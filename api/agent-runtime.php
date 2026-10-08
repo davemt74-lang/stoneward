@@ -111,7 +111,10 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(next song|next track|skip)\b/',$q))return 'player_next';
     if(preg_match('/\b(previous song|previous track|go back a song)\b/',$q))return 'player_previous';
     if(preg_match('/\b(play|listen to)\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'player_play_named';
-    if(preg_match('/recommend|something (dark|quiet|mellow|heavy|similar)|what should i (hear|listen)|play me something/',$q))return 'player_recommend';
+    if(preg_match('/guided (album|release)|listen through .*album|walk me through .*release/',$q))return 'listening_session_guided_release';
+    if(preg_match('/play (?:the )?(?:album|release)|listen to (?:the )?(?:album|release)/',$q))return 'listening_session_release';
+    if(preg_match('/play me something|listening session|keep the music going|give me a .* session|something (dark|quiet|mellow|heavy|warm|driving|acoustic|reflective)/',$q))return 'listening_session_start';
+    if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/album|release| ep |single/',$q))return 'release_browse';
     if(preg_match('/save (?:this |the )?(?:agent )?(?:listening )?session|save (?:these|those) songs/',$q)&&str_contains($q,'playlist'))return 'playlist_save_session';
@@ -136,6 +139,12 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             break;
         case 'player_recommend':
             $track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;
+        case 'listening_session_start':
+            $session=sf_agent_listening_session_create((int)$userId,$message,'mix',$active?:null);$action=['type'=>'start_listening_session','session'=>$session];$text='I built “'.$session['title'].'.” I’ll keep the music moving and adapt as you react.';$profile='recommendation';break;
+        case 'listening_session_release':
+            $session=sf_agent_listening_session_create((int)$userId,$message,'release',$active?:null);$action=['type'=>'start_listening_session','session'=>$session];$text='Starting “'.$session['title'].'” from the beginning.';$profile='catalog';break;
+        case 'listening_session_guided_release':
+            $session=sf_agent_listening_session_create((int)$userId,$message,'guided_release',$active?:null);$action=['type'=>'start_listening_session','session'=>$session];$text='Starting a guided listen to “'.$session['title'].'.” I’ll add context between tracks when it helps.';$profile='catalog';break;
         case 'player_pause':$action=['type'=>'pause_player'];$text='Paused.';break;
         case 'player_next':$action=['type'=>'next_track'];$text='Next track.';break;
         case 'player_previous':$action=['type'=>'previous_track'];$text='Going back one track.';break;
@@ -175,7 +184,10 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0)];
     $criteria=[
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
-        'player_recommend'=>'Asks for a recommendation, a mood, something similar, or something to hear.',
+        'player_recommend'=>'Asks for one recommendation or one next song.',
+        'listening_session_start'=>'Asks for play me something, a mood/theme session, or continuous agent listening.',
+        'listening_session_release'=>'Asks to play through a named album/release.',
+        'listening_session_guided_release'=>'Asks for a guided album/release listening experience with context between tracks.',
         'player_pause'=>'Asks to pause or stop current music playback.',
         'player_next'=>'Asks for the next song or to skip.',
         'player_previous'=>'Asks to go back to the previous song.',
