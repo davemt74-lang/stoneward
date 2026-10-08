@@ -143,7 +143,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'release_browse':$action=['type'=>'open_view','view'=>'releases'];$text='Here are the releases.';$profile='catalog';break;
         case 'playlist_open':$action=['type'=>'open_view','view'=>'account'];$text='Your playlists are in My Stonefellow.';$profile='account';break;
         case 'playlist_create':
-            $ids=sf_agent_playlist_track_ids($message,$active?:null,7);$name=sf_agent_playlist_name($message);$action=['type'=>'create_playlist','name'=>$name,'track_ids'=>$ids,'visibility'=>'private','source_type'=>'agent'];$text='I curated “'.$name.'” and saved it to your playlists.';$profile='recommendation';break;
+            $ids=sf_agent_playlist_track_ids($message,$active?:null,7,$userId);$name=sf_agent_playlist_name($message);$action=['type'=>'create_playlist','name'=>$name,'track_ids'=>$ids,'visibility'=>'private','source_type'=>'agent'];$text='I curated “'.$name.'” and saved it to your playlists.';$profile='recommendation';break;
         case 'playlist_save_session':
             $name=sf_agent_playlist_name($message,'Agent Listening Session');$action=['type'=>'save_agent_session','name'=>$name];$text='I’ll save the recent songs I played for you as “'.$name.'”.';$profile='account';break;
         case 'builder_open':$action=['type'=>'open_view','view'=>'builder'];$text='Let’s build your record.';break;
