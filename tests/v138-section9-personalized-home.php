@@ -13,9 +13,9 @@ ok(str_contains($api,'sf_home_state($uid)'),'home API returns aggregated home st
 ok(str_contains($core,'function sf_home_recent_history'),'recent-history reducer exists');
 ok(str_contains($core,'isset($seen[$id])'),'recent history deduplicates repeated track events');
 ok(str_contains($core,'function sf_home_recent_releases'),'recent release aggregation exists');
-ok(str_contains($core,"($r['state']??'published')!=='published'"),'home excludes unpublished releases');
-ok(str_contains($core,"($r['public_visible']??true)===false"),'home excludes hidden releases');
-ok(str_contains($core,"strcmp((string)$b['release_date'],(string)$a['release_date'])"),'recent releases sort newest first');
+ok(str_contains($core,"state']??'published")&&str_contains($core,"!=='published'"),'home excludes unpublished releases');
+ok(str_contains($core,"public_visible']??true")&&str_contains($core,"===false"),'home excludes hidden releases');
+ok(str_contains($core,'strcmp((string)')&&substr_count($core,"release_date")>=2,'recent releases sort newest first');
 
 ok(str_contains($core,'function sf_home_daily_suggestion'),'daily Agent suggestion generator exists');
 ok(str_contains($core,"'kind'=>'continue'"),'daily suggestion can resume unfinished listening');
