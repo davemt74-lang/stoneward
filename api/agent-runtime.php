@@ -122,7 +122,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/guided (album|release)|listen through .*album|walk me through .*release/',$q))return 'listening_session_guided_release';
     if(preg_match('/play (?:the )?(?:album|release)|listen to (?:the )?(?:album|release)/',$q))return 'listening_session_release';
     if(preg_match('/play me something|listening session|keep the music going|give me a .* session|something (dark|quiet|mellow|heavy|warm|driving|acoustic|reflective)/',$q))return 'listening_session_start';
-    if(preg_match('/what do you suggest today|what.s my suggestion|suggestion for today|what should i do today|today.s suggestion/',$q))return 'home_suggestion';
+    if(preg_match('/what do you suggest today|what.s my suggestion|suggestion for today|what should i (?:do|listen to|hear) today|suggest (?:something|music) today|today.s suggestion/',$q))return 'home_suggestion';
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/album|release| ep |single/',$q))return 'release_browse';
