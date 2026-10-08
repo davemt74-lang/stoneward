@@ -24,6 +24,7 @@ ok(str_contains($core,"'kind'=>'build'"),'daily suggestion can continue a saved 
 ok(str_contains($core,"'kind'=>'favorite_release'"),'daily suggestion can revisit favorite releases');
 ok(str_contains($core,"'kind'=>'release'"),'daily suggestion can surface a recent release');
 ok(str_contains($core,"'kind'=>'catalog'"),'daily suggestion has a catalog fallback');
+ok(substr_count($core,"==='')continue")>=5,'daily suggestion skips malformed rows without actionable IDs');
 ok(str_contains($core,"gmdate('Y-m-d')")&&str_contains($core,'crc32('),'daily suggestion is deterministic for the current UTC day');
 
 ok(str_contains($core,'function sf_home_state'),'personalized home aggregate exists');
@@ -56,6 +57,7 @@ ok(str_contains($app,'Recent releases'),'signed-in home renders recent releases'
 ok(str_contains($app,'Saved builds'),'signed-in home renders saved builds');
 ok(str_contains($app,'id="homeSuggestionAction"'),'signed-in home renders daily Agent suggestion CTA');
 ok(str_contains($app,'id="homeQueueShortcut"'),'signed-in home exposes Up Next count/shortcut');
+ok(str_contains($app,'home-section-copy')&&str_contains($app,'rec.summary'),'home displays recommendation rationale when available');
 
 ok(str_contains($app,"data-home-resume="),'Continue Listening cards preserve resume actions');
 ok(str_contains($app,"data-home-play="),'recent/favorite track cards expose playback');
@@ -68,6 +70,7 @@ ok(str_contains($app,'function homeEmpty'),'all home sections have usable empty 
 ok(str_contains($app,'st.home.loaded=false'),'personalization mutations invalidate cached home state');
 
 ok(str_contains($agent,"return 'home_suggestion'"),'Agent routes requests for today’s suggestion');
+ok(str_contains($agent,'what should i (?:do|listen to|hear) today'),'Agent treats listen-to-today phrasing as the daily home suggestion');
 ok(str_contains($agent,"case 'home_suggestion'"),'Agent policy handles the personalized-home suggestion route');
 ok(str_contains($agent,'sf_home_state((int)$userId)'),'Agent suggestion uses canonical server home state');
 ok(str_contains($agent,"'view'=>'home'"),'Agent suggestion opens the personalized home');
@@ -80,6 +83,7 @@ ok(str_contains($css,'.home-suggestion'),'daily Agent suggestion is styled');
 ok(str_contains($css,'.home-card-grid'),'home media grid is styled');
 ok(str_contains($css,'.home-progress'),'Continue Listening progress is styled');
 ok(str_contains($css,'.home-empty'),'home empty states are styled');
+ok(str_contains($css,'.home-section-copy'),'home recommendation rationale is styled');
 ok(str_contains($css,'@media(max-width:760px)'),'personalized home has responsive mobile rules');
 
 ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.6'"),'Section 9 requires no new database migration');
