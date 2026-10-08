@@ -66,7 +66,7 @@ $recentListeningRows=$pdo->query(
             u.display_name,u.email
      FROM listening_events l
      LEFT JOIN users u ON u.id=l.user_id
-     WHERE l.event_type IN ('start','complete')
+     WHERE l.event_type IN ('start','complete','skip')
      ORDER BY l.id DESC
      LIMIT 12"
 )->fetchAll();
@@ -78,7 +78,7 @@ foreach($recentListeningRows as $row){
     $recentListening[]=$row;
 }
 
-$listening=sf_listening_analytics(30,null);
+$listening=sf_engagement_analytics(30,null);
 
 $recentOrders=[];
 foreach(array_slice($orders,0,8) as $o){
@@ -122,6 +122,15 @@ sf_json_response([
         'completes_30d'=>(int)($listening['completes']??0),
         'listeners_30d'=>(int)($listening['listeners']??0),
         'listen_completion_30d'=>(float)($listening['completion_rate']??0),
+        'listen_skip_30d'=>(float)($listening['skip_rate']??0),
+        'repeat_starts_30d'=>(int)($listening['repeat_starts']??0),
+        'favorites_30d'=>(int)($listening['favorites_added']??0),
+        'playlists_30d'=>(int)($listening['playlists_created']??0),
+        'builds_30d'=>(int)($listening['builds_created']??0),
+        'paid_orders_30d'=>(int)($listening['paid_orders']??0),
+        'purchase_conversion_30d'=>(float)($listening['conversion']['purchase_rate']??0),
+        'custom_media_conversion_30d'=>(float)($listening['conversion']['custom_media_rate']??0),
+        'revenue_30d_cents'=>(int)($listening['revenue_cents']??0),
     ],
     'releases'=>$releases,
     'recent_imports'=>array_slice($imports,0,5),
@@ -134,9 +143,19 @@ sf_json_response([
         'days'=>30,
         'starts'=>(int)($listening['starts']??0),
         'completes'=>(int)($listening['completes']??0),
+        'skips'=>(int)($listening['skips']??0),
         'sessions'=>(int)($listening['sessions']??0),
         'listeners'=>(int)($listening['listeners']??0),
+        'repeat_starts'=>(int)($listening['repeat_starts']??0),
         'completion_rate'=>(float)($listening['completion_rate']??0),
+        'skip_rate'=>(float)($listening['skip_rate']??0),
+        'favorites_added'=>(int)($listening['favorites_added']??0),
+        'playlists_created'=>(int)($listening['playlists_created']??0),
+        'builds_created'=>(int)($listening['builds_created']??0),
+        'paid_orders'=>(int)($listening['paid_orders']??0),
+        'revenue_cents'=>(int)($listening['revenue_cents']??0),
+        'conversion'=>(array)($listening['conversion']??[]),
+        'sources'=>(array)($listening['sources']??[]),
         'tracks'=>array_slice((array)($listening['tracks']??[]),0,8),
         'daily'=>(array)($listening['daily']??[]),
     ],
