@@ -1,0 +1,2 @@
+<?php
+declare(strict_types=1); require __DIR__.'/bootstrap.php'; sf_admin_require_auth(false);$rows=[];foreach(sf_admin_pod_handoffs() as $h)$rows[]=['file'=>$h['_file']??'','order_id'=>$h['order_id']??'','format'=>$h['format']??'','title'=>$h['title']??'','status'=>$h['status']??'','created_at'=>$h['created_at']??'','side_a_seconds'=>$h['sides']['A']['duration']??0,'side_b_seconds'=>$h['sides']['B']['duration']??0];sf_json_response(['ok'=>true,'handoffs'=>$rows]);

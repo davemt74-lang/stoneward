@@ -1,0 +1,1 @@
+window.STONEFELLOW_RELEASES = [];
