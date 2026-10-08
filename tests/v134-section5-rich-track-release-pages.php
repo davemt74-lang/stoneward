@@ -23,5 +23,5 @@ ok(str_contains($js,'release-context'),'release notes and credits surface exists
 ok(str_contains($css,'.track-detail-hero')&&str_contains($css,'.release-detail-hero'),'responsive rich detail hero styles exist');
 ok(str_contains($css,'.credit-grid')&&str_contains($css,'.related-track-grid'),'credit and related-track styles exist');
 ok(str_contains($version,"'rich_media_pages'=>'track-release-artwork-credits-related-agent'"),'version endpoint retains Section 5 rich-media capability');
-ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'Section 5 correctly requires no new database migration');
+ok(str_contains($migrations,"'id'=>'2026-10-08-008'")&&str_contains($migrations,'sf_playlists_ensure_schema'),'Section 5 remains compatible with the pre-Section-6 schema baseline');
 echo "Stonefellow v1.3 Section 5 rich track/release pages audit: PASS\n";

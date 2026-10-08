@@ -27,6 +27,6 @@ ok(str_contains($js,'clearTrackListeningHistory')&&str_contains($js,"action:'cle
 ok(str_contains($js,'clearAllListeningHistory')&&str_contains($js,"action:'clear_all'"),'clear-all privacy control is wired');
 ok(str_contains($js,'drawerOpenHistory')&&str_contains($js,"navigate('history')"),'drawer History tab links to full listening history');
 ok(str_contains($css,'.history-session')&&str_contains($css,'.history-event')&&str_contains($css,'.drawer-history-link'),'history and drawer styles exist');
-ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'Section 3 correctly requires no new schema migration');
+ok(str_contains($migrations,"'id'=>'2026-10-08-008'")&&str_contains($migrations,'sf_playlists_ensure_schema'),'Section 3 remains compatible with the pre-Section-6 schema baseline');
 ok(str_contains($version,"'listening_history'=>'sessions-resume-privacy'"),'version endpoint retains Section 3 listening-history capability');
 echo "Stonefellow v1.3 Section 3 listening history audit: PASS\n";

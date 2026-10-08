@@ -19,7 +19,7 @@ ok(str_contains($api,"public_id")&&str_contains($api,'sf_playlist_get_public'),'
 ok(str_contains($api,'sf_require_user(false,true)'),'playlist writes require authenticated CSRF-protected user');
 ok(str_contains($bootstrap,"require_once __DIR__ . '/playlists-core.php';"),'playlist core loads from application bootstrap');
 ok(str_contains($account,"'playlists'=>sf_playlist_list($"."uid)"),'account payload includes playlists');
-ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'database target remains v1.3.1');
+ok(str_contains($migrations,"'id'=>'2026-10-08-008'")&&str_contains($migrations,'sf_playlists_ensure_schema'),'Section 2 playlist migration remains registered');
 ok(str_contains($migrations,"'id'=>'2026-10-08-008'")&&str_contains($migrations,'sf_playlists_ensure_schema'),'upgrade migration covers playlist schema');
 ok(str_contains($migrations,"'user_playlists','user_playlist_tracks'"),'integrity check requires playlist tables');
 ok(str_contains($agent,"return 'playlist_create'")&&str_contains($agent,"case 'playlist_create'"),'agent playlist-create route and policy exist');

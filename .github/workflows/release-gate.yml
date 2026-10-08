@@ -40,3 +40,4 @@ jobs:
           php tests/v132-section3-listening-history.php
           php tests/v133-section4-personalized-recommendations.php
           php tests/v134-section5-rich-track-release-pages.php
+          php tests/v135-section6-agent-listening-sessions.php

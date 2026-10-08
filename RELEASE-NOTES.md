@@ -1,11 +1,13 @@
-# Stonefellow v1.3.4 — Section 5: Richer Track + Release Pages
+# Stonefellow v1.3.5 — Section 6: Agent Listening Sessions
 
-- Rebuilt track pages around artwork, story, structured credits, lyrics/notes, release context and related tracks.
-- Added songwriter/composer/producer/recording metadata presentation.
-- Added release-artwork fallback when a track has no dedicated artwork.
-- Added Ask About This Song, Buy Digital and Put It on a Record actions directly on track pages.
-- Rebuilt release pages with cover art, release metadata, notes/credits and richer tracklists.
-- Added Play Release and Buy All Digital Tracks.
-- Added direct track-detail and custom-record actions from release tracklists.
-- Reused existing player, cart, favorites, Agent and builder behavior.
-- No database migration required; schema target remains 1.3.1.
+- Added persistent multi-track Agent listening sessions.
+- “Play me something” and mood/theme requests now create a continuing session rather than one track.
+- Added release and guided-release listening modes.
+- Added persistent ordered session progress with skip/complete state.
+- Added Like/Dislike track memory.
+- Like/Dislike feedback now changes future personalized ranking.
+- Added visible active-session controls.
+- Added exact session-to-playlist saving.
+- Completed sessions remain saveable before dismissal.
+- Added `agent_session` playback telemetry source.
+- Added schema migration 009 and integrity checks.

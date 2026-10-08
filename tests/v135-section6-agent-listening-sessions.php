@@ -1,0 +1,45 @@
+<?php
+declare(strict_types=1);
+$root=dirname(__DIR__);
+function ok($v,$m){if(!$v){fwrite(STDERR,"FAIL: $m\n");exit(1);}echo "PASS: $m\n";}
+function src($rel){global $root;return (string)file_get_contents($root.'/'.$rel);}
+$core=src('api/listening-sessions-core.php');$api=src('api/listening-sessions.php');$personal=src('api/personalization-core.php');$agent=src('api/agent-runtime.php');$app=src('assets/js/app.js');$css=src('assets/css/site.css');$mig=src('api/migrations.php');$version=src('version.php');$boot=src('api/bootstrap.php');
+ok(str_contains($boot,"require_once __DIR__ . '/listening-sessions-core.php';"),'listening session core loads from bootstrap');
+ok(str_contains($core,'CREATE TABLE IF NOT EXISTS user_track_feedback'),'track feedback table exists');
+ok(str_contains($core,'CREATE TABLE IF NOT EXISTS agent_listening_sessions'),'listening sessions table exists');
+ok(str_contains($core,'CREATE TABLE IF NOT EXISTS agent_listening_session_tracks'),'ordered session tracks table exists');
+ok(str_contains($core,"PRIMARY KEY(user_id,track_id)"),'track feedback is unique per user/track');
+ok(str_contains($core,"in_array(\$sentiment,['like','dislike','neutral'],true)"),'feedback values are constrained');
+ok(str_contains($core,'function sf_agent_session_plan'),'session planning helper exists');
+ok(str_contains($core,"['mix','release','guided_release']"),'mix/release/guided release modes are supported');
+ok(str_contains($core,'sf_agent_playlist_track_ids'),'mix sessions use personalized agent ranking');
+ok(str_contains($core,'function sf_agent_listening_session_create'),'persistent listening session creation exists');
+ok(str_contains($core,"WHERE user_id=? AND status='active'"),'starting a session closes a prior active session');
+ok(str_contains($core,'function sf_agent_listening_session_advance'),'session advance/skip exists');
+ok(str_contains($core,'function sf_agent_listening_session_feedback'),'session feedback exists');
+ok(str_contains($core,'function sf_agent_listening_session_save_playlist'),'exact session can be saved as a playlist');
+ok(str_contains($api,"action==='start'")&&str_contains($api,"action==='advance'")&&str_contains($api,"action==='feedback'")&&str_contains($api,"action==='end'")&&str_contains($api,"action==='save_playlist'"),'listening session API exposes lifecycle actions');
+ok(str_contains($personal,'sf_track_feedback_map($userId)'),'recommendation profile reads durable feedback');
+ok(str_contains($personal,"if(\$sent==='like')")&&str_contains($personal,"elseif(\$sent==='dislike')"),'like/dislike influences recommendation seed');
+ok(str_contains($personal,"\$feedback==='like'")&&str_contains($personal,"\$feedback==='dislike'"),'like/dislike influences final recommendation rank');
+ok(str_contains($agent,"return 'listening_session_start'"),'play-me-something routes to a session');
+ok(str_contains($agent,"return 'listening_session_release'"),'release listening route exists');
+ok(str_contains($agent,"return 'listening_session_guided_release'"),'guided release listening route exists');
+ok(str_contains($agent,"'type'=>'start_listening_session'"),'agent policy returns a session action');
+ok(str_contains($agent,"'type'=>'save_current_listening_session'"),'agent saves the exact active session when available');
+ok(str_contains($agent,"'type'=>'session_feedback'")&&str_contains($agent,"'type'=>'end_listening_session'"),'natural feedback and end-session Agent actions exist');
+ok(str_contains($app,'function startAgentListeningSession'),'client starts a persistent session queue');
+ok(str_contains($app,'function loadAgentListeningSession')&&str_contains($app,"loadAuth(true).then(()=>loadAgentListeningSession())"),'active Agent session restores after reload');
+ok(str_contains($app,"play(t,0,'agent_session',true)"),'session playback is tagged for telemetry');
+ok(str_contains($app,'function submitSessionFeedback')&&str_contains($app,"$('[data-session-feedback]'"),'client feedback controls bind as a collection');
+ok(str_contains($app,'function saveCurrentAgentSession')&&str_contains($app,'function agentSessionVisible'),'active or completed exact session remains saveable');
+ok(str_contains($app,'function advanceAgentSession'),'client advances persistent session state');
+ok(str_contains($app,'agent_listening_session_id:agentSessionVisible()'),'client sends exact active session identity to the Agent');
+ok(str_contains($app,"st.agentSession.mode==='guided_release'"),'guided sessions provide between-track context');
+ok(str_contains($app,'agent-session-panel'),'visible active-session UI exists');
+ok(str_contains($css,'.agent-session-panel')&&str_contains($css,'.agent-session-actions'),'responsive session UI styles exist');
+ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.5'"),'database schema target advances to 1.3.5');
+ok(str_contains($mig,"'id'=>'2026-10-08-009'")&&str_contains($mig,'sf_listening_sessions_ensure_schema'),'upgrade migration covers listening session schema');
+ok(str_contains($mig,"'user_track_feedback','agent_listening_sessions','agent_listening_session_tracks'"),'integrity check requires listening session tables');
+ok(str_contains($version,"'agent_listening_sessions'=>'persistent-queue-feedback-guided-release-save'"),'version endpoint reports Section 6 capability');
+echo "Stonefellow v1.3 Section 6 Agent listening sessions audit: PASS\n";
