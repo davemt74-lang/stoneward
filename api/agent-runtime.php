@@ -107,6 +107,9 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
 }
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
+    if(preg_match('/\b(end|stop|close) (?:this |the )?(?:listening )?session\b/',$q))return 'listening_session_end';
+    if(preg_match('/\b(i like this|like this|love this|this is good)\b/',$q))return 'listening_session_like';
+    if(preg_match('/\b(i do not like this|i don.t like this|dislike this|not for me|skip this kind)\b/',$q))return 'listening_session_dislike';
     if(preg_match('/\b(pause|stop music|stop song)\b/',$q))return 'player_pause';
     if(preg_match('/\b(next song|next track|skip)\b/',$q))return 'player_next';
     if(preg_match('/\b(previous song|previous track|go back a song)\b/',$q))return 'player_previous';
@@ -154,7 +157,12 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'playlist_create':
             $ids=sf_agent_playlist_track_ids($message,$active?:null,7,$userId);$name=sf_agent_playlist_name($message);$action=['type'=>'create_playlist','name'=>$name,'track_ids'=>$ids,'visibility'=>'private','source_type'=>'agent'];$text='I curated “'.$name.'” and saved it to your playlists.';$profile='recommendation';break;
         case 'playlist_save_session':
-            $name=sf_agent_playlist_name($message,'Agent Listening Session');$action=['type'=>'save_agent_session','name'=>$name];$text='I’ll save the recent songs I played for you as “'.$name.'”.';$profile='account';break;
+            $name=sf_agent_playlist_name($message,'Agent Listening Session');$sessionId=(string)($client['agent_listening_session_id']??'');$action=$sessionId!==''?['type'=>'save_current_listening_session','session_id'=>$sessionId,'name'=>$name]:['type'=>'save_agent_session','name'=>$name];$text=$sessionId!==''?'I’ll save this exact listening session as “'.$name.'”.':'I’ll save the recent songs I played for you as “'.$name.'”.';$profile='account';break;
+        case 'listening_session_like':
+        case 'listening_session_dislike':
+            $sessionId=(string)($client['agent_listening_session_id']??'');if($sessionId!==''&&$active!==''){$sentiment=$route==='listening_session_like'?'like':'dislike';$action=['type'=>'session_feedback','session_id'=>$sessionId,'track_id'=>$active,'sentiment'=>$sentiment];$text=$sentiment==='like'?'Got it. I’ll remember that you like this direction.':'Got it. I’ll steer away from this direction.';$profile='recommendation';}else{$text='Start an Agent listening session first so I can attach that preference to the right track.';}break;
+        case 'listening_session_end':
+            $sessionId=(string)($client['agent_listening_session_id']??'');if($sessionId!==''){$action=['type'=>'end_listening_session','session_id'=>$sessionId];$text='Listening session ended.';}else{$text='There isn’t an active Agent listening session to end.';}break;
         case 'builder_open':$action=['type'=>'open_view','view'=>'builder'];$text='Let’s build your record.';break;
         case 'builder_add':
             if($track){$action=['type'=>'builder_add_track','track_id'=>(string)$track['id']];$text='I’ll add “'.($track['title']??'').'” to the current build.';}
@@ -195,7 +203,10 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'release_browse'=>'Asks to browse albums, EPs, singles, releases, or release pages.',
         'playlist_open'=>'Asks to see or open their playlists.',
         'playlist_create'=>'Asks the agent to create, curate, or build a playlist.',
-        'playlist_save_session'=>'Asks to save the recent agent-curated listening session as a playlist.',
+        'playlist_save_session'=>'Asks to save the current/recent Agent listening session as a playlist.',
+        'listening_session_like'=>'Says they like/love the current session track.',
+        'listening_session_dislike'=>'Says they dislike the current session track or it is not for them.',
+        'listening_session_end'=>'Asks to end/close the active listening session.',
         'track_info'=>'Asks factual questions about a track, lyrics, credits, writers, producers, ISRC, or song story.',
         'knowledge_question'=>'Asks a broader factual/history/meaning question that may require approved knowledge documents.',
         'builder_open'=>'Asks to create, build, or continue a custom record, vinyl, cassette, or mixtape.',
