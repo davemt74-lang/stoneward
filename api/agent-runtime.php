@@ -94,6 +94,11 @@ function sf_agent_recommend_track(string $message,?string $excludeId=null): ?arr
     $rows=[];foreach(sf_catalog() as $t){if($excludeId&&($t['id']??'')===$excludeId)continue;$rows[]=['t'=>$t,'s'=>sf_agent_track_score($t,$message)];}
     usort($rows,fn($a,$b)=>$b['s']<=>$a['s']);return $rows[0]['t']??null;
 }
+function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mix'): string {
+    if(preg_match('/\b(?:called|named)\s+[“"\']?([^”"\']{2,80})[”"\']?/iu',$message,$m))return sf_clean_text(trim((string)$m[1]),80);
+    if(preg_match('/\bplaylist\s+(?:for|about)\s+(.{2,60})$/iu',$message,$m))return sf_clean_text('Stonefellow — '.trim((string)$m[1]),80);
+    return $fallback;
+}
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
     if(preg_match('/\b(pause|stop music|stop song)\b/',$q))return 'player_pause';
@@ -103,6 +108,9 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/recommend|something (dark|quiet|mellow|heavy|similar)|what should i (hear|listen)|play me something/',$q))return 'player_recommend';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/album|release| ep |single/',$q))return 'release_browse';
+    if(preg_match('/save (?:this |the )?(?:agent )?(?:listening )?session|save (?:these|those) songs/',$q)&&str_contains($q,'playlist'))return 'playlist_save_session';
+    if(preg_match('/(?:make|create|build|curate).*playlist|playlist.*(?:make|create|build|curate)/',$q))return 'playlist_create';
+    if(preg_match('/my playlists|show (?:me )?(?:my )?playlists|open playlists/',$q))return 'playlist_open';
     if(preg_match('/make|create|build/',$q)&&preg_match('/record|vinyl|cassette|mixtape/',$q))return 'builder_open';
     if(preg_match('/add .* (record|vinyl|cassette|side [ab])|put .* on/',$q))return 'builder_add';
     if(preg_match('/cart|checkout/',$q))return 'cart_open';
@@ -127,6 +135,11 @@ function sf_agent_policy(string $route,string $message,array $client=[]): array 
         case 'player_previous':$action=['type'=>'previous_track'];$text='Going back one track.';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
         case 'release_browse':$action=['type'=>'open_view','view'=>'releases'];$text='Here are the releases.';$profile='catalog';break;
+        case 'playlist_open':$action=['type'=>'open_view','view'=>'account'];$text='Your playlists are in My Stonefellow.';$profile='account';break;
+        case 'playlist_create':
+            $ids=sf_agent_playlist_track_ids($message,$active?:null,7);$name=sf_agent_playlist_name($message);$action=['type'=>'create_playlist','name'=>$name,'track_ids'=>$ids,'visibility'=>'private','source_type'=>'agent'];$text='I curated “'.$name.'” and saved it to your playlists.';$profile='recommendation';break;
+        case 'playlist_save_session':
+            $name=sf_agent_playlist_name($message,'Agent Listening Session');$action=['type'=>'save_agent_session','name'=>$name];$text='I’ll save the recent songs I played for you as “'.$name.'”.';$profile='account';break;
         case 'builder_open':$action=['type'=>'open_view','view'=>'builder'];$text='Let’s build your record.';break;
         case 'builder_add':
             if($track){$action=['type'=>'builder_add_track','track_id'=>(string)$track['id']];$text='I’ll add “'.($track['title']??'').'” to the current build.';}
@@ -162,6 +175,9 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'player_previous'=>'Asks to go back to the previous song.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
         'release_browse'=>'Asks to browse albums, EPs, singles, releases, or release pages.',
+        'playlist_open'=>'Asks to see or open their playlists.',
+        'playlist_create'=>'Asks the agent to create, curate, or build a playlist.',
+        'playlist_save_session'=>'Asks to save the recent agent-curated listening session as a playlist.',
         'track_info'=>'Asks factual questions about a track, lyrics, credits, writers, producers, ISRC, or song story.',
         'knowledge_question'=>'Asks a broader factual/history/meaning question that may require approved knowledge documents.',
         'builder_open'=>'Asks to create, build, or continue a custom record, vinyl, cassette, or mixtape.',

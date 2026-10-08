@@ -147,3 +147,4 @@ require_once __DIR__ . '/lifecycle.php';
 require_once __DIR__ . '/billing.php';
 require_once __DIR__ . '/operations.php';
 require_once __DIR__ . '/personalization-core.php';
+require_once __DIR__ . '/playlists-core.php';

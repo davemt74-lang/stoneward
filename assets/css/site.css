@@ -131,3 +131,19 @@ body.drawer-open{overflow:hidden}
 .listen-progress{height:3px;background:var(--line);margin-top:7px;overflow:hidden}.listen-progress span{display:block;height:100%;background:var(--accent)}
 .account-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.history-row small{text-transform:capitalize}.continue-row>div:first-child{min-width:0;flex:1}
 @media(max-width:720px){.title-actions{align-items:flex-start}.favorite-control>span{display:none}.release-browser-wrap{grid-template-columns:minmax(0,1fr) 38px}.library-grid{grid-template-columns:1fr}.catalog-row .favorite-control{padding:6px;width:34px;justify-content:center}}
+
+/* v1.3.1 playlists */
+.playlist-module{max-width:980px}
+.playlist-summary{display:flex;flex-wrap:wrap;gap:8px 18px;padding:12px 0 18px;color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--line)}
+.playlist-meta{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+.playlist-meta textarea{min-height:88px;resize:vertical}
+.playlist-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:18px 0}
+.playlist-add select{width:100%;border:1px solid var(--line2);background:#0b0a09;color:var(--ink);padding:11px}
+.playlist-track-list{display:grid;border-top:1px solid var(--line)}
+.playlist-track-row{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:10px 0}
+.playlist-row-actions{display:flex;gap:4px;align-items:center}
+.text-control.compact{padding:6px 8px;min-height:30px;font-size:.62rem}
+.danger-text{color:#d4867d!important}
+.playlist-card{text-align:left}
+.playlist-card span{color:var(--accent);font-size:.6rem;text-transform:uppercase;letter-spacing:.06em}
+@media(max-width:720px){.playlist-track-row{grid-template-columns:36px minmax(0,1fr) auto}.playlist-row-actions{grid-column:2/4;justify-content:flex-start}.playlist-add{grid-template-columns:1fr}.playlist-summary{gap:7px 12px}}

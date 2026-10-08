@@ -1,24 +1,12 @@
-Stonefellow v1.2.2 final release gate
-=====================================
+Stonefellow v1.3.1 Section 2 release gate
+=========================================
 
-PASS: 91 PHP files lint clean
+PASS: 67 runtime PHP files lint clean
 PASS: assets/js/app.js syntax
 PASS: admin/assets/admin.js syntax
-PASS: 14 current regression suites
+PASS: v130-section1-personalization.php
+PASS: v131-playlist-behavior.php
+PASS: v131-section2-playlists.php
+PASS: 68 explicit assertions
 
-PASS: accounts-installer.php
-PASS: admin-core.php
-PASS: ai-providers.php
-PASS: commerce.php
-PASS: player-shell.php
-PASS: v07-agent-tokens-plans.php
-PASS: v08-jev-agent-brain.php
-PASS: v086-admin-auth-view.php
-PASS: v104-current-application.php
-PASS: v104-deployment-path.php
-PASS: v110-customer-lifecycle-billing.php
-PASS: v120-production-operations.php
-PASS: v121-database-upgrade.php
-PASS: v122-dashboard-activity.php
-
-FINAL RELEASE GATE: PASS
+FINAL SECTION 2 RELEASE GATE: PASS — 10/10
