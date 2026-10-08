@@ -28,7 +28,7 @@ ok(str_contains($html,'id="menuQueueLink"'),'signed-in menu exposes Up Next when
 
 ok(str_contains($app,'function loadQueue(')&&str_contains($app,"api('queue.php')"),'queue restores from server');
 ok(str_contains($app,'function renderQueueDrawer'),'queue drawer renderer exists');
-ok(str_contains($app,"$$('[data-queue-play]'")&&str_contains($app,"$$('[data-queue-remove]'")&&str_contains($app,"$$('[data-queue-move]'"),'queue row controls bind as collections');
+ok(str_contains($app,"querySelectorAll('[data-queue-play]')")&&str_contains($app,"querySelectorAll('[data-queue-remove]')")&&str_contains($app,"querySelectorAll('[data-queue-move]')"),'queue row controls bind as collections');
 ok(str_contains($app,'function addTrackToQueue')&&str_contains($app,"placement==='next'?'next':'end'"),'track controls support add and play-next');
 ok(str_contains($app,'function reorderQueueItem'),'client queue reordering is wired');
 ok(str_contains($app,'function clearQueue'),'client clear queue is wired');
@@ -43,7 +43,7 @@ ok(str_contains($app,"if(st.queue.items.length){playNextFromQueue();return}"),'t
 ok(str_contains($app,'loadQueue(true)')&&str_contains($app,'loadAgentListeningSession()'),'queue and Agent session both restore after reload');
 ok(str_contains($app,'queue_count:st.queue.items.length'),'Agent client state includes queue count');
 ok(str_contains($app,'data-queue-placement="next"')&&str_contains($app,'data-queue-placement="end"'),'track page exposes Play Next and Add to Queue');
-ok(str_contains($app,'function bindQueueTrackButtons')&&str_contains($app,'data-queue-track='),'catalog/release surfaces expose queue controls');
+ok(str_contains($app,'function bindQueueTrackButtons')&&str_contains($app,"querySelectorAll('[data-queue-track]')"),'catalog/release surfaces expose collection-safe queue controls');
 
 ok(str_contains($agent,"return 'queue_open'")&&str_contains($agent,"return 'queue_add'"),'Agent routes open/add queue commands');
 ok(str_contains($agent,"return 'queue_play_next'")&&str_contains($agent,"return 'queue_remove'")&&str_contains($agent,"return 'queue_clear'"),'Agent routes play-next/remove/clear commands');
