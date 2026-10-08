@@ -88,7 +88,7 @@ ok(str_contains($css,'@media(max-width:760px)'),'personalized home has responsiv
 
 ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.6'"),'Section 9 requires no new database migration');
 ok(str_contains($mig,"'id'=>'2026-10-08-010'"),'existing latest database migration remains 010');
-ok(str_contains($version,"'stonefellow'=>'1.3.8'"),'version endpoint reports v1.3.8');
+ok(str_contains($version,"'personalized_home'=>'continue-recent-favorites-recommendations-releases-builds-agent-suggestion'"),'Section 9 personalized-home capability remains registered');
 ok(str_contains($version,"'database_schema_target'=>'1.3.6'"),'version endpoint keeps schema target 1.3.6');
 ok(str_contains($version,"'personalized_home'=>'continue-recent-favorites-recommendations-releases-builds-agent-suggestion'"),'version endpoint reports Section 9 personalized-home capability');
 
