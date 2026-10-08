@@ -31,7 +31,7 @@ ok(str_contains($agent,"'type'=>'session_feedback'")&&str_contains($agent,"'type
 ok(str_contains($app,'function startAgentListeningSession'),'client starts a persistent session queue');
 ok(str_contains($app,'function loadAgentListeningSession')&&str_contains($app,'loadAgentListeningSession()'),'active Agent session restore remains wired at startup');
 ok(str_contains($app,"play(t,0,'agent_session',true)"),'session playback is tagged for telemetry');
-ok(str_contains($app,'function submitSessionFeedback')&&str_contains($app,"$('[data-session-feedback]'"),'client feedback controls bind as a collection');
+ok(str_contains($app,'function submitSessionFeedback')&&str_contains($app,"querySelectorAll('[data-session-feedback]')"),'client feedback controls bind as a collection');
 ok(str_contains($app,'function saveCurrentAgentSession')&&str_contains($app,'function agentSessionVisible'),'active or completed exact session remains saveable');
 ok(str_contains($app,'function advanceAgentSession'),'client advances persistent session state');
 ok(str_contains($app,'agent_listening_session_id:agentSessionVisible()'),'client sends exact active session identity to the Agent');
