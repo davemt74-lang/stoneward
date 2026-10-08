@@ -1,25 +1,30 @@
-# Stonefellow v1.3.5 — Section 6: Agent Listening Sessions
+# Stonefellow v1.3.6 — Section 7: Queue / Up Next
 
-Stonefellow v1.3 Section 6 turns one-off recommendations into persistent Agent-guided listening.
+Stonefellow v1.3 Section 7 adds a persistent, user-controlled Up Next queue that is separate from playlists and Agent listening sessions.
 
 ## Included
-- “Play me something” starts a real multi-track Agent listening session.
-- Mood/theme sessions use the same personalized recommendation profile from favorites, history, playlists, and track feedback.
-- Named release listening sessions play a release continuously from beginning to end.
-- Guided release sessions add concise song context between tracks.
-- Session queues have persistent server-side identity and ordered track state.
-- Like/Dislike feedback is durable per user/track and immediately affects future recommendation ranking.
-- Active listening panel exposes current session, position, feedback, Save Playlist, and End controls.
-- Completed sessions remain saveable as exact playlists before dismissal.
-- Session playback uses the existing persistent player and `agent_session` telemetry source.
-- Skip/complete progression is synchronized back to the server.
+- Persistent per-user Up Next queue stored server-side.
+- Add to Queue and Play Next controls on track, catalog, related-track, and release surfaces.
+- Queue drawer with play, remove, move up/down, and clear controls.
+- Queue count in the persistent footer player.
+- Signed-in menu access even when the player is hidden.
+- Manual Next consumes Up Next after active Agent-session and playlist/release contexts.
+- Automatic track completion falls through to Up Next.
+- Queue Previous uses recent local playback history without mutating the server queue backward.
+- Queue restores after reload and survives across authenticated devices.
+- Agent commands can open, add, play next, remove, and clear the same queue.
+- Dedicated `queue` and `queue_history` playback telemetry sources.
+
+## Playback priority
+1. Active Agent listening session
+2. Active playlist/release playback
+3. Up Next queue
+4. Normal catalog stepping
 
 ## Database
-Section 6 advances the database schema target to **1.3.5**.
+Section 7 advances the database schema target to **1.3.6**.
 
-New tables:
-- `user_track_feedback`
-- `agent_listening_sessions`
-- `agent_listening_session_tracks`
+New table:
+- `user_play_queue`
 
-Run `/upgrade.php` after deploying v1.3.5.
+Run `/upgrade.php` after deploying v1.3.6.
