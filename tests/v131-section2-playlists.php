@@ -19,7 +19,7 @@ ok(str_contains($api,"public_id")&&str_contains($api,'sf_playlist_get_public'),'
 ok(str_contains($api,'sf_require_user(false,true)'),'playlist writes require authenticated CSRF-protected user');
 ok(str_contains($bootstrap,"require_once __DIR__ . '/playlists-core.php';"),'playlist core loads from application bootstrap');
 ok(str_contains($account,"'playlists'=>sf_playlist_list($"."uid)"),'account payload includes playlists');
-ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'database target is v1.3.1');
+ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'database target remains v1.3.1');
 ok(str_contains($migrations,"'id'=>'2026-10-08-008'")&&str_contains($migrations,'sf_playlists_ensure_schema'),'upgrade migration covers playlist schema');
 ok(str_contains($migrations,"'user_playlists','user_playlist_tracks'"),'integrity check requires playlist tables');
 ok(str_contains($agent,"return 'playlist_create'")&&str_contains($agent,"case 'playlist_create'"),'agent playlist-create route and policy exist');
@@ -35,5 +35,5 @@ ok(str_contains($js,"st.playlistPlayback.index++")&&str_contains($js,"play(t,0,'
 ok(str_contains($js,"source:st.playSource||'player'")&&str_contains($js,"play(t,0,'agent')"),'agent playback is tagged for session capture');
 ok(str_contains($js,'copyPlaylistLink')&&str_contains($js,"p.visibility==='public'"),'public playlists expose a share-link control');
 ok(str_contains($css,'.playlist-track-row')&&str_contains($css,'.playlist-summary')&&str_contains($css,'.playlist-card'),'playlist responsive styles exist');
-ok(str_contains($version,"'stonefellow'=>'1.3.1'")&&str_contains($version,"'playlists'=>'ordered-public-private-agent'"),'version endpoint reports v1.3 Section 2');
+ok(str_contains($version,"'stonefellow'=>'1.3.2'")&&str_contains($version,"'playlists'=>'ordered-public-private-agent'"),'version endpoint reports v1.3 Section 2');
 echo "Stonefellow v1.3 Section 2 playlists audit: PASS\n";

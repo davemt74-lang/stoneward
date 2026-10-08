@@ -1,16 +1,17 @@
-# Stonefellow v1.3.1 — Section 2: Playlists
+# Stonefellow v1.3.2 — Section 3: Listening History & Resume
 
-Stonefellow v1.3 Section 2 adds persistent user playlists on top of the Section 1 favorites/library/listening foundation.
+Stonefellow v1.3 Section 3 turns the basic Section 1 history into a full customer listening-history experience.
 
 ## Included
-- Create, rename, describe, and delete playlists.
-- Public/private visibility.
-- Add/remove/reorder tracks.
-- Play an entire playlist through the persistent player; Next/Previous and natural end-of-track progression stay inside the playlist.
-- Public playlist URLs for playlists marked public.
-- Stonefellow agent can curate and save a playlist.
-- Recent agent-curated listening sessions can be saved as playlists.
-- Playlist actions appear in user Activity/History.
+- Dedicated full Listening History page.
+- Session grouping with session ID context, source, track, release, event type and timestamp.
+- Summary counts for sessions, unique tracks, starts and completions.
+- Search and event-type filtering.
+- Resume buttons use the current saved listening position when appropriate.
+- Load-earlier pagination.
+- Clear all personal listening history while preserving anonymous aggregate analytics.
+- Remove one track from personal history while preserving anonymous aggregate analytics.
+- Activity drawer History tab now includes recent listening plus normal account activity and links to full history.
 
-## Upgrade
-Upload/extract the code update, then visit `/upgrade.php`. Schema target `1.3.1` adds `user_playlists` and `user_playlist_tracks`.
+## Database
+No new schema is required for Section 3. The database target remains **1.3.1**. Existing listening telemetry and progress tables are reused.

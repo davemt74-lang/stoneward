@@ -1,14 +1,12 @@
-# Stonefellow v1.3.1 — Section 2: Playlists
+# Stonefellow v1.3.2 — Section 3: Listening History & Resume
 
-- Persistent playlists with ordered track membership.
-- Public/private playlist visibility.
-- Playlist editor with metadata, add/remove, and move up/down ordering controls.
-- Play All integrates with the persistent Stonefellow player.
-- Player Next/Previous follows active playlist order.
-- End-of-track advances through the active playlist and stops cleanly at the end.
-- Public playlist sharing URL.
-- Agent route can create a curated playlist from the catalog.
-- Agent-curated playback is tagged in listening telemetry.
-- Recent agent listening can be saved as a playlist.
-- Playlist lifecycle writes to user activity history.
-- Database migration target advanced to 1.3.1.
+- Added dedicated customer Listening History route.
+- Added session grouping and per-session source context.
+- Added listening summary metrics.
+- Added search and event filters.
+- Added resume-from-position controls.
+- Added paginated earlier-history loading.
+- Added per-track privacy clearing.
+- Existing Clear All continues to anonymize listening events instead of deleting aggregate analytics.
+- Activity drawer History tab now surfaces recent listening and links into the full history page.
+- No database migration required; schema target remains 1.3.1.
