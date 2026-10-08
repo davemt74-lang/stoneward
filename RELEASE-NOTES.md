@@ -1,12 +1,12 @@
-# Stonefellow v1.3.2 — Section 3: Listening History & Resume
+# Stonefellow v1.3.3 — Section 4: Personalized Recommendations
 
-- Added dedicated customer Listening History route.
-- Added session grouping and per-session source context.
-- Added listening summary metrics.
-- Added search and event filters.
-- Added resume-from-position controls.
-- Added paginated earlier-history loading.
-- Added per-track privacy clearing.
-- Existing Clear All continues to anonymize listening events instead of deleting aggregate analytics.
-- Activity drawer History tab now surfaces recent listening and links into the full history page.
+- Added listener-specific recommendation profiles.
+- Favorites, listening history, and playlist membership now influence ranking.
+- Added explainable “because of your listening” recommendation reasons.
+- Added Recommended for You to the signed-in home experience and account page.
+- Recommendation playback is tagged separately in listening analytics.
+- Stonefellow Agent recommendations now use the same personalized ranking.
+- Agent-curated playlists now combine the listener profile with the current request.
+- Added deterministic cold-start behavior for users without personalization signals.
+- Fixed multi-row recommendation/resume event binding uncovered during Section 4 audit.
 - No database migration required; schema target remains 1.3.1.

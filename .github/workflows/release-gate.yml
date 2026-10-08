@@ -1,0 +1,41 @@
+name: Stonefellow Release Gate
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: PHP syntax
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' ! -path './storage/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Public JavaScript syntax
+        run: node --check assets/js/app.js
+
+      - name: Admin JavaScript syntax
+        run: node --check admin/assets/admin.js
+
+      - name: v1.3 regression suites
+        run: |
+          set -euo pipefail
+          php tests/v130-section1-personalization.php
+          php tests/v131-playlist-behavior.php
+          php tests/v131-section2-playlists.php
+          php tests/v132-section3-listening-history.php
+          php tests/v133-section4-personalized-recommendations.php

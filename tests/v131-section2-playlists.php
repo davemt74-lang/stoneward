@@ -35,5 +35,5 @@ ok(str_contains($js,"st.playlistPlayback.index++")&&str_contains($js,"play(t,0,'
 ok(str_contains($js,"source:st.playSource||'player'")&&str_contains($js,"play(t,0,'agent')"),'agent playback is tagged for session capture');
 ok(str_contains($js,'copyPlaylistLink')&&str_contains($js,"p.visibility==='public'"),'public playlists expose a share-link control');
 ok(str_contains($css,'.playlist-track-row')&&str_contains($css,'.playlist-summary')&&str_contains($css,'.playlist-card'),'playlist responsive styles exist');
-ok(str_contains($version,"'stonefellow'=>'1.3.2'")&&str_contains($version,"'playlists'=>'ordered-public-private-agent'"),'version endpoint reports v1.3 Section 2');
+ok(str_contains($version,"'playlists'=>'ordered-public-private-agent'"),'version endpoint retains v1.3 Section 2 playlist capability');
 echo "Stonefellow v1.3 Section 2 playlists audit: PASS\n";

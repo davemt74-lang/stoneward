@@ -28,5 +28,5 @@ ok(str_contains($js,"favoriteButton('release'")&&str_contains($js,"favoriteButto
 ok(str_contains($js,'resumeTrack(')&&str_contains($js,'play(t,resumeAt=0'),'Continue Listening resumes saved playback position');
 ok(str_contains($js,'clearListeningHistory')&&str_contains($js,"action:'clear_history'"),'Clear History control is wired');
 ok(str_contains($css,'.favorite-control')&&str_contains($css,'.listen-progress')&&str_contains($css,'.library-grid'),'personalization styles exist');
-ok(str_contains($version,"'stonefellow'=>'1.3.2'")&&str_contains($version,"'personalization'=>'favorites-library-history'"),'version endpoint retains Section 1 personalization on v1.3.2');
+ok(str_contains($version,"'personalization'=>'favorites-library-history'"),'version endpoint retains Section 1 personalization capability');
 echo "Stonefellow v1.3 Section 1 favorites/library/history audit: PASS\n";

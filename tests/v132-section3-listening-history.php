@@ -28,5 +28,5 @@ ok(str_contains($js,'clearAllListeningHistory')&&str_contains($js,"action:'clear
 ok(str_contains($js,'drawerOpenHistory')&&str_contains($js,"navigate('history')"),'drawer History tab links to full listening history');
 ok(str_contains($css,'.history-session')&&str_contains($css,'.history-event')&&str_contains($css,'.drawer-history-link'),'history and drawer styles exist');
 ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'Section 3 correctly requires no new schema migration');
-ok(str_contains($version,"'stonefellow'=>'1.3.2'")&&str_contains($version,"'listening_history'=>'sessions-resume-privacy'"),'version endpoint reports Section 3');
+ok(str_contains($version,"'listening_history'=>'sessions-resume-privacy'"),'version endpoint retains Section 3 listening-history capability');
 echo "Stonefellow v1.3 Section 3 listening history audit: PASS\n";
