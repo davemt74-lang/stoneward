@@ -37,6 +37,7 @@ ok(str_contains($app,"stonefellow.build.draft.id"),'active draft identity persis
 ok(str_contains($app,"items.some(x=>Number(x.id)===activeId)")&&str_contains($app,"localStorage.removeItem('stonefellow.build.draft.id')"),'stale draft identity is cleared across account changes');
 ok(str_contains($app,"data-builder-draft-load")&&str_contains($app,"data-builder-draft-delete"),'builder exposes draft load/delete controls');
 ok(str_contains($app,"st.builderDrafts.activeId?'Update draft':'Save draft'"),'draft save updates an active draft instead of duplicating it');
+ok(str_contains($app,"if(!st.builderDrafts.loaded)await loadBuilderDrafts(true)"),'account draft ownership is reconciled before save');
 
 ok(str_contains($app,'function builderArtworkTiles'),'builder creates artwork tile preview from selected tracks');
 ok(str_contains($app,'builder-art-grid'),'vinyl sleeve preview uses artwork grid');
