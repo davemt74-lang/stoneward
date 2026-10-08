@@ -29,8 +29,8 @@
     `<div class="stats dashboard-primary-stats">
       <div class="stat"><strong>${Number(s.users||0).toLocaleString()}</strong><span>Total users</span></div>
       <div class="stat"><strong>${Number(s.orders||0).toLocaleString()}</strong><span>Total orders</span></div>
-      <div class="stat"><strong>${Number(s.listens_30d||0).toLocaleString()}</strong><span>Listens · 30 days</span></div>
-      <div class="stat"><strong>${Number(s.listen_completion_30d||0)}%</strong><span>Completion · 30 days</span></div>
+      <div class="stat"><strong>${money(s.revenue_30d_cents||0)}</strong><span>Revenue · 30 days</span></div>
+      <div class="stat"><strong>${Number(s.purchase_conversion_30d||0)}%</strong><span>Listener → purchase</span></div>
     </div>
 
     <section class="panel">
