@@ -1,0 +1,94 @@
+name: Build Stonefellow v1.3.7 Deploy
+
+on:
+  push:
+    branches:
+      - package/v137-deploy
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact package branch
+        uses: actions/checkout@v4
+
+      - name: Build deploy package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="Stonefellow-v1.3.7-Deploy"
+          rm -rf "$ROOT" Stonefellow-v1.3.7-Deploy.zip Stonefellow-v1.3.7-Deploy.zip.sha256
+          mkdir -p "$ROOT"
+
+          rsync -a ./ "$ROOT"/ \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='tests/' \
+            --exclude='AUDIT-REPORT.md' \
+            --exclude='TEST-RESULTS.txt' \
+            --exclude='DEPLOY-MANIFEST.txt' \
+            --exclude='config/store.php' \
+            --exclude='assets/js/config.js' \
+            --exclude='assets/js/catalog.js' \
+            --exclude='assets/js/releases.js' \
+            --exclude='Stonefellow-v1.3.7-Deploy/' \
+            --exclude='Stonefellow-v1.3.7-Deploy.zip' \
+            --exclude='Stonefellow-v1.3.7-Deploy.zip.sha256'
+
+          cat > "$ROOT/DEPLOY-MANIFEST.txt" <<'EOF'
+          Stonefellow v1.3.7 Section 8 deploy package
+          Source main commit: f7643ab0af475ddc0d6cd63a56c91193269e41d6
+          Database schema target: 1.3.6
+
+          Deployment:
+          1. Upload the ZIP to the Stonefellow web root.
+          2. Extract over the existing installation.
+          3. /upgrade.php is safe to run; Section 8 adds no new migration.
+          4. Confirm /version.php reports Stonefellow 1.3.7 and database schema target 1.3.6.
+
+          Intentionally preserved / not overwritten:
+          - config/store.php
+          - config/database.php (not tracked in repository)
+          - config/app-secret.php (not tracked in repository)
+          - data/
+          - storage/
+          - assets/js/config.js
+          - assets/js/catalog.js
+          - assets/js/releases.js
+
+          Development-only files excluded:
+          - .github/
+          - tests/
+          - AUDIT-REPORT.md
+          - TEST-RESULTS.txt
+          EOF
+
+          (
+            cd "$ROOT"
+            find . -type f ! -name 'FILE-SHA256SUMS.txt' -print0 | sort -z | xargs -0 sha256sum > FILE-SHA256SUMS.txt
+          )
+
+          zip -qr Stonefellow-v1.3.7-Deploy.zip "$ROOT"
+          sha256sum Stonefellow-v1.3.7-Deploy.zip > Stonefellow-v1.3.7-Deploy.zip.sha256
+          unzip -t Stonefellow-v1.3.7-Deploy.zip
+          test -f "$ROOT/upgrade.php"
+          test -f "$ROOT/api/builds.php"
+          test -f "$ROOT/api/queue.php"
+          test -f "$ROOT/api/listening-sessions.php"
+          test -f "$ROOT/version.php"
+          test ! -e "$ROOT/config/store.php"
+          test ! -e "$ROOT/assets/js/config.js"
+          test ! -e "$ROOT/tests"
+
+      - name: Upload deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stonefellow-v1.3.7-Deploy
+          path: |
+            Stonefellow-v1.3.7-Deploy.zip
+            Stonefellow-v1.3.7-Deploy.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
