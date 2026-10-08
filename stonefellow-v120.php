@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.5');
+define('SF_BUILD', '1.3.6');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -70,6 +70,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
             <span>Signed in</span><strong><?=sf_h((string)$currentUser['display_name'])?></strong>
           </div>
           <a href="?view=account" data-view="account" id="menuAccount">My account</a>
+          <a href="#" id="menuQueueLink">Up Next</a>
 <?php if(($currentUser['role']??'')==='admin'): ?>
           <a href="admin/" id="menuAdmin">Admin</a>
 <?php endif; ?>
@@ -119,6 +120,16 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
     <section id="dynamicCanvas" class="dynamic-canvas" aria-live="polite"></section>
   </main>
 
+  <div id="queueBackdrop" class="drawer-backdrop queue-backdrop" hidden></div>
+  <aside id="queueDrawer" class="queue-drawer" hidden aria-label="Up Next queue">
+    <div class="queue-drawer-head">
+      <div><span class="drawer-kicker">STONEFELLOW</span><h2>Up Next</h2></div>
+      <button id="queueClose" type="button" aria-label="Close Up Next queue">×</button>
+    </div>
+    <div class="queue-drawer-tools"><span id="queueDrawerCount">0 tracks</span><button id="queueClear" type="button">Clear queue</button></div>
+    <div id="queueContent" class="queue-content"><p class="drawer-empty">Your queue is empty.</p></div>
+  </aside>
+
   <footer class="chat-footer">
     <div id="footerPlayer" class="footer-player" hidden aria-label="Music player">
       <button id="playerArtwork" class="player-artwork" type="button" aria-label="View current song"><span>SF</span></button>
@@ -129,6 +140,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button id="playerPrev" class="player-icon" type="button" aria-label="Previous song">‹</button>
       <button id="playerToggle" class="player-toggle" type="button" aria-label="Play">▶</button>
       <button id="playerNext" class="player-icon" type="button" aria-label="Next song">›</button>
+      <button id="playerQueueButton" class="player-queue-button" type="button" aria-label="Open Up Next queue" aria-expanded="false">Queue <span id="playerQueueCount">0</span></button>
       <div class="player-timeline">
         <span id="playerCurrent">0:00</span>
         <input id="playerSeek" type="range" min="0" max="1000" value="0" aria-label="Song position">

@@ -1,13 +1,12 @@
-# Stonefellow v1.3.5 — Section 6: Agent Listening Sessions
+# Stonefellow v1.3.6 — Section 7: Queue / Up Next
 
-- Added persistent multi-track Agent listening sessions.
-- “Play me something” and mood/theme requests now create a continuing session rather than one track.
-- Added release and guided-release listening modes.
-- Added persistent ordered session progress with skip/complete state.
-- Added Like/Dislike track memory.
-- Like/Dislike feedback now changes future personalized ranking.
-- Added visible active-session controls.
-- Added exact session-to-playlist saving.
-- Completed sessions remain saveable before dismissal.
-- Added `agent_session` playback telemetry source.
-- Added schema migration 009 and integrity checks.
+- Added persistent server-side Up Next queue.
+- Added Play Next and Add to Queue controls across listening surfaces.
+- Added queue drawer with exact-item play, remove, reorder, and clear.
+- Added footer queue count and signed-in menu access.
+- Added reload restoration.
+- Queue playback integrates after Agent sessions and playlist/release playback.
+- Added local queue playback history for Previous.
+- Added Agent commands for open/add/play-next/remove/clear.
+- Added migration 010 and schema integrity coverage.
+- Database target advances to 1.3.6.

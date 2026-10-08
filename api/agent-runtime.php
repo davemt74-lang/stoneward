@@ -107,6 +107,11 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
 }
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
+    if(preg_match('/\b(clear|empty) (?:the )?(?:queue|up next)\b/',$q))return 'queue_clear';
+    if(preg_match('/\b(show|open|what.s in|what is in) (?:the )?(?:queue|up next)\b/',$q))return 'queue_open';
+    if(preg_match('/\b(remove|delete) .* (?:from|off) (?:the )?(?:queue|up next)\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'queue_remove';
+    if(preg_match('/\b(play|put|queue) .* next\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'queue_play_next';
+    if(preg_match('/\b(add|queue|put) .* (?:to|on) (?:the )?(?:queue|up next)\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'queue_add';
     if(preg_match('/\b(end|stop|close) (?:this |the )?(?:listening )?session\b/',$q))return 'listening_session_end';
     if(preg_match('/\b(i like this|like this|love this|this is good)\b/',$q))return 'listening_session_like';
     if(preg_match('/\b(i do not like this|i don.t like this|dislike this|not for me|skip this kind)\b/',$q))return 'listening_session_dislike';
@@ -148,6 +153,14 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             $session=sf_agent_listening_session_create((int)$userId,$message,'release',$active?:null);$action=['type'=>'start_listening_session','session'=>$session];$text='Starting “'.$session['title'].'” from the beginning.';$profile='catalog';break;
         case 'listening_session_guided_release':
             $session=sf_agent_listening_session_create((int)$userId,$message,'guided_release',$active?:null);$action=['type'=>'start_listening_session','session'=>$session];$text='Starting a guided listen to “'.$session['title'].'.” I’ll add context between tracks when it helps.';$profile='catalog';break;
+        case 'queue_open':$action=['type'=>'open_queue'];$text='Here’s your Up Next queue.';break;
+        case 'queue_clear':$action=['type'=>'queue_clear'];$text='I cleared your Up Next queue.';break;
+        case 'queue_add':
+        case 'queue_play_next':
+        case 'queue_remove':
+            if($track){$type=$route==='queue_add'?'queue_add_track':($route==='queue_play_next'?'queue_play_next':'queue_remove_track');$action=['type'=>$type,'track_id'=>(string)$track['id']];$text=$route==='queue_add'?'Added “'.($track['title']??'').'” to Up Next.':($route==='queue_play_next'?'“'.($track['title']??'').'” will play next.':'Removed “'.($track['title']??'').'” from Up Next.');}
+            else{$action=['type'=>'open_queue'];$text='Open Up Next and choose the track you want.';}
+            break;
         case 'player_pause':$action=['type'=>'pause_player'];$text='Paused.';break;
         case 'player_next':$action=['type'=>'next_track'];$text='Next track.';break;
         case 'player_previous':$action=['type'=>'previous_track'];$text='Going back one track.';break;
@@ -189,7 +202,7 @@ function sf_jev_endpoint(string $url): string {
 function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $d=sf_ai_resolve_decision();if(!$d)return null;$url=sf_jev_endpoint((string)($d['endpoint_url']??''));if($url==='')return null;
     $model=trim((string)($d['model']??''))?:'typesafe/jev-1.13';
-    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0)];
+    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'queue_count'=>(int)($client['queue_count']??0)];
     $criteria=[
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
         'player_recommend'=>'Asks for one recommendation or one next song.',
@@ -199,6 +212,11 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'player_pause'=>'Asks to pause or stop current music playback.',
         'player_next'=>'Asks for the next song or to skip.',
         'player_previous'=>'Asks to go back to the previous song.',
+        'queue_open'=>'Asks to show/open the Up Next queue.',
+        'queue_add'=>'Asks to add a named/current track to the end of Up Next.',
+        'queue_play_next'=>'Asks to make a named/current track play next.',
+        'queue_remove'=>'Asks to remove a named/current track from Up Next.',
+        'queue_clear'=>'Asks to clear the Up Next queue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
         'release_browse'=>'Asks to browse albums, EPs, singles, releases, or release pages.',
         'playlist_open'=>'Asks to see or open their playlists.',

@@ -1,7 +1,7 @@
-Stonefellow v1.3.5 Section 6 release gate
+Stonefellow v1.3.6 Section 7 release gate
 =========================================
 
-PASS: 77 PHP files lint clean
+PASS: 80 PHP files lint clean
 PASS: assets/js/app.js syntax
 PASS: admin/assets/admin.js syntax
 PASS: v130-section1-personalization.php
@@ -11,8 +11,9 @@ PASS: v132-section3-listening-history.php
 PASS: v133-section4-personalized-recommendations.php
 PASS: v134-section5-rich-track-release-pages.php
 PASS: v135-section6-agent-listening-sessions.php
-PASS: 171 explicit assertions
+PASS: v136-section7-queue-up-next.php
+PASS: 219 explicit assertions
 PASS: GitHub push release gate
 PASS: GitHub pull-request release gate
 
-FINAL SECTION 6 RELEASE GATE: PASS — 10/10
+FINAL SECTION 7 RELEASE GATE: PASS — 10/10

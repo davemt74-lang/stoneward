@@ -1,43 +1,45 @@
-# Stonefellow v1.3.5 — Section 6 Agent Listening Sessions Audit
+# Stonefellow v1.3.6 — Section 7 Queue / Up Next Audit
 
-## 1. Session orchestration — 10/10
-- “Play me something” routes to a multi-track session.
-- Mood/theme prompts reuse personalized Agent ranking.
-- Session identity and ordered tracks are persisted server-side.
-- Completion and skip advancement update persistent state.
+## 1. Persistence and ordering — 10/10
+- Queue is persisted per authenticated user.
+- Each track appears at most once per user.
+- Ordered positions are normalized after remove/take/pop operations.
+- Reorder requires exact current queue membership.
 
-## 2. Release listening — 10/10
-- Named releases can be played continuously.
-- Guided release mode uses the release track order.
-- Guided mode adds concise between-track context without interrupting playback controls.
+## 2. Queue operations — 10/10
+- Add to end and Play Next are distinct operations.
+- Exact queue items can be played and removed.
+- Queue head can be atomically popped for automatic progression.
+- Clear is authenticated and CSRF protected.
 
-## 3. Preference learning — 10/10
-- Like/Dislike is durable per user and track.
-- Feedback is constrained to like/dislike/neutral.
-- Likes raise future affinity.
-- Dislikes strongly suppress future recommendation rank.
-- Feedback is attached to exact session tracks for auditability.
+## 3. Playback integration — 10/10
+- Active Agent sessions retain highest playback priority.
+- Playlist/release playback remains intact until its current context ends.
+- Up Next then becomes the next playback source.
+- Queue Previous uses local playback history and does not reinsert/mutate server order.
 
-## 4. Customer controls — 10/10
-- Active session panel shows session name and current queue position.
-- Like, Dislike, Save Playlist, and End actions are available.
-- Multi-button feedback binding is collection-safe.
-- Completed sessions remain visible long enough to save.
+## 4. Customer experience — 10/10
+- Footer exposes Queue and live count while player is visible.
+- Signed-in menu exposes Up Next when no player is visible.
+- Drawer supports play, remove, reorder, and clear.
+- Track pages expose Play Next and Add to Queue.
+- Catalog, related tracks, and release tracklists expose queue actions.
+- Queue restores after reload.
 
-## 5. Playlist and telemetry integration — 10/10
-- Saving uses the exact persistent session queue.
-- Saved sessions use the existing playlist model.
-- Session playback uses the existing persistent player.
-- Listening telemetry is tagged `agent_session`.
+## 5. Agent integration — 10/10
+- Agent can open Up Next.
+- Agent can add a track, put a track next, remove a track, or clear the queue.
+- Agent receives queue count in client state.
+- Agent actions use the same queue API as direct user controls.
 
 ## 6. Data lifecycle — 10/10
-- New tables use user/session foreign keys and cascading cleanup.
-- Upgrade migration 009 creates the schema.
-- Integrity checks require all three Section 6 tables.
-- Database target advances to 1.3.5.
+- Migration 010 creates `user_play_queue`.
+- User deletion cascades queue cleanup.
+- Integrity checks require the queue table.
+- Database target advances to 1.3.6.
 
 ## 7. Compatibility — 10/10
-- Existing favorites, playlists, history, resume, recommendations, cart, builder, and rich media pages remain intact.
-- The reusable release gate now runs Sections 1–6.
+- Agent listening sessions, playlists, release playback, history, resume, recommendations, cart, builder, and rich media pages remain intact.
+- Release gate now runs Sections 1–7.
 
-The final gate result is recorded in `TEST-RESULTS.txt`.
+The final measured gate is recorded in `TEST-RESULTS.txt`.
