@@ -20,7 +20,7 @@ ok(str_contains($js,'function recommendationCard(')&&str_contains($js,'Recommend
 ok(str_contains($js,"play(t,0,'recommendation')"),'recommendation playback has its own telemetry source');
 ok(str_contains($js,'RECOMMENDED FOR YOU'),'account surfaces recommendations');
 ok(str_contains($js,"['home','music','releases','track','release','account']"),'home preloads authenticated personalization');
-ok(str_contains($js,"$$('[data-recommend-play]'"),'recommendation card controls bind as a collection');
+ok(str_contains($js,"querySelectorAll('[data-recommend-play]')")&&str_contains($js,"querySelectorAll('[data-resume-track]')"),'recommendation and resume controls bind as collections');
 ok(str_contains($css,'.recommendation-grid')&&str_contains($css,'.recommendation-card'),'responsive recommendation styles exist');
 ok(str_contains($version,"'stonefellow'=>'1.3.3'")&&str_contains($version,"'recommendations'=>'favorites-listening-playlists-agent'"),'version endpoint reports Section 4');
 ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'Section 4 correctly requires no new database migration');
