@@ -1,12 +1,11 @@
-# Stonefellow v1.3.3 — Section 4: Personalized Recommendations
+# Stonefellow v1.3.4 — Section 5: Richer Track + Release Pages
 
-- Added listener-specific recommendation profiles.
-- Favorites, listening history, and playlist membership now influence ranking.
-- Added explainable “because of your listening” recommendation reasons.
-- Added Recommended for You to the signed-in home experience and account page.
-- Recommendation playback is tagged separately in listening analytics.
-- Stonefellow Agent recommendations now use the same personalized ranking.
-- Agent-curated playlists now combine the listener profile with the current request.
-- Added deterministic cold-start behavior for users without personalization signals.
-- Fixed multi-row recommendation/resume event binding uncovered during Section 4 audit.
+- Rebuilt track pages around artwork, story, structured credits, lyrics/notes, release context and related tracks.
+- Added songwriter/composer/producer/recording metadata presentation.
+- Added release-artwork fallback when a track has no dedicated artwork.
+- Added Ask About This Song, Buy Digital and Put It on a Record actions directly on track pages.
+- Rebuilt release pages with cover art, release metadata, notes/credits and richer tracklists.
+- Added Play Release and Buy All Digital Tracks.
+- Added direct track-detail and custom-record actions from release tracklists.
+- Reused existing player, cart, favorites, Agent and builder behavior.
 - No database migration required; schema target remains 1.3.1.

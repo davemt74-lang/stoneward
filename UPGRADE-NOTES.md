@@ -1,7 +1,7 @@
-# Upgrade to Stonefellow v1.3.3 Section 4
+# Upgrade to Stonefellow v1.3.4 Section 5
 
 Upload/extract the update over the existing installation.
 
-No new database migration is required for Section 4. `/upgrade.php` should continue to report database schema **1.3.1 current** after the Section 2 playlist migration has been applied.
+No new database migration is required for Section 5. `/upgrade.php` should continue to report database schema **1.3.1 current**.
 
-Existing favorites, playlists, listening history, resume state, account data, purchases, and analytics are preserved.
+Existing catalog metadata, releases, favorites, playlists, listening history, recommendations, purchases and custom builds are preserved.
