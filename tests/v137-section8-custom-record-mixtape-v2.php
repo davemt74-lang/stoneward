@@ -75,7 +75,7 @@ ok(str_contains($html,'id="menuAccount"')&&str_contains($html,'id="menuQueueLink
 
 ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.6'"),'Section 8 requires no new database migration');
 ok(str_contains($mig,"'id'=>'2026-10-08-010'"),'existing latest migration remains 010');
-ok(str_contains($version,"'stonefellow'=>'1.3.7'"),'version endpoint reports v1.3.7');
+ok(str_contains($version,"'custom_media_builder_v2'=>'drag-drop-drafts-personalized-fill-sequence-review'"),'Section 8 builder-v2 capability remains registered');
 ok(str_contains($version,"'database_schema_target'=>'1.3.6'"),'version endpoint keeps schema target 1.3.6');
 ok(str_contains($version,"'custom_media_builder_v2'=>'drag-drop-drafts-personalized-fill-sequence-review'"),'version endpoint reports builder-v2 capability');
 

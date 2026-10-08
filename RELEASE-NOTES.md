@@ -1,15 +1,14 @@
-# Stonefellow v1.3.7 — Section 8: Custom Record / Mixtape v2
+# Stonefellow v1.3.8 — Section 9: Personalized Home
 
-- Upgraded the existing custom vinyl/cassette builder to v4 state.
-- Added accurate cross-side drag-and-drop insertion.
-- Added live remaining-time and over-limit guidance.
-- Added duplicate warnings and cleanup.
-- Added personalized side/build completion.
-- Added account-backed saved drafts.
-- Added richer sleeve/cassette visual previews.
-- Added exact Side A/B sequence review in cart and checkout.
-- Added Agent move/fill/dedupe/save controls.
-- Preserved server-side custom-media validation and the existing order/POD pipeline.
-- Fixed public UI collection bindings that could call `.forEach()` on a single-element selector.
-- Tightened the signed-in dropdown menu so account/admin/logout/version links remain visible.
+- Rebuilt the signed-in home screen as a personalized listening workspace.
+- Added Continue Listening with exact resume position.
+- Added deduplicated Recently Played.
+- Added Favorites, personalized recommendations, recent releases, and saved custom-media drafts.
+- Added daily Agent suggestion with deterministic per-day selection from actionable user context.
+- Added Up Next count/shortcut.
+- Added robust empty states for new or low-activity accounts.
+- Added Agent routing for today’s suggestion and listen-today phrasing.
+- Added current home suggestion fields to Agent/JEV client state.
+- Added malformed-source guards so daily suggestions never point at missing track/release/build IDs.
+- Guest home remains unchanged.
 - No database migration; schema target remains 1.3.6.

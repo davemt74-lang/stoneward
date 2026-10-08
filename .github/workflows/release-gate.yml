@@ -43,3 +43,4 @@ jobs:
           php tests/v135-section6-agent-listening-sessions.php
           php tests/v136-section7-queue-up-next.php
           php tests/v137-section8-custom-record-mixtape-v2.php
+          php tests/v138-section9-personalized-home.php

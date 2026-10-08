@@ -122,6 +122,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/guided (album|release)|listen through .*album|walk me through .*release/',$q))return 'listening_session_guided_release';
     if(preg_match('/play (?:the )?(?:album|release)|listen to (?:the )?(?:album|release)/',$q))return 'listening_session_release';
     if(preg_match('/play me something|listening session|keep the music going|give me a .* session|something (dark|quiet|mellow|heavy|warm|driving|acoustic|reflective)/',$q))return 'listening_session_start';
+    if(preg_match('/what do you suggest today|what.s my suggestion|suggestion for today|what should i (?:do|listen to|hear) today|suggest (?:something|music) today|today.s suggestion/',$q))return 'home_suggestion';
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/album|release| ep |single/',$q))return 'release_browse';
@@ -152,6 +153,10 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             break;
         case 'player_recommend':
             $track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;
+        case 'home_suggestion':
+            if((int)$userId>0){$home=sf_home_state((int)$userId);$suggestion=(array)($home['suggestion']??[]);$action=['type'=>'open_view','view'=>'home'];$text=(string)($suggestion['title']??'I left you a suggestion on your home page.');if(!empty($suggestion['text']))$text.=' '.(string)$suggestion['text'];$profile='recommendation';}
+            else{$action=['type'=>'open_view','view'=>'home'];$text='Open your Stonefellow home and I’ll give you a suggestion for today.';}
+            break;
         case 'listening_session_start':
             $session=sf_agent_listening_session_create((int)$userId,$message,'mix',$active?:null);$action=['type'=>'start_listening_session','session'=>$session];$text='I built “'.$session['title'].'.” I’ll keep the music moving and adapt as you react.';$profile='recommendation';break;
         case 'listening_session_release':
@@ -219,10 +224,11 @@ function sf_jev_endpoint(string $url): string {
 function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $d=sf_ai_resolve_decision();if(!$d)return null;$url=sf_jev_endpoint((string)($d['endpoint_url']??''));if($url==='')return null;
     $model=trim((string)($d['model']??''))?:'typesafe/jev-1.13';
-    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0)];
+    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??'')];
     $criteria=[
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
         'player_recommend'=>'Asks for one recommendation or one next song.',
+        'home_suggestion'=>'Asks for today’s personalized Stonefellow home suggestion or what the Agent suggests today.',
         'listening_session_start'=>'Asks for play me something, a mood/theme session, or continuous agent listening.',
         'listening_session_release'=>'Asks to play through a named album/release.',
         'listening_session_guided_release'=>'Asks for a guided album/release listening experience with context between tracks.',
