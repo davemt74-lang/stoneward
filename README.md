@@ -1,32 +1,24 @@
-# Stonefellow v1.3.8 — Section 9: Personalized Home
+# Stonefellow v1.3.9 — Section 10: Admin Listening & Conversion Analytics
 
-Stonefellow v1.3 Section 9 turns the signed-in home screen into the central listening and creation workspace.
+Stonefellow v1.3 Section 10 turns the existing listening dashboard into an audience, retention, and commerce analytics workspace.
 
 ## Included
-- **Continue Listening** with exact resume positions and progress.
-- **Recently Played** with repeated events collapsed to the latest occurrence per track.
-- **Favorites** combining saved tracks and releases.
-- **Recommended for You** using the existing favorites/listening/playlists/feedback profile.
-- **Recent Releases** ordered newest first and filtered to published, public releases.
-- **Saved Builds** linking directly back into the exact custom vinyl/cassette draft.
-- **Agent Suggestion** for the day, selected from resume opportunities, recommendations, drafts, favorites, and recent releases.
-- **Up Next** count and shortcut on the home header.
-- Empty states that lead somewhere useful when a section has no data.
-- Agent routing for “what do you suggest today?” and “what should I listen to today?”
-- The Agent receives the currently displayed home suggestion in its client context.
-- Existing guest home remains simple and Agent-first.
+- Explicit skip telemetry when a listener changes tracks before natural completion.
+- Overall starts, completions, skips, repeat starts, sessions, listeners, and playback sources.
+- Completion, skip, and repeat rates.
+- Favorites added, playlists created, saved builds, paid orders, revenue, and custom-media orders.
+- Listener conversion funnel from listening into favorites, playlists, saved builds, purchases, and custom media.
+- Per-track starts, repeat starts, completion rate, skip rate, favorites, digital purchases, and custom-build use.
+- Per-user listening, repeat behavior, completion/skip rates, favorites, playlists, builds, orders, and revenue.
+- Per-user inspector combining listening history, engagement activity, current favorites/playlists/builds, orders, and Agent Brain.
+- Main admin dashboard now surfaces revenue, listener→purchase conversion, skip rate, repeat listening, favorites, and custom-media conversion.
+- Existing recent users, recent purchases, activity, and Agent Brain dashboard feeds remain intact.
 
-## Architecture
-Section 9 does not create a second personalization model. The home API aggregates the canonical systems already built in Sections 1–8:
-
-- personalization / favorites / listening history
-- recommendations and feedback
-- saved custom-media builds
-- release metadata
-- Up Next
+## Conversion definition
+For authenticated listeners, conversion metrics count actions that occur at or after that user's first listening activity inside the selected analytics window. This makes the funnel a practical listening→engagement / listening→commerce measure rather than a raw account total.
 
 ## Database
-No new database migration is required.
+No new migration is required. Section 10 uses the existing listening, favorites, playlist, saved-build, user, and order data.
 
-Application: **1.3.8**  
+Application: **1.3.9**
 Database schema target: **1.3.6**

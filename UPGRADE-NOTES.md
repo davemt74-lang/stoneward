@@ -1,9 +1,9 @@
-# Upgrade to Stonefellow v1.3.8 Section 9
+# Upgrade to Stonefellow v1.3.9 Section 10
 
 Upload/extract the application update over the existing installation.
 
-**No new database migration is required for Section 9.** The database schema target remains **1.3.6**.
+**No new database migration is required for Section 10.** The database schema target remains **1.3.6**.
 
-Running `/upgrade.php` remains safe; an already-current v1.3.6 database should report no new Section 9 migration.
+Section 10 reads the existing listening, favorites, playlist, saved-build, user, and order data. Skip events use the existing `listening_events.event_type` column.
 
-Existing users, favorites, listening history, playlists, recommendations, feedback, Agent sessions, Up Next queues, saved builds, releases, purchases, library records, and custom-media orders are preserved.
+Running `/upgrade.php` remains safe and should report no new Section 10 migration on an already-current v1.3.6 database.

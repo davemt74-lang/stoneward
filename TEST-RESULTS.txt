@@ -1,9 +1,10 @@
-Stonefellow v1.3.8 Section 9 release gate
-=========================================
+Stonefellow v1.3.9 Section 10 release gate
+==========================================
 
-PASS: 84 PHP files lint clean
+PASS: 86 PHP files lint clean
 PASS: assets/js/app.js syntax
 PASS: admin/assets/admin.js syntax
+PASS: admin/assets/analytics.js syntax
 PASS: v130-section1-personalization.php
 PASS: v131-playlist-behavior.php
 PASS: v131-section2-playlists.php
@@ -14,8 +15,9 @@ PASS: v135-section6-agent-listening-sessions.php
 PASS: v136-section7-queue-up-next.php
 PASS: v137-section8-custom-record-mixtape-v2.php
 PASS: v138-section9-personalized-home.php
-PASS: 360 explicit assertions
+PASS: v139-section10-admin-listening-conversion-analytics.php
+PASS: 432 explicit assertions
 PASS: GitHub push release gate
 PASS: GitHub pull-request release gate
 
-FINAL SECTION 9 RELEASE GATE: PASS — 10/10
+FINAL SECTION 10 RELEASE GATE: PASS — 10/10

@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.8');
+define('SF_ADMIN_BUILD','1.3.9');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -38,7 +38,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="ai"><span>11</span>AI Providers</button>
         <button type="button" data-view="brain"><span>12</span>Agent Brain</button>
         <button type="button" data-view="customer"><span>13</span>Customer Lifecycle</button>
-        <button type="button" data-view="analytics"><span>14</span>Listening Analytics</button>
+        <button type="button" data-view="analytics"><span>14</span>Listening + Conversion</button>
         <button type="button" data-view="operations"><span>15</span>Operations</button>
         <button type="button" data-view="settings"><span>16</span>Settings</button>
       </nav>
@@ -67,6 +67,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   </div>
 
   <input id="folderInput" type="file" webkitdirectory directory multiple accept=".mp3,.wav,.wave,audio/mpeg,audio/wav" hidden>
+  <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
 </body>
 </html>

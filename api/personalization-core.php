@@ -30,7 +30,7 @@ function sf_personalization_favorites(int $userId): array {
     return $out;
 }
 function sf_personalization_record_progress(int $userId,string $trackId,string $eventType,int $position,int $duration): void {
-    sf_personalization_ensure_schema();if($userId<1||!isset(sf_track_map()[$trackId]))return;$position=max(0,$position);$duration=max(0,$duration);$completed=$eventType==='complete'?1:0;$now=gmdate('c');$driver=(string)(sf_db_config()['driver']??'');
+    sf_personalization_ensure_schema();if($userId<1||!isset(sf_track_map()[$trackId]))return;$position=max(0,$position);$duration=max(0,$duration);$completed=in_array($eventType,['complete','skip'],true)?1:0;$now=gmdate('c');$driver=(string)(sf_db_config()['driver']??'');
     if($driver==='sqlite')$sql="INSERT INTO user_listening_progress(user_id,track_id,position_seconds,duration_seconds,completed,last_event_type,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET position_seconds=excluded.position_seconds,duration_seconds=CASE WHEN excluded.duration_seconds>0 THEN excluded.duration_seconds ELSE user_listening_progress.duration_seconds END,completed=excluded.completed,last_event_type=excluded.last_event_type,updated_at=excluded.updated_at";
     else $sql="INSERT INTO user_listening_progress(user_id,track_id,position_seconds,duration_seconds,completed,last_event_type,updated_at) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE position_seconds=VALUES(position_seconds),duration_seconds=IF(VALUES(duration_seconds)>0,VALUES(duration_seconds),duration_seconds),completed=VALUES(completed),last_event_type=VALUES(last_event_type),updated_at=VALUES(updated_at)";
     sf_db()->prepare($sql)->execute([$userId,$trackId,$position,$duration,$completed,$eventType,$now]);
@@ -41,7 +41,7 @@ function sf_personalization_continue_listening(int $userId,int $limit=12): array
     return $out;
 }
 function sf_personalization_history(int $userId,int $limit=80): array {
-    sf_ops_ensure_schema();$limit=max(1,min(200,$limit));$q=sf_db()->prepare("SELECT id,track_id,event_type,position_seconds,duration_seconds,source,created_at FROM listening_events WHERE user_id=? AND event_type IN ('start','resume','pause','complete') ORDER BY id DESC LIMIT ".$limit);$q->execute([$userId]);$tracks=sf_track_map();$out=[];
+    sf_ops_ensure_schema();$limit=max(1,min(200,$limit));$q=sf_db()->prepare("SELECT id,track_id,event_type,position_seconds,duration_seconds,source,created_at FROM listening_events WHERE user_id=? AND event_type IN ('start','resume','pause','complete','skip') ORDER BY id DESC LIMIT ".$limit);$q->execute([$userId]);$tracks=sf_track_map();$out=[];
     foreach($q->fetchAll() as $r){$id=(string)$r['track_id'];$t=$tracks[$id]??null;if(!$t)continue;$out[]=['id'=>(int)$r['id'],'track_id'=>$id,'title'=>$t['title']??$id,'release'=>$t['release']??'','artwork'=>$t['artwork']??'','event_type'=>$r['event_type'],'position_seconds'=>(int)$r['position_seconds'],'duration_seconds'=>(int)$r['duration_seconds'],'created_at'=>$r['created_at']];}
     return $out;
 }
