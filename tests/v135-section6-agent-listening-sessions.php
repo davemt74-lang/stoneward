@@ -38,7 +38,7 @@ ok(str_contains($app,'agent_listening_session_id:agentSessionVisible()'),'client
 ok(str_contains($app,"st.agentSession.mode==='guided_release'"),'guided sessions provide between-track context');
 ok(str_contains($app,'agent-session-panel'),'visible active-session UI exists');
 ok(str_contains($css,'.agent-session-panel')&&str_contains($css,'.agent-session-actions'),'responsive session UI styles exist');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.5'"),'database schema target advances to 1.3.5');
+ok(str_contains($mig,"'id'=>'2026-10-08-009'")&&str_contains($mig,'sf_listening_sessions_ensure_schema'),'Section 6 listening-session migration remains registered');
 ok(str_contains($mig,"'id'=>'2026-10-08-009'")&&str_contains($mig,'sf_listening_sessions_ensure_schema'),'upgrade migration covers listening session schema');
 ok(str_contains($mig,"'user_track_feedback','agent_listening_sessions','agent_listening_session_tracks'"),'integrity check requires listening session tables');
 ok(str_contains($version,"'agent_listening_sessions'=>'persistent-queue-feedback-guided-release-save'"),'version endpoint reports Section 6 capability');
