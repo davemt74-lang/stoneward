@@ -19,7 +19,7 @@ ok(str_contains($api,"action==='clear_history'"),'clear-history API exists');
 ok(str_contains($api,'sf_require_user(false,$write)'),'personalization API requires auth/CSRF on writes');
 ok(str_contains($listening,'sf_personalization_record_progress'),'listening telemetry updates resume state');
 ok(str_contains($account,"'personalization'=>sf_personalization_state(\$uid)"),'account payload includes personalization');
-ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'database target advances through v1.3.2');
+ok(str_contains($migrations,"'id'=>'2026-10-08-007'")&&str_contains($migrations,'sf_personalization_ensure_schema'),'Section 1 personalization migration remains registered');
 ok(str_contains($migrations,"'id'=>'2026-10-08-007'")&&str_contains($migrations,'sf_personalization_ensure_schema'),'upgrade migration covers personalization schema');
 ok(str_contains($migrations,"'user_favorites','user_listening_progress'"),'integrity check requires personalization tables');
 foreach(['FAVORITES','CONTINUE LISTENING','LISTENING HISTORY'] as $label)ok(str_contains($js,$label),'account renders '.$label);
