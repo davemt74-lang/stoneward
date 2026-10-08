@@ -90,8 +90,14 @@ function sf_agent_track_score(array $t,string $message): int {
     foreach(array_filter(preg_split('/[^a-z0-9]+/',$q)?:[],fn($w)=>strlen($w)>2) as $w)if(str_contains($hay,$w))$score+=2;
     $energy=(int)($t['energy']??3);if(preg_match('/quiet|mellow|soft|calm|reflective/',$q)&&$energy<=2)$score+=8;if(preg_match('/dark|heavy|loud|electric|intense/',$q)&&$energy>=4)$score+=8;if(preg_match('/drive|road|driving/',$q)&&str_contains($hay,'driv'))$score+=8;return $score;
 }
-function sf_agent_recommend_track(string $message,?string $excludeId=null): ?array {
-    $rows=[];foreach(sf_catalog() as $t){if($excludeId&&($t['id']??'')===$excludeId)continue;$rows[]=['t'=>$t,'s'=>sf_agent_track_score($t,$message)];}
+function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $userId=null): ?array {
+    $catalog=sf_catalog();$exclude=$excludeId?[$excludeId]:[];
+    if($userId&&function_exists('sf_personalization_recommendation_profile')){
+        $profile=sf_personalization_recommendation_profile($userId);$ranked=sf_personalization_rank_catalog($catalog,$profile,20,$exclude);
+        $rows=[];foreach($ranked as $r){$t=null;foreach($catalog as $candidate)if((string)($candidate['id']??'')===(string)$r['track_id']){$t=$candidate;break;}if(!$t)continue;$rows[]=['t'=>$t,'s'=>(float)$r['score']+sf_agent_track_score($t,$message)*4];}
+        if($rows){usort($rows,fn($a,$b)=>$b['s']<=>$a['s']);return $rows[0]['t']??null;}
+    }
+    $rows=[];foreach($catalog as $t){if($excludeId&&($t['id']??'')===$excludeId)continue;$rows[]=['t'=>$t,'s'=>sf_agent_track_score($t,$message)];}
     usort($rows,fn($a,$b)=>$b['s']<=>$a['s']);return $rows[0]['t']??null;
 }
 function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mix'): string {
@@ -121,15 +127,15 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/knowledge|notes?|document|history|why did|what does|meaning/',$q))return 'knowledge_question';
     return 'general_conversation';
 }
-function sf_agent_policy(string $route,string $message,array $client=[]): array {
+function sf_agent_policy(string $route,string $message,array $client=[],?int $userId=null): array {
     $active=(string)($client['active_track_id']??'');$track=sf_agent_find_track($message,$active);$action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
         case 'player_play_named':
             if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='Playing “'.($track['title']??'').'.”';}
-            else {$route='player_recommend';$track=sf_agent_recommend_track($message,$active);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}}
+            else {$route='player_recommend';$track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}}
             break;
         case 'player_recommend':
-            $track=sf_agent_recommend_track($message,$active);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;
+            $track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;
         case 'player_pause':$action=['type'=>'pause_player'];$text='Paused.';break;
         case 'player_next':$action=['type'=>'next_track'];$text='Next track.';break;
         case 'player_previous':$action=['type'=>'previous_track'];$text='Going back one track.';break;
@@ -220,7 +226,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     if($isAdmin||sf_can_use_ai($user,128)['ok']){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
-    $route=(string)($jev['route']??sf_agent_local_route($message,$client));$plan=sf_agent_policy($route,$message,$client);
+    $route=(string)($jev['route']??sf_agent_local_route($message,$client));$plan=sf_agent_policy($route,$message,$client,$userId);
     sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$jev['run_id']??'','status'=>$jev['status']??($routeSource==='local'?'local_fallback':'error'),'input_tokens'=>$jev['input_tokens']??0,'output_tokens'=>$jev['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action']]);
     if(!$plan['needs_llm']){
         $text=$plan['text']!==''?$plan['text']:'Ready.';
