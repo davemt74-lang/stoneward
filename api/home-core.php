@@ -14,8 +14,8 @@ function sf_home_recent_releases(int $limit=4): array {
     $limit=max(1,min(12,$limit));$rows=[];
     foreach(sf_release_rows() as $r){
         if(($r['state']??'published')!=='published'||($r['public_visible']??true)===false)continue;
-        $art=$r['artwork']??[];$rows[]=[
-            'id'=>(string)($r['id']??''),
+        $id=(string)($r['id']??'');if($id==='')continue;$art=$r['artwork']??[];$rows[]=[
+            'id'=>$id,
             'title'=>(string)($r['title']??'Untitled release'),
             'type'=>(string)($r['type']??'release'),
             'release_date'=>(string)($r['release_date']??''),
@@ -34,20 +34,20 @@ function sf_home_recent_releases(int $limit=4): array {
 function sf_home_daily_suggestion(int $userId,array $personalization,array $savedBuilds,array $recentReleases): array {
     $pool=[];$continue=(array)($personalization['continue_listening']??[]);
     foreach(array_slice($continue,0,3) as $row){
-        $pool[]=['kind'=>'continue','eyebrow'=>'PICK UP WHERE YOU LEFT OFF','title'=>'Continue “'.(string)($row['title']??'this track').'”','text'=>'You stopped partway through this one. I can pick it up from the same spot.','action'=>['type'=>'resume_track','track_id'=>(string)($row['track_id']??''),'position_seconds'=>(int)($row['position_seconds']??0)],'button'=>'Resume'];
+        if((string)($row['track_id']??'')==='')continue;$pool[]=['kind'=>'continue','eyebrow'=>'PICK UP WHERE YOU LEFT OFF','title'=>'Continue “'.(string)($row['title']??'this track').'”','text'=>'You stopped partway through this one. I can pick it up from the same spot.','action'=>['type'=>'resume_track','track_id'=>(string)($row['track_id']??''),'position_seconds'=>(int)($row['position_seconds']??0)],'button'=>'Resume'];
     }
     foreach(array_slice((array)($personalization['recommendations']['items']??[]),0,4) as $row){
-        $reason=(string)(($row['reasons'][0]??'Based on your Stonefellow listening profile.'));
+        if((string)($row['track_id']??'')==='')continue;$reason=(string)(($row['reasons'][0]??'Based on your Stonefellow listening profile.'));
         $pool[]=['kind'=>'recommendation','eyebrow'=>'AGENT PICK','title'=>'Try “'.(string)($row['title']??'this track').'”','text'=>$reason,'action'=>['type'=>'play_track','track_id'=>(string)($row['track_id']??'')],'button'=>'Play'];
     }
     foreach(array_slice($savedBuilds,0,2) as $row){
-        $pool[]=['kind'=>'build','eyebrow'=>'FINISH SOMETHING','title'=>'Keep building “'.(string)($row['name']??'your custom record').'”','text'=>'Your saved custom-media draft is ready when you are.','action'=>['type'=>'open_build','build_id'=>(int)($row['id']??0)],'button'=>'Open draft'];
+        if((int)($row['id']??0)<1)continue;$pool[]=['kind'=>'build','eyebrow'=>'FINISH SOMETHING','title'=>'Keep building “'.(string)($row['name']??'your custom record').'”','text'=>'Your saved custom-media draft is ready when you are.','action'=>['type'=>'open_build','build_id'=>(int)($row['id']??0)],'button'=>'Open draft'];
     }
     foreach(array_slice((array)($personalization['favorites']['releases']??[]),0,2) as $row){
-        $pool[]=['kind'=>'favorite_release','eyebrow'=>'FROM YOUR FAVORITES','title'=>'Return to “'.(string)($row['title']??'this release').'”','text'=>'A release you saved is worth another pass.','action'=>['type'=>'open_release','release_id'=>(string)($row['id']??'')],'button'=>'Open release'];
+        if((string)($row['id']??'')==='')continue;$pool[]=['kind'=>'favorite_release','eyebrow'=>'FROM YOUR FAVORITES','title'=>'Return to “'.(string)($row['title']??'this release').'”','text'=>'A release you saved is worth another pass.','action'=>['type'=>'open_release','release_id'=>(string)($row['id']??'')],'button'=>'Open release'];
     }
     foreach(array_slice($recentReleases,0,2) as $row){
-        $pool[]=['kind'=>'release','eyebrow'=>'RECENT RELEASE','title'=>'Explore “'.(string)($row['title']??'this release').'”','text'=>'One of the latest Stonefellow releases is ready to explore.','action'=>['type'=>'open_release','release_id'=>(string)($row['id']??'')],'button'=>'Explore'];
+        if((string)($row['id']??'')==='')continue;$pool[]=['kind'=>'release','eyebrow'=>'RECENT RELEASE','title'=>'Explore “'.(string)($row['title']??'this release').'”','text'=>'One of the latest Stonefellow releases is ready to explore.','action'=>['type'=>'open_release','release_id'=>(string)($row['id']??'')],'button'=>'Explore'];
     }
     if(!$pool)return ['kind'=>'catalog','eyebrow'=>'AGENT SUGGESTION','title'=>'Start somewhere new','text'=>'Explore the Stonefellow catalog and I’ll learn what you come back to.','action'=>['type'=>'open_view','view'=>'music'],'button'=>'Browse music'];
     $seed=abs((int)crc32($userId.'|'.gmdate('Y-m-d').'|'.count($pool)));return $pool[$seed%count($pool)];
