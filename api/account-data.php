@@ -34,7 +34,19 @@ function sf_account_normalize_build(array $raw): array {
             if(count($sides[$side])>=30) break;
         }
     }
-    return ['version'=>3,'format'=>$format,'title'=>$title,'theme'=>$theme,'A'=>$sides['A'],'B'=>$sides['B'],'savedAt'=>gmdate('c')];
+    return ['version'=>4,'format'=>$format,'title'=>$title,'theme'=>$theme,'A'=>$sides['A'],'B'=>$sides['B'],'savedAt'=>gmdate('c')];
+}
+
+function sf_account_build_fill_suggestions(int $userId,array $raw,string $side='both'): array {
+    $build=sf_account_normalize_build($raw);$cfg=sf_store_config();$limit=(int)($cfg['limits'][$build['format']]??0);if($limit<1)throw new RuntimeException('Unsupported build format.');
+    $side=in_array($side,['A','B','both'],true)?$side:'both';$map=sf_track_map();$used=array_fill_keys(array_merge($build['A'],$build['B']),true);$profile=sf_personalization_recommendation_profile($userId);
+    $ranked=sf_personalization_rank_catalog(sf_catalog(),$profile,60,array_keys($used));$ordered=[];
+    foreach($ranked as $r){$id=(string)($r['track_id']??'');$t=$map[$id]??null;if(!$t||empty($t['podEligible']))continue;$ordered[]=$id;}
+    foreach(sf_catalog() as $t){$id=(string)($t['id']??'');if($id===''||isset($used[$id])||empty($t['podEligible'])||in_array($id,$ordered,true))continue;$ordered[]=$id;}
+    $duration=function(array $ids)use($map): int {$sum=0;foreach($ids as $id)$sum+=(int)($map[$id]['duration']??0);return $sum;};
+    $sides=['A'=>$build['A'],'B'=>$build['B']];$targets=$side==='both'?['A','B']:[$side];$added=['A'=>[],'B'=>[]];
+    foreach($targets as $target){$remain=max(0,$limit-$duration($sides[$target]));foreach($ordered as $k=>$id){if(isset($used[$id]))continue;$dur=(int)($map[$id]['duration']??0);if($dur<1||$dur>$remain)continue;$sides[$target][]=$id;$added[$target][]=$id;$used[$id]=true;$remain-=$dur;if($remain<30)break;}}
+    return ['build'=>['version'=>4,'format'=>$build['format'],'title'=>$build['title'],'theme'=>$build['theme'],'A'=>$sides['A'],'B'=>$sides['B'],'savedAt'=>gmdate('c')],'added'=>$added,'limit_seconds'=>$limit,'personalized'=>(bool)($profile['personalized']??false)];
 }
 
 function sf_account_saved_builds(int $userId): array {
