@@ -70,6 +70,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
             <span>Signed in</span><strong><?=sf_h((string)$currentUser['display_name'])?></strong>
           </div>
           <a href="?view=account" data-view="account" id="menuAccount">My account</a>
+          <a href="#" id="menuQueueLink">Up Next</a>
 <?php if(($currentUser['role']??'')==='admin'): ?>
           <a href="admin/" id="menuAdmin">Admin</a>
 <?php endif; ?>
