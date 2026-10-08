@@ -58,7 +58,7 @@ ok(str_contains($agent,"return 'builder_fill'"),'Agent routes finish/fill comman
 ok(str_contains($agent,"return 'builder_dedupe'"),'Agent routes duplicate cleanup');
 ok(str_contains($agent,"return 'builder_save'"),'Agent routes draft save');
 ok(str_contains($agent,"'type'=>'builder_move_track'"),'Agent emits move-track action');
-ok(str_contains($agent,"if(in_array($side,['A','B'],true))$action['side']=$side"),'Agent honors requested Side A/B when adding a track');
+ok(str_contains($agent,"if(in_array(\$side,['A','B'],true))")&&str_contains($agent,"\$action['side']=\$side"),'Agent honors requested Side A/B when adding a track');
 ok(str_contains($agent,"'type'=>'builder_fill'"),'Agent emits personalized fill action');
 ok(str_contains($agent,"'type'=>'builder_dedupe'")&&str_contains($agent,"'type'=>'builder_save'"),'Agent emits dedupe/save actions');
 ok(str_contains($app,"case'builder_move_track'")&&str_contains($app,"case'builder_fill'"),'client executes Agent move/fill');
