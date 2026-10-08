@@ -183,7 +183,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             $sessionId=(string)($client['agent_listening_session_id']??'');if($sessionId!==''){$action=['type'=>'end_listening_session','session_id'=>$sessionId];$text='Listening session ended.';}else{$text='There isn’t an active Agent listening session to end.';}break;
         case 'builder_open':$action=['type'=>'open_view','view'=>'builder'];$text='Let’s build your record.';break;
         case 'builder_add':
-            if($track){$action=['type'=>'builder_add_track','track_id'=>(string)$track['id']];$text='I’ll add “'.($track['title']??'').'” to the current build.';}
+            $side=preg_match('/side\s*([ab])/i',$message,$m)?strtoupper((string)$m[1]):'';
+            if($track){$action=['type'=>'builder_add_track','track_id'=>(string)$track['id']];if(in_array($side,['A','B'],true))$action['side']=$side;$text='I’ll add “'.($track['title']??'').'”'.($side!==''?' to Side '.$side:' to the current build').'.';}
             else {$action=['type'=>'open_view','view'=>'builder'];$text='Open the builder and tell me which track you want to add.';}
             break;
         case 'builder_move':
