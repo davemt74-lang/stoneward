@@ -14,6 +14,7 @@ ok(str_contains($core,'function sf_agent_session_plan'),'session planning helper
 ok(str_contains($core,"['mix','release','guided_release']"),'mix/release/guided release modes are supported');
 ok(str_contains($core,'sf_agent_playlist_track_ids'),'mix sessions use personalized agent ranking');
 ok(str_contains($core,'function sf_agent_listening_session_create'),'persistent listening session creation exists');
+ok(str_contains($core,"WHERE user_id=? AND status='active'"),'starting a session closes a prior active session');
 ok(str_contains($core,'function sf_agent_listening_session_advance'),'session advance/skip exists');
 ok(str_contains($core,'function sf_agent_listening_session_feedback'),'session feedback exists');
 ok(str_contains($core,'function sf_agent_listening_session_save_playlist'),'exact session can be saved as a playlist');
@@ -25,11 +26,14 @@ ok(str_contains($agent,"return 'listening_session_start'"),'play-me-something ro
 ok(str_contains($agent,"return 'listening_session_release'"),'release listening route exists');
 ok(str_contains($agent,"return 'listening_session_guided_release'"),'guided release listening route exists');
 ok(str_contains($agent,"'type'=>'start_listening_session'"),'agent policy returns a session action');
+ok(str_contains($agent,"'type'=>'save_current_listening_session'"),'agent saves the exact active session when available');
+ok(str_contains($agent,"'type'=>'session_feedback'")&&str_contains($agent,"'type'=>'end_listening_session'"),'natural feedback and end-session Agent actions exist');
 ok(str_contains($app,'function startAgentListeningSession'),'client starts a persistent session queue');
 ok(str_contains($app,"play(t,0,'agent_session',true)"),'session playback is tagged for telemetry');
 ok(str_contains($app,'function submitSessionFeedback')&&str_contains($app,"$('[data-session-feedback]'"),'client feedback controls bind as a collection');
 ok(str_contains($app,'function saveCurrentAgentSession')&&str_contains($app,'function agentSessionVisible'),'active or completed exact session remains saveable');
 ok(str_contains($app,'function advanceAgentSession'),'client advances persistent session state');
+ok(str_contains($app,'agent_listening_session_id:agentSessionVisible()'),'client sends exact active session identity to the Agent');
 ok(str_contains($app,"st.agentSession.mode==='guided_release'"),'guided sessions provide between-track context');
 ok(str_contains($app,'agent-session-panel'),'visible active-session UI exists');
 ok(str_contains($css,'.agent-session-panel')&&str_contains($css,'.agent-session-actions'),'responsive session UI styles exist');
