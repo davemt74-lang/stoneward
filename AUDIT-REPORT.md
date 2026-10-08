@@ -1,65 +1,44 @@
-# Stonefellow v1.3.1 — Section 2 Playlists Audit
+# Stonefellow v1.3.2 — Section 3 Listening History & Resume Audit
 
-## 1. Playlist persistence — 10/10
-- Dedicated `user_playlists` and `user_playlist_tracks` tables.
-- Ordered membership is stored independently from catalog records.
-- Playlist deletion cascades to membership rows.
-- Track IDs are validated against the current Stonefellow catalog.
-- Playlist names/descriptions are bounded and sanitized.
+## 1. Full listening history — 10/10
+- Dedicated authenticated Listening History page.
+- Stable event-ID pagination.
+- Track, release, event type, source, timestamp and session context.
+- Session-grouped display with search and event filtering.
 
-## 2. Ownership and privacy — 10/10
-- Every write path requires an authenticated customer and CSRF protection.
-- Edit/delete/add/remove/reorder operations verify playlist ownership.
-- Visibility is constrained to `private` or `public`.
-- Public reads expose only playlists explicitly marked public.
-- Private playlists cannot be fetched through the public route.
+## 2. Resume behavior — 10/10
+- History rows join against the current saved progress state.
+- Resume appears only when a meaningful unfinished position exists.
+- Resume uses the same persistent Stonefellow player and telemetry path.
 
-## 3. Playlist editing — 10/10
-- Create / rename / describe / delete.
-- Add and remove tracks.
-- Reorder tracks with exact-current-membership validation to reject stale reorder payloads.
-- Duplicate track occurrences are permitted as independent playlist items.
-- Updated timestamps are refreshed on edits.
+## 3. Privacy controls — 10/10
+- Clear All anonymizes `listening_events.user_id` instead of deleting aggregate analytics.
+- Clear All removes personal progress and personal listen activity rows.
+- Per-track clearing anonymizes only that track's listening events and removes its resume position.
+- Unknown track IDs are rejected.
 
-## 4. Playback — 10/10
-- Play All enters a playlist-aware persistent-player context.
-- Player Next/Previous uses playlist order while a playlist is active.
-- End-of-track automatically advances through the playlist.
-- End of playlist exits playlist playback cleanly.
-- Selecting ordinary catalog playback exits the playlist context instead of leaving a stale queue behind.
+## 4. Session context — 10/10
+- History API returns session key, source and per-event timestamps.
+- Client groups events into listening sessions.
+- Summary includes sessions, unique tracks, starts and completions.
 
-## 5. Public sharing — 10/10
-- Public playlists have a stable share URL using the normal Stonefellow route.
-- Logged-out visitors can load public playlists.
-- Private playlists return not found through the public endpoint.
-- Public playlist pages remain playable without granting edit controls.
+## 5. Activity drawer integration — 10/10
+- Notifications payload includes a recent listening preview.
+- History tab separates Recent Listening from Account Activity.
+- Drawer provides direct access to full Listening History.
 
-## 6. Agent playlist orchestration — 10/10
-- Local and JEV route vocabularies include playlist open/create/save-session intents.
-- Agent playlist creation uses catalog-scored deterministic track IDs.
-- The browser executes only the structured allowlisted `create_playlist` / `save_agent_session` actions.
-- Agent-started playback is tagged `source=agent` in listening telemetry.
-- Recent agent-curated listening can be persisted as a playlist.
-
-## 7. Account / activity integration — 10/10
-- My Stonefellow includes playlist cards, counts, duration, visibility and source.
-- Playlist lifecycle events are written to user activity/history.
-- Create Playlist and Save Agent Session controls are available from the account.
-- Playlist routes coexist with Favorites, Continue Listening and Listening History.
-
-## 8. Upgrade lifecycle — 10/10
-- Schema target advances to `1.3.1`.
-- Migration `2026-10-08-008` creates playlist tables.
-- Final integrity verification requires both playlist tables.
-- The change is additive and preserves existing accounts, favorites, telemetry, orders and billing.
+## 6. Existing feature compatibility — 10/10
+- Favorites/Library/Continue Listening remain intact.
+- Playlist playback and agent source tagging remain intact.
+- Admin listening analytics continue using the same aggregate telemetry.
+- No new schema is required; target remains 1.3.1.
 
 ## Validation
-- 67 runtime PHP files lint clean.
+- 68 runtime PHP files lint clean.
 - Public JavaScript syntax: PASS.
 - Admin JavaScript syntax: PASS.
-- 3 current v1.3 regression suites: PASS.
-- 68 explicit PASS assertions.
-- Pure-function playlist behavior checks: PASS.
+- 4 current v1.3 regression suites: PASS.
+- 93 explicit PASS assertions.
 
 ## Environment limitation
-This build environment has PDO core but no SQLite/MySQL PDO driver. Schema execution itself must be accepted on the installed Stonefellow server through `/upgrade.php`.
+The build container has PDO core but no SQLite/MySQL PDO driver. Live database acceptance remains the installed Stonefellow server.

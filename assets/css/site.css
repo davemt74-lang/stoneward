@@ -147,3 +147,19 @@ body.drawer-open{overflow:hidden}
 .playlist-card{text-align:left}
 .playlist-card span{color:var(--accent);font-size:.6rem;text-transform:uppercase;letter-spacing:.06em}
 @media(max-width:720px){.playlist-track-row{grid-template-columns:36px minmax(0,1fr) auto}.playlist-row-actions{grid-column:2/4;justify-content:flex-start}.playlist-add{grid-template-columns:1fr}.playlist-summary{gap:7px 12px}}
+
+/* v1.3.2 full listening history */
+.listening-history-module{max-width:1040px}
+.history-summary{margin:18px 0}
+.history-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:8px;margin:18px 0}
+.history-toolbar input,.history-toolbar select{width:100%;border:1px solid var(--line2);background:#0b0a09;color:var(--ink);padding:11px;font:inherit}
+.history-session{border:1px solid var(--line);margin:10px 0;background:#0d0c0a}
+.history-session[hidden]{display:none!important}
+.history-session-head{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 14px;border-bottom:1px solid var(--line);background:#11100d}
+.history-session-head strong{display:block;font-family:Georgia,serif;font-weight:400}.history-session-head small,.history-session-head>span{color:var(--muted);font-size:.62rem}
+.history-event{display:grid;grid-template-columns:38px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.history-event:last-child{border-bottom:0}.history-event[hidden]{display:none!important}
+.history-event-main strong{display:block;font-size:.78rem}.history-event-main small{display:block;color:var(--muted);font-size:.62rem;margin-top:3px}.history-event time{color:#716b62;font-size:.6rem;white-space:nowrap}
+.drawer-section-title{padding:15px 4px 7px;color:var(--accent);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+.drawer-history-link{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--accent);text-align:left;padding:12px 4px;font-size:.66rem}
+@media(max-width:720px){.history-toolbar{grid-template-columns:1fr}.history-event{grid-template-columns:36px minmax(0,1fr)}.history-event time,.history-event>[data-history-clear-track]{grid-column:2}.history-session-head{align-items:flex-start}}

@@ -1,12 +1,13 @@
-Stonefellow v1.3.1 Section 2 release gate
+Stonefellow v1.3.2 Section 3 release gate
 =========================================
 
-PASS: 67 runtime PHP files lint clean
+PASS: 68 runtime PHP files lint clean
 PASS: assets/js/app.js syntax
 PASS: admin/assets/admin.js syntax
 PASS: v130-section1-personalization.php
 PASS: v131-playlist-behavior.php
 PASS: v131-section2-playlists.php
-PASS: 68 explicit assertions
+PASS: v132-section3-listening-history.php
+PASS: 93 explicit assertions
 
-FINAL SECTION 2 RELEASE GATE: PASS — 10/10
+FINAL SECTION 3 RELEASE GATE: PASS — 10/10
