@@ -50,7 +50,7 @@ function sf_personalization_clear_history(int $userId): array {
 }
 
 function sf_personalization_recommendation_profile(int $userId): array {
-    sf_personalization_ensure_schema();sf_ops_ensure_schema();sf_playlists_ensure_schema();
+    sf_personalization_ensure_schema();sf_ops_ensure_schema();sf_playlists_ensure_schema();sf_listening_sessions_ensure_schema();
     $tracks=sf_track_map();$seed=[];$moods=[];$themes=[];$releases=[];$seen=[];$favoriteTrackIds=[];$favoriteReleaseIds=[];$favoriteCount=0;$listenCount=0;$playlistCount=0;$energyWeight=0.0;$energyTotal=0.0;
     $q=sf_db()->prepare('SELECT item_type,item_id FROM user_favorites WHERE user_id=?');$q->execute([$userId]);
     foreach($q->fetchAll() as $r){
@@ -61,6 +61,12 @@ function sf_personalization_recommendation_profile(int $userId): array {
     $q=sf_db()->prepare("SELECT track_id,COUNT(*) AS events,SUM(CASE WHEN event_type='complete' THEN 5 WHEN event_type='resume' THEN 3 WHEN event_type='start' THEN 2 WHEN event_type='pause' THEN 1 ELSE 0 END) AS affinity FROM listening_events WHERE user_id=? AND event_type IN ('start','resume','pause','complete') GROUP BY track_id");
     $q->execute([$userId]);
     foreach($q->fetchAll() as $r){$id=(string)$r['track_id'];if(!isset($tracks[$id]))continue;$events=(int)$r['events'];$affinity=min(24,max(0,(int)$r['affinity']));$seen[$id]=$events;$seed[$id]=($seed[$id]??0)+$affinity;$listenCount+=$events;}
+    $feedback=sf_track_feedback_map($userId);
+    foreach($feedback as $id=>$row){
+        if(!isset($tracks[$id]))continue;$sent=(string)($row['sentiment']??'');
+        if($sent==='like')$seed[$id]=($seed[$id]??0)+16;
+        elseif($sent==='dislike')$seed[$id]=($seed[$id]??0)-40;
+    }
     $q=sf_db()->prepare('SELECT upt.track_id,COUNT(*) AS uses FROM user_playlist_tracks upt INNER JOIN user_playlists p ON p.id=upt.playlist_id WHERE p.user_id=? GROUP BY upt.track_id');$q->execute([$userId]);
     foreach($q->fetchAll() as $r){$id=(string)$r['track_id'];if(!isset($tracks[$id]))continue;$uses=max(1,(int)$r['uses']);$seed[$id]=($seed[$id]??0)+min(12,$uses*4);$playlistCount+=$uses;}
     foreach($seed as $id=>$weight){
@@ -74,7 +80,7 @@ function sf_personalization_recommendation_profile(int $userId): array {
     return [
         'personalized'=>$signalCount>0,'signal_count'=>$signalCount,'favorite_count'=>$favoriteCount,'listening_event_count'=>$listenCount,'playlist_track_count'=>$playlistCount,
         'seed_scores'=>$seed,'seen_counts'=>$seen,'favorite_track_ids'=>$favoriteTrackIds,'favorite_release_ids'=>$favoriteReleaseIds,
-        'moods'=>$moods,'themes'=>$themes,'releases'=>$releases,'preferred_energy'=>$energyTotal>0?round($energyWeight/$energyTotal,2):null,
+        'moods'=>$moods,'themes'=>$themes,'releases'=>$releases,'feedback'=>$feedback,'preferred_energy'=>$energyTotal>0?round($energyWeight/$energyTotal,2):null,
     ];
 }
 function sf_personalization_rank_catalog(array $catalog,array $profile,int $limit=8,array $excludeIds=[]): array {
@@ -87,6 +93,7 @@ function sf_personalization_rank_catalog(array $catalog,array $profile,int $limi
         $preferred=$profile['preferred_energy']??null;if($preferred!==null)$score+=max(0,6-abs((float)($t['energy']??3)-(float)$preferred)*2);
         $seen=(int)($profile['seen_counts'][$id]??0);if($seen>0)$score-=min(14,$seen*1.5);
         if(!empty($profile['favorite_track_ids'][$id]))$score-=5;
+        $feedback=$profile['feedback'][$id]['sentiment']??'';if($feedback==='like')$score+=18;elseif($feedback==='dislike')$score-=80;
         if($bestMoodScore>0)$reasons[]='Matches the '.$bestMood.' mood you return to.';
         if($bestThemeScore>0&&count($reasons)<2)$reasons[]='Connects with your interest in '.$bestTheme.'.';
         if($releaseScore>0&&count($reasons)<2)$reasons[]='Related to a release already in your listening profile.';
@@ -104,7 +111,7 @@ function sf_personalization_recommendations(int $userId,int $limit=8,array $excl
     return ['personalized'=>(bool)$profile['personalized'],'summary'=>$summary,'signals'=>['favorites'=>(int)$profile['favorite_count'],'listening_events'=>(int)$profile['listening_event_count'],'playlist_tracks'=>(int)$profile['playlist_track_count']],'items'=>$items];
 }
 
-function sf_personalization_state(int $userId): array {return ['favorites'=>sf_personalization_favorites($userId),'continue_listening'=>sf_personalization_continue_listening($userId),'history'=>sf_personalization_history($userId),'recommendations'=>sf_personalization_recommendations($userId)];}
+function sf_personalization_state(int $userId): array {return ['favorites'=>sf_personalization_favorites($userId),'continue_listening'=>sf_personalization_continue_listening($userId),'history'=>sf_personalization_history($userId),'recommendations'=>sf_personalization_recommendations($userId),'track_feedback'=>sf_track_feedback_map($userId)];}
 
 function sf_personalization_history_summary(int $userId): array {
     sf_ops_ensure_schema();$pdo=sf_db();
