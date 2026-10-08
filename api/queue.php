@@ -9,6 +9,7 @@ try{
     if($action==='remove'){$queue=sf_queue_remove($uid,(int)($b['item_id']??0),(string)($b['track_id']??''));sf_json_response(['ok'=>true,'queue'=>$queue,'csrf'=>sf_user_csrf()]);}
     if($action==='reorder'){$queue=sf_queue_reorder($uid,(array)($b['item_ids']??[]));sf_json_response(['ok'=>true,'queue'=>$queue,'csrf'=>sf_user_csrf()]);}
     if($action==='clear'){$queue=sf_queue_clear($uid);sf_json_response(['ok'=>true,'queue'=>$queue,'csrf'=>sf_user_csrf()]);}
+    if($action==='take'){$result=sf_queue_take($uid,(int)($b['item_id']??0));sf_json_response(['ok'=>true,...$result,'csrf'=>sf_user_csrf()]);}
     if($action==='pop'){$result=sf_queue_pop_next($uid);sf_json_response(['ok'=>true,...$result,'csrf'=>sf_user_csrf()]);}
     sf_json_response(['ok'=>false,'message'=>'Unsupported queue action.'],422);
 }catch(Throwable $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}
