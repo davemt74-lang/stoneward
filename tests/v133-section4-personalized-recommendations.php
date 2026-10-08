@@ -23,5 +23,5 @@ ok(str_contains($js,"['home','music','releases','track','release','account']"),'
 ok(str_contains($js,"querySelectorAll('[data-recommend-play]')")&&str_contains($js,"querySelectorAll('[data-resume-track]')"),'recommendation and resume controls bind as collections');
 ok(str_contains($css,'.recommendation-grid')&&str_contains($css,'.recommendation-card'),'responsive recommendation styles exist');
 ok(str_contains($version,"'recommendations'=>'favorites-listening-playlists-agent'"),'version endpoint retains Section 4 recommendation capability');
-ok(str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.1'"),'Section 4 correctly requires no new database migration');
+ok(str_contains($migrations,"'id'=>'2026-10-08-008'")&&str_contains($migrations,'sf_playlists_ensure_schema'),'Section 4 remains compatible with the pre-Section-6 schema baseline');
 echo "Stonefellow v1.3 Section 4 personalized recommendations audit: PASS\n";
