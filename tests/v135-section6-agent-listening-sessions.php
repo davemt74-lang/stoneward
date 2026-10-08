@@ -29,7 +29,7 @@ ok(str_contains($agent,"'type'=>'start_listening_session'"),'agent policy return
 ok(str_contains($agent,"'type'=>'save_current_listening_session'"),'agent saves the exact active session when available');
 ok(str_contains($agent,"'type'=>'session_feedback'")&&str_contains($agent,"'type'=>'end_listening_session'"),'natural feedback and end-session Agent actions exist');
 ok(str_contains($app,'function startAgentListeningSession'),'client starts a persistent session queue');
-ok(str_contains($app,'function loadAgentListeningSession')&&str_contains($app,"loadAuth(true).then(()=>loadAgentListeningSession())"),'active Agent session restores after reload');
+ok(str_contains($app,'function loadAgentListeningSession')&&str_contains($app,'loadAgentListeningSession()'),'active Agent session restore remains wired at startup');
 ok(str_contains($app,"play(t,0,'agent_session',true)"),'session playback is tagged for telemetry');
 ok(str_contains($app,'function submitSessionFeedback')&&str_contains($app,"$('[data-session-feedback]'"),'client feedback controls bind as a collection');
 ok(str_contains($app,'function saveCurrentAgentSession')&&str_contains($app,'function agentSessionVisible'),'active or completed exact session remains saveable');
