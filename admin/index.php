@@ -38,7 +38,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="ai"><span>11</span>AI Providers</button>
         <button type="button" data-view="brain"><span>12</span>Agent Brain</button>
         <button type="button" data-view="customer"><span>13</span>Customer Lifecycle</button>
-        <button type="button" data-view="analytics"><span>14</span>Listening Analytics</button>
+        <button type="button" data-view="analytics"><span>14</span>Listening + Conversion</button>
         <button type="button" data-view="operations"><span>15</span>Operations</button>
         <button type="button" data-view="settings"><span>16</span>Settings</button>
       </nav>
@@ -67,6 +67,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   </div>
 
   <input id="folderInput" type="file" webkitdirectory directory multiple accept=".mp3,.wav,.wave,audio/mpeg,audio/wav" hidden>
+  <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
 </body>
 </html>
