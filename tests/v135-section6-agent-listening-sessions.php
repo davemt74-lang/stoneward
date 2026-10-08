@@ -27,8 +27,8 @@ ok(str_contains($agent,"return 'listening_session_guided_release'"),'guided rele
 ok(str_contains($agent,"'type'=>'start_listening_session'"),'agent policy returns a session action');
 ok(str_contains($app,'function startAgentListeningSession'),'client starts a persistent session queue');
 ok(str_contains($app,"play(t,0,'agent_session',true)"),'session playback is tagged for telemetry');
-ok(str_contains($app,'function submitSessionFeedback'),'client feedback control is wired');
-ok(str_contains($app,'function saveCurrentAgentSession'),'client saves exact active session');
+ok(str_contains($app,'function submitSessionFeedback')&&str_contains($app,"$('[data-session-feedback]'"),'client feedback controls bind as a collection');
+ok(str_contains($app,'function saveCurrentAgentSession')&&str_contains($app,'function agentSessionVisible'),'active or completed exact session remains saveable');
 ok(str_contains($app,'function advanceAgentSession'),'client advances persistent session state');
 ok(str_contains($app,"st.agentSession.mode==='guided_release'"),'guided sessions provide between-track context');
 ok(str_contains($app,'agent-session-panel'),'visible active-session UI exists');
