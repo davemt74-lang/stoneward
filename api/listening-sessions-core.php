@@ -53,7 +53,7 @@ function sf_agent_session_plan(int $userId,string $message,string $mode='mix',?s
     return ['mode'=>'mix','title'=>$label,'prompt'=>$message,'release_id'=>'','track_ids'=>$ids];
 }
 function sf_agent_listening_session_create(int $userId,string $message,string $mode='mix',?string $activeTrackId=null): array {
-    sf_listening_sessions_ensure_schema();$plan=sf_agent_session_plan($userId,$message,$mode,$activeTrackId);$id=sf_listening_session_id();$now=gmdate('c');$pdo=sf_db();$pdo->beginTransaction();
+    sf_listening_sessions_ensure_schema();$now=gmdate('c');sf_db()->prepare("UPDATE agent_listening_sessions SET status='ended',updated_at=?,completed_at=? WHERE user_id=? AND status='active'")->execute([$now,$now,$userId]);$plan=sf_agent_session_plan($userId,$message,$mode,$activeTrackId);$id=sf_listening_session_id();$pdo=sf_db();$pdo->beginTransaction();
     try{
         $q=$pdo->prepare('INSERT INTO agent_listening_sessions(id,user_id,title,mode,prompt,release_id,status,current_index,created_at,updated_at,completed_at) VALUES(?,?,?,?,?,?,?,0,?,?,NULL)');
         $q->execute([$id,$userId,$plan['title'],$plan['mode'],$plan['prompt'],$plan['release_id'],'active',$now,$now]);
