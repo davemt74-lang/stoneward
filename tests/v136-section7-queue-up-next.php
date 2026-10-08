@@ -57,7 +57,7 @@ ok(str_contains($css,'body.queue-open'),'queue-open body state exists');
 ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.6'"),'database target advances to 1.3.6');
 ok(str_contains($mig,"'id'=>'2026-10-08-010'")&&str_contains($mig,'sf_queue_ensure_schema'),'migration 010 creates persistent queue');
 ok(str_contains($mig,"'user_play_queue'"),'integrity checks require user_play_queue');
-ok(str_contains($version,"'stonefellow'=>'1.3.6'")&&str_contains($version,"'database_schema_target'=>'1.3.6'"),'version endpoint reports v1.3.6 schema');
+ok(str_contains($version,"'database_schema_target'=>'1.3.6'")&&str_contains($version,"'up_next_queue'=>'persistent-reorder-play-next-agent'"),'Section 7 queue capability remains available on schema 1.3.6');
 ok(str_contains($version,"'up_next_queue'=>'persistent-reorder-play-next-agent'"),'version endpoint reports Section 7 queue capability');
 
 echo "Stonefellow v1.3 Section 7 Queue / Up Next audit: PASS\n";

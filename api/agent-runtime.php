@@ -128,6 +128,11 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/save (?:this |the )?(?:agent )?(?:listening )?session|save (?:these|those) songs/',$q)&&str_contains($q,'playlist'))return 'playlist_save_session';
     if(preg_match('/(?:make|create|build|curate).*playlist|playlist.*(?:make|create|build|curate)/',$q))return 'playlist_create';
     if(preg_match('/my playlists|show (?:me )?(?:my )?playlists|open playlists/',$q))return 'playlist_open';
+    if(preg_match('/remove duplicates|dedupe .*?(record|build|mixtape)|duplicate tracks/',$q))return 'builder_dedupe';
+    if(preg_match('/save (?:this |the |my )?(?:record|vinyl|cassette|mixtape|build)/',$q))return 'builder_save';
+    if(preg_match('/move .* side [ab]|side [ab].*move/',$q))return 'builder_move';
+    if(preg_match('/fill .*side [ab]|finish .*side [ab]/',$q))return 'builder_fill';
+    if((string)($client['view']??'')==='builder'&&preg_match('/finish (?:this|the|my) (?:record|vinyl|cassette|mixtape|build)|fill (?:the )?(?:remaining )?(?:time|space)|finish it/',$q))return 'builder_fill';
     if(preg_match('/make|create|build/',$q)&&preg_match('/record|vinyl|cassette|mixtape/',$q))return 'builder_open';
     if(preg_match('/add .* (record|vinyl|cassette|side [ab])|put .* on/',$q))return 'builder_add';
     if(preg_match('/cart|checkout/',$q))return 'cart_open';
@@ -178,9 +183,21 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             $sessionId=(string)($client['agent_listening_session_id']??'');if($sessionId!==''){$action=['type'=>'end_listening_session','session_id'=>$sessionId];$text='Listening session ended.';}else{$text='There isn’t an active Agent listening session to end.';}break;
         case 'builder_open':$action=['type'=>'open_view','view'=>'builder'];$text='Let’s build your record.';break;
         case 'builder_add':
-            if($track){$action=['type'=>'builder_add_track','track_id'=>(string)$track['id']];$text='I’ll add “'.($track['title']??'').'” to the current build.';}
+            $side=preg_match('/side\s*([ab])/i',$message,$m)?strtoupper((string)$m[1]):'';
+            if($track){$action=['type'=>'builder_add_track','track_id'=>(string)$track['id']];if(in_array($side,['A','B'],true))$action['side']=$side;$text='I’ll add “'.($track['title']??'').'”'.($side!==''?' to Side '.$side:' to the current build').'.';}
             else {$action=['type'=>'open_view','view'=>'builder'];$text='Open the builder and tell me which track you want to add.';}
             break;
+        case 'builder_move':
+            $side=preg_match('/side\s*([ab])/i',$message,$m)?strtoupper((string)$m[1]):'';
+            if($track&&in_array($side,['A','B'],true)){$action=['type'=>'builder_move_track','track_id'=>(string)$track['id'],'side'=>$side];$text='I’ll move “'.($track['title']??'').'” to Side '.$side.'.';}
+            else{$action=['type'=>'open_view','view'=>'builder'];$text='Open the builder and tell me which track and side you want.';}
+            break;
+        case 'builder_fill':
+            $side=preg_match('/side\s*([ab])/i',$message,$m)?strtoupper((string)$m[1]):'both';$action=['type'=>'builder_fill','side'=>$side];$text=$side==='both'?'I’ll fill the remaining time while preserving your current sequence.':'I’ll fill the remaining time on Side '.$side.'.';$profile='recommendation';break;
+        case 'builder_dedupe':
+            $action=['type'=>'builder_dedupe'];$text='I’ll remove duplicate tracks and keep the first occurrence of each song.';break;
+        case 'builder_save':
+            $action=['type'=>'builder_save'];$text='I’ll save the current build as a draft.';$profile='account';break;
         case 'cart_open':$action=['type'=>'open_view','view'=>'cart'];$text='Here’s your cart.';$profile='commerce';break;
         case 'purchase_request':$action=['type'=>'open_view','view'=>'cart'];$text='I can take you to the cart. You’ll confirm the purchase yourself at checkout.';$profile='commerce';$confirm=true;break;
         case 'account_open':$action=['type'=>'open_view','view'=>'account'];$text='Here’s your account.';$profile='account';break;
@@ -202,7 +219,7 @@ function sf_jev_endpoint(string $url): string {
 function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $d=sf_ai_resolve_decision();if(!$d)return null;$url=sf_jev_endpoint((string)($d['endpoint_url']??''));if($url==='')return null;
     $model=trim((string)($d['model']??''))?:'typesafe/jev-1.13';
-    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'queue_count'=>(int)($client['queue_count']??0)];
+    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0)];
     $criteria=[
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
         'player_recommend'=>'Asks for one recommendation or one next song.',
@@ -229,6 +246,10 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'knowledge_question'=>'Asks a broader factual/history/meaning question that may require approved knowledge documents.',
         'builder_open'=>'Asks to create, build, or continue a custom record, vinyl, cassette, or mixtape.',
         'builder_add'=>'Asks to put a song onto the current custom-media build.',
+        'builder_move'=>'Asks to move a song to Side A or Side B of the current build.',
+        'builder_fill'=>'Asks to fill remaining time/space or finish a side/current build.',
+        'builder_dedupe'=>'Asks to remove duplicate tracks from the current build.',
+        'builder_save'=>'Asks to save the current build as a draft.',
         'cart_open'=>'Asks to view cart or checkout.',
         'purchase_request'=>'Asks to buy, purchase, or order something.',
         'account_open'=>'Asks for their account, library, purchases, or profile.',

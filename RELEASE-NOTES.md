@@ -1,12 +1,15 @@
-# Stonefellow v1.3.6 — Section 7: Queue / Up Next
+# Stonefellow v1.3.7 — Section 8: Custom Record / Mixtape v2
 
-- Added persistent server-side Up Next queue.
-- Added Play Next and Add to Queue controls across listening surfaces.
-- Added queue drawer with exact-item play, remove, reorder, and clear.
-- Added footer queue count and signed-in menu access.
-- Added reload restoration.
-- Queue playback integrates after Agent sessions and playlist/release playback.
-- Added local queue playback history for Previous.
-- Added Agent commands for open/add/play-next/remove/clear.
-- Added migration 010 and schema integrity coverage.
-- Database target advances to 1.3.6.
+- Upgraded the existing custom vinyl/cassette builder to v4 state.
+- Added accurate cross-side drag-and-drop insertion.
+- Added live remaining-time and over-limit guidance.
+- Added duplicate warnings and cleanup.
+- Added personalized side/build completion.
+- Added account-backed saved drafts.
+- Added richer sleeve/cassette visual previews.
+- Added exact Side A/B sequence review in cart and checkout.
+- Added Agent move/fill/dedupe/save controls.
+- Preserved server-side custom-media validation and the existing order/POD pipeline.
+- Fixed public UI collection bindings that could call `.forEach()` on a single-element selector.
+- Tightened the signed-in dropdown menu so account/admin/logout/version links remain visible.
+- No database migration; schema target remains 1.3.6.
