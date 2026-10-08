@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.0';
+const SF_DB_SCHEMA_TARGET = '1.3.1';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -104,6 +104,13 @@ function sf_migration_definitions(): array {
             'description'=>'Favorites, My Library personalization, listening history and resume state',
             'revision'=>'1',
             'apply'=>function(): void { sf_personalization_ensure_schema(); },
+        ],
+        [
+            'id'=>'2026-10-08-008',
+            'app_version'=>'1.3.1',
+            'description'=>'User playlists, ordered playlist tracks, public/private sharing, and agent playlist sessions',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_playlists_ensure_schema(); },
         ],
     ];
 }
@@ -265,7 +272,7 @@ function sf_migration_integrity_report(): array {
         'agent_conversations','agent_messages','agent_brain_decisions','account_action_tokens',
         'transactional_email_outbox','billing_webhook_events','billing_invoices','billing_audit_log',
         'user_notifications','user_activity','listening_events','provider_health_checks','admin_audit_log',
-        'site_event_log','auth_attempts','order_request_keys','user_favorites','user_listening_progress','schema_migrations','schema_upgrade_runs'
+        'site_event_log','auth_attempts','order_request_keys','user_favorites','user_listening_progress','user_playlists','user_playlist_tracks','schema_migrations','schema_upgrade_runs'
     ];
     $checks=[];$ok=true;
     foreach($requiredTables as $t){$exists=sf_migration_table_exists($t);$checks[]=['name'=>'Table '.$t,'ok'=>$exists,'detail'=>$exists?'Present':'Missing'];if(!$exists)$ok=false;}
