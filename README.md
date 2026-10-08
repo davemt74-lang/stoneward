@@ -1,27 +1,32 @@
-# Stonefellow v1.3.7 — Section 8: Custom Record / Mixtape v2
+# Stonefellow v1.3.8 — Section 9: Personalized Home
 
-Stonefellow v1.3 Section 8 upgrades the existing custom-media builder instead of introducing a second build model.
+Stonefellow v1.3 Section 9 turns the signed-in home screen into the central listening and creation workspace.
 
 ## Included
-- Precise drag-and-drop ordering within and across Side A / Side B.
-- Live used and remaining time per side, including exact over-limit correction.
-- Duplicate-track detection and one-click cleanup.
-- Personalized **Fill remaining** for either side or the whole build.
-- Authenticated fill uses the existing listening/favorites/playlist recommendation profile.
-- Guest fill retains a local similarity-based fallback.
-- Account-backed saved drafts with load, update, and delete.
-- Local v2/v3 build state migrates into builder v4.
-- Richer vinyl sleeve artwork collage and cassette preview.
-- Exact Side A / Side B sequence shown in the cart.
-- Server-validated manufacturing sequence shown again at checkout.
-- Agent commands for move-to-side, fill/finish, remove duplicates, and save draft.
-- Existing cart, quote, order, library, and POD handoff paths remain authoritative.
+- **Continue Listening** with exact resume positions and progress.
+- **Recently Played** with repeated events collapsed to the latest occurrence per track.
+- **Favorites** combining saved tracks and releases.
+- **Recommended for You** using the existing favorites/listening/playlists/feedback profile.
+- **Recent Releases** ordered newest first and filtered to published, public releases.
+- **Saved Builds** linking directly back into the exact custom vinyl/cassette draft.
+- **Agent Suggestion** for the day, selected from resume opportunities, recommendations, drafts, favorites, and recent releases.
+- **Up Next** count and shortcut on the home header.
+- Empty states that lead somewhere useful when a section has no data.
+- Agent routing for “what do you suggest today?” and “what should I listen to today?”
+- The Agent receives the currently displayed home suggestion in its client context.
+- Existing guest home remains simple and Agent-first.
 
-## Header menu refinement
-The signed-in dropdown uses tighter rows and identity/version spacing so all account links remain visible in normal desktop viewports. Short-height displays receive an additional compact rule, and the menu is viewport constrained with overflow as a fallback.
+## Architecture
+Section 9 does not create a second personalization model. The home API aggregates the canonical systems already built in Sections 1–8:
+
+- personalization / favorites / listening history
+- recommendations and feedback
+- saved custom-media builds
+- release metadata
+- Up Next
 
 ## Database
-No new migration is required for Section 8. Existing `user_saved_builds` already supports account drafts.
+No new database migration is required.
 
-Application: **1.3.7**  
+Application: **1.3.8**  
 Database schema target: **1.3.6**
