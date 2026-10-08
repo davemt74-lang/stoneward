@@ -1,52 +1,48 @@
-# Stonefellow v1.3.8 — Section 9 Personalized Home Audit
+# Stonefellow v1.3.9 — Section 10 Admin Listening & Conversion Analytics Audit
 
-## 1. Canonical data aggregation — 10/10
-- Home reuses the existing personalization state rather than maintaining shadow favorites/history/recommendations.
-- Saved builds come from the existing account build store.
-- Up Next count comes from the canonical queue.
-- Release cards use published/public release metadata.
+## 1. Listening telemetry — 10/10
+- Start, resume, pause, progress, complete, and skip events remain supported.
+- Manual track changes emit an explicit skip when playback is interrupted before natural completion.
+- Near-end transitions do not create false skip events.
+- Skip appears in user listening history and terminates Continue Listening state.
 
-## 2. Continue Listening — 10/10
-- Uses canonical resume positions.
-- Displays progress and resume time.
-- Resume action returns to the exact position.
-- Empty state guides the user back to music.
+## 2. Retention analytics — 10/10
+- Starts, completions, skips, sessions, listeners, repeat starts, and repeat listeners are aggregated.
+- Completion, skip, and repeat rates are calculated.
+- Playback sources are grouped and ranked.
+- Daily trend rows expose starts, completions, and skips.
 
-## 3. Recently Played — 10/10
-- Uses canonical listening events.
-- Repeated events are collapsed by track while preserving newest-first ordering.
-- Cards support immediate replay and track details.
-- Full listening history remains one click away.
+## 3. Engagement analytics — 10/10
+- Favorites, playlist creation, and saved-build creation are measured.
+- Authenticated conversion is anchored to listening activity within the selected time window.
+- Listener→favorite, listener→playlist, and listener→saved-build rates are available.
 
-## 4. Favorites and Recommendations — 10/10
-- Favorite tracks and releases are represented together.
-- Recommendations reuse the Section 4 personalization engine.
-- Recommendation rationale is displayed when available.
-- Existing favorite controls remain authoritative.
+## 4. Commerce conversion — 10/10
+- Paid order classification uses canonical order/payment state.
+- Revenue and paid-order counts are included.
+- Listener→purchase and listener→custom-media conversion are measured.
+- Track rows include digital purchases and custom-media build use.
 
-## 5. Releases and Saved Builds — 10/10
-- Recent releases are filtered to public/published and sorted newest first.
-- Saved builds reopen the exact account-backed draft.
-- No duplicate saved-build persistence path was introduced.
+## 5. Per-user analytics — 10/10
+- User rows show listening, repeat, completion, skip, favorites, playlists, builds, orders, and revenue.
+- Inspector includes listening history, engagement activity, favorites, playlists, builds, orders, and Agent Brain.
+- All per-user analytics use the same canonical aggregate as the overall dashboard.
 
-## 6. Agent Suggestion — 10/10
-- Suggestion pool can draw from unfinished listening, recommendations, saved builds, favorite releases, and recent releases.
-- Catalog fallback exists for new accounts.
-- Malformed rows without actionable IDs are skipped.
-- Selection is deterministic for a user/day/current pool.
-- Agent understands daily-suggestion and listen-today phrasing and opens the personalized home.
+## 6. Admin dashboard — 10/10
+- Main dashboard retains recent users and recent purchases.
+- Revenue and listener→purchase conversion are promoted to primary KPIs.
+- Audience pulse includes completion, skip, repeat, favorites, and custom-media conversion.
+- Recent listening distinguishes started, completed, and skipped events.
 
-## 7. UX and resilience — 10/10
-- Signed-in home keeps the Agent canvas as the primary interaction surface.
-- Every personalized section has an actionable empty state.
-- Home falls back to the existing recommendation module if the aggregate API is unavailable.
-- Responsive rules collapse all home grids cleanly on narrow displays.
-- Guest home behavior is unchanged.
+## 7. UI and release safety — 10/10
+- Wide tables are horizontally scroll-safe.
+- Conversion, commerce, trend, source, and user-detail surfaces are responsive.
+- Public/admin/analytics JavaScript are syntax-checked by CI.
+- Existing Sections 1–9 regression suites remain in the release gate.
+- Section 10 adds its own regression suite.
 
-## 8. Compatibility — 10/10
-- Sections 1–8 remain intact.
-- No database migration is required.
+## 8. Database compatibility — 10/10
+- No new database table or migration is required.
 - Database schema target remains 1.3.6.
-- Release gate now runs Sections 1–9.
 
-The measured final result is recorded in `TEST-RESULTS.txt`.
+The measured final gate is recorded in `TEST-RESULTS.txt`.
