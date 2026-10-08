@@ -1,45 +1,40 @@
-# Stonefellow v1.3.3 — Section 4 Personalized Recommendations Audit
+# Stonefellow v1.3.4 — Section 5 Richer Track + Release Pages Audit
 
-## 1. Recommendation signals — 10/10
-- Track and release favorites contribute explicit preference signals.
-- Listening starts, resumes, pauses, and completions contribute weighted affinity.
-- Playlist membership contributes durable curation intent.
-- Unknown or removed catalog tracks are ignored safely.
+## 1. Track presentation — 10/10
+- Track detail uses dedicated artwork with release-cover fallback.
+- Story, release, runtime, year, mood and themes remain visible.
+- Rights and ISRC metadata remain available when populated.
 
-## 2. Ranking quality and discovery — 10/10
-- Mood, theme, release affinity, and preferred energy are combined deterministically.
-- Repeatedly heard tracks receive a familiarity penalty to preserve discovery.
-- Favorited tracks are not blindly promoted back to the top.
-- Cold-start ranking remains deterministic and stable.
+## 2. Credits, lyrics and notes — 10/10
+- Structured words/music/producer/co-producer fields are supported.
+- Additional catalog credits are preserved.
+- Recording notes and lyrics render only when content exists.
 
-## 3. Explainability — 10/10
-- Every recommendation includes a human-readable reason.
-- Reasons are derived from the same mood/theme/release signals used by ranking.
-- The API exposes signal counts without exposing private raw history.
+## 3. Discovery — 10/10
+- Related tracks use mood, theme, release and energy similarity.
+- Track-to-release navigation is direct.
+- Related items can be played or opened without leaving the listening flow.
 
-## 4. Customer experience — 10/10
-- Signed-in home shows Recommended for You.
-- My Stonefellow includes a compact recommendation section.
-- Recommendations open tracks, play through the persistent player, and support favorites.
-- Recommendation playback is tagged `source=recommendation`.
+## 4. Commerce and creation — 10/10
+- Digital track purchase remains connected to the existing cart.
+- Tracks can be put directly onto the current custom record/cassette build.
+- Release pages can add all digital tracks without inventing a parallel product model.
+- Individual release tracks can be added to the builder.
 
-## 5. Agent integration — 10/10
-- “Recommend something” uses the authenticated listener profile.
-- Prompt/mood intent is combined with personal ranking.
-- Agent-created playlists use the same personalization engine.
-- Existing non-personalized call paths remain backwards compatible.
+## 5. Agent experience — 10/10
+- Track page exposes an explicit Ask About This Song action.
+- Release page exposes an Agent context action.
+- Existing catalog/story/credit Agent routes remain authoritative.
 
-## 6. Compatibility and release safety — 10/10
-- Favorites, playlists, listening history, resume, and analytics remain on their existing storage paths.
+## 6. Release pages — 10/10
+- Cover art, date, type, description, runtime and track count are surfaced.
+- Optional release notes and credits are supported.
+- Tracklist provides playback, favorites, rich-detail navigation and builder actions.
+- Whole-release playback uses the persistent player.
+
+## 7. Compatibility and safety — 10/10
 - No new database migration is required; target remains 1.3.1.
-- Multi-row recommendation and resume controls use collection-safe event binding.
-- Section 4 has a dedicated regression suite.
-
-## Release gate
-- PHP syntax validation: required.
-- Public JavaScript syntax validation: required.
-- Admin JavaScript syntax validation: required.
-- Existing v1.3 regression suites: required.
-- Section 4 regression suite: required.
+- Existing favorites, personalization, history, resume, analytics and playlists are preserved.
+- Section 5 has a dedicated regression suite and remains under the reusable release gate.
 
 The final gate result is recorded in `TEST-RESULTS.txt`.
