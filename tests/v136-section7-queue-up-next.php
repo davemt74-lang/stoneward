@@ -47,8 +47,8 @@ ok(str_contains($app,'function bindQueueTrackButtons')&&str_contains($app,"query
 
 ok(str_contains($agent,"return 'queue_open'")&&str_contains($agent,"return 'queue_add'"),'Agent routes open/add queue commands');
 ok(str_contains($agent,"return 'queue_play_next'")&&str_contains($agent,"return 'queue_remove'")&&str_contains($agent,"return 'queue_clear'"),'Agent routes play-next/remove/clear commands');
-ok(str_contains($agent,"'type'=>'open_queue'")&&str_contains($agent,"'type'=>'queue_add_track'"),'Agent queue actions are emitted');
-ok(str_contains($agent,"'type'=>'queue_play_next'")&&str_contains($agent,"'type'=>'queue_remove_track'")&&str_contains($agent,"'type'=>'queue_clear'"),'Agent emits play-next/remove/clear actions');
+ok(str_contains($agent,"'type'=>'open_queue'")&&str_contains($agent,"'queue_add_track'")&&str_contains($agent,"['type'=>\$type"),'Agent open/add queue actions are emitted');
+ok(str_contains($agent,"'queue_play_next'")&&str_contains($agent,"'queue_remove_track'")&&str_contains($agent,"'type'=>'queue_clear'"),'Agent emits play-next/remove/clear actions');
 
 ok(str_contains($css,'.queue-drawer')&&str_contains($css,'.queue-item'),'Up Next drawer styles exist');
 ok(str_contains($css,'.player-queue-button'),'footer Queue control is styled');
