@@ -1,51 +1,52 @@
-# Stonefellow v1.3.7 — Section 8 Custom Record / Mixtape v2 Audit
+# Stonefellow v1.3.8 — Section 9 Personalized Home Audit
 
-## 1. Builder sequencing — 10/10
-- Track order is preserved explicitly on Side A and Side B.
-- Drag/drop supports within-side and cross-side insertion positions.
-- Arrow controls remain available as a keyboard/mouse fallback.
-- Side transfer refuses tracks that exceed physical capacity.
+## 1. Canonical data aggregation — 10/10
+- Home reuses the existing personalization state rather than maintaining shadow favorites/history/recommendations.
+- Saved builds come from the existing account build store.
+- Up Next count comes from the canonical queue.
+- Release cards use published/public release metadata.
 
-## 2. Capacity and duplicate safety — 10/10
-- Used time and remaining time are visible per side.
-- Over-limit sides show the exact time that must be removed.
-- Client detects duplicate IDs and can normalize them.
-- Server continues to reject duplicates and over-limit sides during quote/checkout.
+## 2. Continue Listening — 10/10
+- Uses canonical resume positions.
+- Displays progress and resume time.
+- Resume action returns to the exact position.
+- Empty state guides the user back to music.
 
-## 3. Personalized completion — 10/10
-- Signed-in fill uses the existing personalization recommendation profile.
-- Only POD-eligible, nonduplicate tracks are considered.
-- Tracks are added only when they fit remaining capacity.
-- Side A, Side B, or both may be filled independently.
-- Guest users receive a local similarity fallback.
+## 3. Recently Played — 10/10
+- Uses canonical listening events.
+- Repeated events are collapsed by track while preserving newest-first ordering.
+- Cards support immediate replay and track details.
+- Full listening history remains one click away.
 
-## 4. Saved drafts — 10/10
-- Existing user_saved_builds storage remains authoritative.
-- Builder can save a new draft or update the active draft.
-- Drafts load/delete directly from the builder.
-- Active draft identity survives reload.
-- Older local build state migrates to builder v4.
+## 4. Favorites and Recommendations — 10/10
+- Favorite tracks and releases are represented together.
+- Recommendations reuse the Section 4 personalization engine.
+- Recommendation rationale is displayed when available.
+- Existing favorite controls remain authoritative.
 
-## 5. Artwork and review — 10/10
-- Vinyl preview can use selected-track artwork tiles.
-- Cassette uses a distinct v2 preview.
-- Cart displays exact ordered sides.
-- Checkout displays the server-validated manufacturing sequence before purchase.
+## 5. Releases and Saved Builds — 10/10
+- Recent releases are filtered to public/published and sorted newest first.
+- Saved builds reopen the exact account-backed draft.
+- No duplicate saved-build persistence path was introduced.
 
-## 6. Agent integration — 10/10
-- Agent can add a track, move it to Side A/B, fill remaining time, remove duplicates, and save the build.
-- Timing and active draft state are included in Agent client context.
-- Consequential purchase confirmation remains in the existing checkout flow.
+## 6. Agent Suggestion — 10/10
+- Suggestion pool can draw from unfinished listening, recommendations, saved builds, favorite releases, and recent releases.
+- Catalog fallback exists for new accounts.
+- Malformed rows without actionable IDs are skipped.
+- Selection is deterministic for a user/day/current pool.
+- Agent understands daily-suggestion and listen-today phrasing and opens the personalized home.
 
-## 7. UI reliability — 10/10
-- Public collection bindings no longer use the single-element selector helper with forEach.
-- Signed-in menu row height/padding is reduced.
-- Short viewports use a tighter menu rule.
-- Menu max-height keeps all account links reachable.
+## 7. UX and resilience — 10/10
+- Signed-in home keeps the Agent canvas as the primary interaction surface.
+- Every personalized section has an actionable empty state.
+- Home falls back to the existing recommendation module if the aggregate API is unavailable.
+- Responsive rules collapse all home grids cleanly on narrow displays.
+- Guest home behavior is unchanged.
 
 ## 8. Compatibility — 10/10
-- Favorites, playlists, history, recommendations, Agent listening sessions, Up Next, cart, orders, library, and POD handoff paths remain intact.
-- No database migration is required; schema target remains 1.3.6.
-- Release gate now runs Sections 1–8.
+- Sections 1–8 remain intact.
+- No database migration is required.
+- Database schema target remains 1.3.6.
+- Release gate now runs Sections 1–9.
 
 The measured final result is recorded in `TEST-RESULTS.txt`.
