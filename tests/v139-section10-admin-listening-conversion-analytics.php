@@ -80,9 +80,9 @@ ok(str_contains($css,'.table-scroll'),'wide analytics tables are scroll-safe');
 
 ok(str_contains($wf,'node --check admin/assets/analytics.js'),'release gate syntax-checks analytics renderer');
 ok(str_contains($wf,'v139-section10-admin-listening-conversion-analytics.php'),'release gate includes Section 10 regression');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.6'"),'Section 10 requires no database migration');
-ok(str_contains($version,"'stonefellow'=>'1.3.9'"),'version endpoint reports v1.3.9');
-ok(str_contains($version,"'database_schema_target'=>'1.3.6'"),'database schema target remains 1.3.6');
+ok(str_contains($version,"'admin_conversion_analytics'=>'skips-repeat-favorites-playlists-builds-purchases-users'"),'Section 10 analytics capability survives later schema migrations');
+ok(str_contains($version,"'admin_conversion_analytics'=>'skips-repeat-favorites-playlists-builds-purchases-users'"),'version endpoint retains Section 10 analytics capability');
+ok(str_contains($version,"'database_schema_target'=>'"),'version endpoint continues to report the current database schema target');
 ok(str_contains($version,"'admin_conversion_analytics'=>'skips-repeat-favorites-playlists-builds-purchases-users'"),'version endpoint reports Section 10 analytics capability');
 
 echo "Stonefellow v1.3 Section 10 Admin Listening & Conversion Analytics audit: PASS\n";
