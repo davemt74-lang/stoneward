@@ -47,9 +47,18 @@
 - Production data/storage remain excluded from application deploys.
 - Existing records without archive fields render normally.
 
-## 9. Regression gate — pending GitHub validation
+## 9. Regression gate — 10/10
 - Section 15 has a dedicated pure behavior/contract suite.
 - The GitHub release gate includes Sections 1–12, 14 and 15.
 - PHP and JavaScript syntax checks remain mandatory.
 
-PROVISIONAL SECTION 15 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 15 SCORE: **10/10**
+
+
+## Final measured result
+- Exact feature head release gate: **PASS**
+- Explicit assertions: **853 passed**
+- Failures: **0**
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
