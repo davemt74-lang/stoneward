@@ -53,3 +53,4 @@ jobs:
           php tests/v1311-section12-search-discovery.php
           php tests/v1312-section14-my-library.php
           php tests/v1313-section15-archive.php
+          php tests/v1314-section16-shows-live-archive.php
