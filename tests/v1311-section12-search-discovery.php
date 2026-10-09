@@ -159,4 +159,18 @@ ok(str_contains($version,"'database_schema_target'=>'1.3.11'"),'version endpoint
 ok(str_contains($version,"'catalog_search_discovery'=>'unified-faceted-personalized-telemetry-agent'"),'version endpoint reports Section 12 search/discovery capability');
 ok(str_contains($wf,'v1311-section12-search-discovery.php'),'release gate includes Section 12 regression');
 
+// Pure search behavior checks: no database or installed runtime required.
+require_once $root.'/api/search-core.php';
+ok(sf_search_normalize('  Desert—NIGHT!  ')==='desert night','normalization folds punctuation, case, and whitespace');
+ok(sf_search_tokens('find me songs about desert night')===['desert','night'],'intent tokenization removes catalog command words');
+ok(sf_search_extract_intent_query('Show me songs about memory and night')==='memory night','Agent intent extraction preserves meaningful search terms');
+$exact=sf_search_score_document('desert lights',['title'=>'Desert Lights','release'=>'Stories','mood'=>['warm'],'themes'=>['road'],'story'=>'','lyrics'=>'','credits'=>[],'metadata'=>[]]);
+$mood=sf_search_score_document('warm',['title'=>'Desert Lights','release'=>'Stories','mood'=>['warm'],'themes'=>['road'],'story'=>'','lyrics'=>'','credits'=>[],'metadata'=>[]]);
+$story=sf_search_score_document('highway',['title'=>'Desert Lights','release'=>'Stories','mood'=>['warm'],'themes'=>['road'],'story'=>'A highway at midnight','lyrics'=>'','credits'=>[],'metadata'=>[]]);
+$fuzzy=sf_search_score_document('desret',['title'=>'Desert','release'=>'Stories','mood'=>[],'themes'=>[],'story'=>'','lyrics'=>'','credits'=>[],'metadata'=>[]]);
+ok($exact['score']>$mood['score'],'exact title outranks a mood-only match');
+ok($mood['score']>$story['score'],'explicit discovery tags outrank broad story text');
+ok($fuzzy['score']>0,'single-word typo still produces a fuzzy catalog match');
+ok($exact['reason']==='Exact title','exact-title rationale is deterministic');
+
 echo "Stonefellow v1.3 Section 12 Search, Discovery & Catalog Intelligence audit: PASS\n";
