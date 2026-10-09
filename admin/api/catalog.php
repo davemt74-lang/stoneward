@@ -18,4 +18,15 @@ if(array_key_exists('metadata',$patch)&&is_array($patch['metadata'])){
   if(array_key_exists('isrc',$incoming)){$isrc=sf_admin_normalize_isrc($incoming['isrc']);if(!sf_admin_isrc_valid($isrc))sf_json_response(['ok'=>false,'message'=>'ISRC must be 12 characters, for example USABC2600001.'],422);foreach($catalog as $other)if(($other['id']??'')!==$id&&(($other['metadata']['isrc']??'')===$isrc)&&$isrc!=='')sf_json_response(['ok'=>false,'message'=>'That ISRC is already assigned to another track.'],409);$m['isrc']=$isrc;}
   $track['metadata']=$m;$track['credits']=sf_admin_public_credits($m);
 }
+if(array_key_exists('archive',$patch)&&is_array($patch['archive'])){
+  $a=is_array($track['archive']??null)?$track['archive']:[];$incoming=$patch['archive'];
+  foreach(['era','canonical_work_id','version_type','version_label','version_of','recorded_date','session','source_notes'] as $k)if(array_key_exists($k,$incoming))$a[$k]=sf_clean_text($incoming[$k],$k==='source_notes'?4000:180);
+  if(array_key_exists('alternate_track_ids',$incoming)){
+    $ids=[];foreach((array)$incoming['alternate_track_ids'] as $otherId){$otherId=sf_clean_text($otherId,100);if($otherId===''||$otherId===$id||in_array($otherId,$ids,true))continue;$exists=false;foreach($catalog as $candidate)if((string)($candidate['id']??'')===$otherId){$exists=true;break;}if(!$exists)sf_json_response(['ok'=>false,'message'=>'Unknown alternate track: '.$otherId],422);$ids[]=$otherId;}$a['alternate_track_ids']=$ids;
+  }
+  if(!empty($a['version_of'])){$exists=false;foreach($catalog as $candidate)if((string)($candidate['id']??'')===(string)$a['version_of']){$exists=true;break;}if(!$exists||$a['version_of']===$id)sf_json_response(['ok'=>false,'message'=>'Version of must reference another catalog track.'],422);}
+  if(array_key_exists('personnel',$incoming)){$rows=[];foreach((array)$incoming['personnel'] as $p){if(!is_array($p))continue;$name=sf_clean_text($p['name']??'',140);if($name==='')continue;$rows[]=['name'=>$name,'instrument'=>sf_clean_text($p['instrument']??'',100),'role'=>sf_clean_text($p['role']??'',100)];if(count($rows)>=80)break;}$a['personnel']=$rows;}
+  if(array_key_exists('media',$incoming)){$rows=[];foreach((array)$incoming['media'] as $mrow){if(!is_array($mrow))continue;$url=sf_clean_text($mrow['url']??'',500);if($url==='')continue;$rows[]=['type'=>sf_clean_text($mrow['type']??'link',40),'title'=>sf_clean_text($mrow['title']??'Archive item',180),'url'=>$url,'caption'=>sf_clean_text($mrow['caption']??'',500),'date'=>sf_clean_text($mrow['date']??'',20)];if(count($rows)>=80)break;}$a['media']=$rows;}
+  $track['archive']=$a;
+}
 $catalog[$idx]=$track;sf_admin_write_catalog($catalog);sf_json_response(['ok'=>true,'track'=>$track]);
