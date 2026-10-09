@@ -44,7 +44,7 @@ function sf_agent_brain_log(int $userId,string $conversationId,string $phase,arr
     $q->execute([$userId,$conversationId,$phase,(string)($data['route']??''),(string)($data['action']??''),(string)($data['context_profile']??''),!empty($data['needs_llm'])?1:0,!empty($data['requires_confirmation'])?1:0,sf_agent_excerpt($request),sf_agent_excerpt($response),(string)($data['run_id']??''),(string)($data['status']??''),(int)($data['input_tokens']??0),(int)($data['output_tokens']??0),json_encode($details,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}',gmdate('c')]);
 }
 
-function sf_agent_context(string $query,string $profile='catalog'): string {
+function sf_agent_context(string $query,string $profile='catalog',int $userId=0): string {
     if($profile==='none')return '';
     $terms=array_values(array_filter(preg_split('/[^a-z0-9]+/i',strtolower($query))?:[],fn($x)=>strlen($x)>2));
     $score=function(string $text)use($terms){$t=strtolower($text);$n=0;foreach($terms as $w)if(str_contains($t,$w))$n++;return $n;};
@@ -67,6 +67,7 @@ function sf_agent_context(string $query,string $profile='catalog'): string {
     }
     if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain products and open the cart or builder, but it may not claim a purchase is complete or charge money. Checkout remains a user-confirmed UI action.";
     if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
+    if($userId>0&&in_array($profile,['account','crm','recommendation'],true)){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
     return implode("\n\n",$sections);
 }
 
@@ -127,6 +128,10 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/play me something|listening session|keep the music going|give me a .* session|something (dark|quiet|mellow|heavy|warm|driving|acoustic|reflective)/',$q))return 'listening_session_start';
     if(preg_match('/what do you suggest today|what.s my suggestion|suggestion for today|what should i (?:do|listen to|hear) today|suggest (?:something|music) today|today.s suggestion/',$q))return 'home_suggestion';
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
+    if(preg_match('/\b(fan community|community feed|community posts?|open community)\b/',$q))return 'community_browse';
+    if(preg_match('/\b(newsletter|mailing list|email list)\b/',$q))return 'newsletter_join';
+    if(preg_match('/\b(merch|merchandise|shop|store)\b/',$q))return 'store_browse';
+    if(preg_match('/am i (?:on|subscribed)|my newsletter|my fan profile|fan status/',$q))return 'fan_profile';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/\b(open|show|browse)\b.*\b(shows?|concerts?|tour dates?|live archive)\b|\b(upcoming shows?|tour dates?)\b/',$q))return 'shows_browse';
@@ -187,6 +192,10 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'catalog_search':
             $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
+        case 'community_browse':$action=['type'=>'open_view','view'=>'community'];$text='Here’s the Stonefellow fan community.';$profile='crm';break;
+        case 'newsletter_join':$action=['type'=>'open_view','view'=>'community'];$text='The newsletter signup is in the fan community. You control whether Stonefellow can email you.';$profile='crm';break;
+        case 'store_browse':$action=['type'=>'open_view','view'=>'store'];$text='Here’s the Stonefellow store.';$profile='commerce';break;
+        case 'fan_profile':$action=['type'=>'open_view','view'=>'community'];$profile='crm';$needs=true;break;
         case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;
         case 'show_info':$action=['type'=>'open_view','view'=>'shows'];$profile='catalog';$needs=true;break;
         case 'archive_browse':$action=['type'=>'open_view','view'=>'archive'];$text='Here is the Stonefellow music archive — recordings, versions, sessions and releases in context.';$profile='catalog';break;
@@ -261,6 +270,10 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'queue_clear'=>'Asks to clear the Up Next queue.',
         'catalog_search'=>'Asks to find/search Stonefellow tracks or releases by title, mood, theme, lyric, credit, story, or other catalog clue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
+        'community_browse'=>'Asks to open or browse the Stonefellow fan community or community posts.',
+        'newsletter_join'=>'Asks about joining, leaving, or finding the Stonefellow newsletter or mailing list.',
+        'store_browse'=>'Asks to browse Stonefellow merchandise, products, shop, or store.',
+        'fan_profile'=>'Asks about their own fan CRM state, newsletter subscription, or fan profile.',
         'shows_browse'=>'Asks to browse Stonefellow shows, concerts, tour dates, or the live archive.',
         'show_info'=>'Asks about a specific show, concert, tour, venue, date, setlist, or live performance.',
         'archive_browse'=>'Asks to browse the Stonefellow archive, chronology, eras, recording sessions, or version history.',
@@ -328,7 +341,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         sf_log_user_activity($userId,'agent_interaction','Agent: '.$plan['route'],'agent',$conversationId,['action'=>$plan['action_name'],'needs_llm'=>false]);
         return ['text'=>$text,'provider'=>$routeSource==='jev'?'jev+policy':'stonefellow-policy','model'=>$jev['model']??'policy','input_tokens'=>(int)($jev['input_tokens']??0),'output_tokens'=>(int)($jev['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
     }
-    $context=sf_agent_context($message,$plan['context_profile']);$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
+    $context=sf_agent_context($message,$plan['context_profile'],$userId);$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
     $system="You are the Stonefellow music-site agent. Be concise, warm, knowledgeable, and grounded. Use only the supplied Stonefellow context for factual claims about songs, releases, credits, purchases, or artist history. If the context lacks the answer, say so. Never claim a purchase, playback change, account change, or builder edit happened unless the Stonefellow action layer reports it. The structured route is advisory context, not permission to invent actions.\n\nROUTE: ".$plan['route']."\nCONTEXT PROFILE: ".$plan['context_profile']."\n\n".$context;
     $maxOutput=$isAdmin?700:max(96,min(700,$allow['balance']-$estimate+128));$errors=[];
     foreach(sf_ai_llm_candidates() as $provider){

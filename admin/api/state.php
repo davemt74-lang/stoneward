@@ -33,6 +33,7 @@ usort($imports,fn($a,$b)=>strcmp((string)($b['completed_at']??''),(string)($a['c
 $pdo=sf_db();
 sf_ops_ensure_schema();
 sf_agent_brain_ensure_schema();
+sf_crm_ensure_schema();
 
 $recentUsers=$pdo->query(
     "SELECT id,email,display_name,role,status,created_at,last_login_at,email_verified_at
@@ -82,6 +83,7 @@ $listening=sf_engagement_analytics(30,null);
 $notificationAnalytics=sf_notification_analytics(30,null);
 $searchAnalytics=sf_search_analytics(30,null);
 $libraryAnalytics=sf_library_admin_analytics(null);
+$crmSummary=sf_crm_admin_summary();
 $recentNotificationEvents=$pdo->query(
     "SELECT e.id,e.user_id,e.notification_id,e.event_type,e.created_at,n.kind,n.title,u.display_name,u.email
      FROM notification_events e
@@ -161,6 +163,10 @@ sf_json_response([
         'library_users'=>(int)($libraryAnalytics['users_with_library']??0),
         'library_collections'=>(int)($libraryAnalytics['collections']??0),
         'library_saved_items'=>(int)(($libraryAnalytics['favorites']??0)+($libraryAnalytics['playlists']??0)+($libraryAnalytics['builds']??0)+($libraryAnalytics['purchases']??0)),
+        'fan_contacts'=>(int)($crmSummary['contacts']??0),
+        'newsletter_subscribers'=>(int)($crmSummary['newsletter']??0),
+        'community_posts'=>(int)($crmSummary['community_posts']??0),
+        'fan_auto_engagements'=>(int)($crmSummary['auto_engagements']??0),
     ],
     'releases'=>$releases,
     'recent_imports'=>array_slice($imports,0,5),
@@ -174,6 +180,7 @@ sf_json_response([
     'search_analytics'=>$searchAnalytics,
     'recent_search_events'=>$recentSearchEvents,
     'library_analytics'=>$libraryAnalytics,
+    'crm_summary'=>$crmSummary,
     'listening'=>[
         'days'=>30,
         'starts'=>(int)($listening['starts']??0),

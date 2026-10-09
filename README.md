@@ -1,61 +1,108 @@
-# Stonefellow v1.3.14 — Section 16: Shows, Tours & Live Archive
+# Stonefellow v1.3.15 — Section 17: Fan CRM, Community & Agent Engagement
 
-Stonefellow remains a **single-artist platform**. Section 16 connects that artist's performances to the music catalog and Section 15 archive.
+Stonefellow is still a **single-artist platform**. Section 17 adds a relationship layer around that artist: fans, newsletter contacts, customers, community participation, and governed Agent engagement.
 
-## Shows & Live
+## Fan CRM
 
-The public site now has a dedicated **Shows & Live** workspace with:
+The CRM does not copy the existing account, commerce, listening, library, notification, or Agent systems. Those remain authoritative. A fan contact links them into one relationship profile and timeline.
 
-- Upcoming public performances
-- Historical/past shows
-- Venue, city, region and country
-- Tour and era context
-- Show status
-- Ticket links for scheduled shows
-- Posters and archive media
-- Show notes
-- Setlists
-- Playable live recordings
+A contact can originate from:
 
-Each show has a first-class detail route. Setlists and live recordings reference the existing canonical Stonefellow catalog by track ID.
+- a Stonefellow account
+- newsletter signup
+- a purchase, including guest checkout
+- existing user activity
 
-## Live archive integration
+Account and newsletter identities merge by verified email/user linkage rather than creating parallel people.
 
-Shows are also added to the Section 15 Music Archive timeline. A performance can therefore be explored alongside recording sessions, versions and releases without creating a parallel music catalog.
+CRM stages support lead, fan, customer, member, and inactive.
 
-Live recording track IDs point to normal Stonefellow catalog records, so their credits, version metadata, favorites, queue behavior and playback remain canonical.
+## Newsletter
 
-## Agent
+Newsletter signup is available to guests and signed-in fans.
 
-The Agent receives grounded show context including date, venue, location, tour/era, setlist titles and archive notes.
+The signup:
 
-It distinguishes between:
-- browsing shows/tour dates/live archive; and
-- factual questions about a show, venue, setlist, tour or live performance.
+- creates or updates the CRM contact
+- records explicit marketing opt-in
+- records consent timestamps
+- creates an unsubscribe token
+- sends a welcome/unsubscribe message through the existing email lifecycle
+- never grants marketing consent from an Admin edit
 
-## Admin
+Newsletter consent and proactive in-app Agent interaction are separate settings.
 
-Admin now includes **Shows + Live** with governed show CRUD.
+## Fan Community
 
-A show record supports:
-- date/time and lifecycle status
-- venue/location
-- tour and era
-- public description and archive notes
-- ticket URL
-- poster
-- public/featured flags
-- ordered setlist track IDs
-- playable live-recording track IDs
-- archive media
+Signed-in fans can post to a first-class Stonefellow community feed. Community activity is linked to their account and CRM profile.
 
-Unknown catalog track references are rejected server-side.
+Community posts are:
 
-## Storage and database
+- authenticated and CSRF-protected
+- length bounded
+- lightly rate-limited
+- limited against link spam
+- owner-deletable
+- Admin-moderatable
 
-Shows are stored in canonical `data/shows.json`, alongside the existing file-backed catalog/release content model. Production `data/` remains deployment-owned and must not be overwritten by application deploys.
+## Governed automatic Agent engagement
 
-No database migration is required.
+The Stonefellow Agent can proactively interact with a signed-in fan after meaningful events such as:
 
-Application: **1.3.14**  
-Database schema target: **1.3.12**
+- creating an account
+- contributing to the community
+- making a purchase
+- working with a playlist
+- completing a recording
+
+Automatic interaction is:
+
+- in-app only
+- independently opt-out
+- cooldown-limited
+- deduplicated
+- driven by recent canonical activity
+- recorded in the CRM timeline
+- recorded in Admin Agent Brain
+
+There is no generic daily/welcome nag when no meaningful trigger exists.
+
+## Admin Fans + CRM
+
+Admin now includes **Fans + CRM** for:
+
+- CRM totals and stages
+- account-linked and guest contacts
+- newsletter consent visibility
+- fan tags and Admin notes
+- proactive-Agent permission
+- cross-system CRM timeline
+- canonical account activity
+- Agent Brain history
+- recent automatic Agent outreach
+- community moderation
+- administrator-approved in-app Agent messages
+
+Newsletter consent is visible but cannot be manufactured by Admin.
+
+## Chat footer quick actions
+
+The chat row now has a **+** button to the left of the text field.
+
+Quick actions include:
+
+- Create Record
+- Create Playlist
+- Tour Dates
+- Merch Store
+- Fan Community
+- Newsletter
+
+Every action opens a real existing or Section 17 workflow.
+
+## Database
+
+Section 17 adds migration **2026-10-09-014**.
+
+Application: **1.3.15**  
+Database schema target: **1.3.13**

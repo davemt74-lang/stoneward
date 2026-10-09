@@ -1,18 +1,21 @@
-# Stonefellow v1.3.14 — Section 16: Shows, Tours & Live Archive
+# Stonefellow v1.3.15 — Section 17: Fan CRM, Community & Agent Engagement
 
-- Added dedicated public Shows & Live navigation.
-- Added upcoming and historical show browsing.
-- Added first-class show detail pages.
-- Added venue/location, tour/era and lifecycle status.
-- Added ticket links for scheduled shows.
-- Added ordered setlists backed by canonical track IDs.
-- Added playable live-recording links backed by canonical catalog tracks.
-- Added posters, show notes and live-archive media.
-- Added show entries to the Section 15 Music Archive timeline.
-- Added grounded Agent show/tour/setlist context and routing.
-- Added Admin Shows + Live workspace with governed CRUD.
-- Added server-side validation for setlist/live-recording track references.
-- Added canonical `stonefellow.show.v1` records in `data/shows.json`.
-- Kept production `data/` deploy-owned and excluded from overlays.
-- No database migration is required; schema target remains 1.3.12.
-- Application advances to 1.3.14.
+- Added a unified fan CRM around the existing account, listening, commerce, library, community and Agent systems.
+- Added durable fan contacts and CRM event history.
+- Added CRM identity merge between newsletter contacts and later account users.
+- Added guest-purchase CRM contacts without silently adding them to marketing.
+- Added public newsletter signup connected directly to CRM.
+- Added explicit marketing consent timestamps and tokenized unsubscribe flow.
+- Kept newsletter consent fan-controlled and read-only in Admin.
+- Added signed-in Stonefellow fan community feed and posting.
+- Added community anti-spam bounds, rate limits, owner deletion and Admin moderation.
+- Added governed proactive in-app Agent engagement after meaningful fan activity.
+- Added 20-hour proactive-Agent cooldown and per-event dedupe.
+- Added fan control to disable proactive Agent interaction separately from newsletter email.
+- Added proactive fan engagements to the existing Admin Agent Brain ledger.
+- Added dedicated Admin Fans + CRM workspace and cross-system fan profiles.
+- Added administrator-approved in-app Agent outreach with CRM/Brain audit.
+- Added chat-footer + quick-action menu for Create Record, Create Playlist, Tour Dates, Merch Store, Fan Community and Newsletter.
+- Added current-product Store view backed by server data.
+- Application advances to 1.3.15.
+- Database schema advances to 1.3.13.

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.14');
+define('SF_BUILD', '1.3.15');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -61,6 +61,8 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="?view=releases" data-view="releases">Releases</a>
           <a href="?view=archive" data-view="archive">Music Archive</a>
           <a href="?view=shows" data-view="shows">Shows &amp; Live</a>
+          <a href="?view=community" data-view="community">Fan Community</a>
+          <a href="?view=store" data-view="store">Store</a>
           <a href="?view=builder" data-view="builder">Create a record</a>
           <a href="?view=cart" data-view="cart">Cart</a>
           <a href="?view=plans" data-view="plans">Plans</a>
@@ -152,7 +154,16 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button id="playerClose" class="player-close" type="button" aria-label="Close player">×</button>
       <audio id="persistentAudio" preload="metadata"></audio>
     </div>
+    <div id="chatQuickMenu" class="chat-quick-menu" hidden aria-label="Quick actions">
+      <button type="button" data-quick-action="record"><strong>Create Record</strong><span>Build vinyl or cassette</span></button>
+      <button type="button" data-quick-action="playlist"><strong>Create Playlist</strong><span>Start a saved playlist</span></button>
+      <button type="button" data-quick-action="shows"><strong>Tour Dates</strong><span>Shows & live archive</span></button>
+      <button type="button" data-quick-action="store"><strong>Merch Store</strong><span>Music & custom physical releases</span></button>
+      <button type="button" data-quick-action="community"><strong>Fan Community</strong><span>Join the fan feed</span></button>
+      <button type="button" data-quick-action="newsletter"><strong>Newsletter</strong><span>Join Stonefellow email updates</span></button>
+    </div>
     <form id="chatForm" class="chatbar" autocomplete="off">
+      <button id="chatQuickButton" class="chat-action plus" type="button" aria-label="Open quick actions" aria-expanded="false">+</button>
       <label class="sr-only" for="chatInput">Ask Stonefellow anything</label>
       <input id="chatInput" type="text" placeholder="Ask Stonefellow anything…" maxlength="320">
       <button id="voiceButton" class="chat-action mic" type="button" aria-label="Start conversation" aria-pressed="false">◉</button>

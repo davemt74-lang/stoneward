@@ -17,6 +17,9 @@ try{
   if($test) $order['pod']=sf_build_pod_handoffs($id,$quote,$cust['customer']);
   sf_write_json(SF_ROOT.'/storage/orders/'.$id.'.json',$order);
   if($requestKey!=='')sf_order_request_complete($requestKey,$id);
+  if(!$user){
+    try{$crm=sf_crm_upsert_contact((string)$cust['customer']['email'],(string)$cust['customer']['name'],'purchase',null,null,'customer');sf_crm_log_event((int)$crm['id'],null,'purchase','Created guest order '.$id,'order',$id,['total_cents'=>$quote['total_cents'],'physical'=>$quote['physical']]);}catch(Throwable $crmError){}
+  }
   if($user){
     sf_account_library_add_order((int)$user['id'],$order);
     sf_log_user_activity((int)$user['id'],'purchase','Created order '.$id,'order',$id,['total_cents'=>$quote['total_cents'],'physical'=>$quote['physical']]);

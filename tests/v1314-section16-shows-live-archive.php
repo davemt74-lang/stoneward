@@ -28,6 +28,8 @@ ok(str_contains($agent,"shows_browse")&&str_contains($agent,"show_info"),'Agent 
 ok(str_contains($agent,'SHOWS + LIVE ARCHIVE')&&str_contains($agent,'sf_live_summary'),'Agent context is grounded in canonical show records');
 ok(str_contains($menu,'data-view="shows"')&&str_contains($menu,'Shows &amp; Live'),'public navigation exposes Shows & Live');
 ok(str_contains($css,'.live-show-card')&&str_contains($css,'.show-detail-hero'),'live archive UI has dedicated responsive styling');
-ok(str_contains($version,"'stonefellow'=>'1.3.14'")&&str_contains($version,"'shows_live_archive'=>'single-artist-shows-tours-setlists-live-recordings-media'"),'version endpoint advertises Section 16 capability');
-ok(str_contains($migrations,"SF_DB_SCHEMA_TARGET = '1.3.12'"),'Section 16 remains file-backed and does not advance the database schema');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vm16);
+ok(isset($vm16[1],$vm16[2],$vm16[3])&&[(int)$vm16[1],(int)$vm16[2],(int)$vm16[3]]>=[1,3,14]&&str_contains($version,"'shows_live_archive'=>'single-artist-shows-tours-setlists-live-recordings-media'"),'version endpoint advertises Section 16 capability at v1.3.14 or later');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$migrations,$db16);
+ok(isset($db16[1],$db16[2],$db16[3])&&[(int)$db16[1],(int)$db16[2],(int)$db16[3]]>=[1,3,12],'Section 16 remains compatible with database schema v1.3.12 or later');
 echo "Stonefellow v1.3.14 Section 16 Shows, Tours & Live Archive audit: PASS\n";

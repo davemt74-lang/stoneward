@@ -31,17 +31,18 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="templates"><span>04</span>Metadata Templates</button>
         <button type="button" data-view="releases"><span>05</span>Releases</button>
         <button type="button" data-view="shows"><span>06</span>Shows + Live</button>
-        <button type="button" data-view="knowledge"><span>07</span>Knowledge Base</button>
-        <button type="button" data-view="orders"><span>08</span>Orders</button>
-        <button type="button" data-view="pod"><span>09</span>POD Handoffs</button>
-        <button type="button" data-view="users"><span>10</span>Users + Tokens</button>
-        <button type="button" data-view="packages"><span>11</span>Monthly Packages</button>
-        <button type="button" data-view="ai"><span>12</span>AI Providers</button>
-        <button type="button" data-view="brain"><span>13</span>Agent Brain</button>
-        <button type="button" data-view="customer"><span>14</span>Customer Lifecycle</button>
-        <button type="button" data-view="analytics"><span>15</span>Listening + Conversion</button>
-        <button type="button" data-view="operations"><span>16</span>Operations</button>
-        <button type="button" data-view="settings"><span>17</span>Settings</button>
+        <button type="button" data-view="crm"><span>07</span>Fans + CRM</button>
+        <button type="button" data-view="knowledge"><span>08</span>Knowledge Base</button>
+        <button type="button" data-view="orders"><span>09</span>Orders</button>
+        <button type="button" data-view="pod"><span>10</span>POD Handoffs</button>
+        <button type="button" data-view="users"><span>11</span>Users + Tokens</button>
+        <button type="button" data-view="packages"><span>12</span>Monthly Packages</button>
+        <button type="button" data-view="ai"><span>13</span>AI Providers</button>
+        <button type="button" data-view="brain"><span>14</span>Agent Brain</button>
+        <button type="button" data-view="customer"><span>15</span>Customer Lifecycle</button>
+        <button type="button" data-view="analytics"><span>16</span>Listening + Conversion</button>
+        <button type="button" data-view="operations"><span>17</span>Operations</button>
+        <button type="button" data-view="settings"><span>18</span>Settings</button>
       </nav>
       <div class="sidebar-foot"><span id="adminStatusDot"></span><span>Local admin</span></div>
     </aside>
