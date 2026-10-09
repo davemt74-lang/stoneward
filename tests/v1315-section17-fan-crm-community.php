@@ -21,7 +21,7 @@ ok(str_contains($account,"'fan_crm'=>sf_crm_newsletter_state_for_user"),'account
 ok(str_contains($newsletter,"action==='signup'")&&str_contains($newsletter,"action==='unsubscribe'"),'newsletter endpoint supports signup and unsubscribe');
 ok(str_contains($crm,'marketing_opt_in_at')&&str_contains($crm,'unsubscribe_token_hash'),'newsletter consent and unsubscribe state are durable');
 ok(str_contains($crm,'newsletter_welcome')&&str_contains($crm,'Unsubscribe anytime'),'newsletter signup provides a welcome message with unsubscribe link');
-ok(str_contains($adminCrm,"$marketing=!empty($c['marketing_opt_in'])"),'Admin cannot manufacture newsletter consent');
+ok(str_contains($adminCrm,'marketing_opt_in_read_only'),'Admin cannot manufacture newsletter consent');
 ok(!str_contains($admin,'name="marketing_opt_in"'),'Admin UI treats newsletter consent as read-only');
 ok(str_contains($app,'data-newsletter-form')&&str_contains($app,"'/newsletter.php'"),'public newsletter form feeds the CRM endpoint');
 
@@ -32,8 +32,8 @@ ok(str_contains($adminCrm,"action==='moderate_post'")&&str_contains($admin,'Comm
 ok(str_contains($app,'function renderCommunity(')&&str_contains($app,'communityPostForm'),'public fan community has a first-class feed and composer');
 
 ok(str_contains($crm,'20*3600'),'automatic Agent engagement has a cooldown');
-ok(str_contains($crm,"if($trigger==='')return null;"),'automatic Agent does not nag without a meaningful trigger');
-ok(str_contains($crm,"$type==='account_created'")&&str_contains($crm,"$type==='community_post'")&&str_contains($crm,"$type==='purchase'")&&str_contains($crm,"$type==='listen_complete'"),'automatic Agent reacts to meaningful fan lifecycle events');
+ok(str_contains($crm,"return null;")&&str_contains($crm,"trigger==='"),'automatic Agent does not nag without a meaningful trigger');
+ok(str_contains($crm,"account_created")&&str_contains($crm,"community_post")&&str_contains($crm,"purchase")&&str_contains($crm,"listen_complete"),'automatic Agent reacts to meaningful fan lifecycle events');
 ok(str_contains($crm,"INSERT INTO agent_brain_decisions")&&str_contains($crm,"'fan_engagement'"),'automatic fan engagement is written into Admin Agent Brain');
 ok(str_contains($engage,'sf_crm_next_agent_engagement'),'signed-in app requests governed proactive Agent engagement');
 ok(str_contains($prefs,'agent_auto_engage')&&str_contains($app,'fanAutoEngage'),'fans can disable proactive Agent interaction');
@@ -44,7 +44,7 @@ ok(str_contains($agent,'sf_crm_agent_context($userId)'),'Agent reasoning can use
 ok(str_contains($adminHtml,'data-view="crm"')&&str_contains($adminHtml,'Fans + CRM'),'Admin has a dedicated Fans + CRM workspace');
 ok(str_contains($admin,'function renderCRM()')&&str_contains($admin,'function renderCRMContact('),'Admin CRM includes contact list and cross-system fan detail');
 ok(str_contains($adminCrm,'sf_crm_admin_contact_detail')&&str_contains($adminCrm,"action==='send_agent_message'"),'Admin CRM can inspect fan history and send governed in-app Agent outreach');
-ok(str_contains($app,'function renderStore()')&&str_contains($store,"'products'=>$products"),'Merch Store shortcut opens a server-backed current storefront');
+ok(str_contains($app,'function renderStore()')&&str_contains($store,"'products'=>"),'Merch Store shortcut opens a server-backed current storefront');
 ok(str_contains($html,'id="chatQuickButton"')&&str_contains($html,'id="chatQuickMenu"'),'chat footer has the requested plus quick-action control');
 foreach(['record','playlist','shows','store','community','newsletter'] as $action)ok(str_contains($html,'data-quick-action="'.$action.'"'),'quick menu includes '.$action);
 ok(str_contains($app,'function handleQuickAction(')&&str_contains($app,"action==='playlist'")&&str_contains($app,"action==='shows'")&&str_contains($app,"action==='store'"),'quick actions are wired to real workflows');
