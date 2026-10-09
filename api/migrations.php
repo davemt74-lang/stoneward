@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.6';
+const SF_DB_SCHEMA_TARGET = '1.3.10';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -125,6 +125,13 @@ function sf_migration_definitions(): array {
             'description'=>'Persistent user Up Next playback queue',
             'revision'=>'1',
             'apply'=>function(): void { sf_queue_ensure_schema(); },
+        ],
+        [
+            'id'=>'2026-10-08-011',
+            'app_version'=>'1.3.10',
+            'description'=>'Smart notification preferences, dedupe, generation state, events and conversion analytics',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_notification_ensure_schema(); },
         ],
     ];
 }
@@ -285,7 +292,7 @@ function sf_migration_integrity_report(): array {
         'subscription_packages','user_token_balances','token_ledger','user_subscriptions','user_trial_history',
         'agent_conversations','agent_messages','agent_brain_decisions','account_action_tokens',
         'transactional_email_outbox','billing_webhook_events','billing_invoices','billing_audit_log',
-        'user_notifications','user_activity','listening_events','provider_health_checks','admin_audit_log',
+        'user_notifications','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','user_activity','listening_events','provider_health_checks','admin_audit_log',
         'site_event_log','auth_attempts','order_request_keys','user_favorites','user_listening_progress','user_playlists','user_playlist_tracks','user_track_feedback','agent_listening_sessions','agent_listening_session_tracks','user_play_queue','schema_migrations','schema_upgrade_runs'
     ];
     $checks=[];$ok=true;
