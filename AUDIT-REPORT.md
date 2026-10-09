@@ -1,64 +1,59 @@
-# Stonefellow v1.3.13 — Section 15 Music Archive Audit
+# Stonefellow v1.3.14 — Section 16 Shows, Tours & Live Archive Audit
 
-## 1. Single-artist architecture — 10/10
-- No multi-artist accounts, artist following, or artist-profile abstraction was introduced.
-- Archive metadata extends Stonefellow's canonical track/release records.
-- Production catalog and release JSON remain authoritative.
+## 1. Single-artist live architecture — 10/10
+- Shows belong directly to Stonefellow; no multi-artist event marketplace was introduced.
+- Canonical show records are file-backed alongside catalog/release content.
+- Setlist and live-recording relationships use existing catalog track IDs.
 
-## 2. Recording/version model — 10/10
-- Canonical work IDs connect multiple recordings of one song.
-- Explicit version-of and alternate-track relationships are supported.
-- Self-links and unknown alternate references are rejected by Admin APIs.
-- Version type/label, recording date, session, era and source notes are additive and optional.
+## 2. Show model and governance — 10/10
+- Show lifecycle supports scheduled, completed, cancelled, postponed and archived states.
+- Date and venue are required.
+- Setlist/live-recording references are validated against the canonical catalog.
+- Deleting a show never deletes referenced tracks or recordings.
+- Public visibility is explicit.
 
-## 3. Deep track experience — 10/10
-- Rich song pages expose recording context when available.
-- Personnel supports name, instrument and role.
-- Other versions are directly navigable.
-- Archive media is linked without duplicating the media itself.
+## 3. Public show experience — 10/10
+- Dedicated Shows & Live navigation exists.
+- Upcoming and historical performances are separated automatically.
+- Show details expose venue/location, tour/era, notes, ticket link, setlist, live recordings and media.
+- Show pages remain useful when optional archive data is absent.
+- Responsive layouts cover narrow screens.
 
-## 4. Release archive — 10/10
-- Release records support liner notes and credits.
-- Edition, original release date, reissue relationship and archive media are supported.
-- Release v2 remains compatible with the existing file-backed release store.
-- Release track IDs and reissue IDs are validated.
+## 4. Setlists and live recordings — 10/10
+- Setlist order is preserved.
+- Setlist entries open/play canonical tracks.
+- Playable live recordings use canonical catalog records.
+- Existing playback, queue, credits and archive metadata remain authoritative.
 
-## 5. Public Music Archive — 10/10
-- Dedicated Music Archive navigation exists.
-- Timeline combines recording and release history.
-- Era filtering is available.
-- Version-family cards expose connected recordings.
-- Responsive archive layouts cover narrow screens.
+## 5. Section 15 archive integration — 10/10
+- Public shows participate in the Music Archive chronology.
+- Show timeline entries deep-link to show details.
+- Live performance history complements, rather than duplicates, recording/release history.
 
-## 6. Search + Agent — 10/10
-- Section 12 search indexes archive metadata.
-- Agent catalog context includes era, version, recording session and personnel.
-- Archive/chronology requests route to the Music Archive.
-- Track-info questions include personnel, recording and alternate-version intent.
+## 6. Agent integration — 10/10
+- Agent context is grounded in canonical show records.
+- Show context includes date, venue, location, tour/era, setlist titles and archive notes.
+- Browse intent and factual show/setlist questions are routed separately.
+- Factual responses remain grounded through the existing catalog-context flow.
 
 ## 7. Admin authoring — 10/10
-- Track editor covers archive relationships, personnel, source notes and media.
-- Release editor covers liner notes, credits, editions, reissues and archive media.
-- Existing catalog import and metadata-template workflows remain intact.
+- Dedicated Shows + Live workspace exists.
+- Admin can create/edit/delete show records.
+- Setlists, live recordings and media have structured authoring inputs.
+- Server-side validation prevents invalid catalog references.
 
 ## 8. Deployment compatibility — 10/10
 - No database migration is required.
-- Database schema target remains 1.3.12.
-- Production data/storage remain excluded from application deploys.
-- Existing records without archive fields render normally.
+- Database target remains 1.3.12.
+- Existing installations with no `data/shows.json` return an empty show list safely.
+- Production `data/` remains preserved during deploys.
 
 ## 9. Regression gate — 10/10
-- Section 15 has a dedicated pure behavior/contract suite.
-- The GitHub release gate includes Sections 1–12, 14 and 15.
-- PHP and JavaScript syntax checks remain mandatory.
+- PHP syntax: PASS.
+- Public JavaScript syntax: PASS.
+- Admin JavaScript syntax: PASS.
+- Sections 1–12, 14, 15 and 16: PASS.
+- Explicit assertions: 874 passed.
+- Failures: 0.
 
-FINAL SECTION 15 SCORE: **10/10**
-
-
-## Final measured result
-- Exact feature head release gate: **PASS**
-- Explicit assertions: **853 passed**
-- Failures: **0**
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
+FINAL SECTION 16 SCORE: **10/10**
