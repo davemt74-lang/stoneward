@@ -56,6 +56,9 @@ function sf_agent_context(string $query,string $profile='catalog'): string {
         $releaseLines=[];$rp=SF_ROOT.'/data/releases.json';$rels=is_file($rp)?json_decode((string)file_get_contents($rp),true):[];
         foreach((array)$rels as $r){if(($r['state']??'published')!=='published'||isset($r['agent_discoverable'])&&!$r['agent_discoverable'])continue;$a=(array)($r['archive']??[]);$releaseLines[]='- '.($r['title']??'').' ('.($r['type']??'release').') '.substr((string)($r['description']??''),0,280).' | era '.($a['era']??'').' | edition '.($a['edition']??'').' | original date '.($a['original_release_date']??'').' | liner notes '.substr((string)($r['liner_notes']??''),0,220);if(count($releaseLines)>=6)break;}
         if($releaseLines)$sections[]="RELEASES\n".implode("\n",$releaseLines);
+        $showLines=[];$trackMap=[];foreach(sf_catalog() as $ct)if(!empty($ct['id']))$trackMap[(string)$ct['id']]=$ct;
+        foreach(sf_live_public_shows() as $show){$showLines[]='- id='.($show['id']??'').' | '.sf_live_summary($show,$trackMap);if(count($showLines)>=10)break;}
+        if($showLines)$sections[]="SHOWS + LIVE ARCHIVE\n".implode("\n",$showLines);
     }
     if($profile==='knowledge'){
         $kb=[];$kp=SF_ROOT.'/storage/knowledge/index.json';$kd=is_file($kp)?json_decode((string)file_get_contents($kp),true):[];
@@ -126,6 +129,8 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
+    if(preg_match('/\b(open|show|browse)\b.*\b(shows?|concerts?|tour dates?|live archive)\b|\b(upcoming shows?|tour dates?)\b/',$q))return 'shows_browse';
+    if(preg_match('/\b(setlist|concert|gig|show|tour)\b|played live|where did .* play|when did .* play/',$q))return 'show_info';
     if(preg_match('/\b(archive|timeline|eras?|chronolog(?:y|ical)|recording sessions?)\b/',$q))return 'archive_browse';
     if(preg_match('/album|release| ep |single/',$q))return 'release_browse';
     if(preg_match('/save (?:this |the )?(?:agent )?(?:listening )?session|save (?:these|those) songs/',$q)&&str_contains($q,'playlist'))return 'playlist_save_session';
@@ -182,6 +187,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'catalog_search':
             $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
+        case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;
+        case 'show_info':$action=['type'=>'open_view','view'=>'shows'];$profile='catalog';$needs=true;break;
         case 'archive_browse':$action=['type'=>'open_view','view'=>'archive'];$text='Here is the Stonefellow music archive — recordings, versions, sessions and releases in context.';$profile='catalog';break;
         case 'release_browse':$action=['type'=>'open_view','view'=>'releases'];$text='Here are the releases.';$profile='catalog';break;
         case 'playlist_open':$action=['type'=>'open_view','view'=>'account'];$text='Your playlists are in My Stonefellow.';$profile='account';break;
@@ -254,6 +261,8 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'queue_clear'=>'Asks to clear the Up Next queue.',
         'catalog_search'=>'Asks to find/search Stonefellow tracks or releases by title, mood, theme, lyric, credit, story, or other catalog clue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
+        'shows_browse'=>'Asks to browse Stonefellow shows, concerts, tour dates, or the live archive.',
+        'show_info'=>'Asks about a specific show, concert, tour, venue, date, setlist, or live performance.',
         'archive_browse'=>'Asks to browse the Stonefellow archive, chronology, eras, recording sessions, or version history.',
         'release_browse'=>'Asks to browse albums, EPs, singles, releases, or release pages.',
         'playlist_open'=>'Asks to see or open their playlists.',
