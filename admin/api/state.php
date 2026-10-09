@@ -81,6 +81,7 @@ foreach($recentListeningRows as $row){
 $listening=sf_engagement_analytics(30,null);
 $notificationAnalytics=sf_notification_analytics(30,null);
 $searchAnalytics=sf_search_analytics(30,null);
+$libraryAnalytics=sf_library_admin_analytics(null);
 $recentNotificationEvents=$pdo->query(
     "SELECT e.id,e.user_id,e.notification_id,e.event_type,e.created_at,n.kind,n.title,u.display_name,u.email
      FROM notification_events e
@@ -157,6 +158,9 @@ sf_json_response([
         'searches_30d'=>(int)($searchAnalytics['searches']??0),
         'search_click_rate_30d'=>(float)($searchAnalytics['click_through_rate']??0),
         'search_zero_result_rate_30d'=>(float)($searchAnalytics['zero_result_rate']??0),
+        'library_users'=>(int)($libraryAnalytics['users_with_library']??0),
+        'library_collections'=>(int)($libraryAnalytics['collections']??0),
+        'library_saved_items'=>(int)(($libraryAnalytics['favorites']??0)+($libraryAnalytics['playlists']??0)+($libraryAnalytics['builds']??0)+($libraryAnalytics['purchases']??0)),
     ],
     'releases'=>$releases,
     'recent_imports'=>array_slice($imports,0,5),
@@ -169,6 +173,7 @@ sf_json_response([
     'recent_notification_events'=>$recentNotificationEvents,
     'search_analytics'=>$searchAnalytics,
     'recent_search_events'=>$recentSearchEvents,
+    'library_analytics'=>$libraryAnalytics,
     'listening'=>[
         'days'=>30,
         'starts'=>(int)($listening['starts']??0),
