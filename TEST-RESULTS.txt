@@ -34,4 +34,8 @@ Section 18 coverage includes:
 - Admin Agent Brain campaign audit
 - application/schema capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact feature head: 3c83f1f774f88cce4b44545e1f7a35cfd5399b61
+- Release gate: PASS
+- Explicit assertions: 1005 passed
+- Failures: 0
