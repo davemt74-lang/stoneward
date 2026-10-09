@@ -38,7 +38,7 @@ function sf_ops_json(array $data): string { return json_encode($data,JSON_UNESCA
 function sf_notify_user(int $userId,string $kind,string $title,string $body='',string $link=''): int {
     sf_ops_ensure_schema();$q=sf_db()->prepare('INSERT INTO user_notifications(user_id,kind,title,body,link_url,is_read,created_at) VALUES(?,?,?,?,?,0,?)');
     $q->execute([$userId,sf_clean_text($kind,60),sf_clean_text($title,255),sf_clean_text($body,1000),sf_clean_text($link,500),gmdate('c')]);
-    return (int)sf_db()->lastInsertId();
+    $id=(int)sf_db()->lastInsertId();if(function_exists('sf_notification_event'))sf_notification_event($userId,$id,'delivered',['kind'=>$kind]);return $id;
 }
 function sf_log_user_activity(int $userId,string $eventType,string $title,string $entityType='',string $entityId='',array $meta=[]): void {
     if($userId<1)return;sf_ops_ensure_schema();$q=sf_db()->prepare('INSERT INTO user_activity(user_id,event_type,title,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)');
