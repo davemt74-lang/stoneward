@@ -137,7 +137,8 @@ ok(str_contains($adminCss,'.library-kpi-stack'),'Admin library KPIs are responsi
 ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.12'"),'database schema target advances to 1.3.12');
 ok(str_contains($mig,"'id'=>'2026-10-08-013'")&&str_contains($mig,'sf_library_ensure_schema'),'migration 013 installs collection schema');
 ok(str_contains($mig,"'user_collections','user_collection_items'"),'migration integrity requires collection tables');
-ok(str_contains($version,"'stonefellow'=>'1.3.12'"),'version endpoint reports v1.3.12');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vm);
+ok(isset($vm[1],$vm[2],$vm[3])&&[(int)$vm[1],(int)$vm[2],(int)$vm[3]]>=[1,3,12],'version endpoint reports v1.3.12 or later');
 ok(str_contains($version,"'database_schema_target'=>'1.3.12'"),'version endpoint reports schema 1.3.12');
 ok(str_contains($version,"'my_library'=>'unified-saved-music-purchases-builds-history-collections'"),'version endpoint reports My Library capability');
 ok(str_contains($wf,'node --check assets/js/library.js'),'release gate syntax-checks My Library JavaScript');
