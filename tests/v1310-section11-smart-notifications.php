@@ -29,7 +29,7 @@ ok(str_contains($core,"['23000','19']"),'dedupe handles duplicate-key errors wit
 ok(str_contains($core,'function sf_notification_seed_baseline'),'first-run baseline seeding exists');
 ok(str_contains($core,'sf_notification_seed_baseline($userId,$now)'),'first generation initializes release baseline');
 ok(str_contains($core,"return ['baseline_initialized'=>true"),'first generation exits after baseline initialization');
-ok(str_contains($core,"'release:'.$id"),'existing release IDs are seeded into dedupe baseline');
+ok(str_contains($core,"'release:'.\$id"),'existing release IDs are seeded into dedupe baseline');
 ok(str_contains($core,'updated_at>=? AND updated_at<=?'),'historical listening/build activity is bounded after the Section 11 baseline');
 
 ok(str_contains($core,'time()-12*3600'),'unfinished-listening reminder waits at least 12 hours');
@@ -45,11 +45,11 @@ ok(str_contains($core,"'recommendation','recommendation:'"),'recommendation noti
 
 ok(str_contains($core,'sf_transactional_email'),'email notifications reuse transactional email delivery');
 ok(str_contains($life,'transactional_email_outbox'),'transactional email outbox remains authoritative');
-ok(str_contains($core,"'smart_notification_'.$category"),'smart email delivery is labeled by notification category');
+ok(str_contains($core,"'smart_notification_'.\$category"),'smart email delivery is labeled by notification category');
 ok(str_contains($core,"'email_delivery'"),'email delivery events are tracked');
 ok(str_contains($core,"metadata_json"),'notification event metadata supports email-only category attribution');
 
-ok(str_contains($ops,"sf_notification_event($userId,$id,'delivered'"),'all in-app notification deliveries are instrumented');
+ok(str_contains($ops,"sf_notification_event(\$userId,\$id,'delivered'"),'all in-app notification deliveries are instrumented');
 ok(str_contains($core,"['delivered','read','click','dismiss']"),'notification lifecycle events are de-duplicated per notification');
 ok(str_contains($core,'function sf_notification_mark_read'),'mark-read helper exists');
 ok(str_contains($core,'function sf_notification_dismiss'),'dismiss helper exists');
