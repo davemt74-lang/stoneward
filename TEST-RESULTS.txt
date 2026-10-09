@@ -35,3 +35,17 @@ Measured feature-head GitHub Actions result:
 - Release gate: PASS
 - Explicit assertions: 921 passed
 - Failures: 0
+
+
+Stonefellow v1.3.16 Fan Community Launch Control
+================================================
+Exact feature head: 5d24d07a201d6c13cc5ce9a436b6876be32217f5
+PHP syntax: PASS
+Public JavaScript syntax: PASS
+Admin JavaScript syntax: PASS
+Full v1.3 regression suite: PASS
+Explicit assertions: 945 passed
+Failures: 0
+Fan Community default: OFF
+CRM/newsletter continuity while community OFF: PASS
+Database schema target: 1.3.13 (unchanged)
