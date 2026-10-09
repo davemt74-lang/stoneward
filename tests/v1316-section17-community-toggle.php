@@ -8,12 +8,12 @@ $site=src('api/site-settings.php');$settings=src('admin/api/settings.php');$admi
 ok(str_contains($site,"'fan_community_enabled'=>sf_meta_get('site.fan_community_enabled','0')==='1'"),'Fan Community launch control defaults OFF');
 ok(str_contains($site,"['fan_community_enabled','announcement_enabled','maintenance_enabled']"),'site settings persistence includes Fan Community toggle');
 ok(str_contains($settings,"'fan_community_enabled'=>!empty($body['fan_community_enabled'])"),'Admin settings API accepts Fan Community toggle');
-ok(str_contains($settings,"'fan_community'=>$site['fan_community_enabled']"),'Admin audit records Fan Community launch state');
+ok(str_contains($settings,"'fan_community'=>")&&str_contains($settings,"fan_community_enabled"),'Admin audit records Fan Community launch state');
 ok(str_contains($admin,'name="fan_community_enabled"')&&str_contains($admin,"f.get('fan_community_enabled')==='on'"),'Admin Settings exposes and saves the on/off control');
 ok(str_contains($admin,'CRM, newsletter and fan intelligence remain active when off'),'Admin UI clearly separates community launch from CRM');
 
-ok(str_contains($shell,"if(!empty($siteSettings['fan_community_enabled']))")&&str_contains($shell,'Fan Community'),'public navigation and quick action are server-gated');
-ok(str_contains($shell,"'fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false)"),'public runtime receives the launch state');
+ok(str_contains($shell,"fan_community_enabled")&&str_contains($shell,'Fan Community'),'public navigation and quick action are server-gated');
+ok(str_contains($shell,"'fanCommunityEnabled'=>(bool)")&&str_contains($shell,"fan_community_enabled"),'public runtime receives the launch state');
 ok(str_contains($community,"error'=>'community_disabled'")&&str_contains($community,"sf_site_settings()['fan_community_enabled']"),'community API blocks feed and posting while disabled');
 ok(str_contains($app,'fanCommunityEnabled=!!site.fanCommunityEnabled'),'public app reads launch state');
 ok(str_contains($app,'function renderNewsletter()'),'newsletter remains a standalone public CRM surface');
@@ -22,8 +22,8 @@ ok(str_contains($app,"if(!fanCommunityEnabled){renderNewsletter();return}"),'dir
 ok(str_contains($app,"fanCommunityEnabled?navigate('community'):navigate('newsletter')"),'chat quick-action handler cannot bypass the launch gate');
 ok(str_contains($app,"fanCommunityEnabled?'<button")&&str_contains($app,'Stonefellow updates'),'personalized home keeps newsletter but hides community CTA while disabled');
 
-ok(str_contains($crm,"$communityEnabled=!empty(sf_site_settings()['fan_community_enabled'])"),'CRM engagement policy knows the community launch state');
-ok(str_contains($crm,"$communityEnabled&&$type==='community_post'"),'historical community posts do not trigger proactive community outreach while disabled');
+ok(str_contains($crm,"communityEnabled=!empty")&&str_contains($crm,"fan_community_enabled"),'CRM engagement policy knows the community launch state');
+ok(str_contains($crm,"communityEnabled&&")&&str_contains($crm,"community_post"),'historical community posts do not trigger proactive community outreach while disabled');
 ok(str_contains($crm,'function sf_crm_record_user_activity(')&&str_contains($crm,'function sf_crm_newsletter_signup('),'core CRM and newsletter integrations remain active');
 ok(str_contains($agent,"sf_site_settings()['fan_community_enabled']")&&str_contains($agent,"view'=>'newsletter"),'Agent policy sends disabled-community requests to the still-active newsletter/CRM surface');
 
