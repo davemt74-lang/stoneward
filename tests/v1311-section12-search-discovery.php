@@ -60,12 +60,12 @@ ok(str_contains($core,'function sf_search_facets'),'catalog discovery facets exi
 foreach(["'moods'","'themes'","'releases'","'years'","'energies'"] as $facet)ok(str_contains($core,$facet),'facet exists: '.$facet);
 ok(str_contains($core,"['all','track','release']"),'search supports combined/track/release result types');
 ok(str_contains($core,"['relevance','popular','newest','title']"),'search exposes relevance/popular/newest/title sorting');
-ok(str_contains($core,"$p['mood']!==''"),'mood filter is enforced');
-ok(str_contains($core,"$p['theme']!==''"),'theme filter is enforced');
-ok(str_contains($core,"$p['release']!==''"),'release filter is enforced');
-ok(str_contains($core,"$p['year']>0"),'year filter is enforced');
-ok(str_contains($core,"$p['energy']>0"),'energy filter is enforced');
-ok(str_contains($core,"($r['state']??'published')!=='published'"),'hidden/unpublished releases are excluded');
+ok(str_contains($core,"\$p['mood']!==''"),'mood filter is enforced');
+ok(str_contains($core,"\$p['theme']!==''"),'theme filter is enforced');
+ok(str_contains($core,"\$p['release']!==''"),'release filter is enforced');
+ok(str_contains($core,"\$p['year']>0"),'year filter is enforced');
+ok(str_contains($core,"\$p['energy']>0"),'energy filter is enforced');
+ok(str_contains($core,"(\$r['state']??'published')!=='published'"),'hidden/unpublished releases are excluded');
 ok(str_contains($core,'public_visible'),'public release visibility is respected');
 
 ok(str_contains($core,'function sf_search_suggestions'),'zero-result suggestions exist');
