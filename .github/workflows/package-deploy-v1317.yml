@@ -1,0 +1,40 @@
+name: Stonefellow v1.3.17 Deploy Package
+
+on:
+  push:
+    branches:
+      - 'package/v1317-deploy'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout merged v1.3.17
+        uses: actions/checkout@v4
+
+      - name: Build verified deploy overlay
+        run: |
+          set -euo pipefail
+          ZIP="Stonefellow-v1.3.17-Deploy.zip"
+          rm -f "$ZIP" "$ZIP.sha256"
+          zip -r "$ZIP" .             -x '.git/*'                '.github/*'                'data/*'                'storage/*'                'config/database.php'                'config/app-secret.php'                'config/store.php'                'assets/js/config.js'                'assets/js/catalog.js'                'assets/js/releases.js'                "$ZIP" "$ZIP.sha256"
+          unzip -t "$ZIP"
+          sha256sum "$ZIP" > "$ZIP.sha256"
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^(data/|storage/|config/database.php$|config/app-secret.php$|config/store.php$|assets/js/(config|catalog|releases)\.js$)')" -eq 0
+          unzip -Z1 "$ZIP" | grep -qx 'api/campaign-core.php'
+          unzip -Z1 "$ZIP" | grep -qx 'admin/assets/campaigns.js'
+          unzip -Z1 "$ZIP" | grep -qx 'tests/v1317-section18-campaigns.php'
+          unzip -Z1 "$ZIP" | grep -qx 'upgrade.php'
+
+      - name: Upload deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stonefellow-v1.3.17-Deploy
+          path: |
+            Stonefellow-v1.3.17-Deploy.zip
+            Stonefellow-v1.3.17-Deploy.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
