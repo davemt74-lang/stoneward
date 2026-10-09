@@ -36,4 +36,8 @@ Section 19 measured coverage includes:
 - Admin audit / Agent Brain media events
 - application/schema capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact feature head: 6f64f4152b3011ce4437d270c803cbd119fc8eeb
+- Release gate: PASS
+- Explicit assertions: 1060 passed
+- Failures: 0
