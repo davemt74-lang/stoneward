@@ -1,0 +1,115 @@
+name: Build Stonefellow v1.3.12 Deploy
+
+on:
+  push:
+    branches:
+      - package/v1312-deploy
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact package branch
+        uses: actions/checkout@v4
+
+      - name: Build deploy package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="Stonefellow-v1.3.12-Deploy"
+          rm -rf "$ROOT" Stonefellow-v1.3.12-Deploy.zip Stonefellow-v1.3.12-Deploy.zip.sha256
+          mkdir -p "$ROOT"
+
+          rsync -a ./ "$ROOT"/ \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='tests/' \
+            --exclude='AUDIT-REPORT.md' \
+            --exclude='TEST-RESULTS.txt' \
+            --exclude='DEPLOY-MANIFEST.txt' \
+            --exclude='config/store.php' \
+            --exclude='data/' \
+            --exclude='storage/' \
+            --exclude='assets/js/config.js' \
+            --exclude='assets/js/catalog.js' \
+            --exclude='assets/js/releases.js' \
+            --exclude='Stonefellow-v1.3.12-Deploy/' \
+            --exclude='Stonefellow-v1.3.12-Deploy.zip' \
+            --exclude='Stonefellow-v1.3.12-Deploy.zip.sha256'
+
+          cat > "$ROOT/DEPLOY-MANIFEST.txt" <<'EOF'
+          Stonefellow v1.3.12 Section 14 deploy package
+          Source main commit: bcbb0d5bae7f82c59472dd75dde3e784fee5c2c3
+          Database schema target: 1.3.12
+
+          Deployment:
+          1. Upload the ZIP to the Stonefellow web root.
+          2. Extract over the existing installation.
+          3. Run /upgrade.php to apply migration 2026-10-08-013.
+          4. Confirm /version.php reports Stonefellow 1.3.12 and database schema target 1.3.12.
+          5. Sign in and open My Library from the user dropdown.
+          6. Verify Tracks, Releases, Playlists, Purchases, Builds, History, and Collections.
+
+          Section 14:
+          - Dedicated customer-facing My Library.
+          - Canonical favorites, playlists, purchases, saved builds, Continue Listening, and history.
+          - Mixed user Collections with ownership enforcement and manual ordering.
+          - Paid-order verification before purchase items appear as owned Library content.
+          - Agent My Library routing.
+          - Read-only Admin customer-library analytics.
+
+          Intentionally preserved / not overwritten:
+          - config/store.php
+          - config/database.php (not tracked in repository)
+          - config/app-secret.php (not tracked in repository)
+          - data/
+          - storage/
+          - assets/js/config.js
+          - assets/js/catalog.js
+          - assets/js/releases.js
+
+          Development-only files excluded:
+          - .github/
+          - tests/
+          - AUDIT-REPORT.md
+          - TEST-RESULTS.txt
+          EOF
+
+          (
+            cd "$ROOT"
+            find . -type f ! -name 'FILE-SHA256SUMS.txt' -print0 | sort -z | xargs -0 sha256sum > FILE-SHA256SUMS.txt
+          )
+
+          zip -qr Stonefellow-v1.3.12-Deploy.zip "$ROOT"
+          sha256sum Stonefellow-v1.3.12-Deploy.zip > Stonefellow-v1.3.12-Deploy.zip.sha256
+
+          unzip -t Stonefellow-v1.3.12-Deploy.zip
+          test -f "$ROOT/upgrade.php"
+          test -f "$ROOT/api/library-core.php"
+          test -f "$ROOT/api/library.php"
+          test -f "$ROOT/assets/js/library.js"
+          test -f "$ROOT/api/agent-runtime.php"
+          test -f "$ROOT/admin/assets/analytics.js"
+          test -f "$ROOT/version.php"
+          grep -q "2026-10-08-013" "$ROOT/api/migrations.php"
+          grep -q "1.3.12" "$ROOT/version.php"
+          grep -q "My Library" "$ROOT/assets/js/library.js"
+          grep -q "menuLibrary" "$ROOT/stonefellow-v120.php"
+          test ! -e "$ROOT/config/store.php"
+          test ! -e "$ROOT/data"
+          test ! -e "$ROOT/storage"
+          test ! -e "$ROOT/assets/js/config.js"
+          test ! -e "$ROOT/tests"
+
+      - name: Upload deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stonefellow-v1.3.12-Deploy
+          path: |
+            Stonefellow-v1.3.12-Deploy.zip
+            Stonefellow-v1.3.12-Deploy.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
