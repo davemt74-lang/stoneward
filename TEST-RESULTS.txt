@@ -25,4 +25,4 @@ Section 15 adds 16 explicit assertions covering:
 - Agent archive routing/context
 - navigation/version/site-data capability markers
 
-Final measured GitHub Actions result is required before merge.
+Measured feature-head GitHub Actions result: PASS\n\nExplicit assertions: 853 passed\nFailures: 0
