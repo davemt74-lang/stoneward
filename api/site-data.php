@@ -11,4 +11,5 @@ if(is_file($releasePath)){
     return is_array($r) && (($r['state']??'')==='published') && (($r['public_visible']??true)!==false);
   }));
 }
-sf_json_response(['ok'=>true,'catalog'=>$catalog,'releases'=>$releases,'generated_at'=>gmdate('c')]);
+$archive=sf_archive_payload($catalog,$releases);
+sf_json_response(['ok'=>true,'catalog'=>$catalog,'releases'=>$releases,'archive'=>$archive,'generated_at'=>gmdate('c')]);
