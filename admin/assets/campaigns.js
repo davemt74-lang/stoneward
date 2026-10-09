@@ -204,7 +204,7 @@
   }
   function analyticsHtml(e){
     const a=e.analytics||{},events=a.events||{},offers=a.offers||[];
-    return '<div class="stats"><div class="stat"><strong>'+Number(a.participants||0)+'</strong><span>Participants</span></div><div class="stat"><strong>'+Number(a.converted||0)+'</strong><span>Converted</span></div><div class="stat"><strong>'+Number(a.attributed_orders||0)+'</strong><span>Attributed orders</span></div><div class="stat"><strong>
+    return '<div class="stats"><div class="stat"><strong>'+Number(a.participants||0)+'</strong><span>Participants</span></div><div class="stat"><strong>'+Number(a.converted||0)+'</strong><span>Converted</span></div><div class="stat"><strong>'+Number(a.attributed_orders||0)+'</strong><span>Attributed orders</span></div><div class="stat"><strong>$'+(Number(a.attributed_revenue_cents||0)/100).toFixed(2)+'</strong><span>Attributed revenue</span></div></div>'+
       '<section class="campaign-analytics-grid"><div class="panel"><div class="panel-title"><h2>Event funnel</h2></div>'+(Object.keys(events).length?Object.entries(events).map(function(x){return '<div class="metric-row"><span>'+esc(x[0].replaceAll('_',' '))+'</span><strong>'+Number(x[1])+'</strong></div>'}).join(''):'<div class="empty">No campaign events yet.</div>')+'</div>'+
       '<div class="panel"><div class="panel-title"><h2>Offer activity</h2></div>'+(offers.length?offers.map(function(x){return '<div class="metric-row"><span>'+esc(x.entitlement_type)+' · '+esc(x.status)+'</span><strong>'+Number(x.c)+'</strong></div>'}).join(''):'<div class="empty">No offer claims yet.</div>')+'</div></section>';
   }
