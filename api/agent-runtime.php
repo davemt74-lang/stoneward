@@ -138,6 +138,8 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/add .* (record|vinyl|cassette|side [ab])|put .* on/',$q))return 'builder_add';
     if(preg_match('/cart|checkout/',$q))return 'cart_open';
     if(preg_match('/\b(buy|purchase|order)\b/',$q))return 'purchase_request';
+    if(preg_match('/notification preferences|notification settings|email reminders/',$q))return 'notification_preferences';
+    if(preg_match('/notifications|my reminders|what did i miss|show my alerts/',$q))return 'notifications_open';
     if(preg_match('/my account|my library|my purchases|profile/',$q))return 'account_open';
     if(preg_match('/plan|package|subscription|free trial|active tokens?/',$q))return 'plans_open';
     if(preg_match('/lyrics?|credits?|who wrote|who produced|isrc|bmi|ascap|story|about this song/',$q))return 'track_info';
@@ -205,6 +207,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             $action=['type'=>'builder_save'];$text='I’ll save the current build as a draft.';$profile='account';break;
         case 'cart_open':$action=['type'=>'open_view','view'=>'cart'];$text='Here’s your cart.';$profile='commerce';break;
         case 'purchase_request':$action=['type'=>'open_view','view'=>'cart'];$text='I can take you to the cart. You’ll confirm the purchase yourself at checkout.';$profile='commerce';$confirm=true;break;
+        case 'notifications_open':$action=['type'=>'open_notifications'];$count=(int)($client['notification_unread']??0);$text=$count>0?'You have '.$count.' unread notification'.($count===1?'':'s').'. I’ll open them.':'You’re caught up. I’ll open your activity drawer.';$profile='account';break;
+        case 'notification_preferences':$action=['type'=>'open_view','view'=>'account'];$text='Your notification preferences are in My account. You can control in-app and email reminders there.';$profile='account';break;
         case 'account_open':$action=['type'=>'open_view','view'=>'account'];$text='Here’s your account.';$profile='account';break;
         case 'plans_open':$action=['type'=>'open_view','view'=>'plans'];$text='Here are the Stonefellow plans and Active Token options.';$profile='account';break;
         case 'track_info':
@@ -224,7 +228,7 @@ function sf_jev_endpoint(string $url): string {
 function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $d=sf_ai_resolve_decision();if(!$d)return null;$url=sf_jev_endpoint((string)($d['endpoint_url']??''));if($url==='')return null;
     $model=trim((string)($d['model']??''))?:'typesafe/jev-1.13';
-    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??'')];
+    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??''),'notification_unread'=>(int)($client['notification_unread']??0),'latest_notification_title'=>(string)($client['latest_notification_title']??'')];
     $criteria=[
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
         'player_recommend'=>'Asks for one recommendation or one next song.',
@@ -258,6 +262,8 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'builder_save'=>'Asks to save the current build as a draft.',
         'cart_open'=>'Asks to view cart or checkout.',
         'purchase_request'=>'Asks to buy, purchase, or order something.',
+        'notifications_open'=>'Asks to see notifications, reminders, alerts, or what they missed.',
+        'notification_preferences'=>'Asks to manage notification or email reminder preferences.',
         'account_open'=>'Asks for their account, library, purchases, or profile.',
         'plans_open'=>'Asks about plans, packages, subscriptions, free trial, or Active Tokens.',
         'general_conversation'=>'General conversation that should be answered by the language model.'
