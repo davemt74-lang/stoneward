@@ -236,36 +236,4 @@
     try{const j=await api('campaigns.php',{action:'send_email',id:c.id,node_id:node.id,confirmed:true});say('Campaign email run complete: '+j.result.sent+' sent, '+j.result.failed+' failed.');openEditor(c.id,'analytics')}catch(x){say(x.message)}
   }
   window.SFCampaignAdmin={renderCampaigns:renderCampaigns,openEditor:openEditor};
-})();+(Number(a.attributed_revenue_cents||0)/100).toFixed(2)+'</strong><span>Attributed revenue</span></div></div>'+
-      '<section class="campaign-analytics-grid"><div class="panel"><div class="panel-title"><h2>Event funnel</h2></div>'+(Object.keys(events).length?Object.entries(events).map(function(x){return '<div class="metric-row"><span>'+esc(x[0].replaceAll('_',' '))+'</span><strong>'+Number(x[1])+'</strong></div>'}).join(''):'<div class="empty">No campaign events yet.</div>')+'</div>'+
-      '<div class="panel"><div class="panel-title"><h2>Offer activity</h2></div>'+(offers.length?offers.map(function(x){return '<div class="metric-row"><span>'+esc(x.entitlement_type)+' · '+esc(x.status)+'</span><strong>'+Number(x.c)+'</strong></div>'}).join(''):'<div class="empty">No offer claims yet.</div>')+'</div></section>';
-  }
-  async function validateGraph(){captureMeta();captureLanding();try{const r=await api('campaigns.php',{action:'validate_graph',graph:state.editor.campaign.graph});say('Campaign graph is valid: '+r.graph.nodes.length+' nodes and '+r.graph.edges.length+' connections.')}catch(e){say(e.message)}}
-  function simulateGraph(){
-    const e=state.editor,g=e.campaign.graph||{},trigger=(g.nodes||[]).find(function(n){return n.type==='trigger'});
-    if(!trigger){e.simulation=['Simulation stopped: no Trigger node.'];return renderEditor()}
-    const map={};g.nodes.forEach(function(n){map[n.id]=n});const seen=new Set(),queue=[trigger.id],path=[];
-    while(queue.length&&path.length<80){const id=queue.shift();if(seen.has(id)){path.push('Cycle detected at '+id);continue}seen.add(id);const n=map[id];if(!n)continue;let note=(nodeTypes[n.type]||[n.type])[0];if(n.type==='email')note+=' — explicit Admin send approval';if(n.type==='wait')note+=' — pauses '+Number(n.config&&n.config.hours||0)+'h';if(n.type.indexOf('offer_')===0)note+=' — creates entitlement on claim';path.push(note);g.edges.filter(function(x){return x.from===id}).forEach(function(x){queue.push(x.to)})}
-    e.simulation=path.length?path:['No reachable nodes.'];renderEditor();
-  }
-  async function saveCampaign(forceStatus){
-    captureMeta();captureLanding();const e=state.editor,c=e.campaign;if(!c.slug)c.slug=slug(c.name);c.audience=audienceFromGraph(c);if(forceStatus)c.status=forceStatus;
-    try{const j=await api('campaigns.php',{action:'save',campaign:c});e.campaign=j.campaign;e.analytics=j.analytics||e.analytics;await loadList();say('Campaign saved as '+e.campaign.status+'.');renderEditor()}catch(x){say(x.message)}
-  }
-  async function publishCampaign(){
-    const c=state.editor.campaign;
-    if(c.status==='published'){if(!confirm('Pause this campaign? Public entry and offers stop immediately.'))return;return saveCampaign('paused')}
-    if(!confirm('Publish this campaign? Public landing pages and offer claims become active. Email nodes still require a separate Admin send approval.'))return;
-    saveCampaign('published');
-  }
-  async function duplicateCampaign(){
-    const c=state.editor.campaign;if(!c.id)return;
-    try{const j=await api('campaigns.php',{action:'duplicate',id:c.id});await loadList();say('Campaign duplicated as a draft.');openEditor(j.campaign.id)}catch(e){say(e.message)}
-  }
-  async function sendEmail(){
-    const e=state.editor,c=e.campaign,node=(c.graph.nodes||[]).find(function(x){return x.id===e.selected});if(!node||node.type!=='email'||!c.id)return;
-    if(!confirm('Send this campaign email now to the eligible opted-in audience? This cannot be undone.'))return;
-    try{const j=await api('campaigns.php',{action:'send_email',id:c.id,node_id:node.id,confirmed:true});say('Campaign email run complete: '+j.result.sent+' sent, '+j.result.failed+' failed.');openEditor(c.id,'analytics')}catch(x){say(x.message)}
-  }
-  window.SFCampaignAdmin={renderCampaigns:renderCampaigns,openEditor:openEditor};
 })();
