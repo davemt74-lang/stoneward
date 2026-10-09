@@ -47,10 +47,19 @@
 - Database target advances to 1.3.13.
 - Older Section 14/16 schema/version assertions are forward-compatible without weakening their original capability checks.
 
-## 8. Regression gate — pending measured GitHub validation
-- PHP syntax required.
-- Public JavaScript syntax required.
-- Admin JavaScript syntax required.
-- Sections 1–12, 14, 15, 16 and 17 required.
+## 8. Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Sections 1–12, 14, 15, 16 and 17: **PASS**
+- Explicit assertions: **921 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 17 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 17 SCORE: **10/10**
+
+
+## Final measured feature-head result
+- Exact feature head: `fd6591177797da0f919f229af3f9ea6e223167ff`
+- GitHub release gate: **PASS**
+- Explicit assertions: **921 passed**
+- Failures: **0**
