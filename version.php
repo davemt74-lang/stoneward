@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.17',
+  'stonefellow'=>'1.3.18',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.14',
+  'database_schema_target'=>'1.3.15',
   'database_upgrader'=>'upgrade.php',
   'dashboard'=>'activity-listening-command-center',
   'personalization'=>'favorites-library-history',
@@ -31,6 +31,9 @@ echo json_encode([
   'fan_community_launch_control'=>'admin-toggle-default-off-crm-stays-active',
   'campaigns'=>'visual-node-builder-audience-offers-messaging-attribution',
   'campaign_offers'=>'newsletter-free-download-discount-vip-exclusive',
+  'media_library'=>'central-assets-upload-analyze-attach-reorder-controlled-delivery',
+  'song_media'=>'audio-artwork-photo-video-document-archive-uploader',
+  'audio_metadata'=>'ffprobe-wav-riff-mp3-frame-id3-fallback',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
 ], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);

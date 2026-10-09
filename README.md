@@ -1,135 +1,193 @@
-# Stonefellow v1.3.17 — Section 18: Campaigns, Offers & Fan Acquisition
+# Stonefellow v1.3.18 — Section 19: Media Uploads & Asset Library
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 18 turns the Section 17 CRM into an operational campaign engine.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 19 completes the song-media workflow with a central Media Library, real upload controls, audio metadata extraction, controlled publishing, and reusable asset relationships.
 
-## Campaigns
+## Central Media Library
 
-Admin now has a first-class **Campaigns** workspace for building and managing:
+Admin now includes **Media Library** as a first-class workspace.
 
-- Newsletter acquisition campaigns
-- Free song downloads
-- Merch/order discounts
-- VIP and ticket offers
-- Exclusive/private content
-- Release promotion
-- Loyalty and win-back campaigns
-- Custom fan-acquisition journeys
+Supported media categories:
 
-Every campaign has a public slug, lifecycle state, date window, landing-page content, CRM audience rules, workflow graph, participant history, offer claims and conversion analytics.
+- Audio — MP3 and WAV
+- Images — JPG, PNG, WebP and GIF
+- Video — MP4, WebM and MOV
+- Documents — PDF, TXT, Markdown and RTF
+- Archive media — any supported media type attached in an archival role
 
-## Visual Campaign Builder
+Every asset records:
 
-The Campaign Builder is a drag-and-drop node canvas.
+- stable media UUID
+- original filename
+- managed storage path
+- SHA-256
+- file size
+- MIME type and extension
+- category
+- title, caption, alt text, credit and copyright
+- extracted technical metadata
+- image variants where available
+- uploader and timestamps
+- asset usage count / relationships
 
-Supported node types:
+Files live under private `storage/media/`. Public playback and display go through the controlled `api/media.php` delivery endpoint.
 
-- Trigger
-- Audience
-- Condition
-- Wait
-- Email
-- CRM Tag
-- Agent Message
-- Free Download
-- Discount Offer
-- VIP Offer
-- Exclusive
-- Redirect
-- Conversion
-- Exit
+## Song Media workspace
 
-Nodes can be repositioned and connected visually. The builder includes a node inspector, graph validation and path simulation.
+Every song editor now has a real **Media** section.
 
-The saved graph is the campaign source of truth. Campaign entry executes audience and condition gates, CRM tagging, governed Agent messages, offer availability, conversion and exit behavior. Wait nodes persist a waiting state. Email nodes do **not** send automatically: every campaign email send requires explicit Admin approval.
+It supports:
 
-## Audience and CRM
+- Upload audio
+- Upload artwork
+- Upload photos
+- Upload video
+- Upload documents
+- Upload archive material
+- Choose an existing Media Library asset
 
-Campaign participation uses the existing Fan CRM identity layer.
+Audio roles include:
 
-Audience rules can target:
+- Primary audio
+- Master
+- Preview
+- Download
+- Alternate audio
+- Candidate / replacement
 
-- newsletter subscribers
-- linked Stonefellow accounts
-- previous purchasers
-- CRM lifecycle stages
-- CRM tags
+Uploading audio never silently replaces the live song. The Admin can inspect/play the uploaded asset first and then explicitly choose **Make Primary Audio**.
 
-A campaign participant is connected back to the canonical fan contact. Entering a campaign, claiming an offer, downloading a track and converting all feed CRM history.
+Replacing primary audio:
 
-Providing an email to receive an offer does **not** imply newsletter consent. Marketing opt-in remains an explicit checkbox.
+- updates the song's playable source
+- refreshes duration from extracted audio metadata when available
+- marks the selected media relationship public
+- demotes the previous primary to a non-public candidate instead of deleting it
+- records the action in Admin audit and Agent Brain
 
-## Offers
+Artwork follows the same pattern with **Make Primary Artwork**.
 
-Campaign offer nodes support:
+Attached media supports:
 
-- Free song download entitlements
-- Percentage or fixed campaign discounts
-- VIP/ticket links and access codes
-- Exclusive/private links and access codes
-- claim limits and expiration windows
+- Public on/off
+- Downloadable on/off
+- Featured on/off
+- role selection for audio
+- detach without deleting the asset
+- permanent deletion only when unused
+- drag reordering within media roles
 
-Free song downloads use tokenized campaign entitlements and record the actual download.
+## MP3 / WAV metadata extraction
 
-Campaign discount codes are validated server-side in the cart quote and order flow.
+Stonefellow uses **FFprobe when available**.
 
-## Campaign email
+For MP3/WAV, FFprobe can provide:
 
-Email nodes define campaign newsletter/broadcast copy.
+- duration
+- codec / format
+- bitrate
+- sample rate
+- channel count
+- bit depth where available
+- embedded title
+- artist
+- album
+- year/date
+- track number
+- genre
+- comments
+- embedded-artwork presence
+- stream-level metadata
 
-Campaign email sends:
+Stonefellow also includes built-in fallbacks.
 
-- require a published campaign
-- require explicit Admin confirmation
-- target only fans with marketing opt-in
-- generate a fresh unsubscribe link
-- use the existing Stonefellow email lifecycle
-- create a message-run audit
-- are recorded in Admin Agent Brain
+### WAV fallback
 
-The existence of an Email node alone can never send a mass email.
+The RIFF parser reads:
 
-## Public campaign pages
+- exact duration from data size and byte rate
+- sample rate
+- channels
+- bits per sample
+- audio format / PCM type
+- byte rate
+- block alignment
+- INFO metadata such as title, artist, product/album, date, genre and comment
 
-Published campaigns render at:
+### MP3 fallback
 
-`/campaign/{slug}`
+The MP3 parser reads:
 
-The public experience supports campaign artwork/copy, fan entry, explicit newsletter consent and eligible offers.
+- MPEG version/layer
+- first valid frame bitrate
+- sample rate
+- channel mode
+- approximate constant-bitrate duration
+- ID3v2 text fields
+- ID3v1 title, artist, album, year and comment
+- embedded-artwork presence from ID3v2 APIC when detected
 
-## Attribution and analytics
+The Admin Media Library reports whether FFprobe is installed and whether Stonefellow is using the richer FFprobe path or its built-in fallback.
 
-Stonefellow records:
+## Image processing
 
-- campaign views
-- form starts
-- campaign entry
-- audience decisions
-- offer availability
-- offer claims
-- downloads
-- outbound offer clicks
-- conversions
-- campaign-attributed purchases
-- discount redemptions
-- attributed revenue
+When the PHP GD extension is available, uploaded images generate:
 
-Campaign entry also creates a bounded browser attribution window so a later Stonefellow purchase can be credited to the campaign even when no discount code is used.
+- Large — max 1600 px
+- Medium — max 800 px
+- Thumbnail — max 320 px
+
+The original is retained untouched.
+
+If GD is unavailable, the original asset still works and the Media Library reports that derivative generation is unavailable.
+
+## Public song pages
+
+Only media explicitly marked **Public** appears on public song pages.
+
+Public song media can include:
+
+- photos/artwork galleries
+- video
+- alternate audio
+- downloadable audio when separately allowed
+- documents and archive items
+
+Public visibility and download permission are independent.
+
+Private masters never enter the public song page or public Agent context.
+
+## Existing catalog migration
+
+Migration 016 backfills existing song media where possible.
+
+It can:
+
+- recover old folder-import master/preview audio using the previous SHA-256 media index
+- register existing stored originals without duplicating bytes
+- copy legacy local song audio/artwork into managed Media Library storage
+- import local legacy archive media
+- preserve the song's existing playback source during the migration itself
+
+Future folder imports register master and preview files directly in Media Library.
 
 ## Agent integration
 
-The public Stonefellow Agent receives active-campaign context and can route fans to matching campaigns such as free downloads, discounts, VIP offers, exclusives and early-access promotions.
+Admin Agent Brain records:
 
-The Admin Agent routes campaign-building requests directly into the Campaign Builder.
+- media uploads
+- primary-audio publication
+- primary-artwork publication
 
-Campaign authoring and campaign email sends are written into Admin Agent Brain.
+The Admin Agent routes media-management requests to Media Library.
 
-## Fan Community
-
-The Fan Community launch control introduced in v1.3.16 remains unchanged and defaults OFF. Campaigns, CRM and newsletter acquisition work independently of the public community.
+The public Stonefellow Agent can see a concise summary of **public** song media only. Private masters and private archive assets are excluded.
 
 ## Database
 
-Migration **2026-10-09-015** adds campaign, participant, event, entitlement, saved-segment and message-run storage for SQLite and MySQL.
+Migration **2026-10-09-016** adds:
 
-Application: **1.3.17**  
-Database schema target: **1.3.14**
+- `media_assets`
+- `media_links`
+
+Application: **1.3.18**  
+Database schema target: **1.3.15**

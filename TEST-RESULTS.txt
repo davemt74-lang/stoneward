@@ -1,41 +1,39 @@
-Stonefellow v1.3.17 Section 18 release gate
+Stonefellow v1.3.18 Section 19 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
-- assets/js/app.js syntax
-- admin/assets/admin.js syntax
-- admin/assets/campaigns.js syntax
-- Sections 1–12 regression suites
-- Section 14 My Library
-- Section 15 Music Archive
-- Section 16 Shows, Tours & Live Archive
-- Section 17 Fan CRM + Community controls
-- Section 18 Campaigns, Offers & Fan Acquisition
+- Public JavaScript syntax
+- Admin JavaScript syntax
+- Campaign Builder JavaScript syntax
+- Media Library JavaScript syntax
+- Sections 1–18 inherited regression suites
+- Section 19 Media Uploads & Asset Library
 
-Section 18 coverage includes:
-- migration/schema
-- graph validation
-- node types
-- drag-and-drop visual builder
-- connections/inspector
-- validation/simulation
-- CRM audience gates
-- campaign landing pages
-- explicit newsletter consent
-- free-song download entitlements
-- discount quote/order integration
-- VIP/exclusive claims
-- campaign email approval boundary
-- unsubscribe handling
-- participant and event ledgers
-- purchase/revenue attribution
-- Agent campaign context/routing
-- Admin Agent Brain campaign audit
+Section 19 measured coverage includes:
+- SQLite/MySQL media schema
+- migration 016
+- SHA-256 deduplication
+- upload authentication
+- MIME/signature validation
+- FFprobe capability
+- WAV fallback duration/sample rate/channels/bit depth/bitrate
+- MP3 fallback duration/bitrate/sample rate/channels/ID3
+- image derivative pipeline
+- controlled delivery and HTTP Range
+- public vs downloadable permissions
+- top-level Media Library
+- Song Media uploader categories
+- existing asset picker
+- audio roles
+- explicit primary audio/artwork actions
+- drag ordering
+- detach/delete rules
+- old folder importer integration
+- migration backfill
+- public song media
+- public Agent media context
+- Admin audit / Agent Brain media events
 - application/schema capability markers
 
-Measured feature-head GitHub Actions result:
-- Exact feature head: 3c83f1f774f88cce4b44545e1f7a35cfd5399b61
-- Release gate: PASS
-- Explicit assertions: 1005 passed
-- Failures: 0
+Measured GitHub Actions result will be recorded before merge.
