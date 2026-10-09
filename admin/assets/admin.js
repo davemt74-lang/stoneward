@@ -24,7 +24,7 @@
 
   function head(kicker,title,copy,actions=''){return `<div class="canvas-head"><div><div class="eyebrow">${esc(kicker)}</div><h1>${esc(title)}</h1><p>${esc(copy)}</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>`}
   function renderDashboard(){
-    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},search=d.search_analytics||{},recentNotificationEvents=d.recent_notification_events||[],recentSearchEvents=d.recent_search_events||[],daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
+    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},search=d.search_analytics||{},library=d.library_analytics||{},recentNotificationEvents=d.recent_notification_events||[],recentSearchEvents=d.recent_search_events||[],daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
     canvas.innerHTML=head('STONEFELLOW OPERATIONS','Dashboard','Recent customers, purchases, listening, activity, Agent Brain, catalog health, and launch operations in one place.',`<button class="secondary" id="dashboardRefresh" type="button">Refresh</button>`)+
     `<div class="stats dashboard-primary-stats">
       <div class="stat"><strong>${Number(s.users||0).toLocaleString()}</strong><span>Total users</span></div>
@@ -74,6 +74,16 @@
         <button class="dashboard-kpi" data-view="analytics"><small>TOP QUERY</small><strong>${esc(search.top_queries?.[0]?.query||'—')}</strong><span>${Number(search.top_queries?.[0]?.searches||0)} searches</span></button>
       </div>
       ${recentSearchEvents.length?`<div class="dashboard-timeline search-event-feed">${recentSearchEvents.slice(0,6).map(x=>`<div class="dashboard-timeline-row"><span class="timeline-dot search"></span><div><strong>${esc(x.query_text||x.result_id||'Catalog discovery')}</strong><small>${esc(x.display_name||x.email||'Guest')} · ${esc(String(x.event_type||'search').replaceAll('_',' '))}${x.event_type==='search'?' · '+Number(x.result_count||0)+' results':''}</small></div><time>${esc((x.created_at||'').replace('T',' ').slice(0,16))}</time></div>`).join('')}</div>`:''}
+    </section>
+
+    <section class="panel dashboard-panel library-dashboard-panel">
+      <div class="panel-title"><h2>Customer libraries</h2><button type="button" class="panel-link" data-view="analytics">Library analytics →</button></div>
+      <div class="dashboard-kpi-stack library-kpi-stack">
+        <button class="dashboard-kpi" data-view="analytics"><small>LIBRARY USERS</small><strong>${Number(library.users_with_library||0)}</strong><span>customers saving content</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>SAVED ITEMS</small><strong>${Number(library.favorites||0)+Number(library.playlists||0)+Number(library.builds||0)+Number(library.purchases||0)}</strong><span>favorites + playlists + builds + owned</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>COLLECTIONS</small><strong>${Number(library.collections||0)}</strong><span>${Number(library.collection_items||0)} collected items</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>TOP SAVED</small><strong>${esc(library.top_tracks?.[0]?.title||'—')}</strong><span>${Number(library.top_tracks?.[0]?.saves||0)} saves</span></button>
+      </div>
     </section>
 
     <div class="dashboard-two-col">
