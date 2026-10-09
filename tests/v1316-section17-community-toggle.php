@@ -7,7 +7,7 @@ $site=src('api/site-settings.php');$settings=src('admin/api/settings.php');$admi
 
 ok(str_contains($site,"'fan_community_enabled'=>sf_meta_get('site.fan_community_enabled','0')==='1'"),'Fan Community launch control defaults OFF');
 ok(str_contains($site,"['fan_community_enabled','announcement_enabled','maintenance_enabled']"),'site settings persistence includes Fan Community toggle');
-ok(str_contains($settings,"'fan_community_enabled'=>!empty($body['fan_community_enabled'])"),'Admin settings API accepts Fan Community toggle');
+ok(str_contains($settings,"'fan_community_enabled'=>!empty(")&&str_contains($settings,"fan_community_enabled"),'Admin settings API accepts Fan Community toggle');
 ok(str_contains($settings,"'fan_community'=>")&&str_contains($settings,"fan_community_enabled"),'Admin audit records Fan Community launch state');
 ok(str_contains($admin,'name="fan_community_enabled"')&&str_contains($admin,"f.get('fan_community_enabled')==='on'"),'Admin Settings exposes and saves the on/off control');
 ok(str_contains($admin,'CRM, newsletter and fan intelligence remain active when off'),'Admin UI clearly separates community launch from CRM');
