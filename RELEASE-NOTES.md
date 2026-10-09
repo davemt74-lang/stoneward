@@ -1,17 +1,18 @@
-# Stonefellow v1.3.10 — Section 11: Smart Notifications & Listener Re-engagement
+# Stonefellow v1.3.11 — Section 12: Search, Discovery & Catalog Intelligence
 
-- Added governed smart notifications for unfinished listening, personalized recommendations, new releases, and saved custom-media builds.
-- Added per-category in-app/email preferences in My account.
-- Email reminders reuse the existing transactional email system and are opt-in by default.
-- Added persistent dedupe keys and first-run generation baseline to prevent duplicate notifications and upgrade storms.
-- Added a CLI notification generator for inactive-user re-engagement.
-- Extended the existing bell drawer with explicit Mark read, Open, and Dismiss actions.
-- Added read/click/dismiss lifecycle instrumentation.
-- Added Agent routes for notifications and notification preferences.
-- Added notification unread/latest-title context to Agent routing.
-- Added Admin delivery/read/click metrics, notification→listen conversion, notification→purchase conversion, type breakdowns, user breakdowns, and recent notification activity.
-- Added notification KPIs to the main Admin dashboard.
-- Cleaned the Section 10 analytics renderer markup while preserving its listening and commerce analytics.
-- Updated Sections 7–10 regression gates so later schema migrations do not falsely invalidate completed earlier sections.
-- Added migration 011.
-- Application and database schema target advance to 1.3.10.
+- Replaced the basic Music filter with unified server-backed track/release Search & Discover.
+- Added weighted search across titles, releases, moods, themes, stories, lyrics, credits, metadata, and release metadata.
+- Added typo-tolerant matching and zero-result suggestions.
+- Added facets for result type, mood, theme, release, year, and energy.
+- Added relevance, popularity, newest, and title sorting.
+- Added signed-in personalization boosts without creating a parallel recommendation model.
+- Added popularity signals from canonical listening events.
+- Added recent searches and user-controlled search-history clearing.
+- Added shareable/restorable catalog search URLs.
+- Added search-result selection telemetry and dedicated catalog-search playback telemetry.
+- Added guest-safe telemetry throttling bound to server-observed identity and signed-in user/session governance.
+- Added Agent natural-language catalog search and current-search context.
+- Added Admin search/discovery analytics, zero-result catalog-gap reporting, filter usage, top selected results, and recent search activity.
+- Added migration 012.
+- Application and database schema target advance to 1.3.11.
+- Updated the Section 11 regression gate to remain forward-compatible with later schema upgrades.
