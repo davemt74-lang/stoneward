@@ -1,4 +1,4 @@
-# Stonefellow v1.3.15 — Section 17: Fan CRM, Community & Agent Engagement
+# Stonefellow v1.3.16 — Fan CRM, Community & Agent Engagement
 
 Stonefellow is still a **single-artist platform**. Section 17 adds a relationship layer around that artist: fans, newsletter contacts, customers, community participation, and governed Agent engagement.
 
@@ -34,7 +34,9 @@ Newsletter consent and proactive in-app Agent interaction are separate settings.
 
 ## Fan Community
 
-Signed-in fans can post to a first-class Stonefellow community feed. Community activity is linked to their account and CRM profile.
+The public Fan Community is controlled by **Admin → Settings → Enable public Fan Community feed and posting** and defaults **OFF**. Turning it off hides public entry points and blocks feed/posting APIs without disabling CRM, newsletter, purchases, listening signals, or Agent CRM context.
+
+When enabled, signed-in fans can post to a first-class Stonefellow community feed. Community activity is linked to their account and CRM profile.
 
 Community posts are:
 
@@ -104,5 +106,5 @@ Every action opens a real existing or Section 17 workflow.
 
 Section 17 adds migration **2026-10-09-014**.
 
-Application: **1.3.15**  
+Application: **1.3.16**  
 Database schema target: **1.3.13**

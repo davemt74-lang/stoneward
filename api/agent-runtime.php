@@ -192,8 +192,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'catalog_search':
             $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
-        case 'community_browse':$action=['type'=>'open_view','view'=>'community'];$text='Here’s the Stonefellow fan community.';$profile='crm';break;
-        case 'newsletter_join':$action=['type'=>'open_view','view'=>'community'];$text='The newsletter signup is in the fan community. You control whether Stonefellow can email you.';$profile='crm';break;
+        case 'community_browse':if(!empty(sf_site_settings()['fan_community_enabled'])){$action=['type'=>'open_view','view'=>'community'];$text='Here’s the Stonefellow fan community.';}else{$action=['type'=>'open_view','view'=>'newsletter'];$text='The fan community is not open yet. The fan CRM and newsletter are still active, and you can join the newsletter here.';}$profile='crm';break;
+        case 'newsletter_join':$action=['type'=>'open_view','view'=>'newsletter'];$text='The newsletter signup is in the fan community. You control whether Stonefellow can email you.';$profile='crm';break;
         case 'store_browse':$action=['type'=>'open_view','view'=>'store'];$text='Here’s the Stonefellow store.';$profile='commerce';break;
         case 'fan_profile':$action=['type'=>'open_view','view'=>'community'];$profile='crm';$needs=true;break;
         case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;

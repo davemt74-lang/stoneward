@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.15',
+  'stonefellow'=>'1.3.16',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
@@ -28,6 +28,7 @@ echo json_encode([
   'music_archive'=>'single-artist-eras-versions-sessions-personnel-media-timeline',
   'shows_live_archive'=>'single-artist-shows-tours-setlists-live-recordings-media',
   'fan_crm_community_agent'=>'contacts-consent-newsletter-community-agent-brain-proactive-engagement',
+  'fan_community_launch_control'=>'admin-toggle-default-off-crm-stays-active',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
 ], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
