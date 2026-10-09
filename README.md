@@ -1,110 +1,48 @@
-# Stonefellow v1.3.12 — Section 14: My Library, Collections & Saved Music
+# Stonefellow v1.3.13 — Section 15: Music Archive, Song Stories & Deep Catalog
 
-Section 14 gives every signed-in listener a dedicated **My Library** workspace. It consolidates the saved-content systems already built across Stonefellow without replacing or duplicating them.
+Stonefellow remains a **single-artist platform**. Section 15 deepens that artist's catalog rather than introducing multi-artist profiles or following.
 
-## My Library
+## Music Archive
 
-The signed-in menu now includes **My Library** with first-class tabs for:
+A new public **Music Archive** view organizes the existing Stonefellow catalog by chronology, era, recording session, version family, and release history.
 
-- All
-- Tracks
-- Releases
-- Playlists
-- Purchases
-- Builds
-- History
-- Collections
+Archive metadata remains attached to the canonical track/release records. There is no parallel music database.
 
-The library reuses Stonefellow's canonical favorites, playlists, owned-order library, saved custom-media builds, Continue Listening state, and listening history.
+Track archive fields support:
 
-### Library actions
+- Era
+- Canonical work ID
+- Version type and display label
+- Version-of relationship
+- Alternate track IDs
+- Recording date and session
+- Structured personnel
+- Source/archive notes
+- Attached archival media
 
-From My Library a listener can:
+This allows studio masters, demos, live takes, rehearsals, remasters, alternate mixes, and other versions to be connected as recordings of the same underlying song.
 
-- Play saved tracks.
-- Resume unfinished listening.
-- Open saved tracks and releases.
-- Play or open playlists.
-- Add tracks to Up Next.
-- Reopen saved record/cassette builds.
-- Open the source order for owned purchases.
-- Favorite/unfavorite tracks and releases using the existing personalization system.
-- Search and sort within the current library tab.
-- Organize saved content into mixed Collections.
+## Rich track + release context
 
-## Collections
+Track pages now expose recording context, personnel, connected versions, and archival media when available.
 
-Collections are deliberately different from playlists. A playlist is an ordered music playback sequence; a Collection is a personal folder that can contain different kinds of saved Stonefellow content.
+Release records advance to `stonefellow.release.v2` and support liner notes, credits, edition/original-release context, reissue relationships, and archival media.
 
-A Collection may contain:
+## Search + Agent
 
-- Tracks
-- Releases
-- Playlists owned by the user
-- Paid/complete purchases owned by the user
-- Saved custom-media builds owned by the user
+Section 12 search now indexes archive metadata in addition to titles, lyrics, stories, credits, moods and themes.
 
-Collections support create, rename/description, delete, add, remove, and manual ordering.
-
-Deleting a Collection does **not** delete the underlying favorite, playlist, purchase, or build.
-
-Collection ownership is enforced server-side. Cross-user playlist, build, purchase, or Collection references are rejected.
-
-## Purchase ownership
-
-My Library only presents order items as owned purchases after the canonical order record is paid/complete. A payment-pending order can still be inspected in My Account, but it does not become owned Library content prematurely.
-
-## My Account
-
-My Account remains the place for profile, subscription/billing, receipts, notifications, security/sessions, and transactional order history.
-
-Saved-content management has been consolidated into My Library. Account includes a compact My Library summary and deep links to Tracks, Releases, Playlists, Purchases, and Collections.
-
-## Agent
-
-The Stonefellow Agent now routes requests such as:
-
-- “open my library”
-- “show my saved music”
-- “show my collections”
-- “show my purchases”
-- “show my playlists”
-
-to the appropriate My Library tab instead of sending library requests to Account settings.
+The Stonefellow Agent can open the Music Archive and answer grounded questions about recording sessions, personnel, chronology, and alternate versions using canonical catalog context.
 
 ## Admin
 
-Admin remains read-only with respect to customer library organization.
+Admin catalog editing now includes Archive + Version History controls. Release management includes liner notes, credits, edition/reissue context, and attached archive media.
 
-Admin analytics now includes:
-
-- Users with saved library content
-- Favorites
-- Playlists
-- Owned purchases
-- Saved builds
-- Collections and collected-item totals
-- Most-saved tracks
-- Most-saved releases
-- Per-user My Library summary
-- Per-user Collection names/item counts
-
-No Admin control was added to casually mutate a customer's personal Collection or saved-content state.
+Production `data/` remains deployment-owned content and is not overwritten by application deploys.
 
 ## Database
 
-Section 14 advances the database schema to **1.3.12**.
+No database migration is required. Database schema target remains **1.3.12**.
 
-Migration:
-
-- `2026-10-08-013` — user Collections and mixed saved-item organization.
-
-New tables:
-
-- `user_collections`
-- `user_collection_items`
-
-Run **`/upgrade.php`** after deploying v1.3.12.
-
-Application: **1.3.12**  
+Application: **1.3.13**  
 Database schema target: **1.3.12**
