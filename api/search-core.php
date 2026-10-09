@@ -55,6 +55,7 @@ function sf_search_release_fields(array $r,array $trackMap): array {
         'description'=>(string)($r['description']??''),
         'notes'=>(string)($r['notes']??$r['liner_notes']??''),
         'credits'=>array_values(array_filter(array_map('strval',(array)($r['credits']??[])))),
+        'metadata'=>array_values(array_filter([(string)($r['label']??''),(string)($r['genre']??''),(string)($r['catalog_number']??''),(string)($r['upc_ean']??'')])),
         'tracks'=>$trackTitles,'moods'=>array_values(array_unique($moods)),'themes'=>array_values(array_unique($themes)),
     ];
 }
