@@ -32,6 +32,8 @@ ok((int)$ma['sample_rate']===44100,'MP3 fallback extracts 44.1 kHz sample rate')
 ok((int)$ma['channels']===2,'MP3 fallback extracts channel mode');
 ok(($ma['technical']['normalized_tags']['title']??'')==='Test Song','MP3 fallback reads ID3v1 title');
 ok(($ma['technical']['normalized_tags']['artist']??'')==='Stonefellow','MP3 fallback reads ID3v1 artist');
+$md=sf_media_detect_type($mp3Path,'one-second.mp3');
+ok($md['category']==='audio'&&$md['extension']==='mp3','MP3 signature/MIME validation accepts MPEG audio');
 
 $core=file_get_contents($root.'/api/media-core.php');$boot=file_get_contents($root.'/api/bootstrap.php');$mig=file_get_contents($root.'/api/migrations.php');$adminUpload=file_get_contents($root.'/admin/api/media-upload.php');$adminApi=file_get_contents($root.'/admin/api/media.php');$delivery=file_get_contents($root.'/api/media.php');$linksApi=file_get_contents($root.'/api/media-links.php');$adminJs=file_get_contents($root.'/admin/assets/admin.js');$agent=file_get_contents($root.'/api/agent-runtime.php');$mediaJs=file_get_contents($root.'/admin/assets/media.js');$mediaCss=file_get_contents($root.'/admin/assets/media.css');$app=file_get_contents($root.'/assets/js/app.js');$siteCss=file_get_contents($root.'/assets/css/site.css');$finalize=file_get_contents($root.'/admin/api/finalize.php');$adminShell=file_get_contents($root.'/admin/index.php');$version=file_get_contents($root.'/version.php');$wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
@@ -43,7 +45,7 @@ ok(substr_count($core,'CREATE TABLE IF NOT EXISTS media_links')===2,'media_links
 ok(str_contains($core,'UNIQUE(sha256,size_bytes)')||str_contains($core,'uq_media_hash_size'),'media assets deduplicate by SHA-256 and size');
 
 ok(str_contains($adminUpload,'sf_media_ingest_upload')&&str_contains($adminUpload,'sf_admin_require_auth(true)'),'central media uploader is authenticated and uses the Media Library ingest pipeline');
-ok(str_contains($core,'finfo')&&str_contains($core,'RIFF')&&str_contains($core,"substr($head,0,3)==='ID3'"),'uploader validates MIME plus MP3/WAV signatures');
+ok(str_contains($core,'finfo')&&str_contains($core,'RIFF')&&str_contains($core,'ID3'),'uploader includes MIME plus MP3/WAV signature validation');
 ok(str_contains($core,'1024*1024*1024'),'application upload guard caps individual media at 1 GB before server limits');
 ok(str_contains($core,'function sf_media_capabilities')&&str_contains($core,'upload_max_filesize'),'Media Library reports analyzer and server upload capabilities');
 ok(str_contains($core,'function sf_media_ffprobe')&&str_contains($core,'function sf_media_wav_fallback')&&str_contains($core,'function sf_media_mp3_fallback'),'audio extraction supports FFprobe plus WAV and MP3 fallbacks');
