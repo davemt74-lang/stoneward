@@ -80,6 +80,14 @@ foreach($recentListeningRows as $row){
 
 $listening=sf_engagement_analytics(30,null);
 $notificationAnalytics=sf_notification_analytics(30,null);
+$recentNotificationEvents=$pdo->query(
+    "SELECT e.id,e.user_id,e.notification_id,e.event_type,e.created_at,n.kind,n.title,u.display_name,u.email
+     FROM notification_events e
+     LEFT JOIN user_notifications n ON n.id=e.notification_id
+     LEFT JOIN users u ON u.id=e.user_id
+     ORDER BY e.id DESC
+     LIMIT 12"
+)->fetchAll();
 
 $recentOrders=[];
 foreach(array_slice($orders,0,8) as $o){
@@ -145,6 +153,7 @@ sf_json_response([
     'recent_listening'=>$recentListening,
     'recent_brain'=>$recentBrain,
     'notification_analytics'=>$notificationAnalytics,
+    'recent_notification_events'=>$recentNotificationEvents,
     'listening'=>[
         'days'=>30,
         'starts'=>(int)($listening['starts']??0),
