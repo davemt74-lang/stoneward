@@ -32,7 +32,10 @@ ok(str_contains($core,'function sf_library_collection_create'),'collection creat
 ok(str_contains($core,'function sf_library_collection_update'),'collection edit exists');
 ok(str_contains($core,'function sf_library_collection_delete'),'collection delete exists');
 ok(str_contains($core,'function sf_library_collection_add'),'collection add-item exists');
+ok(str_contains($core,"SELECT id FROM user_collection_items WHERE collection_id=? AND item_type=? AND item_key=? LIMIT 1"),'duplicate collection adds are explicit idempotent no-ops');
+ok(str_contains($core,'if($inserted){'),'duplicate races do not create false collection activity events');
 ok(str_contains($core,'function sf_library_collection_remove'),'collection remove-item exists');
+ok(str_contains($core,"'collection_item_removed'"),'actual collection removals are recorded in user activity');
 ok(str_contains($core,'function sf_library_collection_move'),'collection reorder exists');
 ok(str_contains($core,'function sf_library_collection_resequence'),'collection positions are normalized after removal');
 ok(str_contains($core,"'collection_created'"),'collection creation is included in user activity history');
@@ -43,6 +46,8 @@ ok(str_contains($core,'sf_personalization_favorites($userId)'),'My Library reuse
 ok(str_contains($core,'sf_playlist_list($userId)'),'My Library reuses canonical playlists');
 ok(str_contains($core,'sf_account_saved_builds($userId)'),'My Library reuses canonical saved builds');
 ok(str_contains($core,'sf_account_library($userId)'),'My Library reuses canonical purchased-library ownership');
+ok(str_contains($core,'sf_analytics_paid_order($order)'),'My Library exposes only paid/completed order items as owned purchases');
+ok(str_contains($core,'sf_read_order($orderId)'),'owned-purchase state is verified against the canonical order record');
 ok(str_contains($core,'sf_personalization_continue_listening($userId,24)'),'My Library reuses Continue Listening');
 ok(str_contains($core,'sf_personalization_history($userId,160)'),'My Library reuses personal listening history');
 ok(str_contains($core,"'all'=>\$all"),'My Library exposes unified All view');
