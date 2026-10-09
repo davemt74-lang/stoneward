@@ -1,28 +1,30 @@
-Stonefellow v1.3.13 Section 15 release gate
+Stonefellow v1.3.14 Section 16 release gate
 ===========================================
 
-Release gate includes:
-- PHP syntax across runtime/admin/tests
-- assets/js/app.js syntax
-- assets/js/library.js syntax
-- admin/assets/admin.js syntax
-- admin/assets/analytics.js syntax
-- Sections 1–12 regression suites
-- Section 14 My Library regression suite
-- Section 15 Music Archive behavior/contract suite
+Measured exact feature-head result:
+- PHP syntax: PASS
+- Public JavaScript syntax: PASS
+- Admin JavaScript syntax: PASS
+- Sections 1–12: PASS
+- Section 14 My Library: PASS
+- Section 15 Music Archive: PASS
+- Section 16 Shows, Tours & Live Archive: PASS
+- Explicit assertions: 874 passed
+- Failures: 0
 
-Section 15 adds 16 explicit assertions covering:
-- canonical version grouping
-- chronological archive timeline
-- era derivation
-- structured personnel normalization
-- public archive workspace
-- connected track versions
-- archive media
-- Admin archive authoring
-- catalog/release API validation
-- archive-aware search
-- Agent archive routing/context
-- navigation/version/site-data capability markers
-
-Measured feature-head GitHub Actions result: PASS\n\nExplicit assertions: 853 passed\nFailures: 0
+Section 16 covers:
+- canonical single-artist show storage
+- location/Agent summary normalization
+- public site-data exposure
+- show/setlist/live-recording validation
+- governed show lifecycle states
+- Admin Shows + Live authoring
+- public upcoming/past show browser
+- first-class show detail routes
+- setlist playback/details
+- playable live recordings
+- Music Archive timeline integration
+- Agent show/tour/setlist grounding
+- responsive live UI
+- v1.3.14 capability markers
+- unchanged database schema target 1.3.12
