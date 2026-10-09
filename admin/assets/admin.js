@@ -24,7 +24,7 @@
 
   function head(kicker,title,copy,actions=''){return `<div class="canvas-head"><div><div class="eyebrow">${esc(kicker)}</div><h1>${esc(title)}</h1><p>${esc(copy)}</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>`}
   function renderDashboard(){
-    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
+    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},recentNotificationEvents=d.recent_notification_events||[],daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
     canvas.innerHTML=head('STONEFELLOW OPERATIONS','Dashboard','Recent customers, purchases, listening, activity, Agent Brain, catalog health, and launch operations in one place.',`<button class="secondary" id="dashboardRefresh" type="button">Refresh</button>`)+
     `<div class="stats dashboard-primary-stats">
       <div class="stat"><strong>${Number(s.users||0).toLocaleString()}</strong><span>Total users</span></div>
@@ -62,6 +62,7 @@
         <button class="dashboard-kpi" data-view="analytics"><small>CLICK → LISTEN</small><strong>${Number(notifications.listen_conversion_rate||0)}%</strong><span>${Number(notifications.listen_conversions||0)} conversions</span></button>
         <button class="dashboard-kpi" data-view="analytics"><small>CLICK → PURCHASE</small><strong>${Number(notifications.purchase_conversion_rate||0)}%</strong><span>${Number(notifications.purchase_conversions||0)} conversions</span></button>
       </div>
+      ${recentNotificationEvents.length?`<div class="dashboard-timeline notification-event-feed">${recentNotificationEvents.slice(0,6).map(x=>`<div class="dashboard-timeline-row"><span class="timeline-dot"></span><div><strong>${esc(x.title||String(x.kind||'notification').replaceAll('_',' '))}</strong><small>${esc(x.display_name||x.email||'User')} · ${esc(String(x.event_type||'event').replaceAll('_',' '))}</small></div><time>${esc((x.created_at||'').replace('T',' ').slice(0,16))}</time></div>`).join('')}</div>`:''}
     </section>
 
     <div class="dashboard-two-col">
