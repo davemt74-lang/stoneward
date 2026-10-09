@@ -158,11 +158,11 @@ ok(str_contains($admin,'Catalog discovery'),'main Admin dashboard renders catalo
 ok(str_contains($admin,'recentSearchEvents'),'main Admin dashboard renders recent search activity');
 ok(str_contains($adminCss,'.search-kpi-stack'),'search Admin KPIs are responsive');
 
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.11'"),'database schema target advances to 1.3.11');
+ok(str_contains($mig,"'id'=>'2026-10-08-012'")&&str_contains($mig,'sf_search_ensure_schema'),'Section 12 search migration remains registered after later schema upgrades');
 ok(str_contains($mig,"'id'=>'2026-10-08-012'")&&str_contains($mig,'sf_search_ensure_schema'),'migration 012 installs search telemetry schema');
 ok(str_contains($mig,"'catalog_search_events'"),'migration integrity requires search telemetry table');
-ok(str_contains($version,"'stonefellow'=>'1.3.11'"),'version endpoint reports v1.3.11');
-ok(str_contains($version,"'database_schema_target'=>'1.3.11'"),'version endpoint reports schema 1.3.11');
+ok(str_contains($version,"'catalog_search_discovery'=>'unified-faceted-personalized-telemetry-agent'"),'version endpoint retains Section 12 search/discovery capability');
+ok(str_contains($version,"'database_schema_target'=>'"),'version endpoint continues to report the current database schema target');
 ok(str_contains($version,"'catalog_search_discovery'=>'unified-faceted-personalized-telemetry-agent'"),'version endpoint reports Section 12 search/discovery capability');
 ok(str_contains($wf,'v1311-section12-search-discovery.php'),'release gate includes Section 12 regression');
 

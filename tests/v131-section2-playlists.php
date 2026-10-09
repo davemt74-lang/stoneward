@@ -3,7 +3,7 @@ declare(strict_types=1);
 $root=dirname(__DIR__);
 function ok($v,$m){if(!$v){fwrite(STDERR,"FAIL: $m\n");exit(1);}echo "PASS: $m\n";}
 function src($rel){global $root;return (string)file_get_contents($root.'/'.$rel);}
-$core=src('api/playlists-core.php');$api=src('api/playlists.php');$bootstrap=src('api/bootstrap.php');$account=src('api/account.php');$migrations=src('api/migrations.php');$agent=src('api/agent-runtime.php');$js=src('assets/js/app.js');$css=src('assets/css/site.css');$version=src('version.php');
+$core=src('api/playlists-core.php');$api=src('api/playlists.php');$bootstrap=src('api/bootstrap.php');$account=src('api/account.php');$migrations=src('api/migrations.php');$agent=src('api/agent-runtime.php');$js=src('assets/js/app.js');$libraryJs=src('assets/js/library.js');$css=src('assets/css/site.css');$version=src('version.php');
 ok(str_contains($core,'CREATE TABLE IF NOT EXISTS user_playlists'),'playlist table exists');
 ok(str_contains($core,'CREATE TABLE IF NOT EXISTS user_playlist_tracks'),'ordered playlist track table exists');
 ok(str_contains($core,'FOREIGN KEY(playlist_id) REFERENCES user_playlists(id) ON DELETE CASCADE'),'playlist tracks cascade on playlist delete');
@@ -26,7 +26,7 @@ ok(str_contains($agent,"return 'playlist_create'")&&str_contains($agent,"case 'p
 ok(str_contains($agent,"return 'playlist_save_session'")&&str_contains($agent,"case 'playlist_save_session'"),'agent save-session route and policy exist');
 ok(str_contains($agent,"'playlist_create'=>'Asks the agent to create")&&str_contains($agent,"'playlist_save_session'=>'Asks to save"),'JEV routing criteria include playlist actions');
 ok(str_contains($js,"case'create_playlist'")&&str_contains($js,"case'save_agent_session'"),'client executes authorized agent playlist actions');
-ok(str_contains($js,"function renderPlaylist(id)")&&str_contains($js,'PLAYLISTS'),'playlist editor and account playlist library exist');
+ok(str_contains($js,"function renderPlaylist(id)")&&str_contains($libraryJs,"playlists:'Playlists'")&&str_contains($libraryJs,'data-library-open-playlist'),'playlist editor and My Library playlist surface exist');
 ok(str_contains($js,'data-move-item')&&str_contains($js,"action:'reorder'"),'playlist reorder UI is wired');
 ok(str_contains($js,'data-remove-playlist-item')&&str_contains($js,"action:'remove_item'"),'playlist removal UI is wired');
 ok(str_contains($js,'id="addPlaylistTrack"')&&str_contains($js,"action:'add_track'"),'playlist add-track UI is wired');

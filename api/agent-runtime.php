@@ -141,7 +141,8 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(buy|purchase|order)\b/',$q))return 'purchase_request';
     if(preg_match('/notification preferences|notification settings|email reminders/',$q))return 'notification_preferences';
     if(preg_match('/notifications|my reminders|what did i miss|show my alerts/',$q))return 'notifications_open';
-    if(preg_match('/my account|my library|my purchases|profile/',$q))return 'account_open';
+    if(preg_match('/my library|saved music|my collections|show (?:me )?(?:my )?(?:favorites|saved tracks|saved releases)|my purchases/',$q))return 'library_open';
+    if(preg_match('/my account|profile/',$q))return 'account_open';
     if(preg_match('/plan|package|subscription|free trial|active tokens?/',$q))return 'plans_open';
     if(preg_match('/lyrics?|credits?|who wrote|who produced|isrc|bmi|ascap|story|about this song/',$q))return 'track_info';
     if(preg_match('/knowledge|notes?|document|history|why did|what does|meaning/',$q))return 'knowledge_question';
@@ -212,6 +213,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'purchase_request':$action=['type'=>'open_view','view'=>'cart'];$text='I can take you to the cart. You’ll confirm the purchase yourself at checkout.';$profile='commerce';$confirm=true;break;
         case 'notifications_open':$action=['type'=>'open_notifications'];$count=(int)($client['notification_unread']??0);$text=$count>0?'You have '.$count.' unread notification'.($count===1?'':'s').'. I’ll open them.':'You’re caught up. I’ll open your activity drawer.';$profile='account';break;
         case 'notification_preferences':$action=['type'=>'open_view','view'=>'account'];$text='Your notification preferences are in My account. You can control in-app and email reminders there.';$profile='account';break;
+        case 'library_open':
+            $tab='all';$mq=strtolower($message);if(str_contains($mq,'collection'))$tab='collections';elseif(str_contains($mq,'purchase'))$tab='purchases';elseif(str_contains($mq,'playlist'))$tab='playlists';elseif(str_contains($mq,'release'))$tab='releases';elseif(str_contains($mq,'track')||str_contains($mq,'saved music')||str_contains($mq,'favorite'))$tab='tracks';$action=['type'=>'open_library','tab'=>$tab];$text='Here’s your My Library'.($tab!=='all'?' — '.ucfirst($tab):'').'.';$profile='account';break;
         case 'account_open':$action=['type'=>'open_view','view'=>'account'];$text='Here’s your account.';$profile='account';break;
         case 'plans_open':$action=['type'=>'open_view','view'=>'plans'];$text='Here are the Stonefellow plans and Active Token options.';$profile='account';break;
         case 'track_info':
@@ -268,7 +271,8 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'purchase_request'=>'Asks to buy, purchase, or order something.',
         'notifications_open'=>'Asks to see notifications, reminders, alerts, or what they missed.',
         'notification_preferences'=>'Asks to manage notification or email reminder preferences.',
-        'account_open'=>'Asks for their account, library, purchases, or profile.',
+        'library_open'=>'Asks for My Library, saved music, collections, favorites, or purchases.',
+        'account_open'=>'Asks for account/profile settings.',
         'plans_open'=>'Asks about plans, packages, subscriptions, free trial, or Active Tokens.',
         'general_conversation'=>'General conversation that should be answered by the language model.'
     ];

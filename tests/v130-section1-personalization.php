@@ -3,7 +3,7 @@ declare(strict_types=1);
 $root=dirname(__DIR__);
 function ok($v,$m){if(!$v){fwrite(STDERR,"FAIL: $m\n");exit(1);}echo "PASS: $m\n";}
 function src($rel){global $root;return (string)file_get_contents($root.'/'.$rel);}
-$core=src('api/personalization-core.php');$api=src('api/personalization.php');$listening=src('api/listening.php');$account=src('api/account.php');$migrations=src('api/migrations.php');$js=src('assets/js/app.js');$css=src('assets/css/site.css');$version=src('version.php');
+$core=src('api/personalization-core.php');$api=src('api/personalization.php');$listening=src('api/listening.php');$account=src('api/account.php');$migrations=src('api/migrations.php');$js=src('assets/js/app.js');$libraryJs=src('assets/js/library.js');$css=src('assets/css/site.css');$version=src('version.php');
 ok(str_contains($core,'CREATE TABLE IF NOT EXISTS user_favorites'),'favorites table exists');
 ok(str_contains($core,'UNIQUE(user_id,item_type,item_id)')||str_contains($core,'UNIQUE KEY uq_user_favorite'),'favorites are unique per user/item');
 ok(str_contains($core,'CREATE TABLE IF NOT EXISTS user_listening_progress'),'resume/progress table exists');
@@ -22,7 +22,7 @@ ok(str_contains($account,"'personalization'=>sf_personalization_state(\$uid)"),'
 ok(str_contains($migrations,"'id'=>'2026-10-08-007'")&&str_contains($migrations,'sf_personalization_ensure_schema'),'Section 1 personalization migration remains registered');
 ok(str_contains($migrations,"'id'=>'2026-10-08-007'")&&str_contains($migrations,'sf_personalization_ensure_schema'),'upgrade migration covers personalization schema');
 ok(str_contains($migrations,"'user_favorites','user_listening_progress'"),'integrity check requires personalization tables');
-foreach(['FAVORITES','CONTINUE LISTENING','LISTENING HISTORY'] as $label)ok(str_contains($js,$label),'account renders '.$label);
+ok(str_contains($libraryJs,'CONTINUE LISTENING')&&str_contains($libraryJs,"history:'History'")&&str_contains($libraryJs,"tracks:'Tracks'")&&str_contains($libraryJs,"releases:'Releases'"),'My Library surfaces favorites, Continue Listening, and listening history');
 ok(str_contains($js,'favoriteButton(')&&str_contains($js,'bindFavoriteButtons'),'favorite controls are wired');
 ok(str_contains($js,"favoriteButton('release'")&&str_contains($js,"favoriteButton('track'"),'track and release favorites exist');
 ok(str_contains($js,'resumeTrack(')&&str_contains($js,'play(t,resumeAt=0'),'Continue Listening resumes saved playback position');

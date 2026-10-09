@@ -26,7 +26,9 @@ jobs:
           find . -type f -name '*.php' ! -path './storage/*' -print0 | xargs -0 -n1 php -l
 
       - name: Public JavaScript syntax
-        run: node --check assets/js/app.js
+        run: |
+          node --check assets/js/app.js
+          node --check assets/js/library.js
 
       - name: Admin JavaScript syntax
         run: |
@@ -49,3 +51,4 @@ jobs:
           php tests/v139-section10-admin-listening-conversion-analytics.php
           php tests/v1310-section11-smart-notifications.php
           php tests/v1311-section12-search-discovery.php
+          php tests/v1312-section14-my-library.php
