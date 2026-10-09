@@ -143,14 +143,15 @@ function sf_search_suggestions(string $query,int $limit=8): array {
     foreach($candidates as $value){$n=sf_search_normalize($value);if($n==='')continue;$d=levenshtein(substr($q,0,120),substr($n,0,120));$contains=str_contains($n,$q)||str_contains($q,$n);if(!$contains&&$d>max(2,(int)floor(strlen($q)*.45)))continue;$rows[]=['value'=>$value,'distance'=>$contains?0:$d];}
     usort($rows,fn($a,$b)=>($a['distance']<=>$b['distance'])?:strlen($a['value'])<=>strlen($b['value']));return array_slice(array_column($rows,'value'),0,max(1,min(12,$limit)));
 }
-function sf_search_session_hash(string $sessionKey): string {
-    $sessionKey=trim($sessionKey);if($sessionKey==='')return hash('sha256','server|'.sf_auth_ip_hash());return hash('sha256',substr($sessionKey,0,160));
+function sf_search_session_hash(string $sessionKey,?int $userId=null): string {
+    $sessionKey=trim($sessionKey);if($userId&&$userId>0)return hash('sha256','user|'.$userId.'|'.substr($sessionKey,0,160));
+    return hash('sha256','guest|'.sf_auth_ip_hash());
 }
 function sf_search_event_allowed(string $sessionHash): bool {
     sf_search_ensure_schema();$since=gmdate('c',time()-10*60);$q=sf_db()->prepare('SELECT COUNT(*) FROM catalog_search_events WHERE session_hash=? AND created_at>=?');$q->execute([$sessionHash,$since]);return (int)$q->fetchColumn()<120;
 }
 function sf_search_record_event(?int $userId,string $sessionKey,string $eventType,array $payload): void {
-    sf_search_ensure_schema();$eventType=in_array($eventType,['search','click','clear'],true)?$eventType:'search';$sessionHash=sf_search_session_hash($sessionKey);if(!sf_search_event_allowed($sessionHash))return;
+    sf_search_ensure_schema();$eventType=in_array($eventType,['search','click','clear'],true)?$eventType:'search';$sessionHash=sf_search_session_hash($sessionKey,$userId);if(!sf_search_event_allowed($sessionHash))return;
     $p=sf_search_params((array)($payload['query']??$payload));$query=(string)$p['q'];$resultType=in_array((string)($payload['result_type']??''),['track','release'],true)?(string)$payload['result_type']:'';$resultId=sf_clean_text((string)($payload['result_id']??''),180);$resultCount=max(0,(int)($payload['result_count']??0));$filters=$p;unset($filters['q'],$filters['limit']);
     $q=sf_db()->prepare('INSERT INTO catalog_search_events(user_id,session_hash,event_type,query_text,normalized_query,result_count,result_type,result_id,filters_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)');$q->execute([$userId?:null,$sessionHash,$eventType,$query,sf_search_normalize($query),$resultCount,$resultType,$resultId,sf_ops_json($filters),gmdate('c')]);
 }
