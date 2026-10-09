@@ -24,7 +24,7 @@
 
   function head(kicker,title,copy,actions=''){return `<div class="canvas-head"><div><div class="eyebrow">${esc(kicker)}</div><h1>${esc(title)}</h1><p>${esc(copy)}</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>`}
   function renderDashboard(){
-    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},recentNotificationEvents=d.recent_notification_events||[],daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
+    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},search=d.search_analytics||{},recentNotificationEvents=d.recent_notification_events||[],recentSearchEvents=d.recent_search_events||[],daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
     canvas.innerHTML=head('STONEFELLOW OPERATIONS','Dashboard','Recent customers, purchases, listening, activity, Agent Brain, catalog health, and launch operations in one place.',`<button class="secondary" id="dashboardRefresh" type="button">Refresh</button>`)+
     `<div class="stats dashboard-primary-stats">
       <div class="stat"><strong>${Number(s.users||0).toLocaleString()}</strong><span>Total users</span></div>
@@ -63,6 +63,17 @@
         <button class="dashboard-kpi" data-view="analytics"><small>CLICK → PURCHASE</small><strong>${Number(notifications.purchase_conversion_rate||0)}%</strong><span>${Number(notifications.purchase_conversions||0)} conversions</span></button>
       </div>
       ${recentNotificationEvents.length?`<div class="dashboard-timeline notification-event-feed">${recentNotificationEvents.slice(0,6).map(x=>`<div class="dashboard-timeline-row"><span class="timeline-dot"></span><div><strong>${esc(x.title||String(x.kind||'notification').replaceAll('_',' '))}</strong><small>${esc(x.display_name||x.email||'User')} · ${esc(String(x.event_type||'event').replaceAll('_',' '))}</small></div><time>${esc((x.created_at||'').replace('T',' ').slice(0,16))}</time></div>`).join('')}</div>`:''}
+    </section>
+
+    <section class="panel dashboard-panel search-dashboard-panel">
+      <div class="panel-title"><h2>Catalog discovery</h2><button type="button" class="panel-link" data-view="analytics">Search analytics →</button></div>
+      <div class="dashboard-kpi-stack search-kpi-stack">
+        <button class="dashboard-kpi" data-view="analytics"><small>SEARCHES</small><strong>${Number(search.searches||0)}</strong><span>last 30 days</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>RESULT CTR</small><strong>${Number(search.click_through_rate||0)}%</strong><span>${Number(search.clicks||0)} selected results</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>ZERO RESULTS</small><strong>${Number(search.zero_result_rate||0)}%</strong><span>${Number(search.zero_result_searches||0)} searches</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>TOP QUERY</small><strong>${esc(search.top_queries?.[0]?.query||'—')}</strong><span>${Number(search.top_queries?.[0]?.searches||0)} searches</span></button>
+      </div>
+      ${recentSearchEvents.length?`<div class="dashboard-timeline search-event-feed">${recentSearchEvents.slice(0,6).map(x=>`<div class="dashboard-timeline-row"><span class="timeline-dot search"></span><div><strong>${esc(x.query_text||x.result_id||'Catalog discovery')}</strong><small>${esc(x.display_name||x.email||'Guest')} · ${esc(String(x.event_type||'search').replaceAll('_',' '))}${x.event_type==='search'?' · '+Number(x.result_count||0)+' results':''}</small></div><time>${esc((x.created_at||'').replace('T',' ').slice(0,16))}</time></div>`).join('')}</div>`:''}
     </section>
 
     <div class="dashboard-two-col">

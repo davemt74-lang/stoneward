@@ -48,3 +48,4 @@ jobs:
           php tests/v138-section9-personalized-home.php
           php tests/v139-section10-admin-listening-conversion-analytics.php
           php tests/v1310-section11-smart-notifications.php
+          php tests/v1311-section12-search-discovery.php

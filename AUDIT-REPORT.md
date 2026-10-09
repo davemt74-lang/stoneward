@@ -1,65 +1,72 @@
-# Stonefellow v1.3.10 — Section 11 Smart Notifications & Listener Re-engagement Audit
+# Stonefellow v1.3.11 — Section 12 Search, Discovery & Catalog Intelligence Audit
 
-## 1. Notification governance — 10/10
-- Smart notification categories are explicitly defined.
-- Optional re-engagement notifications default to in-app enabled and email disabled.
-- Account/security/billing/order service notifications remain outside optional re-engagement preferences.
-- Persistent per-user/category preferences survive sessions and devices.
-- Notification writes remain authenticated and CSRF protected.
+## 1. Unified search architecture — 10/10
+- Search is server-backed instead of duplicating ranking logic in the browser.
+- Tracks and published/public releases share one result model.
+- Initial browsing can use GET without creating telemetry.
+- Explicit searches use the governed POST search path.
+- Existing catalog and release records remain authoritative.
 
-## 2. Duplicate and upgrade-storm prevention — 10/10
-- Persistent dedupe keys are unique per user and notification opportunity.
-- Duplicate-key handling distinguishes expected conflicts from unrelated database failures.
-- First use establishes a generation baseline before creating re-engagement notifications.
-- Existing releases are seeded into the baseline.
-- Old listening progress and old saved builds cannot suddenly generate notifications after upgrade.
-- Read/click/dismiss delivery lifecycle events are de-duplicated per notification.
+## 2. Search quality — 10/10
+- Exact title matches receive the strongest deterministic boost.
+- Prefix and title contains matching are supported.
+- Release names, moods, themes, stories, lyrics, credits, metadata, and release track titles are searchable.
+- Release label, genre, catalog number, and UPC/EAN are searchable.
+- Multi-term coverage receives an additional boost.
+- Levenshtein scoring provides bounded typo tolerance.
+- Pure behavior tests verify normalization, intent extraction, relative ranking, fuzzy matching, and deterministic rationale.
 
-## 3. Re-engagement intelligence — 10/10
-- Continue Listening reminders use canonical listening-progress state and wait at least 12 hours.
-- Saved-build reminders use canonical saved builds and wait at least 24 hours.
-- New-release notifications use canonical published/visible releases.
-- Recommendation notifications use the existing personalization engine and its recommendation reasons.
-- No parallel favorites, history, recommendation, release, or build state was introduced.
+## 3. Discovery and personalization — 10/10
+- Facets cover content type, mood, theme, release, year, and energy.
+- Sort options cover relevance, listening popularity, newest, and title.
+- Signed-in search reuses the canonical recommendation profile for modest ranking boosts.
+- Favorites can influence search without suppressing relevant catalog matches.
+- Listening starts/completions provide popularity signals.
+- Every result exposes a human-readable ranking reason.
 
-## 4. In-app experience — 10/10
-- Existing bell drawer remains the single notification surface.
-- Notifications support Mark read, Open, Dismiss, Mark all read, and Refresh.
-- Dismissed notifications no longer clutter the visible drawer.
-- Notification badge/unread state stays synchronized with actions.
-- Existing History and Agent Brain tabs remain intact.
+## 4. Public experience — 10/10
+- Music is now a dedicated Search & Discover workspace.
+- Search/filter state is reflected in the URL and restored on load.
+- Result cards combine tracks and releases cleanly.
+- Track results retain Play, Favorite, Queue, and detail actions.
+- Release results retain Favorite and release-detail navigation.
+- Mood/theme discovery chips support browse-first users.
+- Recent signed-in searches can be reused or cleared.
+- Zero-result suggestions provide a recovery path.
+- Responsive layouts cover desktop, tablet, and narrow mobile.
+- Runtime audit fixed malformed result-host, error-markup, and year-filter markup before release.
 
-## 5. Email and inactive-user delivery — 10/10
-- Email is opt-in per smart-notification category.
-- Delivery reuses Stonefellow's transactional email outbox.
-- Existing log/php_mail delivery configuration remains authoritative.
-- Email delivery status is recorded for analytics.
-- `cron-notifications.php` is CLI-only and can safely process active accounts on a schedule.
+## 5. Telemetry and privacy governance — 10/10
+- Search and click events use one purpose-built telemetry table.
+- Search session identifiers are hashed before persistence.
+- Guest rate identity is derived from server-observed IP rather than a caller-controlled session key.
+- Signed-in rate identity includes the authenticated user.
+- Event volume is bounded over a 10-minute window.
+- Search history is clearable by the signed-in user.
+- Result-click telemetry validates that the selected catalog entity still exists.
 
 ## 6. Agent integration — 10/10
-- The Agent can open the notification drawer.
-- The Agent can direct users to notification preferences.
-- Agent routing receives unread count and latest notification context.
-- Notification actions do not bypass existing user controls or preferences.
+- Natural “find/search songs/tracks/releases” requests route to catalog search.
+- Command words are stripped while meaningful search terms are retained.
+- Agent search uses the same canonical ranking engine as the Music workspace.
+- Agent replies can report match count and leading result.
+- Agent opens the actual Search & Discover workspace with the query populated.
+- Current search query is included in Agent routing context.
 
-## 7. Notification analytics — 10/10
-- Delivery, read, click, dismiss, and email-delivery events are recorded.
-- Read and click rates are calculated.
-- Click→listen and click→paid-purchase conversions use a 24-hour attribution window.
-- Paid-order attribution reuses the canonical Section 10 paid-order classifier.
-- Analytics include notification type and per-user engagement.
-- Email-only events retain category attribution.
+## 7. Admin catalog intelligence — 10/10
+- Admin analytics include searches, CTR, zero-result rate, and identified users.
+- Top queries expose demand.
+- Zero-result queries expose catalog/metadata opportunities.
+- Most-selected results show successful discovery.
+- Filter usage shows how listeners browse.
+- Main dashboard includes catalog-discovery KPIs and recent search activity.
+- Per-user analytics include search behavior alongside listening, notifications, commerce, and Agent Brain context.
 
-## 8. Admin integration — 10/10
-- Listening & Conversion Analytics now includes Notification re-engagement.
-- Main Admin dashboard shows delivery, click rate, click→listen, and click→purchase.
-- Main dashboard includes recent notification activity.
-- Per-user analytics include notification outcomes alongside listening, favorites, playlists, builds, purchases, and Agent Brain.
+## 8. Migration and compatibility — 10/10
+- Migration 012 installs `catalog_search_events`.
+- MySQL query indexing uses a utf8mb4-safe prefix.
+- Database schema target advances to 1.3.11.
+- Section 11 remains validated without freezing the global schema target.
+- Sections 1–12 remain in the release gate.
 
-## 9. Migration and compatibility — 10/10
-- Migration 011 creates the preference, dedupe, event, and generation-state tables.
-- Database schema target advances to 1.3.10.
-- Earlier Section 7–10 gates now verify their own capabilities/migrations instead of freezing the global schema target.
-- Sections 1–11 remain in the release gate.
-
-The measured release result is recorded in `TEST-RESULTS.txt`.
+Measured release results are recorded in `TEST-RESULTS.txt`.

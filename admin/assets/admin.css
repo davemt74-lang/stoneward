@@ -67,3 +67,9 @@
 .notification-analytics-panel h3{font:400 1rem Georgia,serif;margin:0 0 9px}.notification-user-summary{margin:14px 0 2px;padding:10px 12px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:.68rem;line-height:1.45}.notification-user-summary strong{color:var(--ink)}.notification-kpi-stack{grid-template-columns:repeat(4,1fr)}.notification-dashboard-panel{margin-top:18px}
 @media(max-width:1050px){.notification-kpi-stack{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){.notification-kpi-stack{grid-template-columns:1fr}}
+
+
+/* v1.3 Section 12 — Search & discovery intelligence */
+.search-analytics-panel h3{font:400 1rem Georgia,serif;margin:0 0 9px}.search-dashboard-panel{margin-top:18px}.search-kpi-stack{grid-template-columns:repeat(4,minmax(0,1fr))}.search-kpi-stack .dashboard-kpi strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.timeline-dot.search{border-color:var(--accent);background:var(--accent)}
+@media(max-width:1050px){.search-kpi-stack{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.search-kpi-stack{grid-template-columns:1fr}}

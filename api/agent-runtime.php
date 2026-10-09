@@ -124,6 +124,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/play me something|listening session|keep the music going|give me a .* session|something (dark|quiet|mellow|heavy|warm|driving|acoustic|reflective)/',$q))return 'listening_session_start';
     if(preg_match('/what do you suggest today|what.s my suggestion|suggestion for today|what should i (?:do|listen to|hear) today|suggest (?:something|music) today|today.s suggestion/',$q))return 'home_suggestion';
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
+    if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/album|release| ep |single/',$q))return 'release_browse';
     if(preg_match('/save (?:this |the )?(?:agent )?(?:listening )?session|save (?:these|those) songs/',$q)&&str_contains($q,'playlist'))return 'playlist_save_session';
@@ -176,6 +177,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'player_pause':$action=['type'=>'pause_player'];$text='Paused.';break;
         case 'player_next':$action=['type'=>'next_track'];$text='Next track.';break;
         case 'player_previous':$action=['type'=>'previous_track'];$text='Going back one track.';break;
+        case 'catalog_search':
+            $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
         case 'release_browse':$action=['type'=>'open_view','view'=>'releases'];$text='Here are the releases.';$profile='catalog';break;
         case 'playlist_open':$action=['type'=>'open_view','view'=>'account'];$text='Your playlists are in My Stonefellow.';$profile='account';break;
@@ -228,7 +231,7 @@ function sf_jev_endpoint(string $url): string {
 function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $d=sf_ai_resolve_decision();if(!$d)return null;$url=sf_jev_endpoint((string)($d['endpoint_url']??''));if($url==='')return null;
     $model=trim((string)($d['model']??''))?:'typesafe/jev-1.13';
-    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??''),'notification_unread'=>(int)($client['notification_unread']??0),'latest_notification_title'=>(string)($client['latest_notification_title']??'')];
+    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??''),'notification_unread'=>(int)($client['notification_unread']??0),'latest_notification_title'=>(string)($client['latest_notification_title']??''),'current_search_query'=>(string)($client['search_query']??'')];
     $criteria=[
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
         'player_recommend'=>'Asks for one recommendation or one next song.',
@@ -244,6 +247,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'queue_play_next'=>'Asks to make a named/current track play next.',
         'queue_remove'=>'Asks to remove a named/current track from Up Next.',
         'queue_clear'=>'Asks to clear the Up Next queue.',
+        'catalog_search'=>'Asks to find/search Stonefellow tracks or releases by title, mood, theme, lyric, credit, story, or other catalog clue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
         'release_browse'=>'Asks to browse albums, EPs, singles, releases, or release pages.',
         'playlist_open'=>'Asks to see or open their playlists.',
