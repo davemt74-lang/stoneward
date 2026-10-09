@@ -18,7 +18,7 @@ ok(str_contains($playlists,'sf_personalization_rank_catalog(sf_catalog(),$profil
 ok(str_contains($playlists,'?int $userId=null'),'playlist recommendation helper remains backwards compatible');
 ok(str_contains($js,'function recommendationCard(')&&str_contains($js,'Recommended for you'),'home recommendation UI exists');
 ok(str_contains($js,"play(t,0,'recommendation')"),'recommendation playback has its own telemetry source');
-ok(str_contains($js,'RECOMMENDED FOR YOU'),'account surfaces recommendations');
+ok(str_contains($js,'Recommended for you'),'personalized home continues to surface recommendations after Account consolidation');
 ok(str_contains($js,"if(st.auth.authenticated&&[")&&str_contains($js,"'home'")&&str_contains($js,"await loadPersonalization()"),'authenticated views continue to preload personalization');
 ok(str_contains($js,"querySelectorAll('[data-recommend-play]')")&&str_contains($js,"querySelectorAll('[data-resume-track]')"),'recommendation and resume controls bind as collections');
 ok(str_contains($css,'.recommendation-grid')&&str_contains($css,'.recommendation-card'),'responsive recommendation styles exist');
