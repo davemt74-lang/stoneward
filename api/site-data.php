@@ -12,4 +12,5 @@ if(is_file($releasePath)){
   }));
 }
 $archive=sf_archive_payload($catalog,$releases);
-sf_json_response(['ok'=>true,'catalog'=>$catalog,'releases'=>$releases,'archive'=>$archive,'generated_at'=>gmdate('c')]);
+$shows=sf_live_public_shows();
+sf_json_response(['ok'=>true,'catalog'=>$catalog,'releases'=>$releases,'archive'=>$archive,'shows'=>$shows,'generated_at'=>gmdate('c')]);
