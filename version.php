@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.12',
+  'stonefellow'=>'1.3.13',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
@@ -25,5 +25,6 @@ echo json_encode([
   'smart_notifications'=>'preferences-dedupe-cron-email-conversion-agent',
   'catalog_search_discovery'=>'unified-faceted-personalized-telemetry-agent',
   'my_library'=>'unified-saved-music-purchases-builds-history-collections',
+  'music_archive'=>'single-artist-eras-versions-sessions-personnel-media-timeline',
   'customer_lifecycle'=>'v1.1',
 ], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
