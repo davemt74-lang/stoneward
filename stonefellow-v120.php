@@ -69,6 +69,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <div class="menu-identity">
             <span>Signed in</span><strong><?=sf_h((string)$currentUser['display_name'])?></strong>
           </div>
+          <a href="?view=library" data-view="library" id="menuLibrary">My Library</a>
           <a href="?view=account" data-view="account" id="menuAccount">My account</a>
           <a href="#" id="menuQueueLink">Up Next</a>
 <?php if(($currentUser['role']??'')==='admin'): ?>
@@ -168,6 +169,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script>if(window.STONEFELLOW_CONFIG){window.STONEFELLOW_CONFIG.socials=window.STONEFELLOW_CONFIG.socials||{};for(const [k,v] of Object.entries(window.STONEFELLOW_SITE.socials||{})){if(v)window.STONEFELLOW_CONFIG.socials[k]=v;}}</script>
   <script src="assets/js/catalog.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/releases.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/library.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
 </body>
 </html>
