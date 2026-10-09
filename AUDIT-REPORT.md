@@ -52,11 +52,20 @@
 - Validation and simulation.
 - Explicit consequential-action treatment for email.
 
-## Regression gate — pending measured GitHub validation
-- PHP syntax required.
-- Public JavaScript syntax required.
-- Admin JavaScript syntax required.
-- Campaign Builder JavaScript syntax required.
-- Sections 1–12, 14, 15, 16, 17 and 18 required.
+## Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Campaign Builder JavaScript syntax: **PASS**
+- Sections 1–12, 14, 15, 16, 17 and 18: **PASS**
+- Explicit assertions: **1005 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 18 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 18 SCORE: **10/10**
+
+
+## Final measured feature-head result
+- Exact feature head: `3c83f1f774f88cce4b44545e1f7a35cfd5399b61`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1005 passed**
+- Failures: **0**
