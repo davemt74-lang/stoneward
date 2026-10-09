@@ -9,7 +9,8 @@ $crm=src('api/crm-core.php');$newsletter=src('api/newsletter.php');$community=sr
 ok(str_contains($boot,"require_once __DIR__ . '/crm-core.php'"),'CRM core loads from the canonical application bootstrap');
 ok(str_contains($crm,'CREATE TABLE IF NOT EXISTS fan_contacts')&&str_contains($crm,'CREATE TABLE IF NOT EXISTS fan_crm_events')&&str_contains($crm,'CREATE TABLE IF NOT EXISTS fan_agent_engagements')&&str_contains($crm,'CREATE TABLE IF NOT EXISTS community_posts'),'CRM schema covers contacts, relationship events, Agent engagements and community');
 ok(substr_count($crm,'CREATE TABLE IF NOT EXISTS fan_contacts')===2,'CRM schema supports both SQLite and MySQL');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.13'"),'database schema target advances to 1.3.13');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db17);
+ok(isset($db17[1],$db17[2],$db17[3])&&[(int)$db17[1],(int)$db17[2],(int)$db17[3]]>=[1,3,13],'database schema target remains v1.3.13 or later');
 ok(str_contains($mig,"'id'=>'2026-10-09-014'")&&str_contains($mig,"'apply'=>function(): void { sf_crm_ensure_schema(); }"),'migration 014 installs the Section 17 CRM schema');
 ok(str_contains($mig,"'fan_contacts','fan_crm_events','fan_agent_engagements','community_posts'"),'migration integrity requires all Section 17 CRM/community tables');
 
@@ -51,7 +52,8 @@ ok(str_contains($app,'function handleQuickAction(')&&str_contains($app,"action==
 ok(str_contains($css,'.chat-quick-menu')&&str_contains($css,'.newsletter-signup')&&str_contains($css,'.community-feed'),'Section 17 public UX has dedicated responsive styling');
 
 preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vm17);
-ok(isset($vm17[1],$vm17[2],$vm17[3])&&[(int)$vm17[1],(int)$vm17[2],(int)$vm17[3]]>=[1,3,15]&&str_contains($version,"'database_schema_target'=>'1.3.13'"),'version endpoint reports app v1.3.15 or later and schema 1.3.13');
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vdb17);
+ok(isset($vm17[1],$vm17[2],$vm17[3],$vdb17[1],$vdb17[2],$vdb17[3])&&[(int)$vm17[1],(int)$vm17[2],(int)$vm17[3]]>=[1,3,15]&&[(int)$vdb17[1],(int)$vdb17[2],(int)$vdb17[3]]>=[1,3,13],'version endpoint reports app v1.3.15 or later and schema v1.3.13 or later');
 ok(str_contains($version,"'fan_crm_community_agent'=>'contacts-consent-newsletter-community-agent-brain-proactive-engagement'"),'version endpoint advertises Section 17 capability');
 ok(str_contains($version,"'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter'"),'version endpoint advertises quick-action surface');
 ok(str_contains($wf,'php tests/v1315-section17-fan-crm-community.php'),'release gate includes Section 17 regression suite');

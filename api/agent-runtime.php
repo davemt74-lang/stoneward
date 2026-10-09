@@ -65,7 +65,8 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
         foreach((array)($kd['files']??[]) as $f){if(empty($f['public_agent']))continue;$hay=(string)($f['name']??'').' '.(string)($f['notes']??'').' '.(string)($f['text']??'');if($score($hay)>0||!$terms){$kb[]='- '.($f['name']??'knowledge').': '.substr((string)($f['text']??$f['notes']??''),0,1100);}if(count($kb)>=6)break;}
         $sections[]="APPROVED KNOWLEDGE\n".implode("\n",$kb);
     }
-    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain products and open the cart or builder, but it may not claim a purchase is complete or charge money. Checkout remains a user-confirmed UI action.";
+    if(in_array($profile,['commerce','crm','recommendation','catalog'],true)&&function_exists('sf_campaign_live_summaries')){$campaignLines=[];foreach(sf_campaign_live_summaries(10) as $campaign){$campaignLines[]='- slug='.$campaign['slug'].' | '.$campaign['name'].' | goal '.$campaign['goal'].' | '.$campaign['headline'].' | offers '.implode(', ',$campaign['offers']);}if($campaignLines)$sections[]="ACTIVE CAMPAIGNS\n".implode("\n",$campaignLines);}
+    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain products and active campaigns and open the cart, builder, store, or a campaign page, but it may not claim a purchase is complete or charge money. Checkout remains a user-confirmed UI action.";
     if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
     if($userId>0&&in_array($profile,['account','crm','recommendation'],true)){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
     return implode("\n\n",$sections);
@@ -130,6 +131,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
     if(preg_match('/\b(fan community|community feed|community posts?|open community)\b/',$q))return 'community_browse';
     if(preg_match('/\b(newsletter|mailing list|email list)\b/',$q))return 'newsletter_join';
+    if(preg_match('/\b(campaign|offer|free download|free song|discount|vip|exclusive|presale|early access)\b/',$q))return 'campaign_offer';
     if(preg_match('/\b(merch|merchandise|shop|store)\b/',$q))return 'store_browse';
     if(preg_match('/am i (?:on|subscribed)|my newsletter|my fan profile|fan status/',$q))return 'fan_profile';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
@@ -193,7 +195,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
         case 'community_browse':if(!empty(sf_site_settings()['fan_community_enabled'])){$action=['type'=>'open_view','view'=>'community'];$text='Here’s the Stonefellow fan community.';}else{$action=['type'=>'open_view','view'=>'newsletter'];$text='The fan community is not open yet. The fan CRM and newsletter are still active, and you can join the newsletter here.';}$profile='crm';break;
-        case 'newsletter_join':$action=['type'=>'open_view','view'=>'newsletter'];$text='The newsletter signup is in the fan community. You control whether Stonefellow can email you.';$profile='crm';break;
+        case 'newsletter_join':$action=['type'=>'open_view','view'=>'newsletter'];$text='Here is the Stonefellow newsletter signup. You control whether Stonefellow can email you.';$profile='crm';break;
+        case 'campaign_offer':$match=function_exists('sf_campaign_match_query')?sf_campaign_match_query($message):null;if($match){$action=['type'=>'open_view','view'=>'campaign','slug'=>$match['slug']];$text='There is an active Stonefellow campaign: “'.$match['name'].'.” I’ll open it.';$profile='commerce';}else{$action=['type'=>'open_view','view'=>'store'];$text='I do not see a matching active campaign right now. Here is the Stonefellow store.';$profile='commerce';}break;
         case 'store_browse':$action=['type'=>'open_view','view'=>'store'];$text='Here’s the Stonefellow store.';$profile='commerce';break;
         case 'fan_profile':$action=['type'=>'open_view','view'=>'community'];$profile='crm';$needs=true;break;
         case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;
@@ -272,6 +275,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
         'community_browse'=>'Asks to open or browse the Stonefellow fan community or community posts.',
         'newsletter_join'=>'Asks about joining, leaving, or finding the Stonefellow newsletter or mailing list.',
+        'campaign_offer'=>'Asks about an active Stonefellow campaign, free download, discount, VIP offer, exclusive, presale, or early-access offer.',
         'store_browse'=>'Asks to browse Stonefellow merchandise, products, shop, or store.',
         'fan_profile'=>'Asks about their own fan CRM state, newsletter subscription, or fan profile.',
         'shows_browse'=>'Asks to browse Stonefellow shows, concerts, tour dates, or the live archive.',

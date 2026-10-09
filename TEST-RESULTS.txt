@@ -1,51 +1,37 @@
-Stonefellow v1.3.15 Section 17 release gate
+Stonefellow v1.3.17 Section 18 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
-- Public JavaScript syntax
-- Admin JavaScript syntax
+- assets/js/app.js syntax
+- admin/assets/admin.js syntax
+- admin/assets/campaigns.js syntax
 - Sections 1–12 regression suites
 - Section 14 My Library
 - Section 15 Music Archive
 - Section 16 Shows, Tours & Live Archive
-- Section 17 Fan CRM, Community & Agent Engagement
+- Section 17 Fan CRM + Community controls
+- Section 18 Campaigns, Offers & Fan Acquisition
 
-Section 17 regression coverage includes:
-- CRM schema and migration
-- account/newsletter identity merge
-- canonical activity -> CRM feed
-- guest purchase -> CRM without marketing consent
-- newsletter signup/unsubscribe
-- fan-controlled marketing consent
-- community authentication and anti-spam bounds
-- community -> CRM activity
-- automatic Agent meaningful-event policy
-- proactive cooldown/dedupe
-- fan proactive-Agent opt-out
-- CRM -> Agent Brain audit
-- Admin CRM and community moderation
-- Agent CRM-aware routes/context
-- public newsletter/community/store surfaces
-- chat-footer + quick actions
-- version/schema capability markers
+Section 18 coverage includes:
+- migration/schema
+- graph validation
+- node types
+- drag-and-drop visual builder
+- connections/inspector
+- validation/simulation
+- CRM audience gates
+- campaign landing pages
+- explicit newsletter consent
+- free-song download entitlements
+- discount quote/order integration
+- VIP/exclusive claims
+- campaign email approval boundary
+- unsubscribe handling
+- participant and event ledgers
+- purchase/revenue attribution
+- Agent campaign context/routing
+- Admin Agent Brain campaign audit
+- application/schema capability markers
 
-Measured feature-head GitHub Actions result:
-- Exact feature head: fd6591177797da0f919f229af3f9ea6e223167ff
-- Release gate: PASS
-- Explicit assertions: 921 passed
-- Failures: 0
-
-
-Stonefellow v1.3.16 Fan Community Launch Control
-================================================
-Exact feature head: 5d24d07a201d6c13cc5ce9a436b6876be32217f5
-PHP syntax: PASS
-Public JavaScript syntax: PASS
-Admin JavaScript syntax: PASS
-Full v1.3 regression suite: PASS
-Explicit assertions: 945 passed
-Failures: 0
-Fan Community default: OFF
-CRM/newsletter continuity while community OFF: PASS
-Database schema target: 1.3.13 (unchanged)
+Measured GitHub Actions result will be recorded before merge.

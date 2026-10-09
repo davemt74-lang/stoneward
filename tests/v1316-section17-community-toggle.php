@@ -29,8 +29,10 @@ ok(str_contains($agent,"sf_site_settings()['fan_community_enabled']")&&str_conta
 
 preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vm);
 ok(isset($vm[1],$vm[2],$vm[3])&&[(int)$vm[1],(int)$vm[2],(int)$vm[3]]>=[1,3,16],'version endpoint reports v1.3.16 or later');
-ok(str_contains($version,"'database_schema_target'=>'1.3.13'"),'community launch toggle does not require a database migration');
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vdb16);
+ok(isset($vdb16[1],$vdb16[2],$vdb16[3])&&[(int)$vdb16[1],(int)$vdb16[2],(int)$vdb16[3]]>=[1,3,13],'community launch control remains compatible with database schema v1.3.13 or later');
 ok(str_contains($version,"'fan_community_launch_control'=>'admin-toggle-default-off-crm-stays-active'"),'version endpoint advertises launch-control capability');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.13'"),'database schema target remains 1.3.13');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$mdb16);
+ok(isset($mdb16[1],$mdb16[2],$mdb16[3])&&[(int)$mdb16[1],(int)$mdb16[2],(int)$mdb16[3]]>=[1,3,13],'database schema remains v1.3.13 or later');
 ok(str_contains($wf,'php tests/v1316-section17-community-toggle.php'),'release gate includes community launch-control regression suite');
 echo "Stonefellow v1.3.16 Fan Community launch-control audit: PASS\n";

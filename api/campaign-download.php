@@ -1,0 +1,9 @@
+<?php
+declare(strict_types=1);require __DIR__.'/bootstrap.php';sf_campaign_ensure_schema();
+$token=sf_clean_text($_GET['token']??'',80);$e=sf_campaign_entitlement_by_token($token);if(!$e||($e['entitlement_type']??'')!=='offer_download'){http_response_code(404);exit('Download unavailable.');}
+$payload=sf_campaign_decode($e['payload_json']??'',[]);$trackId=sf_clean_text($payload['track_id']??'',120);$track=sf_track_map()[$trackId]??null;if(!$track){http_response_code(404);exit('Track unavailable.');}
+$audio=(string)($track['audio']??'');if($audio===''||preg_match('#^https?://#i',$audio)){http_response_code(404);exit('Protected local download unavailable.');}
+$root=realpath(SF_ROOT);$file=realpath(SF_ROOT.'/'.ltrim($audio,'/'));if(!$root||!$file||!str_starts_with($file,$root.DIRECTORY_SEPARATOR)||!is_file($file)){http_response_code(404);exit('Download unavailable.');}
+$now=gmdate('c');if(($e['status']??'')==='claimed')sf_db()->prepare("UPDATE campaign_entitlements SET status='redeemed',redeemed_at=? WHERE id=?")->execute([$now,(int)$e['id']]);
+sf_campaign_log_event((int)$e['campaign_id'],'song_downloaded',(int)$e['participant_id'],!empty($e['contact_id'])?(int)$e['contact_id']:null,(string)$e['node_id'],['track_id'=>$trackId]);if(!empty($e['contact_id'])){$contact=sf_crm_contact_by_id((int)$e['contact_id']);sf_crm_log_event((int)$e['contact_id'],!empty($contact['user_id'])?(int)$contact['user_id']:null,'song_downloaded','Downloaded campaign song','track',$trackId,['campaign_id'=>(int)$e['campaign_id'],'node_id'=>(string)$e['node_id']]);}
+header('Content-Type: audio/mpeg');header('Content-Length: '.filesize($file));header('Content-Disposition: attachment; filename="'.preg_replace('/[^A-Za-z0-9._-]+/','-',(string)($track['title']??'stonefellow-track')).'.mp3"');header('Cache-Control: private, no-store');readfile($file);exit;

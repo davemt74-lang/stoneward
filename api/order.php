@@ -3,7 +3,7 @@ declare(strict_types=1); require __DIR__.'/bootstrap.php';
 if($_SERVER['REQUEST_METHOD']!=='POST') sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 sf_require_csrf();
 try{
-  $user=sf_current_user();$body=sf_request_json();$requestKey=sf_clean_text($body['request_id']??'',128);$cart=is_array($body['cart']??null)?$body['cart']:[];$quote=sf_quote($cart);if(!$quote['ok'])sf_json_response($quote,422);
+  $user=sf_current_user();$body=sf_request_json();$requestKey=sf_clean_text($body['request_id']??'',128);$cart=is_array($body['cart']??null)?$body['cart']:[];$campaignCode=sf_clean_text($body['campaign_code']??'',80);$quote=sf_quote($cart,$campaignCode);if(!$quote['ok'])sf_json_response($quote,422);
   $cust=sf_customer(is_array($body['customer']??null)?$body['customer']:[],$quote['physical']);if(!$cust['ok'])sf_json_response(['ok'=>false,'errors'=>$cust['errors']],422);
   $cfg=sf_store_config();$id=sf_order_id();$token=sf_token();$test=$cfg['mode']==='test';
   $pay=sf_resolve_payment((string)($body['payment_method']??''),$cfg);
@@ -13,9 +13,9 @@ try{
   }
   $method=$pay['method'];$orderStatus=$pay['order_status'];$paymentProvider=$pay['provider'];$paymentStatus=$pay['payment_status'];
   if($requestKey!==''){$claim=sf_order_request_claim($requestKey,$user?(int)$user['id']:null);if($claim['state']==='existing'){$existingId=(string)$claim['order_id'];$existing=sf_read_order($existingId);if($existing)sf_json_response(['ok'=>true,'idempotent_replay'=>true,'order_id'=>$existingId,'status'=>$existing['status']??'','payment_method'=>$existing['payment']['method']??'','payment_provider'=>$existing['payment']['provider']??'','confirmation_token'=>'','mode'=>($cfg['mode']??'test'),'total_cents'=>$existing['quote']['total_cents']??0,'currency'=>$existing['quote']['currency']??'USD','pod'=>$existing['pod']??[]]);}if($claim['state']==='in_progress')sf_json_response(['ok'=>false,'error'=>'order_in_progress','message'=>'This checkout request is already being processed.'],409);}
-  $order=['schema'=>'stonefellow.order.v1','id'=>$id,'user_id'=>$user?(int)$user['id']:null,'status'=>$orderStatus,'created_at'=>gmdate('c'),'customer'=>$cust['customer'],'quote'=>$quote,'payment'=>['method'=>$method,'provider'=>$paymentProvider,'status'=>$paymentStatus,'amount_cents'=>$quote['total_cents'],'currency'=>$quote['currency']],'fulfillment'=>['status'=>$quote['physical']?'pending':'not_required','carrier'=>'','tracking_number'=>'','tracking_url'=>'','note'=>'','updated_at'=>gmdate('c')],'timeline'=>[['type'=>'order_created','status'=>$orderStatus,'label'=>'Order received','created_at'=>gmdate('c')]],'pod'=>[],'confirmation_token_hash'=>hash('sha256',$token)];
+  $order=['schema'=>'stonefellow.order.v1','id'=>$id,'user_id'=>$user?(int)$user['id']:null,'status'=>$orderStatus,'created_at'=>gmdate('c'),'customer'=>$cust['customer'],'quote'=>$quote,'payment'=>['method'=>$method,'provider'=>$paymentProvider,'status'=>$paymentStatus,'amount_cents'=>$quote['total_cents'],'currency'=>$quote['currency']],'fulfillment'=>['status'=>$quote['physical']?'pending':'not_required','carrier'=>'','tracking_number'=>'','tracking_url'=>'','note'=>'','updated_at'=>gmdate('c')],'timeline'=>[['type'=>'order_created','status'=>$orderStatus,'label'=>'Order received','created_at'=>gmdate('c')]],'pod'=>[],'campaign_code'=>$campaignCode,'confirmation_token_hash'=>hash('sha256',$token)];
   if($test) $order['pod']=sf_build_pod_handoffs($id,$quote,$cust['customer']);
-  sf_write_json(SF_ROOT.'/storage/orders/'.$id.'.json',$order);
+  sf_write_json(SF_ROOT.'/storage/orders/'.$id.'.json',$order);if($campaignCode!=='')sf_campaign_redeem_code($campaignCode,$id);sf_campaign_attribute_order_from_session($id,(int)$quote['total_cents']);
   if($requestKey!=='')sf_order_request_complete($requestKey,$id);
   if(!$user){
     try{$crm=sf_crm_upsert_contact((string)$cust['customer']['email'],(string)$cust['customer']['name'],'purchase',null,null,'customer');sf_crm_log_event((int)$crm['id'],null,'purchase','Created guest order '.$id,'order',$id,['total_cents'=>$quote['total_cents'],'physical'=>$quote['physical']]);}catch(Throwable $crmError){}

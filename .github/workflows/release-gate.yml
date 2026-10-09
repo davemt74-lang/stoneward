@@ -33,6 +33,7 @@ jobs:
       - name: Admin JavaScript syntax
         run: |
           node --check admin/assets/admin.js
+          node --check admin/assets/campaigns.js
           node --check admin/assets/analytics.js
 
       - name: v1.3 regression suites
@@ -56,3 +57,4 @@ jobs:
           php tests/v1314-section16-shows-live-archive.php
           php tests/v1315-section17-fan-crm-community.php
           php tests/v1316-section17-community-toggle.php
+          php tests/v1317-section18-campaigns.php
