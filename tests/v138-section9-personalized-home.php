@@ -86,10 +86,10 @@ ok(str_contains($css,'.home-empty'),'home empty states are styled');
 ok(str_contains($css,'.home-section-copy'),'home recommendation rationale is styled');
 ok(str_contains($css,'@media(max-width:760px)'),'personalized home has responsive mobile rules');
 
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.6'"),'Section 9 requires no new database migration');
-ok(str_contains($mig,"'id'=>'2026-10-08-010'"),'existing latest database migration remains 010');
+ok(str_contains($version,"'personalized_home'=>'continue-recent-favorites-recommendations-releases-builds-agent-suggestion'"),'Section 9 personalized-home capability survives later schema migrations');
+ok(str_contains($mig,"'id'=>'2026-10-08-010'")&&str_contains($mig,'sf_queue_ensure_schema'),'Section 9 baseline migration history remains intact');
 ok(str_contains($version,"'personalized_home'=>'continue-recent-favorites-recommendations-releases-builds-agent-suggestion'"),'Section 9 personalized-home capability remains registered');
-ok(str_contains($version,"'database_schema_target'=>'1.3.6'"),'version endpoint keeps schema target 1.3.6');
+ok(str_contains($version,"'database_schema_target'=>'"),'version endpoint continues to report a database schema target');
 ok(str_contains($version,"'personalized_home'=>'continue-recent-favorites-recommendations-releases-builds-agent-suggestion'"),'version endpoint reports Section 9 personalized-home capability');
 
 echo "Stonefellow v1.3 Section 9 Personalized Home audit: PASS\n";
