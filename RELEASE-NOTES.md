@@ -1,22 +1,15 @@
-# Stonefellow v1.3.12 — Section 14: My Library, Collections & Saved Music
+# Stonefellow v1.3.13 — Section 15: Music Archive, Song Stories & Deep Catalog
 
-Section 13 Smart Radio was intentionally skipped. This release proceeds directly to the customer-facing Section 14 library experience.
-
-- Added dedicated **My Library** navigation for signed-in customers.
-- Added All, Tracks, Releases, Playlists, Purchases, Builds, History, and Collections tabs.
-- Added unified library summary, in-library search, sorting, and responsive saved-item cards.
-- Added Continue Listening directly to My Library with saved-position resume.
-- Reused canonical favorites, playlists, saved builds, owned-order library, and listening history instead of duplicating those systems.
-- Added mixed-content Collections containing tracks, releases, owned playlists, paid purchases, and owned saved builds.
-- Added Collection create/edit/delete, add/remove, and manual item ordering.
-- Added duplicate-safe Collection writes and removal activity history.
-- Collection deletion preserves the underlying saved content.
-- Added strict Collection/user ownership checks.
-- Changed My Library purchase ownership so payment-pending orders do not appear as owned media.
-- Consolidated saved-content management out of the oversized Account page into My Library.
-- Kept billing, receipts, security, notification settings, and transactional order history in My Account.
-- Added Agent routing for My Library and specific Library tabs.
-- Added read-only Admin customer-library analytics and per-user inspection.
-- Added dedicated `assets/js/library.js` bundle and release-gate syntax validation.
-- Added migration 013.
-- Application and database schema target advance to 1.3.12.
+- Added a public Music Archive view for Stonefellow's single-artist catalog.
+- Added chronological recording/release timeline and era browsing.
+- Added canonical song/version relationships for demos, studio masters, live takes, remasters, alternate mixes and other recordings.
+- Added structured recording-session, personnel and archival-media metadata.
+- Expanded rich track pages with archive context, connected versions and personnel.
+- Expanded releases with liner notes, credits, edition/original-release context, reissue relationships and archive media.
+- Advanced release records to `stonefellow.release.v2` while retaining the same file-backed release store.
+- Extended catalog search to index archive/version metadata.
+- Added Agent routing for archive/chronology requests and richer grounded context for version/personnel questions.
+- Added Admin editors and server validation for archive relationships.
+- Preserved production `data/` as deployment-owned content.
+- No database migration is required; schema target remains 1.3.12.
+- Application advances to 1.3.13.

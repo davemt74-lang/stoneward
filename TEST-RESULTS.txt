@@ -1,28 +1,28 @@
-Stonefellow v1.3.12 Section 14 release gate
+Stonefellow v1.3.13 Section 15 release gate
 ===========================================
 
-PASS: 95 PHP files lint clean
-PASS: assets/js/app.js syntax
-PASS: assets/js/library.js syntax
-PASS: admin/assets/admin.js syntax
-PASS: admin/assets/analytics.js syntax
-PASS: v130-section1-personalization.php
-PASS: v131-playlist-behavior.php
-PASS: v131-section2-playlists.php
-PASS: v132-section3-listening-history.php
-PASS: v133-section4-personalized-recommendations.php
-PASS: v134-section5-rich-track-release-pages.php
-PASS: v135-section6-agent-listening-sessions.php
-PASS: v136-section7-queue-up-next.php
-PASS: v137-section8-custom-record-mixtape-v2.php
-PASS: v138-section9-personalized-home.php
-PASS: v139-section10-admin-listening-conversion-analytics.php
-PASS: v1310-section11-smart-notifications.php
-PASS: v1311-section12-search-discovery.php
-PASS: v1312-section14-my-library.php
-PASS: 837 explicit assertions
-PASS: 0 failing assertions
-PASS: GitHub push release gate
-PASS: exact pull-request release gate
+Release gate includes:
+- PHP syntax across runtime/admin/tests
+- assets/js/app.js syntax
+- assets/js/library.js syntax
+- admin/assets/admin.js syntax
+- admin/assets/analytics.js syntax
+- Sections 1–12 regression suites
+- Section 14 My Library regression suite
+- Section 15 Music Archive behavior/contract suite
 
-FINAL SECTION 14 RELEASE GATE: PASS — 10/10
+Section 15 adds 16 explicit assertions covering:
+- canonical version grouping
+- chronological archive timeline
+- era derivation
+- structured personnel normalization
+- public archive workspace
+- connected track versions
+- archive media
+- Admin archive authoring
+- catalog/release API validation
+- archive-aware search
+- Agent archive routing/context
+- navigation/version/site-data capability markers
+
+Measured feature-head GitHub Actions result: PASS\n\nExplicit assertions: 853 passed\nFailures: 0
