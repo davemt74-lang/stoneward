@@ -54,3 +54,4 @@ jobs:
           php tests/v1312-section14-my-library.php
           php tests/v1313-section15-archive.php
           php tests/v1314-section16-shows-live-archive.php
+          php tests/v1315-section17-fan-crm-community.php

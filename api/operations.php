@@ -43,6 +43,7 @@ function sf_notify_user(int $userId,string $kind,string $title,string $body='',s
 function sf_log_user_activity(int $userId,string $eventType,string $title,string $entityType='',string $entityId='',array $meta=[]): void {
     if($userId<1)return;sf_ops_ensure_schema();$q=sf_db()->prepare('INSERT INTO user_activity(user_id,event_type,title,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)');
     $q->execute([$userId,sf_clean_text($eventType,80),sf_clean_text($title,255),sf_clean_text($entityType,80),sf_clean_text($entityId,180),sf_ops_json($meta),gmdate('c')]);
+    if(function_exists('sf_crm_record_user_activity'))sf_crm_record_user_activity($userId,$eventType,$title,$entityType,$entityId,$meta);
 }
 function sf_log_admin_action(?int $userId,string $action,string $entityType='',string $entityId='',array $details=[]): void {
     sf_ops_ensure_schema();$q=sf_db()->prepare('INSERT INTO admin_audit_log(admin_user_id,action,entity_type,entity_id,details_json,created_at) VALUES(?,?,?,?,?,?)');

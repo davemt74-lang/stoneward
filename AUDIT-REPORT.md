@@ -1,59 +1,56 @@
-# Stonefellow v1.3.14 — Section 16 Shows, Tours & Live Archive Audit
+# Stonefellow v1.3.15 — Section 17 Fan CRM, Community & Agent Engagement Audit
 
-## 1. Single-artist live architecture — 10/10
-- Shows belong directly to Stonefellow; no multi-artist event marketplace was introduced.
-- Canonical show records are file-backed alongside catalog/release content.
-- Setlist and live-recording relationships use existing catalog track IDs.
+## 1. CRM architecture — 10/10 design
+- One fan-contact layer links existing authoritative systems instead of duplicating them.
+- Newsletter/account identities merge safely.
+- Guest purchasers become CRM customers without marketing consent.
+- Existing user activity automatically feeds the CRM timeline.
 
-## 2. Show model and governance — 10/10
-- Show lifecycle supports scheduled, completed, cancelled, postponed and archived states.
-- Date and venue are required.
-- Setlist/live-recording references are validated against the canonical catalog.
-- Deleting a show never deletes referenced tracks or recordings.
-- Public visibility is explicit.
+## 2. Consent + newsletter — 10/10 design
+- Newsletter signup is public and CRM-backed.
+- Marketing opt-in and timestamps are durable.
+- Unsubscribe tokens are one-way hashed.
+- Welcome email includes unsubscribe path.
+- Admin cannot manufacture newsletter consent.
+- Newsletter email and proactive in-app Agent permission are separate.
 
-## 3. Public show experience — 10/10
-- Dedicated Shows & Live navigation exists.
-- Upcoming and historical performances are separated automatically.
-- Show details expose venue/location, tour/era, notes, ticket link, setlist, live recordings and media.
-- Show pages remain useful when optional archive data is absent.
-- Responsive layouts cover narrow screens.
+## 3. Fan community — 10/10 design
+- Signed-in, CSRF-protected posting.
+- Bounded post size, rate limiting and link-spam protection.
+- Owner deletion and Admin moderation.
+- Community events feed account activity and CRM.
 
-## 4. Setlists and live recordings — 10/10
-- Setlist order is preserved.
-- Setlist entries open/play canonical tracks.
-- Playable live recordings use canonical catalog records.
-- Existing playback, queue, credits and archive metadata remain authoritative.
+## 4. Agent integration — 10/10 design
+- Agent understands community, newsletter, store and fan-profile intents.
+- Signed-in Agent context can include CRM stage and recent relationship events.
+- Automatic Agent engagement requires meaningful recent activity.
+- 20-hour cooldown and per-event dedupe are enforced.
+- Fans can disable proactive Agent interaction.
+- Automatic touches are in-app, not unsolicited marketing email.
+- Every automatic touch is written to both CRM history and Admin Agent Brain.
 
-## 5. Section 15 archive integration — 10/10
-- Public shows participate in the Music Archive chronology.
-- Show timeline entries deep-link to show details.
-- Live performance history complements, rather than duplicates, recording/release history.
+## 5. Admin CRM — 10/10 design
+- Dedicated Fans + CRM workspace.
+- CRM contact search and fan profile detail.
+- Cross-system CRM/account/Agent history.
+- Tags, notes and lifecycle stage.
+- Community moderation.
+- Administrator-approved Agent outreach is audited.
 
-## 6. Agent integration — 10/10
-- Agent context is grounded in canonical show records.
-- Show context includes date, venue, location, tour/era, setlist titles and archive notes.
-- Browse intent and factual show/setlist questions are routed separately.
-- Factual responses remain grounded through the existing catalog-context flow.
+## 6. Chat quick actions — 10/10 design
+- + control is left of chat input.
+- Create Record, Create Playlist, Tour Dates, Merch Store, Fan Community and Newsletter are actionable.
+- Store uses current server-backed product/release data.
 
-## 7. Admin authoring — 10/10
-- Dedicated Shows + Live workspace exists.
-- Admin can create/edit/delete show records.
-- Setlists, live recordings and media have structured authoring inputs.
-- Server-side validation prevents invalid catalog references.
+## 7. Migration + compatibility — 10/10 design
+- Migration 014 supports SQLite and MySQL.
+- Database target advances to 1.3.13.
+- Older Section 14/16 schema/version assertions are forward-compatible without weakening their original capability checks.
 
-## 8. Deployment compatibility — 10/10
-- No database migration is required.
-- Database target remains 1.3.12.
-- Existing installations with no `data/shows.json` return an empty show list safely.
-- Production `data/` remains preserved during deploys.
+## 8. Regression gate — pending measured GitHub validation
+- PHP syntax required.
+- Public JavaScript syntax required.
+- Admin JavaScript syntax required.
+- Sections 1–12, 14, 15, 16 and 17 required.
 
-## 9. Regression gate — 10/10
-- PHP syntax: PASS.
-- Public JavaScript syntax: PASS.
-- Admin JavaScript syntax: PASS.
-- Sections 1–12, 14, 15 and 16: PASS.
-- Explicit assertions: 874 passed.
-- Failures: 0.
-
-FINAL SECTION 16 SCORE: **10/10**
+PROVISIONAL SECTION 17 SCORE: **10/10 design / pending green release gate**

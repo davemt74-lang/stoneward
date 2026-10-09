@@ -1,10 +1,17 @@
-# Stonefellow v1.3.14 Upgrade Notes
+# Stonefellow v1.3.15 Upgrade Notes
 
-1. Upload and extract the v1.3.14 application deploy over the existing installation.
-2. Preserve production `data/`, `storage/`, and site-specific configuration.
-3. No new database migration is required. Database schema target remains **1.3.12**.
-4. `data/shows.json` is created by the Admin show editor when the first show is saved; application deploys must not overwrite production `data/`.
-5. Existing catalog tracks can be referenced in ordered show setlists and playable live-recording lists.
-6. Verify **Shows & Live** and the Music Archive timeline after entering show data.
+1. Upload/extract the v1.3.15 application files over the installed site while preserving production configuration, `data/`, and `storage/`.
+2. Run `/upgrade.php`.
+3. The database target advances from **1.3.12** to **1.3.13**.
+4. Migration **2026-10-09-014** creates:
+   - `fan_contacts`
+   - `fan_crm_events`
+   - `fan_agent_engagements`
+   - `community_posts`
+5. Existing account/listening/order/library/Agent data remains authoritative; the CRM references and aggregates those systems.
+6. Existing users are linked into CRM lazily as they interact. Newsletter contacts merge into later accounts by email/user identity.
+7. Verify the public newsletter form, Fan Community, chat-footer + menu, Admin Fans + CRM, and Agent Brain fan-engagement ledger.
+8. Newsletter marketing consent is never inferred from an account or purchase.
 
-Running `/upgrade.php` is safe but should report the database as current when migrations through schema 1.3.12 are already installed.
+Application: **1.3.15**  
+Database schema: **1.3.13**

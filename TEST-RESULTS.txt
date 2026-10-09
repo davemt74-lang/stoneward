@@ -1,30 +1,33 @@
-Stonefellow v1.3.14 Section 16 release gate
+Stonefellow v1.3.15 Section 17 release gate
 ===========================================
 
-Measured exact feature-head result:
-- PHP syntax: PASS
-- Public JavaScript syntax: PASS
-- Admin JavaScript syntax: PASS
-- Sections 1–12: PASS
-- Section 14 My Library: PASS
-- Section 15 Music Archive: PASS
-- Section 16 Shows, Tours & Live Archive: PASS
-- Explicit assertions: 874 passed
-- Failures: 0
+Required:
+- PHP syntax across runtime/admin/tests
+- Public JavaScript syntax
+- Admin JavaScript syntax
+- Sections 1–12 regression suites
+- Section 14 My Library
+- Section 15 Music Archive
+- Section 16 Shows, Tours & Live Archive
+- Section 17 Fan CRM, Community & Agent Engagement
 
-Section 16 covers:
-- canonical single-artist show storage
-- location/Agent summary normalization
-- public site-data exposure
-- show/setlist/live-recording validation
-- governed show lifecycle states
-- Admin Shows + Live authoring
-- public upcoming/past show browser
-- first-class show detail routes
-- setlist playback/details
-- playable live recordings
-- Music Archive timeline integration
-- Agent show/tour/setlist grounding
-- responsive live UI
-- v1.3.14 capability markers
-- unchanged database schema target 1.3.12
+Section 17 regression coverage includes:
+- CRM schema and migration
+- account/newsletter identity merge
+- canonical activity -> CRM feed
+- guest purchase -> CRM without marketing consent
+- newsletter signup/unsubscribe
+- fan-controlled marketing consent
+- community authentication and anti-spam bounds
+- community -> CRM activity
+- automatic Agent meaningful-event policy
+- proactive cooldown/dedupe
+- fan proactive-Agent opt-out
+- CRM -> Agent Brain audit
+- Admin CRM and community moderation
+- Agent CRM-aware routes/context
+- public newsletter/community/store surfaces
+- chat-footer + quick actions
+- version/schema capability markers
+
+Measured GitHub Actions result will be recorded before merge.
