@@ -35,6 +35,7 @@ function sf_search_string_values(mixed $value): array {
 }
 function sf_search_track_fields(array $t): array {
     $m=is_array($t['metadata']??null)?$t['metadata']:[];
+    $a=is_array($t['archive']??null)?$t['archive']:[];
     return [
         'title'=>(string)($t['title']??''),
         'release'=>(string)($t['release']??''),
@@ -44,10 +45,11 @@ function sf_search_track_fields(array $t): array {
         'lyrics'=>(string)($t['lyrics']??''),
         'credits'=>array_values(array_filter(array_map('strval',(array)($t['credits']??[])))),
         'metadata'=>sf_search_string_values($m),
+        'archive'=>sf_search_string_values($a),
     ];
 }
 function sf_search_release_fields(array $r,array $trackMap): array {
-    $trackTitles=[];$moods=[];$themes=[];
+    $trackTitles=[];$moods=[];$themes=[];$a=is_array($r['archive']??null)?$r['archive']:[];
     foreach((array)($r['track_ids']??[]) as $id){$t=$trackMap[(string)$id]??null;if(!$t)continue;$trackTitles[]=(string)($t['title']??$id);foreach((array)($t['mood']??[]) as $x)$moods[]=(string)$x;foreach((array)($t['themes']??[]) as $x)$themes[]=(string)$x;}
     return [
         'title'=>(string)($r['title']??''),
@@ -56,6 +58,7 @@ function sf_search_release_fields(array $r,array $trackMap): array {
         'notes'=>(string)($r['notes']??$r['liner_notes']??''),
         'credits'=>array_values(array_filter(array_map('strval',(array)($r['credits']??[])))),
         'metadata'=>array_values(array_filter([(string)($r['label']??''),(string)($r['genre']??''),(string)($r['catalog_number']??''),(string)($r['upc_ean']??'')])),
+        'archive'=>sf_search_string_values($a),
         'tracks'=>$trackTitles,'moods'=>array_values(array_unique($moods)),'themes'=>array_values(array_unique($themes)),
     ];
 }
@@ -75,7 +78,7 @@ function sf_search_score_document(string $query,array $fields): array {
     $tagSets=['mood'=>38,'themes'=>38,'moods'=>34];
     foreach($tagSets as $key=>$weight){foreach((array)($fields[$key]??[]) as $tag){$n=sf_search_normalize((string)$tag);if($q!==''&&$n===$q){$score+=$weight;if($reason==='')$reason=ucfirst(rtrim($key,'s')).' match';}elseif($q!==''&&str_contains($n,$q)){$score+=$weight*.65;if($reason==='')$reason=ucfirst(rtrim($key,'s')).' match';}}}
     $weighted=[
-        'story'=>12,'description'=>12,'notes'=>10,'lyrics'=>8,'credits'=>14,'metadata'=>10,'tracks'=>18,
+        'story'=>12,'description'=>12,'notes'=>10,'lyrics'=>8,'credits'=>14,'metadata'=>10,'archive'=>16,'tracks'=>18,
     ];
     foreach($weighted as $key=>$weight){$vals=(array)($fields[$key]??[]);if(!is_array($fields[$key]??null))$vals=[(string)($fields[$key]??'')];$text=sf_search_normalize(implode(' ',array_map('strval',$vals)));if($q!==''&&$text!==''&&str_contains($text,$q)){$score+=$weight;if($reason==='')$reason=ucfirst($key).' match';}}
     if($tokens){
