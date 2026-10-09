@@ -1,75 +1,55 @@
-# Stonefellow v1.3.12 — Section 14 My Library, Collections & Saved Music Audit
+# Stonefellow v1.3.13 — Section 15 Music Archive Audit
 
-## 1. Canonical library architecture — 10/10
+## 1. Single-artist architecture — 10/10
+- No multi-artist accounts, artist following, or artist-profile abstraction was introduced.
+- Archive metadata extends Stonefellow's canonical track/release records.
+- Production catalog and release JSON remain authoritative.
 
-- Favorites remain authoritative in personalization.
-- Playlists remain authoritative in the playlist subsystem.
-- Purchases remain derived from the account order library and canonical order records.
-- Saved custom-media builds remain authoritative in account/build data.
-- Continue Listening and personal history remain authoritative in personalization.
-- My Library is an aggregation layer, not a parallel persistence model.
+## 2. Recording/version model — 10/10
+- Canonical work IDs connect multiple recordings of one song.
+- Explicit version-of and alternate-track relationships are supported.
+- Self-links and unknown alternate references are rejected by Admin APIs.
+- Version type/label, recording date, session, era and source notes are additive and optional.
 
-## 2. Customer My Library — 10/10
+## 3. Deep track experience — 10/10
+- Rich song pages expose recording context when available.
+- Personnel supports name, instrument and role.
+- Other versions are directly navigable.
+- Archive media is linked without duplicating the media itself.
 
-- Dedicated signed-in My Library navigation exists.
-- All, Tracks, Releases, Playlists, Purchases, Builds, History, and Collections are first-class tabs.
-- Saved content supports appropriate Play/Open/Queue/Resume actions.
-- Search and sorting operate within the active library area.
-- URL state supports Library tab and Collection deep links.
-- Desktop, tablet, and mobile layouts are covered.
+## 4. Release archive — 10/10
+- Release records support liner notes and credits.
+- Edition, original release date, reissue relationship and archive media are supported.
+- Release v2 remains compatible with the existing file-backed release store.
+- Release track IDs and reissue IDs are validated.
 
-## 3. Collections — 10/10
+## 5. Public Music Archive — 10/10
+- Dedicated Music Archive navigation exists.
+- Timeline combines recording and release history.
+- Era filtering is available.
+- Version-family cards expose connected recordings.
+- Responsive archive layouts cover narrow screens.
 
-- Collections are separate from playlists and support mixed saved-content types.
-- Collection CRUD is authenticated and CSRF protected.
-- Playlist/build/purchase references are scoped to the owning user.
-- Track/release references are validated against current catalog/public release visibility.
-- Duplicate Collection additions are idempotent.
-- Duplicate races do not create false activity events.
-- Remove/reorder behavior maintains deterministic positions.
-- Deleting a Collection preserves the source items.
+## 6. Search + Agent — 10/10
+- Section 12 search indexes archive metadata.
+- Agent catalog context includes era, version, recording session and personnel.
+- Archive/chronology requests route to the Music Archive.
+- Track-info questions include personnel, recording and alternate-version intent.
 
-## 4. Purchase ownership — 10/10
+## 7. Admin authoring — 10/10
+- Track editor covers archive relationships, personnel, source notes and media.
+- Release editor covers liner notes, credits, editions, reissues and archive media.
+- Existing catalog import and metadata-template workflows remain intact.
 
-- Library purchase rows are backed by the existing user-library records.
-- Canonical order records are checked before an item is presented as owned.
-- Paid/test-paid/simulated-paid/completed payment states reuse the canonical paid-order classifier.
-- Pending payment orders remain transactional Account records but are not prematurely shown as owned Library media.
+## 8. Deployment compatibility — 10/10
+- No database migration is required.
+- Database schema target remains 1.3.12.
+- Production data/storage remain excluded from application deploys.
+- Existing records without archive fields render normally.
 
-## 5. Account consolidation — 10/10
+## 9. Regression gate — pending GitHub validation
+- Section 15 has a dedicated pure behavior/contract suite.
+- The GitHub release gate includes Sections 1–12, 14 and 15.
+- PHP and JavaScript syntax checks remain mandatory.
 
-- My Account now focuses on account/profile, billing, receipts, notifications, security/sessions, and order history.
-- Previously scattered saved-content sections point into the dedicated My Library.
-- Account exposes an at-a-glance Library summary and tab deep links.
-- Existing account and billing functions remain intact.
-
-## 6. Agent integration — 10/10
-
-- Natural My Library/saved-content requests route to `library_open`.
-- The Agent can select All, Collections, Purchases, Playlists, Releases, or Tracks based on the request.
-- Client execution opens the requested Library tab.
-- Account/profile requests remain distinct from Library requests.
-
-## 7. Admin visibility — 10/10
-
-- Admin gets aggregate customer-library analytics.
-- Most-saved tracks/releases are visible.
-- Per-user inspection includes a read-only My Library summary and Collection metadata.
-- No Admin mutation route was added for personal Collections.
-- Library metrics integrate into the existing Admin dashboard/analytics workspace.
-
-## 8. Compatibility and regression safety — 10/10
-
-- Dedicated My Library JavaScript is independently syntax checked.
-- Earlier personalization/playlist/recommendation tests were updated only where Section 14 intentionally moved UI responsibility from Account to My Library.
-- Section 12 schema checks remain forward-compatible.
-- The runtime audit caught and fixed a collection-binding error that JavaScript syntax alone would not catch.
-- Sections 1–12 and Section 14 all remain in the release gate.
-
-## 9. Migration — 10/10
-
-- Migration 013 creates `user_collections` and `user_collection_items`.
-- Collection tables participate in migration integrity checks.
-- Database schema target advances to 1.3.12.
-
-Measured results are recorded in `TEST-RESULTS.txt`.
+PROVISIONAL SECTION 15 SCORE: **10/10 design / pending green release gate**
