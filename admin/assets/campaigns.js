@@ -104,7 +104,7 @@
     $('#campaignValidate').onclick=validateGraph;$('#campaignSimulate').onclick=simulateGraph;$('#campaignSave').onclick=function(){saveCampaign(null)};
     const pub=$('#campaignPublish');if(pub)pub.onclick=publishCampaign;
     const dup=$('#campaignDuplicate');if(dup)dup.onclick=duplicateCampaign;
-    const copy=$('#copyCampaignUrl');if(copy)copy.onclick=function(){const base=location.href.replace(/admin/.*$/,'');navigator.clipboard&&navigator.clipboard.writeText(base+'campaign/'+c.slug);say('Campaign URL copied.')};
+    const copy=$('#copyCampaignUrl');if(copy)copy.onclick=function(){const base=location.href.replace(/admin\/.*$/,'');navigator.clipboard&&navigator.clipboard.writeText(base+'campaign/'+c.slug);say('Campaign URL copied.')};
     $$('[data-campaign-tab]',canvas).forEach(function(b){b.onclick=function(){switchTab(b.dataset.campaignTab)}});
     if(tab==='builder')bindBuilder();if(tab==='landing'){const f=$('#campaignLandingForm');if(f)f.oninput=captureLanding}
   }
