@@ -24,7 +24,7 @@
 
   function head(kicker,title,copy,actions=''){return `<div class="canvas-head"><div><div class="eyebrow">${esc(kicker)}</div><h1>${esc(title)}</h1><p>${esc(copy)}</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>`}
   function renderDashboard(){
-    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
+    const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
     canvas.innerHTML=head('STONEFELLOW OPERATIONS','Dashboard','Recent customers, purchases, listening, activity, Agent Brain, catalog health, and launch operations in one place.',`<button class="secondary" id="dashboardRefresh" type="button">Refresh</button>`)+
     `<div class="stats dashboard-primary-stats">
       <div class="stat"><strong>${Number(s.users||0).toLocaleString()}</strong><span>Total users</span></div>
@@ -51,6 +51,16 @@
       </div>
       <div class="dashboard-top-tracks">
         ${topTracks.length?topTracks.slice(0,5).map((t,i)=>`<button type="button" data-view="analytics"><span>${i+1}</span><strong>${esc(t.title)}</strong><small>${Number(t.listens||0)} starts · ${Number(t.repeat_starts||0)} repeat · ${Number(t.completion_rate||0)}% complete · ${Number(t.skip_rate||0)}% skip</small></button>`).join(''):'<div class="empty compact">No top tracks yet.</div>'}
+      </div>
+    </section>
+
+    <section class="panel dashboard-panel notification-dashboard-panel">
+      <div class="panel-title"><h2>Notification re-engagement</h2><button type="button" class="panel-link" data-view="analytics">Full analytics →</button></div>
+      <div class="dashboard-kpi-stack notification-kpi-stack">
+        <button class="dashboard-kpi" data-view="analytics"><small>DELIVERED</small><strong>${Number(notifications.delivered||0)}</strong><span>last 30 days</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>CLICK RATE</small><strong>${Number(notifications.click_rate||0)}%</strong><span>${Number(notifications.clicks||0)} clicks</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>CLICK → LISTEN</small><strong>${Number(notifications.listen_conversion_rate||0)}%</strong><span>${Number(notifications.listen_conversions||0)} conversions</span></button>
+        <button class="dashboard-kpi" data-view="analytics"><small>CLICK → PURCHASE</small><strong>${Number(notifications.purchase_conversion_rate||0)}%</strong><span>${Number(notifications.purchase_conversions||0)} conversions</span></button>
       </div>
     </section>
 
