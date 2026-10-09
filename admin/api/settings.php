@@ -8,6 +8,7 @@ $body=sf_request_json();
 if(($body['action']??'')!=='save_site') sf_json_response(['ok'=>false,'error'=>'unknown_action'],400);
 $site=sf_site_settings_update([
     'splash_enabled'=>!empty($body['splash_enabled']),
+    'fan_community_enabled'=>!empty($body['fan_community_enabled']),
     'announcement_enabled'=>!empty($body['announcement_enabled']),
     'announcement_text'=>$body['announcement_text']??'',
     'maintenance_enabled'=>!empty($body['maintenance_enabled']),
@@ -21,5 +22,5 @@ $site=sf_site_settings_update([
     'privacy_text'=>$body['privacy_text']??'',
     'terms_text'=>$body['terms_text']??'',
 ]);
-sf_log_admin_action((int)sf_current_user()['id'],'site_settings_updated','site','public',['splash'=>$site['splash_enabled'],'announcement'=>$site['announcement_enabled'],'maintenance'=>$site['maintenance_enabled']]);
+sf_log_admin_action((int)sf_current_user()['id'],'site_settings_updated','site','public',['splash'=>$site['splash_enabled'],'fan_community'=>$site['fan_community_enabled'],'announcement'=>$site['announcement_enabled'],'maintenance'=>$site['maintenance_enabled']]);
 sf_json_response(['ok'=>true,'site'=>$site,'csrf'=>sf_admin_csrf()]);

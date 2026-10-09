@@ -50,7 +50,8 @@ foreach(['record','playlist','shows','store','community','newsletter'] as $actio
 ok(str_contains($app,'function handleQuickAction(')&&str_contains($app,"action==='playlist'")&&str_contains($app,"action==='shows'")&&str_contains($app,"action==='store'"),'quick actions are wired to real workflows');
 ok(str_contains($css,'.chat-quick-menu')&&str_contains($css,'.newsletter-signup')&&str_contains($css,'.community-feed'),'Section 17 public UX has dedicated responsive styling');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.15'")&&str_contains($version,"'database_schema_target'=>'1.3.13'"),'version endpoint reports app 1.3.15 and schema 1.3.13');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vm17);
+ok(isset($vm17[1],$vm17[2],$vm17[3])&&[(int)$vm17[1],(int)$vm17[2],(int)$vm17[3]]>=[1,3,15]&&str_contains($version,"'database_schema_target'=>'1.3.13'"),'version endpoint reports app v1.3.15 or later and schema 1.3.13');
 ok(str_contains($version,"'fan_crm_community_agent'=>'contacts-consent-newsletter-community-agent-brain-proactive-engagement'"),'version endpoint advertises Section 17 capability');
 ok(str_contains($version,"'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter'"),'version endpoint advertises quick-action surface');
 ok(str_contains($wf,'php tests/v1315-section17-fan-crm-community.php'),'release gate includes Section 17 regression suite');

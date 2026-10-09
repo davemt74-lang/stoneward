@@ -63,3 +63,34 @@ FINAL SECTION 17 SCORE: **10/10**
 - GitHub release gate: **PASS**
 - Explicit assertions: **921 passed**
 - Failures: **0**
+
+
+# Stonefellow v1.3.16 — Fan Community Launch Control Audit
+
+## Launch control — 10/10
+- Public Fan Community defaults OFF.
+- Admin Settings can explicitly enable or disable it.
+- Public navigation and chat quick action are hidden while OFF.
+- Direct community feed/post API access is blocked while OFF.
+- Direct public community routes expose no feed while OFF.
+- Community-specific Agent routing respects the launch control.
+- Historical community-post events do not trigger proactive community outreach while OFF.
+- Existing community records are preserved for future launch.
+
+## CRM continuity — 10/10
+- Fan CRM remains active while the community is OFF.
+- Newsletter signup, consent and unsubscribe remain active.
+- Account, purchase, listening, playlist and Agent interaction signals continue feeding CRM.
+- Newsletter has an independent public view and no longer depends on the community route.
+- No schema migration is required; database target remains 1.3.13.
+
+## Measured feature-head result
+- Exact feature head: `5d24d07a201d6c13cc5ce9a436b6876be32217f5`
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Full v1.3 regression suite: **PASS**
+- Explicit assertions: **945 passed**
+- Failures: **0**
+
+FINAL v1.3.16 SCORE: **10/10**

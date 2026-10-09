@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.15');
+define('SF_BUILD', '1.3.16');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -61,7 +61,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="?view=releases" data-view="releases">Releases</a>
           <a href="?view=archive" data-view="archive">Music Archive</a>
           <a href="?view=shows" data-view="shows">Shows &amp; Live</a>
+<?php if(!empty($siteSettings['fan_community_enabled'])): ?>
           <a href="?view=community" data-view="community">Fan Community</a>
+<?php endif; ?>
           <a href="?view=store" data-view="store">Store</a>
           <a href="?view=builder" data-view="builder">Create a record</a>
           <a href="?view=cart" data-view="cart">Cart</a>
@@ -159,7 +161,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button type="button" data-quick-action="playlist"><strong>Create Playlist</strong><span>Start a saved playlist</span></button>
       <button type="button" data-quick-action="shows"><strong>Tour Dates</strong><span>Shows & live archive</span></button>
       <button type="button" data-quick-action="store"><strong>Merch Store</strong><span>Music & custom physical releases</span></button>
+<?php if(!empty($siteSettings['fan_community_enabled'])): ?>
       <button type="button" data-quick-action="community"><strong>Fan Community</strong><span>Join the fan feed</span></button>
+<?php endif; ?>
       <button type="button" data-quick-action="newsletter"><strong>Newsletter</strong><span>Join Stonefellow email updates</span></button>
     </div>
     <form id="chatForm" class="chatbar" autocomplete="off">
@@ -177,7 +181,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
     </div>
   </footer>
 
-  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
+  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
   <script src="assets/js/config.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script>if(window.STONEFELLOW_CONFIG){window.STONEFELLOW_CONFIG.socials=window.STONEFELLOW_CONFIG.socials||{};for(const [k,v] of Object.entries(window.STONEFELLOW_SITE.socials||{})){if(v)window.STONEFELLOW_CONFIG.socials[k]=v;}}</script>
   <script src="assets/js/catalog.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
