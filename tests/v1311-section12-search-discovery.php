@@ -35,6 +35,8 @@ ok(str_contains($core,'function sf_search_release_fields'),'release search docum
 ok(str_contains($core,"'description'=>(string)(\$r['description']"),'release descriptions are searchable');
 ok(str_contains($core,"'notes'=>(string)(\$r['notes']"),'release notes are searchable');
 ok(str_contains($core,"'tracks'=>\$trackTitles"),'release track titles are searchable');
+ok(str_contains($core,"\$r['catalog_number']")&&str_contains($core,"\$r['upc_ean']"),'release catalog number and UPC/EAN are searchable');
+ok(str_contains($core,"\$r['label']")&&str_contains($core,"\$r['genre']"),'release label and genre are searchable');
 ok(str_contains($core,"'moods'=>array_values(array_unique(\$moods))"),'release discovery inherits track moods');
 ok(str_contains($core,"'themes'=>array_values(array_unique(\$themes))"),'release discovery inherits track themes');
 
@@ -91,6 +93,8 @@ ok(str_contains($core,"hash('sha256'"),'search telemetry stores hashed session i
 ok(str_contains($core,'function sf_search_event_allowed'),'search telemetry is rate bounded');
 ok(str_contains($core,'time()-10*60'),'search telemetry throttle uses a 10-minute window');
 ok(str_contains($core,'<120'),'search telemetry throttle caps event volume');
+ok(str_contains($core,"'guest|'.sf_auth_ip_hash()"),'guest telemetry rate identity is bound to server-observed IP instead of caller-supplied session keys');
+ok(str_contains($core,"'user|'.\$userId"),'signed-in telemetry rate identity is bound to the authenticated user');
 ok(str_contains($core,"['search','click','clear']"),'search telemetry event types are governed');
 ok(str_contains($core,'function sf_search_recent_for_user'),'recent-search helper exists');
 ok(str_contains($core,'function sf_search_clear_user_history'),'search privacy clear helper exists');
@@ -106,6 +110,9 @@ ok(str_contains($app,'clearCatalogSearchHistory'),'search-history privacy contro
 ok(str_contains($app,'catalogRecordClick'),'result selections are attributed');
 ok(str_contains($app,"'catalog_search'"),'search-result playback has dedicated listening telemetry source');
 ok(str_contains($app,'catalogReplaceUrl'),'search/filter state is reflected in the URL');
+ok(!str_contains($app,"$('#atalogDiscoveryResults'"),'catalog result host selector is not malformed');
+ok(!str_contains($app,'<article class="module"<div'),'catalog error markup is structurally valid');
+ok(str_contains($app,'id="catalogYear"'),'catalog year filter has a valid element id');
 ok(str_contains($app,"u.searchParams.get('q')"),'search state restores from URL');
 ok(str_contains($app,"navigate('music',{})"),'catalog reset clears shareable URL state');
 ok(str_contains($app,'track-result'),'unified search renders track results');
