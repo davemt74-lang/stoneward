@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.13');
+define('SF_BUILD', '1.3.14');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -60,6 +60,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="?view=music" data-view="music">Music</a>
           <a href="?view=releases" data-view="releases">Releases</a>
           <a href="?view=archive" data-view="archive">Music Archive</a>
+          <a href="?view=shows" data-view="shows">Shows &amp; Live</a>
           <a href="?view=builder" data-view="builder">Create a record</a>
           <a href="?view=cart" data-view="cart">Cart</a>
           <a href="?view=plans" data-view="plans">Plans</a>

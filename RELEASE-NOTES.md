@@ -1,15 +1,18 @@
-# Stonefellow v1.3.13 — Section 15: Music Archive, Song Stories & Deep Catalog
+# Stonefellow v1.3.14 — Section 16: Shows, Tours & Live Archive
 
-- Added a public Music Archive view for Stonefellow's single-artist catalog.
-- Added chronological recording/release timeline and era browsing.
-- Added canonical song/version relationships for demos, studio masters, live takes, remasters, alternate mixes and other recordings.
-- Added structured recording-session, personnel and archival-media metadata.
-- Expanded rich track pages with archive context, connected versions and personnel.
-- Expanded releases with liner notes, credits, edition/original-release context, reissue relationships and archive media.
-- Advanced release records to `stonefellow.release.v2` while retaining the same file-backed release store.
-- Extended catalog search to index archive/version metadata.
-- Added Agent routing for archive/chronology requests and richer grounded context for version/personnel questions.
-- Added Admin editors and server validation for archive relationships.
-- Preserved production `data/` as deployment-owned content.
+- Added dedicated public Shows & Live navigation.
+- Added upcoming and historical show browsing.
+- Added first-class show detail pages.
+- Added venue/location, tour/era and lifecycle status.
+- Added ticket links for scheduled shows.
+- Added ordered setlists backed by canonical track IDs.
+- Added playable live-recording links backed by canonical catalog tracks.
+- Added posters, show notes and live-archive media.
+- Added show entries to the Section 15 Music Archive timeline.
+- Added grounded Agent show/tour/setlist context and routing.
+- Added Admin Shows + Live workspace with governed CRUD.
+- Added server-side validation for setlist/live-recording track references.
+- Added canonical `stonefellow.show.v1` records in `data/shows.json`.
+- Kept production `data/` deploy-owned and excluded from overlays.
 - No database migration is required; schema target remains 1.3.12.
-- Application advances to 1.3.13.
+- Application advances to 1.3.14.

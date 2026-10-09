@@ -1,48 +1,61 @@
-# Stonefellow v1.3.13 — Section 15: Music Archive, Song Stories & Deep Catalog
+# Stonefellow v1.3.14 — Section 16: Shows, Tours & Live Archive
 
-Stonefellow remains a **single-artist platform**. Section 15 deepens that artist's catalog rather than introducing multi-artist profiles or following.
+Stonefellow remains a **single-artist platform**. Section 16 connects that artist's performances to the music catalog and Section 15 archive.
 
-## Music Archive
+## Shows & Live
 
-A new public **Music Archive** view organizes the existing Stonefellow catalog by chronology, era, recording session, version family, and release history.
+The public site now has a dedicated **Shows & Live** workspace with:
 
-Archive metadata remains attached to the canonical track/release records. There is no parallel music database.
+- Upcoming public performances
+- Historical/past shows
+- Venue, city, region and country
+- Tour and era context
+- Show status
+- Ticket links for scheduled shows
+- Posters and archive media
+- Show notes
+- Setlists
+- Playable live recordings
 
-Track archive fields support:
+Each show has a first-class detail route. Setlists and live recordings reference the existing canonical Stonefellow catalog by track ID.
 
-- Era
-- Canonical work ID
-- Version type and display label
-- Version-of relationship
-- Alternate track IDs
-- Recording date and session
-- Structured personnel
-- Source/archive notes
-- Attached archival media
+## Live archive integration
 
-This allows studio masters, demos, live takes, rehearsals, remasters, alternate mixes, and other versions to be connected as recordings of the same underlying song.
+Shows are also added to the Section 15 Music Archive timeline. A performance can therefore be explored alongside recording sessions, versions and releases without creating a parallel music catalog.
 
-## Rich track + release context
+Live recording track IDs point to normal Stonefellow catalog records, so their credits, version metadata, favorites, queue behavior and playback remain canonical.
 
-Track pages now expose recording context, personnel, connected versions, and archival media when available.
+## Agent
 
-Release records advance to `stonefellow.release.v2` and support liner notes, credits, edition/original-release context, reissue relationships, and archival media.
+The Agent receives grounded show context including date, venue, location, tour/era, setlist titles and archive notes.
 
-## Search + Agent
-
-Section 12 search now indexes archive metadata in addition to titles, lyrics, stories, credits, moods and themes.
-
-The Stonefellow Agent can open the Music Archive and answer grounded questions about recording sessions, personnel, chronology, and alternate versions using canonical catalog context.
+It distinguishes between:
+- browsing shows/tour dates/live archive; and
+- factual questions about a show, venue, setlist, tour or live performance.
 
 ## Admin
 
-Admin catalog editing now includes Archive + Version History controls. Release management includes liner notes, credits, edition/reissue context, and attached archive media.
+Admin now includes **Shows + Live** with governed show CRUD.
 
-Production `data/` remains deployment-owned content and is not overwritten by application deploys.
+A show record supports:
+- date/time and lifecycle status
+- venue/location
+- tour and era
+- public description and archive notes
+- ticket URL
+- poster
+- public/featured flags
+- ordered setlist track IDs
+- playable live-recording track IDs
+- archive media
 
-## Database
+Unknown catalog track references are rejected server-side.
 
-No database migration is required. Database schema target remains **1.3.12**.
+## Storage and database
 
-Application: **1.3.13**  
+Shows are stored in canonical `data/shows.json`, alongside the existing file-backed catalog/release content model. Production `data/` remains deployment-owned and must not be overwritten by application deploys.
+
+No database migration is required.
+
+Application: **1.3.14**  
 Database schema target: **1.3.12**
