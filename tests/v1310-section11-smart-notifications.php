@@ -114,11 +114,11 @@ ok(str_contains($renderer,'Click → purchase'),'analytics workspace renders cli
 ok(str_contains($renderer,'notification_analytics'),'per-user inspector receives notification analytics');
 ok(str_contains($adminCss,'.notification-kpi-stack'),'notification admin KPIs are responsive');
 
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.10'"),'database schema target advances to 1.3.10');
+ok(str_contains($mig,"'id'=>'2026-10-08-011'")&&str_contains($mig,'sf_notification_ensure_schema'),'Section 11 notification migration remains registered after later schema upgrades');
 ok(str_contains($mig,"'id'=>'2026-10-08-011'")&&str_contains($mig,'sf_notification_ensure_schema'),'migration 011 installs smart notification schema');
 ok(str_contains($mig,"'notification_delivery_keys'")&&str_contains($mig,"'notification_generation_state'"),'migration integrity requires notification governance tables');
-ok(str_contains($version,"'stonefellow'=>'1.3.10'"),'version endpoint reports v1.3.10');
-ok(str_contains($version,"'database_schema_target'=>'1.3.10'"),'version endpoint reports schema 1.3.10');
+ok(str_contains($version,"'smart_notifications'=>'preferences-dedupe-cron-email-conversion-agent'"),'version endpoint retains Section 11 smart-notification capability');
+ok(str_contains($version,"'database_schema_target'=>'"),'version endpoint continues to report the current database schema target');
 ok(str_contains($version,"'smart_notifications'=>'preferences-dedupe-cron-email-conversion-agent'"),'version endpoint reports smart notification capability');
 ok(str_contains($wf,'v1310-section11-smart-notifications.php'),'release gate includes Section 11 regression');
 
