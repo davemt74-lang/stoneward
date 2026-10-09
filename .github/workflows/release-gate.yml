@@ -52,3 +52,4 @@ jobs:
           php tests/v1310-section11-smart-notifications.php
           php tests/v1311-section12-search-discovery.php
           php tests/v1312-section14-my-library.php
+          php tests/v1313-section15-archive.php
