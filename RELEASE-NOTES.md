@@ -1,18 +1,22 @@
-# Stonefellow v1.3.11 — Section 12: Search, Discovery & Catalog Intelligence
+# Stonefellow v1.3.12 — Section 14: My Library, Collections & Saved Music
 
-- Replaced the basic Music filter with unified server-backed track/release Search & Discover.
-- Added weighted search across titles, releases, moods, themes, stories, lyrics, credits, metadata, and release metadata.
-- Added typo-tolerant matching and zero-result suggestions.
-- Added facets for result type, mood, theme, release, year, and energy.
-- Added relevance, popularity, newest, and title sorting.
-- Added signed-in personalization boosts without creating a parallel recommendation model.
-- Added popularity signals from canonical listening events.
-- Added recent searches and user-controlled search-history clearing.
-- Added shareable/restorable catalog search URLs.
-- Added search-result selection telemetry and dedicated catalog-search playback telemetry.
-- Added guest-safe telemetry throttling bound to server-observed identity and signed-in user/session governance.
-- Added Agent natural-language catalog search and current-search context.
-- Added Admin search/discovery analytics, zero-result catalog-gap reporting, filter usage, top selected results, and recent search activity.
-- Added migration 012.
-- Application and database schema target advance to 1.3.11.
-- Updated the Section 11 regression gate to remain forward-compatible with later schema upgrades.
+Section 13 Smart Radio was intentionally skipped. This release proceeds directly to the customer-facing Section 14 library experience.
+
+- Added dedicated **My Library** navigation for signed-in customers.
+- Added All, Tracks, Releases, Playlists, Purchases, Builds, History, and Collections tabs.
+- Added unified library summary, in-library search, sorting, and responsive saved-item cards.
+- Added Continue Listening directly to My Library with saved-position resume.
+- Reused canonical favorites, playlists, saved builds, owned-order library, and listening history instead of duplicating those systems.
+- Added mixed-content Collections containing tracks, releases, owned playlists, paid purchases, and owned saved builds.
+- Added Collection create/edit/delete, add/remove, and manual item ordering.
+- Added duplicate-safe Collection writes and removal activity history.
+- Collection deletion preserves the underlying saved content.
+- Added strict Collection/user ownership checks.
+- Changed My Library purchase ownership so payment-pending orders do not appear as owned media.
+- Consolidated saved-content management out of the oversized Account page into My Library.
+- Kept billing, receipts, security, notification settings, and transactional order history in My Account.
+- Added Agent routing for My Library and specific Library tabs.
+- Added read-only Admin customer-library analytics and per-user inspection.
+- Added dedicated `assets/js/library.js` bundle and release-gate syntax validation.
+- Added migration 013.
+- Application and database schema target advance to 1.3.12.

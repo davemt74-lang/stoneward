@@ -1,4 +1,4 @@
-# Upgrade to Stonefellow v1.3.11 Section 12
+# Upgrade to Stonefellow v1.3.12 Section 14
 
 Upload/extract the update over the existing Stonefellow installation, then run:
 
@@ -6,14 +6,23 @@ Upload/extract the update over the existing Stonefellow installation, then run:
 /upgrade.php
 ```
 
-Section 12 advances the database schema from **1.3.10** to **1.3.11** with:
+Section 14 advances the database schema from **1.3.11** to **1.3.12**.
 
-- `2026-10-08-012` — catalog search telemetry, discovery analytics, and selected-result attribution.
+Migration:
 
-New table:
+- `2026-10-08-013` — user My Library Collections and mixed saved-item organization.
 
-- `catalog_search_events`
+New tables:
 
-The table supports both anonymous discovery telemetry and signed-in search history. Anonymous session identity is hashed and rate bounded; signed-in users can clear their own search history from Search & Discover.
+- `user_collections`
+- `user_collection_items`
 
-Existing catalog, releases, favorites, playlists, listening history, recommendations, Agent sessions, queues, saved builds, orders, notifications, and prior analytics are preserved.
+Existing favorites, playlists, user-library purchases, saved builds, listening history, Continue Listening, orders, search analytics, notification data, Agent data, and catalog/release content are preserved.
+
+### Behavioral note
+
+The new Purchases tab only treats an order item as owned Library content when its canonical order/payment state is paid or complete. Payment-pending orders remain visible in My Account/order history until payment completes.
+
+### Section numbering
+
+Section 13 Smart Radio was intentionally passed over. No Section 13 migration is required; migration numbering continues normally with migration 013 for this v1.3.12 Section 14 release.
