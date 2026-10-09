@@ -79,6 +79,7 @@ foreach($recentListeningRows as $row){
 }
 
 $listening=sf_engagement_analytics(30,null);
+$notificationAnalytics=sf_notification_analytics(30,null);
 
 $recentOrders=[];
 foreach(array_slice($orders,0,8) as $o){
@@ -131,6 +132,10 @@ sf_json_response([
         'purchase_conversion_30d'=>(float)($listening['conversion']['purchase_rate']??0),
         'custom_media_conversion_30d'=>(float)($listening['conversion']['custom_media_rate']??0),
         'revenue_30d_cents'=>(int)($listening['revenue_cents']??0),
+        'notifications_30d'=>(int)($notificationAnalytics['delivered']??0),
+        'notification_click_rate_30d'=>(float)($notificationAnalytics['click_rate']??0),
+        'notification_listen_conversion_30d'=>(float)($notificationAnalytics['listen_conversion_rate']??0),
+        'notification_purchase_conversion_30d'=>(float)($notificationAnalytics['purchase_conversion_rate']??0),
     ],
     'releases'=>$releases,
     'recent_imports'=>array_slice($imports,0,5),
@@ -139,6 +144,7 @@ sf_json_response([
     'recent_activity'=>$recentActivity,
     'recent_listening'=>$recentListening,
     'recent_brain'=>$recentBrain,
+    'notification_analytics'=>$notificationAnalytics,
     'listening'=>[
         'days'=>30,
         'starts'=>(int)($listening['starts']??0),
