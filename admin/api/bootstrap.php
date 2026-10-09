@@ -6,6 +6,7 @@ require_once SF_ROOT . '/api/agent-runtime.php';
 const SF_ADMIN_TEMPLATE_DIR = SF_ROOT . '/storage/admin/templates';
 const SF_ADMIN_MEDIA_INDEX = SF_ROOT . '/storage/media/index.json';
 const SF_ADMIN_RELEASES_FILE = SF_ROOT . '/data/releases.json';
+const SF_ADMIN_SHOWS_FILE = SF_ROOT . '/data/shows.json';
 const SF_ADMIN_KNOWLEDGE_INDEX = SF_ROOT . '/storage/knowledge/index.json';
 const SF_ADMIN_KNOWLEDGE_FILES = SF_ROOT . '/storage/knowledge/files';
 const SF_ADMIN_ARTWORK_DIR = SF_ROOT . '/storage/media/artwork';
@@ -161,6 +162,14 @@ function sf_admin_write_releases(array $rows): void {
     $json=json_encode(array_values($rows),JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
     if($json===false) throw new RuntimeException('Could not encode releases.');
     if(file_put_contents(SF_ROOT.'/assets/js/releases.js',"window.STONEFELLOW_RELEASES = ".$json.";\n",LOCK_EX)===false) throw new RuntimeException('Could not write release JavaScript.');
+}
+function sf_admin_shows(): array {
+    if (!is_file(SF_ADMIN_SHOWS_FILE)) return [];
+    $d=json_decode((string)file_get_contents(SF_ADMIN_SHOWS_FILE),true);
+    return is_array($d)?array_values($d):[];
+}
+function sf_admin_write_shows(array $rows): void {
+    sf_write_json(SF_ADMIN_SHOWS_FILE,array_values($rows));
 }
 function sf_admin_knowledge_index(): array {
     if(!is_file(SF_ADMIN_KNOWLEDGE_INDEX)) return ['schema'=>'stonefellow.knowledge.v1','folders'=>[],'files'=>[]];
