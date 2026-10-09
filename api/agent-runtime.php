@@ -51,10 +51,10 @@ function sf_agent_context(string $query,string $profile='catalog'): string {
     $sections=[];
     if(in_array($profile,['catalog','knowledge','recommendation','commerce'],true)){
         $tracks=sf_catalog();usort($tracks,fn($a,$b)=>$score(json_encode($b)?:'')<=>$score(json_encode($a)?:''));$tracks=array_slice($tracks,0,$profile==='knowledge'?6:10);
-        $lines=[];foreach($tracks as $t){$m=(array)($t['metadata']??[]);$lines[]='- id='.($t['id']??'').' | '.($t['title']??'').' | release '.($t['release']??'').' | moods '.implode(', ',(array)($t['mood']??[])).' | story '.substr((string)($t['story']??''),0,360).' | credits '.implode('; ',(array)($t['credits']??[])).' | writer '.($m['words_by']??'').' | music '.($m['music_by']??'').' | producer '.($m['producer']??'').' | ISRC '.($m['isrc']??'');}
+        $lines=[];foreach($tracks as $t){$m=(array)($t['metadata']??[]);$a=(array)($t['archive']??[]);$lines[]='- id='.($t['id']??'').' | '.($t['title']??'').' | release '.($t['release']??'').' | moods '.implode(', ',(array)($t['mood']??[])).' | story '.substr((string)($t['story']??''),0,360).' | credits '.implode('; ',(array)($t['credits']??[])).' | writer '.($m['words_by']??'').' | music '.($m['music_by']??'').' | producer '.($m['producer']??'').' | ISRC '.($m['isrc']??'').' | era '.($a['era']??'').' | version '.($a['version_type']??'').' '.($a['version_label']??'').' | recorded '.($a['recorded_date']??'').' | session '.($a['session']??'').' | personnel '.json_encode($a['personnel']??[]);}
         $sections[]="CATALOG\n".implode("\n",$lines);
         $releaseLines=[];$rp=SF_ROOT.'/data/releases.json';$rels=is_file($rp)?json_decode((string)file_get_contents($rp),true):[];
-        foreach((array)$rels as $r){if(($r['state']??'published')!=='published'||isset($r['agent_discoverable'])&&!$r['agent_discoverable'])continue;$releaseLines[]='- '.($r['title']??'').' ('.($r['type']??'release').') '.substr((string)($r['description']??''),0,280);if(count($releaseLines)>=6)break;}
+        foreach((array)$rels as $r){if(($r['state']??'published')!=='published'||isset($r['agent_discoverable'])&&!$r['agent_discoverable'])continue;$a=(array)($r['archive']??[]);$releaseLines[]='- '.($r['title']??'').' ('.($r['type']??'release').') '.substr((string)($r['description']??''),0,280).' | era '.($a['era']??'').' | edition '.($a['edition']??'').' | original date '.($a['original_release_date']??'').' | liner notes '.substr((string)($r['liner_notes']??''),0,220);if(count($releaseLines)>=6)break;}
         if($releaseLines)$sections[]="RELEASES\n".implode("\n",$releaseLines);
     }
     if($profile==='knowledge'){
@@ -126,6 +126,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
+    if(preg_match('/\b(archive|timeline|eras?|chronolog(?:y|ical)|recording sessions?)\b/',$q))return 'archive_browse';
     if(preg_match('/album|release| ep |single/',$q))return 'release_browse';
     if(preg_match('/save (?:this |the )?(?:agent )?(?:listening )?session|save (?:these|those) songs/',$q)&&str_contains($q,'playlist'))return 'playlist_save_session';
     if(preg_match('/(?:make|create|build|curate).*playlist|playlist.*(?:make|create|build|curate)/',$q))return 'playlist_create';
@@ -144,7 +145,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/my library|saved music|my collections|show (?:me )?(?:my )?(?:favorites|saved tracks|saved releases)|my purchases/',$q))return 'library_open';
     if(preg_match('/my account|profile/',$q))return 'account_open';
     if(preg_match('/plan|package|subscription|free trial|active tokens?/',$q))return 'plans_open';
-    if(preg_match('/lyrics?|credits?|who wrote|who produced|isrc|bmi|ascap|story|about this song/',$q))return 'track_info';
+    if(preg_match('/lyrics?|credits?|who wrote|who produced|who played|personnel|isrc|bmi|ascap|story|about this song|other versions?|version of|when (?:was|did).*record|recording session/',$q))return 'track_info';
     if(preg_match('/knowledge|notes?|document|history|why did|what does|meaning/',$q))return 'knowledge_question';
     return 'general_conversation';
 }
@@ -181,6 +182,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'catalog_search':
             $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
+        case 'archive_browse':$action=['type'=>'open_view','view'=>'archive'];$text='Here is the Stonefellow music archive — recordings, versions, sessions and releases in context.';$profile='catalog';break;
         case 'release_browse':$action=['type'=>'open_view','view'=>'releases'];$text='Here are the releases.';$profile='catalog';break;
         case 'playlist_open':$action=['type'=>'open_view','view'=>'account'];$text='Your playlists are in My Stonefellow.';$profile='account';break;
         case 'playlist_create':
@@ -252,6 +254,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'queue_clear'=>'Asks to clear the Up Next queue.',
         'catalog_search'=>'Asks to find/search Stonefellow tracks or releases by title, mood, theme, lyric, credit, story, or other catalog clue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
+        'archive_browse'=>'Asks to browse the Stonefellow archive, chronology, eras, recording sessions, or version history.',
         'release_browse'=>'Asks to browse albums, EPs, singles, releases, or release pages.',
         'playlist_open'=>'Asks to see or open their playlists.',
         'playlist_create'=>'Asks the agent to create, curate, or build a playlist.',
@@ -259,7 +262,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'listening_session_like'=>'Says they like/love the current session track.',
         'listening_session_dislike'=>'Says they dislike the current session track or it is not for them.',
         'listening_session_end'=>'Asks to end/close the active listening session.',
-        'track_info'=>'Asks factual questions about a track, lyrics, credits, writers, producers, ISRC, or song story.',
+        'track_info'=>'Asks factual questions about a track, lyrics, credits, writers, producers, personnel, recording session, alternate versions, ISRC, or song story.',
         'knowledge_question'=>'Asks a broader factual/history/meaning question that may require approved knowledge documents.',
         'builder_open'=>'Asks to create, build, or continue a custom record, vinyl, cassette, or mixtape.',
         'builder_add'=>'Asks to put a song onto the current custom-media build.',
