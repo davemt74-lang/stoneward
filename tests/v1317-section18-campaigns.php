@@ -18,7 +18,8 @@ ok(sf_campaign_discount_amount(['payload'=>['amount_off_cents'=>750]],500)===500
 $core=src('api/campaign-core.php');$mig=src('api/migrations.php');$boot=src('api/bootstrap.php');$adminApi=src('admin/api/campaigns.php');$adminJs=src('admin/assets/campaigns.js');$adminCss=src('admin/assets/campaigns.css');$adminShell=src('admin/index.php');$publicApi=src('api/campaign.php');$download=src('api/campaign-download.php');$app=src('assets/js/app.js');$siteCss=src('assets/css/site.css');$shell=src('stonefellow-v120.php');$ht=src('.htaccess');$quote=src('api/quote.php');$order=src('api/order.php');$agent=src('api/agent-runtime.php');$version=src('version.php');$wf=src('.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/campaign-core.php'"),'campaign core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.14'"),'database schema advances to 1.3.14');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db18);
+ok(isset($db18[1],$db18[2],$db18[3])&&[(int)$db18[1],(int)$db18[2],(int)$db18[3]]>=[1,3,14],'database schema remains v1.3.14 or later');
 ok(str_contains($mig,"'id'=>'2026-10-09-015'")&&str_contains($mig,'sf_campaign_ensure_schema'),'migration 015 installs campaign schema');
 foreach(['campaigns','campaign_segments','campaign_participants','campaign_events','campaign_entitlements','campaign_message_runs'] as $table)ok(str_contains($core,'CREATE TABLE IF NOT EXISTS '.$table),'campaign schema includes '.$table);
 ok(substr_count($core,'CREATE TABLE IF NOT EXISTS campaigns')===2,'campaign schema supports SQLite and MySQL');
@@ -57,7 +58,9 @@ ok(str_contains($agent,'ACTIVE CAMPAIGNS')&&str_contains($agent,"campaign_offer"
 ok(str_contains($agent,"view'=>'campaign'")&&str_contains($app,"slug:a.slug"),'Agent can open a matched campaign directly');
 ok(str_contains(src('admin/assets/admin.js'),"openView('campaigns')")&&str_contains(src('admin/assets/admin.js'),'Campaign Builder'),'Admin Agent can route campaign creation requests into the builder');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.17'")&&str_contains($version,"'database_schema_target'=>'1.3.14'"),'version endpoint reports app 1.3.17 and schema 1.3.14');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app18);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema18);
+ok(isset($app18[1],$app18[2],$app18[3],$schema18[1],$schema18[2],$schema18[3])&&[(int)$app18[1],(int)$app18[2],(int)$app18[3]]>=[1,3,17]&&[(int)$schema18[1],(int)$schema18[2],(int)$schema18[3]]>=[1,3,14],'version endpoint reports app v1.3.17 or later and schema v1.3.14 or later');
 ok(str_contains($version,"'campaigns'=>'visual-node-builder-audience-offers-messaging-attribution'"),'version endpoint advertises campaign builder capability');
 ok(str_contains($wf,'php tests/v1317-section18-campaigns.php'),'release gate includes Section 18 campaign regression suite');
 echo "Stonefellow v1.3.17 Section 18 Campaigns, Offers & Fan Acquisition audit: PASS\n";

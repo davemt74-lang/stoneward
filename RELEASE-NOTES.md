@@ -1,22 +1,29 @@
-# Stonefellow v1.3.17 — Section 18: Campaigns, Offers & Fan Acquisition
+# Stonefellow v1.3.18 — Section 19: Media Uploads & Asset Library
 
-- Added first-class Admin Campaigns module.
-- Added drag-and-drop visual Campaign Builder with connected nodes, inspector, validation and simulation.
-- Added Trigger, Audience, Condition, Wait, Email, CRM Tag, Agent Message, Free Download, Discount, VIP, Exclusive, Redirect, Conversion and Exit nodes.
-- Added public `/campaign/{slug}` landing pages.
-- Added explicit campaign newsletter opt-in without conflating required delivery email with marketing consent.
-- Added CRM-backed campaign participants and event ledger.
-- Added graph-executed audience gates, conditions, CRM tagging and governed Agent messages.
-- Added tokenized free-song download entitlements and download attribution.
-- Added campaign discount entitlements integrated into quote/order calculations.
-- Added VIP and exclusive offer links/access codes.
-- Added campaign claim limits and expiration support.
-- Added Admin-approved campaign email sends to opted-in fans only.
-- Added fresh unsubscribe links to campaign email.
-- Added campaign email run auditing and Agent Brain records.
-- Added campaign purchase attribution and attributed revenue analytics.
-- Added active-campaign context and offer routing to the public Agent.
-- Added Admin Agent routing into the Campaign Builder.
-- Fan Community remains independently controlled and defaults OFF.
-- Application advances to **1.3.17**.
-- Database schema advances to **1.3.14**.
+- Added first-class Admin Media Library.
+- Added secure private-storage uploader for MP3, WAV, images, video and documents.
+- Added SHA-256 asset deduplication.
+- Added MIME + file-signature validation for MP3/WAV/PDF.
+- Added FFprobe metadata extraction when available.
+- Added built-in WAV RIFF duration/sample-rate/channel/bit-depth parser.
+- Added built-in MP3 frame bitrate/sample-rate/channel/duration parser.
+- Added ID3v1/ID3v2 metadata extraction and embedded-artwork detection.
+- Added Admin visibility for FFprobe, GD and effective upload ceiling.
+- Added automatic image large/medium/thumbnail derivatives when GD is available.
+- Added controlled public media endpoint with HTTP Range support.
+- Added separate Public and Downloadable permissions.
+- Added real Song Media workspace covering audio, artwork, photos, video, documents and archive media.
+- Added choose-from-library asset reuse.
+- Added audio roles for master, preview, download, alternate, candidate and primary.
+- Added explicit Make Primary Audio action; upload alone cannot replace live audio.
+- Added explicit Make Primary Artwork action.
+- Previous primary audio/artwork is demoted rather than deleted.
+- Added attached-media drag ordering.
+- Added safe detach vs permanent-delete behavior.
+- Added public song media gallery/audio/video/document rendering.
+- Added folder-import integration with the central Media Library.
+- Added migration backfill for existing catalog audio, artwork and local archive files where recoverable.
+- Added Media Library events to Admin audit and Agent Brain.
+- Added public Agent context for explicitly public song media only.
+- Application advances to **1.3.18**.
+- Database schema advances to **1.3.15**.

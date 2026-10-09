@@ -34,6 +34,7 @@ jobs:
         run: |
           node --check admin/assets/admin.js
           node --check admin/assets/campaigns.js
+          node --check admin/assets/media.js
           node --check admin/assets/analytics.js
 
       - name: v1.3 regression suites
@@ -58,3 +59,4 @@ jobs:
           php tests/v1315-section17-fan-crm-community.php
           php tests/v1316-section17-community-toggle.php
           php tests/v1317-section18-campaigns.php
+          php tests/v1318-section19-media-library.php

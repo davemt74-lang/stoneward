@@ -150,6 +150,7 @@ require_once __DIR__ . '/billing.php';
 require_once __DIR__ . '/operations.php';
 require_once __DIR__ . '/crm-core.php';
 require_once __DIR__ . '/campaign-core.php';
+require_once __DIR__ . '/media-core.php';
 require_once __DIR__ . '/personalization-core.php';
 require_once __DIR__ . '/playlists-core.php';
 require_once __DIR__ . '/listening-sessions-core.php';

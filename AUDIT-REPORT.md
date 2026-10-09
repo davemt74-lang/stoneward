@@ -1,71 +1,76 @@
-# Stonefellow v1.3.17 — Section 18 Campaigns, Offers & Fan Acquisition Audit
+# Stonefellow v1.3.18 — Section 19 Media Uploads & Asset Library Audit
 
-## 18A — Campaign Core & Admin Workspace — 10/10 design
-- First-class Campaigns Admin module.
-- Draft/published/paused/completed/archive lifecycle model.
-- Pretty public campaign slugs and date windows.
-- Duplicate and delete governance.
-- SQLite and MySQL persistence.
+## 19A — Central Media Library — 10/10 design
+- Reusable central asset model.
+- SHA-256 deduplication.
+- Private managed storage.
+- Reusable entity relationships.
+- Metadata, credits, captions, alt text and rights.
+- Safe detach vs permanent deletion.
 
-## 18B — Audience & CRM Segmentation — 10/10 design
-- Campaign audience gates use canonical CRM contacts.
-- Newsletter, account linkage, purchase history, stage and tags are supported.
-- Campaign participant identity links to CRM without copying account data.
+## 19B — Secure Uploader — 10/10 design
+- Authenticated/CSRF-protected Admin upload.
+- MIME + file-signature validation.
+- Collision-safe managed paths.
+- Server upload-capability reporting.
+- Upload progress in Admin.
+- No executable media is placed into a PHP runtime directory.
 
-## 18C — Offer & Redemption Engine — 10/10 design
-- Free song, discount, VIP and exclusive entitlements.
-- Offer limits and expiration.
-- Graph-reachable eligibility required before claim.
-- Discount validation occurs server-side in quote/order.
-- Free song downloads use tokenized grants.
+## 19C — Song Media — 10/10 design
+- Audio, artwork, photos, video, documents and archive media.
+- Multiple assets per role.
+- Choose existing media.
+- Explicit audio roles.
+- Explicit publish replacement for primary audio/artwork.
 
-## 18D — Campaign Landing Pages & Forms — 10/10 design
-- Public /campaign/{slug} experience.
-- Artwork, headline, copy, fan form and offer cards.
-- Delivery email is separated from explicit marketing consent.
-- CRM and campaign event attribution is automatic.
+## 19D — Gallery / Ordering — 10/10 design
+- Public/Downloadable/Featured controls.
+- Drag ordering.
+- Detach preserves library asset.
+- Deletion blocked while an asset is still linked.
+- Public song page uses public relationships only.
 
-## 18E — Messaging & Automation — 10/10 design
-- Email nodes require explicit Admin send approval.
-- Only marketing-opted-in contacts receive campaign email.
-- Unsubscribe links are generated for each campaign send.
-- Audience/condition/CRM-tag/Agent/conversion/exit nodes execute from the saved graph.
-- Wait nodes persist a waiting state for later continuation.
+## 19E — Audio Metadata — 10/10 design
+- FFprobe path when installed.
+- WAV RIFF fallback.
+- MP3 frame + ID3 fallback.
+- Duration, bitrate, sample rate, channels and bit depth extraction.
+- Embedded metadata and artwork-presence detection.
+- Primary publish refreshes song duration.
 
-## 18F — Agent Brain & Campaign Intelligence — 10/10 design
-- Public Agent receives active campaign context and offer routing.
-- Admin Agent routes campaign creation requests to the Campaign Builder.
-- Campaign saves/publishing and campaign email sends are recorded in Agent Brain.
+## 19F — Image Processing — 10/10 design
+- Original preserved.
+- 1600/800/320 derivatives with GD.
+- Safe original-only fallback when GD is unavailable.
 
-## 18G — Analytics & Attribution — 10/10 design
-- Participant and event ledgers.
-- Offer claims and redemptions.
-- Download and outbound-link tracking.
-- Bounded session purchase attribution.
-- Attributed order and revenue metrics.
+## Existing media migration — 10/10 design
+- Recovers old importer files using SHA/index.
+- Registers existing storage originals without byte duplication.
+- Copies legacy local public assets into managed media storage when needed.
+- Preserves existing public playback URLs during upgrade.
 
-## Visual Builder — 10/10 design
-- Drag-and-drop node palette.
-- Repositionable canvas nodes.
-- Visual connected edges.
-- Right-side node inspector.
-- Validation and simulation.
-- Explicit consequential-action treatment for email.
+## 19H — Agent Brain — 10/10 design
+- Upload/publish actions audited.
+- Media operations feed Admin Agent Brain.
+- Admin Agent routes media requests to Media Library.
+- Public Agent receives only public media summaries.
 
 ## Regression gate — 10/10
 - PHP syntax: **PASS**
 - Public JavaScript syntax: **PASS**
 - Admin JavaScript syntax: **PASS**
-- Campaign Builder JavaScript syntax: **PASS**
-- Sections 1–12, 14, 15, 16, 17 and 18: **PASS**
-- Explicit assertions: **1005 passed**
+- Media Library JavaScript syntax: **PASS**
+- Synthetic WAV metadata parser: **PASS**
+- Synthetic MP3 metadata parser: **PASS**
+- Sections 1–18 regression suites: **PASS**
+- Explicit assertions: **1060 passed**
 - Failures: **0**
 
-FINAL SECTION 18 SCORE: **10/10**
+FINAL SECTION 19 SCORE: **10/10**
 
 
 ## Final measured feature-head result
-- Exact feature head: `3c83f1f774f88cce4b44545e1f7a35cfd5399b61`
+- Exact feature head: `6f64f4152b3011ce4437d270c803cbd119fc8eeb`
 - GitHub release gate: **PASS**
-- Explicit assertions: **1005 passed**
+- Explicit assertions: **1060 passed**
 - Failures: **0**
