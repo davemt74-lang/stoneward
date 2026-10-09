@@ -30,4 +30,8 @@ Section 17 regression coverage includes:
 - chat-footer + quick actions
 - version/schema capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact feature head: fd6591177797da0f919f229af3f9ea6e223167ff
+- Release gate: PASS
+- Explicit assertions: 921 passed
+- Failures: 0
