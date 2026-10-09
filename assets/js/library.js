@@ -45,8 +45,8 @@ function itemCard(c,lib,x){
     <div class="my-library-card-actions">${primary}${favorite}${collectionPicker(c,lib,type,key)}</div>
   </article>`;
 }
-function historyRows(c,lib){
-  const rows=lib.history||[];
+function historyRows(c,lib,query=''){
+  const rows=(lib.history||[]).filter(x=>!query||itemSearchText({title:x.title,subtitle:x.release,kind:x.event_type}).includes(query.toLowerCase()));
   return rows.length?rows.map(x=>`<article class="library-history-row" data-library-card data-library-search="${c.esc(itemSearchText({title:x.title,subtitle:x.release,kind:x.event_type}))}">
     <button class="library-history-play" type="button" data-library-play-track="${c.esc(x.track_id)}">▶</button>
     <div><strong>${c.esc(x.title)}</strong><small>${c.esc(x.release||'')} · ${c.esc(String(x.event_type||'listen').replaceAll('_',' '))} · ${c.time(x.position_seconds||0)}</small></div>
@@ -75,7 +75,7 @@ function tabs(c,lib,tab){
   return `<div class="my-library-tabs" role="tablist">${Object.keys(tabLabel).map(k=>`<button type="button" class="${tab===k?'active':''}" data-library-tab="${k}"><span>${tabLabel[k]}</span><em>${Number(counts[k]||0)}</em></button>`).join('')}</div>`;
 }
 function renderGrid(c,lib,tab,query,sort){
-  if(tab==='history')return `<div class="library-history-list">${historyRows(c,lib)}</div>`;
+  if(tab==='history')return `<div class="library-history-list">${historyRows(c,lib,query)}</div>`;
   const rows=sorted(lib[tab]||[],sort).filter(x=>!query||itemSearchText(x).includes(query.toLowerCase()));
   return rows.length?`<div class="my-library-list">${rows.map(x=>itemCard(c,lib,x)).join('')}</div>`:'<div class="library-empty">Nothing in this part of your library yet.</div>';
 }
