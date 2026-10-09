@@ -1,110 +1,135 @@
-# Stonefellow v1.3.16 — Fan CRM, Community & Agent Engagement
+# Stonefellow v1.3.17 — Section 18: Campaigns, Offers & Fan Acquisition
 
-Stonefellow is still a **single-artist platform**. Section 17 adds a relationship layer around that artist: fans, newsletter contacts, customers, community participation, and governed Agent engagement.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 18 turns the Section 17 CRM into an operational campaign engine.
 
-## Fan CRM
+## Campaigns
 
-The CRM does not copy the existing account, commerce, listening, library, notification, or Agent systems. Those remain authoritative. A fan contact links them into one relationship profile and timeline.
+Admin now has a first-class **Campaigns** workspace for building and managing:
 
-A contact can originate from:
+- Newsletter acquisition campaigns
+- Free song downloads
+- Merch/order discounts
+- VIP and ticket offers
+- Exclusive/private content
+- Release promotion
+- Loyalty and win-back campaigns
+- Custom fan-acquisition journeys
 
-- a Stonefellow account
-- newsletter signup
-- a purchase, including guest checkout
-- existing user activity
+Every campaign has a public slug, lifecycle state, date window, landing-page content, CRM audience rules, workflow graph, participant history, offer claims and conversion analytics.
 
-Account and newsletter identities merge by verified email/user linkage rather than creating parallel people.
+## Visual Campaign Builder
 
-CRM stages support lead, fan, customer, member, and inactive.
+The Campaign Builder is a drag-and-drop node canvas.
 
-## Newsletter
+Supported node types:
 
-Newsletter signup is available to guests and signed-in fans.
+- Trigger
+- Audience
+- Condition
+- Wait
+- Email
+- CRM Tag
+- Agent Message
+- Free Download
+- Discount Offer
+- VIP Offer
+- Exclusive
+- Redirect
+- Conversion
+- Exit
 
-The signup:
+Nodes can be repositioned and connected visually. The builder includes a node inspector, graph validation and path simulation.
 
-- creates or updates the CRM contact
-- records explicit marketing opt-in
-- records consent timestamps
-- creates an unsubscribe token
-- sends a welcome/unsubscribe message through the existing email lifecycle
-- never grants marketing consent from an Admin edit
+The saved graph is the campaign source of truth. Campaign entry executes audience and condition gates, CRM tagging, governed Agent messages, offer availability, conversion and exit behavior. Wait nodes persist a waiting state. Email nodes do **not** send automatically: every campaign email send requires explicit Admin approval.
 
-Newsletter consent and proactive in-app Agent interaction are separate settings.
+## Audience and CRM
+
+Campaign participation uses the existing Fan CRM identity layer.
+
+Audience rules can target:
+
+- newsletter subscribers
+- linked Stonefellow accounts
+- previous purchasers
+- CRM lifecycle stages
+- CRM tags
+
+A campaign participant is connected back to the canonical fan contact. Entering a campaign, claiming an offer, downloading a track and converting all feed CRM history.
+
+Providing an email to receive an offer does **not** imply newsletter consent. Marketing opt-in remains an explicit checkbox.
+
+## Offers
+
+Campaign offer nodes support:
+
+- Free song download entitlements
+- Percentage or fixed campaign discounts
+- VIP/ticket links and access codes
+- Exclusive/private links and access codes
+- claim limits and expiration windows
+
+Free song downloads use tokenized campaign entitlements and record the actual download.
+
+Campaign discount codes are validated server-side in the cart quote and order flow.
+
+## Campaign email
+
+Email nodes define campaign newsletter/broadcast copy.
+
+Campaign email sends:
+
+- require a published campaign
+- require explicit Admin confirmation
+- target only fans with marketing opt-in
+- generate a fresh unsubscribe link
+- use the existing Stonefellow email lifecycle
+- create a message-run audit
+- are recorded in Admin Agent Brain
+
+The existence of an Email node alone can never send a mass email.
+
+## Public campaign pages
+
+Published campaigns render at:
+
+`/campaign/{slug}`
+
+The public experience supports campaign artwork/copy, fan entry, explicit newsletter consent and eligible offers.
+
+## Attribution and analytics
+
+Stonefellow records:
+
+- campaign views
+- form starts
+- campaign entry
+- audience decisions
+- offer availability
+- offer claims
+- downloads
+- outbound offer clicks
+- conversions
+- campaign-attributed purchases
+- discount redemptions
+- attributed revenue
+
+Campaign entry also creates a bounded browser attribution window so a later Stonefellow purchase can be credited to the campaign even when no discount code is used.
+
+## Agent integration
+
+The public Stonefellow Agent receives active-campaign context and can route fans to matching campaigns such as free downloads, discounts, VIP offers, exclusives and early-access promotions.
+
+The Admin Agent routes campaign-building requests directly into the Campaign Builder.
+
+Campaign authoring and campaign email sends are written into Admin Agent Brain.
 
 ## Fan Community
 
-The public Fan Community is controlled by **Admin → Settings → Enable public Fan Community feed and posting** and defaults **OFF**. Turning it off hides public entry points and blocks feed/posting APIs without disabling CRM, newsletter, purchases, listening signals, or Agent CRM context.
-
-When enabled, signed-in fans can post to a first-class Stonefellow community feed. Community activity is linked to their account and CRM profile.
-
-Community posts are:
-
-- authenticated and CSRF-protected
-- length bounded
-- lightly rate-limited
-- limited against link spam
-- owner-deletable
-- Admin-moderatable
-
-## Governed automatic Agent engagement
-
-The Stonefellow Agent can proactively interact with a signed-in fan after meaningful events such as:
-
-- creating an account
-- contributing to the community
-- making a purchase
-- working with a playlist
-- completing a recording
-
-Automatic interaction is:
-
-- in-app only
-- independently opt-out
-- cooldown-limited
-- deduplicated
-- driven by recent canonical activity
-- recorded in the CRM timeline
-- recorded in Admin Agent Brain
-
-There is no generic daily/welcome nag when no meaningful trigger exists.
-
-## Admin Fans + CRM
-
-Admin now includes **Fans + CRM** for:
-
-- CRM totals and stages
-- account-linked and guest contacts
-- newsletter consent visibility
-- fan tags and Admin notes
-- proactive-Agent permission
-- cross-system CRM timeline
-- canonical account activity
-- Agent Brain history
-- recent automatic Agent outreach
-- community moderation
-- administrator-approved in-app Agent messages
-
-Newsletter consent is visible but cannot be manufactured by Admin.
-
-## Chat footer quick actions
-
-The chat row now has a **+** button to the left of the text field.
-
-Quick actions include:
-
-- Create Record
-- Create Playlist
-- Tour Dates
-- Merch Store
-- Fan Community
-- Newsletter
-
-Every action opens a real existing or Section 17 workflow.
+The Fan Community launch control introduced in v1.3.16 remains unchanged and defaults OFF. Campaigns, CRM and newsletter acquisition work independently of the public community.
 
 ## Database
 
-Section 17 adds migration **2026-10-09-014**.
+Migration **2026-10-09-015** adds campaign, participant, event, entitlement, saved-segment and message-run storage for SQLite and MySQL.
 
-Application: **1.3.16**  
-Database schema target: **1.3.13**
+Application: **1.3.17**  
+Database schema target: **1.3.14**

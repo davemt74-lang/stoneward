@@ -69,7 +69,7 @@ function sf_validate_builder(array $b, string $format): array {
     return ['ok'=>!$errors,'errors'=>$errors,'format'=>$format,'title'=>sf_clean_text($b['title'] ?? 'My Stonefellow Record',60),'theme'=>sf_clean_text($b['theme'] ?? 'desert',30),'sides'=>$sides];
 }
 
-function sf_quote(array $cart): array {
+function sf_quote(array $cart,string $campaignCode=''): array {
     if(count($cart)>20) return ['ok'=>false,'errors'=>['Cart is too large.']];
     $cfg=sf_store_config(); $tracks=sf_track_map(); $errors=[]; $items=[]; $subtotal=0; $physical=false;
     foreach($cart as $i=>$raw){
@@ -78,8 +78,7 @@ function sf_quote(array $cart): array {
         if($type==='track'){
             $id=(string)($raw['track_id'] ?? ''); $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
-            $price=(int)round(((float)($t['price'] ?? 0))*100);
-            if($price<0) $price=0;
+            $price=(int)round(((float)($t['price'] ?? 0))*100); if($price<0)$price=0;
             $items[]=['type'=>'track','track_id'=>$id,'label'=>(string)$t['title'],'price_cents'=>$price]; $subtotal+=$price;
         } elseif($type==='custom_media'){
             $format=(string)($raw['format'] ?? ''); $key=$format==='vinyl'?'custom_vinyl':($format==='cassette'?'custom_cassette':'');
@@ -90,9 +89,12 @@ function sf_quote(array $cart): array {
             $items[]=['type'=>'custom_media','format'=>$format,'label'=>(string)$p['label'],'price_cents'=>$price,'builder'=>$valid];
         } else $errors[]='Unsupported cart item type.';
     }
-    if(!$items) $errors[]='Your cart is empty.';
+    if(!$items)$errors[]='Your cart is empty.';
     $shipping=$physical?(int)$cfg['shipping_flat_cents']:0;
-    return ['ok'=>!$errors,'errors'=>$errors,'currency'=>$cfg['currency'],'items'=>$items,'subtotal_cents'=>$subtotal,'shipping_cents'=>$shipping,'tax_cents'=>0,'total_cents'=>$subtotal+$shipping,'physical'=>$physical];
+    $campaignCode=sf_clean_text($campaignCode,80);$entitlement=$campaignCode!==''?sf_campaign_discount_by_code($campaignCode):null;
+    if($campaignCode!==''&&!$entitlement)$errors[]='Campaign offer code is invalid, expired, or already redeemed.';
+    $discount=sf_campaign_discount_amount($entitlement,$subtotal);$total=max(0,$subtotal-$discount+$shipping);
+    return ['ok'=>!$errors,'errors'=>$errors,'currency'=>$cfg['currency'],'items'=>$items,'subtotal_cents'=>$subtotal,'discount_cents'=>$discount,'campaign_code'=>$campaignCode,'shipping_cents'=>$shipping,'tax_cents'=>0,'total_cents'=>$total,'physical'=>$physical];
 }
 
 function sf_order_id(): string { return 'SF-' . gmdate('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3))); }
@@ -147,6 +149,7 @@ require_once __DIR__ . '/lifecycle.php';
 require_once __DIR__ . '/billing.php';
 require_once __DIR__ . '/operations.php';
 require_once __DIR__ . '/crm-core.php';
+require_once __DIR__ . '/campaign-core.php';
 require_once __DIR__ . '/personalization-core.php';
 require_once __DIR__ . '/playlists-core.php';
 require_once __DIR__ . '/listening-sessions-core.php';

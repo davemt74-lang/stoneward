@@ -1,17 +1,19 @@
-# Stonefellow v1.3.15 Upgrade Notes
+# Stonefellow v1.3.17 Upgrade Notes
 
-1. Upload/extract the v1.3.15 application files over the installed site while preserving production configuration, `data/`, and `storage/`.
-2. Run `/upgrade.php`.
-3. The database target advances from **1.3.12** to **1.3.13**.
-4. Migration **2026-10-09-014** creates:
-   - `fan_contacts`
-   - `fan_crm_events`
-   - `fan_agent_engagements`
-   - `community_posts`
-5. Existing account/listening/order/library/Agent data remains authoritative; the CRM references and aggregates those systems.
-6. Existing users are linked into CRM lazily as they interact. Newsletter contacts merge into later accounts by email/user identity.
-7. Verify the public newsletter form, Fan Community, chat-footer + menu, Admin Fans + CRM, and Agent Brain fan-engagement ledger.
-8. Newsletter marketing consent is never inferred from an account or purchase.
+1. Upload/extract the v1.3.17 application deploy over the existing installation.
+2. Preserve production `data/`, `storage/`, generated catalog/config JS and site-specific configuration.
+3. Run `/upgrade.php`.
+4. Database target advances from **1.3.13** to **1.3.14**.
+5. Migration **2026-10-09-015** creates:
+   - `campaigns`
+   - `campaign_segments`
+   - `campaign_participants`
+   - `campaign_events`
+   - `campaign_entitlements`
+   - `campaign_message_runs`
+6. Existing CRM, accounts, newsletter consent, orders, catalog, shows and Agent Brain remain authoritative and are referenced by Campaigns.
+7. Verify Admin → Campaigns, a draft visual workflow, public campaign landing page, free-download claim, campaign discount quote and Agent campaign routing.
+8. Fan Community remains OFF unless separately enabled in Admin Settings.
 
-Application: **1.3.15**  
-Database schema: **1.3.13**
+Application: **1.3.17**  
+Database schema: **1.3.14**
