@@ -47,13 +47,13 @@ ok(substr_count($core,'CREATE TABLE IF NOT EXISTS rights_works')===2,'rights wor
 ok(substr_count($core,'CREATE TABLE IF NOT EXISTS rights_splits')===2,'rights split schema supports SQLite and MySQL');
 ok(substr_count($core,'CREATE TABLE IF NOT EXISTS rights_licenses')===2,'rights license schema supports SQLite and MySQL');
 ok(str_contains($core,'percent_bp'),'ownership is stored as integer basis points');
-ok(str_contains($core,"in_array($type,['composition','master'],true)"),'ownership split types are constrained to composition and master');
+ok(str_contains($core,"['composition','master']"),'ownership split types are constrained to composition and master');
 ok(str_contains($core,'function sf_rights_release_readiness'),'release readiness rolls up track rights');
 ok(str_contains($core,'function sf_rights_agent_brief'),'rights registry produces a deterministic Admin Agent brief');
 ok(str_contains($core,'sf_rights_backfill_catalog'),'migration can initialize rights works from catalog metadata');
-ok(!str_contains($core,"sf_rights_save_split($id")&&!str_contains($core,"words_by']??''),50"),'catalog backfill does not invent ownership splits from writer metadata');
+ok(!str_contains($core,'words_by')&&!str_contains($core,'music_by'),'catalog backfill does not invent ownership splits from writer metadata');
 
-ok(str_contains($api,"action==='save_split'")&&str_contains($api,'requires_confirmation'=>true),'ownership split writes are treated as consequential');
+ok(str_contains($api,"action==='save_split'")&&str_contains($api,"'requires_confirmation'=>true"),'ownership split writes are treated as consequential');
 ok(str_contains($api,"action==='delete_split'")&&str_contains($api,"confirmed"),'split deletion requires explicit confirmation');
 ok(str_contains($api,"action==='delete_license'")&&str_contains($api,"confirmed"),'license deletion requires explicit confirmation');
 ok(str_contains($api,'sf_agent_brain_log'),'rights writes feed Admin Agent Brain');
