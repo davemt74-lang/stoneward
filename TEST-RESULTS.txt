@@ -1,31 +1,31 @@
-Stonefellow v1.3.27 Section 28 release gate
+Stonefellow v1.3.28 Section 29 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Rights Registry JavaScript syntax
-- Sections 1–27 inherited regression suites
-- Section 28 Rights, Credits & Licensing Registry
+- Press Admin JavaScript syntax
+- Sections 1–28 inherited regression suites
+- Section 29 EPK + Press suite
 
-Section 28 coverage includes:
-- basis-point ownership math
-- exact 100% split validation
-- under/over-allocation blockers
-- pending/restricted license blockers
-- expiring-license warnings
-- SQLite/MySQL rights schema
-- safe catalog metadata backfill
-- no inferred ownership percentages
-- Admin rights workspace
-- release-clearance rollup
-- explicit confirmation for destructive rights actions
-- Admin audit + Agent Brain integration
-- application/schema capability markers
+Section 29 coverage includes:
+- safe EPK slugs
+- public/private/draft/archive access policy
+- one-way private token storage
+- constant-time token validation
+- SQLite/MySQL press schema
+- press-kit Media Library integration
+- separate media contact registry
+- do-not-contact enforcement
+- explicit-confirmation outreach
+- private-token requirement for private outreach
+- truthful email outbox states
+- no fake email-open tracking
+- coverage ledger
+- real EPK interaction events
+- public EPK route/rendering
+- Admin Agent routing
+- migration/version/integrity markers
 
-Measured feature-head GitHub Actions result:
-- Exact green feature head: f10a2abc2aa1ee0e26032a6cf60cb82afba41f57
-- Release gate: PASS
-- Explicit assertions: 1503 passed
-- Failures: 0
+Measured GitHub Actions result will be recorded before merge.

@@ -1,58 +1,50 @@
-# Stonefellow v1.3.27 — Section 28 Rights, Credits & Licensing Registry Audit
+# Stonefellow v1.3.28 — Section 29 Press Kit, EPK & Media Relations Audit
 
-## 28A — Rights Party Registry — 10/10 design
-- Reusable writers/composers/publishers/artists/labels/master owners/licensors.
-- PRO, IPI/CAE and publisher IPI metadata.
-- No duplicate ownership inference from public credits.
+## 29A — EPK Core — 10/10 design
+- Release-linked or general artist EPKs.
+- Headline, summary, bio and direct press contact.
+- Draft/published/private/archived lifecycle.
+- Public release/audio context.
 
-## 28B — Work Registration — 10/10 design
-- One rights work per catalog track.
-- ISWC and PRO work ID.
-- Composition/master copyright.
-- Territory and registration status.
-- Catalog-safe migration/backfill.
+## 29B — Private Sharing — 10/10 design
+- SHA-256 token storage.
+- Constant-time validation.
+- Explicit token rotation.
+- Old links invalidated on rotation.
+- Draft/archived kits inaccessible.
 
-## 28C — Composition Ownership — 10/10 design
-- Integer basis-point storage.
-- Exact 100% validation.
-- Reusable parties and roles.
-- Consequential-write audit.
+## 29C — Media Library Integration — 10/10 design
+- Reuses universal Media Library.
+- Hero, photo, audio, video, document and archive roles.
+- Public EPK returns only public attachments.
 
-## 28D — Master Ownership — 10/10 design
-- Independent master split ledger.
-- Exact 100% validation.
-- No composition/master conflation.
+## 29D — Press Contact Registry — 10/10 design
+- Separate from Fan CRM consent model.
+- Outlet, role, location, tags and notes.
+- Explicit do-not-contact / archived state.
 
-## 28E — Licensing & Clearance — 10/10 design
-- Track/release scope.
-- Sync, mechanical, master-use, sample, cover, remix and other licenses.
-- Pending/restricted/expired blockers.
-- Expiry warnings.
+## 29E — Governed Outreach — 10/10 design
+- One-contact sends.
+- Explicit Admin confirmation.
+- Existing Stonefellow email outbox.
+- Real queued/sent/failed state.
+- Private EPK requires current token.
+- No fake email-open tracking.
 
-## 28F — Release Rights Readiness — 10/10 design
-- Rolls up every release track.
-- Includes release-level licenses.
-- Clear blocker explanations.
+## 29F — Coverage & Analytics — 10/10 design
+- Confirmed coverage ledger.
+- Real EPK view/media/contact/play/download events.
+- Outreach facts separated from coverage facts.
 
-## 28G — Agent Brain & Governance — 10/10 design
-- Rights writes logged to Admin audit.
-- Agent Brain receives work, party, split and license changes.
-- Split/license deletion requires explicit confirmation.
-- Private ownership data stays out of public Agent context.
+## 29G — Agent Brain — 10/10 design
+- EPK, token, contact, outreach and coverage writes audited.
+- Admin Agent routes media-relations requests correctly.
+- Record pressing remains a POD/manufacturing intent.
 
-## 28H — Regression Safety — 10/10
-- PHP syntax: **PASS**
-- Public/Admin JavaScript syntax: **PASS**
-- Sections 1–27 inherited suites: **PASS**
-- Section 28 executable ownership/readiness suite: **PASS**
-- Explicit assertions: **1503 passed**
-- Failures: **0**
+## 29H — Regression Safety — pending measured GitHub validation
+- PHP syntax required.
+- Public/Admin JavaScript syntax required.
+- Sections 1–28 inherited suites required.
+- Section 29 access/governance executable suite required.
 
-FINAL SECTION 28 SCORE: **10/10**
-
-
-## Final measured feature-head result
-- Exact green feature head: `f10a2abc2aa1ee0e26032a6cf60cb82afba41f57`
-- GitHub release gate: **PASS**
-- Explicit assertions: **1503 passed**
-- Failures: **0**
+PROVISIONAL SECTION 29 SCORE: **10/10 design / pending green release gate**

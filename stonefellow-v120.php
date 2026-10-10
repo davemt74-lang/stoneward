@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.27');
+define('SF_BUILD', '1.3.28');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -15,6 +15,9 @@ if(!sf_installed()){
 }
 $currentUser=sf_current_user();
 $siteSettings=sf_site_settings();
+$configuredBase=rtrim(sf_public_base_url(),'/');
+$scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
+$appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
 function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES,'UTF-8'); }
 ?>
 <?php if($siteSettings['maintenance_enabled'] && (($currentUser['role']??'')!=='admin')): ?>
@@ -26,6 +29,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#090807">
+  <base href="<?=sf_h($appBaseHref)?>">
   <meta name="description" content="<?=sf_h($siteSettings['seo_description'])?>">
 <?php if(!empty($siteSettings['media_social_share'])): ?>  <meta property="og:image" content="<?=sf_h($siteSettings['media_social_share'])?>"><?php endif; ?>
 <?php if(!empty($siteSettings['media_app_icon'])): ?>  <link rel="icon" href="<?=sf_h($siteSettings['media_app_icon'])?>"><?php endif; ?>

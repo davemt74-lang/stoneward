@@ -7,6 +7,8 @@ Options -Indexes
 RewriteEngine On
 # Public campaign landing pages.
 RewriteRule ^campaign/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=campaign&slug=$1 [QSA,L]
+# Public/private electronic press kits.
+RewriteRule ^press/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=press&slug=$1 [QSA,L]
 # Never serve a stale legacy static shell.
 RewriteRule ^index\.html$ ./ [R=302,L]
 # Old setup URLs always return to the live application.
@@ -25,6 +27,6 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
 Header always set Pragma "no-cache"
 Header always set Expires "0"
-Header always set X-Stonefellow-Build "1.3.27"
+Header always set X-Stonefellow-Build "1.3.28"
 </FilesMatch>
 </IfModule>

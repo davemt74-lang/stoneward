@@ -67,8 +67,11 @@ ok(str_contains($css,'.rights-readiness')&&str_contains($css,'.rights-split-add'
 
 ok(str_contains($bootstrap,"require_once __DIR__ . '/rights-core.php'"),'rights core loads from canonical bootstrap');
 ok(str_contains($mig,"'id'=>'2026-10-10-024'")&&str_contains($mig,'sf_rights_backfill_catalog'),'migration 024 installs/backfills rights registry');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.23'"),'database schema advances to 1.3.23');
-ok(str_contains($version,"'stonefellow'=>'1.3.27'")&&str_contains($version,"'database_schema_target'=>'1.3.23'"),'version endpoint reports app 1.3.27 and schema 1.3.23');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db29);
+ok(isset($db29[1],$db29[2],$db29[3])&&[(int)$db29[1],(int)$db29[2],(int)$db29[3]]>=[1,3,23],'database schema remains v1.3.23 or later');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app29);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema29);
+ok(isset($app29[1],$app29[2],$app29[3],$schema29[1],$schema29[2],$schema29[3])&&[(int)$app29[1],(int)$app29[2],(int)$app29[3]]>=[1,3,27]&&[(int)$schema29[1],(int)$schema29[2],(int)$schema29[3]]>=[1,3,23],'version endpoint reports app v1.3.27 or later and schema v1.3.23 or later');
 ok(str_contains($version,"'rights_registry'=>'works-parties-composition-master-splits-licenses-readiness'"),'version endpoint advertises rights registry capability');
 ok(str_contains($shell,'data-view="rights"')&&str_contains($shell,'assets/rights.js'),'Rights + Licensing is a first-class Admin module');
 ok(str_contains($adminMain,"rights:'Rights + Licensing'")&&str_contains($adminMain,"openView('rights')"),'Admin shell and Agent route into Rights + Licensing');

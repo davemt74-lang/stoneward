@@ -1,107 +1,132 @@
-# Stonefellow v1.3.27 — Section 28: Rights, Credits & Licensing Registry
+# Stonefellow v1.3.28 — Section 29: Press Kit, EPK & Media Relations
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 28 adds an authoritative Admin rights layer for the catalog and releases without pretending to be a royalty-accounting service.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 29 adds a structured electronic press-kit and media-relations workflow around the existing releases, Media Library, email delivery and Admin Agent Brain.
 
-## Rights Registry
+## Electronic press kits
 
-Admin now has a first-class **Rights + Licensing** workspace connected to the existing Stonefellow catalog.
+Admin now includes **EPK + Press**.
 
-It manages:
+An EPK can contain:
 
-- Rights parties: writers, composers, publishers, artists, labels, master owners and licensors
-- One rights work per Stonefellow catalog track
-- ISWC and PRO work identifiers
-- Composition copyright
-- Master copyright
-- Publisher and territory metadata
-- Composition ownership splits
-- Master ownership splits
-- Track/release license and clearance records
-- Work and release rights-readiness status
+- title and share slug
+- release association or general artist-kit mode
+- headline and short summary
+- long artist/project bio
+- press contact name/email
+- website link
+- press-ready Media Library attachments
+- release artwork, date, genre, description, liner notes and credits
+- playable release tracks
 
-## Ownership math
+EPK media reuses the central Media Library rather than creating another uploader.
 
-Stonefellow stores ownership as integer **basis points**.
+## Public and private sharing
 
-- 10,000 basis points = 100%
-- Composition ownership must total exactly 100%
-- Master ownership must total exactly 100%
-
-A work is rights-ready only when both ownership groups equal exactly 100% and no recorded license is pending, restricted or expired.
-
-Stonefellow does **not** infer ownership percentages from existing writer/composer credit text.
-
-## Registration vs readiness
-
-ISWC, PRO work ID and registration status are tracked, but registration is not falsely treated as mandatory for every unreleased work.
-
-Supported registration states:
+EPKs support:
 
 - draft
-- submitted
-- registered
-- not applicable
+- published
+- private
+- archived
 
-Rights readiness and registration state remain separate concepts.
+Published EPKs use:
 
-## Licensing
+`/press/{slug}`
 
-Track and release rights can record:
+Private EPKs require a bearer token.
 
-- sync
-- mechanical
-- master use
-- sample
-- cover
-- remix
-- name / likeness
-- other
+Stonefellow stores only the SHA-256 token hash. Rotating a private link invalidates the old token and reveals the new raw link once to the current Admin session.
 
-Each record may include licensor, status, territory, start/end dates, reference/contract ID, terms and notes.
+Draft and archived EPKs are not publicly available.
 
-Pending/restricted/expired clearances block readiness. Cleared licenses expiring within 60 days generate a warning.
+## Press contacts
 
-## Release clearance
+Press contacts are separate from the Fan CRM because journalists/media contacts are not fans and should not inherit newsletter consent semantics.
 
-Release readiness rolls up:
+Each press contact can store:
 
-- every track’s composition ownership
-- every track’s master ownership
-- track-level license blockers
-- release-level licenses
+- name
+- outlet
+- email
+- role
+- location
+- tags
+- notes
+- active / do-not-contact / archived status
 
-This gives Admin a single pre-release rights checkpoint without changing the existing Release Builder’s catalog/release authority.
+Do-not-contact and archived contacts cannot receive press outreach.
 
-## Catalog migration
+## Governed outreach
 
-Migration **2026-10-10-024** creates rights work records for the current catalog and safely copies existing descriptive rights metadata where present:
+Stonefellow can prepare and send one press outreach message at a time.
 
-- title
-- copyright year
-- composition copyright
-- master copyright
-- publisher
-- ISWC / PRO work ID if those fields already exist
+Every send:
 
-The migration does **not** create parties or ownership splits from free-text credits.
+- requires explicit Admin confirmation
+- uses the existing configured Stonefellow email delivery
+- writes to the existing transactional email outbox
+- records the actual delivery state returned by that system: queued, sent or failed
+- records the action in Admin audit and Agent Brain
 
-## Governance + Agent Brain
+Stonefellow does **not** claim an email was opened/read. There is no tracking pixel or invented email-open event.
 
-Rights metadata edits are audited.
+For private EPKs, the Admin must have the current raw private token in the current session before outreach can include that private link.
 
-Ownership split changes are treated as consequential. Split/license deletion requires explicit confirmation.
+## Coverage
+
+Admin can record confirmed:
+
+- articles
+- reviews
+- interviews
+- radio
+- podcasts
+- video
+- playlists
+- other coverage
+
+Coverage is a separate fact ledger from outreach.
+
+## EPK analytics
+
+Public EPK pages record only real in-site interactions:
+
+- page view
+- media click
+- contact link click
+- release-track play
+- download click
+
+These events are not interpreted as email opens.
+
+## Media Library
+
+`press_kit` is now a reusable Media Library relationship type.
+
+EPKs can attach:
+
+- hero artwork
+- press photos
+- approved alternate audio
+- video
+- PDFs/documents
+- archive media
+
+Only assets marked Public are returned to the public EPK.
+
+## Agent Brain
 
 Admin Agent Brain records:
 
-- work metadata updates
-- rights party updates
-- ownership split changes
-- license/clearance changes
-- catalog synchronization
+- EPK saves/publishing
+- private-link rotation
+- press contact changes
+- confirmed outreach sends
+- recorded coverage
 
-The Admin Agent routes questions about rights, ownership, splits, ISWC, PRO registration, licensing and clearance to this workspace.
+The Admin Agent routes EPK, journalist, reviewer, media-contact, outreach and coverage requests to EPK + Press.
 
-Private ownership data is not added to public Agent context.
+“Record pressing / vinyl manufacturing” continues to route to POD Handoffs rather than Media Relations.
 
-Application: **1.3.27**  
-Database schema target: **1.3.23**
+Application: **1.3.28**  
+Database schema target: **1.3.24**
