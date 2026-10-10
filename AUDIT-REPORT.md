@@ -56,13 +56,22 @@
 - Existing public paths are preserved.
 - Legacy local media is copied/registered safely.
 
-## Regression gate — pending measured GitHub validation
-- PHP syntax required.
-- Public JS syntax required.
-- Admin JS syntax required.
-- Campaign Builder JS syntax required.
-- Media Library JS syntax required.
-- Sections 1–19 regression suites required.
-- Section 20 suite required.
+## Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public JS syntax: **PASS**
+- Admin JS syntax: **PASS**
+- Campaign Builder JS syntax: **PASS**
+- Media Library JS syntax: **PASS**
+- Sections 1–19 regression suites: **PASS**
+- Section 20 suite: **PASS**
+- Explicit assertions: **1122 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 20 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 20 SCORE: **10/10**
+
+
+## Final measured feature-head result
+- Exact feature head: `5de47fa6604c207a516385522696925986345497`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1122 passed**
+- Failures: **0**
