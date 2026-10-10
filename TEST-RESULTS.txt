@@ -24,4 +24,8 @@ Section 28 coverage includes:
 - Admin audit + Agent Brain integration
 - application/schema capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact green feature head: f10a2abc2aa1ee0e26032a6cf60cb82afba41f57
+- Release gate: PASS
+- Explicit assertions: 1503 passed
+- Failures: 0
