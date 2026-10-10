@@ -1,0 +1,33 @@
+name: Stonefellow v1.3.24 Deploy Package
+on:
+  push:
+    branches: ['package/v1324-deploy-verified']
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 09641dab9e0815209967e7c1c780c80166d875c5
+      - name: Build deploy overlay
+        run: |
+          set -euo pipefail
+          ZIP="Stonefellow-v1.3.24-Deploy.zip"
+          rm -f "$ZIP" "$ZIP.sha256"
+          zip -r "$ZIP" . -x '.git/*' '.github/*' 'data/*' 'storage/*' 'config/database.php' 'config/app-secret.php' 'config/store.php' 'assets/js/config.js' 'assets/js/catalog.js' 'assets/js/releases.js' "$ZIP" "$ZIP.sha256"
+          unzip -t "$ZIP"
+          sha256sum "$ZIP" > "$ZIP.sha256"
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^(data/|storage/|config/database.php$|config/app-secret.php$|config/store.php$|assets/js/(config|catalog|releases)\.js$)')" -eq 0
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^api/fulfillment-core.php$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^admin/assets/fulfillment.js$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^upgrade.php$')" -eq 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stonefellow-v1.3.24-Deploy
+          path: |
+            Stonefellow-v1.3.24-Deploy.zip
+            Stonefellow-v1.3.24-Deploy.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
