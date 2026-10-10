@@ -33,7 +33,7 @@ function sf_segment_rules_normalize(array $raw): array {
     $account=(string)($raw['account']??(!empty($raw['linked_accounts_only'])?'linked':'any'));
     if(!in_array($account,['any','linked','unlinked'],true))$account='any';
     $auto=(string)($raw['agent_auto_engage']??'any');if(!in_array($auto,['any','enabled','disabled'],true))$auto='any';
-    $list=function($v,int $max=80){return array_values(array_unique(array_filter(array_map(fn($x)=>sf_clean_text($x,$max),is_array($v)?$v:preg_split('/\s*,\s*/',(string)$v)?:[]))));};
+    $list=function($v,int $max=80){return array_values(array_unique(array_filter(array_map(fn($x)=>sf_clean_text($x,$max),is_array($v)?$v:(preg_split('/\s*,\s*/',(string)$v)?:[])))));};
     return [
         'newsletter'=>$newsletter,'account'=>$account,'agent_auto_engage'=>$auto,
         'stages'=>$list($raw['stages']??[],40),'tags_all'=>$list($raw['tags_all']??($raw['tags']??[]),60),'tags_any'=>$list($raw['tags_any']??[],60),
