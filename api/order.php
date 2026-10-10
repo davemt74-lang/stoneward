@@ -3,7 +3,7 @@ declare(strict_types=1); require __DIR__.'/bootstrap.php';
 if($_SERVER['REQUEST_METHOD']!=='POST') sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 sf_require_csrf();
 try{
-  $user=sf_current_user();$body=sf_request_json();$requestKey=sf_clean_text($body['request_id']??'',128);$cart=is_array($body['cart']??null)?$body['cart']:[];$campaignCode=sf_clean_text($body['campaign_code']??'',80);$quote=sf_quote($cart,$campaignCode);if(!$quote['ok'])sf_json_response($quote,422);
+  $user=sf_current_user();$body=sf_request_json();$requestKey=sf_clean_text($body['request_id']??'',128);$cart=is_array($body['cart']??null)?$body['cart']:[];$campaignCode=sf_clean_text($body['campaign_code']??'',80);$quote=sf_quote($cart,$campaignCode,$user?(int)$user['id']:null);if(!$quote['ok'])sf_json_response($quote,422);
   $cust=sf_customer(is_array($body['customer']??null)?$body['customer']:[],$quote['physical']);if(!$cust['ok'])sf_json_response(['ok'=>false,'errors'=>$cust['errors']],422);
   $cfg=sf_store_config();$id=sf_order_id();$token=sf_token();$test=$cfg['mode']==='test';
   $pay=sf_resolve_payment((string)($body['payment_method']??''),$cfg);

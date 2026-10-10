@@ -69,7 +69,7 @@ function sf_validate_builder(array $b, string $format): array {
     return ['ok'=>!$errors,'errors'=>$errors,'format'=>$format,'title'=>sf_clean_text($b['title'] ?? 'My Stonefellow Record',60),'theme'=>sf_clean_text($b['theme'] ?? 'desert',30),'sides'=>$sides];
 }
 
-function sf_quote(array $cart,string $campaignCode=''): array {
+function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array {
     if(count($cart)>20) return ['ok'=>false,'errors'=>['Cart is too large.']];
     $cfg=sf_store_config(); $tracks=sf_track_map(); $errors=[]; $items=[]; $subtotal=0; $physical=false;
     foreach($cart as $i=>$raw){
@@ -95,8 +95,8 @@ function sf_quote(array $cart,string $campaignCode=''): array {
     $shipping=$physical?(int)$cfg['shipping_flat_cents']:0;
     $campaignCode=sf_clean_text($campaignCode,80);$entitlement=$campaignCode!==''?sf_campaign_discount_by_code($campaignCode):null;
     if($campaignCode!==''&&!$entitlement)$errors[]='Campaign offer code is invalid, expired, or already redeemed.';
-    $discountBase=$subtotal;if($entitlement&&!empty($entitlement['payload']['product_ids'])){$ids=array_values(array_filter(array_map('strval',(array)$entitlement['payload']['product_ids'])));$discountBase=0;foreach($items as $item)if(($item['type']??'')==='merch'&&in_array((string)($item['product_id']??''),$ids,true))$discountBase+=(int)($item['price_cents']??0);}$discount=sf_campaign_discount_amount($entitlement,$discountBase);$total=max(0,$subtotal-$discount+$shipping);
-    return ['ok'=>!$errors,'errors'=>$errors,'currency'=>$cfg['currency'],'items'=>$items,'subtotal_cents'=>$subtotal,'discount_cents'=>$discount,'campaign_code'=>$campaignCode,'shipping_cents'=>$shipping,'tax_cents'=>0,'total_cents'=>$total,'physical'=>$physical];
+    $discountBase=$subtotal;if($entitlement&&!empty($entitlement['payload']['product_ids'])){$ids=array_values(array_filter(array_map('strval',(array)$entitlement['payload']['product_ids'])));$discountBase=0;foreach($items as $item)if(($item['type']??'')==='merch'&&in_array((string)($item['product_id']??''),$ids,true))$discountBase+=(int)($item['price_cents']??0);}$campaignDiscount=sf_campaign_discount_amount($entitlement,$discountBase);$memberDiscount=function_exists('sf_membership_discount_amount')?sf_membership_discount_amount($userId,$items):0;$discount=min($subtotal,$campaignDiscount+$memberDiscount);$total=max(0,$subtotal-$discount+$shipping);
+    return ['ok'=>!$errors,'errors'=>$errors,'currency'=>$cfg['currency'],'items'=>$items,'subtotal_cents'=>$subtotal,'campaign_discount_cents'=>$campaignDiscount,'member_discount_cents'=>$memberDiscount,'discount_cents'=>$discount,'campaign_code'=>$campaignCode,'shipping_cents'=>$shipping,'tax_cents'=>0,'total_cents'=>$total,'physical'=>$physical];
 }
 
 function sf_order_id(): string { return 'SF-' . gmdate('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3))); }
@@ -154,6 +154,7 @@ require_once __DIR__ . '/crm-core.php';
 require_once __DIR__ . '/campaign-core.php';
 require_once __DIR__ . '/media-core.php';
 require_once __DIR__ . '/commerce-core.php';
+require_once __DIR__ . '/membership-core.php';
 require_once __DIR__ . '/automation-core.php';
 require_once __DIR__ . '/personalization-core.php';
 require_once __DIR__ . '/playlists-core.php';

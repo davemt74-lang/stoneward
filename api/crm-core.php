@@ -180,5 +180,5 @@ function sf_crm_admin_contact_detail(int $contactId): array {
     $q=sf_db()->prepare('SELECT id,channel,trigger_type,status,message_text,reason,created_at,delivered_at FROM fan_agent_engagements WHERE contact_id=? ORDER BY id DESC LIMIT 80');$q->execute([$contactId]);$engagements=$q->fetchAll();
     $community=[];if($uid){$q=sf_db()->prepare('SELECT id,body_text,status,created_at FROM community_posts WHERE user_id=? ORDER BY id DESC LIMIT 50');$q->execute([$uid]);$community=$q->fetchAll();}
     $merch=function_exists('sf_commerce_purchase_history')?sf_commerce_purchase_history($uid?:null,(string)$c['email'],80):[];
-    return ['contact'=>$c,'events'=>$events,'agent_engagements'=>$engagements,'community_posts'=>$community,'account_activity'=>$uid?sf_user_history($uid,60):[],'agent_brain'=>$uid?sf_user_brain_timeline($uid,60):[],'merch_purchases'=>$merch];
+    return ['contact'=>$c,'events'=>$events,'agent_engagements'=>$engagements,'community_posts'=>$community,'account_activity'=>$uid?sf_user_history($uid,60):[],'agent_brain'=>$uid?sf_user_brain_timeline($uid,60):[],'merch_purchases'=>$merch,'membership'=>$uid&&function_exists('sf_membership_state')?sf_membership_state($uid,false):null];
 }

@@ -39,7 +39,7 @@ function sf_segment_rules_normalize(array $raw): array {
         'stages'=>$list($raw['stages']??[],40),'tags_all'=>$list($raw['tags_all']??($raw['tags']??[]),60),'tags_any'=>$list($raw['tags_any']??[],60),
         'purchase_required'=>!empty($raw['purchase_required']),'min_orders'=>max(0,(int)($raw['min_orders']??0)),'min_spend_cents'=>max(0,(int)($raw['min_spend_cents']??0)),
         'product_ids_any'=>$list($raw['product_ids_any']??[],120),'campaign_ids_any'=>array_values(array_unique(array_filter(array_map('intval',(array)($raw['campaign_ids_any']??[])),fn($x)=>$x>0))),
-        'event_types_any'=>$list($raw['event_types_any']??[],80),'activity_within_days'=>max(0,(int)($raw['activity_within_days']??0)),'inactive_for_days'=>max(0,(int)($raw['inactive_for_days']??0))
+        'event_types_any'=>$list($raw['event_types_any']??[],80),'membership'=>(in_array((string)($raw['membership']??'any'),['any','active','inactive'],true)?(string)($raw['membership']??'any'):'any'),'package_ids_any'=>array_values(array_unique(array_filter(array_map('intval',(array)($raw['package_ids_any']??[])),fn($x)=>$x>0))),'activity_within_days'=>max(0,(int)($raw['activity_within_days']??0)),'inactive_for_days'=>max(0,(int)($raw['inactive_for_days']??0))
     ];
 }
 
@@ -52,7 +52,7 @@ function sf_segment_contact_metrics(array $contact): array {
     foreach($q->fetchAll() as $e){$events[(string)$e['event_type']]=true;$at=(string)$e['created_at'];if($at>$lastEvent)$lastEvent=$at;}
     $campaigns=[];try{$q=sf_db()->prepare('SELECT DISTINCT campaign_id FROM campaign_participants WHERE contact_id=?');$q->execute([$cid]);foreach($q->fetchAll(PDO::FETCH_COLUMN) as $x)$campaigns[(int)$x]=true;}catch(Throwable $e){}
     $lastActivity=max((string)($contact['last_engaged_at']??''),$lastEvent,$lastPurchase,(string)($contact['updated_at']??''));
-    return ['order_count'=>count($orders),'spend_cents'=>$spend,'product_ids'=>array_keys($products),'last_purchase_at'=>$lastPurchase,'event_types'=>array_keys($events),'campaign_ids'=>array_keys($campaigns),'last_activity_at'=>$lastActivity];
+    $membership=!empty($contact['user_id'])&&function_exists('sf_membership_state')?sf_membership_state((int)$contact['user_id'],false):['active'=>false,'package_id'=>0];return ['order_count'=>count($orders),'spend_cents'=>$spend,'product_ids'=>array_keys($products),'last_purchase_at'=>$lastPurchase,'event_types'=>array_keys($events),'campaign_ids'=>array_keys($campaigns),'membership_active'=>!empty($membership['active']),'package_id'=>(int)($membership['package_id']??0),'last_activity_at'=>$lastActivity];
 }
 
 function sf_segment_contact_matches(array $contact,array $rules,?array $metrics=null): bool {
@@ -71,7 +71,7 @@ function sf_segment_contact_matches(array $contact,array $rules,?array $metrics=
     if((int)$metrics['spend_cents']<$r['min_spend_cents'])return false;
     if($r['product_ids_any']&&!array_intersect($r['product_ids_any'],(array)$metrics['product_ids']))return false;
     if($r['campaign_ids_any']&&!array_intersect($r['campaign_ids_any'],(array)$metrics['campaign_ids']))return false;
-    if($r['event_types_any']&&!array_intersect($r['event_types_any'],(array)$metrics['event_types']))return false;
+    if($r['event_types_any']&&!array_intersect($r['event_types_any'],(array)$metrics['event_types']))return false;if($r['membership']==='active'&&empty($metrics['membership_active']))return false;if($r['membership']==='inactive'&&!empty($metrics['membership_active']))return false;if($r['package_ids_any']&&!in_array((int)($metrics['package_id']??0),$r['package_ids_any'],true))return false;
     $last=(string)($metrics['last_activity_at']??'');$lastTs=$last!==''?strtotime($last):false;
     if($r['activity_within_days']>0&&(!$lastTs||$lastTs<time()-$r['activity_within_days']*86400))return false;
     if($r['inactive_for_days']>0&&$lastTs&&$lastTs>time()-$r['inactive_for_days']*86400)return false;

@@ -44,7 +44,8 @@ $cron=file_get_contents($root.'/cron-automations.php');
 $wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/automation-core.php'"),'automation core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.18'"),'database schema advances to 1.3.18');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db23);
+ok(isset($db23[1],$db23[2],$db23[3])&&[(int)$db23[1],(int)$db23[2],(int)$db23[3]]>=[1,3,18],'database schema remains v1.3.18 or later');
 ok(str_contains($mig,"'id'=>'2026-10-10-019'")&&str_contains($mig,'sf_automation_ensure_schema')&&str_contains($mig,'sf_segment_refresh_all'),'migration 019 installs automation schema and initializes segment membership');
 
 foreach(['lifecycle_automations','lifecycle_automation_runs','lifecycle_automation_events','lifecycle_segment_memberships'] as $table){
@@ -80,7 +81,9 @@ ok(str_contains($adminApi,'sf_agent_brain_log'),'segment and automation authorin
 ok(str_contains($cron,'PHP_SAPI')&&str_contains($cron,'sf_automation_tick'),'CLI automation scheduler runs due waits, segments and schedules');
 ok(str_contains($wf,'node --check admin/assets/automations.js')&&str_contains($wf,'php tests/v1321-section22-fan-automation.php'),'release gate includes lifecycle JS and Section 22 regression suite');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.21'")&&str_contains($version,"'database_schema_target'=>'1.3.18'"),'version endpoint reports app 1.3.21 and schema 1.3.18');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app23);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema23);
+ok(isset($app23[1],$app23[2],$app23[3],$schema23[1],$schema23[2],$schema23[3])&&[(int)$app23[1],(int)$app23[2],(int)$app23[3]]>=[1,3,21]&&[(int)$schema23[1],(int)$schema23[2],(int)$schema23[3]]>=[1,3,18],'version endpoint reports app v1.3.21 or later and schema v1.3.18 or later');
 ok(str_contains($version,"'fan_segments'=>'crm-consent-account-tags-purchases-products-campaigns-events-activity'"),'version endpoint advertises dynamic fan segmentation');
 ok(str_contains($version,"'lifecycle_automations'=>'event-segment-scheduled-triggers-waits-tags-stage-agent-email-campaign'"),'version endpoint advertises lifecycle automation engine');
 

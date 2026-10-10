@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.21',
+  'stonefellow'=>'1.3.22',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.18',
+  'database_schema_target'=>'1.3.19',
   'database_upgrader'=>'upgrade.php',
   'dashboard'=>'activity-listening-command-center',
   'personalization'=>'favorites-library-history',
@@ -42,6 +42,9 @@ echo json_encode([
   'fan_segments'=>'crm-consent-account-tags-purchases-products-campaigns-events-activity',
   'lifecycle_automations'=>'event-segment-scheduled-triggers-waits-tags-stage-agent-email-campaign',
   'lifecycle_scheduler'=>'cli-due-waits-segment-refresh-scheduled-journeys',
+  'membership_vip'=>'package-backed-tiers-benefits-early-access-member-content',
+  'member_commerce'=>'server-side-merch-discount-plus-campaign-cap',
+  'member_agent'=>'tier-benefit-content-context-and-routing',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
 ], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
