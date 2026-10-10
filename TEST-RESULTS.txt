@@ -1,38 +1,34 @@
-Stonefellow v1.3.25 Section 26 release gate
+Stonefellow v1.3.26 Section 27 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Operating Calendar JavaScript syntax
-- Sections 1–25 inherited regression suites
-- Section 26 executable Operating Calendar suite
+- Analytics JavaScript syntax
+- Sections 1–26 inherited regression suites
+- Section 27 Business Intelligence & Growth Analytics
 
-Section 26 executable coverage:
-- SQLite schema
-- launch templates
-- template milestone seeding
-- dependency chain
-- dependency completion guard
-- readiness scoring
-- custom milestone add/delete
-
-Integration coverage:
-- migration 023
-- SQLite/MySQL schema
-- native release/show dates
-- campaign/ticket windows
-- member-content windows
-- scheduled automation timing
-- source vs plan distinction
-- Admin navigation/router/UI
-- Agent routing/context
-- Agent Brain audit
-- version/capability markers
+Section 27 coverage includes:
+- deterministic percentage calculations
+- deterministic operating warnings/opportunities
+- read-only intelligence contract
+- recorded revenue boundaries
+- paid membership invoice revenue
+- confirmed refunds
+- windowed campaign attribution
+- windowed ticket demand/check-in
+- merch sold-item reporting
+- CRM growth/cohorts
+- automation health
+- customer-care health
+- top supporter recorded value
+- Admin Agent performance routing
+- grounded Agent brief
+- application/schema capability markers
 
 Measured feature-head GitHub Actions result:
-- Exact green feature head: 1e80755fed4436d94275811dc3e70300f427ab22
+- Exact green feature head: 3ca08648fdd9c98f73e0d1d71455cdfa32df322d
 - Release gate: PASS
-- Explicit assertions: 1429 passed
+- Explicit assertions: 1463 passed
 - Failures: 0

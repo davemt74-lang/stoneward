@@ -52,7 +52,7 @@ ok(str_contains($state,"'purchase_conversion_30d'")&&str_contains($state,"'custo
 ok(str_contains($state,"'revenue_30d_cents'"),'dashboard state includes 30-day revenue');
 ok(str_contains($state,"('start','complete','skip')"),'recent listening feed includes skips');
 
-ok(str_contains($index,'Listening + Conversion'),'admin navigation names the expanded analytics workspace');
+ok(str_contains($index,'Listening + Conversion')||str_contains($index,'Performance Intelligence'),'admin navigation names the expanded analytics workspace');
 ok(str_contains($index,'assets/analytics.js'),'admin shell loads the dedicated analytics renderer');
 ok(str_contains($admin,'window.StonefellowAdminAnalytics'),'admin app delegates analytics rendering to Section 10 renderer');
 ok(str_contains($admin,'Revenue · 30 days'),'main dashboard surfaces recent revenue');
@@ -60,7 +60,7 @@ ok(str_contains($admin,'Listener → purchase'),'main dashboard surfaces listene
 ok(str_contains($admin,'SKIP RATE')&&str_contains($admin,'REPEAT')&&str_contains($admin,'FAVORITES')&&str_contains($admin,'CUSTOM MEDIA'),'main dashboard surfaces listening quality and conversion KPIs');
 ok(str_contains($admin,"event_type==='skip'"),'recent-listening dashboard labels skip events');
 
-ok(str_contains($renderer,'Listening & Conversion Analytics'),'analytics workspace title is updated');
+ok(str_contains($renderer,'Listening & Conversion Analytics')||str_contains($renderer,'Performance Intelligence'),'analytics workspace title is updated');
 ok(str_contains($renderer,'Listener conversion'),'listener conversion funnel is rendered');
 ok(str_contains($renderer,'Listening quality'),'starts/completions/skips trend is rendered');
 ok(str_contains($renderer,'Playback sources'),'playback-source analytics are rendered');

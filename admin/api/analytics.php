@@ -3,7 +3,7 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 $me=sf_admin_require_auth(false);sf_ops_ensure_schema();
 $days=max(1,min(3650,(int)($_GET['days']??30)));$userId=max(0,(int)($_GET['user_id']??0));
-$overall=sf_engagement_analytics($days,null);$notificationAnalytics=sf_notification_analytics($days,null);$searchAnalytics=sf_search_analytics($days,null);$libraryAnalytics=sf_library_admin_analytics(null);$users=(array)($overall['users']??[]);$selected=null;
+$overall=sf_engagement_analytics($days,null);$growth=sf_growth_analytics($days);$growth['agent_brief']=sf_growth_agent_context_from($growth,$days);$notificationAnalytics=sf_notification_analytics($days,null);$searchAnalytics=sf_search_analytics($days,null);$libraryAnalytics=sf_library_admin_analytics(null);$users=(array)($overall['users']??[]);$selected=null;
 if($userId>0){
     $q=sf_db()->prepare('SELECT id,email,display_name,role,status,created_at,last_login_at FROM users WHERE id=?');$q->execute([$userId]);$u=$q->fetch();
     if($u){
@@ -24,4 +24,4 @@ if($userId>0){
         ];
     }
 }
-sf_json_response(['ok'=>true,'days'=>$days,'overall'=>$overall,'notification_analytics'=>$notificationAnalytics,'search_analytics'=>$searchAnalytics,'library_analytics'=>$libraryAnalytics,'users'=>$users,'selected'=>$selected,'csrf'=>sf_admin_csrf()]);
+sf_json_response(['ok'=>true,'days'=>$days,'overall'=>$overall,'growth'=>$growth,'notification_analytics'=>$notificationAnalytics,'search_analytics'=>$searchAnalytics,'library_analytics'=>$libraryAnalytics,'users'=>$users,'selected'=>$selected,'csrf'=>sf_admin_csrf()]);

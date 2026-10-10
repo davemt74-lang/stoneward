@@ -73,3 +73,4 @@ jobs:
           php tests/v1323-section24-ticketing-vip.php
           php tests/v1324-section25-fulfillment-care.php
           php tests/v1325-section26-operating-calendar.php
+          php tests/v1326-section27-growth-intelligence.php
