@@ -59,7 +59,7 @@ ok(str_contains($core,'sf_commerce_mark_order_sold')&&str_contains($core,'sf_com
 ok(str_contains($core,'function sf_fulfillment_restock_return')&&str_contains($core,"inventory_status='sold'")&&str_contains($core,"inventory_status='returned'"),'returned sold merchandise has an explicit audited restock path');
 ok(str_contains($core,'Shipped merchandise may only be restocked after a returned shipment is recorded.'),'refund flow refuses unsafe automatic restock after shipping');
 ok(str_contains($core,"'partially_refunded'")&&str_contains($core,"'refunded'"),'refund ledger distinguishes partial and full refunds');
-ok(str_contains($core,"'order_shipped'")&&str_contains($core,"'refund_confirmed'")&&str_contains($core,"'support_case_opened'"),'fulfillment and care events feed CRM history');
+ok(str_contains($core,"'order_'.$summaryStatus")&&str_contains($core,"'refund_confirmed'")&&str_contains($core,"'support_case_opened'")&&str_contains($core,'sf_crm_log_event'),'fulfillment and care events feed CRM history');
 ok(str_contains($crm,'sf_automation_process_crm_event'),'fulfillment/care CRM events can feed the existing lifecycle automation engine');
 
 ok(str_contains($publicApi,'sf_require_user(false,true)')&&str_contains($publicApi,"action==='open_case'")&&str_contains($publicApi,"action==='reply_case'"),'fan customer-care mutations require authenticated CSRF-protected self service');
