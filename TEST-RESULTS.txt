@@ -1,43 +1,42 @@
-Stonefellow v1.3.21 Section 22 release gate
+Stonefellow v1.3.22 Section 23 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Campaign Builder JavaScript syntax
-- Media Library JavaScript syntax
-- Products JavaScript syntax
-- Automations JavaScript syntax
-- Sections 1–21 regression suites
-- Section 22 Fan Segments, Automations & Lifecycle Journeys
+- Campaign / Media / Products / Automations JavaScript syntax
+- Membership Admin JavaScript syntax
+- Sections 1–22 inherited regression suites
+- Section 23 Membership & VIP Fan Experience
 
-Section 22 executable/runtime coverage:
-- multi-dimensional segment matching
-- spend threshold rejection
-- newsletter consent matching
-- required-tag rejection
-- valid lifecycle journey validation
-- incomplete marketing-email rejection
-- unsupported action rejection
+Section 23 executable coverage includes:
+- benefit normalization / discount clamp
+- active/trial membership
+- past-due grace access
+- expired grace rejection
+- canceled membership rejection
+- anonymous member-content rejection
 
-Integration coverage:
-- migration 019
-- SQLite/MySQL automation schema
-- CRM event trigger hook
-- saved segment reuse in Campaign Builder
-- dedupe/cooldown/run budgets
-- consent-aware email
-- proactive-Agent permission
-- wait/resume scheduler
-- recursion suppression
-- Admin lifecycle UI
-- Agent Brain audit
-- public Agent segment/journey context
+Integration coverage includes:
+- migration 020
+- package-backed membership schema
+- membership content SQLite/MySQL schema
+- package Admin benefit controls
+- public Plans/My Account membership hydration
+- server-side merch discount
+- campaign + member discount cap
+- early access
+- VIP/download benefit gates
+- protected member-media delivery
+- Admin Membership + VIP
+- CRM membership state
+- saved-segment membership targeting
+- Agent membership context/routing
 - version/capability markers
 
 Measured feature-head GitHub Actions result:
-- Exact feature head: 9956a5e63dfdb30c62c987da4a9720ac4c34b60c
+- Exact green feature head: 4be7234f15d9a9cd50e495fb3a33339888227345
 - Release gate: PASS
-- Explicit assertions: 1226 passed
+- Explicit assertions: 1282 passed
 - Failures: 0

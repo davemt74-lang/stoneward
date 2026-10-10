@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.21');
+define('SF_ADMIN_BUILD','1.3.22');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -23,6 +23,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/media.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/products.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/automations.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/membership.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
 </head>
 <body>
   <div id="adminApp" class="admin-app">
@@ -45,12 +46,13 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="pod"><span>14</span>POD Handoffs</button>
         <button type="button" data-view="users"><span>15</span>Users + Tokens</button>
         <button type="button" data-view="packages"><span>16</span>Monthly Packages</button>
-        <button type="button" data-view="ai"><span>17</span>AI Providers</button>
-        <button type="button" data-view="brain"><span>18</span>Agent Brain</button>
-        <button type="button" data-view="customer"><span>19</span>Customer Lifecycle</button>
-        <button type="button" data-view="analytics"><span>20</span>Listening + Conversion</button>
-        <button type="button" data-view="operations"><span>21</span>Operations</button>
-        <button type="button" data-view="settings"><span>22</span>Settings</button>
+        <button type="button" data-view="membership"><span>17</span>Membership + VIP</button>
+        <button type="button" data-view="ai"><span>18</span>AI Providers</button>
+        <button type="button" data-view="brain"><span>19</span>Agent Brain</button>
+        <button type="button" data-view="customer"><span>20</span>Customer Lifecycle</button>
+        <button type="button" data-view="analytics"><span>21</span>Listening + Conversion</button>
+        <button type="button" data-view="operations"><span>22</span>Operations</button>
+        <button type="button" data-view="settings"><span>23</span>Settings</button>
       </nav>
       <div class="sidebar-foot"><span id="adminStatusDot"></span><span>Local admin</span></div>
     </aside>
@@ -83,5 +85,6 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/media.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/products.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/automations.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/membership.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
 </body>
 </html>

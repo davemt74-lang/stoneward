@@ -1,21 +1,21 @@
-# Stonefellow v1.3.21 — Section 22: Fan Segments, Automations & Lifecycle Journeys
+# Stonefellow v1.3.22 — Section 23: Membership & VIP Fan Experience
 
-- Added first-class Admin **Segments + Automations** workspace.
-- Promoted saved campaign segments into the canonical reusable fan-audience layer.
-- Added dynamic segment rules for consent, accounts, Agent permission, CRM stages, tags, purchases, spend, products, campaigns, CRM events, recency and inactivity.
-- Added segment audience preview before save.
-- Added persistent segment membership with enter/exit tracking.
-- Added Campaign Builder saved-segment selection.
-- Added lifecycle automation triggers: manual, CRM event, segment enter, segment exit and scheduled interval.
-- Added journey actions: add/remove tag, set stage, Agent message, marketing email, campaign enrollment, wait and exit.
-- Added persistent wait/resume state.
-- Added CLI lifecycle scheduler: `cron-automations.php`.
-- Added automation run/event ledger and Admin timeline.
-- Added durable dedupe keys, cooldowns and per-fan run budgets.
-- Automated marketing email requires newsletter consent.
-- Automated Agent outreach requires proactive-Agent permission.
-- Added recursion suppression for automation-originated CRM events.
-- Added Admin Agent Brain records for segment/automation authoring and manual execution.
-- Added active segment/lifecycle state to fan Agent CRM context.
-- Application advances to **1.3.21**.
-- Database schema advances to **1.3.18**.
+- Extended existing Monthly Packages into optional membership/VIP tiers.
+- Added structured tier rank, badge, merch discount, early access, VIP, presale, member-content, download and member-offer benefits.
+- Added first-class Admin Membership + VIP workspace.
+- Added member roster and membership metrics.
+- Added member-exclusive posts, audio, video, downloads, announcements and VIP offers.
+- Added minimum-tier/rank gating.
+- Added tier-driven early-access windows.
+- Added Media Library support for member content.
+- Added server-side membership authorization to direct member-media delivery.
+- Added dedicated public Membership + VIP view.
+- Added Membership action to the chat + menu.
+- Added membership status/benefits to My Account and Plans.
+- Added server-calculated member merch discounts.
+- Kept campaign and member discounts separately visible and subtotal-capped.
+- Added CRM membership state and safe member→customer/fan fallback.
+- Added membership/package targeting to dynamic fan segments.
+- Added Agent membership context and routing.
+- Application advances to **1.3.22**.
+- Database schema advances to **1.3.19**.

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.18';
+const SF_DB_SCHEMA_TARGET = '1.3.19';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -189,6 +189,13 @@ function sf_migration_definitions(): array {
             'revision'=>'1',
             'apply'=>function(): void { sf_automation_ensure_schema(); sf_segment_refresh_all(); },
         ],
+        [
+            'id'=>'2026-10-10-020',
+            'app_version'=>'1.3.22',
+            'description'=>'Membership tiers, VIP benefits, member content, early access and CRM membership synchronization',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_membership_ensure_schema(); foreach(sf_db()->query('SELECT user_id FROM user_subscriptions')->fetchAll(PDO::FETCH_COLUMN) as $uid) sf_membership_sync_crm((int)$uid); },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
@@ -348,14 +355,14 @@ function sf_migration_integrity_report(): array {
         'subscription_packages','user_token_balances','token_ledger','user_subscriptions','user_trial_history',
         'agent_conversations','agent_messages','agent_brain_decisions','account_action_tokens',
         'transactional_email_outbox','billing_webhook_events','billing_invoices','billing_audit_log',
-        'user_notifications','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','catalog_search_events','user_collections','user_collection_items','fan_contacts','fan_crm_events','fan_agent_engagements','community_posts','campaigns','campaign_segments','campaign_participants','campaign_events','campaign_entitlements','campaign_message_runs','media_assets','media_links','store_products','store_variants','store_inventory_events','store_order_items','user_activity','listening_events','provider_health_checks','admin_audit_log',
+        'user_notifications','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','catalog_search_events','user_collections','user_collection_items','fan_contacts','fan_crm_events','fan_agent_engagements','community_posts','campaigns','campaign_segments','campaign_participants','campaign_events','campaign_entitlements','campaign_message_runs','membership_content','media_assets','media_links','store_products','store_variants','store_inventory_events','store_order_items','user_activity','listening_events','provider_health_checks','admin_audit_log',
         'site_event_log','auth_attempts','order_request_keys','user_favorites','user_listening_progress','user_playlists','user_playlist_tracks','user_track_feedback','agent_listening_sessions','agent_listening_session_tracks','user_play_queue','schema_migrations','schema_upgrade_runs'
     ];
     $checks=[];$ok=true;
     foreach($requiredTables as $t){$exists=sf_migration_table_exists($t);$checks[]=['name'=>'Table '.$t,'ok'=>$exists,'detail'=>$exists?'Present':'Missing'];if(!$exists)$ok=false;}
     $userCols=sf_migration_columns('users');foreach(['email_verified_at','email_verification_sent_at'] as $c){$has=in_array($c,$userCols,true);$checks[]=['name'=>'users.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
     $subCols=sf_migration_columns('user_subscriptions');foreach(['provider','provider_customer_id','provider_subscription_id','cancel_at_period_end','canceled_at','grace_ends_at','last_invoice_id','last_payment_at'] as $c){$has=in_array($c,$subCols,true);$checks[]=['name'=>'user_subscriptions.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
-    $pkgCols=sf_migration_columns('subscription_packages');$has=in_array('provider_price_id',$pkgCols,true);$checks[]=['name'=>'subscription_packages.provider_price_id','ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;
+    $pkgCols=sf_migration_columns('subscription_packages');foreach(['provider_price_id','membership_enabled','membership_rank','membership_badge','membership_benefits_json'] as $c){$has=in_array($c,$pkgCols,true);$checks[]=['name'=>'subscription_packages.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
     $aiCols=sf_migration_columns('ai_provider_settings');$has=in_array('endpoint_url',$aiCols,true);$checks[]=['name'=>'ai_provider_settings.endpoint_url','ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;
     return ['ok'=>$ok,'checks'=>$checks];
 }

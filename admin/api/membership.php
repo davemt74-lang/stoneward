@@ -1,0 +1,16 @@
+<?php
+declare(strict_types=1);require __DIR__.'/bootstrap.php';$method=$_SERVER['REQUEST_METHOD']??'GET';$me=sf_admin_require_auth($method!=='GET');sf_membership_ensure_schema();
+function sf_admin_membership_members(int $limit=300): array {
+    $sql='SELECT u.id user_id,u.display_name,u.email,s.package_id,s.status,s.current_period_end,s.cancel_at_period_end,s.grace_ends_at,p.name package_name,p.membership_badge,p.membership_rank,p.membership_benefits_json FROM user_subscriptions s JOIN users u ON u.id=s.user_id JOIN subscription_packages p ON p.id=s.package_id WHERE p.membership_enabled=1 ORDER BY s.updated_at DESC LIMIT '.max(1,min(500,$limit));$rows=sf_db()->query($sql)->fetchAll();foreach($rows as &$r){$r['benefits']=sf_membership_benefits(sf_membership_decode($r['membership_benefits_json']??'',[]));$r['active']=sf_membership_status_active($r);}unset($r);return $rows;
+}
+if($method==='GET'){
+    $id=max(0,(int)($_GET['id']??0));if($id){$content=sf_membership_content_get($id);if(!$content)sf_json_response(['ok'=>false,'message'=>'Member content not found.'],404);sf_json_response(['ok'=>true,'content'=>$content,'media'=>sf_media_links('member_content',(string)$id),'packages'=>array_map('sf_package_public',sf_packages(false))]);}
+    sf_json_response(['ok'=>true,'summary'=>sf_membership_summary(),'content'=>sf_membership_content_list(false),'members'=>sf_admin_membership_members(),'packages'=>array_map('sf_package_public',sf_packages(false))]);
+}
+if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);$b=sf_request_json();$action=(string)($b['action']??'');
+try{
+    if($action==='save_content'){$content=sf_membership_content_save((array)($b['content']??[]),(int)$me['id']);sf_log_admin_action((int)$me['id'],'membership_content_saved','membership_content',(string)$content['id'],['status'=>$content['status'],'minimum_rank'=>(int)$content['minimum_rank']]);sf_agent_brain_log((int)$me['id'],'admin_membership','membership_content',['route'=>'membership_vip','action'=>'save_member_content','context_profile'=>'crm','needs_llm'=>false,'requires_confirmation'=>$content['status']==='published','status'=>$content['status'],'request'=>'Save member content '.$content['title'],'response'=>'Member content saved as '.$content['status'].'.']);sf_json_response(['ok'=>true,'content'=>$content]);}
+    if($action==='delete_content'){$id=(int)($b['id']??0);$content=sf_membership_content_get($id);if(!$content)throw new InvalidArgumentException('Member content not found.');if(!sf_membership_content_delete($id))throw new RuntimeException('Only draft or archived member content can be deleted.');sf_log_admin_action((int)$me['id'],'membership_content_deleted','membership_content',(string)$id,['title'=>$content['title']]);sf_json_response(['ok'=>true]);}
+    if($action==='sync_memberships'){$count=0;foreach(sf_db()->query('SELECT user_id FROM user_subscriptions')->fetchAll(PDO::FETCH_COLUMN) as $uid){sf_membership_sync_crm((int)$uid);$count++;}sf_json_response(['ok'=>true,'synced'=>$count]);}
+    sf_json_response(['ok'=>false,'error'=>'unknown_action'],400);
+}catch(Throwable $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}

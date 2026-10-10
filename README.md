@@ -1,117 +1,134 @@
-# Stonefellow v1.3.21 — Section 22: Fan Segments, Automations & Lifecycle Journeys
+# Stonefellow v1.3.22 — Section 23: Membership & VIP Fan Experience
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 22 turns CRM, campaign and commerce history into reusable fan audiences and governed lifecycle automation.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 23 turns the existing subscription/package system into a real fan-membership and VIP experience without creating a second billing system.
 
-## Dynamic fan segments
+## Package-backed membership tiers
 
-The existing campaign segment store is now the canonical Stonefellow audience layer.
+Every existing Monthly Package can optionally act as a membership tier.
 
-Segments can match on:
+Structured tier configuration:
 
-- newsletter consent
-- linked vs email-only fan identity
-- proactive-Agent permission
-- CRM lifecycle stage
-- required tags and any-of tags
-- purchase history
-- minimum order count
-- minimum merch spend
-- specific merch products
-- campaign participation
-- CRM event types
-- recent activity
-- inactivity windows
+- membership enabled
+- numeric tier rank
+- member/VIP badge
+- merch discount percentage
+- early-access days
+- VIP access
+- priority presale
+- member content
+- exclusive downloads
+- member-only offers
 
-Admin can preview matching fans before saving a segment. Segment membership is continuously evaluated and stored with enter/exit timestamps.
+Stripe/local subscription status remains authoritative.
 
-The same saved segment can be used by:
+Active and trialing subscriptions receive membership benefits. A past-due subscription remains active only during its configured billing grace window.
 
-- Campaign Builder Audience nodes
-- lifecycle automations
-- manual lifecycle runs
+## My Membership
 
-## Lifecycle automations
+Fans have a dedicated **Membership + VIP** experience from the chat + menu and normal navigation.
 
-Admin → **Segments + Automations** provides a lifecycle journey builder.
+It shows:
 
-Triggers:
+- current membership tier
+- member badge
+- active benefit summary
+- billing/access window
+- member-exclusive content
+- early-access items
+- membership tier choices
 
-- Manual
-- CRM event
-- Segment entered
-- Segment exited
-- Scheduled interval
+My Account also displays the active membership badge and benefit summary.
 
-Actions:
+## Member / VIP content
 
-- Add CRM tag
-- Remove CRM tag
-- Set CRM stage
-- Governed Agent message
-- Consent-aware marketing email
-- Enroll in a published campaign
-- Wait
-- Exit
+Admin → **Membership + VIP** manages gated content:
 
-Published automations are standing Admin approval for the configured journey. Runtime policy still applies:
+- posts
+- audio
+- video
+- downloads
+- announcements
+- VIP offers
 
-- marketing email requires newsletter opt-in
-- Agent messages require a linked Stonefellow account and proactive-Agent permission
-- campaign enrollment requires a published campaign
-- dedupe keys prevent duplicate execution
-- per-fan cooldowns and run budgets prevent repeated automation loops
+Each item can define:
 
-## Waits and scheduler
+- minimum membership tier/package
+- minimum rank
+- publication status
+- public release/start time
+- end time
+- teaser
+- full member content
+- private/external destination
+- featured/sort state
+- Media Library attachments
 
-Wait steps persist run state and a due time.
+A future start date becomes an early-access boundary: members whose tier grants enough early-access days can unlock it before the public start time.
 
-Run:
+VIP-offer content additionally requires the VIP benefit. Download content additionally requires the exclusive-download benefit.
 
-`php cron-automations.php`
+## Secure member media
 
-The lifecycle scheduler:
+Media Library supports a new `member_content` relationship type.
 
-- refreshes segment membership
-- fires segment enter/exit transitions
-- resumes due waits
-- starts due scheduled automations
+Even when an attachment is marked Public inside the Media Library, `api/media.php` rechecks the current user's membership/tier entitlement before serving bytes for member-content links. This prevents sharing a direct media URL from bypassing membership gating.
 
-## CRM and Agent Brain
+Download permission remains separate from viewing permission.
 
-CRM events automatically feed lifecycle evaluation using the authoritative CRM event ID.
+## Member commerce benefit
 
-Automation-originated CRM events suppress recursive automation triggering.
+Signed-in members can receive the merch discount configured on their active tier.
 
-Admin Agent Brain records:
+The server computes the benefit from authenticated subscription state; the client never supplies a tier or discount percentage.
 
-- segment saves
-- automation saves/publishing
-- explicit manual lifecycle runs
+Cart quotes expose:
 
-The fan-facing Agent CRM context can see the fan's active segments and active/waiting lifecycle journeys, while normal consent/privacy controls remain intact.
+- member discount
+- campaign discount
+- total discount
 
-## Run history
+Member and campaign savings may coexist, but their combined value is capped at the subtotal.
 
-Every journey records:
+## CRM + segmentation
 
-- fan/contact
-- trigger
-- automation
-- current step
-- waiting due time
-- completion/failure state
-- step-level execution events
+Active members are synchronized to CRM stage `member`.
 
-Admin can inspect a per-fan journey timeline.
+When membership ends, Stonefellow preserves relationship history:
+
+- fans with purchase history fall back to `customer`
+- otherwise they fall back to `fan`
+
+CRM fan detail includes current membership state.
+
+Dynamic fan segments can now target:
+
+- active/inactive membership
+- specific subscription package/tier IDs
+
+This makes member-only campaigns and lifecycle journeys reusable through the existing segment engine.
+
+## Agent
+
+The Stonefellow Agent understands:
+
+- the fan's current membership tier
+- member badge
+- active benefits
+- VIP access
+- early access
+- merch savings
+- member content/download eligibility
+
+Membership/VIP questions route to the Membership experience.
+
+Admin Agent Brain records membership-content publishing and package/member operations.
 
 ## Database
 
-Migration **2026-10-10-019** adds:
+Migration **2026-10-10-020** adds:
 
-- `lifecycle_automations`
-- `lifecycle_automation_runs`
-- `lifecycle_automation_events`
-- `lifecycle_segment_memberships`
+- membership metadata columns to `subscription_packages`
+- `membership_content`
 
-Application: **1.3.21**  
-Database schema target: **1.3.18**
+Application: **1.3.22**  
+Database schema target: **1.3.19**

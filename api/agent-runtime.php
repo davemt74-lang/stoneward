@@ -68,7 +68,8 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
     if(in_array($profile,['commerce','crm','recommendation','catalog'],true)&&function_exists('sf_campaign_live_summaries')){$campaignLines=[];foreach(sf_campaign_live_summaries(10) as $campaign){$campaignLines[]='- slug='.$campaign['slug'].' | '.$campaign['name'].' | goal '.$campaign['goal'].' | '.$campaign['headline'].' | offers '.implode(', ',$campaign['offers']);}if($campaignLines)$sections[]="ACTIVE CAMPAIGNS\n".implode("\n",$campaignLines);}
     if($profile==='commerce'&&function_exists('sf_commerce_agent_context')){$merch=sf_commerce_agent_context();if($merch!=='')$sections[]=$merch;}
     if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products and active campaigns and open the cart, builder, store, or a campaign page, but it may not claim a purchase is complete, reserve inventory, or charge money. Checkout remains a user-confirmed UI action.";
-    if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
+    if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, membership benefits, VIP access, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
+    if($userId>0&&function_exists('sf_membership_agent_context')&&in_array($profile,['account','commerce','crm','recommendation'],true))$sections[]=sf_membership_agent_context($userId);
     if($userId>0&&in_array($profile,['account','crm','recommendation'],true)){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
     return implode("\n\n",$sections);
 }
@@ -157,6 +158,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/notifications|my reminders|what did i miss|show my alerts/',$q))return 'notifications_open';
     if(preg_match('/my library|saved music|my collections|show (?:me )?(?:my )?(?:favorites|saved tracks|saved releases)|my purchases/',$q))return 'library_open';
     if(preg_match('/my account|profile/',$q))return 'account_open';
+    if(preg_match('/membership|member benefits?|vip access|member content|exclusive downloads?|presale|early access|my tier/',$q))return 'membership_info';
     if(preg_match('/plan|package|subscription|free trial|active tokens?/',$q))return 'plans_open';
     if(preg_match('/lyrics?|credits?|who wrote|who produced|who played|personnel|isrc|bmi|ascap|story|about this song|other versions?|version of|when (?:was|did).*record|recording session/',$q))return 'track_info';
     if(preg_match('/knowledge|notes?|document|history|why did|what does|meaning/',$q))return 'knowledge_question';
@@ -199,6 +201,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'newsletter_join':$action=['type'=>'open_view','view'=>'newsletter'];$text='Here is the Stonefellow newsletter signup. You control whether Stonefellow can email you.';$profile='crm';break;
         case 'campaign_offer':$match=function_exists('sf_campaign_match_query')?sf_campaign_match_query($message):null;if($match){$action=['type'=>'open_view','view'=>'campaign','slug'=>$match['slug']];$text='There is an active Stonefellow campaign: “'.$match['name'].'.” I’ll open it.';$profile='commerce';}else{$action=['type'=>'open_view','view'=>'store'];$text='I do not see a matching active campaign right now. Here is the Stonefellow store.';$profile='commerce';}break;
         case 'store_browse':$action=['type'=>'open_view','view'=>'store'];$text='Here’s the Stonefellow store.';$profile='commerce';break;
+        case 'membership_info':$action=['type'=>'open_view','view'=>'membership'];$text='Here is your Stonefellow membership and VIP access.';$profile='account';$needs=true;break;
         case 'fan_profile':$action=['type'=>'open_view','view'=>'community'];$profile='crm';$needs=true;break;
         case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;
         case 'show_info':$action=['type'=>'open_view','view'=>'shows'];$profile='catalog';$needs=true;break;
