@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.22';
+const SF_DB_SCHEMA_TARGET = '1.3.23';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -216,6 +216,13 @@ function sf_migration_definitions(): array {
             'description'=>'Release and promotion operating plans, milestones, dependencies and unified source calendar',
             'revision'=>'1',
             'apply'=>function(): void { sf_calendar_ensure_schema(); },
+        ],
+        [
+            'id'=>'2026-10-10-024',
+            'app_version'=>'1.3.27',
+            'description'=>'Rights parties, catalog works, composition/master ownership splits, licenses, clearance and release readiness',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_rights_ensure_schema(); sf_rights_backfill_catalog(); },
         ],
     ];
 }

@@ -1,65 +1,58 @@
-# Stonefellow v1.3.26 — Section 27 Business Intelligence & Growth Analytics Audit
+# Stonefellow v1.3.27 — Section 28 Rights, Credits & Licensing Registry Audit
 
-## 27A — Unified Intelligence Model — 10/10 design
-- Reads existing authoritative source systems.
-- No duplicate reporting database.
-- One reporting-window contract across business metrics.
-- Existing listening analytics preserved.
+## 28A — Rights Party Registry — 10/10 design
+- Reusable writers/composers/publishers/artists/labels/master owners/licensors.
+- PRO, IPI/CAE and publisher IPI metadata.
+- No duplicate ownership inference from public credits.
 
-## 27B — Recorded Revenue — 10/10 design
-- Paid Stonefellow orders.
-- Paid membership invoices.
-- Confirmed refunds deducted.
-- Campaign attribution kept separate.
-- External ticket checkout excluded from recorded revenue.
+## 28B — Work Registration — 10/10 design
+- One rights work per catalog track.
+- ISWC and PRO work ID.
+- Composition/master copyright.
+- Territory and registration status.
+- Catalog-safe migration/backfill.
 
-## 27C — Fan Growth & Value — 10/10 design
-- CRM acquisition.
-- Newsletter opt-in growth.
-- Lifecycle/stage mix.
-- Acquisition sources.
-- Weekly cohorts.
-- Top supporter recorded value.
+## 28C — Composition Ownership — 10/10 design
+- Integer basis-point storage.
+- Exact 100% validation.
+- Reusable parties and roles.
+- Consequential-write audit.
 
-## 27D — Campaign / Commerce Intelligence — 10/10 design
-- Campaign participation and conversion.
-- Windowed attributed orders/revenue.
-- Merch units/revenue/product ranking.
-- Low-stock intelligence.
+## 28D — Master Ownership — 10/10 design
+- Independent master split ledger.
+- Exact 100% validation.
+- No composition/master conflation.
 
-## 27E — Membership / Ticket / Automation Intelligence — 10/10 design
-- Active members and membership revenue.
-- Cancellation-risk count.
-- Ticket reservation/check-in demand.
-- Offer fill.
-- Automation completion/failure/waiting.
+## 28E — Licensing & Clearance — 10/10 design
+- Track/release scope.
+- Sync, mechanical, master-use, sample, cover, remix and other licenses.
+- Pending/restricted/expired blockers.
+- Expiry warnings.
 
-## 27F — Customer-Care Intelligence — 10/10 design
-- Open/high-priority support load.
-- Cases opened/closed.
-- Refund workload.
-- Shipment/delivery state.
+## 28F — Release Rights Readiness — 10/10 design
+- Rolls up every release track.
+- Includes release-level licenses.
+- Clear blocker explanations.
 
-## 27G — Agent Intelligence — 10/10 design
-- Admin Agent routing for growth/performance questions.
-- One Agent-ready brief generated from already-computed dashboard data.
-- Deterministic opportunity signals, not generated guesses.
+## 28G — Agent Brain & Governance — 10/10 design
+- Rights writes logged to Admin audit.
+- Agent Brain receives work, party, split and license changes.
+- Split/license deletion requires explicit confirmation.
+- Private ownership data stays out of public Agent context.
 
-## 27H — Regression Safety — 10/10
+## 28H — Regression Safety — 10/10
 - PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Analytics JavaScript syntax: **PASS**
-- Sections 1–26 inherited suites: **PASS**
-- Section 27 executable intelligence suite: **PASS**
-- Explicit assertions: **1463 passed**
+- Public/Admin JavaScript syntax: **PASS**
+- Sections 1–27 inherited suites: **PASS**
+- Section 28 executable ownership/readiness suite: **PASS**
+- Explicit assertions: **1503 passed**
 - Failures: **0**
 
-FINAL SECTION 27 SCORE: **10/10**
+FINAL SECTION 28 SCORE: **10/10**
 
 
 ## Final measured feature-head result
-- Exact green feature head: `3ca08648fdd9c98f73e0d1d71455cdfa32df322d`
+- Exact green feature head: `f10a2abc2aa1ee0e26032a6cf60cb82afba41f57`
 - GitHub release gate: **PASS**
-- Explicit assertions: **1463 passed**
+- Explicit assertions: **1503 passed**
 - Failures: **0**

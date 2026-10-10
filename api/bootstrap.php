@@ -166,6 +166,7 @@ require_once __DIR__ . '/queue-core.php';
 require_once __DIR__ . '/home-core.php';
 require_once __DIR__ . '/analytics-core.php';
 require_once __DIR__ . '/growth-analytics-core.php';
+require_once __DIR__ . '/rights-core.php';
 require_once __DIR__ . '/notification-core.php';
 require_once __DIR__ . '/search-core.php';
 require_once __DIR__ . '/archive-core.php';

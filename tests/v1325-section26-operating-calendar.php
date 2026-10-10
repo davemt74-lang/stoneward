@@ -37,7 +37,8 @@ ok(sf_calendar_delete_milestone((int)$custom['id']),'custom milestone can be del
 $core=src('api/operating-calendar-core.php');$boot=src('api/bootstrap.php');$adminApi=src('admin/api/operating-calendar.php');$adminJs=src('admin/assets/admin.js');$calendarJs=src('admin/assets/operating-calendar.js');$calendarCss=src('admin/assets/operating-calendar.css');$adminShell=src('admin/index.php');$mig=src('api/migrations.php');$version=src('version.php');$wf=src('.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/operating-calendar-core.php'"),'operating calendar core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.22'"),'database schema advances to 1.3.22');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$mig26later);
+ok(isset($mig26later[1],$mig26later[2],$mig26later[3])&&[(int)$mig26later[1],(int)$mig26later[2],(int)$mig26later[3]]>=[1,3,22],'database schema remains v1.3.22 or later');
 ok(str_contains($mig,"'id'=>'2026-10-10-023'")&&str_contains($mig,'sf_calendar_ensure_schema'),'migration 023 installs operating calendar schema');
 foreach(['operating_plans','operating_milestones'] as $table){ok(substr_count($core,'CREATE TABLE IF NOT EXISTS '.$table)===2,'operating calendar supports SQLite and MySQL for '.$table);ok(str_contains($mig,"'".$table."'"),'migration integrity requires '.$table);}
 

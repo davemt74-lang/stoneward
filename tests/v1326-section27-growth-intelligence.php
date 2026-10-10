@@ -67,9 +67,12 @@ ok(str_contains($admin,'business performance')&&str_contains($admin,'campaign ro
 ok(str_contains($index,'Performance Intelligence'),'Admin navigation labels the unified analytics workspace');
 ok(str_contains($css,'.growth-primary-stats')&&str_contains($css,'.growth-opportunities'),'growth intelligence has dedicated responsive Admin styles');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.26'")&&str_contains($version,"'database_schema_target'=>'1.3.22'"),'version endpoint reports app 1.3.26 with unchanged schema 1.3.22');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app28);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema28);
+ok(isset($app28[1],$app28[2],$app28[3],$schema28[1],$schema28[2],$schema28[3])&&[(int)$app28[1],(int)$app28[2],(int)$app28[3]]>=[1,3,26]&&[(int)$schema28[1],(int)$schema28[2],(int)$schema28[3]]>=[1,3,22],'version endpoint reports app v1.3.26 or later and schema v1.3.22 or later');
 ok(str_contains($version,"'growth_intelligence'=>'recorded-revenue-crm-campaign-merch-membership-ticket-automation-care-fan-value'"),'version endpoint advertises unified growth intelligence');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.22'"),'Section 27 does not require a database migration');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$mig28);
+ok(isset($mig28[1],$mig28[2],$mig28[3])&&[(int)$mig28[1],(int)$mig28[2],(int)$mig28[3]]>=[1,3,22],'Section 27 remains compatible with schema v1.3.22 or later');
 ok(str_contains($wf,'php tests/v1326-section27-growth-intelligence.php'),'release gate includes Section 27 regression suite');
 
 echo "Stonefellow v1.3.26 Section 27 Business Intelligence & Growth Analytics audit: PASS\n";

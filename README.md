@@ -1,163 +1,107 @@
-# Stonefellow v1.3.26 — Section 27: Business Intelligence & Growth Analytics
+# Stonefellow v1.3.27 — Section 28: Rights, Credits & Licensing Registry
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 27 turns the existing listening dashboard into a unified **Performance Intelligence** workspace across the systems completed through Section 26.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 28 adds an authoritative Admin rights layer for the catalog and releases without pretending to be a royalty-accounting service.
 
-## One read-only intelligence layer
+## Rights Registry
 
-Section 27 does not create a second reporting database and does not copy business state into shadow tables.
+Admin now has a first-class **Rights + Licensing** workspace connected to the existing Stonefellow catalog.
 
-It reads the authoritative systems directly:
+It manages:
 
-- Listening + conversion telemetry
-- Fan CRM
-- Campaigns + attribution
-- Merch + products
-- Orders
-- Membership billing
-- Tickets + VIP reservations
-- Lifecycle automations
-- Fulfillment, refunds + fan customer care
+- Rights parties: writers, composers, publishers, artists, labels, master owners and licensors
+- One rights work per Stonefellow catalog track
+- ISWC and PRO work identifiers
+- Composition copyright
+- Master copyright
+- Publisher and territory metadata
+- Composition ownership splits
+- Master ownership splits
+- Track/release license and clearance records
+- Work and release rights-readiness status
 
-Database schema remains **1.3.22**.
+## Ownership math
 
-## Recorded revenue
+Stonefellow stores ownership as integer **basis points**.
 
-Performance Intelligence distinguishes real recorded money from engagement and attribution.
+- 10,000 basis points = 100%
+- Composition ownership must total exactly 100%
+- Master ownership must total exactly 100%
 
-Recorded revenue is:
+A work is rights-ready only when both ownership groups equal exactly 100% and no recorded license is pending, restricted or expired.
 
-- Paid Stonefellow orders
-- Paid membership invoices
-- Less confirmed refunds
+Stonefellow does **not** infer ownership percentages from existing writer/composer credit text.
 
-Campaign-attributed revenue is shown separately because it attributes existing orders; it is **not added again** to revenue.
+## Registration vs readiness
 
-Internal Stonefellow ticket reservations measure demand and check-in. External ticket URLs are not counted as revenue because Stonefellow does not own those external payment records.
+ISWC, PRO work ID and registration status are tracked, but registration is not falsely treated as mandatory for every unreleased work.
 
-## Fan growth
+Supported registration states:
 
-The unified dashboard shows:
+- draft
+- submitted
+- registered
+- not applicable
 
-- Total CRM contacts
-- New contacts in the selected reporting window
-- Total newsletter audience
-- New newsletter opt-ins
-- CRM lifecycle/stage mix
-- Acquisition sources
-- Weekly fan cohorts
-- Customer/member progression
+Rights readiness and registration state remain separate concepts.
 
-## Campaign performance
+## Licensing
 
-Campaign reporting now rolls up:
+Track and release rights can record:
 
-- Participants
-- Conversions
-- Conversion rate
-- Attributed orders
-- Attributed revenue
+- sync
+- mechanical
+- master use
+- sample
+- cover
+- remix
+- name / likeness
+- other
 
-Campaign revenue and participants obey the selected 7/30/90/365-day reporting window.
+Each record may include licensor, status, territory, start/end dates, reference/contract ID, terms and notes.
 
-## Merch + membership
+Pending/restricted/expired clearances block readiness. Cleared licenses expiring within 60 days generate a warning.
 
-Admin can see:
+## Release clearance
 
-- Merch units sold
-- Merch revenue
-- Top products
-- Low-stock warnings
-- Active members
-- Membership tier mix
-- Paid membership invoice revenue
-- Members scheduled to cancel
+Release readiness rolls up:
 
-## Tickets + lifecycle automation
+- every track’s composition ownership
+- every track’s master ownership
+- track-level license blockers
+- release-level licenses
 
-Performance Intelligence includes:
+This gives Admin a single pre-release rights checkpoint without changing the existing Release Builder’s catalog/release authority.
 
-- Reserved ticket/VIP quantity
-- Checked-in quantity
-- Check-in rate
-- Offer capacity/fill
-- Lifecycle automation runs
-- Completion rate
-- Failed runs
-- Waiting runs
+## Catalog migration
 
-Ticket activity obeys the selected reporting window.
+Migration **2026-10-10-024** creates rights work records for the current catalog and safely copies existing descriptive rights metadata where present:
 
-## Customer care
+- title
+- copyright year
+- composition copyright
+- master copyright
+- publisher
+- ISWC / PRO work ID if those fields already exist
 
-The dashboard surfaces:
+The migration does **not** create parties or ownership splits from free-text credits.
 
-- Support cases opened
-- Cases closed
-- Current open cases
-- High/urgent cases
-- Refund requests
-- Confirmed refunds
-- Active shipments
-- Delivered shipments
+## Governance + Agent Brain
 
-## Top supporters
+Rights metadata edits are audited.
 
-Stonefellow ranks supporters by **recorded Stonefellow value** inside the reporting window:
+Ownership split changes are treated as consequential. Split/license deletion requires explicit confirmation.
 
-- Paid orders
-- Paid membership invoices
+Admin Agent Brain records:
 
-Ticket reservation quantity and membership tier are displayed as context but do not inflate revenue.
+- work metadata updates
+- rights party updates
+- ownership split changes
+- license/clearance changes
+- catalog synchronization
 
-## What needs attention
+The Admin Agent routes questions about rights, ownership, splits, ISWC, PRO registration, licensing and clearance to this workspace.
 
-The dashboard uses deterministic thresholds rather than generated guesses.
+Private ownership data is not added to public Agent context.
 
-Current opportunity/warning checks include:
-
-- elevated refund rate
-- high-priority support cases
-- failed lifecycle automations
-- low-converting campaigns with meaningful participation
-- near-capacity ticket/VIP offers
-- memberships scheduled to cancel
-- low-stock merch
-
-If none are triggered, the dashboard reports a clear operating state.
-
-## Admin Agent
-
-The Admin Agent routes questions such as:
-
-- “How is revenue doing?”
-- “Show business performance.”
-- “Who are the top supporters?”
-- “How is campaign ROI?”
-- “What needs attention?”
-- “Show fan growth.”
-
-to Performance Intelligence.
-
-The API also produces one grounded **Admin Agent brief** from the exact metrics already computed for the dashboard. It does not recalculate a second set of numbers.
-
-## Existing listening analytics remain
-
-Section 27 does not remove the existing listening intelligence:
-
-- starts
-- completion
-- skips
-- repeat listening
-- favorites
-- playlists
-- saved builds
-- search/discovery
-- notifications
-- customer libraries
-- per-track analytics
-- per-user inspection
-
-The business layer sits above those existing analytics.
-
-Application: **1.3.26**  
-Database schema target: **1.3.22**
+Application: **1.3.27**  
+Database schema target: **1.3.23**
