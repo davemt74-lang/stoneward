@@ -48,11 +48,19 @@
 - Current tier and benefits in Agent context.
 - VIP/early-access/member-content guidance.
 
-## Regression gate — pending measured GitHub validation
-- PHP syntax required.
-- Public/Admin JavaScript syntax required.
-- Membership Admin JavaScript required.
-- Sections 1–22 inherited suites required.
-- Section 23 executable membership policy suite required.
+## Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public/Admin JavaScript syntax: **PASS**
+- Membership Admin JavaScript: **PASS**
+- Sections 1–22 inherited suites: **PASS**
+- Section 23 executable membership policy suite: **PASS**
+- Explicit assertions: **1282 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 23 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 23 SCORE: **10/10**
+
+## Final measured feature-head result
+- Exact green feature head: `4be7234f15d9a9cd50e495fb3a33339888227345`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1282 passed**
+- Failures: **0**

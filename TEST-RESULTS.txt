@@ -35,4 +35,8 @@ Integration coverage includes:
 - Agent membership context/routing
 - version/capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact green feature head: 4be7234f15d9a9cd50e495fb3a33339888227345
+- Release gate: PASS
+- Explicit assertions: 1282 passed
+- Failures: 0
