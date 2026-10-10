@@ -1,154 +1,130 @@
-# Stonefellow v1.3.20 — Section 21: Merch & Direct-to-Fan Commerce
+# Stonefellow v1.3.21 — Section 22: Fan Segments, Automations & Lifecycle Journeys
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 21 turns the existing Store/order stack into a real merch commerce system while preserving the custom vinyl/cassette builder.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 22 turns the Section 17 CRM, Section 18 Campaigns and Section 21 commerce intelligence into an always-on fan relationship layer.
 
-## Merch products
+Campaigns remain finite promotions. **Lifecycle Automations** are persistent journeys that react to fan behavior over time.
 
-Admin now has **Merch + Products** for database-backed products with:
+## Dynamic fan segments
 
-- title, description and category
-- draft / active / archived lifecycle
-- base price and compare-at price
-- physical / non-physical products
-- manual, self or POD fulfillment classification
-- finite or unlimited inventory
-- low-stock threshold
-- per-order quantity limits
-- tags and featured status
-- reusable Media Library imagery
+Admin now includes reusable **Fan Segments** evaluated from current data rather than copied lists.
 
-Legacy custom vinyl and cassette builder products continue to work alongside the new catalog.
+Segment conditions can use:
 
-## Variants and SKUs
+- CRM stage
+- newsletter consent
+- proactive-Agent permission
+- linked-account state
+- CRM tags
+- contact source
+- contact age
+- days since engagement
+- CRM event history
+- purchased merch product
+- merch spend
+- merch units
+- listening-event count
+- days since listening
 
-Products can have purchasable variants such as:
+Segments support **Match ALL** and **Match ANY** logic and include a live preview/count before they are used.
 
-- size
-- color
-- edition
-- format
-- bundle option
+## Lifecycle triggers
 
-Each variant can have its own:
+Automations support:
 
-- SKU
-- price
-- compare-at price
-- finite / unlimited / inherited inventory
-- quantity
-- low-stock threshold
-- active / archived status
+- Segment entry / match
+- Daily eligibility
+- Newsletter signup
+- Merch purchase
+- Campaign conversion
+- Inactivity threshold
+- Manual run
 
-When active variants exist, the customer must choose a valid available variant.
+CRM-event triggers use the immutable CRM event ID as the trigger key. Segment-entry and inactivity journeys are version-aware. Daily/manual triggers remain controlled by cooldown and max-enrollment limits.
 
-## Inventory governance
+## Journey actions
 
-Finite inventory is enforced server-side.
+Lifecycle actions run sequentially:
 
-At checkout Stonefellow:
+- Wait
+- Add CRM tag
+- Change CRM stage
+- In-app notification
+- Agent message
+- Marketing email
+- Exit journey
 
-1. re-validates live availability,
-2. atomically reserves finite stock,
-3. writes an audited inventory event,
-4. writes the canonical merch order-line record.
+**Wait** persists the fan's exact step and a future due time. A later cron run resumes the same enrollment.
 
-If order creation fails, reserved stock is released.
+## Delivery governance
 
-Cancellation or an eligible refund releases only stock still marked **reserved**. The release is idempotent: the same order cannot restore stock twice.
+Each channel has its own boundary:
 
-When fulfillment becomes **shipped** or **delivered**, the inventory reservation becomes **sold** and is no longer automatically restocked by a later status change.
+- **In-app lifecycle notification:** requires linked account and respects the fan's Lifecycle Messages notification preference.
+- **Agent message:** requires linked account **and** proactive-Agent permission.
+- **Marketing email:** requires newsletter opt-in and includes a fresh unsubscribe link.
+- **CRM tag/stage:** operates only inside the CRM profile.
+- **Activation:** requires explicit Admin confirmation.
+- **Run now:** requires explicit Admin confirmation.
 
-Manual Admin stock adjustments are recorded in the same inventory ledger.
+Saving an active automation automatically pauses it and increments its version. The Admin must review and reactivate the new version.
 
-## Store and checkout
+## Dedupe, retries and reconnect safety
 
-The public Stonefellow Store now supports:
+Lifecycle uses two durable safeguards:
 
-- merch cards
-- Media Library product imagery
-- compare-at pricing
-- variant selection
-- quantities
-- max-per-order rules
-- low-stock messaging
-- sold-out state
-- merch cart lines
-- merch-aware checkout review
-- existing campaign discounts
-- existing digital-track purchases
-- existing custom vinyl/cassette builds
+1. Enrollment uniqueness: automation + fan + trigger key.
+2. Action uniqueness: a persistent dedupe key for every enrollment step.
 
-Merch is added as a new cart line type; the existing checkout architecture is retained.
+A cron retry or reconnect therefore cannot resend a successful action. Failed actions have a bounded retry limit rather than retrying forever.
 
-## Campaign integration
+Automations also support:
 
-Campaign discount nodes can optionally specify product IDs.
+- cooldown hours
+- max enrollments per fan
+- active / paused / archived state
+- per-action success/skip/error ledger
+- complete run history
 
-A product-scoped discount applies only to matching merch line items. It does not accidentally discount unrelated music, custom physical builds or other merchandise.
+## Admin workspace
 
-Campaign entitlement claim/redemption and attribution remain unchanged.
+**Segments + Automations** is a first-class Admin section with:
 
-## CRM and fan intelligence
+- dynamic segment list
+- segment editor and live preview
+- lifecycle journey list
+- sequential Journey Builder
+- trigger and segment configuration
+- cooldown / enrollment caps
+- channel-governance notices
+- Activate / Pause / Archive
+- Run now
+- enrollment history
+- action ledger
+- cron/manual run history
 
-Every merch checkout produces canonical merch line items linked back to the fan when possible.
+Admin Agent can route requests about segments, re-engagement, win-back and lifecycle journeys into this workspace.
 
-Fan CRM profiles expose:
+Lifecycle saves, activation/status changes and manual runs feed Admin Agent Brain.
 
-- product
-- variant
-- SKU
-- quantity
-- spend
-- order ID
-- inventory state
+## Scheduled execution
 
-The CRM timeline also receives a merchandise purchase event.
+`cron-lifecycle.php` is a CLI-only runner:
 
-This allows later segmentation and lifecycle automation to operate on actual buying behavior rather than generic order totals.
+`php cron-lifecycle.php`
 
-## Agent integration
+It evaluates all active lifecycle automations, enrolls newly eligible fans and executes actions that are due.
 
-The public Stonefellow Agent receives active merch catalog context including product names, pricing, variants and current availability.
-
-The Agent may:
-
-- explain products
-- discuss sizes/options
-- report availability
-- surface matching campaigns/offers
-- open the Store
-
-The Agent may **not** reserve stock, complete checkout or charge a customer. Purchase remains a user-confirmed Store action.
-
-Admin Agent Brain records:
-
-- product saves / activation
-- product archive
-- inventory adjustments
-
-Making a product public/active requires explicit Admin confirmation.
-
-## Media Library integration
-
-Every database merch product uses the Section 20 universal Media Library.
-
-Supported product roles include:
-
-- Primary product image
-- Product gallery
-- Video
-- Documents
-
-Media completeness includes dynamic merch products as well as the original custom-media products.
+It is intentionally separate from `cron-notifications.php`; smart listening/release reminders and CRM lifecycle journeys have different governance and dedupe models.
 
 ## Database
 
-Migration **2026-10-10-018** adds:
+Migration **2026-10-10-019** adds:
 
-- `store_products`
-- `store_variants`
-- `store_inventory_events`
-- `store_order_items`
+- `fan_segments`
+- `lifecycle_automations`
+- `lifecycle_enrollments`
+- `lifecycle_action_log`
+- `lifecycle_runs`
 
-Application: **1.3.20**  
-Database schema target: **1.3.17**
+Application: **1.3.21**  
+Database schema target: **1.3.18**

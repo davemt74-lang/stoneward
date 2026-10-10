@@ -36,6 +36,7 @@ jobs:
           node --check admin/assets/campaigns.js
           node --check admin/assets/media.js
           node --check admin/assets/products.js
+          node --check admin/assets/lifecycle-automations.js
           node --check admin/assets/analytics.js
 
       - name: v1.3 regression suites
@@ -63,3 +64,4 @@ jobs:
           php tests/v1318-section19-media-library.php
           php tests/v1319-section20-universal-media.php
           php tests/v1320-section21-merch-commerce.php
+          php tests/v1321-section22-lifecycle-automations.php

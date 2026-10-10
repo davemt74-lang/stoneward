@@ -7,6 +7,7 @@ function sf_notification_categories(): array {
         'recommendation'=>['label'=>'Recommendations','description'=>'Occasional suggestions based on my Stonefellow listening.'],
         'release'=>['label'=>'New releases','description'=>'Tell me when new Stonefellow releases become available.'],
         'build'=>['label'=>'Saved builds','description'=>'Remind me about unfinished custom records or cassettes.'],
+        'lifecycle'=>['label'=>'Fan lifecycle messages','description'=>'Allow in-app messages from Stonefellow fan journeys I qualify for.'],
     ];
 }
 function sf_notification_ensure_schema(): void {

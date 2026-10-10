@@ -1,27 +1,24 @@
-# Stonefellow v1.3.20 — Section 21: Merch & Direct-to-Fan Commerce
+# Stonefellow v1.3.21 — Section 22: Fan Segments, Automations & Lifecycle Journeys
 
-- Added first-class Admin **Merch + Products** workspace.
-- Added database-backed product catalog alongside existing custom vinyl/cassette products.
-- Added draft, active and archived product lifecycle.
-- Added base and compare-at pricing.
-- Added product variants and unique SKUs.
-- Added per-variant pricing and inventory.
-- Added finite, unlimited and inherited inventory modes.
-- Added low-stock thresholds and max-per-order rules.
-- Added audited manual inventory adjustments.
-- Added atomic finite-stock reservation during checkout.
-- Added idempotent inventory restoration for eligible canceled/refunded orders.
-- Added sold inventory state after shipment/delivery.
-- Added canonical merch order-line ledger.
-- Added Media Library product imagery/gallery integration.
-- Added public Store merch cards, variants, quantities, low-stock and sold-out states.
-- Added merch cart and checkout line-item rendering.
-- Preserved digital-track and custom physical-media checkout behavior.
-- Added optional product-scoped Campaign discount offers.
-- Added merch line items and spend to Fan CRM profiles.
-- Added merch buying context to fan Agent context.
-- Added live merch catalog/availability context to the public Agent.
-- Kept checkout and inventory reservation as user-confirmed consequential actions.
-- Added Admin Agent Brain audit for product and inventory operations.
-- Application advances to **1.3.20**.
-- Database schema advances to **1.3.17**.
+- Added first-class Admin **Segments + Automations** workspace.
+- Added dynamic fan segments using CRM, merch and listening data.
+- Added Match ALL / Match ANY rule groups.
+- Added live segment preview and fan count.
+- Added segment-entry, daily, newsletter-signup, merch-purchase, campaign-conversion, inactivity and manual triggers.
+- Added sequential Wait, CRM Tag, CRM Stage, Notification, Agent Message, Email and Exit actions.
+- Added persistent wait/resume journey state.
+- Added database-enforced enrollment dedupe.
+- Added database-enforced action dedupe.
+- Added bounded failed-action retry behavior.
+- Added cooldown and max-enrollment-per-fan safeguards.
+- Added explicit Admin confirmation for activation and Run Now.
+- Editing an active journey now pauses it and increments its version.
+- Added dedicated Lifecycle Messages user notification preference.
+- Lifecycle in-app notification respects that preference.
+- Agent message actions require proactive-Agent permission.
+- Marketing email actions require newsletter opt-in and include unsubscribe.
+- Added enrollment, action and run history.
+- Added CLI-only `cron-lifecycle.php`.
+- Added Admin Agent routing and Agent Brain audit for lifecycle administration.
+- Application advances to **1.3.21**.
+- Database schema advances to **1.3.18**.

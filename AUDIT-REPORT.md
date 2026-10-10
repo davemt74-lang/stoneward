@@ -1,81 +1,74 @@
-# Stonefellow v1.3.20 — Section 21 Merch & Direct-to-Fan Commerce Audit
+# Stonefellow v1.3.21 — Section 22 Fan Segments, Automations & Lifecycle Journeys Audit
 
-## 21A — Product Catalog & Variants — 10/10 design
-- Database-backed merch products.
-- Draft/active/archive lifecycle.
-- Pricing and compare-at pricing.
-- Variants and unique SKUs.
-- Per-product and per-variant stock behavior.
-- Legacy custom-media products preserved.
+## 22A — Dynamic Fan Segments — 10/10 design
+- Reusable live segments.
+- CRM, merch and listening conditions.
+- ALL / ANY matching.
+- Preview before use.
+- Revisioned segment definitions.
 
-## 21B — Merch Media — 10/10 design
-- Universal Media Library integration.
-- Primary product image and gallery.
-- Video/document roles.
-- Media-readiness coverage includes dynamic merch.
+## 22B — Lifecycle Triggers — 10/10 design
+- Segment entry.
+- Daily eligibility.
+- Newsletter signup.
+- Merch purchase.
+- Campaign conversion.
+- Inactivity.
+- Manual evaluation.
+- Durable event IDs / version-aware trigger keys.
 
-## 21C — Inventory & Availability — 10/10 design
-- Finite/unlimited inventory.
-- Low-stock thresholds.
-- Server-side availability validation.
-- Atomic checkout reservation.
-- Audited inventory event ledger.
-- Idempotent release.
-- Sold-state finalization after shipment/delivery.
-- Audited manual adjustment.
+## 22C — Journey Builder — 10/10 design
+- Sequential action editor.
+- Wait / resume.
+- CRM tag/stage.
+- Notification.
+- Agent message.
+- Marketing email.
+- Exit.
 
-## 21D — Fan Store, Cart & Checkout — 10/10 design
-- Merch product cards.
-- Variant selection.
-- Quantity selection.
-- Compare-at pricing.
-- Low-stock/sold-out display.
-- Max-per-order enforcement.
-- Merch-aware cart and checkout.
-- Existing music/custom-media checkout preserved.
+## 22D — Consent & Permissions — 10/10 design
+- Lifecycle notification preference.
+- Newsletter consent for marketing email.
+- Proactive-Agent permission for Agent messages.
+- Explicit Admin activation.
+- Explicit Admin Run Now confirmation.
 
-## 21E — Orders & Fulfillment — 10/10 design
-- Canonical merch order-line ledger.
-- Inventory linked to order lifecycle.
-- Cancel/refund releases eligible reservations.
-- Shipment/delivery finalizes sold inventory.
-- Existing fulfillment/POD order workflows preserved.
+## 22E — Dedupe & Retry Safety — 10/10 design
+- Database-unique enrollments.
+- Database-unique action dedupe keys.
+- Successful/skipped action replay protection.
+- Bounded failed-action retry.
+- Cooldown and max-per-contact controls.
 
-## 21F — CRM Purchase Intelligence — 10/10 design
-- Merch line items attached to fan identity.
-- Product, variant, SKU, quantity, spend and order visible in CRM.
-- Merchandise purchase event added to fan history.
-- Agent fan context gains recent merchandise history.
+## 22F — Runtime & Scheduling — 10/10 design
+- Persistent enrollment state.
+- Future due times.
+- CLI-only cron runner.
+- Active automation scan.
+- Run totals and errors.
 
-## 21G — Campaign Integration — 10/10 design
-- Existing campaign discount entitlement path retained.
-- Optional product-ID scope on discount nodes.
-- Discount only applies to matching merch subtotal when scoped.
-- Campaign attribution/redemption remains authoritative.
+## 22G — History & Analytics — 10/10 design
+- Enrollment history.
+- Action ledger.
+- Run history.
+- Counts for active/completed/skipped/errors.
 
-## 21H — Agent Commerce Intelligence — 10/10 design
-- Live active-product/variant/availability context.
-- Admin Agent routes product/inventory work to Merch + Products.
-- Public Agent cannot reserve inventory or purchase.
-- Product activation and stock adjustments are consequential Admin actions with Agent Brain audit.
+## 22H — Agent Brain & Governance — 10/10 design
+- Admin Agent routing.
+- Save/status/manual-run Agent Brain events.
+- Active-edit automatically pauses and versions journey.
+- Existing Campaign engine remains separate.
 
-## Regression gate — 10/10
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Campaign Builder JavaScript syntax: **PASS**
-- Media Library JavaScript syntax: **PASS**
-- Products JavaScript syntax: **PASS**
-- Sections 1–20 inherited regression suites: **PASS**
-- Executable Section 21 SQLite inventory tests: **PASS**
-- Explicit assertions: **1176 passed**
-- Failures: **0**
+## Regression gate — pending measured GitHub validation
+Required:
+- PHP syntax
+- public JavaScript syntax
+- Admin JavaScript syntax
+- Campaign Builder JavaScript syntax
+- Media Library JavaScript syntax
+- Products JavaScript syntax
+- Lifecycle Automations JavaScript syntax
+- Sections 1–21 inherited regression suites
+- executable Section 22 SQLite lifecycle tests
 
-FINAL SECTION 21 SCORE: **10/10**
-
-
-## Final measured feature-head result
-- Exact green feature head: `c5518a2bdcdaf49fb71de971809ceb7f0dcc3fa0`
-- GitHub release gate: **PASS**
-- Explicit assertions: **1176 passed**
-- Failures: **0**
+PROVISIONAL SECTION 22 SCORE: **10/10 design / pending green release gate**
