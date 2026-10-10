@@ -33,16 +33,16 @@ $ht=file_get_contents($root.'/.htaccess');
 $wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 foreach(['press_kits','press_contacts','press_outreach','press_coverage','press_events'] as $table)ok(substr_count($core,'CREATE TABLE IF NOT EXISTS '.$table)===2,'press schema supports SQLite and MySQL for '.$table);
-ok(str_contains($core,'share_token_hash')&&str_contains($core,"hash('sha256',$raw)"),'private EPK stores a one-way token hash');
+ok(str_contains($core,'share_token_hash')&&str_contains($core,"hash('sha256'"),'private EPK stores a one-way token hash');
 ok(str_contains($core,'hash_equals'),'private token comparison uses constant-time hash comparison');
 ok(str_contains($core,'sf_transactional_email'),'press outreach uses the existing Stonefellow email delivery/outbox');
 ok(str_contains($core,"status']??'')!=='active'")&&str_contains($core,'cannot receive outreach'),'do-not-contact/archived press contacts cannot receive outreach');
-ok(str_contains($core,"($kit['status']??'')==='private'")&&str_contains($core,'valid current private-kit token'),'private EPK outreach requires the current token');
+ok(str_contains($core,"==='private'")&&str_contains($core,'valid current private-kit token'),'private EPK outreach requires the current token');
 ok(str_contains($core,"'queued','sent'")&&str_contains($core,"status='failed'"),'press summary preserves real queued/sent/failed delivery states');
 ok(str_contains($core,"['view','media_click','contact_click','release_play','download_click']"),'EPK analytics are limited to explicit real interaction events');
 ok(!str_contains($core,'opened_at')&&!str_contains($core,'email_open'),'press module does not invent email-open tracking');
 ok(str_contains($core,"'artist_photo'")&&str_contains($core,"'media_artist_photo'"),'public EPK maps existing flat site-media settings correctly');
-ok(!str_contains($core,"'notes'=>(string)$kit['notes']"),'public EPK payload does not expose internal kit notes');
+ok(!str_contains($core,"'notes'=>(string)"),'public EPK payload does not expose internal kit notes');
 
 ok(str_contains($adminApi,"action==='send_outreach'")&&str_contains($adminApi,'confirmed'),'press outreach requires explicit Admin confirmation');
 ok(str_contains($adminApi,"action==='rotate_token'")&&str_contains($adminApi,'confirmed'),'private-link rotation requires explicit Admin confirmation');
