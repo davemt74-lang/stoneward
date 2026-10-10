@@ -1,134 +1,137 @@
-# Stonefellow v1.3.22 — Section 23: Membership & VIP Fan Experience
+# Stonefellow v1.3.23 — Section 24: Ticketing, RSVP & VIP Guest Experiences
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 23 turns the existing subscription/package system into a real fan-membership and VIP experience without creating a second billing system.
+Stonefellow is a **single-artist direct-to-fan platform**. Section 24 turns Shows + Live, Membership + VIP, Campaigns, CRM and lifecycle automation into an operational guest-access system.
 
-## Package-backed membership tiers
+## Ticket and VIP offers
 
-Every existing Monthly Package can optionally act as a membership tier.
+Admin now has a first-class **Tickets + VIP** workspace.
 
-Structured tier configuration:
+Offers are attached to the existing canonical Stonefellow show ID and support:
 
-- membership enabled
-- numeric tier rank
-- member/VIP badge
-- merch discount percentage
-- early-access days
+- RSVP
+- Ticket
+- VIP
+- Meet & Greet
+- Presale
+
+Offer lifecycle:
+
+- Draft
+- Published
+- Paused
+- Closed
+- Archived
+
+Internal Stonefellow reservations are intentionally **free reservation/guest-list actions**. If an offer has a paid price, it must use **External ticket provider** fulfillment with a valid external checkout URL. Stonefellow does not pretend that an RSVP is a paid ticket transaction.
+
+## Capacity and reservations
+
+Internal reservations are account-backed and server-authoritative.
+
+Stonefellow enforces:
+
+- authenticated account
+- CSRF protection
+- unique retry/idempotency request key
+- transactional capacity updates
+- per-fan quantity limit
+- unique human-readable confirmation code
+- cancellation with capacity release
+- reservation state history
+- CRM identity linkage
+
+The offer row is locked on MySQL before per-fan and capacity checks. Capacity increments use a conditional atomic update.
+
+## Membership, VIP and presale access
+
+Offers may require:
+
+- any active membership
+- a minimum membership tier/package
+- minimum membership rank
+- VIP benefit
+- priority-presale benefit
+
+If an offer has not reached its public start time, members with the **priority presale** benefit may gain access when the offer falls inside their membership tier’s configured early-access window.
+
+The public offer payload explains why access is locked, such as:
+
+- sign in required
+- membership required
+- higher tier required
+- VIP required
+- presale required
+- not open yet
+- sold out
+- closed
+
+## Guest list and check-in
+
+Admin Ticketing includes:
+
+- guest list
+- quantity
+- confirmation code
+- reservation state
+- check in
+- confirmation-code check in
+- cancellation
+- CSV export
+
+Check-in is idempotent. A checked-in reservation cannot be cancelled.
+
+## CRM and lifecycle automation
+
+Reservation actions write canonical CRM events:
+
+- `ticket_reserved`
+- `vip_reserved`
+- `ticket_cancelled`
+- `guest_checked_in`
+
+Because CRM events already feed the Section 22 lifecycle engine, these events can immediately power segmentation and automation without a second workflow system.
+
+## Fan experience
+
+The public site adds **Tickets & VIP** to navigation and the chat `+` quick-action menu.
+
+The public Tickets + VIP hub includes:
+
+- active show offers
+- access/lock reason
+- capacity remaining
+- internal RSVP / VIP reservations
+- external official ticket links
+- My Reservations
+- confirmation codes
+- cancellation
+
+Show detail pages also load the current offers for that show.
+
+## Agent integration
+
+The Stonefellow Agent receives active offer context and the signed-in fan’s own reservation context.
+
+It can answer questions about:
+
+- upcoming ticket offers
+- RSVP availability
 - VIP access
-- priority presale
-- member content
-- exclusive downloads
-- member-only offers
+- presales
+- capacity
+- the fan’s confirmation codes/reservations
 
-Stripe/local subscription status remains authoritative.
+The Agent may **not** reserve capacity or check a guest in. Those remain explicit fan/Admin actions.
 
-Active and trialing subscriptions receive membership benefits. A past-due subscription remains active only during its configured billing grace window.
-
-## My Membership
-
-Fans have a dedicated **Membership + VIP** experience from the chat + menu and normal navigation.
-
-It shows:
-
-- current membership tier
-- member badge
-- active benefit summary
-- billing/access window
-- member-exclusive content
-- early-access items
-- membership tier choices
-
-My Account also displays the active membership badge and benefit summary.
-
-## Member / VIP content
-
-Admin → **Membership + VIP** manages gated content:
-
-- posts
-- audio
-- video
-- downloads
-- announcements
-- VIP offers
-
-Each item can define:
-
-- minimum membership tier/package
-- minimum rank
-- publication status
-- public release/start time
-- end time
-- teaser
-- full member content
-- private/external destination
-- featured/sort state
-- Media Library attachments
-
-A future start date becomes an early-access boundary: members whose tier grants enough early-access days can unlock it before the public start time.
-
-VIP-offer content additionally requires the VIP benefit. Download content additionally requires the exclusive-download benefit.
-
-## Secure member media
-
-Media Library supports a new `member_content` relationship type.
-
-Even when an attachment is marked Public inside the Media Library, `api/media.php` rechecks the current user's membership/tier entitlement before serving bytes for member-content links. This prevents sharing a direct media URL from bypassing membership gating.
-
-Download permission remains separate from viewing permission.
-
-## Member commerce benefit
-
-Signed-in members can receive the merch discount configured on their active tier.
-
-The server computes the benefit from authenticated subscription state; the client never supplies a tier or discount percentage.
-
-Cart quotes expose:
-
-- member discount
-- campaign discount
-- total discount
-
-Member and campaign savings may coexist, but their combined value is capped at the subtotal.
-
-## CRM + segmentation
-
-Active members are synchronized to CRM stage `member`.
-
-When membership ends, Stonefellow preserves relationship history:
-
-- fans with purchase history fall back to `customer`
-- otherwise they fall back to `fan`
-
-CRM fan detail includes current membership state.
-
-Dynamic fan segments can now target:
-
-- active/inactive membership
-- specific subscription package/tier IDs
-
-This makes member-only campaigns and lifecycle journeys reusable through the existing segment engine.
-
-## Agent
-
-The Stonefellow Agent understands:
-
-- the fan's current membership tier
-- member badge
-- active benefits
-- VIP access
-- early access
-- merch savings
-- member content/download eligibility
-
-Membership/VIP questions route to the Membership experience.
-
-Admin Agent Brain records membership-content publishing and package/member operations.
+The Admin Agent routes guest-list, ticket, RSVP and check-in requests to the Ticketing workspace.
 
 ## Database
 
-Migration **2026-10-10-020** adds:
+Migration **2026-10-10-021** adds:
 
-- membership metadata columns to `subscription_packages`
-- `membership_content`
+- `ticket_offers`
+- `ticket_reservations`
+- `ticket_events`
 
-Application: **1.3.22**  
-Database schema target: **1.3.19**
+Application: **1.3.23**  
+Database schema target: **1.3.20**

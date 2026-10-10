@@ -1,42 +1,40 @@
-Stonefellow v1.3.22 Section 23 release gate
+Stonefellow v1.3.23 Section 24 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Campaign / Media / Products / Automations JavaScript syntax
-- Membership Admin JavaScript syntax
-- Sections 1–22 inherited regression suites
-- Section 23 Membership & VIP Fan Experience
+- Campaign / Media / Products / Automations / Membership JavaScript syntax
+- Ticketing Admin JavaScript syntax
+- Sections 1–23 inherited regression suites
+- Section 24 Ticketing, RSVP & VIP Guest Experiences
 
-Section 23 executable coverage includes:
-- benefit normalization / discount clamp
-- active/trial membership
-- past-due grace access
-- expired grace rejection
-- canceled membership rejection
-- anonymous member-content rejection
-
-Integration coverage includes:
-- migration 020
-- package-backed membership schema
-- membership content SQLite/MySQL schema
-- package Admin benefit controls
-- public Plans/My Account membership hydration
-- server-side merch discount
-- campaign + member discount cap
-- early access
-- VIP/download benefit gates
-- protected member-media delivery
-- Admin Membership + VIP
-- CRM membership state
-- saved-segment membership targeting
-- Agent membership context/routing
+Section 24 executable/policy coverage includes:
+- public external-offer access
+- internal reservation sign-in gate
+- remaining-capacity calculation
+- future offer lock
+- sold-out lock
+- closed-offer lock
+- migration 021
+- SQLite/MySQL schema
+- paid-offer external checkout policy
+- transactional capacity
+- per-fan reservation limit
+- retry idempotency
+- confirmation codes
+- cancellation capacity release
+- check-in state
+- CRM lifecycle events
+- membership/tier/VIP/presale gates
+- early-access presale behavior
+- public API reserve/cancel
+- Admin offer lifecycle
+- guest-list export
+- public Tickets + VIP experience
+- show-page offers
+- Agent ticket context and non-autonomy
 - version/capability markers
 
-Measured feature-head GitHub Actions result:
-- Exact green feature head: 4be7234f15d9a9cd50e495fb3a33339888227345
-- Release gate: PASS
-- Explicit assertions: 1282 passed
-- Failures: 0
+Measured GitHub Actions result will be recorded before merge.

@@ -1,21 +1,27 @@
-# Stonefellow v1.3.22 — Section 23: Membership & VIP Fan Experience
+# Stonefellow v1.3.23 — Section 24: Ticketing, RSVP & VIP Guest Experiences
 
-- Extended existing Monthly Packages into optional membership/VIP tiers.
-- Added structured tier rank, badge, merch discount, early access, VIP, presale, member-content, download and member-offer benefits.
-- Added first-class Admin Membership + VIP workspace.
-- Added member roster and membership metrics.
-- Added member-exclusive posts, audio, video, downloads, announcements and VIP offers.
-- Added minimum-tier/rank gating.
-- Added tier-driven early-access windows.
-- Added Media Library support for member content.
-- Added server-side membership authorization to direct member-media delivery.
-- Added dedicated public Membership + VIP view.
-- Added Membership action to the chat + menu.
-- Added membership status/benefits to My Account and Plans.
-- Added server-calculated member merch discounts.
-- Kept campaign and member discounts separately visible and subtotal-capped.
-- Added CRM membership state and safe member→customer/fan fallback.
-- Added membership/package targeting to dynamic fan segments.
-- Added Agent membership context and routing.
-- Application advances to **1.3.22**.
-- Database schema advances to **1.3.19**.
+- Added first-class Admin Tickets + VIP workspace.
+- Added RSVP, ticket, VIP, meet-and-greet and presale offer types.
+- Added draft/published/paused/closed/archive offer lifecycle.
+- Added show-linked capacity and claimed-quantity tracking.
+- Added free internal Stonefellow reservations.
+- Enforced external provider checkout for paid offers.
+- Added authenticated, CSRF-protected reservation flow.
+- Added unique reservation request keys for retry idempotency.
+- Added transactional capacity enforcement.
+- Added per-fan reservation limits inside the reservation transaction.
+- Added unique confirmation codes.
+- Added cancellation with capacity release.
+- Added guest list and confirmation-code check-in.
+- Added CSV guest-list export.
+- Added membership, tier/rank, VIP and priority-presale gates.
+- Added member early-access/presale windows using existing membership benefits.
+- Added CRM events for reserve/cancel/check-in.
+- Added lifecycle-automation compatibility through the existing CRM event pipeline.
+- Added public Tickets & VIP hub and My Reservations.
+- Added ticket/VIP offers to show detail pages.
+- Added public navigation and chat + quick action.
+- Added Agent ticket/VIP context and routing.
+- Added policy preventing Agent-autonomous reservation/check-in.
+- Application advances to **1.3.23**.
+- Database schema advances to **1.3.20**.
