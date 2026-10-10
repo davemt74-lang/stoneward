@@ -31,4 +31,8 @@ Integration coverage:
 - Agent Brain audit
 - version/capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact green feature head: 1e80755fed4436d94275811dc3e70300f427ab22
+- Release gate: PASS
+- Explicit assertions: 1429 passed
+- Failures: 0

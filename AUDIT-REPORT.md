@@ -43,6 +43,20 @@
 - Migration integrity checks.
 - Existing modules remain untouched.
 
-## 26H — Regression Safety — pending measured GitHub validation
+## 26H — Regression Safety — 10/10
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Operating Calendar JavaScript syntax: **PASS**
+- Sections 1–25 inherited suites: **PASS**
+- Section 26 executable Operating Calendar suite: **PASS**
+- Explicit assertions: **1429 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 26 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 26 SCORE: **10/10**
+
+## Final measured feature-head result
+- Exact green feature head: `1e80755fed4436d94275811dc3e70300f427ab22`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1429 passed**
+- Failures: **0**
