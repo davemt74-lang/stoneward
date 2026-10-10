@@ -36,4 +36,8 @@ Integration coverage:
 - public Agent segment/journey context
 - version/capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact feature head: 9956a5e63dfdb30c62c987da4a9720ac4c34b60c
+- Release gate: PASS
+- Explicit assertions: 1226 passed
+- Failures: 0
