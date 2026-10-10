@@ -1,34 +1,27 @@
-Stonefellow v1.3.26 Section 27 release gate
+Stonefellow v1.3.27 Section 28 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Analytics JavaScript syntax
-- Sections 1–26 inherited regression suites
-- Section 27 Business Intelligence & Growth Analytics
+- Rights Registry JavaScript syntax
+- Sections 1–27 inherited regression suites
+- Section 28 Rights, Credits & Licensing Registry
 
-Section 27 coverage includes:
-- deterministic percentage calculations
-- deterministic operating warnings/opportunities
-- read-only intelligence contract
-- recorded revenue boundaries
-- paid membership invoice revenue
-- confirmed refunds
-- windowed campaign attribution
-- windowed ticket demand/check-in
-- merch sold-item reporting
-- CRM growth/cohorts
-- automation health
-- customer-care health
-- top supporter recorded value
-- Admin Agent performance routing
-- grounded Agent brief
+Section 28 coverage includes:
+- basis-point ownership math
+- exact 100% split validation
+- under/over-allocation blockers
+- pending/restricted license blockers
+- expiring-license warnings
+- SQLite/MySQL rights schema
+- safe catalog metadata backfill
+- no inferred ownership percentages
+- Admin rights workspace
+- release-clearance rollup
+- explicit confirmation for destructive rights actions
+- Admin audit + Agent Brain integration
 - application/schema capability markers
 
-Measured feature-head GitHub Actions result:
-- Exact green feature head: 3ca08648fdd9c98f73e0d1d71455cdfa32df322d
-- Release gate: PASS
-- Explicit assertions: 1463 passed
-- Failures: 0
+Measured GitHub Actions result will be recorded before merge.

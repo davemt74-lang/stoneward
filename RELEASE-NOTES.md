@@ -1,21 +1,18 @@
-# Stonefellow v1.3.26 — Section 27: Business Intelligence & Growth Analytics
+# Stonefellow v1.3.27 — Section 28: Rights, Credits & Licensing Registry
 
-- Upgraded Admin **Listening + Conversion** to **Performance Intelligence**.
-- Added read-only cross-system growth analytics with no shadow reporting database.
-- Added recorded revenue model: paid orders + paid membership invoices − confirmed refunds.
-- Kept campaign-attributed revenue separate from recorded revenue to prevent double counting.
-- Explicitly excluded external ticket checkout from recorded revenue.
-- Added CRM contact, newsletter, source, stage and weekly cohort growth.
-- Added campaign participant, conversion, attributed-order and attributed-revenue rollups.
-- Added merch unit/revenue/product performance and low-stock intelligence.
-- Added active membership, paid membership invoice revenue and cancellation-risk counts.
-- Added ticket reservation/check-in demand and offer fill rates.
-- Added lifecycle automation completion, waiting and failure reporting.
-- Added customer-care workload, refund and fulfillment health.
-- Added top-supporter ranking using recorded order + membership value.
-- Added deterministic cross-system “What needs attention” signals.
-- Added one grounded Admin Agent performance brief from the same computed metrics.
-- Added Admin Agent routing for revenue, growth, fan value, campaign ROI and business-performance questions.
-- Preserved all existing listening, notification, search, library, track and per-user analytics.
-- Application advances to **1.3.26**.
-- Database schema remains **1.3.22**.
+- Added first-class Admin **Rights + Licensing** workspace.
+- Added reusable rights parties for writers, composers, publishers, artists, labels, master owners and licensors.
+- Added authoritative rights work record for each catalog track.
+- Added ISWC, PRO work ID, copyright, publisher, territory and registration metadata.
+- Added composition ownership and master ownership splits.
+- Stored ownership as integer basis points to avoid floating-point split errors.
+- Added exact 100% composition/master readiness validation.
+- Added track and release license/clearance records.
+- Added pending, restricted, expired and expiring license intelligence.
+- Added release-level rights readiness rollup.
+- Added migration backfill from existing catalog rights metadata without inventing ownership percentages.
+- Added explicit-confirmation boundary for deleting ownership splits and licenses.
+- Added rights changes to Admin audit and Agent Brain.
+- Added Admin Agent routing for rights/ownership/licensing questions.
+- Application advances to **1.3.27**.
+- Database schema advances to **1.3.23**.
