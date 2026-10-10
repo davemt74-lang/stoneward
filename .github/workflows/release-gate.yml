@@ -39,6 +39,7 @@ jobs:
           node --check admin/assets/automations.js
           node --check admin/assets/membership.js
           node --check admin/assets/ticketing.js
+          node --check admin/assets/fulfillment.js
           node --check admin/assets/analytics.js
 
       - name: v1.3 regression suites
@@ -69,3 +70,4 @@ jobs:
           php tests/v1321-section22-fan-automation.php
           php tests/v1322-section23-membership-vip.php
           php tests/v1323-section24-ticketing-vip.php
+          php tests/v1324-section25-fulfillment-care.php

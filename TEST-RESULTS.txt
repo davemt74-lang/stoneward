@@ -1,44 +1,34 @@
-Stonefellow v1.3.23 Section 24 release gate
+Stonefellow v1.3.24 Section 25 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Campaign / Media / Products / Automations / Membership JavaScript syntax
-- Ticketing Admin JavaScript syntax
-- Sections 1–23 inherited regression suites
-- Section 24 Ticketing, RSVP & VIP Guest Experiences
+- Fulfillment Admin JavaScript syntax
+- Sections 1–24 inherited regression suites
+- Section 25 executable fulfillment/care suite
 
-Section 24 executable/policy coverage includes:
-- public external-offer access
-- internal reservation sign-in gate
-- remaining-capacity calculation
-- future offer lock
-- sold-out lock
-- closed-offer lock
-- migration 021
+Section 25 coverage:
 - SQLite/MySQL schema
-- paid-offer external checkout policy
-- transactional capacity
-- per-fan reservation limit
-- retry idempotency
-- confirmation codes
-- cancellation capacity release
-- check-in state
-- CRM lifecycle events
-- membership/tier/VIP/presale gates
-- early-access presale behavior
-- public API reserve/cancel
-- Admin offer lifecycle
-- guest-list export
-- public Tickets + VIP experience
-- show-page offers
-- Agent ticket context and non-autonomy
-- version/capability markers
+- migration 022
+- shipment states
+- shipment retry idempotency
+- order fulfillment synchronization
+- refund request vs confirm
+- partial/full refund states
+- safe return restocking
+- order-owned support cases
+- support message idempotency
+- Admin case controls
+- fan order self-service
+- CRM/lifecycle events
+- Agent context/restrictions
+- Admin Agent Brain
+- application/schema capability markers
 
 Measured feature-head GitHub Actions result:
-- Exact green feature head: 4a4facf16299224658ed8f0b1a1d0a0253b90a97
+- Exact green feature head: 565522f2c0f079a73e76b2f6b9ee5fc6aedf38ea
 - Release gate: PASS
-- Explicit assertions: 1333 passed
+- Explicit assertions: 1389 passed
 - Failures: 0

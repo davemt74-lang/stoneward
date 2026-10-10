@@ -1,137 +1,127 @@
-# Stonefellow v1.3.23 — Section 24: Ticketing, RSVP & VIP Guest Experiences
+# Stonefellow v1.3.24 — Section 25: Orders, Fulfillment & Fan Customer Care
 
-Stonefellow is a **single-artist direct-to-fan platform**. Section 24 turns Shows + Live, Membership + VIP, Campaigns, CRM and lifecycle automation into an operational guest-access system.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 25 completes the post-purchase layer behind the merch, membership, campaign and ticketing stack.
 
-## Ticket and VIP offers
+## Fulfillment + Care
 
-Admin now has a first-class **Tickets + VIP** workspace.
+Admin now has a first-class **Fulfillment + Care** workspace.
 
-Offers are attached to the existing canonical Stonefellow show ID and support:
+It combines:
 
-- RSVP
-- Ticket
-- VIP
-- Meet & Greet
-- Presale
+- physical-order fulfillment queue
+- shipment/tracking records
+- delivery/exception/return states
+- refund requests and confirmations
+- explicit returned-inventory restocking
+- fan support cases
+- support conversations
+- case priority/status management
 
-Offer lifecycle:
+## Shipment lifecycle
 
-- Draft
-- Published
-- Paused
+Shipment records support:
+
+- Label created
+- In transit
+- Out for delivery
+- Delivered
+- Exception
+- Returned
+- Canceled
+
+Each shipment has its own request key, carrier, service, tracking number/URL, ETA, note and timestamps.
+
+Shipment actions synchronize the customer-visible order summary and existing merchandise inventory state. Shipped/delivered orders finalize reserved inventory as sold.
+
+## Refunds and returns
+
+Refunds use their own ledger.
+
+A refund starts as **requested**. It does not claim that money moved.
+
+Admin must explicitly confirm a refund after the payment-provider/manual process is complete. Confirmed refunds record the provider reference and update the order as partially or fully refunded.
+
+Restocking is separate from refund confirmation.
+
+- Unshipped reserved inventory can be released safely.
+- Shipped/delivered merchandise is not silently restocked.
+- A physical return must be recorded before sold inventory is explicitly restocked.
+
+This prevents a refund button from accidentally increasing stock for merchandise the customer still has.
+
+## Fan customer care
+
+Signed-in fans can open a case directly from their own Order Details page.
+
+Issue types include:
+
+- order status
+- shipping
+- damaged item
+- wrong item
+- refund
+- download
+- billing
+- other
+
+Fans can reply to their own cases and close them. Admin can reply, set priority and move cases through:
+
+- Open
+- Waiting on fan
+- Waiting on Admin
+- Resolved
 - Closed
-- Archived
 
-Internal Stonefellow reservations are intentionally **free reservation/guest-list actions**. If an offer has a paid price, it must use **External ticket provider** fulfillment with a valid external checkout URL. Stonefellow does not pretend that an RSVP is a paid ticket transaction.
+Support messages use idempotent request keys.
 
-## Capacity and reservations
+## CRM + lifecycle
 
-Internal reservations are account-backed and server-authoritative.
+Stonefellow records CRM events including:
 
-Stonefellow enforces:
+- order shipped/delivered/returned
+- refund requested/confirmed
+- support case opened
 
-- authenticated account
-- CSRF protection
-- unique retry/idempotency request key
-- transactional capacity updates
-- per-fan quantity limit
-- unique human-readable confirmation code
-- cancellation with capacity release
-- reservation state history
-- CRM identity linkage
-
-The offer row is locked on MySQL before per-fan and capacity checks. Capacity increments use a conditional atomic update.
-
-## Membership, VIP and presale access
-
-Offers may require:
-
-- any active membership
-- a minimum membership tier/package
-- minimum membership rank
-- VIP benefit
-- priority-presale benefit
-
-If an offer has not reached its public start time, members with the **priority presale** benefit may gain access when the offer falls inside their membership tier’s configured early-access window.
-
-The public offer payload explains why access is locked, such as:
-
-- sign in required
-- membership required
-- higher tier required
-- VIP required
-- presale required
-- not open yet
-- sold out
-- closed
-
-## Guest list and check-in
-
-Admin Ticketing includes:
-
-- guest list
-- quantity
-- confirmation code
-- reservation state
-- check in
-- confirmation-code check in
-- cancellation
-- CSV export
-
-Check-in is idempotent. A checked-in reservation cannot be cancelled.
-
-## CRM and lifecycle automation
-
-Reservation actions write canonical CRM events:
-
-- `ticket_reserved`
-- `vip_reserved`
-- `ticket_cancelled`
-- `guest_checked_in`
-
-Because CRM events already feed the Section 22 lifecycle engine, these events can immediately power segmentation and automation without a second workflow system.
+Because CRM events already feed the lifecycle engine, order and customer-care activity can become segment/automation triggers without a second workflow system.
 
 ## Fan experience
 
-The public site adds **Tickets & VIP** to navigation and the chat `+` quick-action menu.
+Order Details now includes:
 
-The public Tickets + VIP hub includes:
+- shipment history
+- carrier/tracking links
+- ETA
+- refund/return status
+- support-case history
+- fan replies
+- Get help with this order
 
-- active show offers
-- access/lock reason
-- capacity remaining
-- internal RSVP / VIP reservations
-- external official ticket links
-- My Reservations
-- confirmation codes
-- cancellation
-
-Show detail pages also load the current offers for that show.
+Only the authenticated order owner can access these records.
 
 ## Agent integration
 
-The Stonefellow Agent receives active offer context and the signed-in fan’s own reservation context.
+The public Agent receives the signed-in fan’s own recent order, fulfillment, refund and support-case status.
 
-It can answer questions about:
+It may explain status and route the fan to their account. It may **not**:
 
-- upcoming ticket offers
-- RSVP availability
-- VIP access
-- presales
-- capacity
-- the fan’s confirmation codes/reservations
+- ship an order
+- confirm or reject a refund
+- restock a return
+- close a support case
+- reserve inventory
+- charge money
 
-The Agent may **not** reserve capacity or check a guest in. Those remain explicit fan/Admin actions.
-
-The Admin Agent routes guest-list, ticket, RSVP and check-in requests to the Ticketing workspace.
+The Admin Agent routes shipment, tracking, refund, return and support-case requests to Fulfillment + Care.
 
 ## Database
 
-Migration **2026-10-10-021** adds:
+Migration **2026-10-10-022** adds:
 
-- `ticket_offers`
-- `ticket_reservations`
-- `ticket_events`
+- `order_shipments`
+- `order_refunds`
+- `support_cases`
+- `support_messages`
+- `order_ops_events`
 
-Application: **1.3.23**  
-Database schema target: **1.3.20**
+Application: **1.3.24**  
+Database schema target: **1.3.21**
