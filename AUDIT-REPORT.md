@@ -1,62 +1,56 @@
-# Stonefellow v1.3.25 — Section 26 Release & Promotion Operating Calendar Audit
+# Stonefellow v1.3.26 — Section 27 Business Intelligence & Growth Analytics Audit
 
-## 26A — Unified Native Calendar — 10/10 design
-- Releases remain authoritative for release dates.
-- Shows remain authoritative for show dates.
-- Campaign/Ticket/Member content windows remain authoritative.
-- Scheduled automation timing is surfaced.
-- Native and plan events are visibly distinguished.
+## 27A — Unified Intelligence Model — 10/10 design
+- Reads existing authoritative source systems.
+- No duplicate reporting database.
+- One reporting-window contract across business metrics.
+- Existing listening analytics preserved.
 
-## 26B — Launch Plans & Templates — 10/10 design
-- Single, album, show, campaign and custom templates.
-- Target-relative milestone dates.
-- Direct-to-fan operational checklist.
+## 27B — Recorded Revenue — 10/10 design
+- Paid Stonefellow orders.
+- Paid membership invoices.
+- Confirmed refunds deducted.
+- Campaign attribution kept separate.
+- External ticket checkout excluded from recorded revenue.
 
-## 26C — Dependencies & Readiness — 10/10 design
-- Server-enforced dependencies.
-- Blocking milestones.
-- Overdue calculation.
-- Completion percentage.
-- Ready/not-ready score.
+## 27C — Fan Growth & Value — 10/10 design
+- CRM acquisition.
+- Newsletter opt-in growth.
+- Lifecycle/stage mix.
+- Acquisition sources.
+- Weekly cohorts.
+- Top supporter recorded value.
 
-## 26D — Admin Operating Workspace — 10/10 design
-- First-class navigation.
-- Unified timeline.
-- Launch-plan cards.
-- Plan editor.
-- Milestone editor.
-- Completion and drag ordering.
+## 27D — Campaign / Commerce Intelligence — 10/10 design
+- Campaign participation and conversion.
+- Windowed attributed orders/revenue.
+- Merch units/revenue/product ranking.
+- Low-stock intelligence.
 
-## 26E — Source Safety — 10/10 design
-- Calendar milestone completion never publishes source content.
-- Source dates are read-only projections.
-- Plan deletion does not delete source entities.
+## 27E — Membership / Ticket / Automation Intelligence — 10/10 design
+- Active members and membership revenue.
+- Cancellation-risk count.
+- Ticket reservation/check-in demand.
+- Offer fill.
+- Automation completion/failure/waiting.
 
-## 26F — Agent / Agent Brain — 10/10 design
-- Admin Agent route.
-- Agent-ready operating context.
-- Admin audit.
-- Agent Brain plan/milestone events.
+## 27F — Customer-Care Intelligence — 10/10 design
+- Open/high-priority support load.
+- Cases opened/closed.
+- Refund workload.
+- Shipment/delivery state.
 
-## 26G — Migration / Integrity — 10/10 design
-- SQLite/MySQL plan and milestone schema.
-- Migration integrity checks.
-- Existing modules remain untouched.
+## 27G — Agent Intelligence — 10/10 design
+- Admin Agent routing for growth/performance questions.
+- One Agent-ready brief generated from already-computed dashboard data.
+- Deterministic opportunity signals, not generated guesses.
 
-## 26H — Regression Safety — 10/10
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Operating Calendar JavaScript syntax: **PASS**
-- Sections 1–25 inherited suites: **PASS**
-- Section 26 executable Operating Calendar suite: **PASS**
-- Explicit assertions: **1429 passed**
-- Failures: **0**
+## 27H — Regression Safety — pending measured GitHub validation
+- PHP syntax required.
+- Public JavaScript syntax required.
+- Admin JavaScript syntax required.
+- Analytics JavaScript syntax required.
+- Sections 1–26 inherited suites required.
+- Section 27 executable intelligence suite required.
 
-FINAL SECTION 26 SCORE: **10/10**
-
-## Final measured feature-head result
-- Exact green feature head: `1e80755fed4436d94275811dc3e70300f427ab22`
-- GitHub release gate: **PASS**
-- Explicit assertions: **1429 passed**
-- Failures: **0**
+PROVISIONAL SECTION 27 SCORE: **10/10 design / pending green release gate**

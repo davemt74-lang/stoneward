@@ -1,125 +1,163 @@
-# Stonefellow v1.3.25 — Section 26: Release & Promotion Operating Calendar
+# Stonefellow v1.3.26 — Section 27: Business Intelligence & Growth Analytics
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 26 gives the Admin and Agent one operating view across the release, campaign, show, ticket, membership and automation systems already built.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 27 turns the existing listening dashboard into a unified **Performance Intelligence** workspace across the systems completed through Section 26.
 
-## One calendar, authoritative source dates
+## One read-only intelligence layer
 
-The Operating Calendar does **not** copy release dates, show dates, campaign windows or ticket windows into a second system.
+Section 27 does not create a second reporting database and does not copy business state into shadow tables.
 
-It reads native dates directly from:
+It reads the authoritative systems directly:
 
-- Releases
-- Shows + Live
-- Campaigns
-- Tickets + VIP
-- Member / VIP content
-- Scheduled lifecycle automations
+- Listening + conversion telemetry
+- Fan CRM
+- Campaigns + attribution
+- Merch + products
+- Orders
+- Membership billing
+- Tickets + VIP reservations
+- Lifecycle automations
+- Fulfillment, refunds + fan customer care
 
-Those events appear as **native source events**.
+Database schema remains **1.3.22**.
 
-Stonefellow stores only the operating plans and milestones used to coordinate work around those dates.
+## Recorded revenue
 
-## Launch plans
+Performance Intelligence distinguishes real recorded money from engagement and attribution.
 
-Admin → **Operating Calendar** can create:
+Recorded revenue is:
 
-- Single release plan
-- Album release plan
-- Show launch plan
-- Campaign launch plan
-- Custom plan
+- Paid Stonefellow orders
+- Paid membership invoices
+- Less confirmed refunds
 
-A plan has:
+Campaign-attributed revenue is shown separately because it attributes existing orders; it is **not added again** to revenue.
 
-- name
-- target date/time
-- timezone
-- status
-- optional primary release/show
-- notes
-- milestones
-- readiness score
+Internal Stonefellow ticket reservations measure demand and check-in. External ticket URLs are not counted as revenue because Stonefellow does not own those external payment records.
 
-Plan states:
+## Fan growth
 
-- Draft
-- Active
-- Completed
-- Archived
+The unified dashboard shows:
 
-## Templates
+- Total CRM contacts
+- New contacts in the selected reporting window
+- Total newsletter audience
+- New newsletter opt-ins
+- CRM lifecycle/stage mix
+- Acquisition sources
+- Weekly fan cohorts
+- Customer/member progression
 
-Templates seed practical direct-to-fan milestones around one target date.
+## Campaign performance
 
-Single/album plans include work such as:
+Campaign reporting now rolls up:
 
-- master approval
-- credits / metadata / ISRC
-- artwork
-- Campaign Builder journey
-- merch / physical offers
-- newsletter and fan segment
-- VIP / presale / member access
-- QA
-- release day
-- post-release follow-up
-- analytics review
+- Participants
+- Conversions
+- Conversion rate
+- Attributed orders
+- Attributed revenue
 
-Show plans include ticket/VIP setup, campaign/presale, poster/media, fan communication, guest-list QA and post-show archive work.
+Campaign revenue and participants obey the selected 7/30/90/365-day reporting window.
 
-Campaign plans include audience, landing page/media, messaging, entitlement/conversion QA, launch and conversion review.
+## Merch + membership
 
-## Dependencies and blockers
+Admin can see:
 
-Each milestone can have:
+- Merch units sold
+- Merch revenue
+- Top products
+- Low-stock warnings
+- Active members
+- Membership tier mix
+- Paid membership invoice revenue
+- Members scheduled to cancel
 
-- due date/time
-- type
-- owner/team label
-- priority
-- blocking flag
-- dependency
-- status
-- notes
+## Tickets + lifecycle automation
 
-A downstream milestone cannot be marked complete until its dependency is complete.
+Performance Intelligence includes:
 
-Readiness calculates:
+- Reserved ticket/VIP quantity
+- Checked-in quantity
+- Check-in rate
+- Offer capacity/fill
+- Lifecycle automation runs
+- Completion rate
+- Failed runs
+- Waiting runs
 
-- percent complete
-- overdue milestones
-- dependency-blocked milestones
-- open launch blockers
-- next milestone
-- ready/not-ready state
+Ticket activity obeys the selected reporting window.
 
-## Unified timeline
+## Customer care
 
-The Admin timeline merges native source dates and operating milestones.
+The dashboard surfaces:
 
-Each row clearly identifies whether it came from:
+- Support cases opened
+- Cases closed
+- Current open cases
+- High/urgent cases
+- Refund requests
+- Confirmed refunds
+- Active shipments
+- Delivered shipments
 
-- the native source system, or
-- an operating plan
+## Top supporters
 
-This prevents the calendar from silently changing a release, show, campaign or ticket date.
+Stonefellow ranks supporters by **recorded Stonefellow value** inside the reporting window:
 
-## Agent + Agent Brain
+- Paid orders
+- Paid membership invoices
 
-Admin Agent commands such as “show the release calendar,” “launch readiness,” or “open the launch plan” route to Operating Calendar.
+Ticket reservation quantity and membership tier are displayed as context but do not inflate revenue.
 
-Plan saves and milestone completions are audited. Significant plan operations feed Admin Agent Brain.
+## What needs attention
 
-The core also exposes an internal Agent-ready summary with active plans, overdue work, blockers, seven-day workload and the next 30 days of calendar activity.
+The dashboard uses deterministic thresholds rather than generated guesses.
 
-The Agent does not publish a release, campaign, ticket offer or merch product merely because a calendar milestone is completed.
+Current opportunity/warning checks include:
 
-## Database
+- elevated refund rate
+- high-priority support cases
+- failed lifecycle automations
+- low-converting campaigns with meaningful participation
+- near-capacity ticket/VIP offers
+- memberships scheduled to cancel
+- low-stock merch
 
-Migration **2026-10-10-023** adds:
+If none are triggered, the dashboard reports a clear operating state.
 
-- `operating_plans`
-- `operating_milestones`
+## Admin Agent
 
-Application: **1.3.25**  
+The Admin Agent routes questions such as:
+
+- “How is revenue doing?”
+- “Show business performance.”
+- “Who are the top supporters?”
+- “How is campaign ROI?”
+- “What needs attention?”
+- “Show fan growth.”
+
+to Performance Intelligence.
+
+The API also produces one grounded **Admin Agent brief** from the exact metrics already computed for the dashboard. It does not recalculate a second set of numbers.
+
+## Existing listening analytics remain
+
+Section 27 does not remove the existing listening intelligence:
+
+- starts
+- completion
+- skips
+- repeat listening
+- favorites
+- playlists
+- saved builds
+- search/discovery
+- notifications
+- customer libraries
+- per-track analytics
+- per-user inspection
+
+The business layer sits above those existing analytics.
+
+Application: **1.3.26**  
 Database schema target: **1.3.22**

@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.25',
+  'stonefellow'=>'1.3.26',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
@@ -50,6 +50,8 @@ echo json_encode([
   'order_fulfillment'=>'shipments-tracking-delivery-returns-refunds',
   'fan_customer_care'=>'order-linked-cases-messaging-self-service-crm-agent',
   'operating_calendar'=>'native-source-timeline-launch-plans-milestones-dependencies-readiness',
+  'growth_intelligence'=>'recorded-revenue-crm-campaign-merch-membership-ticket-automation-care-fan-value',
+  'growth_opportunities'=>'cross-system-thresholds-agent-ready-brief',
   'launch_templates'=>'single-album-show-campaign-custom',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',

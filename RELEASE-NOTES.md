@@ -1,16 +1,21 @@
-# Stonefellow v1.3.25 — Section 26: Release & Promotion Operating Calendar
+# Stonefellow v1.3.26 — Section 27: Business Intelligence & Growth Analytics
 
-- Added first-class Admin Operating Calendar.
-- Added native-source timeline for releases, shows, campaigns, ticket windows, member content and scheduled automations.
-- Kept native systems authoritative; calendar source events are read-only projections.
-- Added Single Release, Album Release, Show Launch, Campaign Launch and Custom plan templates.
-- Added target-date offset milestones.
-- Added milestone owner, priority, type, blocking flag, dependency, status and notes.
-- Added server-enforced milestone dependencies.
-- Added completion percentage, overdue count, dependency blocking, launch blockers and ready/not-ready scoring.
-- Added launch-plan detail and drag ordering.
-- Added governed plan deletion.
-- Added Admin Agent routing for launch/readiness/calendar requests.
-- Added Admin audit / Agent Brain events for plan and milestone operations.
-- Application advances to **1.3.25**.
-- Database schema advances to **1.3.22**.
+- Upgraded Admin **Listening + Conversion** to **Performance Intelligence**.
+- Added read-only cross-system growth analytics with no shadow reporting database.
+- Added recorded revenue model: paid orders + paid membership invoices − confirmed refunds.
+- Kept campaign-attributed revenue separate from recorded revenue to prevent double counting.
+- Explicitly excluded external ticket checkout from recorded revenue.
+- Added CRM contact, newsletter, source, stage and weekly cohort growth.
+- Added campaign participant, conversion, attributed-order and attributed-revenue rollups.
+- Added merch unit/revenue/product performance and low-stock intelligence.
+- Added active membership, paid membership invoice revenue and cancellation-risk counts.
+- Added ticket reservation/check-in demand and offer fill rates.
+- Added lifecycle automation completion, waiting and failure reporting.
+- Added customer-care workload, refund and fulfillment health.
+- Added top-supporter ranking using recorded order + membership value.
+- Added deterministic cross-system “What needs attention” signals.
+- Added one grounded Admin Agent performance brief from the same computed metrics.
+- Added Admin Agent routing for revenue, growth, fan value, campaign ROI and business-performance questions.
+- Preserved all existing listening, notification, search, library, track and per-user analytics.
+- Application advances to **1.3.26**.
+- Database schema remains **1.3.22**.

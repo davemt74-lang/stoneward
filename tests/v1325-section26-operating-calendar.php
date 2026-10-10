@@ -62,7 +62,9 @@ ok(str_contains($adminApi,'explicit Admin confirmation'),'plan deletion is gover
 ok(str_contains($adminJs,"openView('calendar')")&&str_contains($adminJs,'launch readiness'),'Admin Agent routes launch/calendar requests to Operating Calendar');
 ok(str_contains($core,'function sf_calendar_agent_context')&&str_contains($core,'OPERATING CALENDAR'),'calendar exposes an internal Agent-ready operational summary');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.25'")&&str_contains($version,"'database_schema_target'=>'1.3.22'"),'version endpoint reports app 1.3.25 and schema 1.3.22');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app26);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema26);
+ok(isset($app26[1],$app26[2],$app26[3],$schema26[1],$schema26[2],$schema26[3])&&[(int)$app26[1],(int)$app26[2],(int)$app26[3]]>=[1,3,25]&&[(int)$schema26[1],(int)$schema26[2],(int)$schema26[3]]>=[1,3,22],'version endpoint reports app v1.3.25 or later and schema v1.3.22 or later');
 ok(str_contains($version,"'operating_calendar'=>'native-source-timeline-launch-plans-milestones-dependencies-readiness'"),'version endpoint advertises Operating Calendar capability');
 ok(str_contains($wf,'node --check admin/assets/operating-calendar.js')&&str_contains($wf,'php tests/v1325-section26-operating-calendar.php'),'release gate includes Operating Calendar JS and Section 26 suite');
 echo "Stonefellow v1.3.25 Section 26 Release & Promotion Operating Calendar audit: PASS\n";
