@@ -45,12 +45,21 @@
 - One Agent-ready brief generated from already-computed dashboard data.
 - Deterministic opportunity signals, not generated guesses.
 
-## 27H — Regression Safety — pending measured GitHub validation
-- PHP syntax required.
-- Public JavaScript syntax required.
-- Admin JavaScript syntax required.
-- Analytics JavaScript syntax required.
-- Sections 1–26 inherited suites required.
-- Section 27 executable intelligence suite required.
+## 27H — Regression Safety — 10/10
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Analytics JavaScript syntax: **PASS**
+- Sections 1–26 inherited suites: **PASS**
+- Section 27 executable intelligence suite: **PASS**
+- Explicit assertions: **1463 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 27 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 27 SCORE: **10/10**
+
+
+## Final measured feature-head result
+- Exact green feature head: `3ca08648fdd9c98f73e0d1d71455cdfa32df322d`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1463 passed**
+- Failures: **0**
