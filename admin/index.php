@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.19');
+define('SF_ADMIN_BUILD','1.3.20');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -21,6 +21,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/admin.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/campaigns.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/media.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/products.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
 </head>
 <body>
   <div id="adminApp" class="admin-app">
@@ -36,17 +37,18 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="shows"><span>07</span>Shows + Live</button>
         <button type="button" data-view="crm"><span>08</span>Fans + CRM</button>
         <button type="button" data-view="campaigns"><span>09</span>Campaigns</button>
-        <button type="button" data-view="knowledge"><span>10</span>Knowledge Base</button>
-        <button type="button" data-view="orders"><span>11</span>Orders</button>
-        <button type="button" data-view="pod"><span>12</span>POD Handoffs</button>
-        <button type="button" data-view="users"><span>13</span>Users + Tokens</button>
-        <button type="button" data-view="packages"><span>14</span>Monthly Packages</button>
-        <button type="button" data-view="ai"><span>15</span>AI Providers</button>
-        <button type="button" data-view="brain"><span>16</span>Agent Brain</button>
-        <button type="button" data-view="customer"><span>17</span>Customer Lifecycle</button>
-        <button type="button" data-view="analytics"><span>18</span>Listening + Conversion</button>
-        <button type="button" data-view="operations"><span>19</span>Operations</button>
-        <button type="button" data-view="settings"><span>20</span>Settings</button>
+        <button type="button" data-view="products"><span>10</span>Merch + Products</button>
+        <button type="button" data-view="knowledge"><span>11</span>Knowledge Base</button>
+        <button type="button" data-view="orders"><span>12</span>Orders</button>
+        <button type="button" data-view="pod"><span>13</span>POD Handoffs</button>
+        <button type="button" data-view="users"><span>14</span>Users + Tokens</button>
+        <button type="button" data-view="packages"><span>15</span>Monthly Packages</button>
+        <button type="button" data-view="ai"><span>16</span>AI Providers</button>
+        <button type="button" data-view="brain"><span>17</span>Agent Brain</button>
+        <button type="button" data-view="customer"><span>18</span>Customer Lifecycle</button>
+        <button type="button" data-view="analytics"><span>19</span>Listening + Conversion</button>
+        <button type="button" data-view="operations"><span>20</span>Operations</button>
+        <button type="button" data-view="settings"><span>21</span>Settings</button>
       </nav>
       <div class="sidebar-foot"><span id="adminStatusDot"></span><span>Local admin</span></div>
     </aside>
@@ -77,5 +79,6 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/media.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/products.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
 </body>
 </html>

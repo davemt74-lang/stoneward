@@ -64,6 +64,8 @@ if($action==='update_fulfillment'){
     $note=sf_clean_text($b['note']??'',1000);$now=gmdate('c');$previous=(string)($o['fulfillment']['status']??'pending');
     $o['fulfillment']=['status'=>$status,'carrier'=>$carrier,'tracking_number'=>$tracking,'tracking_url'=>$trackingUrl,'note'=>$note,'updated_at'=>$now,'updated_by'=>(int)$me['id']];
     $o['timeline']=is_array($o['timeline']??null)?$o['timeline']:[];$o['timeline'][]=['type'=>'fulfillment','status'=>$status,'label'=>'Fulfillment '.ucwords(str_replace('_',' ',$status)),'created_at'=>$now];
+    if($status==='canceled'&&!in_array($previous,['shipped','delivered'],true))sf_commerce_release_order_inventory($id,'fulfillment_canceled',(int)$me['id']);
+    if(in_array($status,['shipped','delivered'],true))sf_commerce_mark_order_sold($id);
     sf_admin_order_write($o);
     sf_admin_order_sync_pod($id,$status);
     $uid=(int)($o['user_id']??0);
@@ -90,7 +92,7 @@ if($action==='update_fulfillment'){
 if($action==='update_order_status'){
     $id=sf_clean_text($b['id']??'',100);$o=sf_read_order($id);if(!$o)sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);$target=(string)($b['status']??'');$allowed=['canceled','refund_requested','refunded'];if(!in_array($target,$allowed,true))sf_json_response(['ok'=>false,'message'=>'Invalid order state.'],422);
     $provider=(string)($o['payment']['provider']??'');$method=(string)($o['payment']['method']??'');if($target==='refunded'&&!in_array($provider,['test','cash_simulation'],true)&&!in_array($method,['test','cash'],true))sf_json_response(['ok'=>false,'message'=>'This payment requires a provider-side refund. Mark it refund requested until the payment provider confirms the refund.'],422);
-    $previous=(string)($o['status']??'');$now=gmdate('c');$o['status']=$target;if($target==='refunded')$o['payment']['status']='refunded';if($target==='canceled'&&!empty($o['quote']['physical'])){$o['fulfillment']['status']='canceled';$o['fulfillment']['updated_at']=$now;sf_admin_order_sync_pod($id,'canceled');}$o['timeline']=is_array($o['timeline']??null)?$o['timeline']:[];$o['timeline'][]=['type'=>'order_status','status'=>$target,'label'=>ucwords(str_replace('_',' ',$target)),'created_at'=>$now];sf_admin_order_write($o);
+    $previous=(string)($o['status']??'');$now=gmdate('c');$o['status']=$target;if($target==='refunded')$o['payment']['status']='refunded';if(in_array($target,['canceled','refunded'],true)&&!in_array((string)($o['fulfillment']['status']??''),['shipped','delivered'],true))sf_commerce_release_order_inventory($id,'order_'.$target,(int)$me['id']);if($target==='canceled'&&!empty($o['quote']['physical'])){$o['fulfillment']['status']='canceled';$o['fulfillment']['updated_at']=$now;sf_admin_order_sync_pod($id,'canceled');}$o['timeline']=is_array($o['timeline']??null)?$o['timeline']:[];$o['timeline'][]=['type'=>'order_status','status'=>$target,'label'=>ucwords(str_replace('_',' ',$target)),'created_at'=>$now];sf_admin_order_write($o);
     $uid=(int)($o['user_id']??0);if($uid>0){$label='Order '.$id.' is now '.ucwords(str_replace('_',' ',$target)).'.';sf_notify_user($uid,'order',$label,'','?view=order&id='.rawurlencode($id));sf_log_user_activity($uid,'order_status',$label,'order',$id,['from'=>$previous,'to'=>$target]);}sf_log_admin_action((int)$me['id'],'order_status_updated','order',$id,['from'=>$previous,'to'=>$target]);sf_json_response(['ok'=>true,'order'=>sf_admin_order_public($o),'csrf'=>sf_admin_csrf()]);
 }
 if($action==='retry_pod'){

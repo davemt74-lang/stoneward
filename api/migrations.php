@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.16';
+const SF_DB_SCHEMA_TARGET = '1.3.17';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -175,6 +175,13 @@ function sf_migration_definitions(): array {
             'revision'=>'1',
             'apply'=>function(): void { sf_media_ensure_schema(); sf_media_backfill_universal(); },
         ],
+        [
+            'id'=>'2026-10-10-018',
+            'app_version'=>'1.3.20',
+            'description'=>'Merch product catalog, variants, audited inventory reservations, direct commerce and CRM purchase intelligence',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_commerce_ensure_schema(); },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
@@ -334,7 +341,7 @@ function sf_migration_integrity_report(): array {
         'subscription_packages','user_token_balances','token_ledger','user_subscriptions','user_trial_history',
         'agent_conversations','agent_messages','agent_brain_decisions','account_action_tokens',
         'transactional_email_outbox','billing_webhook_events','billing_invoices','billing_audit_log',
-        'user_notifications','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','catalog_search_events','user_collections','user_collection_items','fan_contacts','fan_crm_events','fan_agent_engagements','community_posts','campaigns','campaign_segments','campaign_participants','campaign_events','campaign_entitlements','campaign_message_runs','media_assets','media_links','user_activity','listening_events','provider_health_checks','admin_audit_log',
+        'user_notifications','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','catalog_search_events','user_collections','user_collection_items','fan_contacts','fan_crm_events','fan_agent_engagements','community_posts','campaigns','campaign_segments','campaign_participants','campaign_events','campaign_entitlements','campaign_message_runs','media_assets','media_links','store_products','store_variants','store_inventory_events','store_order_items','user_activity','listening_events','provider_health_checks','admin_audit_log',
         'site_event_log','auth_attempts','order_request_keys','user_favorites','user_listening_progress','user_playlists','user_playlist_tracks','user_track_feedback','agent_listening_sessions','agent_listening_session_tracks','user_play_queue','schema_migrations','schema_upgrade_runs'
     ];
     $checks=[];$ok=true;

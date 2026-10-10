@@ -1,77 +1,81 @@
-# Stonefellow v1.3.19 — Section 20 Universal Media Integration & Publishing Audit
+# Stonefellow v1.3.20 — Section 21 Merch & Direct-to-Fan Commerce Audit
 
-## 20A — Release Media — 10/10 design
-- Central Media Library embedded in Release Builder.
-- Front/back cover, labels, social art, photos, video, PDFs/documents and archive roles.
-- Manual artwork/archive path entry removed from live Release Builder.
-- Published primary artwork synchronizes canonical release data.
+## 21A — Product Catalog & Variants — 10/10 design
+- Database-backed merch products.
+- Draft/active/archive lifecycle.
+- Pricing and compare-at pricing.
+- Variants and unique SKUs.
+- Per-product and per-variant stock behavior.
+- Legacy custom-media products preserved.
 
-## 20B — Shows & Live Archive — 10/10 design
-- Poster, photo, alternate/live audio, video, document and archive media.
-- Manual poster and archive-media path entry removed.
-- Published poster synchronizes canonical Show data.
-- Public Show page can render explicitly public Media Library assets.
+## 21B — Merch Media — 10/10 design
+- Universal Media Library integration.
+- Primary product image and gallery.
+- Video/document roles.
+- Media-readiness coverage includes dynamic merch.
 
-## 20C — Campaign Builder Media — 10/10 design
-- Dedicated Media tab.
-- Hero, background, offer-artwork, video, document and archive roles.
-- Manual campaign artwork path field removed.
-- Public campaign payload includes public Media Library relationships.
+## 21C — Inventory & Availability — 10/10 design
+- Finite/unlimited inventory.
+- Low-stock thresholds.
+- Server-side availability validation.
+- Atomic checkout reservation.
+- Audited inventory event ledger.
+- Idempotent release.
+- Sold-state finalization after shipment/delivery.
+- Audited manual adjustment.
 
-## 20D — Store Media — 10/10 design
-- Per-product Media Library manager.
-- Primary and gallery imagery.
-- Storefront API and cards consume managed public media.
+## 21D — Fan Store, Cart & Checkout — 10/10 design
+- Merch product cards.
+- Variant selection.
+- Quantity selection.
+- Compare-at pricing.
+- Low-stock/sold-out display.
+- Max-per-order enforcement.
+- Merch-aware cart and checkout.
+- Existing music/custom-media checkout preserved.
 
-## 20E — Site / Artist Media — 10/10 design
-- Logo, hero, artist photo, social-share art and app icon.
-- Canonical site metadata updated by explicit publish.
-- Public shell/About page uses published assets.
+## 21E — Orders & Fulfillment — 10/10 design
+- Canonical merch order-line ledger.
+- Inventory linked to order lifecycle.
+- Cancel/refund releases eligible reservations.
+- Shipment/delivery finalizes sold inventory.
+- Existing fulfillment/POD order workflows preserved.
 
-## 20F — Usage Intelligence — 10/10 design
-- Asset usage list resolves entity names and roles.
-- Public/download state shown.
-- Linked assets cannot be destructively deleted.
-- Managed-storage and unused-asset totals available.
+## 21F — CRM Purchase Intelligence — 10/10 design
+- Merch line items attached to fan identity.
+- Product, variant, SKU, quantity, spend and order visible in CRM.
+- Merchandise purchase event added to fan history.
+- Agent fan context gains recent merchandise history.
 
-## 20G — Agent Media Operations — 10/10 design
-- Attach/detach/publish actions feed Admin Agent Brain.
-- Missing/broken/unused media queries route to Media Library.
-- Consequential publishing remains explicit.
+## 21G — Campaign Integration — 10/10 design
+- Existing campaign discount entitlement path retained.
+- Optional product-ID scope on discount nodes.
+- Discount only applies to matching merch subtotal when scoped.
+- Campaign attribution/redemption remains authoritative.
 
-## 20H — Completeness Dashboard — 10/10 design
-- Missing song audio/artwork.
-- Missing release covers.
-- Missing show posters.
-- Missing campaign heroes.
-- Missing store imagery.
-- Missing site roles.
-- Broken files.
-- Public/private relationship mismatch.
-- Storage and unused-media totals.
-
-## Migration & backward compatibility — 10/10 design
-- Migration 017 only adds universal relationship backfill.
-- Existing Section 19 media tables remain canonical.
-- Existing public paths are preserved.
-- Legacy local media is copied/registered safely.
+## 21H — Agent Commerce Intelligence — 10/10 design
+- Live active-product/variant/availability context.
+- Admin Agent routes product/inventory work to Merch + Products.
+- Public Agent cannot reserve inventory or purchase.
+- Product activation and stock adjustments are consequential Admin actions with Agent Brain audit.
 
 ## Regression gate — 10/10
 - PHP syntax: **PASS**
-- Public JS syntax: **PASS**
-- Admin JS syntax: **PASS**
-- Campaign Builder JS syntax: **PASS**
-- Media Library JS syntax: **PASS**
-- Sections 1–19 regression suites: **PASS**
-- Section 20 suite: **PASS**
-- Explicit assertions: **1122 passed**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Campaign Builder JavaScript syntax: **PASS**
+- Media Library JavaScript syntax: **PASS**
+- Products JavaScript syntax: **PASS**
+- Sections 1–20 inherited regression suites: **PASS**
+- Executable Section 21 SQLite inventory tests: **PASS**
+- Explicit assertions: **1176 passed**
 - Failures: **0**
 
-FINAL SECTION 20 SCORE: **10/10**
+FINAL SECTION 21 SCORE: **10/10**
 
 
 ## Final measured feature-head result
-- Exact feature head: `5de47fa6604c207a516385522696925986345497`
+- Exact green feature head: `c5518a2bdcdaf49fb71de971809ceb7f0dcc3fa0`
 - GitHub release gate: **PASS**
-- Explicit assertions: **1122 passed**
+- Explicit assertions: **1176 passed**
 - Failures: **0**

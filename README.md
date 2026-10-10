@@ -1,142 +1,154 @@
-# Stonefellow v1.3.19 — Section 20: Universal Media Integration & Publishing
+# Stonefellow v1.3.20 — Section 21: Merch & Direct-to-Fan Commerce
 
-Stonefellow is a **single-artist direct-to-fan platform**. Section 20 extends the v1.3.18 Media Library from songs to every major publishing surface.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 21 turns the existing Store/order stack into a real merch commerce system while preserving the custom vinyl/cassette builder.
 
-## Universal Media Library
+## Merch products
 
-The same reusable Media Library now powers:
+Admin now has **Merch + Products** for database-backed products with:
 
-- Songs
-- Releases
-- Shows / Live Archive
-- Campaigns
-- Store products
-- Public site / artist media
+- title, description and category
+- draft / active / archived lifecycle
+- base price and compare-at price
+- physical / non-physical products
+- manual, self or POD fulfillment classification
+- finite or unlimited inventory
+- low-stock threshold
+- per-order quantity limits
+- tags and featured status
+- reusable Media Library imagery
 
-Uploads are still stored privately under `storage/media/` and delivered through the controlled media endpoint. Public visibility and download permission remain separate.
+Legacy custom vinyl and cassette builder products continue to work alongside the new catalog.
 
-## 20A — Release Media
+## Variants and SKUs
 
-Release editing now uses the Media Library instead of typed paths or a separate artwork uploader.
+Products can have purchasable variants such as:
 
-Supported release roles:
+- size
+- color
+- edition
+- format
+- bundle option
 
-- Front cover
-- Back cover
-- Label — Side A
-- Label — Side B
-- Social square
-- Social story
-- Photos
-- Video
-- Documents / liner-note PDFs
-- Archive media
+Each variant can have its own:
 
-Publishing an artwork role updates the canonical release record. Existing legacy archive links are preserved.
+- SKU
+- price
+- compare-at price
+- finite / unlimited / inherited inventory
+- quantity
+- low-stock threshold
+- active / archived status
 
-## 20B — Shows & Live Archive
+When active variants exist, the customer must choose a valid available variant.
 
-Show editing now supports:
+## Inventory governance
 
-- Poster
-- Photos
-- Alternate / live audio
-- Video
-- Documents
-- Archive / memorabilia
+Finite inventory is enforced server-side.
 
-This replaces the old poster-path and archive-media text fields.
+At checkout Stonefellow:
 
-Publishing a Poster updates the canonical Show record. Public Show pages load additional public Media Library relationships.
+1. re-validates live availability,
+2. atomically reserves finite stock,
+3. writes an audited inventory event,
+4. writes the canonical merch order-line record.
 
-## 20C — Campaign Builder Media
+If order creation fails, reserved stock is released.
 
-Campaign Builder now has a dedicated **Media** tab.
+Cancellation or an eligible refund releases only stock still marked **reserved**. The release is idempotent: the same order cannot restore stock twice.
 
-Supported campaign roles:
+When fulfillment becomes **shipped** or **delivered**, the inventory reservation becomes **sold** and is no longer automatically restocked by a later status change.
 
-- Hero artwork
-- Background
-- Offer artwork
-- Video
-- Documents
-- Archive/supporting media
+Manual Admin stock adjustments are recorded in the same inventory ledger.
 
-Publishing Hero updates the campaign's canonical artwork field. Public campaign payloads include public campaign-media relationships.
+## Store and checkout
 
-## 20D — Store Media
+The public Stonefellow Store now supports:
 
-The Media Library dashboard lists current store products and opens a product-specific media manager.
+- merch cards
+- Media Library product imagery
+- compare-at pricing
+- variant selection
+- quantities
+- max-per-order rules
+- low-stock messaging
+- sold-out state
+- merch cart lines
+- merch-aware checkout review
+- existing campaign discounts
+- existing digital-track purchases
+- existing custom vinyl/cassette builds
 
-Store roles:
+Merch is added as a new cart line type; the existing checkout architecture is retained.
+
+## Campaign integration
+
+Campaign discount nodes can optionally specify product IDs.
+
+A product-scoped discount applies only to matching merch line items. It does not accidentally discount unrelated music, custom physical builds or other merchandise.
+
+Campaign entitlement claim/redemption and attribution remain unchanged.
+
+## CRM and fan intelligence
+
+Every merch checkout produces canonical merch line items linked back to the fan when possible.
+
+Fan CRM profiles expose:
+
+- product
+- variant
+- SKU
+- quantity
+- spend
+- order ID
+- inventory state
+
+The CRM timeline also receives a merchandise purchase event.
+
+This allows later segmentation and lifecycle automation to operate on actual buying behavior rather than generic order totals.
+
+## Agent integration
+
+The public Stonefellow Agent receives active merch catalog context including product names, pricing, variants and current availability.
+
+The Agent may:
+
+- explain products
+- discuss sizes/options
+- report availability
+- surface matching campaigns/offers
+- open the Store
+
+The Agent may **not** reserve stock, complete checkout or charge a customer. Purchase remains a user-confirmed Store action.
+
+Admin Agent Brain records:
+
+- product saves / activation
+- product archive
+- inventory adjustments
+
+Making a product public/active requires explicit Admin confirmation.
+
+## Media Library integration
+
+Every database merch product uses the Section 20 universal Media Library.
+
+Supported product roles include:
 
 - Primary product image
 - Product gallery
+- Video
+- Documents
 
-The storefront API resolves public product imagery from Media Library relationships. Store cards display managed product imagery automatically.
+Media completeness includes dynamic merch products as well as the original custom-media products.
 
-## 20E — Site & Artist Media
+## Database
 
-Admin Settings now embeds a Site & Artist Media panel for:
+Migration **2026-10-10-018** adds:
 
-- Logo
-- Hero/background
-- Artist photos
-- Social-share artwork
-- App icon
+- `store_products`
+- `store_variants`
+- `store_inventory_events`
+- `store_order_items`
 
-Published site media becomes canonical site metadata.
-
-The public experience uses it for:
-
-- header/splash logo
-- Agent-stage hero background
-- Open Graph image
-- favicon
-- About-page artist photo
-
-## 20F — Media Usage Intelligence
-
-Each asset can show every place it is used:
-
-- entity type
-- entity name
-- role
-- public/private state
-- downloadable state
-
-Deletion remains blocked while an asset is referenced.
-
-## 20G — Agent Media Operations
-
-Media attach/detach/publish operations are recorded in Admin Agent Brain.
-
-Admin Agent requests such as missing artwork, unused media, broken media, media completeness, or attaching/reusing artwork route to the Media Library.
-
-Consequential publish/detach actions remain explicit Admin operations.
-
-## 20H — Media Completeness Dashboard
-
-Media Library now reports:
-
-- total managed assets
-- storage use
-- unused assets
-- broken stored files
-- songs missing audio
-- songs missing artwork
-- releases missing front cover
-- shows missing poster
-- published/scheduled campaigns missing hero artwork
-- store products missing media
-- missing site-media roles
-- public records pointing to Media Library assets that are no longer public
-
-## Upgrade
-
-Migration **2026-10-09-017** backfills existing release/show/campaign media into the universal relationship model where local files are available.
-
-It does not replace canonical public paths during migration. Publishing a replacement remains an explicit Admin action.
-
-Application: **1.3.19**  
-Database schema target: **1.3.16**
+Application: **1.3.20**  
+Database schema target: **1.3.17**

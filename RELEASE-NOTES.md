@@ -1,24 +1,27 @@
-# Stonefellow v1.3.19 — Section 20: Universal Media Integration & Publishing
+# Stonefellow v1.3.20 — Section 21: Merch & Direct-to-Fan Commerce
 
-- Extended central Media Library beyond songs.
-- Replaced live Release Builder artwork/path controls with Media Library upload/reuse controls.
-- Added front/back cover, label artwork, social artwork, photos, video, documents and archive roles.
-- Replaced Show poster/archive path entry with Media Library controls.
-- Added show poster, photo, alternate-audio, video, document and archive roles.
-- Added Campaign Builder Media tab.
-- Added campaign hero, background, offer-artwork, video, document and archive roles.
-- Added Store product media management from Media Library.
-- Added storefront product imagery from Media Library relationships.
-- Added Site & Artist Media controls for logo, hero, artist photo, social share and app icon.
-- Added public logo/hero/favicon/Open Graph/About-photo usage.
-- Added universal asset-usage intelligence.
-- Added media completeness dashboard and storage totals.
-- Added broken-file, unused-asset and public/private mismatch detection.
-- Added missing-media detection for songs, releases, shows, campaigns, store products and site roles.
-- Added universal publish action that synchronizes primary image roles back to canonical release/show/campaign/site records.
-- Added release/show public media galleries using public Media Library relationships.
-- Added public campaign supporting media.
-- Added Agent Brain audit for universal media attachment/detachment/publishing.
-- Added migration 017 to backfill existing release/show/campaign local media.
-- Application advances to **1.3.19**.
-- Database schema advances to **1.3.16**.
+- Added first-class Admin **Merch + Products** workspace.
+- Added database-backed product catalog alongside existing custom vinyl/cassette products.
+- Added draft, active and archived product lifecycle.
+- Added base and compare-at pricing.
+- Added product variants and unique SKUs.
+- Added per-variant pricing and inventory.
+- Added finite, unlimited and inherited inventory modes.
+- Added low-stock thresholds and max-per-order rules.
+- Added audited manual inventory adjustments.
+- Added atomic finite-stock reservation during checkout.
+- Added idempotent inventory restoration for eligible canceled/refunded orders.
+- Added sold inventory state after shipment/delivery.
+- Added canonical merch order-line ledger.
+- Added Media Library product imagery/gallery integration.
+- Added public Store merch cards, variants, quantities, low-stock and sold-out states.
+- Added merch cart and checkout line-item rendering.
+- Preserved digital-track and custom physical-media checkout behavior.
+- Added optional product-scoped Campaign discount offers.
+- Added merch line items and spend to Fan CRM profiles.
+- Added merch buying context to fan Agent context.
+- Added live merch catalog/availability context to the public Agent.
+- Kept checkout and inventory reservation as user-confirmed consequential actions.
+- Added Admin Agent Brain audit for product and inventory operations.
+- Application advances to **1.3.20**.
+- Database schema advances to **1.3.17**.
