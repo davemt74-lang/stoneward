@@ -51,6 +51,11 @@ function sf_site_settings(): array {
         'social_spotify'=>sf_meta_get('site.social_spotify',''),
         'privacy_text'=>sf_meta_get('site.privacy_text',''),
         'terms_text'=>sf_meta_get('site.terms_text',''),
+        'media_logo'=>sf_meta_get('site.media_logo',''),
+        'media_hero'=>sf_meta_get('site.media_hero',''),
+        'media_social_share'=>sf_meta_get('site.media_social_share',''),
+        'media_app_icon'=>sf_meta_get('site.media_app_icon',''),
+        'media_artist_photo'=>sf_meta_get('site.media_artist_photo',''),
     ];
 }
 function sf_site_settings_update(array $data): array {

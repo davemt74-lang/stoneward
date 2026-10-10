@@ -65,7 +65,7 @@
     if(!c||!f)return;
     const d=new FormData(f);
     c.name=String(d.get('name')||'').trim();c.slug=String(d.get('slug')||'').trim();c.goal=String(d.get('goal')||'fan_acquisition');
-    c.headline=String(d.get('headline')||'').trim();c.body_text=String(d.get('body_text')||'').trim();c.artwork=String(d.get('artwork')||'').trim();
+    c.headline=String(d.get('headline')||'').trim();c.body_text=String(d.get('body_text')||'').trim();
     c.starts_at=String(d.get('starts_at')||'');c.ends_at=String(d.get('ends_at')||'');
   }
   function captureLanding(){
@@ -94,11 +94,11 @@
       '<label class="field">Starts<input name="starts_at" type="datetime-local" value="'+esc((c.starts_at||'').slice(0,16))+'"></label>'+
       '<label class="field">Ends<input name="ends_at" type="datetime-local" value="'+esc((c.ends_at||'').slice(0,16))+'"></label>'+
       '<label class="field span2">Public headline<input name="headline" value="'+esc(c.headline||'')+'"></label>'+
-      '<label class="field span2">Artwork / image path<input name="artwork" value="'+esc(c.artwork||'')+'"></label>'+
+
       '<label class="field span3">Public campaign copy<textarea name="body_text">'+esc(c.body_text||'')+'</textarea></label></form>'+
       (saved?'<div class="campaign-public-link"><span>'+badge(c.status)+'</span><code>/campaign/'+esc(c.slug)+'</code><button class="secondary" type="button" id="copyCampaignUrl">Copy URL</button></div>':'')+
-      '<div class="campaign-tabs">'+[['builder','Builder'],['landing','Landing Page'],['participants','Participants'],['analytics','Analytics']].map(function(x){return '<button type="button" data-campaign-tab="'+x[0]+'" class="'+(tab===x[0]?'active':'')+'">'+x[1]+'</button>'}).join('')+'</div>'+
-      '<div id="campaignTabBody">'+(tab==='builder'?builderHtml(e):tab==='landing'?landingHtml(c):tab==='participants'?participantsHtml(e):analyticsHtml(e))+'</div>'+
+      '<div class="campaign-tabs">'+[['builder','Builder'],['media','Media'],['landing','Landing Page'],['participants','Participants'],['analytics','Analytics']].map(function(x){return '<button type="button" data-campaign-tab="'+x[0]+'" class="'+(tab===x[0]?'active':'')+'">'+x[1]+'</button>'}).join('')+'</div>'+
+      '<div id="campaignTabBody">'+(tab==='builder'?builderHtml(e):tab==='media'?campaignMediaHtml(c):tab==='landing'?landingHtml(c):tab==='participants'?participantsHtml(e):analyticsHtml(e))+'</div>'+
       '<div id="campaignSimulation" class="campaign-simulation">'+((e.simulation||[]).length?'<strong>Simulation path</strong>'+e.simulation.map(function(x){return '<span>'+esc(x)+'</span>'}).join(''):'')+'</div>';
     $('#campaignBack').onclick=function(){ctx.openView('campaigns')};
     $('#campaignValidate').onclick=validateGraph;$('#campaignSimulate').onclick=simulateGraph;$('#campaignSave').onclick=function(){saveCampaign(null)};
@@ -106,7 +106,11 @@
     const dup=$('#campaignDuplicate');if(dup)dup.onclick=duplicateCampaign;
     const copy=$('#copyCampaignUrl');if(copy)copy.onclick=function(){const base=location.href.replace(/admin\/.*$/,'');navigator.clipboard&&navigator.clipboard.writeText(base+'campaign/'+c.slug);say('Campaign URL copied.')};
     $$('[data-campaign-tab]',canvas).forEach(function(b){b.onclick=function(){switchTab(b.dataset.campaignTab)}});
-    if(tab==='builder')bindBuilder();if(tab==='landing'){const f=$('#campaignLandingForm');if(f)f.oninput=captureLanding}
+    if(tab==='builder')bindBuilder();if(tab==='media'&&Number(c.id)>0)window.SFMediaAdmin?.bindEntityMedia?.('campaign',String(c.id),{roles:['hero','background','offer_artwork','video','document','archive'],publishRoles:['hero','background','offer_artwork']});if(tab==='landing'){const f=$('#campaignLandingForm');if(f)f.oninput=captureLanding}
+  }
+  function campaignMediaHtml(c){
+    if(!window.SFMediaAdmin)return '<div class="empty">Media module unavailable.</div>';
+    return '<section class="panel"><div class="panel-title"><div><h2>Campaign media</h2><p>Hero artwork, background imagery, offer artwork, video and downloadable/supporting documents from the central Media Library.</p></div></div>'+window.SFMediaAdmin.entitySection('campaign',Number(c.id)>0?String(c.id):'',{roles:['hero','background','offer_artwork','video','document','archive'],publishRoles:['hero','background','offer_artwork']})+'</section>';
   }
   function builderHtml(e){
     const g=e.campaign.graph||defaultGraph(),selected=(g.nodes||[]).find(function(n){return n.id===e.selected})||null;

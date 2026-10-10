@@ -38,7 +38,8 @@ ok($md['category']==='audio'&&$md['extension']==='mp3','MP3 signature/MIME valid
 $core=file_get_contents($root.'/api/media-core.php');$boot=file_get_contents($root.'/api/bootstrap.php');$mig=file_get_contents($root.'/api/migrations.php');$adminUpload=file_get_contents($root.'/admin/api/media-upload.php');$adminApi=file_get_contents($root.'/admin/api/media.php');$delivery=file_get_contents($root.'/api/media.php');$linksApi=file_get_contents($root.'/api/media-links.php');$adminJs=file_get_contents($root.'/admin/assets/admin.js');$agent=file_get_contents($root.'/api/agent-runtime.php');$mediaJs=file_get_contents($root.'/admin/assets/media.js');$mediaCss=file_get_contents($root.'/admin/assets/media.css');$app=file_get_contents($root.'/assets/js/app.js');$siteCss=file_get_contents($root.'/assets/css/site.css');$finalize=file_get_contents($root.'/admin/api/finalize.php');$adminShell=file_get_contents($root.'/admin/index.php');$version=file_get_contents($root.'/version.php');$wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/media-core.php'"),'Media Library core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.15'"),'database schema advances to 1.3.15');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db19);
+ok(isset($db19[1],$db19[2],$db19[3])&&[(int)$db19[1],(int)$db19[2],(int)$db19[3]]>=[1,3,15],'database schema remains v1.3.15 or later');
 ok(str_contains($mig,"'id'=>'2026-10-09-016'")&&str_contains($mig,'sf_media_ensure_schema')&&str_contains($mig,'sf_media_backfill_catalog'),'migration 016 installs Media Library schema and backfills existing catalog media');
 ok(substr_count($core,'CREATE TABLE IF NOT EXISTS media_assets')===2,'media_assets schema supports SQLite and MySQL');
 ok(substr_count($core,'CREATE TABLE IF NOT EXISTS media_links')===2,'media_links schema supports SQLite and MySQL');
@@ -83,7 +84,9 @@ ok(str_contains($adminApi,'track_primary_audio_published')&&str_contains($adminA
 ok(str_contains($adminUpload,'sf_agent_brain_log')&&str_contains($adminApi,'sf_agent_brain_log'),'media uploads and primary publishes feed Admin Agent Brain');
 ok(str_contains($agent,'sf_media_public_links')&&str_contains($agent,'public media'),'public Agent context includes only explicitly public song-media relationships');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.18'")&&str_contains($version,"'database_schema_target'=>'1.3.15'"),'version endpoint reports app 1.3.18 and schema 1.3.15');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app19);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema19);
+ok(isset($app19[1],$app19[2],$app19[3],$schema19[1],$schema19[2],$schema19[3])&&[(int)$app19[1],(int)$app19[2],(int)$app19[3]]>=[1,3,18]&&[(int)$schema19[1],(int)$schema19[2],(int)$schema19[3]]>=[1,3,15],'version endpoint reports app v1.3.18 or later and schema v1.3.15 or later');
 ok(str_contains($version,"'audio_metadata'=>'ffprobe-wav-riff-mp3-frame-id3-fallback'"),'version endpoint advertises audio metadata extraction capability');
 ok(str_contains($wf,'node --check admin/assets/media.js')&&str_contains($wf,'php tests/v1318-section19-media-library.php'),'release gate includes Media Library JavaScript and Section 19 regression tests');
 

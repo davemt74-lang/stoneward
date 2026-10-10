@@ -1,43 +1,30 @@
-Stonefellow v1.3.18 Section 19 release gate
+Stonefellow v1.3.19 Section 20 release gate
 ===========================================
 
 Required:
-- PHP syntax across runtime/admin/tests
+- PHP syntax
 - Public JavaScript syntax
 - Admin JavaScript syntax
 - Campaign Builder JavaScript syntax
 - Media Library JavaScript syntax
-- Sections 1–18 inherited regression suites
-- Section 19 Media Uploads & Asset Library
+- Sections 1–19 regression suites
+- Section 20 Universal Media Integration & Publishing
 
-Section 19 measured coverage includes:
-- SQLite/MySQL media schema
-- migration 016
-- SHA-256 deduplication
-- upload authentication
-- MIME/signature validation
-- FFprobe capability
-- WAV fallback duration/sample rate/channels/bit depth/bitrate
-- MP3 fallback duration/bitrate/sample rate/channels/ID3
-- image derivative pipeline
-- controlled delivery and HTTP Range
-- public vs downloadable permissions
-- top-level Media Library
-- Song Media uploader categories
-- existing asset picker
-- audio roles
-- explicit primary audio/artwork actions
-- drag ordering
-- detach/delete rules
-- old folder importer integration
-- migration backfill
-- public song media
-- public Agent media context
-- Admin audit / Agent Brain media events
-- application/schema capability markers
+Section 20 coverage:
+- migration 017 and universal backfill
+- Release Builder Media Library controls
+- Show Media Library controls
+- Campaign Builder Media tab
+- Store product imagery
+- Site/artist media
+- public release/show/campaign media rendering
+- canonical primary-media synchronization
+- usage intelligence
+- storage totals
+- unused/broken media
+- completeness dashboard
+- public/private mismatch detection
+- Agent Brain universal media audit
+- version/schema markers
 
-Measured feature-head GitHub Actions result:
-- Exact feature head: 6f64f4152b3011ce4437d270c803cbd119fc8eeb
-- Release gate: PASS
-- Explicit assertions: 1060 passed
-- Failures: 0
+Measured GitHub Actions result will be recorded before merge.
