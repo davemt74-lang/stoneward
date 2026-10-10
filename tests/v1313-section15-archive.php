@@ -21,7 +21,7 @@ $app=src('assets/js/app.js');$admin=src('admin/assets/admin.js');$catalogApi=src
 ok(str_contains($app,'function renderArchive(')&&str_contains($app,'archive-timeline'),'public Music Archive workspace exists');
 ok(str_contains($app,'function versionTracksFor(')&&str_contains($app,'Other versions'),'track pages connect alternate recordings');
 ok(str_contains($app,'archiveMediaHtml')&&str_contains($app,'Personnel'),'track/release archive media and personnel are surfaced');
-ok(str_contains($admin,'Archive + version history')&&str_contains($admin,'Attached media'),'Admin exposes structured archive editing');
+ok(str_contains($admin,'Archive + version history')&&(str_contains($admin,'trackMediaPanel')||str_contains($admin,'Attached media')),'Admin exposes structured archive editing with Media Library attachments');
 ok(str_contains($catalogApi,"'alternate_track_ids'")&&str_contains($catalogApi,"'personnel'")&&str_contains($catalogApi,"'media'"),'catalog API validates structured archive relationships');
 ok(str_contains($releaseApi,"stonefellow.release.v2")&&str_contains($releaseApi,"'liner_notes'")&&str_contains($releaseApi,"'archive'"),'release API persists liner notes, credits, editions and archive context');
 ok(str_contains($search,"'archive'=>sf_search_string_values"),'catalog search indexes archive metadata');

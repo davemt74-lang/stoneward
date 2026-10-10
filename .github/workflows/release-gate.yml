@@ -60,3 +60,4 @@ jobs:
           php tests/v1316-section17-community-toggle.php
           php tests/v1317-section18-campaigns.php
           php tests/v1318-section19-media-library.php
+          php tests/v1319-section20-universal-media.php

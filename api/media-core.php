@@ -140,3 +140,47 @@ function sf_media_publish_track_audio(string $trackId,int $linkId): array {
     $old=(string)($catalog[$idx]['audio']??'');$new='api/media.php?id='.rawurlencode((string)$r['uuid']);$catalog[$idx]['audio']=$new;if((float)$r['duration_seconds']>0)$catalog[$idx]['duration']=(int)round((float)$r['duration_seconds']);$catalog[$idx]['media_primary_asset']=(int)$r['asset_id'];if(function_exists('sf_admin_write_catalog'))sf_admin_write_catalog($catalog);else throw new RuntimeException('Catalog writer unavailable.');
     sf_db()->prepare("UPDATE media_links SET role='audio_candidate',public_visible=0,updated_at=? WHERE entity_type='track' AND entity_id=? AND role='primary_audio' AND id<>?")->execute([gmdate('c'),$trackId,$linkId]);sf_db()->prepare("UPDATE media_links SET public_visible=1,role='primary_audio',updated_at=? WHERE id=?")->execute([gmdate('c'),$linkId]);return ['track'=>$catalog[$idx],'previous_audio'=>$old,'asset'=>sf_media_asset((int)$r['asset_id'])];
 }
+
+
+function sf_media_managed_url(array $asset,string $variant='original'): string {
+    $url='api/media.php?id='.rawurlencode((string)($asset['uuid']??''));
+    if($variant!==''&&$variant!=='original')$url.='&variant='.rawurlencode($variant);
+    return $url;
+}
+function sf_media_entity_label(string $type,string $id): string {
+    if($type==='track'){foreach(sf_catalog() as $t)if((string)($t['id']??'')===$id)return (string)($t['title']??$id);}
+    if($type==='release'){$p=SF_ROOT.'/data/releases.json';$rows=is_file($p)?json_decode((string)file_get_contents($p),true):[];foreach((array)$rows as $x)if((string)($x['id']??'')===$id)return (string)($x['title']??$id);}
+    if($type==='show'){$p=SF_ROOT.'/data/shows.json';$rows=is_file($p)?json_decode((string)file_get_contents($p),true):[];foreach((array)$rows as $x)if((string)($x['id']??'')===$id)return (string)($x['title']??$x['venue']??$id);}
+    if($type==='campaign'){sf_campaign_ensure_schema();$q=sf_db()->prepare('SELECT name FROM campaigns WHERE id=?');$q->execute([(int)$id]);$v=$q->fetchColumn();if($v!==false)return (string)$v;}
+    if($type==='store'){$cfg=sf_store_config();return (string)($cfg['products'][$id]['label']??$id);}
+    if($type==='site')return 'Public site';
+    return $id;
+}
+function sf_media_usage(int $assetId): array {
+    sf_media_ensure_schema();$q=sf_db()->prepare('SELECT * FROM media_links WHERE asset_id=? ORDER BY entity_type,entity_id,role,sort_order,id');$q->execute([$assetId]);$rows=$q->fetchAll();
+    foreach($rows as &$r){$r['entity_label']=sf_media_entity_label((string)$r['entity_type'],(string)$r['entity_id']);$r['link']=sf_media_decode($r['link_json']??'',[]);}unset($r);
+    return $rows;
+}
+function sf_media_has_link(string $type,string $id,array $roles=[]): bool {
+    sf_media_ensure_schema();$sql='SELECT 1 FROM media_links WHERE entity_type=? AND entity_id=?';$args=[$type,$id];if($roles){$sql.=' AND role IN ('.implode(',',array_fill(0,count($roles),'?')).')';$args=array_merge($args,$roles);}$sql.=' LIMIT 1';$q=sf_db()->prepare($sql);$q->execute($args);return (bool)$q->fetchColumn();
+}
+function sf_media_completeness(): array {
+    sf_media_ensure_schema();$pdo=sf_db();$assets=(int)$pdo->query('SELECT COUNT(*) FROM media_assets')->fetchColumn();$bytes=(int)$pdo->query('SELECT COALESCE(SUM(size_bytes),0) FROM media_assets')->fetchColumn();$unused=(int)$pdo->query('SELECT COUNT(*) FROM media_assets a WHERE NOT EXISTS (SELECT 1 FROM media_links l WHERE l.asset_id=a.id)')->fetchColumn();$broken=0;$brokenRows=[];
+    foreach($pdo->query('SELECT id,uuid,title,original_name,stored_path FROM media_assets')->fetchAll() as $a){$abs=SF_ROOT.'/'.ltrim((string)$a['stored_path'],'/');if(!is_file($abs)){$broken++;if(count($brokenRows)<100)$brokenRows[]=['asset_id'=>(int)$a['id'],'uuid'=>$a['uuid'],'title'=>$a['title']?:$a['original_name'],'path'=>$a['stored_path']];}}
+    $catalog=sf_catalog();$missingTrackAudio=[];$missingTrackArt=[];foreach($catalog as $t){$id=(string)($t['id']??'');if($id==='')continue;if(trim((string)($t['audio']??''))==='')$missingTrackAudio[]=['id'=>$id,'title'=>(string)($t['title']??$id)];if(trim((string)($t['artwork']??''))===''&&!sf_media_has_link('track',$id,['primary_artwork','artwork']))$missingTrackArt[]=['id'=>$id,'title'=>(string)($t['title']??$id)];}
+    $rp=SF_ROOT.'/data/releases.json';$rels=is_file($rp)?json_decode((string)file_get_contents($rp),true):[];$missingRelease=[];foreach((array)$rels as $x){$id=(string)($x['id']??'');$cover=(string)($x['artwork']['cover']??'');if($id!==''&&$cover===''&&!sf_media_has_link('release',$id,['cover']))$missingRelease[]=['id'=>$id,'title'=>(string)($x['title']??$id)];}
+    $sp=SF_ROOT.'/data/shows.json';$shows=is_file($sp)?json_decode((string)file_get_contents($sp),true):[];$missingShow=[];foreach((array)$shows as $x){$id=(string)($x['id']??'');if($id!==''&&trim((string)($x['poster']??''))===''&&!sf_media_has_link('show',$id,['poster']))$missingShow[]=['id'=>$id,'title'=>(string)($x['title']??$x['venue']??$id)];}
+    $missingCampaign=[];try{$q=$pdo->query("SELECT id,name,status,artwork FROM campaigns WHERE status IN ('published','scheduled')");foreach($q->fetchAll() as $x){$id=(string)$x['id'];if(trim((string)$x['artwork'])===''&&!sf_media_has_link('campaign',$id,['hero']))$missingCampaign[]=['id'=>$id,'title'=>(string)$x['name']];}}catch(Throwable $e){}
+    $missingStore=[];$cfg=sf_store_config();foreach((array)($cfg['products']??[]) as $id=>$p)if(!sf_media_has_link('store',(string)$id,['product_primary','product_gallery']))$missingStore[]=['id'=>(string)$id,'title'=>(string)($p['label']??$id)];
+    $siteMissing=[];foreach(['logo','hero','social_share','app_icon'] as $role)if(!sf_media_has_link('site','public',[$role]))$siteMissing[]=$role;
+    $publicPrivate=[];$refs=[['release',$rels,'artwork','cover'],['show',$shows,'poster',null]];foreach($refs as [$type,$rows,$field,$sub])foreach((array)$rows as $x){$id=(string)($x['id']??'');$url=$sub!==null?(string)($x[$field][$sub]??''):(string)($x[$field]??'');if($id!==''&&str_contains($url,'api/media.php?id=')){parse_str((string)parse_url($url,PHP_URL_QUERY),$qq);$uuid=(string)($qq['id']??'');$a=$uuid!==''?sf_media_asset($uuid):null;if($a){$q=$pdo->prepare('SELECT MAX(public_visible) FROM media_links WHERE asset_id=? AND entity_type=? AND entity_id=?');$q->execute([(int)$a['id'],$type,$id]);if(!(int)$q->fetchColumn())$publicPrivate[]=['entity_type'=>$type,'entity_id'=>$id,'label'=>sf_media_entity_label($type,$id),'asset'=>$uuid];}}}
+    return ['assets'=>$assets,'storage_bytes'=>$bytes,'unused_assets'=>$unused,'broken_assets'=>$broken,'broken'=>$brokenRows,'missing'=>['track_audio'=>$missingTrackAudio,'track_artwork'=>$missingTrackArt,'release_cover'=>$missingRelease,'show_poster'=>$missingShow,'campaign_hero'=>$missingCampaign,'store_media'=>$missingStore,'site_roles'=>$siteMissing],'public_private_mismatch'=>$publicPrivate];
+}
+function sf_media_backfill_universal(): array {
+    sf_media_ensure_schema();$counts=['release'=>0,'show'=>0,'campaign'=>0,'skipped'=>0];
+    $register=function(string $type,string $id,string $role,string $url,bool $public,bool $featured=false)use(&$counts){if($url===''||preg_match('#^(?:https?:)?//#i',$url)||str_starts_with($url,'api/'))return;try{$a=sf_media_register_local_copy(SF_ROOT.'/'.ltrim($url,'/'),basename($url),0);sf_media_attach((int)$a['id'],$type,$id,$role,['public_visible'=>$public,'featured'=>$featured]);$counts[$type]=($counts[$type]??0)+1;}catch(Throwable $e){$counts['skipped']++;}};
+    $rp=SF_ROOT.'/data/releases.json';$rels=is_file($rp)?json_decode((string)file_get_contents($rp),true):[];foreach((array)$rels as $r){$id=(string)($r['id']??'');if($id==='')continue;$pub=(($r['state']??'')==='published'&&($r['public_visible']??true)!==false);foreach(['cover','back','label_a','label_b','social_square','social_story'] as $role)$register('release',$id,$role,(string)($r['artwork'][$role]??''),$pub,$role==='cover');foreach((array)($r['archive']['media']??[]) as $m)$register('release',$id,'archive',(string)($m['url']??''),$pub,false);}
+    $sp=SF_ROOT.'/data/shows.json';$shows=is_file($sp)?json_decode((string)file_get_contents($sp),true):[];foreach((array)$shows as $s){$id=(string)($s['id']??'');if($id==='')continue;$pub=(($s['public_visible']??true)!==false);$register('show',$id,'poster',(string)($s['poster']??''),$pub,true);foreach((array)($s['media']??[]) as $m)$register('show',$id,'archive',(string)($m['url']??''),$pub,false);}
+    try{$q=sf_db()->query('SELECT id,status,artwork FROM campaigns');foreach($q->fetchAll() as $x){$register('campaign',(string)$x['id'],'hero',(string)($x['artwork']??''),($x['status']??'')==='published',true);}}catch(Throwable $e){}
+    return $counts;
+}

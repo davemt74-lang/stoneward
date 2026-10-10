@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.15';
+const SF_DB_SCHEMA_TARGET = '1.3.16';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -167,6 +167,13 @@ function sf_migration_definitions(): array {
             'description'=>'Central Media Library, uploader metadata extraction, media relationships, and controlled delivery',
             'revision'=>'1',
             'apply'=>function(): void { sf_media_ensure_schema(); sf_media_backfill_catalog(); },
+        ],
+        [
+            'id'=>'2026-10-09-017',
+            'app_version'=>'1.3.19',
+            'description'=>'Universal media integration for releases, shows, campaigns, store products, and site publishing',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_media_ensure_schema(); sf_media_backfill_universal(); },
         ],
     ];
 }

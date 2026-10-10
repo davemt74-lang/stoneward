@@ -1,29 +1,24 @@
-# Stonefellow v1.3.18 — Section 19: Media Uploads & Asset Library
+# Stonefellow v1.3.19 — Section 20: Universal Media Integration & Publishing
 
-- Added first-class Admin Media Library.
-- Added secure private-storage uploader for MP3, WAV, images, video and documents.
-- Added SHA-256 asset deduplication.
-- Added MIME + file-signature validation for MP3/WAV/PDF.
-- Added FFprobe metadata extraction when available.
-- Added built-in WAV RIFF duration/sample-rate/channel/bit-depth parser.
-- Added built-in MP3 frame bitrate/sample-rate/channel/duration parser.
-- Added ID3v1/ID3v2 metadata extraction and embedded-artwork detection.
-- Added Admin visibility for FFprobe, GD and effective upload ceiling.
-- Added automatic image large/medium/thumbnail derivatives when GD is available.
-- Added controlled public media endpoint with HTTP Range support.
-- Added separate Public and Downloadable permissions.
-- Added real Song Media workspace covering audio, artwork, photos, video, documents and archive media.
-- Added choose-from-library asset reuse.
-- Added audio roles for master, preview, download, alternate, candidate and primary.
-- Added explicit Make Primary Audio action; upload alone cannot replace live audio.
-- Added explicit Make Primary Artwork action.
-- Previous primary audio/artwork is demoted rather than deleted.
-- Added attached-media drag ordering.
-- Added safe detach vs permanent-delete behavior.
-- Added public song media gallery/audio/video/document rendering.
-- Added folder-import integration with the central Media Library.
-- Added migration backfill for existing catalog audio, artwork and local archive files where recoverable.
-- Added Media Library events to Admin audit and Agent Brain.
-- Added public Agent context for explicitly public song media only.
-- Application advances to **1.3.18**.
-- Database schema advances to **1.3.15**.
+- Extended central Media Library beyond songs.
+- Replaced live Release Builder artwork/path controls with Media Library upload/reuse controls.
+- Added front/back cover, label artwork, social artwork, photos, video, documents and archive roles.
+- Replaced Show poster/archive path entry with Media Library controls.
+- Added show poster, photo, alternate-audio, video, document and archive roles.
+- Added Campaign Builder Media tab.
+- Added campaign hero, background, offer-artwork, video, document and archive roles.
+- Added Store product media management from Media Library.
+- Added storefront product imagery from Media Library relationships.
+- Added Site & Artist Media controls for logo, hero, artist photo, social share and app icon.
+- Added public logo/hero/favicon/Open Graph/About-photo usage.
+- Added universal asset-usage intelligence.
+- Added media completeness dashboard and storage totals.
+- Added broken-file, unused-asset and public/private mismatch detection.
+- Added missing-media detection for songs, releases, shows, campaigns, store products and site roles.
+- Added universal publish action that synchronizes primary image roles back to canonical release/show/campaign/site records.
+- Added release/show public media galleries using public Media Library relationships.
+- Added public campaign supporting media.
+- Added Agent Brain audit for universal media attachment/detachment/publishing.
+- Added migration 017 to backfill existing release/show/campaign local media.
+- Application advances to **1.3.19**.
+- Database schema advances to **1.3.16**.
