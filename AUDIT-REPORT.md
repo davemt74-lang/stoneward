@@ -50,6 +50,20 @@
 - Shipment/order drill-down.
 - Support conversation workspace.
 
-## Regression gate — pending measured GitHub validation
+## Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Fulfillment Admin JavaScript syntax: **PASS**
+- Sections 1–24 inherited suites: **PASS**
+- Section 25 executable fulfillment/care suite: **PASS**
+- Explicit assertions: **1389 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 25 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 25 SCORE: **10/10**
+
+## Final measured feature-head result
+- Exact green feature head: `565522f2c0f079a73e76b2f6b9ee5fc6aedf38ea`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1389 passed**
+- Failures: **0**

@@ -27,4 +27,8 @@ Section 25 coverage:
 - Admin Agent Brain
 - application/schema capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact green feature head: 565522f2c0f079a73e76b2f6b9ee5fc6aedf38ea
+- Release gate: PASS
+- Explicit assertions: 1389 passed
+- Failures: 0
