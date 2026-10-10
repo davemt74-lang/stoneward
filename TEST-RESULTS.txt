@@ -38,4 +38,8 @@ Section 21 integration coverage:
 - Admin Agent Brain audit
 - version/capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact green feature head: c5518a2bdcdaf49fb71de971809ceb7f0dcc3fa0
+- Release gate: PASS
+- Explicit assertions: 1176 passed
+- Failures: 0

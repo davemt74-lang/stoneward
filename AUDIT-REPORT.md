@@ -59,15 +59,23 @@
 - Public Agent cannot reserve inventory or purchase.
 - Product activation and stock adjustments are consequential Admin actions with Agent Brain audit.
 
-## Regression gate — pending measured GitHub validation
-Required:
-- PHP syntax
-- public JavaScript syntax
-- Admin JavaScript syntax
-- Campaign Builder JavaScript syntax
-- Media Library JavaScript syntax
-- Products JavaScript syntax
-- Sections 1–20 inherited regression suites
-- executable Section 21 SQLite inventory tests
+## Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Campaign Builder JavaScript syntax: **PASS**
+- Media Library JavaScript syntax: **PASS**
+- Products JavaScript syntax: **PASS**
+- Sections 1–20 inherited regression suites: **PASS**
+- Executable Section 21 SQLite inventory tests: **PASS**
+- Explicit assertions: **1176 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 21 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 21 SCORE: **10/10**
+
+
+## Final measured feature-head result
+- Exact green feature head: `c5518a2bdcdaf49fb71de971809ceb7f0dcc3fa0`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1176 passed**
+- Failures: **0**
