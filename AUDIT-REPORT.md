@@ -40,10 +40,19 @@
 - Split/license deletion requires explicit confirmation.
 - Private ownership data stays out of public Agent context.
 
-## 28H — Regression Safety — pending measured GitHub validation
-- PHP syntax required.
-- Public/Admin JavaScript syntax required.
-- Sections 1–27 inherited suites required.
-- Section 28 executable ownership/readiness suite required.
+## 28H — Regression Safety — 10/10
+- PHP syntax: **PASS**
+- Public/Admin JavaScript syntax: **PASS**
+- Sections 1–27 inherited suites: **PASS**
+- Section 28 executable ownership/readiness suite: **PASS**
+- Explicit assertions: **1503 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 28 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 28 SCORE: **10/10**
+
+
+## Final measured feature-head result
+- Exact green feature head: `f10a2abc2aa1ee0e26032a6cf60cb82afba41f57`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1503 passed**
+- Failures: **0**
