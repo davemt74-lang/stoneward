@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.17';
+const SF_DB_SCHEMA_TARGET = '1.3.18';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -181,6 +181,13 @@ function sf_migration_definitions(): array {
             'description'=>'Merch product catalog, variants, audited inventory reservations, direct commerce and CRM purchase intelligence',
             'revision'=>'1',
             'apply'=>function(): void { sf_commerce_ensure_schema(); },
+        ],
+        [
+            'id'=>'2026-10-10-019',
+            'app_version'=>'1.3.21',
+            'description'=>'Dynamic fan segments, lifecycle automations, journey runs, waits, triggers, and governed CRM actions',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_automation_ensure_schema(); sf_segment_refresh_all(); },
         ],
     ];
 }

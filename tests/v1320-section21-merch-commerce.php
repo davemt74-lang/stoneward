@@ -58,7 +58,8 @@ ok($adjust['delta']===3&&$adjust['after']===$adjust['before']+3,'manual inventor
 $core=src('api/commerce-core.php');$boot=src('api/bootstrap.php');$store=src('api/storefront.php');$order=src('api/order.php');$adminApi=src('admin/api/products.php');$adminOrders=src('admin/api/orders.php');$adminJs=src('admin/assets/admin.js');$productsJs=src('admin/assets/products.js');$productsCss=src('admin/assets/products.css');$app=src('assets/js/app.js');$siteCss=src('assets/css/site.css');$campaignJs=src('admin/assets/campaigns.js');$agent=src('api/agent-runtime.php');$crm=src('api/crm-core.php');$media=src('api/media-core.php');$mediaApi=src('admin/api/media.php');$mig=src('api/migrations.php');$version=src('version.php');$adminShell=src('admin/index.php');$wf=src('.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/commerce-core.php'"),'commerce core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.17'"),'database schema advances to 1.3.17');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db22);
+ok(isset($db22[1],$db22[2],$db22[3])&&[(int)$db22[1],(int)$db22[2],(int)$db22[3]]>=[1,3,17],'database schema remains v1.3.17 or later');
 ok(str_contains($mig,"'id'=>'2026-10-10-018'")&&str_contains($mig,'sf_commerce_ensure_schema'),'migration 018 installs direct commerce schema');
 foreach(['store_products','store_variants','store_inventory_events','store_order_items'] as $table)ok(str_contains($mig,"'".$table."'"),'migration integrity requires '.$table);
 
@@ -94,7 +95,9 @@ ok(str_contains($crm,"'merch_purchases'")&&str_contains($crm,'sf_commerce_purcha
 ok(str_contains($adminJs,'Merch purchase history')&&str_contains($adminJs,'merchSpend'),'Admin fan profile exposes merch line items and spend');
 ok(str_contains($media,'sf_commerce_products(false)')&&str_contains($mediaApi,"'kind'=>'merch'"),'Media Library completeness and product manager include dynamic merch');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.20'")&&str_contains($version,"'database_schema_target'=>'1.3.17'"),'version endpoint reports app 1.3.20 and schema 1.3.17');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app22);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema22);
+ok(isset($app22[1],$app22[2],$app22[3],$schema22[1],$schema22[2],$schema22[3])&&[(int)$app22[1],(int)$app22[2],(int)$app22[3]]>=[1,3,20]&&[(int)$schema22[1],(int)$schema22[2],(int)$schema22[3]]>=[1,3,17],'version endpoint reports app v1.3.20 or later and schema v1.3.17 or later');
 ok(str_contains($version,"'direct_merch_commerce'=>'products-variants-skus-inventory-media-cart-fulfillment-crm'"),'version endpoint advertises direct merch commerce');
 ok(str_contains($wf,'node --check admin/assets/products.js')&&str_contains($wf,'php tests/v1320-section21-merch-commerce.php'),'release gate includes Products JavaScript and Section 21 suite');
 echo "Stonefellow v1.3.20 Section 21 Merch & Direct-to-Fan Commerce audit: PASS\n";

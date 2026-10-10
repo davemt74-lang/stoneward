@@ -1,154 +1,117 @@
-# Stonefellow v1.3.20 — Section 21: Merch & Direct-to-Fan Commerce
+# Stonefellow v1.3.21 — Section 22: Fan Segments, Automations & Lifecycle Journeys
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 21 turns the existing Store/order stack into a real merch commerce system while preserving the custom vinyl/cassette builder.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 22 turns CRM, campaign and commerce history into reusable fan audiences and governed lifecycle automation.
 
-## Merch products
+## Dynamic fan segments
 
-Admin now has **Merch + Products** for database-backed products with:
+The existing campaign segment store is now the canonical Stonefellow audience layer.
 
-- title, description and category
-- draft / active / archived lifecycle
-- base price and compare-at price
-- physical / non-physical products
-- manual, self or POD fulfillment classification
-- finite or unlimited inventory
-- low-stock threshold
-- per-order quantity limits
-- tags and featured status
-- reusable Media Library imagery
+Segments can match on:
 
-Legacy custom vinyl and cassette builder products continue to work alongside the new catalog.
+- newsletter consent
+- linked vs email-only fan identity
+- proactive-Agent permission
+- CRM lifecycle stage
+- required tags and any-of tags
+- purchase history
+- minimum order count
+- minimum merch spend
+- specific merch products
+- campaign participation
+- CRM event types
+- recent activity
+- inactivity windows
 
-## Variants and SKUs
+Admin can preview matching fans before saving a segment. Segment membership is continuously evaluated and stored with enter/exit timestamps.
 
-Products can have purchasable variants such as:
+The same saved segment can be used by:
 
-- size
-- color
-- edition
-- format
-- bundle option
+- Campaign Builder Audience nodes
+- lifecycle automations
+- manual lifecycle runs
 
-Each variant can have its own:
+## Lifecycle automations
 
-- SKU
-- price
-- compare-at price
-- finite / unlimited / inherited inventory
-- quantity
-- low-stock threshold
-- active / archived status
+Admin → **Segments + Automations** provides a lifecycle journey builder.
 
-When active variants exist, the customer must choose a valid available variant.
+Triggers:
 
-## Inventory governance
+- Manual
+- CRM event
+- Segment entered
+- Segment exited
+- Scheduled interval
 
-Finite inventory is enforced server-side.
+Actions:
 
-At checkout Stonefellow:
+- Add CRM tag
+- Remove CRM tag
+- Set CRM stage
+- Governed Agent message
+- Consent-aware marketing email
+- Enroll in a published campaign
+- Wait
+- Exit
 
-1. re-validates live availability,
-2. atomically reserves finite stock,
-3. writes an audited inventory event,
-4. writes the canonical merch order-line record.
+Published automations are standing Admin approval for the configured journey. Runtime policy still applies:
 
-If order creation fails, reserved stock is released.
+- marketing email requires newsletter opt-in
+- Agent messages require a linked Stonefellow account and proactive-Agent permission
+- campaign enrollment requires a published campaign
+- dedupe keys prevent duplicate execution
+- per-fan cooldowns and run budgets prevent repeated automation loops
 
-Cancellation or an eligible refund releases only stock still marked **reserved**. The release is idempotent: the same order cannot restore stock twice.
+## Waits and scheduler
 
-When fulfillment becomes **shipped** or **delivered**, the inventory reservation becomes **sold** and is no longer automatically restocked by a later status change.
+Wait steps persist run state and a due time.
 
-Manual Admin stock adjustments are recorded in the same inventory ledger.
+Run:
 
-## Store and checkout
+`php cron-automations.php`
 
-The public Stonefellow Store now supports:
+The lifecycle scheduler:
 
-- merch cards
-- Media Library product imagery
-- compare-at pricing
-- variant selection
-- quantities
-- max-per-order rules
-- low-stock messaging
-- sold-out state
-- merch cart lines
-- merch-aware checkout review
-- existing campaign discounts
-- existing digital-track purchases
-- existing custom vinyl/cassette builds
+- refreshes segment membership
+- fires segment enter/exit transitions
+- resumes due waits
+- starts due scheduled automations
 
-Merch is added as a new cart line type; the existing checkout architecture is retained.
+## CRM and Agent Brain
 
-## Campaign integration
+CRM events automatically feed lifecycle evaluation using the authoritative CRM event ID.
 
-Campaign discount nodes can optionally specify product IDs.
-
-A product-scoped discount applies only to matching merch line items. It does not accidentally discount unrelated music, custom physical builds or other merchandise.
-
-Campaign entitlement claim/redemption and attribution remain unchanged.
-
-## CRM and fan intelligence
-
-Every merch checkout produces canonical merch line items linked back to the fan when possible.
-
-Fan CRM profiles expose:
-
-- product
-- variant
-- SKU
-- quantity
-- spend
-- order ID
-- inventory state
-
-The CRM timeline also receives a merchandise purchase event.
-
-This allows later segmentation and lifecycle automation to operate on actual buying behavior rather than generic order totals.
-
-## Agent integration
-
-The public Stonefellow Agent receives active merch catalog context including product names, pricing, variants and current availability.
-
-The Agent may:
-
-- explain products
-- discuss sizes/options
-- report availability
-- surface matching campaigns/offers
-- open the Store
-
-The Agent may **not** reserve stock, complete checkout or charge a customer. Purchase remains a user-confirmed Store action.
+Automation-originated CRM events suppress recursive automation triggering.
 
 Admin Agent Brain records:
 
-- product saves / activation
-- product archive
-- inventory adjustments
+- segment saves
+- automation saves/publishing
+- explicit manual lifecycle runs
 
-Making a product public/active requires explicit Admin confirmation.
+The fan-facing Agent CRM context can see the fan's active segments and active/waiting lifecycle journeys, while normal consent/privacy controls remain intact.
 
-## Media Library integration
+## Run history
 
-Every database merch product uses the Section 20 universal Media Library.
+Every journey records:
 
-Supported product roles include:
+- fan/contact
+- trigger
+- automation
+- current step
+- waiting due time
+- completion/failure state
+- step-level execution events
 
-- Primary product image
-- Product gallery
-- Video
-- Documents
-
-Media completeness includes dynamic merch products as well as the original custom-media products.
+Admin can inspect a per-fan journey timeline.
 
 ## Database
 
-Migration **2026-10-10-018** adds:
+Migration **2026-10-10-019** adds:
 
-- `store_products`
-- `store_variants`
-- `store_inventory_events`
-- `store_order_items`
+- `lifecycle_automations`
+- `lifecycle_automation_runs`
+- `lifecycle_automation_events`
+- `lifecycle_segment_memberships`
 
-Application: **1.3.20**  
-Database schema target: **1.3.17**
+Application: **1.3.21**  
+Database schema target: **1.3.18**

@@ -75,8 +75,10 @@ function sf_crm_sync_user(int $userId): ?array {
 }
 function sf_crm_log_event(int $contactId,?int $userId,string $eventType,string $title,string $entityType='',string $entityId='',array $meta=[]): int {
     sf_crm_ensure_schema();$now=gmdate('c');$q=sf_db()->prepare('INSERT INTO fan_crm_events(contact_id,user_id,event_type,title,entity_type,entity_id,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?)');
-    $q->execute([$contactId,$userId?:null,sf_clean_text($eventType,80),sf_clean_text($title,255),sf_clean_text($entityType,80),sf_clean_text($entityId,180),sf_crm_json($meta),$now]);
-    sf_db()->prepare('UPDATE fan_contacts SET last_engaged_at=?,updated_at=? WHERE id=?')->execute([$now,$now,$contactId]);return (int)sf_db()->lastInsertId();
+    $q->execute([$contactId,$userId?:null,sf_clean_text($eventType,80),sf_clean_text($title,255),sf_clean_text($entityType,80),sf_clean_text($entityId,180),sf_crm_json($meta),$now]);$eventId=(int)sf_db()->lastInsertId();
+    sf_db()->prepare('UPDATE fan_contacts SET last_engaged_at=?,updated_at=? WHERE id=?')->execute([$now,$now,$contactId]);
+    if(function_exists('sf_automation_process_crm_event')&&empty($GLOBALS['sf_automation_suppressed']))sf_automation_process_crm_event($contactId,$eventType,$eventId);
+    return $eventId;
 }
 function sf_crm_record_user_activity(int $userId,string $eventType,string $title,string $entityType='',string $entityId='',array $meta=[]): void {
     $c=sf_crm_sync_user($userId);if(!$c)return;$stage='';
@@ -155,6 +157,7 @@ function sf_crm_next_agent_engagement(int $userId): ?array {
 function sf_crm_agent_context(int $userId): string {
     $c=sf_crm_sync_user($userId);if(!$c)return '';$lines=['CRM FAN PROFILE','- stage '.($c['status']??'fan').' | newsletter '.(!empty($c['marketing_opt_in'])?'subscribed':'not subscribed').' | proactive agent '.(!empty($c['agent_auto_engage'])?'enabled':'disabled')];
     $q=sf_db()->prepare('SELECT event_type,title,created_at FROM fan_crm_events WHERE contact_id=? ORDER BY id DESC LIMIT 8');$q->execute([(int)$c['id']]);foreach($q->fetchAll() as $e)$lines[]='- '.($e['created_at']??'').' | '.($e['event_type']??'event').' | '.($e['title']??'');if(function_exists('sf_commerce_purchase_history')){foreach(sf_commerce_purchase_history($userId,(string)$c['email'],6) as $m)$lines[]='- merch | '.($m['title']??'Product').(($m['variant_title']??'')!==''?' · '.$m['variant_title']:'').' | qty '.($m['quantity']??1).' | order '.($m['order_id']??'');}
+    if(function_exists('sf_automation_ensure_schema')){sf_automation_ensure_schema();$q=sf_db()->prepare('SELECT s.name FROM lifecycle_segment_memberships m JOIN campaign_segments s ON s.id=m.segment_id WHERE m.contact_id=? AND m.matched=1 ORDER BY s.name LIMIT 12');$q->execute([(int)$c['id']]);$segments=$q->fetchAll(PDO::FETCH_COLUMN);if($segments)$lines[]='- active segments '.implode(', ',$segments);$q=sf_db()->prepare("SELECT a.name,r.status,r.due_at FROM lifecycle_automation_runs r JOIN lifecycle_automations a ON a.id=r.automation_id WHERE r.contact_id=? AND r.status IN ('running','waiting') ORDER BY r.id DESC LIMIT 6");$q->execute([(int)$c['id']]);foreach($q->fetchAll() as $r)$lines[]='- lifecycle '.$r['name'].' | '.$r['status'].(!empty($r['due_at'])?' until '.$r['due_at']:'');}
     return implode("\n",$lines);
 }
 function sf_crm_admin_summary(): array {

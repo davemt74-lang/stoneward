@@ -1,27 +1,21 @@
-# Stonefellow v1.3.20 — Section 21: Merch & Direct-to-Fan Commerce
+# Stonefellow v1.3.21 — Section 22: Fan Segments, Automations & Lifecycle Journeys
 
-- Added first-class Admin **Merch + Products** workspace.
-- Added database-backed product catalog alongside existing custom vinyl/cassette products.
-- Added draft, active and archived product lifecycle.
-- Added base and compare-at pricing.
-- Added product variants and unique SKUs.
-- Added per-variant pricing and inventory.
-- Added finite, unlimited and inherited inventory modes.
-- Added low-stock thresholds and max-per-order rules.
-- Added audited manual inventory adjustments.
-- Added atomic finite-stock reservation during checkout.
-- Added idempotent inventory restoration for eligible canceled/refunded orders.
-- Added sold inventory state after shipment/delivery.
-- Added canonical merch order-line ledger.
-- Added Media Library product imagery/gallery integration.
-- Added public Store merch cards, variants, quantities, low-stock and sold-out states.
-- Added merch cart and checkout line-item rendering.
-- Preserved digital-track and custom physical-media checkout behavior.
-- Added optional product-scoped Campaign discount offers.
-- Added merch line items and spend to Fan CRM profiles.
-- Added merch buying context to fan Agent context.
-- Added live merch catalog/availability context to the public Agent.
-- Kept checkout and inventory reservation as user-confirmed consequential actions.
-- Added Admin Agent Brain audit for product and inventory operations.
-- Application advances to **1.3.20**.
-- Database schema advances to **1.3.17**.
+- Added first-class Admin **Segments + Automations** workspace.
+- Promoted saved campaign segments into the canonical reusable fan-audience layer.
+- Added dynamic segment rules for consent, accounts, Agent permission, CRM stages, tags, purchases, spend, products, campaigns, CRM events, recency and inactivity.
+- Added segment audience preview before save.
+- Added persistent segment membership with enter/exit tracking.
+- Added Campaign Builder saved-segment selection.
+- Added lifecycle automation triggers: manual, CRM event, segment enter, segment exit and scheduled interval.
+- Added journey actions: add/remove tag, set stage, Agent message, marketing email, campaign enrollment, wait and exit.
+- Added persistent wait/resume state.
+- Added CLI lifecycle scheduler: `cron-automations.php`.
+- Added automation run/event ledger and Admin timeline.
+- Added durable dedupe keys, cooldowns and per-fan run budgets.
+- Automated marketing email requires newsletter consent.
+- Automated Agent outreach requires proactive-Agent permission.
+- Added recursion suppression for automation-originated CRM events.
+- Added Admin Agent Brain records for segment/automation authoring and manual execution.
+- Added active segment/lifecycle state to fan Agent CRM context.
+- Application advances to **1.3.21**.
+- Database schema advances to **1.3.18**.

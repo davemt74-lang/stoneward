@@ -119,6 +119,7 @@ function sf_campaign_log_event(int $campaignId,string $eventType,?int $participa
     $q->execute([$campaignId,$participantId?:null,$contactId?:null,sf_clean_text($eventType,80),sf_clean_text($nodeId,120),sf_campaign_json($meta),gmdate('c')]);return (int)sf_db()->lastInsertId();
 }
 function sf_campaign_contact_matches(array $contact,array $rules): bool {
+    if(!empty($rules['segment_id'])&&function_exists('sf_segment_get')&&function_exists('sf_segment_contact_matches')){$segment=sf_segment_get((int)$rules['segment_id']);if(!$segment||!sf_segment_contact_matches($contact,(array)$segment['rules']))return false;}
     if(!empty($rules['newsletter_only'])&&empty($contact['marketing_opt_in']))return false;
     if(!empty($rules['linked_accounts_only'])&&empty($contact['user_id']))return false;
     if(!empty($rules['purchase_required'])){$q=sf_db()->prepare("SELECT 1 FROM fan_crm_events WHERE contact_id=? AND event_type='purchase' LIMIT 1");$q->execute([(int)$contact['id']]);if(!$q->fetchColumn())return false;}
@@ -237,6 +238,7 @@ function sf_campaign_redeem_code(string $code,string $orderId): void {
 function sf_campaign_audience_contacts(array $campaign,int $limit=1000): array {
     sf_crm_ensure_schema();$aud=is_array($campaign['audience']??null)?$campaign['audience']:sf_campaign_decode($campaign['audience_json']??'',[]);
     if(!$aud){$graph=is_array($campaign['graph']??null)?$campaign['graph']:sf_campaign_decode($campaign['graph_json']??'',[]);foreach((array)($graph['nodes']??[]) as $n)if(($n['type']??'')==='audience'){$aud=is_array($n['config']??null)?$n['config']:[];break;}}
+    if(!empty($aud['segment_id'])&&function_exists('sf_segment_contacts'))return sf_segment_contacts((int)$aud['segment_id'],$limit);
     $where=['1=1'];$args=[];
     if(!empty($aud['newsletter_only']))$where[]='c.marketing_opt_in=1';
     $stages=array_values(array_filter(array_map('strval',(array)($aud['stages']??[]))));if($stages){$where[]='c.status IN ('.implode(',',array_fill(0,count($stages),'?')).')';$args=array_merge($args,$stages);}
