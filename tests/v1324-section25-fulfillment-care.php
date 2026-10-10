@@ -49,7 +49,8 @@ ok(($GLOBALS['test_order']['status']??'')==='partially_refunded','partial confir
 $core=src('api/fulfillment-core.php');$boot=src('api/bootstrap.php');$adminApi=src('admin/api/fulfillment.php');$publicApi=src('api/customer-care.php');$customerOrder=src('api/customer-order.php');$adminJs=src('admin/assets/admin.js');$fulfillJs=src('admin/assets/fulfillment.js');$fulfillCss=src('admin/assets/fulfillment.css');$adminShell=src('admin/index.php');$app=src('assets/js/app.js');$siteCss=src('assets/css/site.css');$agent=src('api/agent-runtime.php');$crm=src('api/crm-core.php');$mig=src('api/migrations.php');$version=src('version.php');$wf=src('.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/fulfillment-core.php'"),'fulfillment core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.21'"),'database schema advances to 1.3.21');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db26);
+ok(isset($db26[1],$db26[2],$db26[3])&&[(int)$db26[1],(int)$db26[2],(int)$db26[3]]>=[1,3,21],'database schema remains v1.3.21 or later');
 ok(str_contains($mig,"'id'=>'2026-10-10-022'")&&str_contains($mig,'sf_fulfillment_ensure_schema'),'migration 022 installs fulfillment/care schema');
 foreach(['order_shipments','order_refunds','support_cases','support_messages','order_ops_events'] as $table){ok(substr_count($core,'CREATE TABLE IF NOT EXISTS '.$table)===2,'fulfillment schema supports SQLite and MySQL for '.$table);ok(str_contains($mig,"'".$table."'"),'migration integrity requires '.$table);}
 
@@ -81,7 +82,9 @@ ok(str_contains($agent,'order_support')&&str_contains($agent,'sf_fulfillment_age
 ok(str_contains($agent,'confirm/refuse a refund')&&str_contains($agent,'restock a return'),'Agent policy forbids autonomous refund/restock operations');
 ok(str_contains($adminJs,"openView('fulfillment')"),'Admin Agent routes shipment/refund/support work to Fulfillment + Care');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.24'")&&str_contains($version,"'database_schema_target'=>'1.3.21'"),'version endpoint reports app 1.3.24 and schema 1.3.21');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app26);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema26);
+ok(isset($app26[1],$app26[2],$app26[3],$schema26[1],$schema26[2],$schema26[3])&&[(int)$app26[1],(int)$app26[2],(int)$app26[3]]>=[1,3,24]&&[(int)$schema26[1],(int)$schema26[2],(int)$schema26[3]]>=[1,3,21],'version endpoint reports app v1.3.24 or later and schema v1.3.21 or later');
 ok(str_contains($version,"'order_fulfillment'=>'shipments-tracking-delivery-returns-refunds'"),'version endpoint advertises fulfillment capability');
 ok(str_contains($version,"'fan_customer_care'=>'order-linked-cases-messaging-self-service-crm-agent'"),'version endpoint advertises fan customer-care capability');
 ok(str_contains($wf,'node --check admin/assets/fulfillment.js')&&str_contains($wf,'php tests/v1324-section25-fulfillment-care.php'),'release gate includes Fulfillment Admin JS and Section 25 suite');

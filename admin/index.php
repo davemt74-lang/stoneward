@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.24');
+define('SF_ADMIN_BUILD','1.3.25');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -26,6 +26,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/membership.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/ticketing.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/fulfillment.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/operating-calendar.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
 </head>
 <body>
   <div id="adminApp" class="admin-app">
@@ -55,8 +56,9 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="brain"><span>21</span>Agent Brain</button>
         <button type="button" data-view="customer"><span>22</span>Customer Lifecycle</button>
         <button type="button" data-view="analytics"><span>23</span>Listening + Conversion</button>
-        <button type="button" data-view="operations"><span>24</span>Operations</button>
-        <button type="button" data-view="settings"><span>25</span>Settings</button>
+        <button type="button" data-view="calendar"><span>24</span>Operating Calendar</button>
+        <button type="button" data-view="operations"><span>25</span>Operations</button>
+        <button type="button" data-view="settings"><span>26</span>Settings</button>
       </nav>
       <div class="sidebar-foot"><span id="adminStatusDot"></span><span>Local admin</span></div>
     </aside>
@@ -92,5 +94,6 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/membership.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/ticketing.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/fulfillment.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/operating-calendar.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
 </body>
 </html>

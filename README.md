@@ -1,127 +1,125 @@
-# Stonefellow v1.3.24 — Section 25: Orders, Fulfillment & Fan Customer Care
+# Stonefellow v1.3.25 — Section 26: Release & Promotion Operating Calendar
 
-Stonefellow remains a **single-artist direct-to-fan platform**. Section 25 completes the post-purchase layer behind the merch, membership, campaign and ticketing stack.
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 26 gives the Admin and Agent one operating view across the release, campaign, show, ticket, membership and automation systems already built.
 
-## Fulfillment + Care
+## One calendar, authoritative source dates
 
-Admin now has a first-class **Fulfillment + Care** workspace.
+The Operating Calendar does **not** copy release dates, show dates, campaign windows or ticket windows into a second system.
 
-It combines:
+It reads native dates directly from:
 
-- physical-order fulfillment queue
-- shipment/tracking records
-- delivery/exception/return states
-- refund requests and confirmations
-- explicit returned-inventory restocking
-- fan support cases
-- support conversations
-- case priority/status management
+- Releases
+- Shows + Live
+- Campaigns
+- Tickets + VIP
+- Member / VIP content
+- Scheduled lifecycle automations
 
-## Shipment lifecycle
+Those events appear as **native source events**.
 
-Shipment records support:
+Stonefellow stores only the operating plans and milestones used to coordinate work around those dates.
 
-- Label created
-- In transit
-- Out for delivery
-- Delivered
-- Exception
-- Returned
-- Canceled
+## Launch plans
 
-Each shipment has its own request key, carrier, service, tracking number/URL, ETA, note and timestamps.
+Admin → **Operating Calendar** can create:
 
-Shipment actions synchronize the customer-visible order summary and existing merchandise inventory state. Shipped/delivered orders finalize reserved inventory as sold.
+- Single release plan
+- Album release plan
+- Show launch plan
+- Campaign launch plan
+- Custom plan
 
-## Refunds and returns
+A plan has:
 
-Refunds use their own ledger.
+- name
+- target date/time
+- timezone
+- status
+- optional primary release/show
+- notes
+- milestones
+- readiness score
 
-A refund starts as **requested**. It does not claim that money moved.
+Plan states:
 
-Admin must explicitly confirm a refund after the payment-provider/manual process is complete. Confirmed refunds record the provider reference and update the order as partially or fully refunded.
+- Draft
+- Active
+- Completed
+- Archived
 
-Restocking is separate from refund confirmation.
+## Templates
 
-- Unshipped reserved inventory can be released safely.
-- Shipped/delivered merchandise is not silently restocked.
-- A physical return must be recorded before sold inventory is explicitly restocked.
+Templates seed practical direct-to-fan milestones around one target date.
 
-This prevents a refund button from accidentally increasing stock for merchandise the customer still has.
+Single/album plans include work such as:
 
-## Fan customer care
+- master approval
+- credits / metadata / ISRC
+- artwork
+- Campaign Builder journey
+- merch / physical offers
+- newsletter and fan segment
+- VIP / presale / member access
+- QA
+- release day
+- post-release follow-up
+- analytics review
 
-Signed-in fans can open a case directly from their own Order Details page.
+Show plans include ticket/VIP setup, campaign/presale, poster/media, fan communication, guest-list QA and post-show archive work.
 
-Issue types include:
+Campaign plans include audience, landing page/media, messaging, entitlement/conversion QA, launch and conversion review.
 
-- order status
-- shipping
-- damaged item
-- wrong item
-- refund
-- download
-- billing
-- other
+## Dependencies and blockers
 
-Fans can reply to their own cases and close them. Admin can reply, set priority and move cases through:
+Each milestone can have:
 
-- Open
-- Waiting on fan
-- Waiting on Admin
-- Resolved
-- Closed
+- due date/time
+- type
+- owner/team label
+- priority
+- blocking flag
+- dependency
+- status
+- notes
 
-Support messages use idempotent request keys.
+A downstream milestone cannot be marked complete until its dependency is complete.
 
-## CRM + lifecycle
+Readiness calculates:
 
-Stonefellow records CRM events including:
+- percent complete
+- overdue milestones
+- dependency-blocked milestones
+- open launch blockers
+- next milestone
+- ready/not-ready state
 
-- order shipped/delivered/returned
-- refund requested/confirmed
-- support case opened
+## Unified timeline
 
-Because CRM events already feed the lifecycle engine, order and customer-care activity can become segment/automation triggers without a second workflow system.
+The Admin timeline merges native source dates and operating milestones.
 
-## Fan experience
+Each row clearly identifies whether it came from:
 
-Order Details now includes:
+- the native source system, or
+- an operating plan
 
-- shipment history
-- carrier/tracking links
-- ETA
-- refund/return status
-- support-case history
-- fan replies
-- Get help with this order
+This prevents the calendar from silently changing a release, show, campaign or ticket date.
 
-Only the authenticated order owner can access these records.
+## Agent + Agent Brain
 
-## Agent integration
+Admin Agent commands such as “show the release calendar,” “launch readiness,” or “open the launch plan” route to Operating Calendar.
 
-The public Agent receives the signed-in fan’s own recent order, fulfillment, refund and support-case status.
+Plan saves and milestone completions are audited. Significant plan operations feed Admin Agent Brain.
 
-It may explain status and route the fan to their account. It may **not**:
+The core also exposes an internal Agent-ready summary with active plans, overdue work, blockers, seven-day workload and the next 30 days of calendar activity.
 
-- ship an order
-- confirm or reject a refund
-- restock a return
-- close a support case
-- reserve inventory
-- charge money
-
-The Admin Agent routes shipment, tracking, refund, return and support-case requests to Fulfillment + Care.
+The Agent does not publish a release, campaign, ticket offer or merch product merely because a calendar milestone is completed.
 
 ## Database
 
-Migration **2026-10-10-022** adds:
+Migration **2026-10-10-023** adds:
 
-- `order_shipments`
-- `order_refunds`
-- `support_cases`
-- `support_messages`
-- `order_ops_events`
+- `operating_plans`
+- `operating_milestones`
 
-Application: **1.3.24**  
-Database schema target: **1.3.21**
+Application: **1.3.25**  
+Database schema target: **1.3.22**

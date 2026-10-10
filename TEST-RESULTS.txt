@@ -1,34 +1,38 @@
-Stonefellow v1.3.24 Section 25 release gate
+Stonefellow v1.3.25 Section 26 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Fulfillment Admin JavaScript syntax
-- Sections 1–24 inherited regression suites
-- Section 25 executable fulfillment/care suite
+- Operating Calendar JavaScript syntax
+- Sections 1–25 inherited regression suites
+- Section 26 executable Operating Calendar suite
 
-Section 25 coverage:
+Section 26 executable coverage:
+- SQLite schema
+- launch templates
+- template milestone seeding
+- dependency chain
+- dependency completion guard
+- readiness scoring
+- custom milestone add/delete
+
+Integration coverage:
+- migration 023
 - SQLite/MySQL schema
-- migration 022
-- shipment states
-- shipment retry idempotency
-- order fulfillment synchronization
-- refund request vs confirm
-- partial/full refund states
-- safe return restocking
-- order-owned support cases
-- support message idempotency
-- Admin case controls
-- fan order self-service
-- CRM/lifecycle events
-- Agent context/restrictions
-- Admin Agent Brain
-- application/schema capability markers
+- native release/show dates
+- campaign/ticket windows
+- member-content windows
+- scheduled automation timing
+- source vs plan distinction
+- Admin navigation/router/UI
+- Agent routing/context
+- Agent Brain audit
+- version/capability markers
 
 Measured feature-head GitHub Actions result:
-- Exact green feature head: 565522f2c0f079a73e76b2f6b9ee5fc6aedf38ea
+- Exact green feature head: 1e80755fed4436d94275811dc3e70300f427ab22
 - Release gate: PASS
-- Explicit assertions: 1389 passed
+- Explicit assertions: 1429 passed
 - Failures: 0
