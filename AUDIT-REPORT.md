@@ -55,11 +55,21 @@
 - Failed/waiting/completed state.
 - Admin audit + Agent Brain events.
 
-## Regression gate — pending measured GitHub validation
-- PHP syntax required.
-- Public/Admin JavaScript syntax required.
-- Lifecycle Admin JavaScript syntax required.
-- Sections 1–21 inherited suites required.
-- Section 22 executable segment/automation suite required.
+## Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Lifecycle Admin JavaScript syntax: **PASS**
+- Sections 1–21 inherited suites: **PASS**
+- Section 22 executable segment/automation suite: **PASS**
+- Explicit assertions: **1226 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 22 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 22 SCORE: **10/10**
+
+
+## Final measured feature-head result
+- Exact feature head: `9956a5e63dfdb30c62c987da4a9720ac4c34b60c`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1226 passed**
+- Failures: **0**
