@@ -42,7 +42,8 @@ $version=file_get_contents($root.'/version.php');
 $wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/membership-core.php'"),'membership core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.19'"),'database schema advances to 1.3.19');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db24);
+ok(isset($db24[1],$db24[2],$db24[3])&&[(int)$db24[1],(int)$db24[2],(int)$db24[3]]>=[1,3,19],'database schema remains v1.3.19 or later');
 ok(str_contains($mig,"'id'=>'2026-10-10-020'")&&str_contains($mig,'sf_membership_ensure_schema')&&str_contains($mig,'sf_membership_sync_crm'),'migration 020 installs membership schema and synchronizes CRM');
 ok(substr_count($core,'CREATE TABLE IF NOT EXISTS membership_content')===2,'membership content schema supports SQLite and MySQL');
 foreach(['membership_enabled','membership_rank','membership_badge','membership_benefits_json'] as $col)ok(str_contains($core,"sf_schema_add_column('subscription_packages','".$col."'"),'membership extends existing package model with '.$col);
@@ -87,7 +88,9 @@ ok(str_contains($billing,'sf_membership_sync_crm'),'billing lifecycle synchroniz
 ok(str_contains($automation,"'membership'")&&str_contains($automation,"'package_ids_any'"),'dynamic fan segments can target membership status and package tiers');
 ok(str_contains($agent,'membership_info')&&str_contains($agent,'sf_membership_agent_context'),'Stonefellow Agent routes membership questions and receives member benefit context');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.22'")&&str_contains($version,"'database_schema_target'=>'1.3.19'"),'version endpoint reports app 1.3.22 and schema 1.3.19');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app24);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema24);
+ok(isset($app24[1],$app24[2],$app24[3],$schema24[1],$schema24[2],$schema24[3])&&[(int)$app24[1],(int)$app24[2],(int)$app24[3]]>=[1,3,22]&&[(int)$schema24[1],(int)$schema24[2],(int)$schema24[3]]>=[1,3,19],'version endpoint reports app v1.3.22 or later and schema v1.3.19 or later');
 ok(str_contains($version,"'membership_vip'=>'package-backed-tiers-benefits-early-access-member-content'"),'version endpoint advertises Membership + VIP capability');
 ok(str_contains($wf,'node --check admin/assets/membership.js')&&str_contains($wf,'php tests/v1322-section23-membership-vip.php'),'release gate includes Membership Admin JS and Section 23 suite');
 echo "Stonefellow v1.3.22 Section 23 Membership & VIP Fan Experience audit: PASS\n";

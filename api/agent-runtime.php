@@ -67,7 +67,8 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
     }
     if(in_array($profile,['commerce','crm','recommendation','catalog'],true)&&function_exists('sf_campaign_live_summaries')){$campaignLines=[];foreach(sf_campaign_live_summaries(10) as $campaign){$campaignLines[]='- slug='.$campaign['slug'].' | '.$campaign['name'].' | goal '.$campaign['goal'].' | '.$campaign['headline'].' | offers '.implode(', ',$campaign['offers']);}if($campaignLines)$sections[]="ACTIVE CAMPAIGNS\n".implode("\n",$campaignLines);}
     if($profile==='commerce'&&function_exists('sf_commerce_agent_context')){$merch=sf_commerce_agent_context();if($merch!=='')$sections[]=$merch;}
-    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products and active campaigns and open the cart, builder, store, or a campaign page, but it may not claim a purchase is complete, reserve inventory, or charge money. Checkout remains a user-confirmed UI action.";
+    if(function_exists('sf_ticket_agent_context')&&in_array($profile,['catalog','commerce','account'],true)){$tickets=sf_ticket_agent_context($userId>0?$userId:null);if($tickets!=='')$sections[]=$tickets;}
+    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products, active campaigns, ticket/VIP offers and reservation eligibility, but it may not complete a purchase, reserve ticket capacity, check in guests, reserve inventory, or charge money. Checkout and reservations remain user-confirmed UI actions.";
     if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, membership benefits, VIP access, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
     if($userId>0&&function_exists('sf_membership_agent_context')&&in_array($profile,['account','commerce','crm','recommendation'],true))$sections[]=sf_membership_agent_context($userId);
     if($userId>0&&in_array($profile,['account','crm','recommendation'],true)){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
@@ -138,6 +139,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/am i (?:on|subscribed)|my newsletter|my fan profile|fan status/',$q))return 'fan_profile';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
+    if(preg_match('/\b(tickets?|rsvp|guest list|check.?in|vip tickets?|meet.?greet|presale|reservation)\b/',$q))return 'ticketing_info';
     if(preg_match('/\b(open|show|browse)\b.*\b(shows?|concerts?|tour dates?|live archive)\b|\b(upcoming shows?|tour dates?)\b/',$q))return 'shows_browse';
     if(preg_match('/\b(setlist|concert|gig|show|tour)\b|played live|where did .* play|when did .* play/',$q))return 'show_info';
     if(preg_match('/\b(archive|timeline|eras?|chronolog(?:y|ical)|recording sessions?)\b/',$q))return 'archive_browse';
@@ -203,6 +205,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'store_browse':$action=['type'=>'open_view','view'=>'store'];$text='Here’s the Stonefellow store.';$profile='commerce';break;
         case 'membership_info':$action=['type'=>'open_view','view'=>'membership'];$text='Here is your Stonefellow membership and VIP access.';$profile='account';$needs=true;break;
         case 'fan_profile':$action=['type'=>'open_view','view'=>'community'];$profile='crm';$needs=true;break;
+        case 'ticketing_info':$action=['type'=>'open_view','view'=>'tickets'];$text='Here are Stonefellow ticket, RSVP, presale and VIP offers. I can explain your access, but reservations and check-in require explicit user or Admin actions.';$profile='commerce';$needs=true;break;
         case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;
         case 'show_info':$action=['type'=>'open_view','view'=>'shows'];$profile='catalog';$needs=true;break;
         case 'archive_browse':$action=['type'=>'open_view','view'=>'archive'];$text='Here is the Stonefellow music archive — recordings, versions, sessions and releases in context.';$profile='catalog';break;

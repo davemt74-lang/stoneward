@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.22');
+define('SF_BUILD', '1.3.23');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -63,6 +63,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="?view=releases" data-view="releases">Releases</a>
           <a href="?view=archive" data-view="archive">Music Archive</a>
           <a href="?view=shows" data-view="shows">Shows &amp; Live</a>
+          <a href="?view=tickets" data-view="tickets">Tickets &amp; VIP</a>
 <?php if(!empty($siteSettings['fan_community_enabled'])): ?>
           <a href="?view=community" data-view="community">Fan Community</a>
 <?php endif; ?>
@@ -164,6 +165,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button type="button" data-quick-action="shows"><strong>Tour Dates</strong><span>Shows & live archive</span></button>
       <button type="button" data-quick-action="store"><strong>Merch Store</strong><span>Music & custom physical releases</span></button>
       <button type="button" data-quick-action="membership"><strong>Membership + VIP</strong><span>Benefits, exclusives & early access</span></button>
+      <button type="button" data-quick-action="tickets"><strong>Tickets + VIP</strong><span>RSVPs, presales & guest access</span></button>
 <?php if(!empty($siteSettings['fan_community_enabled'])): ?>
       <button type="button" data-quick-action="community"><strong>Fan Community</strong><span>Join the fan feed</span></button>
 <?php endif; ?>
