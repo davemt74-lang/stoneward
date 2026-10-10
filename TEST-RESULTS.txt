@@ -37,4 +37,8 @@ Section 24 executable/policy coverage includes:
 - Agent ticket context and non-autonomy
 - version/capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact green feature head: 4a4facf16299224658ed8f0b1a1d0a0253b90a97
+- Release gate: PASS
+- Explicit assertions: 1333 passed
+- Failures: 0
