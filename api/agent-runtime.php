@@ -66,7 +66,8 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
         $sections[]="APPROVED KNOWLEDGE\n".implode("\n",$kb);
     }
     if(in_array($profile,['commerce','crm','recommendation','catalog'],true)&&function_exists('sf_campaign_live_summaries')){$campaignLines=[];foreach(sf_campaign_live_summaries(10) as $campaign){$campaignLines[]='- slug='.$campaign['slug'].' | '.$campaign['name'].' | goal '.$campaign['goal'].' | '.$campaign['headline'].' | offers '.implode(', ',$campaign['offers']);}if($campaignLines)$sections[]="ACTIVE CAMPAIGNS\n".implode("\n",$campaignLines);}
-    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain products and active campaigns and open the cart, builder, store, or a campaign page, but it may not claim a purchase is complete or charge money. Checkout remains a user-confirmed UI action.";
+    if($profile==='commerce'&&function_exists('sf_commerce_agent_context')){$merch=sf_commerce_agent_context();if($merch!=='')$sections[]=$merch;}
+    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products and active campaigns and open the cart, builder, store, or a campaign page, but it may not claim a purchase is complete, reserve inventory, or charge money. Checkout remains a user-confirmed UI action.";
     if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
     if($userId>0&&in_array($profile,['account','crm','recommendation'],true)){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
     return implode("\n\n",$sections);

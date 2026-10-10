@@ -1,34 +1,41 @@
-Stonefellow v1.3.19 Section 20 release gate
+Stonefellow v1.3.20 Section 21 release gate
 ===========================================
 
 Required:
-- PHP syntax
+- PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
 - Campaign Builder JavaScript syntax
 - Media Library JavaScript syntax
-- Sections 1–19 regression suites
-- Section 20 Universal Media Integration & Publishing
+- Products JavaScript syntax
+- Sections 1–20 inherited v1.3 regression suites
+- Section 21 Merch & Direct-to-Fan Commerce
 
-Section 20 coverage:
-- migration 017 and universal backfill
-- Release Builder Media Library controls
-- Show Media Library controls
-- Campaign Builder Media tab
-- Store product imagery
-- Site/artist media
-- public release/show/campaign media rendering
-- canonical primary-media synchronization
-- usage intelligence
-- storage totals
-- unused/broken media
-- completeness dashboard
-- public/private mismatch detection
-- Agent Brain universal media audit
-- version/schema markers
+Section 21 executable/runtime coverage:
+- SQLite product/variant/inventory/order-line schema
+- product + variant save
+- unique SKU representation
+- finite variant quote
+- max-per-order validation
+- atomic finite-stock reservation
+- oversell rejection
+- cancellation stock restoration
+- idempotent stock release
+- sold inventory non-restock rule
+- merch unit/revenue summary
+- audited manual inventory adjustment
 
-Measured feature-head GitHub Actions result:
-- Exact feature head: 5de47fa6604c207a516385522696925986345497
-- Release gate: PASS
-- Explicit assertions: 1122 passed
-- Failures: 0
+Section 21 integration coverage:
+- migration 018 / schema 1.3.17
+- public Store active merch merge
+- merch quote/cart/checkout
+- product-scoped Campaign discounts
+- Admin Merch + Products
+- universal Media Library product imagery
+- order/fulfillment inventory synchronization
+- CRM merch purchase history
+- public Agent merchandise context/governance
+- Admin Agent Brain audit
+- version/capability markers
+
+Measured GitHub Actions result will be recorded before merge.

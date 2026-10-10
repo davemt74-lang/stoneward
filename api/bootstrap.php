@@ -80,6 +80,8 @@ function sf_quote(array $cart,string $campaignCode=''): array {
             if(!$t){$errors[]="Unknown track: $id.";continue;}
             $price=(int)round(((float)($t['price'] ?? 0))*100); if($price<0)$price=0;
             $items[]=['type'=>'track','track_id'=>$id,'label'=>(string)$t['title'],'price_cents'=>$price]; $subtotal+=$price;
+        } elseif($type==='merch'){
+            $merch=sf_commerce_quote_item($raw);if(!$merch['ok']){$errors[]=$merch['error'];continue;}$item=$merch['item'];$items[]=$item;$subtotal+=(int)$item['price_cents'];if(!empty($item['physical']))$physical=true;
         } elseif($type==='custom_media'){
             $format=(string)($raw['format'] ?? ''); $key=$format==='vinyl'?'custom_vinyl':($format==='cassette'?'custom_cassette':'');
             $p=$cfg['products'][$key] ?? null; if(!$p){$errors[]='Unsupported custom-media format.';continue;}
@@ -93,7 +95,7 @@ function sf_quote(array $cart,string $campaignCode=''): array {
     $shipping=$physical?(int)$cfg['shipping_flat_cents']:0;
     $campaignCode=sf_clean_text($campaignCode,80);$entitlement=$campaignCode!==''?sf_campaign_discount_by_code($campaignCode):null;
     if($campaignCode!==''&&!$entitlement)$errors[]='Campaign offer code is invalid, expired, or already redeemed.';
-    $discount=sf_campaign_discount_amount($entitlement,$subtotal);$total=max(0,$subtotal-$discount+$shipping);
+    $discountBase=$subtotal;if($entitlement&&!empty($entitlement['payload']['product_ids'])){$ids=array_values(array_filter(array_map('strval',(array)$entitlement['payload']['product_ids'])));$discountBase=0;foreach($items as $item)if(($item['type']??'')==='merch'&&in_array((string)($item['product_id']??''),$ids,true))$discountBase+=(int)($item['price_cents']??0);}$discount=sf_campaign_discount_amount($entitlement,$discountBase);$total=max(0,$subtotal-$discount+$shipping);
     return ['ok'=>!$errors,'errors'=>$errors,'currency'=>$cfg['currency'],'items'=>$items,'subtotal_cents'=>$subtotal,'discount_cents'=>$discount,'campaign_code'=>$campaignCode,'shipping_cents'=>$shipping,'tax_cents'=>0,'total_cents'=>$total,'physical'=>$physical];
 }
 
@@ -151,6 +153,7 @@ require_once __DIR__ . '/operations.php';
 require_once __DIR__ . '/crm-core.php';
 require_once __DIR__ . '/campaign-core.php';
 require_once __DIR__ . '/media-core.php';
+require_once __DIR__ . '/commerce-core.php';
 require_once __DIR__ . '/personalization-core.php';
 require_once __DIR__ . '/playlists-core.php';
 require_once __DIR__ . '/listening-sessions-core.php';

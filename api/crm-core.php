@@ -154,7 +154,7 @@ function sf_crm_next_agent_engagement(int $userId): ?array {
 }
 function sf_crm_agent_context(int $userId): string {
     $c=sf_crm_sync_user($userId);if(!$c)return '';$lines=['CRM FAN PROFILE','- stage '.($c['status']??'fan').' | newsletter '.(!empty($c['marketing_opt_in'])?'subscribed':'not subscribed').' | proactive agent '.(!empty($c['agent_auto_engage'])?'enabled':'disabled')];
-    $q=sf_db()->prepare('SELECT event_type,title,created_at FROM fan_crm_events WHERE contact_id=? ORDER BY id DESC LIMIT 8');$q->execute([(int)$c['id']]);foreach($q->fetchAll() as $e)$lines[]='- '.($e['created_at']??'').' | '.($e['event_type']??'event').' | '.($e['title']??'');
+    $q=sf_db()->prepare('SELECT event_type,title,created_at FROM fan_crm_events WHERE contact_id=? ORDER BY id DESC LIMIT 8');$q->execute([(int)$c['id']]);foreach($q->fetchAll() as $e)$lines[]='- '.($e['created_at']??'').' | '.($e['event_type']??'event').' | '.($e['title']??'');if(function_exists('sf_commerce_purchase_history')){foreach(sf_commerce_purchase_history($userId,(string)$c['email'],6) as $m)$lines[]='- merch | '.($m['title']??'Product').(($m['variant_title']??'')!==''?' · '.$m['variant_title']:'').' | qty '.($m['quantity']??1).' | order '.($m['order_id']??'');}
     return implode("\n",$lines);
 }
 function sf_crm_admin_summary(): array {
@@ -176,5 +176,6 @@ function sf_crm_admin_contact_detail(int $contactId): array {
     $q=sf_db()->prepare('SELECT id,event_type,title,entity_type,entity_id,metadata_json,created_at FROM fan_crm_events WHERE contact_id=? ORDER BY id DESC LIMIT 120');$q->execute([$contactId]);$events=$q->fetchAll();
     $q=sf_db()->prepare('SELECT id,channel,trigger_type,status,message_text,reason,created_at,delivered_at FROM fan_agent_engagements WHERE contact_id=? ORDER BY id DESC LIMIT 80');$q->execute([$contactId]);$engagements=$q->fetchAll();
     $community=[];if($uid){$q=sf_db()->prepare('SELECT id,body_text,status,created_at FROM community_posts WHERE user_id=? ORDER BY id DESC LIMIT 50');$q->execute([$uid]);$community=$q->fetchAll();}
-    return ['contact'=>$c,'events'=>$events,'agent_engagements'=>$engagements,'community_posts'=>$community,'account_activity'=>$uid?sf_user_history($uid,60):[],'agent_brain'=>$uid?sf_user_brain_timeline($uid,60):[]];
+    $merch=function_exists('sf_commerce_purchase_history')?sf_commerce_purchase_history($uid?:null,(string)$c['email'],80):[];
+    return ['contact'=>$c,'events'=>$events,'agent_engagements'=>$engagements,'community_posts'=>$community,'account_activity'=>$uid?sf_user_history($uid,60):[],'agent_brain'=>$uid?sf_user_brain_timeline($uid,60):[],'merch_purchases'=>$merch];
 }

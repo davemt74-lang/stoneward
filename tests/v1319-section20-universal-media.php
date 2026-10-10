@@ -11,7 +11,8 @@ $core=src('api/media-core.php');$mediaApi=src('admin/api/media.php');$mediaJs=sr
 
 ok(sf_media_managed_url(['uuid'=>'MTEST'],'large')==='api/media.php?id=MTEST&variant=large','managed media URL helper produces controlled delivery URL');
 
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.16'"),'database schema advances to 1.3.16');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db20);
+ok(isset($db20[1],$db20[2],$db20[3])&&[(int)$db20[1],(int)$db20[2],(int)$db20[3]]>=[1,3,16],'database schema remains v1.3.16 or later');
 ok(str_contains($mig,"'id'=>'2026-10-09-017'")&&str_contains($mig,'sf_media_backfill_universal'),'migration 017 backfills universal media relationships');
 ok(str_contains($core,'function sf_media_backfill_universal')&&str_contains($core,"'release'")&&str_contains($core,"'show'")&&str_contains($core,"'campaign'"),'universal backfill covers releases, shows and campaigns');
 ok(str_contains($core,"['cover','back','label_a','label_b','social_square','social_story']"),'release artwork package is backfilled into Media Library roles');
@@ -65,7 +66,9 @@ ok(str_contains($app,"renderPublicEntityMedia('release'")&&str_contains($app,"re
 ok(str_contains($app,'public-entity-media'),'universal public media renderer shares the song-media presentation system');
 ok(str_contains($core,'public_visible')&&str_contains($core,'download_allowed'),'universal media continues separate public-view and download permissions');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.19'")&&str_contains($version,"'database_schema_target'=>'1.3.16'"),'version endpoint reports app 1.3.19 and schema 1.3.16');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app20);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema20);
+ok(isset($app20[1],$app20[2],$app20[3],$schema20[1],$schema20[2],$schema20[3])&&[(int)$app20[1],(int)$app20[2],(int)$app20[3]]>=[1,3,19]&&[(int)$schema20[1],(int)$schema20[2],(int)$schema20[3]]>=[1,3,16],'version endpoint reports app v1.3.19 or later and schema v1.3.16 or later');
 ok(str_contains($version,"'universal_media'=>'release-show-campaign-store-site-media-publishing'"),'version endpoint advertises universal media capability');
 ok(str_contains($wf,'php tests/v1319-section20-universal-media.php'),'release gate includes Section 20 regression suite');
 
