@@ -1,69 +1,48 @@
-# Stonefellow v1.3.24 — Section 25 Orders, Fulfillment & Fan Customer Care Audit
+# Stonefellow v1.3.25 — Section 26 Release & Promotion Operating Calendar Audit
 
-## 25A — Fulfillment Lifecycle — 10/10 design
-- Existing order remains authoritative.
-- Queryable shipment ledger.
-- Customer-visible fulfillment synchronization.
-- Retry-idempotent shipment writes.
+## 26A — Unified Native Calendar — 10/10 design
+- Releases remain authoritative for release dates.
+- Shows remain authoritative for show dates.
+- Campaign/Ticket/Member content windows remain authoritative.
+- Scheduled automation timing is surfaced.
+- Native and plan events are visibly distinguished.
 
-## 25B — Shipment Tracking — 10/10 design
-- Carrier, service, tracking number/URL, ETA and notes.
-- Label, transit, delivery, exception, return and cancel states.
-- In-app/transactional fan updates.
+## 26B — Launch Plans & Templates — 10/10 design
+- Single, album, show, campaign and custom templates.
+- Target-relative milestone dates.
+- Direct-to-fan operational checklist.
 
-## 25C — Refunds & Returns — 10/10 design
-- Separate requested vs confirmed refund states.
-- Partial/full refund distinction.
-- Provider reference.
-- Refund and inventory restocking are separate.
-- Shipped merchandise cannot be silently restocked.
-- Explicit returned-merchandise restock path.
+## 26C — Dependencies & Readiness — 10/10 design
+- Server-enforced dependencies.
+- Blocking milestones.
+- Overdue calculation.
+- Completion percentage.
+- Ready/not-ready score.
 
-## 25D — Fan Customer Care — 10/10 design
-- Order-linked authenticated cases.
-- Order ownership enforcement.
-- Message threads with retry idempotency.
-- Priorities and case lifecycle.
-- Fan and Admin replies.
+## 26D — Admin Operating Workspace — 10/10 design
+- First-class navigation.
+- Unified timeline.
+- Launch-plan cards.
+- Plan editor.
+- Milestone editor.
+- Completion and drag ordering.
 
-## 25E — Fan Self Service — 10/10 design
-- Shipment/refund/support history in Order Details.
-- Tracking link and ETA.
-- Open/reply/close support cases.
+## 26E — Source Safety — 10/10 design
+- Calendar milestone completion never publishes source content.
+- Source dates are read-only projections.
+- Plan deletion does not delete source entities.
 
-## 25F — CRM + Notifications — 10/10 design
-- Fulfillment/refund/support CRM events.
-- Existing lifecycle automation receives CRM events.
-- In-app and transactional updates.
+## 26F — Agent / Agent Brain — 10/10 design
+- Admin Agent route.
+- Agent-ready operating context.
+- Admin audit.
+- Agent Brain plan/milestone events.
 
-## 25G — Agent Governance — 10/10 design
-- Signed-in fan order/care context only.
-- Agent may explain and route.
-- Agent cannot ship, refund, restock or close a case.
-- Admin Agent routes to Fulfillment + Care.
-- Consequential Admin operations feed Agent Brain.
+## 26G — Migration / Integrity — 10/10 design
+- SQLite/MySQL plan and milestone schema.
+- Migration integrity checks.
+- Existing modules remain untouched.
 
-## 25H — Admin Operations — 10/10 design
-- Fulfillment queue.
-- Refund queue.
-- Care queue.
-- Shipment/order drill-down.
-- Support conversation workspace.
+## 26H — Regression Safety — pending measured GitHub validation
 
-## Regression gate — 10/10
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Fulfillment Admin JavaScript syntax: **PASS**
-- Sections 1–24 inherited suites: **PASS**
-- Section 25 executable fulfillment/care suite: **PASS**
-- Explicit assertions: **1389 passed**
-- Failures: **0**
-
-FINAL SECTION 25 SCORE: **10/10**
-
-## Final measured feature-head result
-- Exact green feature head: `565522f2c0f079a73e76b2f6b9ee5fc6aedf38ea`
-- GitHub release gate: **PASS**
-- Explicit assertions: **1389 passed**
-- Failures: **0**
+PROVISIONAL SECTION 26 SCORE: **10/10 design / pending green release gate**

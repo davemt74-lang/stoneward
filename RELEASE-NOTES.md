@@ -1,22 +1,16 @@
-# Stonefellow v1.3.24 — Section 25: Orders, Fulfillment & Fan Customer Care
+# Stonefellow v1.3.25 — Section 26: Release & Promotion Operating Calendar
 
-- Added first-class Admin Fulfillment + Care workspace.
-- Added shipment ledger with carrier, service, tracking, ETA and status history.
-- Added retry-idempotent shipment request keys.
-- Added delivered/exception/return/cancel shipment states.
-- Added refund request ledger.
-- Added explicit Admin refund confirmation and provider reference.
-- Added partial vs full refunded order state.
-- Separated refund confirmation from inventory restocking.
-- Prevented shipped merchandise from being silently restocked by refund.
-- Added explicit restock-after-return workflow.
-- Added fan support cases and message threads.
-- Added order ownership checks for fan cases.
-- Added case priority and workflow states.
-- Added fan Order Details shipment/refund/support self service.
-- Added transactional/in-app shipment and support updates.
-- Added CRM fulfillment/refund/support events.
-- Added Agent order/support context while prohibiting autonomous consequential actions.
-- Added Admin Agent routing to Fulfillment + Care.
-- Application advances to **1.3.24**.
-- Database schema advances to **1.3.21**.
+- Added first-class Admin Operating Calendar.
+- Added native-source timeline for releases, shows, campaigns, ticket windows, member content and scheduled automations.
+- Kept native systems authoritative; calendar source events are read-only projections.
+- Added Single Release, Album Release, Show Launch, Campaign Launch and Custom plan templates.
+- Added target-date offset milestones.
+- Added milestone owner, priority, type, blocking flag, dependency, status and notes.
+- Added server-enforced milestone dependencies.
+- Added completion percentage, overdue count, dependency blocking, launch blockers and ready/not-ready scoring.
+- Added launch-plan detail and drag ordering.
+- Added governed plan deletion.
+- Added Admin Agent routing for launch/readiness/calendar requests.
+- Added Admin audit / Agent Brain events for plan and milestone operations.
+- Application advances to **1.3.25**.
+- Database schema advances to **1.3.22**.
