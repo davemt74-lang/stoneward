@@ -1,27 +1,22 @@
-# Stonefellow v1.3.23 — Section 24: Ticketing, RSVP & VIP Guest Experiences
+# Stonefellow v1.3.24 — Section 25: Orders, Fulfillment & Fan Customer Care
 
-- Added first-class Admin Tickets + VIP workspace.
-- Added RSVP, ticket, VIP, meet-and-greet and presale offer types.
-- Added draft/published/paused/closed/archive offer lifecycle.
-- Added show-linked capacity and claimed-quantity tracking.
-- Added free internal Stonefellow reservations.
-- Enforced external provider checkout for paid offers.
-- Added authenticated, CSRF-protected reservation flow.
-- Added unique reservation request keys for retry idempotency.
-- Added transactional capacity enforcement.
-- Added per-fan reservation limits inside the reservation transaction.
-- Added unique confirmation codes.
-- Added cancellation with capacity release.
-- Added guest list and confirmation-code check-in.
-- Added CSV guest-list export.
-- Added membership, tier/rank, VIP and priority-presale gates.
-- Added member early-access/presale windows using existing membership benefits.
-- Added CRM events for reserve/cancel/check-in.
-- Added lifecycle-automation compatibility through the existing CRM event pipeline.
-- Added public Tickets & VIP hub and My Reservations.
-- Added ticket/VIP offers to show detail pages.
-- Added public navigation and chat + quick action.
-- Added Agent ticket/VIP context and routing.
-- Added policy preventing Agent-autonomous reservation/check-in.
-- Application advances to **1.3.23**.
-- Database schema advances to **1.3.20**.
+- Added first-class Admin Fulfillment + Care workspace.
+- Added shipment ledger with carrier, service, tracking, ETA and status history.
+- Added retry-idempotent shipment request keys.
+- Added delivered/exception/return/cancel shipment states.
+- Added refund request ledger.
+- Added explicit Admin refund confirmation and provider reference.
+- Added partial vs full refunded order state.
+- Separated refund confirmation from inventory restocking.
+- Prevented shipped merchandise from being silently restocked by refund.
+- Added explicit restock-after-return workflow.
+- Added fan support cases and message threads.
+- Added order ownership checks for fan cases.
+- Added case priority and workflow states.
+- Added fan Order Details shipment/refund/support self service.
+- Added transactional/in-app shipment and support updates.
+- Added CRM fulfillment/refund/support events.
+- Added Agent order/support context while prohibiting autonomous consequential actions.
+- Added Admin Agent routing to Fulfillment + Care.
+- Application advances to **1.3.24**.
+- Database schema advances to **1.3.21**.

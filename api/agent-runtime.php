@@ -68,7 +68,8 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
     if(in_array($profile,['commerce','crm','recommendation','catalog'],true)&&function_exists('sf_campaign_live_summaries')){$campaignLines=[];foreach(sf_campaign_live_summaries(10) as $campaign){$campaignLines[]='- slug='.$campaign['slug'].' | '.$campaign['name'].' | goal '.$campaign['goal'].' | '.$campaign['headline'].' | offers '.implode(', ',$campaign['offers']);}if($campaignLines)$sections[]="ACTIVE CAMPAIGNS\n".implode("\n",$campaignLines);}
     if($profile==='commerce'&&function_exists('sf_commerce_agent_context')){$merch=sf_commerce_agent_context();if($merch!=='')$sections[]=$merch;}
     if(function_exists('sf_ticket_agent_context')&&in_array($profile,['catalog','commerce','account'],true)){$tickets=sf_ticket_agent_context($userId>0?$userId:null);if($tickets!=='')$sections[]=$tickets;}
-    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products, active campaigns, ticket/VIP offers and reservation eligibility, but it may not complete a purchase, reserve ticket capacity, check in guests, reserve inventory, or charge money. Checkout and reservations remain user-confirmed UI actions.";
+    if($userId>0&&function_exists('sf_fulfillment_agent_context')&&in_array($profile,['commerce','account','crm'],true)){$orders=sf_fulfillment_agent_context($userId);if($orders!=='')$sections[]=$orders;}
+    if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products, active campaigns, ticket/VIP offers, reservation eligibility, and the signed-in fan's own order/shipment/refund status, but it may not complete a purchase, reserve ticket capacity, check in guests, reserve inventory, ship an order, confirm/refuse a refund, restock a return, close a support case, or charge money. Checkout and reservations remain user-confirmed UI actions.";
     if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, membership benefits, VIP access, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
     if($userId>0&&function_exists('sf_membership_agent_context')&&in_array($profile,['account','commerce','crm','recommendation'],true))$sections[]=sf_membership_agent_context($userId);
     if($userId>0&&in_array($profile,['account','crm','recommendation'],true)){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
@@ -139,6 +140,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/am i (?:on|subscribed)|my newsletter|my fan profile|fan status/',$q))return 'fan_profile';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
+    if(preg_match('/\b(where is my order|order status|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
     if(preg_match('/\b(tickets?|rsvp|guest list|check.?in|vip tickets?|meet.?greet|presale|reservation)\b/',$q))return 'ticketing_info';
     if(preg_match('/\b(open|show|browse)\b.*\b(shows?|concerts?|tour dates?|live archive)\b|\b(upcoming shows?|tour dates?)\b/',$q))return 'shows_browse';
     if(preg_match('/\b(setlist|concert|gig|show|tour)\b|played live|where did .* play|when did .* play/',$q))return 'show_info';
@@ -238,6 +240,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'builder_save':
             $action=['type'=>'builder_save'];$text='I’ll save the current build as a draft.';$profile='account';break;
         case 'cart_open':$action=['type'=>'open_view','view'=>'cart'];$text='Here’s your cart.';$profile='commerce';break;
+        case 'order_support':
+            $action=['type'=>'open_view','view'=>'account'];$text='I can show your own Stonefellow order, shipment, refund and support-case status. I cannot change fulfillment or confirm a refund for you.';$profile='account';break;
         case 'purchase_request':$action=['type'=>'open_view','view'=>'cart'];$text='I can take you to the cart. You’ll confirm the purchase yourself at checkout.';$profile='commerce';$confirm=true;break;
         case 'notifications_open':$action=['type'=>'open_notifications'];$count=(int)($client['notification_unread']??0);$text=$count>0?'You have '.$count.' unread notification'.($count===1?'':'s').'. I’ll open them.':'You’re caught up. I’ll open your activity drawer.';$profile='account';break;
         case 'notification_preferences':$action=['type'=>'open_view','view'=>'account'];$text='Your notification preferences are in My account. You can control in-app and email reminders there.';$profile='account';break;

@@ -25,7 +25,8 @@ ok($a['allowed']===false&&$a['reason']==='closed','expired offer is closed');
 $core=file_get_contents($root.'/api/ticketing-core.php');$boot=file_get_contents($root.'/api/bootstrap.php');$public=file_get_contents($root.'/api/ticketing.php');$admin=file_get_contents($root.'/admin/api/ticketing.php');$export=file_get_contents($root.'/admin/api/ticketing-export.php');$adminJs=file_get_contents($root.'/admin/assets/admin.js');$ticketJs=file_get_contents($root.'/admin/assets/ticketing.js');$ticketCss=file_get_contents($root.'/admin/assets/ticketing.css');$adminShell=file_get_contents($root.'/admin/index.php');$app=file_get_contents($root.'/assets/js/app.js');$siteCss=file_get_contents($root.'/assets/css/site.css');$shell=file_get_contents($root.'/stonefellow-v120.php');$agent=file_get_contents($root.'/api/agent-runtime.php');$crm=file_get_contents($root.'/api/crm-core.php');$mig=file_get_contents($root.'/api/migrations.php');$version=file_get_contents($root.'/version.php');$wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 ok(str_contains($boot,"require_once __DIR__ . '/ticketing-core.php'"),'ticketing core loads from canonical bootstrap');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.20'"),'database schema advances to 1.3.20');
+preg_match("/SF_DB_SCHEMA_TARGET = '([0-9]+)\.([0-9]+)\.([0-9]+)'/",$mig,$db25);
+ok(isset($db25[1],$db25[2],$db25[3])&&[(int)$db25[1],(int)$db25[2],(int)$db25[3]]>=[1,3,20],'database schema remains v1.3.20 or later');
 ok(str_contains($mig,"'id'=>'2026-10-10-021'")&&str_contains($mig,'sf_ticketing_ensure_schema'),'migration 021 installs ticketing schema');
 foreach(['ticket_offers','ticket_reservations','ticket_events'] as $table){ok(substr_count($core,'CREATE TABLE IF NOT EXISTS '.$table)===2,'ticketing schema supports SQLite and MySQL for '.$table);ok(str_contains($mig,"'".$table."'"),'migration integrity requires '.$table);}
 
@@ -68,7 +69,9 @@ ok(str_contains($agent,'ticketing_info')&&str_contains($agent,'sf_ticket_agent_c
 ok(str_contains($agent,'reservations remain user-confirmed UI actions'),'Agent policy forbids autonomous ticket reservations');
 ok(str_contains($adminJs,'guest list')&&str_contains($adminJs,"openView('ticketing')"),'Admin Agent routes guest-list and check-in requests to Ticketing');
 
-ok(str_contains($version,"'stonefellow'=>'1.3.23'")&&str_contains($version,"'database_schema_target'=>'1.3.20'"),'version endpoint reports app 1.3.23 and schema 1.3.20');
+preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$app25);
+preg_match("/'database_schema_target'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$schema25);
+ok(isset($app25[1],$app25[2],$app25[3],$schema25[1],$schema25[2],$schema25[3])&&[(int)$app25[1],(int)$app25[2],(int)$app25[3]]>=[1,3,23]&&[(int)$schema25[1],(int)$schema25[2],(int)$schema25[3]]>=[1,3,20],'version endpoint reports app v1.3.23 or later and schema v1.3.20 or later');
 ok(str_contains($version,"'ticketing_vip'=>'show-offers-rsvp-capacity-reservations-guest-list-checkin'"),'version endpoint advertises ticketing/VIP capability');
 ok(str_contains($wf,'node --check admin/assets/ticketing.js')&&str_contains($wf,'php tests/v1323-section24-ticketing-vip.php'),'release gate includes Ticketing Admin JS and Section 24 suite');
 echo "Stonefellow v1.3.23 Section 24 Ticketing, RSVP & VIP Guest Experiences audit: PASS\n";
