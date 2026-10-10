@@ -76,3 +76,4 @@ jobs:
           php tests/v1325-section26-operating-calendar.php
           php tests/v1326-section27-growth-intelligence.php
           php tests/v1327-section28-rights-licensing.php
+          php tests/v1327-admin-sidebar-density.php
