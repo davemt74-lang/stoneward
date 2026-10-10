@@ -27,4 +27,8 @@ Section 20 coverage:
 - Agent Brain universal media audit
 - version/schema markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact feature head: 5de47fa6604c207a516385522696925986345497
+- Release gate: PASS
+- Explicit assertions: 1122 passed
+- Failures: 0
