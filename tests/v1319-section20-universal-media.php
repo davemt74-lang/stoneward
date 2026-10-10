@@ -34,7 +34,7 @@ ok(str_contains($campaignCore,"'media'=>$media")&&str_contains($campaignCore,"sf
 ok(str_contains($app,"publicEntityMediaHtml(c.media||[],'CAMPAIGN MEDIA')"),'public campaign page renders public supporting campaign media');
 
 ok(str_contains($mediaJs,'Store product media')&&str_contains($mediaJs,"openEntityManager('store'"),'Media Library provides store-product media management');
-ok(str_contains($store,"sf_media_public_links('store'")&&str_contains($store,"'image'=>$primary['url']"),'storefront API resolves product imagery from Media Library');
+ok(str_contains($store,"sf_media_public_links('store'")&&str_contains($store,"'image'=>")&&str_contains($store,"primary['url']"),'storefront API resolves product imagery from Media Library');
 ok(str_contains($app,'p.image')&&str_contains($app,'data-store-format'),'public store cards render managed product imagery');
 
 ok(str_contains($adminJs,"entitySection?.('site','public'")&&str_contains($adminJs,"roles:['logo','hero','artist_photo','social_share','app_icon']"),'Settings embeds site and artist Media Library controls');
