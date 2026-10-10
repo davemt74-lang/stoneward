@@ -134,7 +134,7 @@
   function textarea(name,label,val){return '<label class="field">'+label+'<textarea name="'+name+'">'+esc(val||'')+'</textarea></label>'}
   function checkbox(name,label,val){return '<label class="check-field"><input name="'+name+'" type="checkbox" '+(val?'checked':'')+'>'+label+'</label>'}
   function nodeFields(n,c){
-    if(n.type==='audience')return checkbox('newsletter_only','Newsletter subscribers only',!!c.newsletter_only)+checkbox('linked_accounts_only','Linked accounts only',!!c.linked_accounts_only)+checkbox('purchase_required','Previous purchasers only',!!c.purchase_required)+input('stages','CRM stages',(c.stages||[]).join(', '))+input('tags','Required CRM tags',(c.tags||[]).join(', '));
+    if(n.type==='audience')return '<label class="field">Saved segment<select name="segment_id"><option value="0">Custom rules below</option>'+state.segments.map(s=>'<option value="'+s.id+'" '+(Number(c.segment_id||0)===Number(s.id)?'selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label>'+checkbox('newsletter_only','Newsletter subscribers only',!!c.newsletter_only)+checkbox('linked_accounts_only','Linked accounts only',!!c.linked_accounts_only)+checkbox('purchase_required','Previous purchasers only',!!c.purchase_required)+input('stages','CRM stages',(c.stages||[]).join(', '))+input('tags','Required CRM tags',(c.tags||[]).join(', '));
     if(n.type==='condition')return input('field','Field',c.field||'marketing_opt_in')+input('operator','Operator',c.operator||'equals')+input('value','Value',c.value||'true');
     if(n.type==='wait')return input('hours','Wait hours',c.hours||24,'number');
     if(n.type==='email')return input('subject','Subject',c.subject||'')+textarea('body','Email body',c.body||'');
@@ -187,7 +187,7 @@
     const e=state.editor,g=e.campaign.graph,n=g.nodes.find(function(x){return x.id===form.dataset.nodeId});if(!n)return;
     const d=new FormData(form),cfg=Object.assign({},n.config||{});
     d.forEach(function(v,k){cfg[k]=v});
-    ['newsletter_only','linked_accounts_only','purchase_required','respect_auto_engage'].forEach(function(k){cfg[k]=d.get(k)==='on'});
+    ['newsletter_only','linked_accounts_only','purchase_required','respect_auto_engage'].forEach(function(k){cfg[k]=d.get(k)==='on'});if(d.has('segment_id'))cfg.segment_id=Number(d.get('segment_id')||0);
     ['inventory','percent_off','amount_off_cents','hours'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(cfg,k))cfg[k]=Number(cfg[k]||0)});
     ['stages','tags','product_ids'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(cfg,k))cfg[k]=String(cfg[k]||'').split(',').map(function(x){return x.trim()}).filter(Boolean)});
     n.config=cfg;if(n.type==='audience')e.campaign.audience=Object.assign({},cfg);renderEditor();

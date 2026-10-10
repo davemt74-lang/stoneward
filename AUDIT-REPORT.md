@@ -1,81 +1,65 @@
-# Stonefellow v1.3.20 — Section 21 Merch & Direct-to-Fan Commerce Audit
+# Stonefellow v1.3.21 — Section 22 Fan Segments, Automations & Lifecycle Journeys Audit
 
-## 21A — Product Catalog & Variants — 10/10 design
-- Database-backed merch products.
-- Draft/active/archive lifecycle.
-- Pricing and compare-at pricing.
-- Variants and unique SKUs.
-- Per-product and per-variant stock behavior.
-- Legacy custom-media products preserved.
+## 22A — Canonical Fan Segments — 10/10 design
+- Reuses the existing saved segment store.
+- Dynamic CRM/consent/account/tag rules.
+- Commerce product/order/spend rules.
+- Campaign and CRM-event rules.
+- Activity/inactivity windows.
+- Audience preview and persistent membership ledger.
 
-## 21B — Merch Media — 10/10 design
-- Universal Media Library integration.
-- Primary product image and gallery.
-- Video/document roles.
-- Media-readiness coverage includes dynamic merch.
+## 22B — Segment Transitions — 10/10 design
+- Enter/exit state recorded per fan.
+- Segment refresh is idempotent.
+- Enter/exit can trigger published journeys.
 
-## 21C — Inventory & Availability — 10/10 design
-- Finite/unlimited inventory.
-- Low-stock thresholds.
-- Server-side availability validation.
-- Atomic checkout reservation.
-- Audited inventory event ledger.
-- Idempotent release.
-- Sold-state finalization after shipment/delivery.
-- Audited manual adjustment.
+## 22C — Lifecycle Automation Runtime — 10/10 design
+- Manual, CRM-event, segment-enter, segment-exit and scheduled triggers.
+- Durable dedupe key.
+- Cooldown and maximum run budget.
+- Per-fan run state and step index.
 
-## 21D — Fan Store, Cart & Checkout — 10/10 design
-- Merch product cards.
-- Variant selection.
-- Quantity selection.
-- Compare-at pricing.
-- Low-stock/sold-out display.
-- Max-per-order enforcement.
-- Merch-aware cart and checkout.
-- Existing music/custom-media checkout preserved.
+## 22D — Governed Journey Actions — 10/10 design
+- Add/remove tag.
+- Set CRM stage.
+- Governed Agent message.
+- Consent-aware email.
+- Published campaign enrollment.
+- Wait and exit.
+- Automation-originated CRM activity cannot recursively trigger itself.
 
-## 21E — Orders & Fulfillment — 10/10 design
-- Canonical merch order-line ledger.
-- Inventory linked to order lifecycle.
-- Cancel/refund releases eligible reservations.
-- Shipment/delivery finalizes sold inventory.
-- Existing fulfillment/POD order workflows preserved.
+## 22E — Wait / Resume Scheduler — 10/10 design
+- Persistent due_at.
+- CLI scheduler.
+- Due-wait resume.
+- Scheduled journey execution.
+- Segment refresh integrated into scheduler.
 
-## 21F — CRM Purchase Intelligence — 10/10 design
-- Merch line items attached to fan identity.
-- Product, variant, SKU, quantity, spend and order visible in CRM.
-- Merchandise purchase event added to fan history.
-- Agent fan context gains recent merchandise history.
+## 22F — Admin Journey Builder — 10/10 design
+- Dynamic segment editor.
+- Audience preview.
+- Ordered step builder.
+- Publish/pause.
+- Explicit manual run.
+- Governance boundary shown in UI.
 
-## 21G — Campaign Integration — 10/10 design
-- Existing campaign discount entitlement path retained.
-- Optional product-ID scope on discount nodes.
-- Discount only applies to matching merch subtotal when scoped.
-- Campaign attribution/redemption remains authoritative.
+## 22G — Campaign / Agent Integration — 10/10 design
+- Campaign Audience node can use a saved segment.
+- Campaign sends dynamically resolve the shared segment.
+- Admin Agent routes lifecycle requests to the module.
+- Fan Agent CRM context includes active segment/journey state.
 
-## 21H — Agent Commerce Intelligence — 10/10 design
-- Live active-product/variant/availability context.
-- Admin Agent routes product/inventory work to Merch + Products.
-- Public Agent cannot reserve inventory or purchase.
-- Product activation and stock adjustments are consequential Admin actions with Agent Brain audit.
+## 22H — Audit & Explainability — 10/10 design
+- Run ledger.
+- Step event timeline.
+- Failed/waiting/completed state.
+- Admin audit + Agent Brain events.
 
-## Regression gate — 10/10
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Campaign Builder JavaScript syntax: **PASS**
-- Media Library JavaScript syntax: **PASS**
-- Products JavaScript syntax: **PASS**
-- Sections 1–20 inherited regression suites: **PASS**
-- Executable Section 21 SQLite inventory tests: **PASS**
-- Explicit assertions: **1176 passed**
-- Failures: **0**
+## Regression gate — pending measured GitHub validation
+- PHP syntax required.
+- Public/Admin JavaScript syntax required.
+- Lifecycle Admin JavaScript syntax required.
+- Sections 1–21 inherited suites required.
+- Section 22 executable segment/automation suite required.
 
-FINAL SECTION 21 SCORE: **10/10**
-
-
-## Final measured feature-head result
-- Exact green feature head: `c5518a2bdcdaf49fb71de971809ceb7f0dcc3fa0`
-- GitHub release gate: **PASS**
-- Explicit assertions: **1176 passed**
-- Failures: **0**
+PROVISIONAL SECTION 22 SCORE: **10/10 design / pending green release gate**

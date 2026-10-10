@@ -40,10 +40,8 @@ try{
         $r=sf_campaign_send_email_node($campaign,(string)($b['node_id']??''),(int)$me['id'],!empty($b['confirmed']));sf_agent_brain_log((int)$me['id'],'admin_campaign','campaign_send',['route'=>'campaign_email','action'=>'send_campaign_email','context_profile'=>'crm','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','campaign_id'=>$id,'node_id'=>(string)($b['node_id']??''),'request'=>'Admin approved campaign email send','response'=>'Sent '.$r['sent'].' campaign emails; '.$r['failed'].' failed.']);sf_json_response(['ok'=>true,'result'=>$r]);
     }
     if($action==='save_segment'){
-        $id=(int)($b['id']??0);$name=sf_clean_text($b['name']??'',180);if($name==='')throw new InvalidArgumentException('Segment name is required.');$rules=is_array($b['rules']??null)?$b['rules']:[];$now=gmdate('c');
-        if($id){$q=sf_db()->prepare('UPDATE campaign_segments SET name=?,rules_json=?,updated_at=? WHERE id=?');$q->execute([$name,sf_campaign_json($rules),$now,$id]);}
-        else{$q=sf_db()->prepare('INSERT INTO campaign_segments(name,rules_json,created_by,created_at,updated_at) VALUES(?,?,?,?,?)');$q->execute([$name,sf_campaign_json($rules),(int)$me['id'],$now,$now]);$id=(int)sf_db()->lastInsertId();}
-        sf_log_admin_action((int)$me['id'],'campaign_segment_saved','campaign_segment',(string)$id);sf_json_response(['ok'=>true,'id'=>$id]);
+        $segment=sf_segment_save(['id'=>(int)($b['id']??0),'name'=>$b['name']??'','rules'=>is_array($b['rules']??null)?$b['rules']:[]],(int)$me['id']);
+        sf_log_admin_action((int)$me['id'],'campaign_segment_saved','campaign_segment',(string)$segment['id']);sf_json_response(['ok'=>true,'id'=>(int)$segment['id'],'segment'=>$segment]);
     }
     if($action==='delete_segment'){
         $id=(int)($b['id']??0);sf_db()->prepare('DELETE FROM campaign_segments WHERE id=?')->execute([$id]);sf_log_admin_action((int)$me['id'],'campaign_segment_deleted','campaign_segment',(string)$id);sf_json_response(['ok'=>true]);
