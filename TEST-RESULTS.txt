@@ -27,4 +27,8 @@ Section 27 coverage includes:
 - grounded Agent brief
 - application/schema capability markers
 
-Measured GitHub Actions result will be recorded before merge.
+Measured feature-head GitHub Actions result:
+- Exact green feature head: 3ca08648fdd9c98f73e0d1d71455cdfa32df322d
+- Release gate: PASS
+- Explicit assertions: 1463 passed
+- Failures: 0
