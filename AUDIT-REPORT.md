@@ -60,11 +60,19 @@
 - Migration integrity requires all ticket tables.
 - Full inherited release gate plus dedicated Section 24 policy suite.
 
-## Regression gate — pending measured GitHub validation
-- PHP syntax required.
-- Public/Admin JavaScript syntax required.
-- Ticketing Admin JavaScript required.
-- Sections 1–23 inherited suites required.
-- Section 24 executable policy suite required.
+## Regression gate — 10/10
+- PHP syntax: **PASS**
+- Public/Admin JavaScript syntax: **PASS**
+- Ticketing Admin JavaScript: **PASS**
+- Sections 1–23 inherited suites: **PASS**
+- Section 24 executable policy suite: **PASS**
+- Explicit assertions: **1333 passed**
+- Failures: **0**
 
-PROVISIONAL SECTION 24 SCORE: **10/10 design / pending green release gate**
+FINAL SECTION 24 SCORE: **10/10**
+
+## Final measured feature-head result
+- Exact green feature head: `4a4facf16299224658ed8f0b1a1d0a0253b90a97`
+- GitHub release gate: **PASS**
+- Explicit assertions: **1333 passed**
+- Failures: **0**
