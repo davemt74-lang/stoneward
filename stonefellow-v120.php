@@ -14,7 +14,10 @@ if(!sf_installed()){
     exit;
 }
 $currentUser=sf_current_user();
-$siteSettings=sf_site_settings();\n$configuredBase=rtrim(sf_public_base_url(),'/');\n$scriptDir=rtrim(str_replace('\\\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');\n$appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
+$siteSettings=sf_site_settings();
+$configuredBase=rtrim(sf_public_base_url(),'/');
+$scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
+$appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
 function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES,'UTF-8'); }
 ?>
 <?php if($siteSettings['maintenance_enabled'] && (($currentUser['role']??'')!=='admin')): ?>
