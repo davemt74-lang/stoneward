@@ -1,79 +1,83 @@
-# Stonefellow v1.3.32 — Section 33 Public Content & Storytelling Audit
+# Stonefellow v1.3.33 — Section 34 Artist Brand & Visual Theme Audit
 
-Section 33 extends Stonefellow as a single-artist platform. It does not introduce a generic CMS, artist selector, tenant abstraction, or duplicate catalog. Long-form editorial is layered around the authoritative Catalog, Releases, Shows, Media Library, Homepage and Agent systems.
+Section 34 adds a governed visual identity system for the one Stonefellow artist. It deliberately avoids a generic page builder, arbitrary custom CSS, remote font injection, or multi-artist theming.
 
-## 33A — Single-Artist Editorial Model — 10/10
-- Fixed Stonefellow story types: Artist About, Editorial Essay, Release Story, Track Story, Show Story and Timeline Milestone.
+## 34A — Safe Single-Artist Theme Model — 10/10
+- Four curated presets: Desert, Midnight, Paper and Monochrome.
+- Dark, Light and Follow System appearance modes.
+- Safe allowlisted display/body typography stacks.
+- Allowlisted corner styles, density and content width.
+- Strict six-digit hex color validation.
 - No artist_id, tenant_id, workspace_id or multi-artist abstraction.
-- Exactly one published Artist About is allowed at a time.
-- Draft, published and archived lifecycle is explicit.
-- Story slugs are unique and stable.
-- Long-form copy preserves paragraphs and line breaks.
+- No custom CSS, @import, script or remote-font escape hatch.
+- Draft and published state reuse the existing app_meta settings store; no new theme table.
+- Modified preset values are server-reclassified as Custom so the UI never mislabels a changed preset.
 
-## 33B — Canonical Content Ownership — 10/10
-- Release, track and show stories link to authoritative public Stonefellow entities.
-- A linked story cannot publish if its canonical entity is missing/private.
-- Storytelling never rewrites Catalog, Release or Show source records.
-- Existing track story, release description/liner notes and show data remain canonical in their original workspaces.
-- Supplemental long-form editorial appears alongside those canonical pages without shadow copies.
+## 34B — Contrast & Readiness Governance — 10/10
+- Server-side WCAG-style relative luminance and contrast calculation.
+- Required 4.5:1 checks for primary text/background, secondary text/background, primary text/surface, accent/background and accent-button text.
+- Danger/background uses a 3.0:1 warning threshold.
+- Follow System validates both dark and light palettes.
+- All four built-in presets pass both palettes at 100%.
+- A contrast-blocked draft may be saved safely but cannot be published.
 
-## 33C — Admin Editor & Publishing Governance — 10/10
-- Storytelling lives inside Admin → Settings; the 29-link Admin sidebar remains unchanged.
-- Editor supports type, status, title, slug, eyebrow, summary, body, entity link, timeline date, era, ordering, featured state and SEO overrides.
-- New and existing stories require explicit confirmation when publishing or archiving.
-- Published stories must be drafted/archived before deletion.
-- Permanent deletion requires explicit confirmation.
-- Saves/deletes are written to Admin audit and Agent Brain.
-- Admin Agent routes biography/editorial/timeline requests directly to the Storytelling editor.
+## 34C — Draft, Preview, Publish & Restore — 10/10
+- Editing happens in a draft separate from the public theme.
+- Unsaved browser edits disable Publish and clearly require Save Draft first.
+- Real public-site preview uses the saved draft.
+- Publishing requires explicit Admin confirmation.
+- Restoring the original Desert default requires explicit Admin confirmation and changes the live theme.
+- Draft reset safely returns to the currently published theme.
+- Draft saves, publishes and default restores are written to Admin audit.
+- Publish/restore lifecycle is visible in Agent Brain.
 
-## 33D — Public Storytelling Experience — 10/10
-- Public About page consumes the governed Artist About source when published.
-- Editorial essays and historical milestones are presented under About.
-- Standalone stories use canonical /story/{slug} routes.
-- Track, Release and Show pages surface relevant supplemental stories.
-- Editorial body rendering preserves paragraphs while escaping markup.
-- Timeline is chronological and remains tied to one artist.
+## 34D — Secure Public Preview & Shell Application — 10/10
+- Draft preview is available only when theme_preview=1 and the current account is an Administrator.
+- Draft preview is forced noindex,nofollow,noarchive and has no canonical URL.
+- SPA SEO synchronization preserves that noindex/no-canonical state after navigation.
+- Theme preview persists through public SPA routes.
+- Automated discovery, Homepage and Storytelling event writes are suppressed during theme preview.
+- Server-side Storytelling view events are suppressed only for authenticated Admin preview.
+- Theme CSS and body classes are rendered server-side before the SPA runs.
+- Browser theme-color metadata supports fixed modes and system dark/light variants.
 
-## 33E — Media & SEO Integration — 10/10
-- Stories reuse the Universal Media Library through story_entry relationships.
-- Governed story roles include hero, inline and gallery media.
-- Hero publication uses the established explicit-public media workflow.
-- Deleting a story removes media relationships, not reusable Media Library assets.
-- Published stories receive canonical metadata, Open Graph/social metadata through the Section 32 resolver and Article JSON-LD.
-- Artist About keeps /about as its canonical identity.
-- Only published, readiness-approved non-About stories enter the sitemap.
+## 34E — Public Surface Integration — 10/10
+- Core theme variables cover background, surfaces, text, secondary text, accent, accent text, danger, width, typography, corners and density.
+- Top bar, menus, drawers, persistent player and Agent chat use theme surfaces.
+- Forms, search, account, history, library, cards and commerce surfaces follow theme colors.
+- Splash, Artist Homepage, Storytelling, music, releases, shows, store and public editorial pages share the same visual system.
+- Legacy structural hard-coded colors were replaced with theme tokens; intentionally decorative vinyl/cassette artwork remains art-directed.
+- Display and body typography now use configured stacks throughout the public site.
+- Compact density and square/soft/round corner settings affect real components.
+- Maintenance mode also uses the published theme.
 
-## 33F — Homepage & Agent Integration — 10/10
-- A published Artist About automatically becomes the Homepage Artist Story source.
-- Homepage title, excerpt and public story hero image come from Storytelling.
-- Section 31 Homepage copy remains a safe fallback only when no published Artist About exists.
-- Homepage Admin explicitly explains the single-source behavior.
-- Public Agent context receives only published, readiness-approved Storytelling content.
-- Agent story context is relevance-ranked and bounded to six entries.
+## 34F — Settings, Preview UX & Admin Agent — 10/10
+- Artist Brand & Visual Theme is embedded in Admin → Settings.
+- The Admin sidebar remains exactly 29 links.
+- Editor includes preset, appearance mode, display/body type, corners, density, content width and paired dark/light palettes.
+- Side-by-side dark/light preview cards are shown inside Settings.
+- Detailed contrast readiness appears before publishing.
+- Live saved-draft preview opens the actual public application.
+- Admin Agent routes theme, appearance, brand-color, typography and dark/light requests to Settings.
 
-## 33G — Truthful Events & Public Safety — 10/10
-- Allowlisted events: view, connected-entity open, story-media open and share.
-- Events cannot be recorded for draft/private/unready stories.
-- Public event writes are session-rate-limited.
-- Native-share events are recorded only after native sharing succeeds.
-- Copy-share events are recorded only after clipboard copy succeeds.
-- Event detail is bounded and sanitized.
-- Story metrics report actual published/draft state and observed events.
+## 34G — Release & Schema Boundaries — 10/10
+- Application advances to **1.3.33**.
+- Database target remains **1.3.28**.
+- No migration 030 is introduced because visual state correctly reuses app_meta.
+- Public and Admin asset builds both advance to 1.3.33.
+- Web-server build header advances to 1.3.33.
+- Version capability metadata documents Artist Brand, contrast governance and site-wide theme scope.
 
-## 33H — Upgrade, Regression & Release Safety — 10/10
-- Application advances to **1.3.32**.
-- Database target advances to **1.3.28**.
-- Migration **2026-10-11-029** creates story_entries and story_events.
-- Upgrade integrity requires both Storytelling tables.
-- Section 32 version/route tests remain forward-compatible without weakening their minimum guarantees.
-- Release Gate syntax-checks Storytelling Admin JavaScript.
+## 34H — Regression & Release Safety — 10/10
+- Theme Admin JavaScript is syntax-checked by the release gate.
+- Section 34 certification is part of the full release gate.
 - PHP syntax: **PASS**
 - Public JavaScript syntax: **PASS**
 - Admin JavaScript syntax: **PASS**
-- Sections 1–32 inherited regression suites: **PASS**
-- Section 33 certification: **PASS**
-- Explicit PASS lines on hardened implementation candidate: **1836**
+- Sections 1–33 inherited regression suites: **PASS**
+- Section 34 certification: **PASS**
+- Explicit PASS lines on the hardened implementation candidate: **1902**
 - PHP warnings: **0**
 - Failures: **0**
 
-FINAL SECTION 33 SCORE: **10/10**
+FINAL SECTION 34 SCORE: **10/10**

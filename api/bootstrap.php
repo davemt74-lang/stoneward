@@ -144,6 +144,7 @@ function sf_build_pod_handoffs(string $orderId, array $quote, array $customer): 
 
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/site-settings.php';
+require_once __DIR__ . '/theme-core.php';
 require_once __DIR__ . '/account-data.php';
 require_once __DIR__ . '/ai.php';
 require_once __DIR__ . '/entitlements.php';
