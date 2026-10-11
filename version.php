@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.34',
+  'stonefellow'=>'1.3.35',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.29',
+  'database_schema_target'=>'1.3.30',
   'database_upgrader'=>'upgrade.php',
   'dashboard'=>'activity-listening-command-center',
   'personalization'=>'favorites-library-history',
@@ -77,7 +77,10 @@ echo json_encode([
   'theme_scope'=>'public-shell-homepage-storytelling-music-store-agent-surfaces',
   'songbook'=>'catalog-lyrics-governed-publication-sections-annotations',
   'songbook_privacy'=>'draft-lyrics-excluded-public-page-search-agent',
-  'songbook_events'=>'truthful-view-section-annotation-share-events',
+  'songbook_events'=>'truthful-view-section-annotation-events',
+  'video_hub'=>'single-artist-managed-video-poster-vtt-gallery-publication',
+  'video_experience'=>'public-hub-detail-chapters-captions-linked-music-shows',
+  'video_events'=>'truthful-view-play-pause-progress-complete-caption-chapter-events',
   'launch_templates'=>'single-album-show-campaign-custom',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
