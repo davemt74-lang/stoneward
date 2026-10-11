@@ -59,6 +59,10 @@ ok34(str_contains($shell,'sf_theme_css($activeTheme)')&&str_contains($shell,'sf_
 ok34(str_contains($shell,'prefers-color-scheme: dark')&&str_contains($shell,'prefers-color-scheme: light'),'system appearance emits browser theme-color variants');
 ok34(str_contains($shell,'STONEFELLOW_THEME_PREVIEW')&&str_contains($shell,"'appearance'=>"),'public bootstrap exposes bounded appearance state and preview mode');
 ok34(str_contains($app,"finish=u=>{if(window.STONEFELLOW_THEME_PREVIEW)u.searchParams.set('theme_preview','1')"),'SPA navigation preserves admin-only draft preview');
+ok34(str_contains($app,"if(window.STONEFELLOW_THEME_PREVIEW){m.robots='noindex,nofollow,noarchive';m.canonical=''"),'SPA SEO sync cannot re-index an admin theme preview');
+ok34(str_contains($app,'async function recordDiscovery')&&str_contains($app,'if(window.STONEFELLOW_THEME_PREVIEW)return;try{'),'theme preview suppresses public discovery/event writes in the browser');
+$storiesApi=file_get_contents($root.'/api/stories.php');
+ok34(str_contains($storiesApi,"theme_preview")&&str_contains($storiesApi,"role']??'')==='admin'")&&str_contains($storiesApi,'if(!$themePreview)sf_story_event'),'server-side story page views are suppressed only for authenticated Admin preview');
 
 # 34E — Public surface integration
 foreach(['--surface:','--accent-text:','--display-font:','--body-font:','--card-radius:','--control-radius:'] as $token)ok34(str_contains($siteCss,$token),'public CSS includes theme token '.$token);
@@ -66,6 +70,8 @@ ok34(str_contains($siteCss,'.topbar{background:linear-gradient')&&str_contains($
 ok34(str_contains($siteCss,'.menu-sheet,.notification-drawer,.queue-drawer,.footer-player,.chatbar'),'menus, drawers, player and chat share themed surfaces');
 ok34(str_contains($siteCss,'.splash-screen{background:var(--bg)')&&str_contains($siteCss,'.artist-homepage,.storytelling-about,.story-public-page'),'Splash, Homepage and Storytelling are covered by the theme layer');
 ok34(str_contains($siteCss,'font-family:var(--display-font)')&&str_contains($siteCss,'font-family:var(--body-font)'),'public display and body typography use theme tokens');
+ok34(!str_contains($siteCss,'Georgia,serif')&&!str_contains($siteCss,'Inter,system-ui,sans-serif'),'legacy hard-coded public type stacks no longer bypass the theme');
+ok34(str_contains($shell,'Stonefellow — Maintenance')&&str_contains($shell,'sf_theme_css($activeTheme)'),'maintenance mode uses the published visual theme');
 ok34(str_contains($siteCss,'.theme-density-compact')&&str_contains($siteCss,'.theme-corners-square'),'density and corner controls affect real public components');
 
 # 34F — Settings/editor integration
