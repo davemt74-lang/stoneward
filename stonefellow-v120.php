@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.31');
+define('SF_BUILD', '1.3.32');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -18,7 +18,7 @@ $siteSettings=sf_site_settings();
 $configuredBase=rtrim(sf_public_base_url(),'/');
 $scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
 $appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
-$initialView=sf_clean_text($_GET['view']??'',40);$publicInitialViews=['press','campaign','track','release','show','store','music','releases','shows','about','archive'];if(!in_array($initialView,$publicInitialViews,true))$initialView='';
+$initialView=sf_clean_text($_GET['view']??'',40);$publicInitialViews=['press','campaign','story','track','release','show','store','music','releases','shows','about','archive'];if(!in_array($initialView,$publicInitialViews,true))$initialView='';
 $initialId=sf_clean_text($_GET['id']??'',160);$initialSlug=sf_clean_text($_GET['slug']??'',160);
 $initialRoute=['view'=>$initialView,'id'=>$initialId,'slug'=>$initialSlug];
 $seo=sf_seo_resolve($initialView,$initialId,$initialSlug);
