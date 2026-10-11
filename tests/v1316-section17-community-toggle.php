@@ -6,7 +6,7 @@ function src($rel){global $root;return (string)file_get_contents($root.'/'.$rel)
 $site=src('api/site-settings.php');$settings=src('admin/api/settings.php');$admin=src('admin/assets/admin.js');$shell=src('stonefellow-v120.php');$app=src('assets/js/app.js');$community=src('api/community.php');$crm=src('api/crm-core.php');$agent=src('api/agent-runtime.php');$version=src('version.php');$mig=src('api/migrations.php');$wf=src('.github/workflows/release-gate.yml');
 
 ok(str_contains($site,"'fan_community_enabled'=>sf_meta_get('site.fan_community_enabled','0')==='1'"),'Fan Community launch control defaults OFF');
-ok(str_contains($site,"['fan_community_enabled','announcement_enabled','maintenance_enabled']"),'site settings persistence includes Fan Community toggle');
+ok(str_contains($site,"'fan_community_enabled'")&&str_contains($site,"foreach(['artist_homepage_enabled','fan_community_enabled','announcement_enabled','maintenance_enabled']"),'site settings persistence includes Fan Community toggle alongside newer site controls');
 ok(str_contains($settings,"'fan_community_enabled'=>!empty(")&&str_contains($settings,"fan_community_enabled"),'Admin settings API accepts Fan Community toggle');
 ok(str_contains($settings,"'fan_community'=>")&&str_contains($settings,"fan_community_enabled"),'Admin audit records Fan Community launch state');
 ok(str_contains($admin,'name="fan_community_enabled"')&&str_contains($admin,"f.get('fan_community_enabled')==='on'"),'Admin Settings exposes and saves the on/off control');
