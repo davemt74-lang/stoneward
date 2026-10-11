@@ -256,17 +256,17 @@
   async function loadStore(){if(st.store)return st.store;try{const health=await fetch((cfg.apiBase||'api')+'/health.php',{cache:'no-store'}).then(r=>r.json());st.store={mode:health.mode||'test',currency:'USD'};return st.store}catch(_){st.store={mode:'offline',currency:'USD'};return st.store}}
   async function refreshSiteData(){try{const r=await fetch((cfg.apiBase||'api')+'/site-data.php',{cache:'no-store'});const j=await r.json();if(r.ok&&j.ok){if(Array.isArray(j.catalog))catalog=j.catalog.map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));if(Array.isArray(j.releases))releases=j.releases;if(Array.isArray(j.shows))shows=j.shows;return true}}catch(_){}return false}
   function publicRouteUrl(view,params={}){
-    const id=encodeURIComponent(String(params.id||'')),slug=encodeURIComponent(String(params.slug||'')),base=document.baseURI;
-    if(!view||view==='home')return new URL('./',base);
-    if(view==='track'&&id)return new URL('track/'+id,base);
-    if(view==='release'&&id)return new URL('release/'+id,base);
-    if(view==='show'&&id)return new URL('show/'+id,base);
-    if(view==='store'&&slug)return new URL('store/'+slug,base);
-    if(view==='campaign'&&slug)return new URL('campaign/'+slug,base);
-    if(view==='story'&&slug)return new URL('story/'+slug,base);
-    if(view==='press'&&slug){const u=new URL('press/'+slug,base);if(params.token)u.hash='token='+encodeURIComponent(String(params.token));return u}
-    if(['music','releases','shows','store','about','archive'].includes(view))return new URL(view,base);
-    const u=new URL('./',base);u.searchParams.set('view',view);Object.entries(params).forEach(([k,v])=>{if(k!=='token'&&v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});return u;
+    const id=encodeURIComponent(String(params.id||'')),slug=encodeURIComponent(String(params.slug||'')),base=document.baseURI,finish=u=>{if(window.STONEFELLOW_THEME_PREVIEW)u.searchParams.set('theme_preview','1');return u};
+    if(!view||view==='home')return finish(new URL('./',base));
+    if(view==='track'&&id)return finish(new URL('track/'+id,base));
+    if(view==='release'&&id)return finish(new URL('release/'+id,base));
+    if(view==='show'&&id)return finish(new URL('show/'+id,base));
+    if(view==='store'&&slug)return finish(new URL('store/'+slug,base));
+    if(view==='campaign'&&slug)return finish(new URL('campaign/'+slug,base));
+    if(view==='story'&&slug)return finish(new URL('story/'+slug,base));
+    if(view==='press'&&slug){const u=new URL('press/'+slug,base);if(params.token)u.hash='token='+encodeURIComponent(String(params.token));return finish(u)}
+    if(['music','releases','shows','store','about','archive'].includes(view))return finish(new URL(view,base));
+    const u=new URL('./',base);u.searchParams.set('view',view);Object.entries(params).forEach(([k,v])=>{if(k!=='token'&&v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});return finish(u);
   }
   async function syncSeo(view,params={}){
     try{
