@@ -48,7 +48,7 @@ ok35(str_contains($core,"\$allowed=['view','section_open','annotation_open']")&&
 ok35(str_contains($core,'!sf_songbook_get($trackId,true)'),'Songbook events require a currently public Songbook');
 ok35(str_contains($core,'function sf_songbook_agent_context'),'Songbook exposes bounded published lyric context for Agent use');
 
-ok35(str_contains($adminApi,'explicit Admin confirmation')&&str_contains($adminApi,"\$existing===null?in_array(\$target,['published','archived'],true)"),'initial and later publish/archive transitions require Admin confirmation');
+ok35(str_contains($adminApi,'Changing Songbook visibility requires explicit Admin confirmation.')&&str_contains($adminApi,'$consequential=$changed||$initialConsequential'),'every Songbook visibility transition requires Admin confirmation');
 ok35(str_contains($adminApi,'sf_log_admin_action')&&str_contains($adminApi,'sf_agent_brain_log'),'Songbook Admin mutations feed audit and Agent Brain');
 ok35(str_contains($publicApi,'count($attempts)>=60'),'public Songbook event writes are rate-limited');
 ok35(substr_count($publicApi,'sf_songbook_event(')===1,'Songbook GET is side-effect free; all event writes use the rate-limited POST path');
