@@ -1,79 +1,79 @@
-# Stonefellow v1.3.32 — Section 33 Public Content & Storytelling Audit
+# Stonefellow v1.3.33 — Section 34 Lyrics, Songbook & Track Notes Audit
 
-Section 33 extends Stonefellow as a single-artist platform. It does not introduce a generic CMS, artist selector, tenant abstraction, or duplicate catalog. Long-form editorial is layered around the authoritative Catalog, Releases, Shows, Media Library, Homepage and Agent systems.
+Section 34 keeps each track’s existing Catalog `lyrics` field authoritative and adds governed publication metadata around it. The Songbook database never stores a second copy of lyric text.
 
-## 33A — Single-Artist Editorial Model — 10/10
-- Fixed Stonefellow story types: Artist About, Editorial Essay, Release Story, Track Story, Show Story and Timeline Milestone.
-- No artist_id, tenant_id, workspace_id or multi-artist abstraction.
-- Exactly one published Artist About is allowed at a time.
-- Draft, published and archived lifecycle is explicit.
-- Story slugs are unique and stable.
-- Long-form copy preserves paragraphs and line breaks.
+## 34A — Canonical Lyrics + Songbook Data Model — 10/10
+- Catalog lyrics remain the single authoritative lyric text.
+- Songbook stores only status, language, section ranges, annotations, credits display, internal notes and timestamps.
+- One Songbook record per canonical track.
+- SQLite and MySQL schemas are both supported.
+- Existing Catalog records require no destructive backfill or duplication.
 
-## 33B — Canonical Content Ownership — 10/10
-- Release, track and show stories link to authoritative public Stonefellow entities.
-- A linked story cannot publish if its canonical entity is missing/private.
-- Storytelling never rewrites Catalog, Release or Show source records.
-- Existing track story, release description/liner notes and show data remain canonical in their original workspaces.
-- Supplemental long-form editorial appears alongside those canonical pages without shadow copies.
+## 34B — Catalog-Embedded Songbook Editor — 10/10
+- Songbook lives inside each existing Catalog track workspace; no additional Admin sidebar item was added.
+- Canonical lyrics remain editable through the existing track form.
+- Admin copy explicitly explains that canonical lyrics remain private until Songbook publication.
+- Songbook editor supports Draft / Published / Archived, language, public credit visibility, internal notes, section ranges and line annotations.
+- Verse / chorus / bridge structure detection can seed section ranges from conventional lyric headings.
+- Readiness and 30-day Songbook metrics are visible directly in the track workspace.
+- Admin Agent routes Songbook / lyric-publishing / verse / chorus / annotation requests into Catalog.
 
-## 33C — Admin Editor & Publishing Governance — 10/10
-- Storytelling lives inside Admin → Settings; the 29-link Admin sidebar remains unchanged.
-- Editor supports type, status, title, slug, eyebrow, summary, body, entity link, timeline date, era, ordering, featured state and SEO overrides.
-- New and existing stories require explicit confirmation when publishing or archiving.
-- Published stories must be drafted/archived before deletion.
-- Permanent deletion requires explicit confirmation.
-- Saves/deletes are written to Admin audit and Agent Brain.
-- Admin Agent routes biography/editorial/timeline requests directly to the Storytelling editor.
+## 34C — Publication Readiness & Governance — 10/10
+- Publishing requires a public canonical track, non-empty canonical lyrics, valid language code and at least one valid section.
+- Section ranges must remain inside the current canonical lyric line count.
+- Overlapping sections block publication.
+- Annotations must reference a lyric line that belongs to a published section.
+- Initial publication, later publication and archival all require explicit Admin confirmation.
+- Status changes and saves feed Admin audit and Agent Brain.
+- If canonical lyrics later change enough to invalidate stored ranges, the public Songbook automatically becomes unavailable until corrected.
 
-## 33D — Public Storytelling Experience — 10/10
-- Public About page consumes the governed Artist About source when published.
-- Editorial essays and historical milestones are presented under About.
-- Standalone stories use canonical /story/{slug} routes.
-- Track, Release and Show pages surface relevant supplemental stories.
-- Editorial body rendering preserves paragraphs while escaping markup.
-- Timeline is chronological and remains tied to one artist.
+## 34D — Public Songbook Experience — 10/10
+- Raw Catalog lyrics are no longer rendered directly on track pages.
+- Track pages load only a Published + ready Songbook payload.
+- Public view renders named sections, line numbers, optional songwriting credits and expandable line annotations.
+- Public Songbook uses dedicated responsive styling.
+- Missing/draft/unready Songbooks simply disappear from the public track page rather than leaking partial content.
+- Existing rich track page, credits, recording notes, media, stories, queue, purchase and custom-record controls remain intact.
 
-## 33E — Media & SEO Integration — 10/10
-- Stories reuse the Universal Media Library through story_entry relationships.
-- Governed story roles include hero, inline and gallery media.
-- Hero publication uses the established explicit-public media workflow.
-- Deleting a story removes media relationships, not reusable Media Library assets.
-- Published stories receive canonical metadata, Open Graph/social metadata through the Section 32 resolver and Article JSON-LD.
-- Artist About keeps /about as its canonical identity.
-- Only published, readiness-approved non-About stories enter the sitemap.
+## 34E — Draft-Lyric Privacy & Public Catalog Hardening — 10/10
+- Public generated `assets/js/catalog.js` strips the canonical `lyrics` field entirely.
+- Full canonical lyrics remain only in the private authoritative `data/catalog.json`.
+- Migration 030 immediately regenerates an existing public catalog without lyric text.
+- Every later Catalog write continues generating a lyric-free public catalog.
+- Apache now denies direct web requests to `/data/` and `/config/`.
+- Public search indexes lyric text only when the corresponding Songbook is currently Published + ready.
+- Public Agent track ranking removes private lyrics before relevance scoring, eliminating draft-lyric title-association leakage.
 
-## 33F — Homepage & Agent Integration — 10/10
-- A published Artist About automatically becomes the Homepage Artist Story source.
-- Homepage title, excerpt and public story hero image come from Storytelling.
-- Section 31 Homepage copy remains a safe fallback only when no published Artist About exists.
-- Homepage Admin explicitly explains the single-source behavior.
-- Public Agent context receives only published, readiness-approved Storytelling content.
-- Agent story context is relevance-ranked and bounded to six entries.
+## 34F — Search + Agent Integration — 10/10
+- Published Songbooks remain searchable by lyric phrase through the established Search & Discovery engine.
+- Draft/archived/unready Songbooks contribute no lyric search text.
+- Public Agent receives a bounded published Songbook context, separate from the normal catalog context.
+- Agent Songbook context is query-ranked and capped, preventing indiscriminate full-catalog lyric injection.
+- Existing song, story, release, show and knowledge context remains intact.
 
-## 33G — Truthful Events & Public Safety — 10/10
-- Allowlisted events: view, connected-entity open, story-media open and share.
-- Events cannot be recorded for draft/private/unready stories.
-- Public event writes are session-rate-limited.
-- Native-share events are recorded only after native sharing succeeds.
-- Copy-share events are recorded only after clipboard copy succeeds.
+## 34G — Truthful Songbook Events — 10/10
+- Allowlisted events are limited to view, section_open, annotation_open and share.
+- Songbook GET is side-effect free.
+- Public event writes use the rate-limited POST path.
+- Events are accepted only while the Songbook remains public.
 - Event detail is bounded and sanitized.
-- Story metrics report actual published/draft state and observed events.
+- Public UI records real views, section opens and annotation opens; no inferred reading/completion events are invented.
 
-## 33H — Upgrade, Regression & Release Safety — 10/10
-- Application advances to **1.3.32**.
-- Database target advances to **1.3.28**.
-- Migration **2026-10-11-029** creates story_entries and story_events.
-- Upgrade integrity requires both Storytelling tables.
-- Section 32 version/route tests remain forward-compatible without weakening their minimum guarantees.
-- Release Gate syntax-checks Storytelling Admin JavaScript.
+## 34H — Upgrade, Regression & Release Safety — 10/10
+- Application advances to **1.3.33**.
+- Database target advances to **1.3.29**.
+- Migration **2026-10-11-030** creates `songbooks` and `songbook_events` and regenerates the lyric-free public catalog.
+- Upgrade integrity requires both Songbook tables.
+- Section 5 rich-track regression now requires governed Songbook lyrics rather than raw Catalog rendering.
+- Section 12 search regression now requires published-Songbook lyric search.
+- Section 33 version/schema regression remains forward-compatible.
 - PHP syntax: **PASS**
 - Public JavaScript syntax: **PASS**
 - Admin JavaScript syntax: **PASS**
-- Sections 1–32 inherited regression suites: **PASS**
-- Section 33 certification: **PASS**
-- Explicit PASS lines on hardened implementation candidate: **1836**
+- Sections 1–33 inherited regression suites: **PASS**
+- Section 34 certification: **PASS**
+- Explicit PASS lines on hardened implementation candidate: **1887**
 - PHP warnings: **0**
 - Failures: **0**
 
-FINAL SECTION 33 SCORE: **10/10**
+FINAL SECTION 34 SCORE: **10/10**
