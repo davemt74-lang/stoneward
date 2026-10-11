@@ -78,10 +78,24 @@ function sf_artist_home_payload(int $userId=0): array {
     }
     return ['enabled'=>!empty($site['artist_homepage_enabled']),'artist'=>'Stonefellow','sections'=>$sections,'generated_at'=>gmdate('c')];
 }
+function sf_artist_home_readiness(): array {
+    $payload=sf_artist_home_payload(0);$checks=[];$blockers=[];$warnings=[];
+    foreach((array)$payload['sections'] as $s){$k=(string)$s['section_key'];$d=$s['data']??null;$ok=true;$detail='Ready.';
+      if($k==='hero'){$ok=trim((string)$s['heading'])!=='';$detail=$ok?(!empty($d['hero_image'])?'Hero copy + media ready.':'Hero copy ready; no hero image published.'):'Hero heading is missing.';if($ok&&empty($d['hero_image']))$warnings[]='Hero section has no published site hero image.';}
+      elseif($k==='featured_release'){$ok=is_array($d)&&!empty($d['id']);$detail=$ok?(!empty($d['cover'])?'Featured release ready.':'Featured release has no public cover.'):'No public featured release is available.';if($ok&&empty($d['cover']))$warnings[]='Featured release has no public cover image.';}
+      elseif($k==='featured_track'){$ok=is_array($d)&&!empty($d['id'])&&!empty($d['audio']['url']);$detail=$ok?'Featured track has public audio.':'Featured track needs an explicitly Public primary audio asset.';}
+      elseif($k==='latest_releases'){$ok=is_array($d)&&count($d)>0;$detail=$ok?count($d).' public release(s).':'No public releases available.';}
+      elseif($k==='upcoming_show'){$ok=$d===null||!empty($d['id']);$detail=$d?'Upcoming show ready.':'No upcoming public show; section will be omitted.';if($d===null)$warnings[]='Upcoming Show is enabled but no future public show is available.';}
+      elseif($k==='merch'){$ok=$d===null||!empty($d['id']);$detail=$d?'Featured merch ready.':'No active available merch; section will be omitted.';if($d===null)$warnings[]='Featured Merch is enabled but no active available product is available.';}
+      elseif($k==='artist_story'){$ok=trim((string)$s['body_text'])!=='';$detail=$ok?(!empty($d['artist_photo'])?'Story + artist photo ready.':'Story ready; no artist photo published.'):'Artist story copy is empty.';if($ok&&empty($d['artist_photo']))$warnings[]='Artist Story has no published artist photo.';}
+      $checks[]=['key'=>$k,'label'=>ucwords(str_replace('_',' ',$k)),'ok'=>$ok,'detail'=>$detail];if(!$ok&&in_array($k,['hero','featured_release','featured_track'],true))$blockers[]=$detail;elseif(!$ok)$warnings[]=$detail;
+    }
+    $passed=count(array_filter($checks,fn($c)=>!empty($c['ok'])));$score=count($checks)?(int)round($passed*100/count($checks)):0;return ['ready'=>$blockers===[],'score'=>$score,'checks'=>$checks,'blockers'=>array_values(array_unique($blockers)),'warnings'=>array_values(array_unique($warnings))];
+}
 function sf_artist_home_event(string $eventType,string $sectionKey='',string $entityType='',string $entityId='',int $userId=0,array $detail=[]): void {
-    sf_artist_home_ensure_schema();$allowed=['view','hero_primary','hero_secondary','release_open','track_play','show_open','merch_open','newsletter_open','about_open','personalized_open','agent_open'];if(!in_array($eventType,$allowed,true))return;if($sectionKey!==''&&!in_array($sectionKey,sf_artist_home_keys(),true))return;$safe=[];foreach(array_slice($detail,0,6,true) as $k=>$v)$safe[sf_clean_text((string)$k,60)]=is_scalar($v)?sf_clean_text((string)$v,180):'';
+    sf_artist_home_ensure_schema();$allowed=['view','hero_primary','hero_secondary','release_open','track_open','track_play','show_open','merch_open','newsletter_open','about_open','personalized_open','agent_open'];if(!in_array($eventType,$allowed,true))return;if($sectionKey!==''&&!in_array($sectionKey,sf_artist_home_keys(),true))return;$safe=[];foreach(array_slice($detail,0,6,true) as $k=>$v)$safe[sf_clean_text((string)$k,60)]=is_scalar($v)?sf_clean_text((string)$v,180):'';
     $q=sf_db()->prepare('INSERT INTO artist_home_events(event_type,section_key,entity_type,entity_id,user_id,detail_json,created_at) VALUES(?,?,?,?,?,?,?)');$q->execute([$eventType,$sectionKey,sf_clean_text($entityType,60),sf_clean_text($entityId,160),$userId?:null,sf_artist_home_json($safe),gmdate('c')]);
 }
 function sf_artist_home_metrics(): array {
-    sf_artist_home_ensure_schema();$rows=sf_db()->query("SELECT event_type,COUNT(*) total FROM artist_home_events WHERE created_at>='".gmdate('c',time()-2592000)."' GROUP BY event_type ORDER BY total DESC")->fetchAll();$events=[];foreach($rows as $r)$events[(string)$r['event_type']]=(int)$r['total'];return ['views'=>$events['view']??0,'events'=>$events,'sections'=>sf_artist_home_sections(false)];
+    sf_artist_home_ensure_schema();$rows=sf_db()->query("SELECT event_type,COUNT(*) total FROM artist_home_events WHERE created_at>='".gmdate('c',time()-2592000)."' GROUP BY event_type ORDER BY total DESC")->fetchAll();$events=[];foreach($rows as $r)$events[(string)$r['event_type']]=(int)$r['total'];return ['views'=>$events['view']??0,'events'=>$events,'sections'=>sf_artist_home_sections(false),'readiness'=>sf_artist_home_readiness()];
 }
