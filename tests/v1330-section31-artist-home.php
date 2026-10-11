@@ -38,7 +38,7 @@ ok31(str_contains($core,'sf_live_public_shows'),'homepage show selection uses pu
 ok31(str_contains($core,'sf_commerce_products(true)'),'homepage merch selection uses only active public products');
 ok31(str_contains($core,'sf_distribution_record'),'homepage featured release can consume Section 29 live DSP destinations');
 ok31(str_contains($core,'sf_home_state($userId)'),'logged-in homepage reuses existing personalization rather than creating another profile model');
-ok31(str_contains($core,"if($key==='personalized'&&$userId<1)continue"),'anonymous visitors never receive personalized-home data');
+ok31(str_contains($core,"if(\$key==='personalized'&&\$userId<1)continue"),'anonymous visitors never receive personalized-home data');
 ok31(str_contains($core,'function sf_artist_home_readiness'),'homepage has deterministic public-content readiness');
 ok31(str_contains($core,'Hero section has no published site hero image')&&str_contains($core,'explicitly Public primary audio'),'readiness checks homepage visual/audio publishing quality');
 ok31(str_contains($core,"['view','hero_primary','hero_secondary','release_open','track_open','track_play','show_open','merch_open','newsletter_open','about_open','personalized_open','agent_open']"),'homepage analytics allow only real journey events');
