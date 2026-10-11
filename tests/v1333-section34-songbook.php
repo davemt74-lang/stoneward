@@ -41,20 +41,20 @@ ok34(str_contains($core,'Track must be public before Songbook publication.'),'So
 ok34(str_contains($core,'Songbook sections may not overlap.'),'publication readiness blocks overlapping sections');
 ok34(str_contains($core,'Annotations must reference a lyric line included in a Songbook section.'),'publication readiness blocks orphan annotations');
 ok34(str_contains($core,"preg_match('/^[a-z]{2,3}(?:-[A-Z]{2})?$/"),'Songbook validates normalized language codes');
-ok34(str_contains($core,'sf_songbook_public_payload')&&str_contains($core,"($r['status']??'')!=='published'"),'public payload is gated by Published status and readiness');
-ok34(str_contains($core,"$allowed=['view','section_open','annotation_open','share']"),'Songbook events are restricted to truthful interaction types');
+ok34(str_contains($core,'sf_songbook_public_payload')&&str_contains($core,"(\$r['status']??'')!=='published'"),'public payload is gated by Published status and readiness');
+ok34(str_contains($core,"\$allowed=['view','section_open','annotation_open','share']"),'Songbook events are restricted to truthful interaction types');
 ok34(str_contains($core,'!sf_songbook_get($trackId,true)'),'Songbook events require a currently public Songbook');
 ok34(str_contains($core,'function sf_songbook_agent_context'),'Songbook exposes bounded published lyric context for Agent use');
 
-ok34(str_contains($adminApi,'explicit Admin confirmation')&&str_contains($adminApi,"$existing===null?in_array($target,['published','archived'],true)"),'initial and later publish/archive transitions require Admin confirmation');
+ok34(str_contains($adminApi,'explicit Admin confirmation')&&str_contains($adminApi,"\$existing===null?in_array(\$target,['published','archived'],true)"),'initial and later publish/archive transitions require Admin confirmation');
 ok34(str_contains($adminApi,'sf_log_admin_action')&&str_contains($adminApi,'sf_agent_brain_log'),'Songbook Admin mutations feed audit and Agent Brain');
 ok34(str_contains($publicApi,'count($attempts)>=60'),'public Songbook event writes are rate-limited');
 ok34(str_contains($publicApi,'sf_songbook_public_payload($trackId)'),'public API never returns an ungoverned canonical lyric record');
 
-ok34(str_contains($adminBoot,'sf_songbook_public_catalog_rows')&&str_contains($adminBoot,"unset($track['lyrics'])"),'Catalog writer generates a lyric-free public catalog');
+ok34(str_contains($adminBoot,'sf_songbook_public_catalog_rows')&&str_contains($adminBoot,"unset(\$track['lyrics'])"),'Catalog writer generates a lyric-free public catalog');
 ok34(str_contains($core,'sf_songbook_refresh_public_catalog_asset'),'upgrade can sanitize an existing public catalog immediately');
 ok34(str_contains($mig,'sf_songbook_refresh_public_catalog_asset()'),'migration 030 regenerates the lyric-free public catalog');
-ok34(str_contains($search,"sf_songbook_get((string)($t['id']??''),true)?(string)($t['lyrics']??''):''"),'public search indexes lyrics only through a published Songbook');
+ok34(str_contains($search,"sf_songbook_get((string)(\$t['id']??''),true)?(string)(\$t['lyrics']??''):''"),'public search indexes lyrics only through a published Songbook');
 ok34(str_contains($agent,'sf_songbook_agent_context($query,4)'),'public Agent receives only published Songbook context');
 
 ok34(str_contains($adminShell,'assets/songbook.css')&&str_contains($adminShell,'assets/songbook.js'),'Admin shell loads Songbook editor assets');
