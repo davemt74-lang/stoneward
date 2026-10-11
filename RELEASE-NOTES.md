@@ -1,3 +1,22 @@
+# Stonefellow v1.3.33 — Section 34: Artist Brand & Visual Theme
+
+- Added a governed **single-artist Artist Brand & Visual Theme system** under Admin → Settings.
+- Added four curated presets: **Desert, Midnight, Paper and Monochrome**.
+- Added **Dark, Light and Follow System** appearance modes.
+- Added paired dark/light palettes with safe controls for background, surfaces, text, secondary text, accent, accent-button text and danger.
+- Added allowlisted display/body typography stacks, content width, density and corner controls.
+- Added deterministic server-side contrast/readiness scoring; inaccessible required color combinations block publishing.
+- Added separate **Draft** and **Published** theme state using the existing app_meta settings store.
+- Added a real-site **saved-draft preview** that is Administrator-only, noindex and analytics-clean.
+- Added explicit confirmation for live theme publishing and restoring the original Desert default.
+- Added Admin audit and Agent Brain visibility for theme lifecycle changes.
+- Added site-wide theme integration across Splash, Homepage, Storytelling, music, releases, shows, store, account/library surfaces and the persistent Agent/player shell.
+- Replaced structural hard-coded public colors/type stacks with theme tokens while preserving intentionally art-directed record/cassette visuals.
+- Added system-aware browser theme-color metadata.
+- Added no arbitrary CSS, script injection or remote-font capability.
+- Application advances to **1.3.33**.
+- Database schema remains **1.3.28**; no new migration is required.
+
 # Stonefellow v1.3.32 — Section 33: Public Content & Storytelling
 
 - Added a governed **single-artist Storytelling system** for Stonefellow.
