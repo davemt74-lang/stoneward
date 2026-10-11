@@ -63,7 +63,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <div class="menu-sheet">
         <button class="menu-close" id="menuClose" type="button" aria-label="Close menu">×</button>
         <nav>
-          <a href="?view=home" data-view="home">Agent</a>
+          <a href="?view=home" data-view="home"><?=!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent'?></a>
           <a href="?view=music" data-view="music">Music</a>
           <a href="?view=releases" data-view="releases">Releases</a>
           <a href="?view=archive" data-view="archive">Music Archive</a>
