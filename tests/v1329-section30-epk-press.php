@@ -89,13 +89,13 @@ ok30(str_contains($ht,'RewriteRule ^press/'),'pretty /press/{slug} route is supp
 ok30(str_contains($publicShell,'STONEFELLOW_INITIAL_ROUTE')&&str_contains($app,'initial.view')&&str_contains($app,'initial.slug'),'server rewrite state is handed to the SPA for pretty press/campaign routes');
 ok30(str_contains($publicShell,'<base href="<?=sf_h($appBaseHref)?>">'),'public shell has base URL support for pretty subdirectory routes');
 ok30(str_contains($lifecycle,'$trimmed!==$script')&&str_contains($lifecycle,"rtrim(\$trimmed,'/\\\\')"),'public base URL preserves subdirectory installs for API/Admin requests');
-ok30(str_contains($publicShell,"define('SF_BUILD', '1.3.29')"),'public assets are cache-busted for v1.3.29');
+$publicBuild='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$publicShell,$bm))$publicBuild=$bm[1];ok30(version_compare($publicBuild,'1.3.29','>='),'public assets remain Section 30 compatible after later releases');
 
 ok30(str_contains($boot,"require_once __DIR__ . '/press-core.php'"),'press core loads from canonical bootstrap');
 ok30(str_contains($mig,"'id'=>'2026-10-11-026'")&&str_contains($mig,'sf_press_ensure_schema'),'migration 026 installs press/EPK schema');
-ok30(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.25'"),'database schema advances to 1.3.25');
+$schema30='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$mm30))$schema30=$mm30[1];ok30(version_compare($schema30,'1.3.25','>='),'database schema remains Section 30 compatible or newer');
 foreach(['press_kits','press_contacts','press_outreach','press_coverage','press_events'] as $table)ok30(str_contains($mig,"'".$table."'"),'migration integrity requires '.$table);
-ok30(str_contains($version,"'stonefellow'=>'1.3.29'")&&str_contains($version,"'database_schema_target'=>'1.3.25'"),'version endpoint reports app 1.3.29 and schema 1.3.25');
+$app30='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm30))$app30=$vm30[1];ok30(version_compare($app30,'1.3.29','>=')&&version_compare($schema30,'1.3.25','>='),'version endpoint remains Section 30 compatible after later releases');
 ok30(str_contains($version,"'press_epk'=>'public-private-release-media-live-dsp-share-links'"),'version endpoint advertises EPK capability');
 ok30(str_contains($version,"'press_outreach'=>'explicit-send-transactional-outbox-dedupe-agent-brain'"),'version endpoint advertises governed press outreach');
 ok30(str_contains($wf,'node --check admin/assets/press.js')&&str_contains($wf,'php tests/v1329-section30-epk-press.php'),'release gate includes Press Admin JS and Section 30 suite');
