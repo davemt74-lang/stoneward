@@ -5,8 +5,8 @@ function ok31($v,$m){if(!$v){fwrite(STDERR,"FAIL: $m\n");exit(1);}echo "PASS: $m
 if(!function_exists('sf_clean_text')){function sf_clean_text(mixed $v,int $max=255): string {$s=trim((string)$v);return strlen($s)>$max?substr($s,0,$max):$s;}}
 require $root.'/api/artist-home-core.php';
 
-ok31(sf_artist_home_keys()===['hero','featured_release','featured_track','latest_releases','upcoming_show','merch','artist_story','newsletter','personalized'],'homepage section keys are fixed for one artist');
-$defs=sf_artist_home_defaults();ok31(count($defs)===9,'homepage seeds nine Stonefellow sections');
+$baseHomeKeys=['hero','featured_release','featured_track','latest_releases','upcoming_show','merch','artist_story','newsletter','personalized'];$homeKeys=sf_artist_home_keys();ok31(count(array_diff($baseHomeKeys,$homeKeys))===0,'original single-artist homepage sections remain available after later releases');
+$defs=sf_artist_home_defaults();ok31(count($defs)>=9,'homepage retains the original Stonefellow section set while allowing later public modules');
 ok31($defs[0][0]==='hero'&&$defs[0][4]==='Music made to be lived with.','homepage default hero is Stonefellow-specific');
 ok31(!str_contains(file_get_contents($root.'/api/artist-home-core.php'),'artist_id'),'homepage model does not introduce multi-artist tenancy');
 
