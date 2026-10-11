@@ -17,7 +17,7 @@ try{
         sf_json_response(['ok'=>true,'distribution'=>$r]);
     }
     if($action==='set_state'){
-        $state=(string)($b['state']??'draft');$consequential=in_array($state,['submitted','scheduled','live'],true);if($consequential&&empty($b['confirmed']))throw new RuntimeException('Changing a release to '.$state.' requires explicit confirmation.');
+        $state=(string)($b['state']??'draft');$consequential=in_array($state,['submitted','scheduled','live','archived'],true);if($consequential&&empty($b['confirmed']))throw new RuntimeException('Changing a release to '.$state.' requires explicit confirmation.');
         $r=sf_distribution_set_state($releaseId,$state,(int)$me['id']);
         sf_log_admin_action((int)$me['id'],'distribution_state_changed','release',$releaseId,['state'=>$state]);
         sf_agent_brain_log((int)$me['id'],'admin_distribution','distribution_state',['route'=>'release_distribution','action'=>'set_state','context_profile'=>'release','needs_llm'=>false,'requires_confirmation'=>$consequential,'status'=>'completed','request'=>'Set release distribution state to '.$state,'response'=>'Distribution state is now '.$state.'.']);
