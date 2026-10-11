@@ -271,7 +271,7 @@ function sf_migration_definitions(): array {
             'app_version'=>'1.3.35',
             'description'=>'Governed public video features, managed video/poster/caption relationships, chapters and truthful watch events',
             'revision'=>'1',
-            'apply'=>function(): void { sf_video_ensure_schema(); },
+            'apply'=>function(): void { sf_video_ensure_schema(); sf_artist_home_ensure_schema(); },
         ],
     ];
 }
