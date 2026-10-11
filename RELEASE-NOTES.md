@@ -1,3 +1,27 @@
+# Stonefellow v1.3.29 — Section 30: Press Kit, EPK & Media Relations
+
+- Added first-class Admin **EPK + Press** workspace.
+- Added general artist EPKs and release-specific EPKs with Draft, Published, Private and Archived lifecycle states.
+- Added EPK publishing-readiness checks for press copy, public contact information, hero media, linked release validity and Section 29 distribution readiness.
+- Added pretty public URLs at `/press/{slug}`.
+- Added private EPK links using 256-bit bearer tokens stored only as SHA-256 hashes on the EPK record.
+- Private bearer tokens use URL fragments and private EPK content loads through POST, keeping the token out of the page request query string.
+- Leaving Private status invalidates the previous token; rotating a token invalidates the previous private link.
+- Added reusable Media Library relationships for EPK hero art, photos, approved audio/video, documents and archive media.
+- Public EPKs expose only explicitly Public Media Library assets; legacy/private catalog audio paths are not surfaced.
+- Release EPKs consume live DSP links from Section 29 Distribution + Publishing.
+- Added separate press-contact directory with Active, Do Not Contact and Archived governance; press contacts are not Fan CRM/newsletter contacts.
+- Added governed press outreach through Stonefellow’s existing transactional email outbox.
+- Every press send requires explicit Admin confirmation and uses duplicate suppression; failed sends remain visible and may be retried.
+- Added confirmed coverage ledger for articles, reviews, interviews, radio, podcasts, video, playlists and other placements.
+- Added truthful EPK engagement events for page views, media/contact/DSP clicks, release plays and downloads; no email-open tracking is invented.
+- Added Admin audit + Agent Brain visibility for EPK publishing, token rotation, press contacts, outreach and coverage.
+- Admin Agent distinguishes media relations from vinyl/record pressing.
+- Hardened public base-URL and internal-route handling for subdirectory installations.
+- Admin sidebar now supports 29 navigation links under the short-viewport density regression.
+- Application advances to **1.3.29**.
+- Database schema advances to **1.3.25** via migration **2026-10-11-026**.
+
 # Stonefellow v1.3.28 — Section 29: Release Publishing & Distribution Operations
 
 ## Hardening audit
