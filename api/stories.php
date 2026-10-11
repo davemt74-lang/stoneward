@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
-sf_story_ensure_schema();$method=$_SERVER['REQUEST_METHOD']??'GET';$user=sf_current_user();$uid=(int)($user['id']??0);
+sf_story_ensure_schema();$method=$_SERVER['REQUEST_METHOD']??'GET';$user=sf_current_user();$uid=(int)($user['id']??0);$themePreview=!empty($_GET['theme_preview'])&&(($user['role']??'')==='admin');
 if($method==='GET'){
     $slug=sf_clean_text($_GET['slug']??'',160);$mode=sf_clean_text($_GET['mode']??'',40);$entityType=sf_clean_text($_GET['entity_type']??'',40);$entityId=sf_clean_text($_GET['entity_id']??'',160);
     if($slug!==''){$e=sf_story_get($slug,true);if(!$e)sf_json_response(['ok'=>false,'message'=>'Story not found.'],404);sf_story_event((int)$e['id'],'view',$uid);sf_json_response(['ok'=>true,'story'=>$e]);}
