@@ -286,8 +286,8 @@
   function shareButton(view,id,title,slug=''){return '<button class="text-control" type="button" data-share-view="'+esc(view)+'" data-share-id="'+esc(id||'')+'" data-share-slug="'+esc(slug||'')+'" data-share-title="'+esc(title||'Stonefellow')+'">Share</button>'}
   async function shareRoute(view,id,title,slug=''){
     const params={};if(id)params.id=id;if(slug)params.slug=slug;const url=publicRouteUrl(view,params).href;
-    if(navigator.share){try{await navigator.share({title:title||'Stonefellow',url});await recordDiscovery('share',{route_type:view,route_id:id||slug||'',share_target:'native'});return}catch(e){if(e?.name==='AbortError')return}}
-    try{await navigator.clipboard.writeText(url);await recordDiscovery('share',{route_type:view,route_id:id||slug||'',share_target:'copy'});say('Share link copied.')}catch(_){say(url)}
+    if(navigator.share){try{await navigator.share({title:title||'Stonefellow',url});await recordDiscovery('share',{route_type:view,route_id:id||slug||'',share_target:'native'});if(view==='story'&&id)await storyEvent(Number(id),'share',{target:'native'});return}catch(e){if(e?.name==='AbortError')return}}
+    try{await navigator.clipboard.writeText(url);await recordDiscovery('share',{route_type:view,route_id:id||slug||'',share_target:'copy'});if(view==='story'&&id)await storyEvent(Number(id),'share',{target:'copy'});say('Share link copied.')}catch(_){say(url)}
   }
   function bindShareButtons(r=document){$$('[data-share-view]',r).forEach(b=>b.onclick=()=>shareRoute(b.dataset.shareView,b.dataset.shareId||'',b.dataset.shareTitle||'Stonefellow',b.dataset.shareSlug||''))}
   function setUrl(view,params={}){const u=publicRouteUrl(view,params);history.pushState({view,params},'',u);syncSeo(view,params)}
