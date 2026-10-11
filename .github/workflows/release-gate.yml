@@ -47,6 +47,7 @@ jobs:
           node --check admin/assets/press.js
           node --check admin/assets/homepage.js
           node --check admin/assets/stories.js
+          node --check admin/assets/songbook.js
 
       - name: v1.3 regression suites
         run: |
@@ -87,3 +88,4 @@ jobs:
           php tests/v1330-section31-artist-home.php
           php tests/v1331-section32-seo-discovery.php
           php tests/v1332-section33-storytelling.php
+          php tests/v1333-section34-songbook.php
