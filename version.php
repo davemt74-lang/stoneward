@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.32',
+  'stonefellow'=>'1.3.33',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
@@ -72,6 +72,9 @@ echo json_encode([
   'story_media'=>'media-library-hero-inline-gallery-public-governance',
   'story_editorial_links'=>'authoritative-track-release-show-links-no-shadow-catalog',
   'story_events'=>'truthful-view-entity-media-share-events',
+  'artist_brand_theme'=>'single-artist-draft-preview-publish-dark-light-system',
+  'theme_accessibility'=>'server-validated-contrast-readiness-no-arbitrary-css',
+  'theme_scope'=>'public-shell-homepage-storytelling-music-store-agent-surfaces',
   'launch_templates'=>'single-album-show-campaign-custom',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
