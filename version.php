@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.32',
+  'stonefellow'=>'1.3.33',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.28',
+  'database_schema_target'=>'1.3.29',
   'database_upgrader'=>'upgrade.php',
   'dashboard'=>'activity-listening-command-center',
   'personalization'=>'favorites-library-history',
@@ -72,6 +72,9 @@ echo json_encode([
   'story_media'=>'media-library-hero-inline-gallery-public-governance',
   'story_editorial_links'=>'authoritative-track-release-show-links-no-shadow-catalog',
   'story_events'=>'truthful-view-entity-media-share-events',
+  'songbook'=>'catalog-lyrics-governed-publication-sections-annotations',
+  'songbook_privacy'=>'draft-lyrics-excluded-public-page-search-agent',
+  'songbook_events'=>'truthful-view-section-annotation-share-events',
   'launch_templates'=>'single-album-show-campaign-custom',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
