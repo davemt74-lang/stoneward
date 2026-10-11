@@ -31,7 +31,7 @@ function sf_artist_home_ensure_schema(): void {
     $done=true;
 }
 function sf_artist_home_normalize_config(string $key,array $raw): array {
-    $viewAllowed=['music','releases','shows','store','about','newsletter','archive'];
+    $viewAllowed=['music','releases','shows','store','about','newsletter'];
     if($key==='hero')return [
       'primary_label'=>sf_clean_text($raw['primary_label']??'Listen now',80),
       'primary_view'=>in_array((string)($raw['primary_view']??''),$viewAllowed,true)?(string)$raw['primary_view']:'music',
@@ -57,6 +57,10 @@ function sf_artist_home_section(string $key): ?array { foreach(sf_artist_home_se
 function sf_artist_home_save_section(array $raw): array {
     sf_artist_home_ensure_schema();$key=(string)($raw['section_key']??'');if(!in_array($key,sf_artist_home_keys(),true))throw new InvalidArgumentException('Unknown homepage section.');
     $clean=sf_artist_home_normalize_config($key,(array)($raw['config']??[]));
+    if($key==='featured_release'&&!empty($clean['release_id'])){$found=false;foreach(sf_release_rows() as $r)if((string)($r['id']??'')===$clean['release_id']&&($r['state']??'published')==='published'&&($r['public_visible']??true)!==false){$found=true;break;}if(!$found)throw new InvalidArgumentException('Featured release must be a published public Stonefellow release.');}
+    if($key==='featured_track'&&!empty($clean['track_id'])){$found=false;foreach(sf_catalog() as $t)if((string)($t['id']??'')===$clean['track_id']){$found=true;break;}if(!$found)throw new InvalidArgumentException('Featured track was not found in the Stonefellow catalog.');}
+    if($key==='upcoming_show'&&!empty($clean['show_id'])&&(!function_exists('sf_live_show_by_id')||!sf_live_show_by_id((string)$clean['show_id'])))throw new InvalidArgumentException('Featured show must be a public Stonefellow show.');
+    if($key==='merch'&&!empty($clean['product_id'])&&(!function_exists('sf_commerce_product')||!sf_commerce_product((string)$clean['product_id'],true)))throw new InvalidArgumentException('Featured merch must be an active public Stonefellow product.');
     $q=sf_db()->prepare('UPDATE artist_home_sections SET enabled=?,position=?,eyebrow=?,heading=?,body_text=?,config_json=?,updated_at=? WHERE section_key=?');$q->execute([!empty($raw['enabled'])?1:0,max(0,min(999,(int)($raw['position']??0))),sf_clean_text($raw['eyebrow']??'',120),sf_clean_text($raw['heading']??'',255),sf_clean_text($raw['body_text']??'',6000),sf_artist_home_json($clean),gmdate('c'),$key]);return sf_artist_home_section($key)?:[];
 }
 function sf_artist_home_reset(): array {
