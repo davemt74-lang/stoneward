@@ -48,8 +48,20 @@ function sf_distribution_managed_media_path(array $asset): ?string {
     $rel=ltrim((string)($asset['stored_path']??''),'/');if($rel===''||!str_starts_with($rel,'storage/media/'))return null;$root=realpath(SF_ROOT.'/storage/media');$abs=realpath(SF_ROOT.'/'.$rel);if(!$root||!$abs||!str_starts_with($abs,$root.DIRECTORY_SEPARATOR)||!is_file($abs))return null;return $abs;
 }
 function sf_distribution_destination_transition_allowed(string $from,string $to): bool {
-    if($from===$to)return true;if($from==='live')return false;if($to==='failed')return true;if($from==='failed')return in_array($to,['preparing','submitted'],true);
+    if($from===$to)return true;if($to==='failed')return true;if($from==='live')return false;if($from==='failed')return in_array($to,['preparing','submitted'],true);
     $rank=['not_started'=>0,'preparing'=>1,'submitted'=>2,'scheduled'=>3,'live'=>4];return isset($rank[$from],$rank[$to])&&$rank[$to]>=$rank[$from];
+}
+function sf_distribution_has_destination_status(array $destinations,array $statuses): bool {
+    foreach($destinations as $d)if(in_array((string)($d['status']??''),$statuses,true))return true;return false;
+}
+function sf_distribution_state_evidence(array $rec,string $state): ?string {
+    if(!in_array($state,['submitted','scheduled','live'],true))return null;
+    if(empty($rec['package_path'])||!empty($rec['package_stale']))return 'Build a current distributor package before marking the release '.$state.'.';
+    $dest=(array)($rec['destinations']??[]);
+    if($state==='submitted'&&!sf_distribution_has_destination_status($dest,['submitted','scheduled','live']))return 'Mark at least one DSP destination submitted before marking the release submitted.';
+    if($state==='scheduled'&&!sf_distribution_has_destination_status($dest,['scheduled','live']))return 'Mark at least one DSP destination scheduled before marking the release scheduled.';
+    if($state==='live'){foreach($dest as $d)if(($d['status']??'')==='live'&&sf_distribution_valid_https_url((string)($d['release_url']??''))&&(string)($d['release_url']??'')!=='')return null;return 'At least one DSP destination must be live with a valid HTTPS release URL.';}
+    return null;
 }
 function sf_distribution_rights_manifest(string $trackId): array {
     if(!function_exists('sf_rights_work'))return [];$w=sf_rights_work($trackId);if(!$w)return [];
@@ -146,13 +158,13 @@ function sf_distribution_save_metadata(string $releaseId,array $raw,int $adminId
 }
 function sf_distribution_set_state(string $releaseId,string $state,int $adminId=0): array {
     $allowed=['draft','preparing','ready','submitted','scheduled','live','archived'];if(!in_array($state,$allowed,true))throw new InvalidArgumentException('Invalid distribution state.');$rec=sf_distribution_record($releaseId);if(!$rec)throw new InvalidArgumentException('Release not found.');if(!sf_distribution_transition_allowed((string)$rec['distribution_state'],$state))throw new RuntimeException('Invalid distribution transition from '.$rec['distribution_state'].' to '.$state.'.');
-    if(in_array($state,['ready','submitted','scheduled','live'],true)){ $read=sf_distribution_release_readiness($releaseId,$rec);if(empty($read['ready']))throw new RuntimeException('Release is blocked: '.implode(' ',array_slice($read['blockers'],0,5))); }
+    if(in_array($state,['ready','submitted','scheduled','live'],true)){ $read=sf_distribution_release_readiness($releaseId,$rec);if(empty($read['ready']))throw new RuntimeException('Release is blocked: '.implode(' ',array_slice($read['blockers'],0,5))); }$evidence=sf_distribution_state_evidence($rec,$state);if($evidence!==null)throw new RuntimeException($evidence);
     $now=gmdate('c');$submitted=$rec['submitted_at']??null;$scheduled=$rec['scheduled_at']??null;$live=$rec['live_at']??null;if($state==='submitted'&&!$submitted)$submitted=$now;if($state==='scheduled'&&!$scheduled)$scheduled=$now;if($state==='live'&&!$live)$live=$now;
     sf_db()->prepare('UPDATE distribution_releases SET distribution_state=?,submitted_at=?,scheduled_at=?,live_at=?,updated_at=? WHERE release_id=?')->execute([$state,$submitted,$scheduled,$live,$now,$releaseId]);sf_distribution_event($releaseId,'state_changed',['from'=>$rec['distribution_state'],'to'=>$state],$adminId);return sf_distribution_record($releaseId)?:[];
 }
 function sf_distribution_save_destination(string $releaseId,array $raw,int $adminId=0): array {
     $provider=sf_clean_text($raw['provider']??'',60);if(!in_array($provider,sf_distribution_destinations(),true))throw new InvalidArgumentException('Unsupported destination.');$status=(string)($raw['status']??'not_started');$allowed=['not_started','preparing','submitted','scheduled','live','failed'];if(!in_array($status,$allowed,true))throw new InvalidArgumentException('Invalid destination status.');$url=$url;if(!sf_distribution_valid_https_url($url))throw new InvalidArgumentException('Destination URL must be a valid HTTPS URL.');if($status==='live'&&$url==='')throw new InvalidArgumentException('A live destination requires its public release URL.');
-    $rec=sf_distribution_record($releaseId);if(!$rec)throw new InvalidArgumentException('Release not found.');if(in_array($status,['submitted','scheduled','live'],true)&&empty($rec['readiness']['ready']))throw new RuntimeException('Resolve release blockers before marking a destination '.$status.'.');
+    $rec=sf_distribution_record($releaseId);if(!$rec)throw new InvalidArgumentException('Release not found.');if(in_array($status,['submitted','scheduled','live'],true)&&empty($rec['readiness']['ready']))throw new RuntimeException('Resolve release blockers before marking a destination '.$status.'.');if(in_array($status,['submitted','scheduled','live'],true)&&(empty($rec['package_path'])||!empty($rec['package_stale'])))throw new RuntimeException('Build a current distributor package before marking a destination '.$status.'.');$releaseState=(string)($rec['distribution_state']??'draft');$allowedReleaseStates=$status==='submitted'?['ready','submitted','scheduled','live']:($status==='scheduled'?['submitted','scheduled','live']:['scheduled','live']);if(in_array($status,['submitted','scheduled','live'],true)&&!in_array($releaseState,$allowedReleaseStates,true))throw new RuntimeException('Release state '.$releaseState.' does not permit a destination to be marked '.$status.'.');
     $q=sf_db()->prepare('SELECT * FROM distribution_destinations WHERE release_id=? AND provider=?');$q->execute([$releaseId,$provider]);$old=$q->fetch()?:[];if($old&&!sf_distribution_destination_transition_allowed((string)$old['status'],$status))throw new RuntimeException('Invalid destination transition from '.$old['status'].' to '.$status.'.');$now=gmdate('c');$submitted=$old['submitted_at']??null;$scheduled=$old['scheduled_at']??null;$live=$old['live_at']??null;if($status==='submitted'&&!$submitted)$submitted=$now;if($status==='scheduled'&&!$scheduled)$scheduled=$now;if($status==='live'&&!$live)$live=$now;
     sf_db()->prepare('UPDATE distribution_destinations SET status=?,external_id=?,release_url=?,notes=?,submitted_at=?,scheduled_at=?,live_at=?,updated_at=? WHERE release_id=? AND provider=?')->execute([$status,sf_clean_text($raw['external_id']??'',255),sf_clean_text($raw['release_url']??'',700),sf_clean_text($raw['notes']??'',5000),$submitted,$scheduled,$live,$now,$releaseId,$provider]);sf_distribution_event($releaseId,'destination_updated',['provider'=>$provider,'status'=>$status],$adminId);return sf_distribution_record($releaseId)?:[];
 }
