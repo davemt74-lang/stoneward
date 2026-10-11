@@ -12,7 +12,7 @@ if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed']
 $b=sf_request_json();$action=(string)($b['action']??'');
 try{
     if($action==='save_kit'){
-        $raw=(array)($b['kit']??[]);$existing=!empty($raw['id'])?sf_press_kit((int)$raw['id']):null;$target=(string)($raw['status']??'draft');$consequential=in_array($target,['published','private','archived'],true)&&($existing['status']??'draft')!==$target;if($consequential&&empty($b['confirmed']))throw new RuntimeException('Changing EPK visibility to '.$target.' requires explicit Admin confirmation.');
+        $raw=(array)($b['kit']??[]);$existing=!empty($raw['id'])?sf_press_kit((int)$raw['id']):null;$target=(string)($raw['status']??'draft');$consequential=$existing!==null&&($existing['status']??'draft')!==$target;if($consequential&&empty($b['confirmed']))throw new RuntimeException('Changing EPK visibility to '.$target.' requires explicit Admin confirmation.');
         $kit=sf_press_save_kit($raw,(int)$me['id']);sf_log_admin_action((int)$me['id'],'press_kit_saved','press_kit',(string)$kit['id'],['status'=>$kit['status'],'release_id'=>$kit['release_id'],'readiness'=>$kit['readiness']]);sf_agent_brain_log((int)$me['id'],'admin_press','press_kit',['route'=>'press_epk','action'=>'save_kit','context_profile'=>'catalog','needs_llm'=>false,'requires_confirmation'=>$consequential,'status'=>'completed','request'=>'Save EPK '.$kit['title'],'response'=>'EPK '.$kit['slug'].' saved as '.$kit['status'].'; readiness '.$kit['readiness']['score'].'%.']);sf_json_response(['ok'=>true,'kit'=>$kit,'summary'=>sf_press_summary()]);
     }
     if($action==='rotate_token'){
