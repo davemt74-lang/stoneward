@@ -78,7 +78,7 @@ ok34(str_contains($siteCss,'.site-announcement,.notification-drawer,.queue-drawe
 ok34(str_contains($siteCss,'.story-lede,.story-rich-copy p')&&str_contains($siteCss,'color:var(--muted)!important'),'Storytelling text follows theme secondary color');
 
 # 34F — Settings/editor integration
-ok34(str_contains($adminIndex,'assets/theme.css')&&str_contains($adminIndex,'assets/theme.js'),'Artist Brand Admin assets load in v1.3.33');
+ok34(str_contains($adminIndex,'assets/theme.css')&&str_contains($adminIndex,'assets/theme.js'),'Artist Brand Admin assets remain loaded after later releases');
 ok34(substr_count($adminIndex,'<button type="button" data-view=')===29,'Artist Brand adds no 30th Admin sidebar item');
 ok34(str_contains($adminMain,'id="themePanel"')&&str_contains($adminMain,"SFThemeAdmin?.renderInto?.('themePanel')"),'Artist Brand editor is embedded in Settings');
 ok34(str_contains($adminMain,'Artist Brand & Visual Theme lives in Settings.'),'Admin Agent routes appearance requests to the theme editor');
@@ -87,10 +87,10 @@ ok34(str_contains($adminCss,'.theme-preview-grid')&&str_contains($adminCss,'.the
 
 # 34G — Release/version boundaries
 ok34(str_contains($boot,"require_once __DIR__ . '/theme-core.php'"),'theme core loads from canonical bootstrap');
-ok34(str_contains($shell,"define('SF_BUILD', '1.3.33')")&&str_contains($adminIndex,"define('SF_ADMIN_BUILD','1.3.33')"),'public and Admin asset builds advance to v1.3.33');
-ok34(str_contains($ht,'X-Stonefellow-Build "1.3.33"'),'web-server build header advances to v1.3.33');
-ok34(str_contains($version,"'stonefellow'=>'1.3.33'")&&str_contains($version,"'database_schema_target'=>'1.3.28'"),'v1.3.33 intentionally keeps database schema 1.3.28');
-ok34(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.28'")&&!str_contains($mig,"'id'=>'2026-10-11-030'"),'Artist Brand requires no new database migration');
+$publicBuild34='0.0.0';$adminBuild34='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$pb34))$publicBuild34=$pb34[1];if(preg_match("/define\('SF_ADMIN_BUILD','([^']+)'\)/",$adminIndex,$ab34))$adminBuild34=$ab34[1];ok34(version_compare($publicBuild34,'1.3.33','>=')&&version_compare($adminBuild34,'1.3.33','>='),'public and Admin asset builds remain Section 34 compatible or newer');
+ok34(preg_match('/X-Stonefellow-Build "([0-9.]+)"/',$ht,$hb34)&&version_compare($hb34[1],'1.3.33','>='),'web-server build header remains Section 34 compatible or newer');
+$app34='0.0.0';$schema34='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$av34))$app34=$av34[1];if(preg_match("/'database_schema_target'=>'([^']+)'/",$version,$sv34))$schema34=$sv34[1];ok34(version_compare($app34,'1.3.33','>=')&&version_compare($schema34,'1.3.28','>='),'version endpoint remains Section 34 compatible after later releases');
+ok34(!str_contains($core,'CREATE TABLE')&&str_contains($core,'site.theme_published_json'),'Artist Brand itself remains table-free and uses app_meta even when later sections add migrations');
 ok34(str_contains($version,"'artist_brand_theme'=>'single-artist-draft-preview-publish-dark-light-system'"),'version endpoint advertises the Artist Brand contract');
 
 # 34H — Regression gate
