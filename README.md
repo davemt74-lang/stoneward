@@ -1,3 +1,42 @@
+# Stonefellow v1.3.28 — Section 29: Release Publishing & Distribution Operations
+
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 29 turns the existing release, Media Library, Rights Registry and Operating Calendar data into a governed distribution-preparation workflow.
+
+## Distribution + Publishing
+
+Admin now has a first-class workspace that answers the operational question: **is this release actually ready to deliver?**
+
+Preflight covers:
+
+- release title and date
+- primary artist, label, genre, language and territory
+- UPC-A / EAN-13
+- per-track ISRCs
+- audio masters
+- cover artwork and managed resolution
+- © / ℗ lines
+- Section 28 composition/master ownership and license blockers
+
+Stonefellow produces a deterministic readiness score, blockers and warnings before allowing Ready, Submitted, Scheduled or Live states.
+
+## Distributor packages
+
+A green release can generate an authenticated distributor package containing:
+
+- `manifest.json`
+- `credits-rights.csv`
+- managed audio masters
+- managed front cover
+- SHA-256 package digest
+
+Stonefellow does **not** claim to submit directly to Spotify, Apple Music or other DSPs without a real distributor API. It prepares the delivery package and records external submission/live status.
+
+## DSP status and launch calendar
+
+The workspace tracks Spotify, Apple Music, YouTube Music, Amazon Music and Bandcamp status, external IDs and live URLs. It can also synchronize distributor deadline, presave, campaign start and release-day checks into the native Operating Calendar using deterministic milestone keys.
+
+---
+
 # Stonefellow v1.3.27 — Section 28: Rights, Credits & Licensing Registry
 
 Stonefellow remains a **single-artist direct-to-fan platform**. Section 28 adds an authoritative Admin rights layer for the catalog and releases without pretending to be a royalty-accounting service.
