@@ -1,3 +1,21 @@
+# Stonefellow v1.3.34 — Section 35: Lyrics, Songbook & Track Notes
+
+- Added governed Songbook publishing for Stonefellow tracks.
+- Canonical lyrics remain private Catalog data until an Administrator explicitly publishes a Songbook.
+- Generated `assets/js/catalog.js` no longer contains canonical lyric text.
+- Added Draft, Published and Archived Songbook lifecycle.
+- Every Songbook visibility change requires explicit Admin confirmation.
+- Added verse/chorus/bridge section ranges, language metadata, optional songwriting credits and line annotations.
+- Publication readiness requires a public track, canonical lyrics, valid language, non-overlapping in-range sections, full meaningful-line coverage and valid annotation references.
+- Added automatic section detection in the Catalog Songbook editor.
+- Public track pages load governed Songbook content instead of raw Catalog lyrics.
+- Public Songbook interaction metrics record only real views, section opens and annotation opens.
+- Public search indexes lyrics only through a currently published Songbook.
+- Public Agent grounding receives only bounded published Songbook lyric context.
+- Migration 030 regenerates the public catalog asset immediately so existing private lyric fields are removed from browser-delivered catalog JS.
+- Application advances to **1.3.34**.
+- Database schema advances to **1.3.29** via migration **2026-10-11-030**.
+
 # Stonefellow v1.3.33 — Section 34: Artist Brand & Visual Theme
 
 - Added a governed **single-artist Artist Brand & Visual Theme system** under Admin → Settings.
