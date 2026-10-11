@@ -40,9 +40,9 @@ ok31(str_contains($core,'sf_distribution_record'),'homepage featured release can
 ok31(str_contains($core,'sf_home_state($userId)'),'logged-in homepage reuses existing personalization rather than creating another profile model');
 ok31(str_contains($core,"if(\$key==='personalized'&&\$userId<1)continue"),'anonymous visitors never receive personalized-home data');
 ok31(str_contains($core,'function sf_artist_home_readiness'),'homepage has deterministic public-content readiness');
-ok31(str_contains($core,'function sf_artist_home_normalize_config')&&!str_contains($core,"$viewAllowed=['music','releases','shows','store','about','newsletter','archive']"),'homepage API normalizes config through a server-side destination allowlist');
+ok31(str_contains($core,'function sf_artist_home_normalize_config')&&!str_contains($core,"\$viewAllowed=['music','releases','shows','store','about','newsletter','archive']"),'homepage API normalizes config through a server-side destination allowlist');
 ok31(str_contains($core,'Featured release must be a published public Stonefellow release.')&&str_contains($core,'Featured track was not found in the Stonefellow catalog.')&&str_contains($core,'Featured show must be a public Stonefellow show.')&&str_contains($core,'Featured merch must be an active public Stonefellow product.'),'homepage explicit overrides are validated against authoritative Stonefellow entities');
-ok31(str_contains($core,"parse_url($url,PHP_URL_SCHEME)")&&str_contains($core,"==='https'"),'homepage defensively revalidates live DSP links as HTTPS');
+ok31(str_contains($core,"parse_url(\$url,PHP_URL_SCHEME)")&&str_contains($core,"==='https'"),'homepage defensively revalidates live DSP links as HTTPS');
 ok31(str_contains($core,'Hero section has no published site hero image')&&str_contains($core,'explicitly Public primary audio'),'readiness checks homepage visual/audio publishing quality');
 ok31(str_contains($core,"['view','hero_primary','hero_secondary','release_open','track_open','track_play','show_open','merch_open','newsletter_open','about_open','personalized_open','agent_open']"),'homepage analytics allow only real journey events');
 ok31(!str_contains($core,'email_open')&&!str_contains($core,'impression_score'),'homepage does not invent engagement signals');
