@@ -77,7 +77,10 @@ function sf_admin_write_catalog(array $catalog): void {
     $tmp=$catalogPath.'.tmp.'.bin2hex(random_bytes(3));
     if(file_put_contents($tmp,$json,LOCK_EX)===false) throw new RuntimeException('Could not write catalog.');
     if(!rename($tmp,$catalogPath)){@unlink($tmp);throw new RuntimeException('Could not finalize catalog.');}
-    $js="window.STONEFELLOW_CATALOG = ".$json.";\n";
+    $publicCatalog=function_exists('sf_songbook_public_catalog_rows')?sf_songbook_public_catalog_rows($catalog):array_map(function($track){if(is_array($track))unset($track['lyrics']);return $track;},array_values($catalog));
+    $publicJson=json_encode(array_values($publicCatalog), JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+    if($publicJson===false) throw new RuntimeException('Could not encode public catalog.');
+    $js="window.STONEFELLOW_CATALOG = ".$publicJson.";\n";
     $jsPath=SF_ROOT.'/assets/js/catalog.js';
     $tmp2=$jsPath.'.tmp.'.bin2hex(random_bytes(3));
     if(file_put_contents($tmp2,$js,LOCK_EX)===false) throw new RuntimeException('Could not write catalog JavaScript.');
