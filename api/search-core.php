@@ -42,7 +42,7 @@ function sf_search_track_fields(array $t): array {
         'mood'=>array_values(array_filter(array_map('strval',(array)($t['mood']??[])))),
         'themes'=>array_values(array_filter(array_map('strval',(array)($t['themes']??[])))),
         'story'=>(string)($t['story']??''),
-        'lyrics'=>(string)($t['lyrics']??''),
+        'lyrics'=>function_exists('sf_songbook_get')&&sf_songbook_get((string)($t['id']??''),true)?(string)($t['lyrics']??''):'',
         'credits'=>array_values(array_filter(array_map('strval',(array)($t['credits']??[])))),
         'metadata'=>sf_search_string_values($m),
         'archive'=>sf_search_string_values($a),
