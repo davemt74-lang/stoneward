@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.27';
+const SF_DB_SCHEMA_TARGET = '1.3.28';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -252,6 +252,13 @@ function sf_migration_definitions(): array {
             'revision'=>'1',
             'apply'=>function(): void { sf_seo_ensure_schema(); },
         ],
+        [
+            'id'=>'2026-10-11-029',
+            'app_version'=>'1.3.32',
+            'description'=>'Single-artist editorial stories, About content, linked song/release/show stories, timeline milestones and story events',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_story_ensure_schema(); },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
@@ -412,7 +419,7 @@ function sf_migration_integrity_report(): array {
         'agent_conversations','agent_messages','agent_brain_decisions','account_action_tokens',
         'transactional_email_outbox','billing_webhook_events','billing_invoices','billing_audit_log',
         'user_notifications','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','catalog_search_events','user_collections','user_collection_items','fan_contacts','fan_crm_events','fan_agent_engagements','community_posts','campaigns','campaign_segments','campaign_participants','campaign_events','campaign_entitlements','campaign_message_runs','membership_content','ticket_offers','ticket_reservations','ticket_events','order_shipments','order_refunds','support_cases','support_messages','order_ops_events','operating_plans','operating_milestones','media_assets','media_links','store_products','store_variants','store_inventory_events','store_order_items','user_activity','listening_events','provider_health_checks','admin_audit_log',
-        'site_event_log','auth_attempts','order_request_keys','user_favorites','user_listening_progress','user_playlists','user_playlist_tracks','user_track_feedback','agent_listening_sessions','agent_listening_session_tracks','user_play_queue','schema_migrations','schema_upgrade_runs','distribution_releases','distribution_destinations','distribution_events','press_kits','press_contacts','press_outreach','press_coverage','press_events','artist_home_sections','artist_home_events','discovery_events'
+        'site_event_log','auth_attempts','order_request_keys','user_favorites','user_listening_progress','user_playlists','user_playlist_tracks','user_track_feedback','agent_listening_sessions','agent_listening_session_tracks','user_play_queue','schema_migrations','schema_upgrade_runs','distribution_releases','distribution_destinations','distribution_events','press_kits','press_contacts','press_outreach','press_coverage','press_events','artist_home_sections','artist_home_events','discovery_events','story_entries','story_events'
     ];
     $checks=[];$ok=true;
     foreach($requiredTables as $t){$exists=sf_migration_table_exists($t);$checks[]=['name'=>'Table '.$t,'ok'=>$exists,'detail'=>$exists?'Present':'Missing'];if(!$exists)$ok=false;}

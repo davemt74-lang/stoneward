@@ -1,3 +1,57 @@
+# Stonefellow v1.3.32 — Section 33: Public Content & Storytelling
+
+Stonefellow remains a **single-artist platform**. Section 33 adds governed long-form storytelling around the artist’s real catalog without turning the product into a generic CMS.
+
+## One editorial system, one artist
+
+Storytelling lives in Admin → Settings and supports:
+
+- Artist About
+- Editorial Essay
+- Release Story
+- Track Story
+- Show Story
+- Timeline Milestone
+
+There is no artist selector, tenant ID or second catalog.
+
+## Canonical ownership
+
+Storytelling adds context around the existing systems rather than duplicating them:
+
+- Song metadata and short song story remain owned by Catalog.
+- Release metadata, descriptions and liner notes remain owned by Releases.
+- Show facts remain owned by Shows & Live.
+- Long-form editorial can link to those public records and appears alongside them.
+
+## Artist About as the narrative source
+
+Once an Artist About is published, it becomes the governed narrative source for:
+
+- the public About page,
+- the Homepage Artist Story section,
+- About SEO metadata,
+- and grounded public Agent context.
+
+The earlier Homepage/About copy remains a fallback until a published Artist About exists.
+
+## Story media
+
+Stories reuse Media Library assets. Hero, inline and gallery media can be attached; public presentation only receives explicitly public media relationships.
+
+## Public editorial
+
+Published, readiness-approved stories receive clean `/story/{slug}` URLs, route-specific SEO and Article structured data. Public track, release and show pages can surface linked editorial without replacing their canonical data.
+
+## Truthful analytics
+
+Storytelling records only observable public actions: view, connected-content open, media open and completed share.
+
+Application: **1.3.32**  
+Database schema target: **1.3.28**
+
+---
+
 # Stonefellow v1.3.31 — Section 32: SEO, Discovery & Social Sharing
 
 Stonefellow’s public pages now have a canonical discovery layer built around the existing single-artist catalog.

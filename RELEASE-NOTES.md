@@ -1,3 +1,22 @@
+# Stonefellow v1.3.32 — Section 33: Public Content & Storytelling
+
+- Added a governed **single-artist Storytelling system** for Stonefellow.
+- Added Artist About, Editorial Essay, Release Story, Track Story, Show Story and Timeline Milestone types.
+- Storytelling is embedded in **Admin → Settings** and does not add another Admin sidebar item.
+- Added explicit publish/archive/delete confirmation and readiness enforcement.
+- Added canonical links from editorial stories to existing public tracks, releases and shows without creating shadow catalog data.
+- Added public **About** storytelling, editorial essays and Stonefellow history timeline.
+- Added canonical public **/story/{slug}** pages.
+- Added supplemental Story sections to track, release and show detail pages.
+- Added Storytelling Media Library integration with governed hero, inline and gallery media.
+- Added story-specific SEO, Article structured data and sitemap integration.
+- Published Artist About now automatically drives the Homepage Artist Story; Section 31 copy remains fallback only.
+- Public Agent context now includes bounded, relevance-ranked, published Storytelling content.
+- Added truthful story view, connected-content, media and share events.
+- Native/copy share events are recorded only after the corresponding user action succeeds.
+- Application advances to **1.3.32**.
+- Database schema advances to **1.3.28** via migration **2026-10-11-029**.
+
 # Stonefellow v1.3.31 — Section 32: SEO, Discovery & Social Sharing
 
 - Added route-specific canonical metadata for Home, songs, releases, shows, products, campaigns, EPKs and major public sections.

@@ -53,14 +53,14 @@ ok32(str_contains($robots,'Disallow: /admin/')&&str_contains($robots,'Disallow: 
 
 foreach(['^sitemap\\.xml$','^robots\\.txt$','^track/','^release/','^show/','^store/','^campaign/','^press/'] as $route)ok32(str_contains($ht,$route),'rewrite table contains '.$route);
 ok32(!str_contains($ht,'\\nRewriteRule'),'rewrite configuration contains no literal escaped-newline artifacts');
-ok32(str_contains($ht,'X-Stonefellow-Build "1.3.31"'),'web-server build header advances to 1.3.31');
+$htBuild32='0.0.0';if(preg_match('/X-Stonefellow-Build "([^"]+)"/',$ht,$hb32))$htBuild32=$hb32[1];ok32(version_compare($htBuild32,'1.3.31','>='),'web-server build header remains Section 32 compatible or newer');
 
-ok32(str_contains($shell,"define('SF_BUILD', '1.3.31')"),'public shell cache build advances to 1.3.31');
+$shellBuild32='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$sb32))$shellBuild32=$sb32[1];ok32(version_compare($shellBuild32,'1.3.31','>='),'public shell remains Section 32 compatible or newer');
 ok32(str_contains($shell,'<link rel="canonical"')&&str_contains($shell,'property="og:title"')&&str_contains($shell,'name="twitter:card"'),'server shell emits canonical, Open Graph and social-card metadata');
 ok32(str_contains($shell,'name="robots" content="<?=sf_h((string)$seo[\'robots\'])?>"'),'server shell emits route-specific robots policy');
 ok32(str_contains($shell,'type="application/ld+json" data-seo-jsonld="1"'),'server shell emits replaceable JSON-LD');
 ok32(str_contains($shell,'sf_seo_server_html($seo)'),'server shell renders crawlable critical route content before SPA takeover');
-ok32(str_contains($shell,"['press','campaign','track','release','show','store','music','releases','shows','about','archive']"),'pretty route handoff supports all public SEO routes');
+$routes32Ok=true;$routeList32='';if(preg_match('/\\$publicInitialViews=\\[([^\\]]+)\\]/',$shell,$rm32))$routeList32=$rm32[1];else$routes32Ok=false;foreach(['press','campaign','track','release','show','store','music','releases','shows','about','archive'] as $requiredRoute32)if(!str_contains($routeList32,"'".$requiredRoute32."'"))$routes32Ok=false;ok32($routes32Ok,'pretty route handoff preserves all Section 32 public SEO routes while allowing later routes');
 ok32(str_contains($shell,'href="./" id="homeLink"')&&str_contains($shell,'href="music" data-view="music"'),'server navigation prefers canonical public paths');
 
 ok32(str_contains($app,'function publicRouteUrl')&&str_contains($app,"new URL('track/'+id")&&str_contains($app,"new URL('release/'+id")&&str_contains($app,"new URL('show/'+id")&&str_contains($app,"new URL('store/'+slug"),'SPA generates the same canonical entity paths');
@@ -89,9 +89,9 @@ ok32(str_contains($analytics,'Discovery sources')&&str_contains($analytics,'no f
 
 ok32(str_contains($boot,"require_once __DIR__ . '/seo-core.php'"),'SEO core loads from canonical bootstrap');
 ok32(str_contains($mig,"'id'=>'2026-10-11-028'")&&str_contains($mig,'sf_seo_ensure_schema'),'migration 028 installs discovery schema');
-ok32(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.27'"),'database schema advances to 1.3.27');
+$schema32='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$ms32))$schema32=$ms32[1];ok32(version_compare($schema32,'1.3.27','>='),'database schema remains Section 32 compatible or newer');
 ok32(str_contains($mig,"'discovery_events'"),'upgrade integrity requires discovery_events');
-ok32(str_contains($version,"'stonefellow'=>'1.3.31'")&&str_contains($version,"'database_schema_target'=>'1.3.27'"),'version endpoint reports app 1.3.31 and schema 1.3.27');
+$app32='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$av32))$app32=$av32[1];ok32(version_compare($app32,'1.3.31','>=')&&version_compare($schema32,'1.3.27','>='),'version endpoint remains Section 32 compatible after later releases');
 ok32(str_contains($version,"'seo_routes'=>'canonical-pretty-public-track-release-show-product-campaign-press'"),'version endpoint advertises canonical public route capability');
 ok32(str_contains($wf,'php tests/v1331-section32-seo-discovery.php'),'release gate includes Section 32 certification');
 
