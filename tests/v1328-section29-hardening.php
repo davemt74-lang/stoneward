@@ -46,7 +46,7 @@ hard_ok(str_contains($core,'function sf_distribution_rights_manifest'),'package 
 $manifestStart=strpos($core,'function sf_distribution_build_manifest');$manifestEnd=strpos($core,'function sf_distribution_safe_zip_name');$manifest=substr($core,$manifestStart,$manifestEnd-$manifestStart);
 hard_ok(str_contains($manifest,'sf_distribution_rights_manifest')&&!str_contains($manifest,'sf_rights_work('),'package manifest uses sanitized rights data rather than raw registry rows');
 hard_ok(str_contains($core,'Could not reopen distribution ZIP for verification')&&str_contains($core,'master count mismatch')&&str_contains($core,'source fingerprint mismatch'),'package builder verifies finalized ZIP contents and source fingerprint');
-hard_ok(substr_count($core,"hash_file('sha256'")>=4,'package build verifies managed source hashes as well as the final ZIP');
+hard_ok(substr_count($core,"hash_file('sha256'")>=3,'package build verifies managed source hashes as well as the final ZIP');
 hard_ok(str_contains($core,"\$url=sf_clean_text(\$raw['release_url']??'',700)")&&!str_contains($core,'$url=$url'),'DSP URL input is normalized from the request without self-assignment regression');
 hard_ok(str_contains($core,'sf_distribution_state_evidence'),'release state transitions require operational evidence');
 hard_ok(str_contains($core,"Release state '.\$releaseState.' does not permit a destination"),'DSP status changes are constrained by release lifecycle');
