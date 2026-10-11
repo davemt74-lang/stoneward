@@ -67,7 +67,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   </section>
 <?php endif; ?>
   <header class="topbar">
-    <a class="wordmark" href="?view=home" id="homeLink" aria-label="Stonefellow home"><?php if(!empty($siteSettings['media_logo'])): ?><img src="<?=sf_h($siteSettings['media_logo'])?>" alt="Stonefellow"><?php else: ?>STONEFELLOW<?php endif; ?></a>
+    <a class="wordmark" href="./" id="homeLink" aria-label="Stonefellow home"><?php if(!empty($siteSettings['media_logo'])): ?><img src="<?=sf_h($siteSettings['media_logo'])?>" alt="Stonefellow"><?php else: ?>STONEFELLOW<?php endif; ?></a>
     <div class="header-actions">
 <?php if($currentUser): ?>
       <button id="notificationButton" class="notification-button" type="button" aria-label="Open notifications and history" aria-expanded="false">
