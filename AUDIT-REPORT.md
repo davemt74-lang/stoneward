@@ -1,77 +1,79 @@
-# Stonefellow v1.3.31 — Section 32 SEO, Discovery & Social Sharing Audit
+# Stonefellow v1.3.32 — Section 33 Public Content & Storytelling Audit
 
-Section 32 was built on the fully merged Section 31 mainline and audited against crawler privacy, canonical routing, structured data, SPA metadata drift, truthful sharing, discovery attribution, and regression compatibility.
+Section 33 extends Stonefellow as a single-artist platform. It does not introduce a generic CMS, artist selector, tenant abstraction, or duplicate catalog. Long-form editorial is layered around the authoritative Catalog, Releases, Shows, Media Library, Homepage and Agent systems.
 
-## 32A — Dynamic Route Metadata — 10/10
-- One canonical server-side resolver owns public metadata for Home, tracks, releases, shows, merch, campaigns, EPKs and top-level public sections.
-- Initial HTML emits route-specific title, description, canonical URL, robots policy, Open Graph and social-card metadata.
-- Unknown/private/non-public routes receive noindex,nofollow,noarchive and no canonical/JSON-LD.
-- SPA navigation re-resolves metadata from the same server authority so title/canonical/social tags do not drift after AJAX navigation.
-- Existing server JSON-LD is explicitly replaceable during SPA navigation.
+## 33A — Single-Artist Editorial Model — 10/10
+- Fixed Stonefellow story types: Artist About, Editorial Essay, Release Story, Track Story, Show Story and Timeline Milestone.
+- No artist_id, tenant_id, workspace_id or multi-artist abstraction.
+- Exactly one published Artist About is allowed at a time.
+- Draft, published and archived lifecycle is explicit.
+- Story slugs are unique and stable.
+- Long-form copy preserves paragraphs and line breaks.
 
-## 32B — Music / Event / Product Structured Data — 10/10
-- MusicGroup schema represents Stonefellow.
-- MusicAlbum schema includes public tracks.
-- MusicRecording includes public duration and ISRC where available.
-- MusicEvent uses canonical public show data and only validated HTTPS ticket URLs.
-- Product schema uses active public merch records and configured store currency.
-- ProfilePage covers published/ready public EPKs.
-- Structured-data images resolve through Public Media Library relationships where available.
+## 33B — Canonical Content Ownership — 10/10
+- Release, track and show stories link to authoritative public Stonefellow entities.
+- A linked story cannot publish if its canonical entity is missing/private.
+- Storytelling never rewrites Catalog, Release or Show source records.
+- Existing track story, release description/liner notes and show data remain canonical in their original workspaces.
+- Supplemental long-form editorial appears alongside those canonical pages without shadow copies.
 
-## 32C — Sitemap & Robots Privacy — 10/10
-- Standard XML sitemap endpoint is available at /sitemap.xml.
-- Sitemap includes canonical Home/top-level pages, published public releases, public standalone/release tracks, public shows, active merch, live campaigns and published-ready EPKs.
-- Private/draft/hidden records are rejected before sitemap inclusion.
-- robots.txt blocks Admin, API, storage/data, account/auth query routes and token-bearing query URLs.
-- Sitemap URL validation accepts only ordinary HTTP/HTTPS URLs.
+## 33C — Admin Editor & Publishing Governance — 10/10
+- Storytelling lives inside Admin → Settings; the 29-link Admin sidebar remains unchanged.
+- Editor supports type, status, title, slug, eyebrow, summary, body, entity link, timeline date, era, ordering, featured state and SEO overrides.
+- New and existing stories require explicit confirmation when publishing or archiving.
+- Published stories must be drafted/archived before deletion.
+- Permanent deletion requires explicit confirmation.
+- Saves/deletes are written to Admin audit and Agent Brain.
+- Admin Agent routes biography/editorial/timeline requests directly to the Storytelling editor.
 
-## 32D — Canonical Public URLs — 10/10
-- Pretty routes exist for /track/{id}, /release/{id}, /show/{id}, /store/{slug}, /campaign/{slug} and /press/{slug}.
-- Main public sections use canonical /music, /releases, /shows, /store, /about and /archive routes.
-- Server rewrite handoff preserves route id/slug for the SPA.
-- Browser navigation generates the same route shapes instead of returning to duplicate ?view=... URLs.
-- Private EPK bearer tokens remain in URL fragments and are never moved into query parameters.
-- Public navigation and wordmark now prefer canonical URLs.
+## 33D — Public Storytelling Experience — 10/10
+- Public About page consumes the governed Artist About source when published.
+- Editorial essays and historical milestones are presented under About.
+- Standalone stories use canonical /story/{slug} routes.
+- Track, Release and Show pages surface relevant supplemental stories.
+- Editorial body rendering preserves paragraphs while escaping markup.
+- Timeline is chronological and remains tied to one artist.
 
-## 32E — Social Sharing — 10/10
-- Track, release, show and focused merch pages expose Share controls.
-- Native Web Share is used when available; clipboard-copy fallback is supported.
-- Share attribution is recorded only after native share resolves or clipboard copy succeeds.
-- Aborted native shares are not counted.
-- Store cards can open focused /store/{slug} product pages with a product-specific social/SEO surface.
+## 33E — Media & SEO Integration — 10/10
+- Stories reuse the Universal Media Library through story_entry relationships.
+- Governed story roles include hero, inline and gallery media.
+- Hero publication uses the established explicit-public media workflow.
+- Deleting a story removes media relationships, not reusable Media Library assets.
+- Published stories receive canonical metadata, Open Graph/social metadata through the Section 32 resolver and Article JSON-LD.
+- Artist About keeps /about as its canonical identity.
+- Only published, readiness-approved non-About stories enter the sitemap.
 
-## 32F — Server-Rendered Discovery Content — 10/10
-- Initial public HTML contains a crawlable route-specific content snapshot before JavaScript runs.
-- The SPA replaces that snapshot with the interactive experience without creating a second shell.
-- Direct pretty-route loading works through the existing public application.
-- Critical titles/descriptions are server rendered rather than relying exclusively on JavaScript.
-- Focused merch and SEO snapshot views have responsive presentation.
+## 33F — Homepage & Agent Integration — 10/10
+- A published Artist About automatically becomes the Homepage Artist Story source.
+- Homepage title, excerpt and public story hero image come from Storytelling.
+- Section 31 Homepage copy remains a safe fallback only when no published Artist About exists.
+- Homepage Admin explicitly explains the single-source behavior.
+- Public Agent context receives only published, readiness-approved Storytelling content.
+- Agent story context is relevance-ranked and bounded to six entries.
 
-## 32G — Discovery Attribution & Existing Analytics — 10/10
-- Discovery events are stored in the main Stonefellow database; no parallel analytics service was introduced.
-- Only bounded landing/share event types are accepted.
-- Referrers normalize into direct/internal/search/social/referral or bounded UTM source classes.
-- Full referrer URLs are never persisted.
-- Landing attribution is recorded once per document load, not on every internal SPA click.
-- Public event writes are rate-limited.
-- Raw discovery summaries are Admin-only.
-- Discovery sources/routes feed the existing Growth Analytics payload, Performance Intelligence UI, and grounded Admin Agent brief.
+## 33G — Truthful Events & Public Safety — 10/10
+- Allowlisted events: view, connected-entity open, story-media open and share.
+- Events cannot be recorded for draft/private/unready stories.
+- Public event writes are session-rate-limited.
+- Native-share events are recorded only after native sharing succeeds.
+- Copy-share events are recorded only after clipboard copy succeeds.
+- Event detail is bounded and sanitized.
+- Story metrics report actual published/draft state and observed events.
 
-## 32H — Release Safety & Regression — 10/10
-- Application advances to **1.3.31**.
-- Database target advances to **1.3.27**.
-- Migration **2026-10-11-028** creates discovery_events and upgrade integrity requires it.
-- Section 31 version/schema regression was made forward-compatible without weakening its minimum guarantees.
-- Section 17 storefront regression was updated to allow the route-aware renderer while still requiring server-backed storefront data.
-- Existing list-selector safety regression caught and prevented two collection binding defects.
-- Manual audit caught and fixed SEO excerpt whitespace normalization and missing one-shot landing attribution before acceptance.
+## 33H — Upgrade, Regression & Release Safety — 10/10
+- Application advances to **1.3.32**.
+- Database target advances to **1.3.28**.
+- Migration **2026-10-11-029** creates story_entries and story_events.
+- Upgrade integrity requires both Storytelling tables.
+- Section 32 version/route tests remain forward-compatible without weakening their minimum guarantees.
+- Release Gate syntax-checks Storytelling Admin JavaScript.
 - PHP syntax: **PASS**
 - Public JavaScript syntax: **PASS**
 - Admin JavaScript syntax: **PASS**
-- Sections 1–31 inherited regression suites: **PASS**
-- Section 32 certification: **PASS**
-- Explicit PASS lines on hardened implementation candidate: **1784**
+- Sections 1–32 inherited regression suites: **PASS**
+- Section 33 certification: **PASS**
+- Explicit PASS lines on hardened implementation candidate: **1836**
 - PHP warnings: **0**
 - Failures: **0**
 
-FINAL SECTION 32 SCORE: **10/10**
+FINAL SECTION 33 SCORE: **10/10**
