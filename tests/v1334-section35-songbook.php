@@ -6,6 +6,7 @@ if(!function_exists('sf_clean_text')){function sf_clean_text(mixed $v,int $max=2
 require $root.'/api/songbook-core.php';
 
 ok35(sf_songbook_lines("Verse one\nLine two")===['Verse one','Line two'],'Songbook line splitter preserves canonical lyric lines');
+ok35(sf_songbook_is_heading_line('[Chorus]')&&sf_songbook_is_heading_line('Verse 2')&&!sf_songbook_is_heading_line('Actual lyric line'),'Songbook recognizes structural heading lines without treating lyric text as headings');
 $sections=sf_songbook_clean_sections([['label'=>'Verse 1','start_line'=>1,'end_line'=>2],['label'=>'Chorus','start_line'=>3,'end_line'=>4]],4);
 ok35(count($sections)===2&&$sections[1]['label']==='Chorus','Songbook section normalization keeps valid ordered ranges');
 ok35(sf_songbook_clean_sections([['label'=>'Bad','start_line'=>5,'end_line'=>6]],4)===[],'Songbook section normalization rejects ranges outside canonical lyrics');
@@ -39,6 +40,7 @@ ok35(str_contains($core,"['draft','published','archived']"),'Songbook lifecycle 
 ok35(str_contains($core,'Canonical Catalog lyrics are required.'),'publication readiness requires canonical Catalog lyrics');
 ok35(str_contains($core,'Track must be public before Songbook publication.'),'Songbook cannot publish for a private track');
 ok35(str_contains($core,'Songbook sections may not overlap.'),'publication readiness blocks overlapping sections');
+ok35(str_contains($core,'Every non-empty lyric line must be included in exactly one Songbook section.'),'publication readiness blocks incomplete lyric section coverage');
 ok35(str_contains($core,'Annotations must reference a lyric line included in a Songbook section.'),'publication readiness blocks orphan annotations');
 ok35(str_contains($core,"preg_match('/^[a-z]{2,3}(?:-[A-Z]{2})?$/"),'Songbook validates normalized language codes');
 ok35(str_contains($core,'sf_songbook_public_payload')&&str_contains($core,"(\$r['status']??'')!=='published'"),'public payload is gated by Published status and readiness');
@@ -65,7 +67,7 @@ ok35(str_contains($adminJs,'Canonical lyrics')&&str_contains($adminJs,'remain pr
 ok35(str_contains($adminJs,'SFSongbookAdmin?.section')&&str_contains($adminJs,'SFSongbookAdmin?.bindTrack'),'Songbook editor is embedded in each Catalog track workspace');
 ok35(str_contains($adminJs,'songbook|publish.*lyrics|lyrics.*publish|verse|chorus|bridge'),'Admin Agent routes lyric publishing work to Songbook');
 ok35(str_contains($adminModule,'Detect verse / chorus structure')&&str_contains($adminModule,'Sections')&&str_contains($adminModule,'Annotations'),'Songbook editor supports structure detection, sections and annotations');
-ok35(str_contains($adminModule,'confirm(')&&str_contains($adminModule,'Save Songbook'),'Songbook editor confirms consequential status changes');
+ok35(str_contains($adminModule,"confirm('Change this Songbook status to '")&&str_contains($adminModule,'confirmed:changed'),'Songbook editor confirms every status change before saving');
 ok35(str_contains($adminCss,'.songbook-readiness')&&str_contains($adminCss,'.songbook-admin-metrics'),'Songbook editor has readiness and metrics presentation');
 
 ok35(!str_contains($app,'class="lyrics-panel"'),'track page no longer renders raw Catalog lyrics directly');
