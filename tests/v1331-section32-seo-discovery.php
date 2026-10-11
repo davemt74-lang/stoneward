@@ -33,20 +33,20 @@ $wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 ok32(str_contains($core,'function sf_seo_resolve'),'central server SEO resolver exists');
 ok32(str_contains($core,"'robots'=>'index,follow,max-image-preview:large'")&&str_contains($core,"'noindex,nofollow,noarchive'"),'SEO resolver has explicit index/noindex policies');
-ok32(str_contains($core,"($k['status']??'')!=='published'")&&str_contains($core,"empty($k['readiness']['ready'])"),'private/draft/unready EPKs cannot resolve as public SEO pages');
-ok32(str_contains($core,"($r['state']??'published')!=='published'")&&str_contains($core,"($r['public_visible']??true)===false"),'draft/hidden releases are excluded');
-ok32(str_contains($core,"in_array((string)($t['state']??''),['draft','private','archived'],true)"),'non-public track states are excluded');
+ok32(str_contains($core,"(\$k['status']??'')!=='published'")&&str_contains($core,"empty(\$k['readiness']['ready'])"),'private/draft/unready EPKs cannot resolve as public SEO pages');
+ok32(str_contains($core,"(\$r['state']??'published')!=='published'")&&str_contains($core,"(\$r['public_visible']??true)===false"),'draft/hidden releases are excluded');
+ok32(str_contains($core,"in_array((string)(\$t['state']??''),['draft','private','archived'],true)"),'non-public track states are excluded');
 ok32(str_contains($core,'sf_commerce_products(true)'),'product SEO uses public commerce records');
 ok32(str_contains($core,'sf_campaign_by_slug($slug,true)')&&str_contains($core,'sf_campaign_is_live($c)'),'campaign SEO requires public live campaign');
 foreach(['MusicGroup','MusicAlbum','MusicRecording','MusicEvent','Product','ProfilePage'] as $type)ok32(str_contains($core,"'@type'=>'".$type."'"),'structured data includes '.$type);
 ok32(str_contains($core,"'isrcCode'"),'track structured data carries ISRC when available');
 ok32(str_contains($core,"'priceCurrency'=>(string)(sf_store_config()['currency']??'USD')"),'product structured data uses configured store currency');
 ok32(str_contains($core,"sf_media_public_links"),'SEO artwork resolves through explicitly public Media Library links');
-ok32(str_contains($core,"parse_url($ticket,PHP_URL_SCHEME)")||str_contains($core,'sf_seo_https_url($ticket)'),'event ticket structured data only exposes validated HTTPS ticket URLs');
+ok32(str_contains($core,"parse_url(\$ticket,PHP_URL_SCHEME)")||str_contains($core,'sf_seo_https_url($ticket)'),'event ticket structured data only exposes validated HTTPS ticket URLs');
 
-ok32(str_contains($core,"$base.'/release/'")&&str_contains($core,"$base.'/track/'")&&str_contains($core,"$base.'/show/'")&&str_contains($core,"$base.'/store/'"),'sitemap emits canonical entity routes');
+ok32(str_contains($core,"\$base.'/release/'")&&str_contains($core,"\$base.'/track/'")&&str_contains($core,"\$base.'/show/'")&&str_contains($core,"\$base.'/store/'"),'sitemap emits canonical entity routes');
 ok32(str_contains($core,'foreach(sf_catalog() as $t)'),'sitemap includes public standalone catalog tracks');
-ok32(str_contains($core,"($k['status']??'')==='published'")&&str_contains($core,"!empty($k['readiness']['ready'])"),'sitemap admits only published ready EPKs');
+ok32(str_contains($core,"(\$k['status']??'')==='published'")&&str_contains($core,"!empty(\$k['readiness']['ready'])"),'sitemap admits only published ready EPKs');
 ok32(str_contains($core,'sf_campaign_is_live($c)'),'sitemap admits only live campaigns');
 ok32(str_contains($sitemap,'http://www.sitemaps.org/schemas/sitemap/0.9')&&str_contains($sitemap,'sf_seo_sitemap_entries'),'XML sitemap uses standard sitemap protocol');
 ok32(str_contains($robots,'Disallow: /admin/')&&str_contains($robots,'Disallow: /api/')&&str_contains($robots,'Disallow: /*?token=')&&str_contains($robots,'Sitemap:'),'robots policy blocks private surfaces and advertises sitemap');
@@ -74,16 +74,16 @@ ok32(strpos($app,"await navigator.share")<strpos($app,"share_target:'native'"),'
 ok32(strpos($app,'await navigator.clipboard.writeText')<strpos($app,"share_target:'copy'"),'copy-share attribution is recorded only after copy succeeds');
 ok32(str_contains($app,'data-merch-open')&&str_contains($app,"navigate('store',{slug:b.dataset.merchOpen})"),'store cards open canonical focused product routes');
 ok32(str_contains($app,'function merchDetailHtml')&&str_contains($app,"renderStore(params={})"),'direct product route renders focused merch detail');
-ok32(str_contains($storefront,"'slug'=>(string)$p['slug']"),'storefront API exposes canonical product slug');
+ok32(str_contains($storefront,"'slug'=>(string)\$p['slug']"),'storefront API exposes canonical product slug');
 ok32(str_contains($css,'.merch-detail-module')&&str_contains($css,'.seo-server-snapshot'),'focused merch and crawl snapshot have dedicated responsive presentation');
 
 ok32(substr_count($core,'CREATE TABLE IF NOT EXISTS discovery_events')===2,'discovery event schema supports SQLite and MySQL');
-ok32(str_contains($core,"$allowed=['landing','share']"),'discovery analytics only accept bounded landing/share events');
-ok32(str_contains($core,'sf_seo_normalize_source')&&str_contains($core,"$source='search'")&&str_contains($core,"$source='social'")&&str_contains($core,"$medium='referral'"),'referrers normalize into bounded acquisition classes');
+ok32(str_contains($core,"\$allowed=['landing','share']"),'discovery analytics only accept bounded landing/share events');
+ok32(str_contains($core,'sf_seo_normalize_source')&&str_contains($core,"\$source='search'")&&str_contains($core,"\$source='social'")&&str_contains($core,"\$medium='referral'"),'referrers normalize into bounded acquisition classes');
 ok32(!str_contains($core,"'referrer'=>"),'raw referrer URLs are never persisted in discovery event detail');
-ok32(str_contains($discovery,"($user['role']??'')!=='admin'"),'raw discovery summary endpoint is admin-only');
+ok32(str_contains($discovery,"(\$user['role']??'')!=='admin'"),'raw discovery summary endpoint is admin-only');
 ok32(str_contains($discovery,'count($attempts)>=60'),'public discovery event writes are rate-limited');
-ok32(str_contains($growth,"'discovery'=>$discovery"),'discovery attribution feeds existing Growth Analytics payload');
+ok32(str_contains($growth,"'discovery'=>\$discovery"),'discovery attribution feeds existing Growth Analytics payload');
 ok32(str_contains($growth,'discovery top source'),'Admin Agent brief includes grounded discovery source');
 ok32(str_contains($analytics,'Discovery sources')&&str_contains($analytics,'no full referrer URLs are retained'),'Performance Intelligence visibly reports privacy-bounded acquisition');
 
