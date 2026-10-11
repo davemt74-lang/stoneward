@@ -1,22 +1,22 @@
-# Stonefellow v1.3.29 Upgrade Notes
+# Stonefellow v1.3.30 Upgrade Notes
 
-1. Upload/extract the v1.3.29 deploy over the existing Stonefellow installation.
+1. Upload/extract the v1.3.30 deploy over the existing Stonefellow installation.
 2. Preserve production-owned `data/`, `storage/`, database configuration, secrets, store configuration and generated catalog/config JS.
 3. Run `/upgrade.php`.
-4. Database target advances from **1.3.24** to **1.3.25**.
-5. Migration **2026-10-11-026** creates:
-   - `press_kits`
-   - `press_contacts`
-   - `press_outreach`
-   - `press_coverage`
-   - `press_events`
-6. No fan contacts are copied into Press Contacts. Journalists/media contacts remain a separate directory from Fan CRM/newsletter consent.
-7. Existing releases, Distribution + Publishing records and Media Library assets remain authoritative; Section 30 references them rather than copying them into a shadow catalog.
-8. Open Admin → **EPK + Press**, create/save an EPK as Draft, then attach and explicitly publish its press-ready Media Library assets.
-9. Published/Private EPKs must pass current readiness. Release-linked kits also consume current Section 29 distribution readiness.
-10. Private EPK links must be rotated/generated from the Admin session. The raw token is shown only at generation time and is carried in the URL fragment.
-11. Press outreach uses the existing transactional email configuration. Test email delivery before sending real outreach.
-12. Press contacts marked Do Not Contact or Archived cannot receive outreach.
+4. Database target advances from **1.3.25** to **1.3.26**.
+5. Migration **2026-10-11-027** creates:
+   - `artist_home_sections`
+   - `artist_home_events`
+6. Migration 027 seeds the default Stonefellow single-artist homepage section layout.
+7. The new Artist Homepage plugin defaults **OFF**. Existing public Home behavior therefore remains unchanged after upgrade until an Administrator enables it.
+8. The existing Splash toggle remains independent. You may use:
+   - Splash ON + Homepage ON
+   - Splash OFF + Homepage ON
+   - Homepage OFF to retain the existing Agent/Personalized Home
+9. Configure the homepage in Admin → Settings → **Artist Homepage**.
+10. Before enabling it, review the readiness score and explicitly publish the desired site hero, release cover, featured-track primary audio, show poster and other public Media Library assets.
+11. Public featured-track playback requires an explicitly Public `primary_audio` Media Library relationship; private/legacy catalog audio is not used as a fallback.
+12. Fan Community remains controlled by its existing independent on/off toggle; CRM/newsletter behavior is unchanged.
 
-Application: **1.3.29**  
-Database schema target: **1.3.25**
+Application: **1.3.30**  
+Database schema target: **1.3.26**
