@@ -31,7 +31,7 @@ ok(!str_contains($adminJs,'id="showPoster"')&&!str_contains($adminJs,'id="showMe
 ok(str_contains($campaignJs,"['builder','Builder'],['media','Media']"),'Campaign Builder has a dedicated Media tab');
 ok(str_contains($campaignJs,"entitySection('campaign'")&&str_contains($campaignJs,"roles:['hero','background','offer_artwork','video','document','archive']"),'campaign Media tab covers hero, background, offer artwork, video and documents');
 ok(!str_contains($campaignJs,'Artwork / image path'),'campaign editor no longer asks Admin to type an artwork path');
-ok(str_contains($campaignCore,"'media'=>$media")&&str_contains($campaignCore,"sf_media_public_links('campaign'"),'public campaign payload carries explicitly public Media Library assets');
+ok(str_contains($campaignCore,"'media'=>\$media")&&str_contains($campaignCore,"sf_media_public_links('campaign'"),'public campaign payload carries explicitly public Media Library assets');
 ok(str_contains($app,"publicEntityMediaHtml(c.media||[],'CAMPAIGN MEDIA')"),'public campaign page renders public supporting campaign media');
 
 ok(str_contains($mediaJs,'Store product media')&&str_contains($mediaJs,"openEntityManager('store'"),'Media Library provides store-product media management');

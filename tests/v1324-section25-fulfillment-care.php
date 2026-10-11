@@ -60,12 +60,12 @@ ok(str_contains($core,'sf_commerce_mark_order_sold')&&str_contains($core,'sf_com
 ok(str_contains($core,'function sf_fulfillment_restock_return')&&str_contains($core,"inventory_status='sold'")&&str_contains($core,"inventory_status='returned'"),'returned sold merchandise has an explicit audited restock path');
 ok(str_contains($core,'Shipped merchandise may only be restocked after a returned shipment is recorded.'),'refund flow refuses unsafe automatic restock after shipping');
 ok(str_contains($core,"'partially_refunded'")&&str_contains($core,"'refunded'"),'refund ledger distinguishes partial and full refunds');
-ok(str_contains($core,"'order_'.$summaryStatus")&&str_contains($core,"'refund_confirmed'")&&str_contains($core,"'support_case_opened'")&&str_contains($core,'sf_crm_log_event'),'fulfillment and care events feed CRM history');
+ok(str_contains($core,"'order_'.\$summaryStatus")&&str_contains($core,"'refund_confirmed'")&&str_contains($core,"'support_case_opened'")&&str_contains($core,'sf_crm_log_event'),'fulfillment and care events feed CRM history');
 ok(str_contains($crm,'sf_automation_process_crm_event'),'fulfillment/care CRM events can feed the existing lifecycle automation engine');
 
 ok(str_contains($publicApi,'sf_require_user(false,true)')&&str_contains($publicApi,"action==='open_case'")&&str_contains($publicApi,"action==='reply_case'"),'fan customer-care mutations require authenticated CSRF-protected self service');
 ok(str_contains($publicApi,'You cannot open a case for this order.')||str_contains($core,'You cannot open a case for this order.'),'support cases enforce order ownership');
-ok(str_contains($customerOrder,"'operations'=>$ops"),'owned order detail includes shipment/refund/care operations');
+ok(str_contains($customerOrder,"'operations'=>\$ops"),'owned order detail includes shipment/refund/care operations');
 ok(str_contains($app,'Get help with this order')&&str_contains($app,'customer-care.php'),'fan order page exposes order-linked customer care');
 ok(str_contains($app,'orderShipmentHtml')&&str_contains($app,'orderRefundHtml')&&str_contains($app,'orderCareHtml'),'fan order page renders shipment, refund and support history');
 ok(str_contains($siteCss,'.order-care-card')&&str_contains($siteCss,'.order-shipment-card'),'fan self-service order operations have responsive styling');

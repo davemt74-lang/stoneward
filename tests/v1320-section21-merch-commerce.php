@@ -73,7 +73,7 @@ ok(str_contains($core,'function sf_commerce_mark_order_sold'),'fulfillment can f
 ok(str_contains($core,'external_key')&&str_contains($core,'UNIQUE'),'inventory ledger has duplicate-action protection');
 
 ok(str_contains($store,"'kind'=>'merch'")&&str_contains($store,'sf_commerce_products(true)'),'public storefront merges active database merch with legacy builder products');
-ok(str_contains($boot,"$type==='merch'")&&str_contains($boot,'sf_commerce_quote_item'),'cart quote recognizes merch as a governed line type');
+ok(str_contains($boot,"\$type==='merch'")&&str_contains($boot,'sf_commerce_quote_item'),'cart quote recognizes merch as a governed line type');
 ok(str_contains($boot,"payload']['product_ids")&&str_contains($boot,'discountBase'),'campaign discounts can be scoped to selected merch products');
 ok(str_contains($order,'sf_commerce_reserve_order')&&str_contains($order,'sf_commerce_record_purchase'),'checkout reserves inventory and records merch purchase intelligence');
 ok(str_contains($adminOrders,'sf_commerce_release_order_inventory')&&str_contains($adminOrders,'sf_commerce_mark_order_sold'),'Admin cancellation/refund/fulfillment synchronizes merch inventory state');

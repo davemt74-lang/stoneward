@@ -1,5 +1,24 @@
 # Stonefellow v1.3.28 — Section 29: Release Publishing & Distribution Operations
 
+## Hardening audit
+
+A second production-focused audit tightened the v1.3.28 Distribution + Publishing implementation before final acceptance.
+
+- Distributor preflight now requires managed Media Library assets rather than legacy playback paths.
+- Cover delivery requires managed square JPG/PNG artwork at 3000×3000 or greater.
+- Track delivery requires managed WAV masters at 44.1 kHz / 16-bit or better.
+- Media source hashes are verified during package construction.
+- Distributor ZIPs now carry an exact source fingerprint and stale packages are blocked.
+- Downloads re-verify the stored ZIP SHA-256.
+- Rights data in the package is minimized to distributor-relevant fields.
+- Release and DSP state transitions are governed by package/DSP evidence.
+- Calendar re-sync preserves completed milestone state.
+- The Admin UI exposes only valid next transitions and clearly identifies stale packages.
+- Full regression gate is warning-free.
+- App remains **v1.3.28**; DB schema remains **1.3.24**; no new migration is required.
+
+## Original Section 29 delivery
+
 - Added first-class Admin **Distribution + Publishing** workspace.
 - Added release preflight across metadata, release date, track list, ISRCs, audio masters, cover artwork and Section 28 rights clearance.
 - Added checksum validation for UPC-A and EAN-13 identifiers.

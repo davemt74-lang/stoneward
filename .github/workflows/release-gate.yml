@@ -79,3 +79,4 @@ jobs:
           php tests/v1327-section28-rights-licensing.php
           php tests/v1327-admin-sidebar-density.php
           php tests/v1328-section29-distribution.php
+          php tests/v1328-section29-hardening.php

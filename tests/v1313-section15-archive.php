@@ -29,5 +29,5 @@ ok(str_contains($agent,"archive_browse")&&str_contains($agent,'other versions'),
 ok(str_contains($menu,'data-view="archive"')&&str_contains($menu,'Music Archive'),'public menu links to the Music Archive');
 preg_match("/'stonefellow'=>'([0-9]+)\.([0-9]+)\.([0-9]+)'/",$version,$vm15);
 ok(isset($vm15[1],$vm15[2],$vm15[3])&&[(int)$vm15[1],(int)$vm15[2],(int)$vm15[3]]>=[1,3,13]&&str_contains($version,"'music_archive'=>'single-artist-eras-versions-sessions-personnel-media-timeline'"),'version endpoint advertises Section 15 capability at v1.3.13 or later');
-ok(str_contains($siteData,"'archive'=>$archive"),'site data publishes derived archive context');
+ok(str_contains($siteData,"'archive'=>\$archive"),'site data publishes derived archive context');
 echo "Stonefellow v1.3.13 Section 15 music archive audit: PASS\n";

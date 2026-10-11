@@ -62,8 +62,8 @@ ok(str_contains($quote,'sf_current_user')&&str_contains($quote,'sf_quote($cart')
 ok(str_contains($app,'Member discount')&&str_contains($app,'Campaign discount'),'cart UI explains member and campaign savings separately');
 
 ok(str_contains($core,'early_access_days')&&str_contains($core,"reason='early_access'"),'member content enforces tier early-access windows');
-ok(str_contains($core,"$type==='vip_offer'")&&str_contains($core,'vip_benefit_required'),'VIP content requires configured VIP benefit');
-ok(str_contains($core,"$type==='download'")&&str_contains($core,'download_benefit_required'),'exclusive downloads require download benefit');
+ok(str_contains($core,"\$type==='vip_offer'")&&str_contains($core,'vip_benefit_required'),'VIP content requires configured VIP benefit');
+ok(str_contains($core,"\$type==='download'")&&str_contains($core,'download_benefit_required'),'exclusive downloads require download benefit');
 ok(str_contains($mediaCore,"'member_content'"),'Media Library can attach assets to member content');
 ok(str_contains($media,"entity_type']??'')==='member_content'")&&str_contains($media,'sf_membership_content_access'),'controlled media delivery rechecks member-content entitlement before serving bytes');
 
@@ -82,7 +82,7 @@ ok(str_contains($app,"view==='membership'")&&str_contains($app,'membershipBenefi
 ok(str_contains($app,'account-membership-panel'),'My Account displays active membership badge and benefits');
 ok(str_contains($siteCss,'.membership-hero')&&str_contains($siteCss,'.member-content-card'),'public membership experience has responsive presentation styling');
 
-ok(str_contains($crm,"'membership'=>$uid")&&str_contains($core,"UPDATE fan_contacts SET status='member'"),'CRM detail exposes membership and active members synchronize to member stage');
+ok(str_contains($crm,"'membership'=>\$uid")&&str_contains($core,"UPDATE fan_contacts SET status='member'"),'CRM detail exposes membership and active members synchronize to member stage');
 ok(str_contains($core,"'customer':'fan'"),'membership loss preserves customer history instead of blindly downgrading to fan');
 ok(str_contains($billing,'sf_membership_sync_crm'),'billing lifecycle synchronizes membership state into CRM');
 ok(str_contains($automation,"'membership'")&&str_contains($automation,"'package_ids_any'"),'dynamic fan segments can target membership status and package tiers');
