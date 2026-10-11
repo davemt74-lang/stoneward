@@ -10,6 +10,9 @@ function sf_songbook_public_track(string $trackId): ?array {
 }
 function sf_songbook_lines(string $lyrics): array { return preg_split('/\R/u',str_replace(["\r\n","\r"],"\n",$lyrics)) ?: []; }
 
+function sf_songbook_public_catalog_rows(array $catalog): array { $out=[];foreach($catalog as $track){if(!is_array($track))continue;unset($track['lyrics']);$out[]=$track;}return $out; }
+function sf_songbook_refresh_public_catalog_asset(): void { $path=SF_ROOT.'/data/catalog.json';if(!is_file($path))return;$catalog=json_decode((string)file_get_contents($path),true);if(!is_array($catalog))return;$rows=sf_songbook_public_catalog_rows($catalog);$json=json_encode(array_values($rows),JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);if($json===false)throw new RuntimeException('Could not encode public catalog.');$target=SF_ROOT.'/assets/js/catalog.js';$tmp=$target.'.tmp.'.bin2hex(random_bytes(3));if(file_put_contents($tmp,"window.STONEFELLOW_CATALOG = ".$json.";\n",LOCK_EX)===false)throw new RuntimeException('Could not write public catalog JavaScript.');if(!rename($tmp,$target)){@unlink($tmp);throw new RuntimeException('Could not finalize public catalog JavaScript.');} }
+
 function sf_songbook_ensure_schema(): void {
     static $done=false;if($done)return;$pdo=sf_db();$driver=(string)(sf_db_config()['driver']??'');
     if($driver==='sqlite'){
