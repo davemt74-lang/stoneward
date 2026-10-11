@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.32');
+define('SF_BUILD', '1.3.33');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -14,14 +14,14 @@ if(!sf_installed()){
     exit;
 }
 $currentUser=sf_current_user();
-$siteSettings=sf_site_settings();
+$siteSettings=sf_site_settings();$themePreview=!empty($_GET['theme_preview'])&&(($currentUser['role']??'')==='admin');$activeTheme=$themePreview?sf_theme_draft():sf_theme_published();$themeMeta=sf_theme_meta_colors($activeTheme);
 $configuredBase=rtrim(sf_public_base_url(),'/');
 $scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
 $appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
 $initialView=sf_clean_text($_GET['view']??'',40);$publicInitialViews=['press','campaign','story','track','release','show','store','music','releases','shows','about','archive'];if(!in_array($initialView,$publicInitialViews,true))$initialView='';
 $initialId=sf_clean_text($_GET['id']??'',160);$initialSlug=sf_clean_text($_GET['slug']??'',160);
 $initialRoute=['view'=>$initialView,'id'=>$initialId,'slug'=>$initialSlug];
-$seo=sf_seo_resolve($initialView,$initialId,$initialSlug);
+$seo=sf_seo_resolve($initialView,$initialId,$initialSlug);if($themePreview){$seo['robots']='noindex,nofollow,noarchive';$seo['canonical']='';}
 function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES,'UTF-8'); }
 ?>
 <?php if($siteSettings['maintenance_enabled'] && (($currentUser['role']??'')!=='admin')): ?>
@@ -32,7 +32,10 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#090807">
+<?php if($themeMeta['mode']==='system'): ?>  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="<?=sf_h($themeMeta['dark'])?>">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="<?=sf_h($themeMeta['light'])?>">
+<?php else: ?>  <meta name="theme-color" content="<?=sf_h($themeMeta[$themeMeta['mode']])?>">
+<?php endif; ?>
   <meta name="description" content="<?=sf_h((string)$seo['description'])?>">
   <meta name="robots" content="<?=sf_h((string)$seo['robots'])?>">
 <?php if(!empty($seo['canonical'])): ?>  <link rel="canonical" href="<?=sf_h((string)$seo['canonical'])?>">
@@ -53,8 +56,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php foreach((array)$seo['json_ld'] as $structured): ?>  <script type="application/ld+json" data-seo-jsonld="1"><?=json_encode($structured,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script>
 <?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <style id="stonefellowTheme"><?=sf_theme_css($activeTheme)?></style>
 </head>
-<body class="<?=trim((($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':''))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
+<body class="<?=sf_h(trim(sf_theme_body_classes($activeTheme).' '.(($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':'')))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
 <?php if($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!==''): ?><div class="site-announcement"><?=sf_h($siteSettings['announcement_text'])?></div><?php endif; ?>
 <?php if($siteSettings['splash_enabled']): ?>
   <section id="splashScreen" class="splash-screen" data-revision="<?=sf_h((string)$siteSettings['splash_revision'])?>" aria-label="Stonefellow welcome">
@@ -207,7 +211,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
     </div>
   </footer>
 
-  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['artistHomepageEnabled'=>(bool)($siteSettings['artist_homepage_enabled']??false),'fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text'],'media'=>['logo'=>$siteSettings['media_logo']??'','hero'=>$siteSettings['media_hero']??'','social_share'=>$siteSettings['media_social_share']??'','app_icon'=>$siteSettings['media_app_icon']??'','artist_photo'=>$siteSettings['media_artist_photo']??'']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
+  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_THEME_PREVIEW=<?=json_encode($themePreview)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['artistHomepageEnabled'=>(bool)($siteSettings['artist_homepage_enabled']??false),'fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text'],'appearance'=>['mode'=>$activeTheme['mode'],'preset'=>$activeTheme['preset'],'density'=>$activeTheme['density'],'corner_style'=>$activeTheme['corner_style'],'max_width'=>$activeTheme['max_width']],'media'=>['logo'=>$siteSettings['media_logo']??'','hero'=>$siteSettings['media_hero']??'','social_share'=>$siteSettings['media_social_share']??'','app_icon'=>$siteSettings['media_app_icon']??'','artist_photo'=>$siteSettings['media_artist_photo']??'']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
   <script>window.STONEFELLOW_INITIAL_ROUTE=<?=json_encode($initialRoute,JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?>;</script>
   <script src="assets/js/config.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script>if(window.STONEFELLOW_CONFIG){window.STONEFELLOW_CONFIG.socials=window.STONEFELLOW_CONFIG.socials||{};for(const [k,v] of Object.entries(window.STONEFELLOW_SITE.socials||{})){if(v)window.STONEFELLOW_CONFIG.socials[k]=v;}}</script>
