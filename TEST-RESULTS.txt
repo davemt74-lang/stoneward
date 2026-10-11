@@ -1,37 +1,42 @@
-Stonefellow v1.3.32 Section 33 hardened release gate
+Stonefellow v1.3.33 Section 34 hardened release gate
 ====================================================
 
 Required:
 - PHP syntax across runtime/Admin/tests
 - Public JavaScript syntax
-- Admin JavaScript syntax including stories.js
-- Sections 1–32 inherited regression suites
+- Admin JavaScript syntax including admin/assets/songbook.js
+- Sections 1–33 inherited regression suites
 - Admin sidebar density regression
-- Section 33 Public Content & Storytelling certification
+- Section 34 Lyrics, Songbook & Track Notes certification
 
-Section 33 coverage includes:
-- fixed single-artist editorial types
-- no tenant / artist selector abstraction
-- one public Artist About
-- canonical public track/release/show links
-- no shadow catalog mutations
-- Storytelling editor embedded in Settings
-- explicit publish/archive/delete confirmation
+Section 34 certification covers:
+- canonical Catalog lyric authority
+- no duplicate lyric text in Songbook SQL
+- SQLite/MySQL Songbook + event schema
+- Draft / Published / Archived lifecycle
+- language normalization and validation
+- public-track + canonical-lyrics publication readiness
+- section range bounds and overlap prevention
+- annotation-to-section line validation
+- explicit publication/archive confirmation
 - Admin audit + Agent Brain
-- public About/editorial/timeline experience
-- canonical /story/{slug} routing
-- track/release/show story surfaces
-- Universal Media Library story_entry integration
-- Article SEO/JSON-LD + sitemap boundaries
-- Homepage Artist Story canonical-source integration
-- bounded published-story Agent context
-- truthful view/entity/media/share events
-- public event rate limiting
-- app 1.3.32 / schema 1.3.28 / migration 029
+- Catalog-embedded Songbook editor
+- automatic verse/chorus structure detection
+- public Published+ready Songbook payload only
+- raw Catalog lyrics removed from track rendering
+- lyric-free generated public catalog JavaScript
+- migration-time public-catalog sanitation
+- Apache denial of /data/ and /config/
+- published-Songbook-only lyric search
+- draft-lyric-free Agent ranking
+- bounded published Songbook Agent context
+- side-effect-free GET
+- rate-limited allowlisted Songbook events
+- app 1.3.33 / schema 1.3.29 / migration 030
 
 Measured hardened implementation candidate:
 - Release gate: PASS
-- Explicit PASS lines: 1836
+- Explicit PASS lines: 1887
 - PHP warnings: 0
 - Failures: 0
 
