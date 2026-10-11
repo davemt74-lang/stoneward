@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.30');
+define('SF_BUILD', '1.3.31');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -18,8 +18,10 @@ $siteSettings=sf_site_settings();
 $configuredBase=rtrim(sf_public_base_url(),'/');
 $scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
 $appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
-$initialView=sf_clean_text($_GET['view']??'',40);if(!in_array($initialView,['press','campaign'],true))$initialView='';
-$initialRoute=['view'=>$initialView,'slug'=>sf_clean_text($_GET['slug']??'',160)];
+$initialView=sf_clean_text($_GET['view']??'',40);$publicInitialViews=['press','campaign','track','release','show','store','music','releases','shows','about','archive'];if(!in_array($initialView,$publicInitialViews,true))$initialView='';
+$initialId=sf_clean_text($_GET['id']??'',160);$initialSlug=sf_clean_text($_GET['slug']??'',160);
+$initialRoute=['view'=>$initialView,'id'=>$initialId,'slug'=>$initialSlug];
+$seo=sf_seo_resolve($initialView,$initialId,$initialSlug);
 function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES,'UTF-8'); }
 ?>
 <?php if($siteSettings['maintenance_enabled'] && (($currentUser['role']??'')!=='admin')): ?>
@@ -31,11 +33,25 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#090807">
-  <meta name="description" content="<?=sf_h($siteSettings['seo_description'])?>">
-<?php if(!empty($siteSettings['media_social_share'])): ?>  <meta property="og:image" content="<?=sf_h($siteSettings['media_social_share'])?>"><?php endif; ?>
-<?php if(!empty($siteSettings['media_app_icon'])): ?>  <link rel="icon" href="<?=sf_h($siteSettings['media_app_icon'])?>"><?php endif; ?>
-  <base href="<?=sf_h($appBaseHref)?>">\n  <meta name="stonefellow-build" content="<?=sf_h(SF_BUILD)?>">
-  <title><?=sf_h($siteSettings['seo_title'])?></title>
+  <meta name="description" content="<?=sf_h((string)$seo['description'])?>">
+  <meta name="robots" content="<?=sf_h((string)$seo['robots'])?>">
+<?php if(!empty($seo['canonical'])): ?>  <link rel="canonical" href="<?=sf_h((string)$seo['canonical'])?>">
+<?php endif; ?>  <meta property="og:site_name" content="Stonefellow">
+  <meta property="og:title" content="<?=sf_h((string)$seo['title'])?>">
+  <meta property="og:description" content="<?=sf_h((string)$seo['description'])?>">
+  <meta property="og:type" content="<?=sf_h((string)$seo['type'])?>">
+<?php if(!empty($seo['canonical'])): ?>  <meta property="og:url" content="<?=sf_h((string)$seo['canonical'])?>">
+<?php endif; ?><?php if(!empty($seo['image'])): ?>  <meta property="og:image" content="<?=sf_h((string)$seo['image'])?>">
+<?php endif; ?>  <meta name="twitter:card" content="<?=!empty($seo['image'])?'summary_large_image':'summary'?>">
+  <meta name="twitter:title" content="<?=sf_h((string)$seo['title'])?>">
+  <meta name="twitter:description" content="<?=sf_h((string)$seo['description'])?>">
+<?php if(!empty($seo['image'])): ?>  <meta name="twitter:image" content="<?=sf_h((string)$seo['image'])?>">
+<?php endif; ?><?php if(!empty($siteSettings['media_app_icon'])): ?>  <link rel="icon" href="<?=sf_h($siteSettings['media_app_icon'])?>">
+<?php endif; ?>  <base href="<?=sf_h($appBaseHref)?>">
+  <meta name="stonefellow-build" content="<?=sf_h(SF_BUILD)?>">
+  <title><?=sf_h((string)$seo['title'])?></title>
+<?php foreach((array)$seo['json_ld'] as $structured): ?>  <script type="application/ld+json"><?=json_encode($structured,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script>
+<?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
 </head>
 <body class="<?=trim((($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':''))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
@@ -132,7 +148,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
         <button type="button" data-command="show me the catalog">Look around</button>
       </div>
     </section>
-    <section id="dynamicCanvas" class="dynamic-canvas" aria-live="polite"></section>
+    <section id="dynamicCanvas" class="dynamic-canvas" aria-live="polite"><?=sf_seo_server_html($seo)?></section>
   </main>
 
   <div id="queueBackdrop" class="drawer-backdrop queue-backdrop" hidden></div>
