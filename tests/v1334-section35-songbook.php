@@ -44,7 +44,7 @@ ok35(str_contains($core,'Every non-empty lyric line must be included in exactly 
 ok35(str_contains($core,'Annotations must reference a lyric line included in a Songbook section.'),'publication readiness blocks orphan annotations');
 ok35(str_contains($core,"preg_match('/^[a-z]{2,3}(?:-[A-Z]{2})?$/"),'Songbook validates normalized language codes');
 ok35(str_contains($core,'sf_songbook_public_payload')&&str_contains($core,"(\$r['status']??'')!=='published'"),'public payload is gated by Published status and readiness');
-ok35(str_contains($core,"\$allowed=['view','section_open','annotation_open','share']"),'Songbook events are restricted to truthful interaction types');
+ok35(str_contains($core,"\$allowed=['view','section_open','annotation_open']")&&!str_contains($core,"'share'];"),'Songbook events are restricted to interaction types the public UI actually emits');
 ok35(str_contains($core,'!sf_songbook_get($trackId,true)'),'Songbook events require a currently public Songbook');
 ok35(str_contains($core,'function sf_songbook_agent_context'),'Songbook exposes bounded published lyric context for Agent use');
 
