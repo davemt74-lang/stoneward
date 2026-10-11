@@ -30,6 +30,7 @@ $mediaLinks=file_get_contents($root.'/api/media-links.php');
 $app=file_get_contents($root.'/assets/js/app.js');
 $siteCss=file_get_contents($root.'/assets/css/site.css');
 $publicShell=file_get_contents($root.'/stonefellow-v120.php');
+$lifecycle=file_get_contents($root.'/api/lifecycle.php');
 $boot=file_get_contents($root.'/api/bootstrap.php');
 $mig=file_get_contents($root.'/api/migrations.php');
 $version=file_get_contents($root.'/version.php');
@@ -44,6 +45,7 @@ ok30(str_contains($core,"'#token='"),'private share link keeps token in URL frag
 ok30(!str_contains($core,"'?token='"),'core does not construct private token query strings');
 ok30(str_contains($core,"($existing['status']??'')==='private'")&&str_contains($core,'share_token_hash=CASE WHEN ? THEN NULL'),'leaving Private status invalidates its old bearer token');
 ok30(str_contains($core,'sf_press_readiness'),'EPK publishing has deterministic readiness');
+ok30(str_contains($core,"empty(\$k['readiness']['ready'])"),'published/private EPK access rechecks current readiness');
 ok30(str_contains($core,'sf_distribution_record')&&str_contains($core,"status']??'')==='live'"),'release EPK consumes live DSP links from Section 29');
 ok30(str_contains($core,"sf_media_public_links('track'")&&str_contains($core,"sf_media_public_links('release'"),'public EPK consumes only explicitly public track/release media');
 ok30(!str_contains($core,"'audio'=>(string)(\$t['audio']"),'public EPK does not expose legacy catalog audio paths directly');
@@ -58,7 +60,7 @@ ok30(!str_contains($core,"'notes'=>(string)"),'public EPK payload does not expos
 
 ok30(str_contains($publicApi,"action==='load'")&&str_contains($publicApi,'sf_request_json'),'private EPK loads through POST body');
 ok30(!str_contains($publicApi,"$_GET['token']"),'public EPK endpoint never accepts private token in GET query');
-ok30(str_contains($adminApi,'explicit Admin confirmation')&&str_contains($adminApi,"action==='send_outreach'"),'visibility and outreach mutations are confirmation governed');
+ok30(str_contains($adminApi,'explicit Admin confirmation')&&str_contains($adminApi,"action==='send_outreach'")&&str_contains($adminApi,"\$existing!==null&&"),'every existing EPK visibility-state change and outreach send are confirmation governed');
 ok30(str_contains($adminApi,'sf_agent_brain_log')&&str_contains($adminApi,'sf_log_admin_action'),'press mutations feed Agent Brain and Admin audit');
 ok30(!str_contains($adminApi,"'token'=>"),'Admin audit/Brain payloads do not log raw bearer token');
 
@@ -73,18 +75,20 @@ ok30(substr_count($adminShell,'data-view="')===29,'Admin sidebar exposes 29 navi
 ok30(str_contains($adminBaseCss,'min-height:21px')&&str_contains($adminBaseCss,'font-size:.62rem'),'short-viewport sidebar remains dense with 29 links');
 ok30(str_contains($adminJs,'Electronic press kits')&&str_contains($adminJs,'Press contacts'),'Admin workspace manages EPKs and press contacts');
 ok30(str_contains($adminJs,'Rotate private link')&&str_contains($adminJs,'privateTokens'),'private raw token remains session-scoped in the EPK workspace');
-ok30(str_contains($adminJs,'#token=')&&!str_contains($adminJs,"publicUrl+'?token='"),'Admin displays private bearer token in URL fragment');
+ok30(str_contains($adminJs,'#token=')&&!str_contains($adminJs,"publicUrl+'?token='")&&str_contains($adminJs,"new URL('../press/"),'Admin uses fragment tokens and subdirectory-safe EPK links');
 ok30(str_contains($adminJs,'Send approved outreach')&&str_contains($adminJs,"confirm('Send this press outreach"),'Admin requires confirmation before press email send');
 ok30(str_contains($adminJs,'do_not_contact')&&str_contains($adminJs,'Record confirmed coverage'),'Admin manages opt-out status and confirmed coverage separately');
 ok30(str_contains($adminCss,'.press-share-panel')&&str_contains($adminCss,'.press-readiness'),'EPK Admin has dedicated responsive/readiness styling');
 
 ok30(str_contains($app,'async function renderPress(')&&str_contains($app,"view==='press'"),'public app renders routed EPK pages');
-ok30(str_contains($app,"action:'load',slug,token")&&str_contains($app,'hashParams.get(\'token\')'),'public app reads fragment token and posts it in request body');
+ok30(str_contains($app,"action:'load',slug,token")&&str_contains($app,"hashParams.get('token')"),'public app reads fragment token and posts it in request body');
 ok30(str_contains($app,'STONEFELLOW · ELECTRONIC PRESS KIT')&&str_contains($app,'Selected music'),'public EPK has branded listening presentation');
 ok30(str_contains($app,"event_type:'release_play'")&&str_contains($app,"event_type:'dsp_click'")&&str_contains($app,"event_type:'contact_click'"),'public EPK records actual play/DSP/contact interactions');
 ok30(str_contains($siteCss,'.press-public')&&str_contains($siteCss,'.press-dsp-links'),'public EPK has dedicated responsive presentation');
 ok30(str_contains($ht,'RewriteRule ^press/'),'pretty /press/{slug} route is supported');
+ok30(str_contains($publicShell,'STONEFELLOW_INITIAL_ROUTE')&&str_contains($app,'initial.view')&&str_contains($app,'initial.slug'),'server rewrite state is handed to the SPA for pretty press/campaign routes');
 ok30(str_contains($publicShell,'<base href="<?=sf_h($appBaseHref)?>">'),'public shell has base URL support for pretty subdirectory routes');
+ok30(str_contains($lifecycle,'$trimmed!==$script')&&str_contains($lifecycle,"rtrim($trimmed,'/\\\\')"),'public base URL preserves subdirectory installs for API/Admin requests');
 ok30(str_contains($publicShell,"define('SF_BUILD', '1.3.29')"),'public assets are cache-busted for v1.3.29');
 
 ok30(str_contains($boot,"require_once __DIR__ . '/press-core.php'"),'press core loads from canonical bootstrap');
