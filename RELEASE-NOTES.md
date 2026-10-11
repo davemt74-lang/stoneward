@@ -1,3 +1,25 @@
+# Stonefellow v1.3.28 — Section 29: Release Publishing & Distribution Operations
+
+- Added first-class Admin **Distribution + Publishing** workspace.
+- Added release preflight across metadata, release date, track list, ISRCs, audio masters, cover artwork and Section 28 rights clearance.
+- Added checksum validation for UPC-A and EAN-13 identifiers.
+- Added managed-cover certification at 3000×3000 or greater; legacy cover paths remain visible with an uncertified-resolution warning.
+- Added distributor metadata for artist, edition/version, label, genre/subgenre, language, territory, catalog number, © and ℗ lines.
+- Added publishing lifecycle: Draft → Preparing → Ready → Submitted → Scheduled → Live → Archived.
+- Added DSP status tracking for Spotify, Apple Music, YouTube Music, Amazon Music and Bandcamp.
+- Added external IDs and live release URLs without pretending Stonefellow has direct DSP submission APIs.
+- Added distributor-ready ZIP builder containing `manifest.json`, `credits-rights.csv`, managed masters and managed cover art.
+- Added SHA-256 certification for every generated release package.
+- Added authenticated, path-contained Admin package download.
+- Added native Operating Calendar synchronization for distributor deadline, presave, campaign start and release-day milestones with deterministic dedupe keys.
+- Added durable distribution event history plus Admin audit and Agent Brain logging.
+- Added Admin Agent routing for distribution, DSP, UPC/EAN, preflight and release-readiness questions.
+- Expanded the compact Admin sidebar safely from 27 to 28 links.
+- Application advances to **1.3.28**.
+- Database schema advances to **1.3.24** via migration **2026-10-10-025**.
+
+> Stonefellow prepares and tracks release delivery. It does not claim direct submission to Spotify, Apple Music or other DSPs until a real distributor integration is configured.
+
 # Stonefellow v1.3.27 — Section 28: Rights, Credits & Licensing Registry
 
 - Added first-class Admin **Rights + Licensing** workspace.
