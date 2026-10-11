@@ -10,6 +10,7 @@ function sf_seo_abs(string $path): string {
     return sf_seo_base_url().'/'.ltrim($path,'/');
 }
 function sf_seo_https_url(string $url): bool { return $url!==''&&(bool)filter_var($url,FILTER_VALIDATE_URL)&&strtolower((string)parse_url($url,PHP_URL_SCHEME))==='https'; }
+function sf_seo_web_url(string $url): bool { if($url===''||!filter_var($url,FILTER_VALIDATE_URL))return false;return in_array(strtolower((string)parse_url($url,PHP_URL_SCHEME)),['http','https'],true); }
 function sf_seo_excerpt(string $text,int $max=180): string {
     $text=preg_replace('/s+/u',' ',trim(strip_tags($text)))??'';if($text==='')return '';
     if(function_exists('mb_strlen')&&mb_strlen($text)>$max)return rtrim(mb_substr($text,0,$max-1)).'…';
@@ -25,9 +26,9 @@ function sf_seo_public_release(string $id): ?array {
     foreach(sf_seo_release_rows() as $r){if((string)($r['id']??'')!==$id)continue;if(($r['state']??'published')!=='published'||($r['public_visible']??true)===false)return null;return $r;}return null;
 }
 function sf_seo_public_track(string $id): ?array {
-    $t=sf_track_map()[$id]??null;if(!$t)return null;
+    $t=sf_track_map()[$id]??null;if(!$t||($t['public_visible']??true)===false||in_array((string)($t['state']??''),['draft','private','archived'],true))return null;
     $releaseId=(string)($t['release_id']??'');$release=null;
-    if($releaseId!=='')$release=sf_seo_public_release($releaseId);
+    if($releaseId!==''){$release=sf_seo_public_release($releaseId);if(!$release)return null;}
     if(!$release&&($t['release']??'')!==''){foreach(sf_seo_release_rows() as $r)if((string)($r['title']??'')===(string)$t['release']&&($r['state']??'published')==='published'&&($r['public_visible']??true)!==false){$release=$r;break;}}
     $t['_release']=$release;return $t;
 }
@@ -112,7 +113,7 @@ function sf_seo_server_html(array $m): string {
 }
 
 function sf_seo_sitemap_entries(): array {
-    $out=[];$add=function(string $url,string $lastmod='',string $priority='0.7')use(&$out){if(!sf_seo_https_url($url)&&!str_starts_with($url,'http://localhost'))return;$out[$url]=['loc'=>$url,'lastmod'=>$lastmod,'priority'=>$priority];};
+    $out=[];$add=function(string $url,string $lastmod='',string $priority='0.7')use(&$out){if(!sf_seo_web_url($url))return;$out[$url]=['loc'=>$url,'lastmod'=>$lastmod,'priority'=>$priority];};
     $base=sf_seo_base_url();foreach([''=>'1.0','music'=>'0.8','releases'=>'0.9','shows'=>'0.8','store'=>'0.8','about'=>'0.6','archive'=>'0.7'] as $path=>$priority)$add($base.'/'.($path!==''?$path:''),'',$priority);
     foreach(sf_seo_release_rows() as $r){if(($r['state']??'published')!=='published'||($r['public_visible']??true)===false||empty($r['id']))continue;$id=(string)$r['id'];$add($base.'/release/'.rawurlencode($id),(string)($r['updated_at']??$r['release_date']??''),'0.9');foreach((array)($r['track_ids']??[]) as $tid){if(sf_seo_public_track((string)$tid))$add($base.'/track/'.rawurlencode((string)$tid),(string)($r['updated_at']??$r['release_date']??''),'0.8');}}
     if(function_exists('sf_live_public_shows'))foreach(sf_live_public_shows() as $s)if(!empty($s['id']))$add($base.'/show/'.rawurlencode((string)$s['id']),(string)($s['updated_at']??$s['date']??''),'0.7');
