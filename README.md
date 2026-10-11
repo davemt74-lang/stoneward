@@ -1,3 +1,61 @@
+# Stonefellow v1.3.33 — Section 34: Lyrics, Songbook & Track Notes
+
+Stonefellow’s **Catalog remains authoritative for lyric text**. Section 34 adds a publication and presentation layer around that canonical text instead of building a second lyric database.
+
+## Admin Songbook
+
+Open **Admin → Catalog → Track**.
+
+The existing **Canonical lyrics** field remains where the lyric text is edited and saved. Under the track form, Songbook controls:
+
+- Draft / Published / Archived
+- language
+- songwriting-credit visibility
+- verse / chorus / bridge section ranges
+- line annotations
+- internal notes
+- publication readiness
+
+The editor can detect conventional headings such as `[Verse 1]`, `Chorus`, `Bridge` and `Outro` and propose line ranges.
+
+## Publication boundary
+
+Canonical lyrics are private until the Songbook is explicitly published.
+
+Publishing requires:
+- a currently public Stonefellow track;
+- non-empty canonical lyrics;
+- valid language;
+- at least one valid Songbook section;
+- no overlapping section ranges;
+- all annotations to reference a line included in a Songbook section.
+
+If later Catalog edits invalidate those ranges, the public Songbook stops resolving until the editor is corrected.
+
+## Public experience
+
+Published Songbooks appear inside the existing song detail page. Lyrics are grouped into named sections with line numbers, optional songwriting credits and expandable annotations.
+
+Draft/unready/archived Songbooks do not render.
+
+## Privacy hardening
+
+Stonefellow no longer ships canonical lyrics inside the generated public Catalog JavaScript.
+
+Public lyric access is now governed consistently:
+- Track page → Published Songbook only
+- Search → Published Songbook only
+- Agent context → Published Songbook only
+- Agent ranking → draft lyrics removed before relevance scoring
+- `/data/` and `/config/` → denied by Apache
+
+The private `data/catalog.json` remains the canonical source used by server-side Stonefellow code.
+
+Application: **1.3.33**  
+Database schema target: **1.3.29**
+
+---
+
 # Stonefellow v1.3.32 — Section 33: Public Content & Storytelling
 
 Stonefellow remains a **single-artist platform**. Section 33 adds governed long-form storytelling around the artist’s real catalog without turning the product into a generic CMS.
