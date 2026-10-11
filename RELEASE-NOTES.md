@@ -1,4 +1,6 @@
-## Section 29 hardening audit
+# Stonefellow v1.3.28 — Section 29: Release Publishing & Distribution Operations
+
+## Hardening audit
 
 A second production-focused audit tightened the v1.3.28 Distribution + Publishing implementation before final acceptance.
 
@@ -15,7 +17,7 @@ A second production-focused audit tightened the v1.3.28 Distribution + Publishin
 - Full regression gate is warning-free.
 - App remains **v1.3.28**; DB schema remains **1.3.24**; no new migration is required.
 
-# Stonefellow v1.3.28 — Section 29: Release Publishing & Distribution Operations
+## Original Section 29 delivery
 
 - Added first-class Admin **Distribution + Publishing** workspace.
 - Added release preflight across metadata, release date, track list, ISRCs, audio masters, cover artwork and Section 28 rights clearance.
