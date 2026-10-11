@@ -1,36 +1,36 @@
-Stonefellow v1.3.33 Section 34 hardened release gate
+Stonefellow v1.3.34 Section 35 hardened release gate
 ====================================================
 
 Required:
 - PHP syntax across runtime/Admin/tests
 - Public JavaScript syntax
-- Admin JavaScript syntax including theme.js
-- Sections 1–33 inherited regression suites
-- Admin sidebar density regression
-- Section 34 Artist Brand & Visual Theme certification
+- Admin JavaScript syntax
+- Sections 1–34 inherited regression suites
+- Section 35 Lyrics, Songbook & Track Notes certification
 
-Section 34 coverage includes:
-- fixed single-artist visual identity model
-- Desert, Midnight, Paper and Monochrome presets
-- dark / light / follow-system appearance
-- safe allowlisted typography, width, density and corner controls
-- paired dark/light color palettes
-- strict server color/font validation
-- no arbitrary CSS, remote fonts or tenant abstraction
-- deterministic contrast/readiness validation
-- draft / saved-preview / publish / reset / default-restore lifecycle
-- explicit confirmation for live theme publication/restoration
-- Admin audit + Agent Brain
-- authenticated Admin-only real-site draft preview
-- noindex/no-canonical preview across SPA navigation
-- preview analytics/event suppression
-- server-rendered theme CSS and browser theme-color metadata
-- public shell, Homepage, Storytelling, music, store, account and persistent Agent/player integration
-- app 1.3.33 / database schema unchanged at 1.3.28 / no migration 030
+Section 35 certification covers:
+- canonical lyric privacy
+- lyric-free generated public catalog
+- migration-time public catalog sanitization
+- Songbook Draft / Published / Archived lifecycle
+- public-track publication gating
+- language validation
+- section range, overlap and full meaningful-line coverage
+- structural heading recognition
+- annotation range integrity
+- every visibility transition confirmed
+- embedded Catalog Songbook editor
+- governed public Songbook API
+- correct public collection selectors
+- published-only search lyric indexing
+- bounded published-only Agent lyric context
+- truthful Songbook event allowlist
+- public event rate limiting
+- v1.3.34 / DB 1.3.29 / migration 030
 
 Measured hardened implementation candidate:
 - Release gate: PASS
-- Explicit PASS lines: 1902
+- Explicit PASS lines: 1956
 - PHP warnings: 0
 - Failures: 0
 
