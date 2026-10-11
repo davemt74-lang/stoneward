@@ -340,10 +340,10 @@
   }
   async function renderArtistHomepage(){
     starters.hidden=true;document.body.classList.add('artist-home-active');let data;try{data=await api('artist-home.php')}catch(e){document.body.classList.remove('artist-home-active');return false}const home=data.homepage||{};if(!home.enabled){document.body.classList.remove('artist-home-active');return false}
-    canvas.innerHTML='<article class="artist-homepage">'+(home.sections||[]).map(artistHomeSection).join('')+'</article>';homepageEvent('view','hero');bindNewsletterForms(canvas);bind(canvas);
+    canvas.innerHTML='<article class="artist-homepage">'+(home.sections||[]).map(artistHomeSection).join('')+'</article>';homepageEvent('view','hero');bindNewsletterForms(canvas);bind(canvas);const newsletter=$('.artist-home-block .newsletter-form',canvas);if(newsletter)newsletter.addEventListener('focusin',()=>homepageEvent('newsletter_open','newsletter'),{once:true});
     $('[data-home-view]',canvas).forEach(b=>b.onclick=()=>{homepageEvent(b.dataset.homeEvent||'hero_primary','hero','view',b.dataset.homeView);navigate(b.dataset.homeView||'music')});
     $('[data-home-release]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('release_open','featured_release','release',b.dataset.homeRelease);navigate('release',{id:b.dataset.homeRelease})});
-    $('[data-home-track]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('release_open','featured_track','track',b.dataset.homeTrack);navigate('track',{id:b.dataset.homeTrack})});
+    $('[data-home-track]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('track_open','featured_track','track',b.dataset.homeTrack);navigate('track',{id:b.dataset.homeTrack})});
     $('[data-home-play]',canvas).forEach(b=>b.onclick=()=>{const sec=(home.sections||[]).find(x=>x.section_key==='featured_track'),t=sec?.data;if(t){homepageEvent('track_play','featured_track','track',t.id);play(homepageTrackObject(t),0,'artist_home')}});
     $('[data-home-show]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('show_open','upcoming_show','show',b.dataset.homeShow);navigate('show',{id:b.dataset.homeShow})});
     $('[data-home-store]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('merch_open','merch','store',b.dataset.homeStore);navigate('store')});
