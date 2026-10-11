@@ -80,7 +80,7 @@ function sf_press_public_payload(array $kit): array {
       'release'=>$release?['id'=>(string)$release['id'],'title'=>(string)($release['title']??''),'type'=>(string)($release['type']??''),'release_date'=>(string)($release['release_date']??''),'genre'=>(string)($release['genre']??''),'description'=>(string)($release['description']??''),'liner_notes'=>(string)($release['liner_notes']??''),'credits'=>(array)($release['credits']??[]),'media'=>function_exists('sf_media_public_links')?sf_media_public_links('release',$rid):[],'distribution'=>sf_press_release_distribution($rid)]:null,
       'tracks'=>$tracks,'media'=>$publicMedia,'artist_media'=>['logo'=>(string)($site['media_logo']??''),'artist_photo'=>(string)($site['media_artist_photo']??'')],'generated_at'=>gmdate('c')];
 }
-function sf_press_public_kit(string $slug,string $token=''): ?array { $k=sf_press_kit($slug);if(!$k||!sf_press_access_allowed($k,$token))return null;return sf_press_public_payload($k); }
+function sf_press_public_kit(string $slug,string $token=''): ?array { $k=sf_press_kit($slug);if(!$k||!sf_press_access_allowed($k,$token)||empty($k['readiness']['ready']))return null;return sf_press_public_payload($k); }
 
 function sf_press_contact(int $id): ?array { sf_press_ensure_schema();$q=sf_db()->prepare('SELECT * FROM press_contacts WHERE id=?');$q->execute([$id]);$r=$q->fetch();if(!$r)return null;$r['tags']=sf_press_decode($r['tags_json']??'',[]);return $r; }
 function sf_press_contacts(): array { sf_press_ensure_schema();$rows=sf_db()->query("SELECT * FROM press_contacts ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'do_not_contact' THEN 1 ELSE 2 END,outlet,name")->fetchAll();foreach($rows as &$r)$r['tags']=sf_press_decode($r['tags_json']??'',[]);unset($r);return $rows; }
