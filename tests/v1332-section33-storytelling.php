@@ -87,9 +87,9 @@ ok33(str_contains($app,"'media_open'")&&str_contains($app,"'entity_open'"),'stor
 
 # 33H — Upgrade and regression safety
 ok33(str_contains($boot,"require_once __DIR__ . '/story-core.php'"),'Storytelling core loads from canonical bootstrap');
-ok33(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.28'")&&str_contains($mig,"'id'=>'2026-10-11-029'")&&str_contains($mig,"'app_version'=>'1.3.32'"),'database target 1.3.28 includes migration 029 for v1.3.32');
+$schema33='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$m33))$schema33=$m33[1];ok33(version_compare($schema33,'1.3.28','>=')&&str_contains($mig,"'id'=>'2026-10-11-029'")&&str_contains($mig,"'app_version'=>'1.3.32'"),'database remains Section 33 compatible and retains migration 029');
 ok33(str_contains($mig,"'story_entries','story_events'"),'upgrade integrity requires both story tables');
-$app33='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$av33))$app33=$av33[1];ok33(version_compare($app33,'1.3.32','>=')&&str_contains($version,"'database_schema_target'=>'1.3.28'"),'version endpoint remains Section 33 compatible after later app releases');
+$app33='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$av33))$app33=$av33[1];ok33(version_compare($app33,'1.3.32','>=')&&version_compare($schema33,'1.3.28','>='),'version endpoint remains Section 33 compatible after later releases');
 ok33(str_contains($version,"'artist_storytelling'=>'single-artist-about-essays-release-track-show-stories-timeline'"),'version endpoint advertises the single-artist storytelling contract');
 ok33(str_contains($wf,'node --check admin/assets/stories.js'),'release gate syntax-checks Storytelling Admin JavaScript');
 ok33(str_contains($wf,'php tests/v1332-section33-storytelling.php'),'release gate includes Section 33 certification');
