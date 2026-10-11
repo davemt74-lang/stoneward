@@ -84,3 +84,4 @@ jobs:
           php tests/v1328-section29-hardening.php
           php tests/v1329-section30-epk-press.php
           php tests/v1330-section31-artist-home.php
+          php tests/v1331-section32-seo-discovery.php
