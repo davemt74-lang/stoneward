@@ -338,3 +338,9 @@ button,.text-control,.tiny-control,.buy-primary,input,select,textarea{border-rad
 .player-toggle,.chat-action,.catalog-play,.round-control,.notification-button{border-radius:999px}
 .theme-corners-square .chatbar,.theme-corners-square .footer-player{border-radius:0}
 .theme-density-compact .stage{padding-top:92px}.theme-density-compact .module{padding-top:18px}.theme-density-compact .catalog-row{padding-top:10px;padding-bottom:10px}.theme-density-compact .store-card,.theme-density-compact .plan-card{padding:15px}
+
+.splash-screen{background:var(--bg);color:var(--ink)}
+.splash-orb span{background:radial-gradient(circle at 36% 30%,var(--ink) 0 5%,var(--accent) 22%,var(--surface2) 58%,var(--bg) 80%);box-shadow:0 0 45px rgba(var(--accent-rgb),.18)}
+.artist-homepage,.storytelling-about,.story-public-page{color:var(--ink)}
+.artist-home-eyebrow,.story-date,.story-teaser small,.story-timeline small{color:var(--accent)}
+.theme-mode-light .social-links a{color:var(--muted)}
