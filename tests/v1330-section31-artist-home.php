@@ -65,7 +65,7 @@ ok31(str_contains($adminModule,'CORE READY')&&str_contains($adminModule,'NEEDS A
 ok31(str_contains($adminModuleCss,'.homepage-section-card')&&str_contains($adminModuleCss,'.homepage-readiness'),'homepage editor has dedicated responsive styling');
 ok31(str_contains($adminBaseCss,'min-height:21px')&&str_contains($adminBaseCss,'font-size:.62rem'),'existing 29-link short-viewport sidebar density remains unchanged');
 
-ok31(str_contains($shell,"define('SF_BUILD', '1.3.30')"),'public shell advances cache-busting build to 1.3.30');
+$build31='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$b31))$build31=$b31[1];ok31(version_compare($build31,'1.3.30','>='),'public shell remains Section 31 compatible or newer');
 ok31(str_contains($shell,"'artistHomepageEnabled'"),'public shell exposes homepage plugin state');
 ok31(str_contains($shell,"?'Home':'Agent'"),'public navigation labels Home when the Artist Homepage plugin is active');
 ok31(str_contains($shell,"siteSettings['splash_enabled']"),'existing splash toggle remains independently supported');
@@ -80,9 +80,9 @@ ok31(str_contains($css,'.artist-homepage')&&str_contains($css,'.artist-home-rele
 
 ok31(str_contains($boot,"require_once __DIR__ . '/artist-home-core.php'"),'homepage core loads from canonical bootstrap');
 ok31(str_contains($mig,"'id'=>'2026-10-11-027'")&&str_contains($mig,'sf_artist_home_ensure_schema'),'migration 027 installs homepage section/event schema');
-ok31(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.26'"),'database schema advances to 1.3.26');
+$schema31='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$m31))$schema31=$m31[1];ok31(version_compare($schema31,'1.3.26','>='),'database schema remains Section 31 compatible or newer');
 ok31(str_contains($mig,"'artist_home_sections'")&&str_contains($mig,"'artist_home_events'"),'upgrade integrity requires homepage tables');
-ok31(str_contains($version,"'stonefellow'=>'1.3.30'")&&str_contains($version,"'database_schema_target'=>'1.3.26'"),'version endpoint reports app 1.3.30 and schema 1.3.26');
+$app31='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$v31))$app31=$v31[1];ok31(version_compare($app31,'1.3.30','>=')&&version_compare($schema31,'1.3.26','>='),'version endpoint remains Section 31 compatible after later releases');
 ok31(str_contains($version,"'artist_homepage'=>'single-artist-plugin-toggle-configurable-sections-public-media'"),'version endpoint advertises single-artist homepage capability');
 ok31(str_contains($wf,'node --check admin/assets/homepage.js')&&str_contains($wf,'php tests/v1330-section31-artist-home.php'),'release gate includes Homepage Admin JS and Section 31 suite');
 

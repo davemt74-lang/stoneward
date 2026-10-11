@@ -82,7 +82,7 @@ const inspector=(c,sel)=>{
 };
 
 const growthPanel=(c,g,days)=>{
-  const r=g.recorded_revenue||{},crm=g.crm||{},campaigns=g.campaigns||{},merch=g.merch||{},membership=g.membership||{},tickets=g.ticketing||{},automation=g.automation||{},care=g.care||{},opps=g.opportunities||[],supporters=g.top_supporters||[],cohorts=crm.cohorts||[],daily=g.daily||[];
+  const r=g.recorded_revenue||{},discovery=g.discovery||{},discoverySources=discovery.sources||[],discoveryRoutes=discovery.routes||[],crm=g.crm||{},campaigns=g.campaigns||{},merch=g.merch||{},membership=g.membership||{},tickets=g.ticketing||{},automation=g.automation||{},care=g.care||{},opps=g.opportunities||[],supporters=g.top_supporters||[],cohorts=crm.cohorts||[],daily=g.daily||[];
   const money=c.money,esc=c.esc,maxRevenue=Math.max(1,...daily.map(x=>Number(x.order_revenue_cents||0))),maxActivity=Math.max(1,...daily.map(x=>Number(x.new_contacts||0)+Number(x.ticket_qty||0)+Number(x.campaign_entries||0)));
   const rows=(campaigns.campaigns||[]).slice(0,10);
   return `<section class="growth-intelligence">
@@ -98,6 +98,10 @@ const growthPanel=(c,g,days)=>{
       ${daily.length?`<div class="growth-chart">${daily.map(d=>`<div data-tip="${esc(d.day)} · ${money(d.order_revenue_cents||0)} · ${Number(d.new_contacts||0)} new fans"><i class="orders" style="height:${Math.max(2,Math.round(Number(d.order_revenue_cents||0)/maxRevenue*100))}%"></i><i style="height:${Math.max(2,Math.round((Number(d.new_contacts||0)+Number(d.ticket_qty||0)+Number(d.campaign_entries||0))/maxActivity*100))}%"></i></div>`).join('')}</div>`:'<div class="empty">No cross-system activity in this window yet.</div>'}
     </section>
     <div class="growth-grid">
+      <section class="panel"><div class="panel-title"><div><h2>Discovery sources</h2><p>External acquisition recorded at the public landing boundary; no full referrer URLs are retained.</p></div></div>
+        ${discoverySources.length?`<div class="source-list">${discoverySources.slice(0,10).map(x=>`<div><span>${esc(String(x.source||'direct').replaceAll('_',' '))}</span><strong>${Number(x.total||0)} landings</strong><em>${esc(x.medium||'')}</em></div>`).join('')}</div>`:'<div class="empty">No discovery landings recorded yet.</div>'}
+        ${discoveryRoutes.length?`<div class="growth-metric-list">${discoveryRoutes.slice(0,8).map(x=>`<div class="growth-metric-row"><span>${esc(String(x.route_type||'home').replaceAll('_',' '))}</span><strong>${Number(x.total||0)}</strong><em>landings</em></div>`).join('')}</div>`:'' }
+      </section>
       <section class="panel"><div class="panel-title"><div><h2>Fan growth</h2><p>CRM acquisition, consent and lifecycle mix.</p></div></div>
         <div class="analytics-commerce-strip"><div><span>Total CRM contacts</span><strong>${Number(crm.contacts||0)}</strong></div><div><span>New contacts</span><strong>${Number(crm.new_contacts||0)}</strong></div><div><span>Newsletter</span><strong>${Number(crm.newsletter||0)}</strong></div><div><span>New opt-ins</span><strong>${Number(crm.new_newsletter||0)}</strong></div></div>
         <div class="growth-cohorts">${cohorts.slice(-10).map(x=>`<div class="growth-cohort"><strong>${esc(x.week)}</strong><span>${Number(x.contacts||0)} contacts</span><span>${Number(x.newsletter||0)} newsletter</span><span>${Number(x.customer_or_member||0)} customer/member</span></div>`).join('')||'<div class="empty">No new-contact cohorts yet.</div>'}</div>

@@ -1,3 +1,53 @@
+# Stonefellow v1.3.31 — Section 32: SEO, Discovery & Social Sharing
+
+Stonefellow’s public pages now have a canonical discovery layer built around the existing single-artist catalog.
+
+## Canonical public routes
+
+- /track/{id}
+- /release/{id}
+- /show/{id}
+- /store/{slug}
+- /campaign/{slug}
+- /press/{slug}
+- /music, /releases, /shows, /store, /about, /archive
+
+The AJAX application still provides uninterrupted playback, but browser/history URLs and the server response now agree on the public canonical route.
+
+## Search + social metadata
+
+Initial HTML and later SPA navigation share the same server-side metadata resolver. Public pages can emit title, description, canonical URL, robots policy, Open Graph, social-card tags and JSON-LD.
+
+Structured data includes MusicGroup, MusicAlbum, MusicRecording, MusicEvent, Product and ProfilePage.
+
+## Sitemap + privacy
+
+/sitemap.xml contains only genuinely public content. Draft/private/hidden records and private EPKs are filtered before sitemap generation.
+
+/robots.txt blocks Admin/API/storage/data surfaces and common account/auth/token URLs.
+
+## Social sharing
+
+Songs, releases, shows and focused merch pages expose Share controls. Stonefellow uses native Web Share where available and clipboard-copy fallback otherwise. A share event is recorded only after the action actually succeeds.
+
+## Discovery attribution
+
+Stonefellow records bounded acquisition facts into its existing database:
+- direct
+- organic search
+- social
+- external referral
+- campaign / UTM source
+
+Full referrer URLs are not retained. Landing attribution is recorded once per page load rather than every internal AJAX navigation.
+
+The resulting source/route data appears in Admin → Performance Intelligence and in the grounded Admin Agent business brief.
+
+Application: **1.3.31**
+Database schema target: **1.3.27**
+
+---
+
 # Stonefellow v1.3.30 — Section 31: Public Artist Experience & Fan Journey
 
 Stonefellow remains a **single-artist platform**. Section 31 gives that artist a true public homepage without turning the project into a multi-artist CMS.
