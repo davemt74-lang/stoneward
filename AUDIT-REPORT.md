@@ -1,80 +1,77 @@
-# Stonefellow v1.3.30 — Section 31 Public Artist Experience & Fan Journey Audit
+# Stonefellow v1.3.31 — Section 32 SEO, Discovery & Social Sharing Audit
 
-Section 31 was built cleanly on the v1.3.29 mainline with extra emphasis on the single-artist homepage experience. The Homepage is implemented as a Settings-managed plugin rather than another Admin navigation area, keeping the already-dense left sidebar unchanged.
+Section 32 was built on the fully merged Section 31 mainline and audited against crawler privacy, canonical routing, structured data, SPA metadata drift, truthful sharing, discovery attribution, and regression compatibility.
 
-## 31A — Homepage Plugin & Launch Control — 10/10
-- Added a dedicated Artist Homepage plugin toggle under existing Site Settings.
-- Existing Splash toggle remains completely independent.
-- Safe launch order is Splash (optional) → Artist Homepage (optional) → existing Agent/Personalized Home fallback.
-- When the plugin is disabled or unavailable, the existing Home implementation remains unchanged.
-- The plugin adds no 30th Admin sidebar item; the existing 29-link density contract remains intact.
-- Public navigation says Home when the plugin is active and Agent when it is not.
+## 32A — Dynamic Route Metadata — 10/10
+- One canonical server-side resolver owns public metadata for Home, tracks, releases, shows, merch, campaigns, EPKs and top-level public sections.
+- Initial HTML emits route-specific title, description, canonical URL, robots policy, Open Graph and social-card metadata.
+- Unknown/private/non-public routes receive noindex,nofollow,noarchive and no canonical/JSON-LD.
+- SPA navigation re-resolves metadata from the same server authority so title/canonical/social tags do not drift after AJAX navigation.
+- Existing server JSON-LD is explicitly replaceable during SPA navigation.
 
-## 31B — Single-Artist Homepage Editor — 10/10
-- Fixed Stonefellow-only section model: Hero, Featured Release, Featured Track, Latest Releases, Upcoming Show, Merch, Artist Story, Newsletter, Personalized.
-- No artist selector, artist_id, tenant key or multi-artist abstraction was introduced.
-- Each section supports enable/disable, position, eyebrow, heading, body and section-specific configuration.
-- Smart auto-selection supports newest public release, first featured-release track, next public show and featured/available merch.
-- Explicit overrides are server-validated against authoritative public Stonefellow releases/shows/products and catalog tracks.
-- Server-side config normalization prevents API callers from setting unsupported destinations or arbitrary config keys.
-- Defaults can be restored only after explicit Admin confirmation.
-- Preview opens the real public Home route.
+## 32B — Music / Event / Product Structured Data — 10/10
+- MusicGroup schema represents Stonefellow.
+- MusicAlbum schema includes public tracks.
+- MusicRecording includes public duration and ISRC where available.
+- MusicEvent uses canonical public show data and only validated HTTPS ticket URLs.
+- Product schema uses active public merch records and configured store currency.
+- ProfilePage covers published/ready public EPKs.
+- Structured-data images resolve through Public Media Library relationships where available.
 
-## 31C — Public Artist Homepage Experience — 10/10
-- Homepage becomes the visual landing surface rather than stacking under the large Agent stage.
-- Persistent chat, voice controls and music player remain available throughout the experience.
-- Cinematic hero uses governed Site Media and responsive layout.
-- Featured release, track, latest releases, show, merch, story, newsletter and personalized sections share the existing public application shell.
-- Live DSP links come from Section 29 and are revalidated as HTTPS before exposure.
-- Main menu labels Home appropriately while the plugin is active.
-- Mobile layouts collapse cleanly without creating a second public shell.
+## 32C — Sitemap & Robots Privacy — 10/10
+- Standard XML sitemap endpoint is available at /sitemap.xml.
+- Sitemap includes canonical Home/top-level pages, published public releases, public standalone/release tracks, public shows, active merch, live campaigns and published-ready EPKs.
+- Private/draft/hidden records are rejected before sitemap inclusion.
+- robots.txt blocks Admin, API, storage/data, account/auth query routes and token-bearing query URLs.
+- Sitemap URL validation accepts only ordinary HTTP/HTTPS URLs.
 
-## 31D — Public Media & Playback Boundaries — 10/10
-- Homepage release/track/show imagery is resolved through explicitly Public Media Library relationships.
-- Featured track playback requires a public primary_audio relationship.
-- Homepage playback overrides the catalog object with the approved public audio URL.
-- The second-pass audit removed the remaining legacy catalog-audio fallback entirely.
-- Site hero/artist media continue to use the governed site-media publication path.
-- No homepage-specific uploader or duplicate media store was introduced.
+## 32D — Canonical Public URLs — 10/10
+- Pretty routes exist for /track/{id}, /release/{id}, /show/{id}, /store/{slug}, /campaign/{slug} and /press/{slug}.
+- Main public sections use canonical /music, /releases, /shows, /store, /about and /archive routes.
+- Server rewrite handoff preserves route id/slug for the SPA.
+- Browser navigation generates the same route shapes instead of returning to duplicate ?view=... URLs.
+- Private EPK bearer tokens remain in URL fragments and are never moved into query parameters.
+- Public navigation and wordmark now prefer canonical URLs.
 
-## 31E — Logged-In Fan Journey — 10/10
-- Logging in does not turn the homepage into a generic account dashboard.
-- Existing personalization is presented as a lower Your Stonefellow section beneath the artist experience.
-- Continue Listening, favorites and Agent suggestion data reuse the established Home/personalization model.
-- Anonymous visitors never receive personalized payload data.
-- Persistent playback, queue, library and account behavior remain part of the same AJAX application shell.
+## 32E — Social Sharing — 10/10
+- Track, release, show and focused merch pages expose Share controls.
+- Native Web Share is used when available; clipboard-copy fallback is supported.
+- Share attribution is recorded only after native share resolves or clipboard copy succeeds.
+- Aborted native shares are not counted.
+- Store cards can open focused /store/{slug} product pages with a product-specific social/SEO surface.
 
-## 31F — Homepage Readiness & Completeness — 10/10
-- Added deterministic homepage readiness scoring.
-- Core homepage blockers include missing hero copy, featured release and explicitly Public featured-track audio.
-- Warnings surface missing published hero imagery, artist photo, future public show or available merch.
-- Readiness is visible directly inside Settings alongside plugin state.
-- Homepage can still be edited while disabled, allowing safe preparation before launch.
-- Later public-media/catalog changes are reflected by fresh payload/readiness evaluation rather than copied shadow data.
+## 32F — Server-Rendered Discovery Content — 10/10
+- Initial public HTML contains a crawlable route-specific content snapshot before JavaScript runs.
+- The SPA replaces that snapshot with the interactive experience without creating a second shell.
+- Direct pretty-route loading works through the existing public application.
+- Critical titles/descriptions are server rendered rather than relying exclusively on JavaScript.
+- Focused merch and SEO snapshot views have responsive presentation.
 
-## 31G — Truthful Fan-Journey Events & Governance — 10/10
-- Allowlisted events: view, hero primary/secondary CTA, release open, track open/play, show open, merch open, newsletter CTA, About, personalization and Agent CTA.
-- No email-open, impression-score or inferred engagement events exist.
-- Public event writes are blocked when the Homepage plugin is disabled.
-- Anonymous event writes are session-rate-limited to prevent trivial event-table flooding.
-- Event detail is bounded and sanitized.
-- Homepage section changes/reset feed Admin audit and Agent Brain.
-- Resetting all homepage defaults requires explicit confirmation.
+## 32G — Discovery Attribution & Existing Analytics — 10/10
+- Discovery events are stored in the main Stonefellow database; no parallel analytics service was introduced.
+- Only bounded landing/share event types are accepted.
+- Referrers normalize into direct/internal/search/social/referral or bounded UTM source classes.
+- Full referrer URLs are never persisted.
+- Landing attribution is recorded once per document load, not on every internal SPA click.
+- Public event writes are rate-limited.
+- Raw discovery summaries are Admin-only.
+- Discovery sources/routes feed the existing Growth Analytics payload, Performance Intelligence UI, and grounded Admin Agent brief.
 
-## 31H — Upgrade, Regression & Release Safety — 10/10
-- Application advances to **1.3.30**.
-- Database target advances to **1.3.26**.
-- Migration **2026-10-11-027** creates `artist_home_sections` and `artist_home_events`.
-- Upgrade integrity requires both new tables.
-- Existing Section 30 version/schema regressions were made forward-compatible without weakening their minimum guarantees.
-- Existing Section 17 Fan Community persistence regression remains enforced while allowing the new site toggle.
+## 32H — Release Safety & Regression — 10/10
+- Application advances to **1.3.31**.
+- Database target advances to **1.3.27**.
+- Migration **2026-10-11-028** creates discovery_events and upgrade integrity requires it.
+- Section 31 version/schema regression was made forward-compatible without weakening its minimum guarantees.
+- Section 17 storefront regression was updated to allow the route-aware renderer while still requiring server-backed storefront data.
+- Existing list-selector safety regression caught and prevented two collection binding defects.
+- Manual audit caught and fixed SEO excerpt whitespace normalization and missing one-shot landing attribution before acceptance.
 - PHP syntax: **PASS**
 - Public JavaScript syntax: **PASS**
 - Admin JavaScript syntax: **PASS**
-- Sections 1–30 inherited regression suites: **PASS**
-- Section 31 certification: **PASS**
-- Explicit PASS lines on hardened implementation candidate: **1708**
+- Sections 1–31 inherited regression suites: **PASS**
+- Section 32 certification: **PASS**
+- Explicit PASS lines on hardened implementation candidate: **1784**
 - PHP warnings: **0**
 - Failures: **0**
 
-FINAL SECTION 31 SCORE: **10/10**
+FINAL SECTION 32 SCORE: **10/10**
