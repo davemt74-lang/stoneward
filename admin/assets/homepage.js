@@ -3,7 +3,7 @@
   const ctx=window.STONEFELLOW_ADMIN_CONTEXT;if(!ctx)return;
   const {api,esc,say}=ctx,$=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const state={data:null,mount:null};
-  const label=s=>String(s||'').replaceAll('_',' ').replace(/w/g,c=>c.toUpperCase());
+  const label=s=>String(s||'').replaceAll('_',' ').replace(/\\b\\w/g,c=>c.toUpperCase());
   const option=(value,text,current)=>'<option value="'+esc(value)+'" '+(String(value)===String(current)?'selected':'')+'>'+esc(text)+'</option>';
   function configFields(section,refs){
     const c=section.config||{},key=section.section_key;
@@ -11,6 +11,7 @@
     if(key==='featured_release')return '<label class="field">Featured release<select name="release_id">'+option('','Auto — newest published release',c.release_id||'')+(refs.releases||[]).map(r=>option(r.id,r.title+(r.date?' · '+r.date:''),c.release_id||'')).join('')+'</select></label>';
     if(key==='featured_track')return '<label class="field">Featured track<select name="track_id">'+option('','Auto — first track from featured release',c.track_id||'')+(refs.tracks||[]).map(t=>option(t.id,t.title+(t.release?' · '+t.release:''),c.track_id||'')).join('')+'</select></label>';
     if(key==='latest_releases')return '<label class="field">Number of releases<select name="limit">'+[2,3,4,5,6].map(v=>option(v,String(v),Number(c.limit||3))).join('')+'</select></label>';
+    if(key==='featured_video')return '<label class="field">Featured video<select name="video_slug">'+option('','Auto — featured published video',c.video_slug||'')+(refs.videos||[]).map(v=>option(v.slug,v.title+' · '+label(v.kind),c.video_slug||'')).join('')+'</select></label>';
     if(key==='upcoming_show')return '<label class="field">Featured show<select name="show_id">'+option('','Auto — next upcoming show',c.show_id||'')+(refs.shows||[]).map(s=>option(s.id,(s.date?s.date+' · ':'')+(s.venue||s.title),c.show_id||'')).join('')+'</select></label>';
     if(key==='merch')return '<label class="field">Featured product<select name="product_id">'+option('','Auto — featured available merch',c.product_id||'')+(refs.products||[]).map(p=>option(p.id,p.title+(p.available?'':' · unavailable'),c.product_id||'')).join('')+'</select></label>';
     if(key==='artist_story')return '<div class="notice span2"><strong>Single source:</strong> when a published Artist About exists in Storytelling below, its title, summary/body and public hero image automatically replace this section’s fallback heading/body/media. This section copy remains only as a safe fallback.</div><div class="homepage-config-grid"><label class="field">Button label<input name="button_label" value="'+esc(c.button_label||'About Stonefellow')+'"></label><label class="field">Destination<select name="button_view">'+['about','music','archive','shows'].map(v=>option(v,label(v),c.button_view||'about')).join('')+'</select></label></div>';
@@ -37,6 +38,7 @@
     if(key==='featured_release')return {release_id:v('release_id')};
     if(key==='featured_track')return {track_id:v('track_id')};
     if(key==='latest_releases'||key==='personalized')return {limit:Number(v('limit')||0)};
+    if(key==='featured_video')return {video_slug:v('video_slug')};
     if(key==='upcoming_show')return {show_id:v('show_id')};
     if(key==='merch')return {product_id:v('product_id')};
     if(key==='artist_story')return {button_label:v('button_label'),button_view:v('button_view')};
