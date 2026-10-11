@@ -38,7 +38,7 @@ $ht=file_get_contents($root.'/.htaccess');
 $wf=file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 foreach(['press_kits','press_contacts','press_outreach','press_coverage','press_events'] as $table)ok30(substr_count($core,'CREATE TABLE IF NOT EXISTS '.$table)===2,'press schema supports SQLite and MySQL for '.$table);
-ok30(str_contains($core,'message_fingerprint')&&str_contains($core,'last five minutes'),'press outreach has duplicate-send suppression');
+ok30(str_contains($core,'message_fingerprint')&&str_contains($core,'last five minutes')&&str_contains($core,"status IN ('sending','queued','logged','sent')"),'press outreach suppresses duplicate in-flight/successful sends but allows failed retries');
 ok30(str_contains($core,'share_token_hash')&&str_contains($core,"hash('sha256'"),'EPK record stores a one-way share-token hash');
 ok30(str_contains($core,'hash_equals'),'private token verification uses constant-time comparison');
 ok30(str_contains($core,"'#token='"),'private share link keeps token in URL fragment');
@@ -51,7 +51,7 @@ ok30(str_contains($core,"sf_media_public_links('track'")&&str_contains($core,"sf
 ok30(!str_contains($core,"'audio'=>(string)(\$t['audio']"),'public EPK does not expose legacy catalog audio paths directly');
 ok30(str_contains($core,'sf_transactional_email'),'press outreach uses existing transactional email delivery');
 ok30(str_contains($core,"status']??'')!=='active'")&&str_contains($core,'cannot receive outreach'),'do-not-contact and archived press contacts cannot receive outreach');
-ok30(str_contains($core,'transactional_email_outbox')&&str_contains($core,'error_text'),'press outreach preserves real delivery status/error');
+ok30(str_contains($core,'transactional_email_outbox')&&str_contains($core,'error_text')&&str_contains($core,"'sending'"),'press outreach records an in-flight ledger row and preserves real delivery status/error');
 ok30(str_contains($core,"['queued','logged','sent','failed']"),'press outreach preserves real configured email states');
 ok30(str_contains($core,"['view','media_click','contact_click','release_play','download_click','dsp_click']"),'EPK analytics allow only explicit real interaction events');
 ok30(!str_contains($core,'opened_at')&&!str_contains($core,'email_open'),'press module does not invent email-open tracking');
@@ -64,7 +64,7 @@ ok30(str_contains($adminApi,'explicit Admin confirmation')&&str_contains($adminA
 ok30(str_contains($adminApi,'sf_agent_brain_log')&&str_contains($adminApi,'sf_log_admin_action'),'press mutations feed Agent Brain and Admin audit');
 ok30(!str_contains($adminApi,"'token'=>"),'Admin audit/Brain payloads do not log raw bearer token');
 
-ok30(str_contains($mediaCore,"'press_kit'"),'central Media Library accepts press-kit relationships');
+ok30(str_contains($mediaCore,"'press_kit'")&&str_contains($mediaCore,'Press kit not found.'),'central Media Library accepts valid press-kit relationships and rejects orphan attachments');
 ok30(str_contains($mediaLinks,"'press_kit'"),'public media endpoint supports press-kit relationships');
 ok30(str_contains($mediaApi,"'press_kit'=>['hero']"),'EPK hero can be explicitly published through universal media controls');
 
@@ -76,7 +76,7 @@ ok30(str_contains($adminBaseCss,'min-height:21px')&&str_contains($adminBaseCss,'
 ok30(str_contains($adminJs,'Electronic press kits')&&str_contains($adminJs,'Press contacts'),'Admin workspace manages EPKs and press contacts');
 ok30(str_contains($adminJs,'Rotate private link')&&str_contains($adminJs,'privateTokens'),'private raw token remains session-scoped in the EPK workspace');
 ok30(str_contains($adminJs,'#token=')&&!str_contains($adminJs,"publicUrl+'?token='")&&str_contains($adminJs,"new URL('../press/"),'Admin uses fragment tokens and subdirectory-safe EPK links');
-ok30(str_contains($adminJs,'Send approved outreach')&&str_contains($adminJs,"confirm('Send this press outreach"),'Admin requires confirmation before press email send');
+ok30(str_contains($adminJs,'Send approved outreach')&&str_contains($adminJs,"confirm('Send this press outreach")&&str_contains($adminJs,'button.disabled=true'),'Admin confirms and locks the send control during press outreach');
 ok30(str_contains($adminJs,'do_not_contact')&&str_contains($adminJs,'Record confirmed coverage'),'Admin manages opt-out status and confirmed coverage separately');
 ok30(str_contains($adminCss,'.press-share-panel')&&str_contains($adminCss,'.press-readiness'),'EPK Admin has dedicated responsive/readiness styling');
 
