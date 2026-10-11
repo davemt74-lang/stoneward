@@ -5,9 +5,20 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
-# Public campaign landing pages.
+# SEO/crawler endpoints.
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+RewriteRule ^robots\.txt$ robots.php [L]
+
+# Canonical public content routes.
+RewriteRule ^track/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=track&id=$1 [QSA,L]
+RewriteRule ^release/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=release&id=$1 [QSA,L]
+RewriteRule ^show/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=show&id=$1 [QSA,L]
+RewriteRule ^store/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=store&slug=$1 [QSA,L]
 RewriteRule ^campaign/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=campaign&slug=$1 [QSA,L]
-# Public/private electronic press kits.\nRewriteRule ^press/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=press&slug=$1 [QSA,L]\n# Never serve a stale legacy static shell.
+RewriteRule ^press/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=press&slug=$1 [QSA,L]
+RewriteRule ^(music|releases|shows|store|about|archive)/?$ stonefellow-v120.php?view=$1 [QSA,L]
+
+# Never serve a stale legacy static shell.
 RewriteRule ^index\.html$ ./ [R=302,L]
 # Old setup URLs always return to the live application.
 RewriteRule ^install\.php$ ./ [R=302,L]
@@ -25,6 +36,6 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
 Header always set Pragma "no-cache"
 Header always set Expires "0"
-Header always set X-Stonefellow-Build "1.3.29"
+Header always set X-Stonefellow-Build "1.3.31"
 </FilesMatch>
 </IfModule>
