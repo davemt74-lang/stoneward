@@ -1,3 +1,80 @@
+# Stonefellow v1.3.30 — Section 31: Public Artist Experience & Fan Journey
+
+Stonefellow remains a **single-artist platform**. Section 31 gives that artist a true public homepage without turning the project into a multi-artist CMS.
+
+## Artist Homepage plugin
+
+Admin → Settings now contains an **Artist Homepage** module and an independent on/off toggle.
+
+The existing Splash remains separate. Public launch behavior is:
+
+**Splash (optional) → Artist Homepage (optional) → existing Agent/Personalized Home fallback**
+
+This makes the new homepage safe to configure before launch. Turning it off immediately returns the site to the existing Home experience.
+
+## Homepage sections
+
+The homepage is intentionally opinionated around one artist:
+
+- Hero
+- Featured Release
+- Featured Track
+- Latest Releases
+- Upcoming Show
+- Featured Merch
+- Artist Story
+- Newsletter
+- Your Stonefellow personalization for logged-in fans
+
+Each section can be enabled/disabled and reordered. The Admin can edit copy and select explicit featured content, or leave release/track/show/merch selectors on **Auto** so Stonefellow chooses from current authoritative public data.
+
+There is no artist selector, tenant ID or second catalog.
+
+## Public experience
+
+When enabled, the homepage becomes the visual landing surface. The large Agent orb/stage is hidden on Home so the site reads as an artist website first, while the persistent Agent chat bar and music player remain available.
+
+The homepage pulls from existing systems instead of duplicating content:
+
+- Media Library for public imagery and featured-track audio
+- Releases + Distribution for releases and live DSP links
+- Shows for the next public live date
+- Merch for active available products
+- Newsletter/CRM for fan signup
+- Personalization for logged-in Continue Listening/favorites/Agent suggestions
+
+## Publishing boundaries
+
+Homepage track playback requires an explicitly Public Media Library `primary_audio` relationship. Legacy/private catalog audio is never used as a homepage fallback.
+
+Explicit homepage release/show/product choices are server-validated against public Stonefellow records. DSP links are defensively revalidated as HTTPS before being exposed.
+
+## Readiness
+
+Settings displays a homepage readiness score and current blockers/warnings, including public hero imagery, featured release/cover, featured-track audio, artist photo, upcoming show and merch availability.
+
+## Fan journey analytics
+
+Homepage analytics record real Stonefellow actions only:
+
+- page view
+- hero CTA
+- release open
+- track open/play
+- show open
+- merch open
+- newsletter interaction
+- About
+- personalization
+- Agent entry
+
+No invented email opens, impressions or inferred engagement are generated.
+
+Application: **1.3.30**  
+Database schema target: **1.3.26**
+
+---
+
 # Stonefellow v1.3.29 — Section 30: Press Kit, EPK & Media Relations
 
 Stonefellow remains a **single-artist direct-to-fan platform**. Section 30 adds a governed media-relations layer around the existing catalog, Media Library, releases, Distribution + Publishing, transactional email and Agent Brain.
