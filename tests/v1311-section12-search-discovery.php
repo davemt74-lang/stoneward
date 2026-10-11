@@ -27,7 +27,7 @@ ok(str_contains($core,"'release'=>(string)(\$t['release']"),'track release is se
 ok(str_contains($core,"'mood'=>"),'track moods are searchable');
 ok(str_contains($core,"'themes'=>"),'track themes are searchable');
 ok(str_contains($core,"'story'=>(string)(\$t['story']"),'track story is searchable');
-ok(str_contains($core,"'lyrics'=>(string)(\$t['lyrics']"),'track lyrics are searchable');
+ok(str_contains($core,"'lyrics'=>function_exists('sf_songbook_get')")&&str_contains($core,"sf_songbook_get((string)(\$t['id']??''),true)?(string)(\$t['lyrics']??''):''"),'track lyrics are searchable only through a published Songbook');
 ok(str_contains($core,"'credits'=>"),'track credits are searchable');
 ok(str_contains($core,"'metadata'=>sf_search_string_values"),'structured track metadata is searchable');
 

@@ -1,3 +1,59 @@
+# Stonefellow v1.3.34 — Section 35: Lyrics, Songbook & Track Notes
+
+Stonefellow now has a governed Songbook layer for publishing lyrics and lyric context without making the private Catalog lyric field automatically public.
+
+## Privacy model
+
+Canonical lyrics live on the private Catalog track record.
+
+The generated public catalog JavaScript deliberately removes the `lyrics` field. A visitor can receive lyric text only through a Songbook that is:
+
+- attached to a public Stonefellow track;
+- explicitly Published;
+- currently readiness-green.
+
+This same boundary is used by public search and Agent grounding.
+
+## Songbook publishing
+
+Admin → Catalog → Track includes the Songbook editor. It manages:
+
+- Draft / Published / Archived status
+- language
+- verse / chorus / bridge / other section ranges
+- line annotations
+- optional songwriting credits
+- internal Songbook notes
+
+Automatic section detection can recognize common structural markers such as Verse, Chorus, Bridge, Hook, Intro and Outro.
+
+Publication requires complete meaningful-line coverage. Blank lines and recognized structural heading lines do not need to be assigned as lyric content.
+
+## Public track pages
+
+Published Songbooks appear within the existing track detail experience. Lyrics render in structured sections with optional line annotations. Raw Catalog lyrics are not rendered directly.
+
+## Search and Agent
+
+Public search includes lyric matches only for published Songbooks.
+
+The Stonefellow Agent may receive bounded published Songbook text when it is relevant to the user’s question. Draft/private lyric text is excluded from public Agent ranking/context.
+
+## Analytics
+
+Songbook analytics record only real in-site interactions:
+
+- Songbook view
+- section open
+- annotation open
+
+No fabricated share, impression or email-style tracking is generated.
+
+Application: **1.3.34**  
+Database schema target: **1.3.29**
+
+---
+
 # Stonefellow v1.3.33 — Section 34: Artist Brand & Visual Theme
 
 Stonefellow remains a **single-artist platform**. Section 34 adds controlled visual identity without becoming a generic theme marketplace or arbitrary site builder.
