@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.28';
+const SF_DB_SCHEMA_TARGET = '1.3.29';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -258,6 +258,13 @@ function sf_migration_definitions(): array {
             'description'=>'Single-artist editorial stories, About content, linked song/release/show stories, timeline milestones and story events',
             'revision'=>'1',
             'apply'=>function(): void { sf_story_ensure_schema(); },
+        ],
+        [
+            'id'=>'2026-10-11-030',
+            'app_version'=>'1.3.33',
+            'description'=>'Visual Story Builder document model and backward-compatible story block layouts',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_story_builder_migrate(); },
         ],
     ];
 }
