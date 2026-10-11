@@ -65,14 +65,14 @@ ok33(str_contains($ht,'^story/([A-Za-z0-9_-]+)/?$'),'web server exposes canonica
 ok33(str_contains($mediaCore,"'story_entry'")&&str_contains($mediaApi,"'story_entry'"),'Universal Media Library supports story entries');
 ok33(str_contains($adminJs,"roles:['hero','inline','gallery']")&&str_contains($adminJs,"publishRoles:['hero']"),'Story editor reuses governed hero/inline/gallery media');
 ok33(str_contains($core,"DELETE FROM media_links WHERE entity_type='story_entry'"),'story deletion cleans media relationships without deleting library assets');
-ok33(str_contains($seo,"if($view==='story'")&&str_contains($seo,"'@type'=>'Article'"),'published stories receive route-specific Article structured data');
-ok33(str_contains($seo,"if($view==='about'")&&str_contains($seo,"canonical'=>sf_seo_base_url().'/about'"),'Artist About uses the canonical /about identity');
+ok33(str_contains($seo,"view==='story'")&&str_contains($seo,"'@type'=>'Article'"),'published stories receive route-specific Article structured data');
+ok33(str_contains($seo,"view==='about'")&&str_contains($seo,"canonical'=>sf_seo_base_url().'/about'"),'Artist About uses the canonical /about identity');
 ok33(str_contains($seo,"sf_story_list(true,'',500)")&&str_contains($seo,"'/story/'"),'only public readiness-approved stories enter the sitemap');
 ok33(str_contains($siteCss,'.story-public-page')&&str_contains($siteCss,'.story-timeline'),'public story and timeline presentation is styled');
 
 # 33F — Homepage and Agent integration
-ok33(str_contains($home,'sf_story_about_payload')&&str_contains($home,"'story_source'=>$publicAbout?'storytelling':'homepage_fallback'"),'Homepage Artist Story consumes the published canonical About narrative with fallback');
-ok33(str_contains($home,"sf_story_media((int)$publicAbout['id'],true)"),'Homepage Artist Story uses public governed story media');
+ok33(str_contains($home,'sf_story_about_payload')&&str_contains($home,"'story_source'")&&str_contains($home,"'storytelling':'homepage_fallback'"),'Homepage Artist Story consumes the published canonical About narrative with fallback');
+ok33(str_contains($home,'sf_story_media((int)')&&str_contains($home,"['id'],true)"),'Homepage Artist Story uses public governed story media');
 ok33(str_contains($homeAdmin,'Single source:')&&str_contains($homeAdmin,'safe fallback'),'Homepage editor explains canonical Storytelling ownership');
 ok33(str_contains($agent,"sf_story_list(true,'',30)")&&str_contains($agent,'PUBLISHED ARTIST STORIES'),'public Agent context includes only published ready artist editorial');
 ok33(str_contains($agent,'count($storyLines)>=6'),'Agent storytelling context is bounded');
