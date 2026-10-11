@@ -60,7 +60,7 @@ ok32(str_contains($shell,'<link rel="canonical"')&&str_contains($shell,'property
 ok32(str_contains($shell,'name="robots" content="<?=sf_h((string)$seo[\'robots\'])?>"'),'server shell emits route-specific robots policy');
 ok32(str_contains($shell,'type="application/ld+json" data-seo-jsonld="1"'),'server shell emits replaceable JSON-LD');
 ok32(str_contains($shell,'sf_seo_server_html($seo)'),'server shell renders crawlable critical route content before SPA takeover');
-ok32(str_contains($shell,"['press','campaign','track','release','show','store','music','releases','shows','about','archive']"),'pretty route handoff supports all public SEO routes');
+$routes32Ok=true;$routeList32='';if(preg_match('/\\$publicInitialViews=\\[([^\\]]+)\\]/',$shell,$rm32))$routeList32=$rm32[1];else$routes32Ok=false;foreach(['press','campaign','track','release','show','store','music','releases','shows','about','archive'] as $requiredRoute32)if(!str_contains($routeList32,"'".$requiredRoute32."'"))$routes32Ok=false;ok32($routes32Ok,'pretty route handoff preserves all Section 32 public SEO routes while allowing later routes');
 ok32(str_contains($shell,'href="./" id="homeLink"')&&str_contains($shell,'href="music" data-view="music"'),'server navigation prefers canonical public paths');
 
 ok32(str_contains($app,'function publicRouteUrl')&&str_contains($app,"new URL('track/'+id")&&str_contains($app,"new URL('release/'+id")&&str_contains($app,"new URL('show/'+id")&&str_contains($app,"new URL('store/'+slug"),'SPA generates the same canonical entity paths');
