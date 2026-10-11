@@ -341,14 +341,14 @@
   async function renderArtistHomepage(){
     starters.hidden=true;document.body.classList.add('artist-home-active');let data;try{data=await api('artist-home.php')}catch(e){document.body.classList.remove('artist-home-active');return false}const home=data.homepage||{};if(!home.enabled){document.body.classList.remove('artist-home-active');return false}
     canvas.innerHTML='<article class="artist-homepage">'+(home.sections||[]).map(artistHomeSection).join('')+'</article>';homepageEvent('view','hero');bindNewsletterForms(canvas);bind(canvas);const newsletter=$('.artist-home-block .newsletter-form',canvas);if(newsletter)newsletter.addEventListener('focusin',()=>homepageEvent('newsletter_open','newsletter'),{once:true});
-    $('[data-home-view]',canvas).forEach(b=>b.onclick=()=>{homepageEvent(b.dataset.homeEvent||'hero_primary','hero','view',b.dataset.homeView);navigate(b.dataset.homeView||'music')});
-    $('[data-home-release]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('release_open','featured_release','release',b.dataset.homeRelease);navigate('release',{id:b.dataset.homeRelease})});
-    $('[data-home-track]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('track_open','featured_track','track',b.dataset.homeTrack);navigate('track',{id:b.dataset.homeTrack})});
-    $('[data-home-play]',canvas).forEach(b=>b.onclick=()=>{const sec=(home.sections||[]).find(x=>x.section_key==='featured_track'),t=sec?.data;if(t){homepageEvent('track_play','featured_track','track',t.id);play(homepageTrackObject(t),0,'artist_home')}});
-    $('[data-home-show]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('show_open','upcoming_show','show',b.dataset.homeShow);navigate('show',{id:b.dataset.homeShow})});
-    $('[data-home-store]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('merch_open','merch','store',b.dataset.homeStore);navigate('store')});
-    $('[data-home-dsp]',canvas).forEach(a=>a.onclick=()=>homepageEvent('release_open','featured_release','dsp',''));
-    $('[data-home-ticket]',canvas).forEach(a=>a.onclick=()=>homepageEvent('show_open','upcoming_show','ticket',''));
+    $$('[data-home-view]',canvas).forEach(b=>b.onclick=()=>{homepageEvent(b.dataset.homeEvent||'hero_primary','hero','view',b.dataset.homeView);navigate(b.dataset.homeView||'music')});
+    $$('[data-home-release]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('release_open','featured_release','release',b.dataset.homeRelease);navigate('release',{id:b.dataset.homeRelease})});
+    $$('[data-home-track]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('track_open','featured_track','track',b.dataset.homeTrack);navigate('track',{id:b.dataset.homeTrack})});
+    $$('[data-home-play]',canvas).forEach(b=>b.onclick=()=>{const sec=(home.sections||[]).find(x=>x.section_key==='featured_track'),t=sec?.data;if(t){homepageEvent('track_play','featured_track','track',t.id);play(homepageTrackObject(t),0,'artist_home')}});
+    $$('[data-home-show]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('show_open','upcoming_show','show',b.dataset.homeShow);navigate('show',{id:b.dataset.homeShow})});
+    $$('[data-home-store]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('merch_open','merch','store',b.dataset.homeStore);navigate('store')});
+    $$('[data-home-dsp]',canvas).forEach(a=>a.onclick=()=>homepageEvent('release_open','featured_release','dsp',''));
+    $$('[data-home-ticket]',canvas).forEach(a=>a.onclick=()=>homepageEvent('show_open','upcoming_show','ticket',''));
     const agentBtn=$('[data-home-agent]',canvas);if(agentBtn)agentBtn.onclick=()=>{homepageEvent('agent_open','hero');input?.focus();agent('idle','Ask me about a song, a release, a show, or what you should hear first.')};
     const pp=$('[data-home-personalized]',canvas);if(pp)pp.onclick=()=>{homepageEvent('personalized_open','personalized');const sec=(home.sections||[]).find(x=>x.section_key==='personalized'),a=sec?.data?.suggestion?.action||{};if(a.type==='play_track'&&a.track_id){const t=trackById(a.track_id);if(t)play(t)}else if(a.type==='resume_track'&&a.track_id){const t=trackById(a.track_id);if(t)play(t,a.position_seconds||0)}else if(a.type==='open_release')navigate('release',{id:a.release_id});else if(a.type==='open_build')navigate('builder');else navigate(a.view||'music')};
     agent(st.playing?'playing':'idle','Welcome to Stonefellow. Start with the music, see what is next, or ask me where to begin.');return true;
