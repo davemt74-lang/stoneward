@@ -1,3 +1,21 @@
+# Stonefellow v1.3.31 — Section 32: SEO, Discovery & Social Sharing
+
+- Added route-specific canonical metadata for Home, songs, releases, shows, products, campaigns, EPKs and major public sections.
+- Added server-rendered Open Graph and social-card metadata.
+- Added structured data for Stonefellow, albums, recordings, shows, products and public press kits.
+- Added /sitemap.xml and /robots.txt with explicit private/admin/account/token exclusions.
+- Added canonical pretty public routes for tracks, releases, shows, merch, campaigns and press kits.
+- Added server-rendered route snapshots so critical public content exists before JavaScript executes.
+- Added SPA metadata synchronization so title/canonical/social/JSON-LD stay correct after AJAX navigation.
+- Added public Share controls for songs, releases, shows and focused merch pages.
+- Added focused /store/{slug} product pages and exposed public product slugs through Storefront.
+- Share analytics only record completed native-share or copy actions.
+- Added privacy-bounded acquisition attribution for direct, search, social, referral and campaign landings.
+- Full referrer URLs are not retained.
+- Discovery attribution feeds the existing Performance Intelligence dashboard and Admin Agent brief.
+- Application advances to **1.3.31**.
+- Database schema advances to **1.3.27** via migration **2026-10-11-028**.
+
 # Stonefellow v1.3.30 — Section 31: Public Artist Experience & Fan Journey
 
 - Added a new **single-artist Artist Homepage plugin** managed under Admin → Settings.
