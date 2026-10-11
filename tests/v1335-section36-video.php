@@ -38,20 +38,20 @@ ok36(substr_count($core,'CREATE TABLE IF NOT EXISTS video_features')===2,'video 
 ok36(substr_count($core,'CREATE TABLE IF NOT EXISTS video_events')===2,'video event schema supports SQLite and MySQL');
 ok36(!str_contains($core,'stored_path TEXT')&&!str_contains($core,'video_path'),'Video Hub stores publication metadata rather than duplicate video bytes');
 ok36(str_contains($core,"sf_media_links('video_feature'"),'video publication references central Media Library relationships');
-ok36(str_contains($core,"count($videos)===1")&&str_contains($core,"count($posters)===1"),'publishing requires exactly one public managed video and poster');
-ok36(str_contains($core,"in_array($c['mime_type'],['text/vtt','text/plain'],true)")&&str_contains($core,"$c['extension']!=='vtt'"),'caption readiness accepts real-world VTT MIME detection but requires .vtt');
+ok36(str_contains($core,"count(\$videos)===1")&&str_contains($core,"count(\$posters)===1"),'publishing requires exactly one public managed video and poster');
+ok36(str_contains($core,"in_array(\$c['mime_type'],['text/vtt','text/plain'],true)")&&str_contains($core,"\$c['extension']!=='vtt'"),'caption readiness accepts real-world VTT MIME detection but requires .vtt');
 ok36(str_contains($core,'Linked song, release and show records must be currently public.'),'video publication validates authoritative public entity links');
 ok36(str_contains($core,'Chapter times must be unique, ascending and inside video duration.'),'video publication validates chapters against duration');
-ok36(str_contains($core,"if($status==='published')")&&str_contains($core,'Video is blocked:'),'published videos require green readiness');
+ok36(str_contains($core,"if(\$status==='published')")&&str_contains($core,'Video is blocked:'),'published videos require green readiness');
 ok36(str_contains($core,"status='published'")&&str_contains($core,'featured=0'),'publishing a featured video makes featured published state unique');
-ok36(str_contains($core,"$allowed=['view','play','pause','progress_25','progress_50','progress_75','complete','caption_on','chapter_seek','entity_open']"),'video event allowlist matches real player interactions');
+ok36(str_contains($core,"\$allowed=['view','play','pause','progress_25','progress_50','progress_75','complete','caption_on','chapter_seek','entity_open']"),'video event allowlist matches real player interactions');
 ok36(!str_contains($core,"'impression'")&&!str_contains($core,"'watch_time_estimate'"),'video metrics do not invent impressions or estimated watch time');
 ok36(str_contains($core,'sf_video_agent_context')&&str_contains($core,'PUBLISHED VIDEOS'),'Agent context is sourced only from public Video Hub records');
 
 ok36(str_contains($mediaCore,"'video'=>['video/mp4'=>['mp4'],'video/webm'=>['webm'],'video/quicktime'=>['mov']]"),'Media Library remains the managed MP4/WebM/MOV uploader');
 ok36(str_contains($mediaCore,"'text/plain'=>['txt','vtt']")&&str_contains($mediaCore,"'text/vtt'=>['vtt']"),'Media Library accepts WebVTT across common server MIME detection');
 ok36(str_contains($mediaCore,"'video_feature'")&&str_contains($mediaCore,'Video feature not found.'),'Media Library allows only real Video Hub relationships');
-ok36(str_contains($mediaDelivery,"extension'])==='vtt'")&&str_contains($mediaDelivery,"$mime='text/vtt'"),'managed VTT captions are served with browser-correct MIME');
+ok36(str_contains($mediaDelivery,"extension'])==='vtt'")&&str_contains($mediaDelivery,"\$mime='text/vtt'"),'managed VTT captions are served with browser-correct MIME');
 ok36(str_contains($mediaAdmin,"'video_feature'=>['poster']"),'Admin can publish exactly one governed video poster');
 ok36(str_contains($mediaJs,"captions:{label:'Captions'")&&str_contains($mediaJs,'videoHubPanel'),'Media Library exposes captions role and embedded Public Video Hub');
 ok36(str_contains($mediaJs,'SFVideoAdmin?.renderInto'),'Media Library loads the Video Hub publisher in place');
@@ -65,7 +65,7 @@ ok36(str_contains($adminModule,"roles:['video','poster','captions','photo']"),'V
 ok36(str_contains($adminModule,"confirm('Change this video status to '")&&str_contains($adminModule,'confirmed:changed'),'Video Hub Admin confirms visibility changes before save');
 ok36(str_contains($adminCss,'.video-admin-row')&&str_contains($adminCss,'.video-editor'),'Video Hub Admin has dedicated responsive presentation');
 
-ok36(str_contains($publicApi,"if($method==='GET')")&&str_contains($publicApi,"if($method==='POST')"),'public video API separates side-effect-free reads from events');
+ok36(str_contains($publicApi,"if(\$method==='GET')")&&str_contains($publicApi,"if(\$method==='POST')"),'public video API separates side-effect-free reads from events');
 ok36(str_contains($publicApi,'count($attempts)>=90'),'public video event writes are rate-limited');
 ok36(str_contains($app,"async function renderVideos()")&&str_contains($app,"async function renderVideo(slug)"),'public app provides Video Hub and focused video detail');
 ok36(str_contains($app,'controls preload="metadata" playsinline')&&!str_contains($app,'<video autoplay'),'public video playback never autoplays and uses native controls');
@@ -80,13 +80,13 @@ ok36(str_contains($shell,"define('SF_BUILD', '1.3.35')"),'public shell advances 
 ok36(str_contains($shell,"'video'")&&str_contains($shell,"'videos'")&&str_contains($shell,'href="videos" data-view="videos"'),'server route handoff and public nav include Videos');
 ok36(str_contains($app,"if(view==='video'&&slug)")&&str_contains($app,"'videos'].includes(view)"),'SPA canonical URL builder supports /video/{slug} and /videos');
 ok36(str_contains($seo,"'@type'=>'VideoObject'")&&str_contains($seo,"'contentUrl'")&&str_contains($seo,"'thumbnailUrl'"),'video pages emit VideoObject structured data');
-ok36(str_contains($seo,"$base.'/video/'")&&str_contains($seo,"'videos'=>'0.8'"),'sitemap exposes only public video pages and Video Hub');
+ok36(str_contains($seo,"\$base.'/video/'")&&str_contains($seo,"'videos'=>'0.8'"),'sitemap exposes only public video pages and Video Hub');
 ok36(str_contains($seo,"function_exists('sf_video_public_list')"),'sitemap source is readiness-filtered public Video Hub list');
 
 ok36(in_array('featured_video',sf_artist_home_keys(),true),'Artist Homepage supports optional Featured Video section');
-ok36(str_contains($home,"sf_video_featured()")&&str_contains($home,"sf_video_public((string)$cfg['video_slug'])"),'Homepage auto-selects or explicitly selects a public ready video');
+ok36(str_contains($home,"sf_video_featured()")&&str_contains($home,"sf_video_public((string)\$cfg['video_slug'])"),'Homepage auto-selects or explicitly selects a public ready video');
 ok36(str_contains($home,"'video_open'"),'Homepage records real featured-video opens');
-ok36(str_contains($homeApi,"'videos'=>$videos"),'Homepage Admin references published Video Hub records');
+ok36(str_contains($homeApi,"'videos'=>\$videos"),'Homepage Admin references published Video Hub records');
 ok36(str_contains($homeAdmin,"if(key==='featured_video')")&&str_contains($homeAdmin,'Auto — featured published video'),'Homepage editor can select or auto-pick featured video');
 ok36(str_contains($app,"k==='featured_video'")&&str_contains($app,'data-home-video'),'public Homepage renders a Featured Video section');
 ok36(str_contains($mig,'sf_artist_home_ensure_schema()'),'migration 031 seeds missing Featured Video homepage defaults on existing installs');
