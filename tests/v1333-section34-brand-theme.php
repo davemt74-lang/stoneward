@@ -10,6 +10,7 @@ ok34(array_keys($presets)===['desert','midnight','paper','monochrome'],'theme sy
 foreach($presets as $name=>$preset){$probe=['preset'=>$name]+$preset;$probe['mode']='system';$r=sf_theme_readiness($probe);ok34($r['ready']&&$r['score']===100,'preset '.$name.' passes dark and light contrast readiness');}
 $badHex=sf_theme_default();$badHex['dark']['bg']='red';$thrown=false;try{sf_theme_normalize($badHex);}catch(InvalidArgumentException $e){$thrown=true;}ok34($thrown,'non-hex theme colors are rejected');
 $badFont=sf_theme_default();$badFont['display_font']='https://evil.example/font.woff2';$thrown=false;try{sf_theme_normalize($badFont);}catch(InvalidArgumentException $e){$thrown=true;}ok34($thrown,'remote or arbitrary display fonts are rejected');
+$modifiedPreset=sf_theme_default();$modifiedPreset['dark']['bg']='#010203';ok34(sf_theme_normalize($modifiedPreset)['preset']==='custom','server marks a modified preset as Custom instead of mislabeling it');
 $low=sf_theme_default();$low['dark']['ink']=$low['dark']['bg'];$low['mode']='dark';$lr=sf_theme_readiness($low);ok34(!$lr['ready']&&count($lr['blockers'])>0,'insufficient primary-text contrast blocks publishing');
 $system=sf_theme_default();$system['mode']='system';$cssProbe=sf_theme_css($system);ok34(str_contains($cssProbe,'prefers-color-scheme:light')&&str_contains($cssProbe,'--accent-text:')&&str_contains($cssProbe,'--display-font:'),'system appearance emits paired safe CSS variables');
 ok34(sf_theme_contrast('#ffffff','#000000')>20.9,'contrast engine implements WCAG-style luminance ratio');
@@ -73,6 +74,8 @@ ok34(str_contains($siteCss,'font-family:var(--display-font)')&&str_contains($sit
 ok34(!str_contains($siteCss,'Georgia,serif')&&!str_contains($siteCss,'Inter,system-ui,sans-serif'),'legacy hard-coded public type stacks no longer bypass the theme');
 ok34(str_contains($shell,'Stonefellow — Maintenance')&&str_contains($shell,'sf_theme_css($activeTheme)'),'maintenance mode uses the published visual theme');
 ok34(str_contains($siteCss,'.theme-density-compact')&&str_contains($siteCss,'.theme-corners-square'),'density and corner controls affect real public components');
+ok34(str_contains($siteCss,'.site-announcement,.notification-drawer,.queue-drawer')&&str_contains($siteCss,'background:var(--surface2)'),'announcement, drawers and content placeholders use theme surfaces');
+ok34(str_contains($siteCss,'.story-lede,.story-rich-copy p')&&str_contains($siteCss,'color:var(--muted)!important'),'Storytelling text follows theme secondary color');
 
 # 34F — Settings/editor integration
 ok34(str_contains($adminIndex,'assets/theme.css')&&str_contains($adminIndex,'assets/theme.js'),'Artist Brand Admin assets load in v1.3.33');
