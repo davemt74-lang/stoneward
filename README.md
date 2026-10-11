@@ -1,3 +1,56 @@
+# Stonefellow v1.3.33 — Section 34: Artist Brand & Visual Theme
+
+Stonefellow remains a **single-artist platform**. Section 34 adds controlled visual identity without becoming a generic theme marketplace or arbitrary site builder.
+
+## Artist Brand
+
+Admin → Settings now includes **Artist Brand & Visual Theme**. It does not add another sidebar item.
+
+Built-in starting points:
+
+- Desert
+- Midnight
+- Paper
+- Monochrome
+
+Each can run Dark, Light or Follow System.
+
+## Safe customization
+
+The theme system exposes only bounded design controls:
+
+- background and surface colors
+- primary and secondary text
+- accent and accent-button text
+- danger color
+- display and body type stacks
+- content width
+- comfortable or compact density
+- square, soft or round corners
+
+Arbitrary CSS, JavaScript, remote fonts and per-page themes are intentionally unsupported.
+
+## Draft before publish
+
+Theme changes are saved as a draft first. The live public site continues using the published theme.
+
+The **Live saved-draft preview** opens the real Stonefellow public application with the draft theme. It is available only to an Administrator, is noindex, has no canonical URL and does not write normal discovery/Homepage/Storytelling analytics.
+
+Publishing or restoring the default theme requires explicit confirmation.
+
+## Accessibility
+
+Stonefellow calculates contrast server-side and blocks publication when required color pairs do not meet the configured WCAG-style thresholds. Follow System validates both dark and light palettes.
+
+## Site-wide visual identity
+
+Published theme tokens apply to the persistent shell, Agent/chat/player, Homepage, Storytelling, catalog, releases, shows, store, account/library, Splash and maintenance state.
+
+Application: **1.3.33**  
+Database schema target: **1.3.28**
+
+---
+
 # Stonefellow v1.3.32 — Section 33: Public Content & Storytelling
 
 Stonefellow remains a **single-artist platform**. Section 33 adds governed long-form storytelling around the artist’s real catalog without turning the product into a generic CMS.
