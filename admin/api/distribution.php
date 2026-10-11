@@ -24,7 +24,7 @@ try{
         sf_json_response(['ok'=>true,'distribution'=>$r]);
     }
     if($action==='save_destination'){
-        $status=(string)($b['destination']['status']??'not_started');$consequential=in_array($status,['submitted','scheduled','live'],true);if($consequential&&empty($b['confirmed']))throw new RuntimeException('Marking a DSP destination '.$status.' requires explicit confirmation.');
+        $status=(string)($b['destination']['status']??'not_started');$consequential=in_array($status,['submitted','scheduled','live','failed'],true);if($consequential&&empty($b['confirmed']))throw new RuntimeException('Marking a DSP destination '.$status.' requires explicit confirmation.');
         $r=sf_distribution_save_destination($releaseId,(array)($b['destination']??[]),(int)$me['id']);
         sf_log_admin_action((int)$me['id'],'distribution_destination_saved','release',$releaseId,['provider'=>$b['destination']['provider']??'','status'=>$status]);
         sf_agent_brain_log((int)$me['id'],'admin_distribution','distribution_destination',['route'=>'release_distribution','action'=>'save_destination','context_profile'=>'release','needs_llm'=>false,'requires_confirmation'=>$consequential,'status'=>'completed','request'=>'Update DSP destination for '.$releaseId,'response'=>'Destination status saved as '.$status.'.']);
