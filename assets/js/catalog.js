@@ -20,7 +20,6 @@ window.STONEFELLOW_CATALOG = [
     "artwork": "",
     "price": 2,
     "podEligible": true,
-    "lyrics": "",
     "credits": [
       "Written and performed by Stonefellow"
     ],
@@ -47,7 +46,6 @@ window.STONEFELLOW_CATALOG = [
     "artwork": "",
     "price": 2,
     "podEligible": true,
-    "lyrics": "",
     "credits": [
       "Written and performed by Stonefellow"
     ],
@@ -74,7 +72,6 @@ window.STONEFELLOW_CATALOG = [
     "artwork": "",
     "price": 2,
     "podEligible": true,
-    "lyrics": "",
     "credits": [
       "Written and performed by Stonefellow"
     ],
@@ -101,7 +98,6 @@ window.STONEFELLOW_CATALOG = [
     "artwork": "",
     "price": 2,
     "podEligible": true,
-    "lyrics": "",
     "credits": [
       "Written and performed by Stonefellow"
     ],
@@ -127,7 +123,6 @@ window.STONEFELLOW_CATALOG = [
     "artwork": "",
     "price": 2,
     "podEligible": true,
-    "lyrics": "",
     "credits": [
       "Written and performed by Stonefellow"
     ],
