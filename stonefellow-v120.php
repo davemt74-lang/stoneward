@@ -50,7 +50,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php endif; ?>  <base href="<?=sf_h($appBaseHref)?>">
   <meta name="stonefellow-build" content="<?=sf_h(SF_BUILD)?>">
   <title><?=sf_h((string)$seo['title'])?></title>
-<?php foreach((array)$seo['json_ld'] as $structured): ?>  <script type="application/ld+json"><?=json_encode($structured,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script>
+<?php foreach((array)$seo['json_ld'] as $structured): ?>  <script type="application/ld+json" data-seo-jsonld="1"><?=json_encode($structured,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script>
 <?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
 </head>
@@ -79,20 +79,20 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <div class="menu-sheet">
         <button class="menu-close" id="menuClose" type="button" aria-label="Close menu">×</button>
         <nav>
-          <a href="?view=home" data-view="home"><?=!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent'?></a>
-          <a href="?view=music" data-view="music">Music</a>
-          <a href="?view=releases" data-view="releases">Releases</a>
-          <a href="?view=archive" data-view="archive">Music Archive</a>
-          <a href="?view=shows" data-view="shows">Shows &amp; Live</a>
+          <a href="./" data-view="home"><?=!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent'?></a>
+          <a href="music" data-view="music">Music</a>
+          <a href="releases" data-view="releases">Releases</a>
+          <a href="archive" data-view="archive">Music Archive</a>
+          <a href="shows" data-view="shows">Shows &amp; Live</a>
           <a href="?view=tickets" data-view="tickets">Tickets &amp; VIP</a>
 <?php if(!empty($siteSettings['fan_community_enabled'])): ?>
           <a href="?view=community" data-view="community">Fan Community</a>
 <?php endif; ?>
-          <a href="?view=store" data-view="store">Store</a>
+          <a href="store" data-view="store">Store</a>
           <a href="?view=builder" data-view="builder">Create a record</a>
           <a href="?view=cart" data-view="cart">Cart</a>
           <a href="?view=plans" data-view="plans">Plans</a>
-          <a href="?view=about" data-view="about">About</a>
+          <a href="about" data-view="about">About</a>
           <a href="?view=privacy" data-view="privacy">Privacy</a>
           <a href="?view=terms" data-view="terms">Terms</a>
 <?php if($currentUser): ?>
