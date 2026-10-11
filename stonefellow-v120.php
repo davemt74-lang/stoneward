@@ -25,7 +25,7 @@ $seo=sf_seo_resolve($initialView,$initialId,$initialSlug);if($themePreview){$seo
 function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES,'UTF-8'); }
 ?>
 <?php if($siteSettings['maintenance_enabled'] && (($currentUser['role']??'')!=='admin')): ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Stonefellow — Maintenance</title><style>body{margin:0;background:#090807;color:#f2eee8;font:16px/1.6 system-ui,sans-serif}.wrap{width:min(680px,calc(100% - 40px));margin:18vh auto}.brand{font-weight:800;letter-spacing:.28em;font-size:.75rem}h1{font:400 clamp(2.5rem,8vw,5rem)/1 Georgia,serif;margin:42px 0 18px}p{color:#aaa;max-width:560px}</style></head><body><main class="wrap"><div class="brand">STONEFELLOW</div><h1>We’ll be right back.</h1><p><?=sf_h($siteSettings['maintenance_message'])?></p></main></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Stonefellow — Maintenance</title><style><?=sf_theme_css($activeTheme)?>body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body-font)}.wrap{width:min(680px,calc(100% - 40px));margin:18vh auto}.brand{font-weight:800;letter-spacing:.28em;font-size:.75rem}h1{font:400 clamp(2.5rem,8vw,5rem)/1 var(--display-font);margin:42px 0 18px;color:var(--ink)}p{color:var(--muted);max-width:560px}</style></head><body><main class="wrap"><div class="brand">STONEFELLOW</div><h1>We’ll be right back.</h1><p><?=sf_h($siteSettings['maintenance_message'])?></p></main></body></html>
 <?php exit; endif; ?>
 <!doctype html>
 <html lang="en">
