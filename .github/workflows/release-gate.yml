@@ -45,6 +45,7 @@ jobs:
           node --check admin/assets/rights.js
           node --check admin/assets/distribution.js
           node --check admin/assets/press.js
+          node --check admin/assets/homepage.js
 
       - name: v1.3 regression suites
         run: |
@@ -82,3 +83,4 @@ jobs:
           php tests/v1328-section29-distribution.php
           php tests/v1328-section29-hardening.php
           php tests/v1329-section30-epk-press.php
+          php tests/v1330-section31-artist-home.php

@@ -277,3 +277,44 @@ body.drawer-open{overflow:hidden}
 
 /* v1.3.29 — public EPK */
 .press-public{max-width:980px;margin:auto}.press-public-hero{width:100%;max-height:560px;overflow:hidden;border:1px solid var(--line);margin-bottom:24px;background:#0b0a08}.press-public-hero img{display:block;width:100%;height:100%;max-height:560px;object-fit:cover}.press-public>h1{font:400 clamp(2rem,6vw,4.6rem)/.98 Georgia,serif;margin:.25em 0}.press-public-summary{max-width:780px;font-size:1rem;line-height:1.7;color:var(--muted)}.press-public-section{border-top:1px solid var(--line);padding-top:22px;margin-top:28px}.press-public-section h3{font:400 1.5rem Georgia,serif}.press-bio{max-width:820px;line-height:1.75;color:var(--muted)}.press-release-card{display:grid;grid-template-columns:minmax(180px,320px) minmax(0,1fr);gap:22px;align-items:start}.press-release-card>img{width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--line)}.press-meta{color:var(--muted)}.press-track-list{display:grid;gap:8px}.press-track-list article{border:1px solid var(--line);padding:11px;display:grid;grid-template-columns:minmax(150px,1fr) minmax(280px,2fr);gap:12px;align-items:center}.press-track-list strong,.press-track-list small{display:block}.press-track-list small,.press-no-preview{color:var(--muted);margin-top:3px;font-size:.7rem}.press-track-list audio{width:100%}.press-contact-card,.press-dsp-links{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.press-contact-card .module-kicker{width:100%}.press-contact-card a,.press-dsp-links a{border:1px solid var(--line);padding:8px 10px;text-transform:capitalize}@media(max-width:700px){.press-release-card,.press-track-list article{grid-template-columns:1fr}.press-public>h1{font-size:2.5rem}}
+
+
+/* v1.3.30 — Section 31 single-artist Homepage plugin */
+body.artist-home-active .stage{width:min(1260px,calc(100% - 42px));padding-top:92px}
+body.artist-home-active .agent-stage{display:none}
+body.artist-home-active .dynamic-canvas{max-width:none;margin:0 auto}
+.artist-homepage{display:grid;gap:76px;padding-bottom:40px}
+.artist-home-hero{position:relative;min-height:min(76vh,760px);border:1px solid var(--line);overflow:hidden;display:flex;align-items:flex-end;background:linear-gradient(145deg,#241b15,#0a0908);background-image:linear-gradient(90deg,rgba(8,7,6,.94) 0%,rgba(8,7,6,.68) 42%,rgba(8,7,6,.28) 72%,rgba(8,7,6,.5) 100%),var(--artist-home-hero);background-size:cover;background-position:center}
+.artist-home-hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.62))}
+.artist-home-hero-copy{position:relative;z-index:2;width:min(760px,88%);padding:clamp(34px,6vw,76px)}
+.artist-home-logo{display:block;max-width:min(360px,68vw);max-height:90px;object-fit:contain;margin-bottom:18px}
+.artist-home-eyebrow{font-size:.62rem;letter-spacing:.24em;color:var(--accent);text-transform:uppercase;margin-bottom:10px}
+.artist-home-hero h1{font:400 clamp(3rem,8vw,7rem)/.92 Georgia,serif;margin:0 0 20px;max-width:760px}
+.artist-home-copy{color:#b7b0a7;line-height:1.7;max-width:720px;margin:0 0 20px}
+.artist-home-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.artist-home-section{display:grid;grid-template-columns:minmax(280px,.9fr) minmax(320px,1.1fr);gap:clamp(28px,5vw,72px);align-items:center;border-top:1px solid var(--line);padding-top:38px}
+.artist-home-section:nth-of-type(even){grid-template-columns:minmax(320px,1.1fr) minmax(280px,.9fr)}
+.artist-home-section:nth-of-type(even)>:first-child{order:2}
+.artist-home-section h2,.artist-home-block h2{font:400 clamp(2rem,4vw,3.6rem)/1.05 Georgia,serif;margin:0 0 13px}
+.artist-home-section h3{font:400 clamp(1.7rem,3vw,2.7rem)/1.05 Georgia,serif;margin:16px 0 10px}
+.artist-home-section p{color:var(--muted);line-height:1.65}
+.artist-home-cover,.artist-home-track-art,.artist-home-show-poster,.artist-home-merch-image,.artist-home-story-photo{width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--line);display:block;background:#100e0c}
+.artist-home-cover{padding:0;background:transparent}
+.artist-home-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.artist-home-show-poster{aspect-ratio:4/5}
+.artist-home-story-photo{aspect-ratio:4/3}
+.artist-home-meta{font-size:.76rem;letter-spacing:.04em;color:#777068!important;text-transform:uppercase}
+.artist-home-block{border-top:1px solid var(--line);padding-top:38px}
+.artist-home-release-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:22px}
+.artist-home-release-card{border:0;background:transparent;color:var(--ink);padding:0;text-align:left;display:grid;gap:8px}
+.artist-home-release-card img,.artist-home-square{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--line)}
+.artist-home-release-card strong{font:400 1.15rem Georgia,serif}
+.artist-home-release-card small{color:var(--muted);font-size:.68rem}
+.artist-home-release-card:hover strong{color:var(--accent)}
+.artist-home-personalized{background:rgba(255,255,255,.018);border:1px solid var(--line);padding:28px}
+.artist-home-personal-pick{display:flex;justify-content:space-between;gap:18px;align-items:center;border-bottom:1px solid var(--line);padding:0 0 18px;margin-bottom:18px}
+.artist-home-personal-pick small,.artist-home-personal-pick strong{display:block}.artist-home-personal-pick small{color:var(--accent);font-size:.58rem;letter-spacing:.12em}.artist-home-personal-pick strong{font:400 1.3rem Georgia,serif;margin-top:5px}.artist-home-personal-pick p{color:var(--muted);margin:5px 0 0}
+.artist-home-block .newsletter-signup{margin-top:20px}
+.placeholder{display:grid;place-items:center;color:#655d54;font:400 1.3rem Georgia,serif;letter-spacing:.14em;background:linear-gradient(145deg,#1a1612,#0c0b09)}
+@media(max-width:820px){body.artist-home-active .stage{width:calc(100% - 28px);padding-top:86px}.artist-homepage{gap:52px}.artist-home-hero{min-height:70vh}.artist-home-section,.artist-home-section:nth-of-type(even){grid-template-columns:1fr;gap:24px}.artist-home-section:nth-of-type(even)>:first-child{order:0}.artist-home-release-grid{grid-template-columns:1fr 1fr}.artist-home-personal-pick{align-items:flex-start;flex-direction:column}}
+@media(max-width:560px){.artist-home-hero-copy{width:100%;padding:28px 22px}.artist-home-hero h1{font-size:3rem}.artist-home-release-grid{grid-template-columns:1fr}.artist-home-personalized{padding:20px}}
