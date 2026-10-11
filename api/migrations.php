@@ -264,7 +264,7 @@ function sf_migration_definitions(): array {
             'app_version'=>'1.3.33',
             'description'=>'Governed track Songbooks with publication metadata, lyric sections, annotations and truthful Songbook events',
             'revision'=>'1',
-            'apply'=>function(): void { sf_songbook_ensure_schema(); },
+            'apply'=>function(): void { sf_songbook_ensure_schema(); sf_songbook_refresh_public_catalog_asset(); },
         ],
     ];
 }
