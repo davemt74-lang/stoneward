@@ -49,6 +49,7 @@ ok34(str_contains($core,'function sf_songbook_agent_context'),'Songbook exposes 
 ok34(str_contains($adminApi,'explicit Admin confirmation')&&str_contains($adminApi,"\$existing===null?in_array(\$target,['published','archived'],true)"),'initial and later publish/archive transitions require Admin confirmation');
 ok34(str_contains($adminApi,'sf_log_admin_action')&&str_contains($adminApi,'sf_agent_brain_log'),'Songbook Admin mutations feed audit and Agent Brain');
 ok34(str_contains($publicApi,'count($attempts)>=60'),'public Songbook event writes are rate-limited');
+ok34(substr_count($publicApi,'sf_songbook_event(')===1,'Songbook GET is side-effect free; all event writes use the rate-limited POST path');
 ok34(str_contains($publicApi,'sf_songbook_public_payload($trackId)'),'public API never returns an ungoverned canonical lyric record');
 
 ok34(str_contains($adminBoot,'sf_songbook_public_catalog_rows')&&str_contains($adminBoot,"unset(\$track['lyrics'])"),'Catalog writer generates a lyric-free public catalog');
@@ -56,6 +57,7 @@ ok34(str_contains($core,'sf_songbook_refresh_public_catalog_asset'),'upgrade can
 ok34(str_contains($mig,'sf_songbook_refresh_public_catalog_asset()'),'migration 030 regenerates the lyric-free public catalog');
 ok34(str_contains($search,"sf_songbook_get((string)(\$t['id']??''),true)?(string)(\$t['lyrics']??''):''"),'public search indexes lyrics only through a published Songbook');
 ok34(str_contains($agent,'sf_songbook_agent_context($query,4)'),'public Agent receives only published Songbook context');
+ok34(str_contains($agent,"unset(\$safe['lyrics'])")&&str_contains($agent,'$publicTrackHay'),'public Agent track ranking cannot be influenced by draft lyric text');
 
 ok34(str_contains($adminShell,'assets/songbook.css')&&str_contains($adminShell,'assets/songbook.js'),'Admin shell loads Songbook editor assets');
 ok34(substr_count($adminShell,'data-view="')===29,'Songbook stays inside Catalog and adds no sidebar item');
@@ -69,7 +71,8 @@ ok34(str_contains($adminCss,'.songbook-readiness')&&str_contains($adminCss,'.son
 ok34(!str_contains($app,'class="lyrics-panel"'),'track page no longer renders raw Catalog lyrics directly');
 ok34(str_contains($app,'id="publicSongbookPanel"')&&str_contains($app,'renderPublicSongbook(t.id)'),'track page loads governed Songbook instead of raw lyrics');
 ok34(str_contains($app,'songbookSectionHtml')&&str_contains($app,'data-songbook-annotation'),'public Songbook renders sections and line annotations');
-ok34(str_contains($app,"songbookEvent(trackId,'section_open'")&&str_contains($app,"songbookEvent(trackId,'annotation_open'"),'public Songbook records real section and annotation interactions');
+ok34(str_contains($app,"songbookEvent(trackId,'view'")&&str_contains($app,"songbookEvent(trackId,'section_open'")&&str_contains($app,"songbookEvent(trackId,'annotation_open'"),'public Songbook records views, section opens and annotation opens through the bounded event path');
+ok34(str_contains($app,"$('.songbook-section',host).forEach")&&str_contains($app,"$('[data-songbook-annotation]',host).forEach"),'Songbook collection controls use the collection selector helper');
 ok34(str_contains($siteCss,'.public-songbook-panel')&&str_contains($siteCss,'.songbook-section')&&str_contains($siteCss,'.songbook-annotation'),'public Songbook has responsive dedicated styling');
 
 ok34(str_contains($boot,"require_once __DIR__ . '/songbook-core.php'"),'Songbook core loads from canonical bootstrap');
@@ -78,6 +81,7 @@ ok34(str_contains($mig,"'songbooks','songbook_events'"),'upgrade integrity requi
 ok34(str_contains($version,"'stonefellow'=>'1.3.33'")&&str_contains($version,"'database_schema_target'=>'1.3.29'"),'version endpoint reports v1.3.33 and DB 1.3.29');
 ok34(str_contains($version,"'songbook_privacy'=>'draft-lyrics-excluded-public-page-search-agent'"),'version endpoint advertises Songbook privacy boundary');
 ok34(str_contains($ht,'X-Stonefellow-Build "1.3.33"'),'web build header advances to v1.3.33');
+ok34(str_contains($ht,'RewriteRule ^(?:data|config)/ - [F,L,NC]'),'web server blocks direct access to private catalog and configuration directories');
 ok34(str_contains($wf,'node --check admin/assets/songbook.js')&&str_contains($wf,'php tests/v1333-section34-songbook.php'),'release gate includes Songbook Admin JS and Section 34 certification');
 
 echo "Stonefellow v1.3.33 Section 34 Lyrics, Songbook & Track Notes audit: PASS\n";
