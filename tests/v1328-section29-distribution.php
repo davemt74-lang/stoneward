@@ -34,7 +34,7 @@ ok(str_contains($core,"['cover']")&&str_contains($core,'3000'),'preflight certif
 ok(str_contains($core,"['master_audio','primary_audio']")&&str_contains($core,'valid ISRC required'),'preflight verifies track masters and ISRCs');
 ok(str_contains($core,'sf_rights_release_readiness'),'preflight consumes Section 28 rights readiness');
 ok(str_contains($core,'function sf_distribution_sync_calendar'),'distribution integrates with the native Operating Calendar');
-ok(str_contains($core,"'distribution:'.$releaseId.':'.$key"),'calendar source keys prevent duplicate distribution milestones');
+ok(str_contains($core,"'distribution:'.\$releaseId.':'.\$key"),'calendar source keys prevent duplicate distribution milestones');
 ok(str_contains($core,'function sf_distribution_build_package'),'distributor package builder exists');
 ok(str_contains($core,"'manifest.json'")&&str_contains($core,"'credits-rights.csv'")&&str_contains($core,"'masters/'")&&str_contains($core,"'artwork/cover.'"),'package includes manifest, credits/rights, masters and cover');
 ok(str_contains($core,"hash_file('sha256'"),'distribution package is SHA-256 certified');
