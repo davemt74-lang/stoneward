@@ -12,7 +12,7 @@ function sf_seo_abs(string $path): string {
 function sf_seo_https_url(string $url): bool { return $url!==''&&(bool)filter_var($url,FILTER_VALIDATE_URL)&&strtolower((string)parse_url($url,PHP_URL_SCHEME))==='https'; }
 function sf_seo_web_url(string $url): bool { if($url===''||!filter_var($url,FILTER_VALIDATE_URL))return false;return in_array(strtolower((string)parse_url($url,PHP_URL_SCHEME)),['http','https'],true); }
 function sf_seo_excerpt(string $text,int $max=180): string {
-    $text=preg_replace('/s+/u',' ',trim(strip_tags($text)))??'';if($text==='')return '';
+    $text=preg_replace('/\\s+/u',' ',trim(strip_tags($text)))??'';if($text==='')return '';
     if(function_exists('mb_strlen')&&mb_strlen($text)>$max)return rtrim(mb_substr($text,0,$max-1)).'…';
     return strlen($text)>$max?rtrim(substr($text,0,$max-1)).'…':$text;
 }
