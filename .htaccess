@@ -5,6 +5,8 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
+# Private application data/config are never web-addressable.
+RewriteRule ^(?:data|config)/ - [F,L,NC]
 # SEO/crawler endpoints.
 RewriteRule ^sitemap\.xml$ sitemap.php [L]
 RewriteRule ^robots\.txt$ robots.php [L]
