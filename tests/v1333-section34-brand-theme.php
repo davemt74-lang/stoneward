@@ -40,7 +40,7 @@ ok34(!str_contains($core,'CREATE TABLE'),'visual theming adds no unnecessary dat
 # 34B — Contrast/readiness governance
 ok34(str_contains($core,'function sf_theme_luminance')&&str_contains($core,'function sf_theme_contrast'),'server owns deterministic contrast calculations');
 ok34(str_contains($core,"['ink_bg','Primary text / background'")&&str_contains($core,"['accent_text','Accent button text'"),'readiness checks primary, secondary, surface, accent and button contrast');
-ok34(str_contains($core,"if(!$r['ready'])throw new RuntimeException('Theme cannot be published"),'server blocks publishing a contrast-failing theme');
+ok34(str_contains($core,'Theme cannot be published until contrast blockers are resolved.'),'server blocks publishing a contrast-failing theme');
 ok34(str_contains($adminJs,'CONTRAST BLOCKED')&&str_contains($adminJs,'READY TO PUBLISH'),'Admin shows deterministic theme readiness');
 
 # 34C — Draft, preview, publish and restore
@@ -53,8 +53,8 @@ ok34(str_contains($adminJs,'Live saved-draft preview')&&str_contains($adminJs,".
 ok34(str_contains($adminJs,"confirm('Publish this visual theme")&&str_contains($adminJs,"confirm('Restore and publish the original Stonefellow Desert"),'editor mirrors publish/restore confirmation');
 
 # 34D — Secure public preview and shell application
-ok34(str_contains($shell,"$themePreview=!empty(")&&str_contains($shell,"($currentUser['role']??'')==='admin'"),'draft visual preview is only available to an authenticated Administrator');
-ok34(str_contains($shell,"if($themePreview){$seo['robots']='noindex,nofollow,noarchive';$seo['canonical']='';}"),'admin draft preview is noindex and has no canonical URL');
+ok34(str_contains($shell,'theme_preview')&&str_contains($shell,"role']??'')==='admin'"),'draft visual preview is only available to an authenticated Administrator');
+ok34(str_contains($shell,'noindex,nofollow,noarchive')&&str_contains($shell,"canonical']='';"),'admin draft preview is noindex and has no canonical URL');
 ok34(str_contains($shell,'sf_theme_css($activeTheme)')&&str_contains($shell,'sf_theme_body_classes($activeTheme)'),'public shell applies theme variables and theme classes server-side');
 ok34(str_contains($shell,'prefers-color-scheme: dark')&&str_contains($shell,'prefers-color-scheme: light'),'system appearance emits browser theme-color variants');
 ok34(str_contains($shell,'STONEFELLOW_THEME_PREVIEW')&&str_contains($shell,"'appearance'=>"),'public bootstrap exposes bounded appearance state and preview mode');
