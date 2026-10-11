@@ -173,6 +173,7 @@ require_once __DIR__ . '/press-core.php';
 require_once __DIR__ . '/artist-home-core.php';
 require_once __DIR__ . '/story-core.php';
 require_once __DIR__ . '/seo-core.php';
+require_once __DIR__ . '/songbook-core.php';
 require_once __DIR__ . '/notification-core.php';
 require_once __DIR__ . '/search-core.php';
 require_once __DIR__ . '/archive-core.php';
