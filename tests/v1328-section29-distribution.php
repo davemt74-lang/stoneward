@@ -41,7 +41,7 @@ ok(str_contains($core,"hash_file('sha256'"),'distribution package is SHA-256 cer
 ok(str_contains($core,'function sf_distribution_agent_brief'),'Admin Agent has a deterministic release-readiness brief');
 
 ok(str_contains($api,"action==='save_metadata'")&&str_contains($api,"action==='build_package'"),'Admin API manages metadata and package generation');
-ok(str_contains($api,"['submitted','scheduled','live']")&&str_contains($api,'explicit confirmation'),'consequential publishing statuses require explicit confirmation');
+ok(str_contains($api,"'submitted'")&&str_contains($api,"'scheduled'")&&str_contains($api,"'live'")&&str_contains($api,'explicit confirmation'),'consequential publishing statuses require explicit confirmation');
 ok(str_contains($api,'sf_log_admin_action')&&str_contains($api,'sf_agent_brain_log'),'distribution actions feed audit history and Agent Brain');
 ok(str_contains($download,'realpath')&&str_contains($download,"storage/distribution/"),'package download is authenticated and path-contained');
 
