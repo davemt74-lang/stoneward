@@ -29,7 +29,8 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/operating-calendar.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/rights.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/distribution.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
-  <link rel="stylesheet" href="assets/press.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">\n  <link rel="stylesheet" href="assets/homepage.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/press.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/homepage.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
 </head>
 <body>
   <div id="adminApp" class="admin-app">
@@ -103,6 +104,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/operating-calendar.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/rights.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/distribution.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
-  <script src="assets/press.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>\n  <script src="assets/homepage.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/press.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/homepage.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
 </body>
 </html>
