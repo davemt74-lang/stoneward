@@ -67,8 +67,8 @@ ok(str_contains($css,'.rights-readiness')&&str_contains($css,'.rights-split-add'
 
 ok(str_contains($bootstrap,"require_once __DIR__ . '/rights-core.php'"),'rights core loads from canonical bootstrap');
 ok(str_contains($mig,"'id'=>'2026-10-10-024'")&&str_contains($mig,'sf_rights_backfill_catalog'),'migration 024 installs/backfills rights registry');
-ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.23'"),'database schema advances to 1.3.23');
-ok(str_contains($version,"'stonefellow'=>'1.3.27'")&&str_contains($version,"'database_schema_target'=>'1.3.23'"),'version endpoint reports app 1.3.27 and schema 1.3.23');
+$schema='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$mm))$schema=$mm[1];ok(version_compare($schema,'1.3.23','>='),'database schema remains compatible with Section 28 or newer');
+$appVersion='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm))$appVersion=$vm[1];ok(version_compare($appVersion,'1.3.27','>=')&&str_contains($version,"'database_schema_target'=>'".$schema."'"),'version endpoint remains Section 28 compatible after later releases');
 ok(str_contains($version,"'rights_registry'=>'works-parties-composition-master-splits-licenses-readiness'"),'version endpoint advertises rights registry capability');
 ok(str_contains($shell,'data-view="rights"')&&str_contains($shell,'assets/rights.js'),'Rights + Licensing is a first-class Admin module');
 ok(str_contains($adminMain,"rights:'Rights + Licensing'")&&str_contains($adminMain,"openView('rights')"),'Admin shell and Agent route into Rights + Licensing');

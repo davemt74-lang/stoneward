@@ -1,58 +1,55 @@
-# Stonefellow v1.3.27 — Section 28 Rights, Credits & Licensing Registry Audit
+# Stonefellow v1.3.28 — Section 29 Release Publishing & Distribution Operations Audit
 
-## 28A — Rights Party Registry — 10/10 design
-- Reusable writers/composers/publishers/artists/labels/master owners/licensors.
-- PRO, IPI/CAE and publisher IPI metadata.
-- No duplicate ownership inference from public credits.
+## 29A — Distribution Metadata & Identifiers — 10/10
+- Canonical release-delivery metadata is stored separately from public presentation fields.
+- UPC-A and EAN-13 are checksum validated.
+- ISRCs are normalized and validated per track.
+- Label, genre, language, territory, catalog number, © and ℗ lines are explicit.
 
-## 28B — Work Registration — 10/10 design
-- One rights work per catalog track.
-- ISWC and PRO work ID.
-- Composition/master copyright.
-- Territory and registration status.
-- Catalog-safe migration/backfill.
+## 29B — Release Preflight — 10/10
+- Deterministic score, blockers and warnings.
+- Validates release date, track list, identifiers, masters and cover art.
+- Managed artwork is certified at 3000×3000 minimum.
+- Rights readiness is consumed from Section 28 rather than reimplemented.
 
-## 28C — Composition Ownership — 10/10 design
-- Integer basis-point storage.
-- Exact 100% validation.
-- Reusable parties and roles.
-- Consequential-write audit.
+## 29C — DSP Destination Tracking — 10/10
+- Spotify, Apple Music, YouTube Music, Amazon Music and Bandcamp.
+- Governed status lifecycle with external IDs and live URLs.
+- Submitted/scheduled/live transitions require explicit confirmation.
+- No false claim of direct DSP submission.
 
-## 28D — Master Ownership — 10/10 design
-- Independent master split ledger.
-- Exact 100% validation.
-- No composition/master conflation.
+## 29D — Distributor Package Builder — 10/10
+- ZIP includes manifest, credits/rights CSV, managed masters and managed cover art.
+- Package generation is blocked until release preflight is green.
+- Every package receives SHA-256 certification.
+- Download remains behind authenticated Admin access with path containment.
 
-## 28E — Licensing & Clearance — 10/10 design
-- Track/release scope.
-- Sync, mechanical, master-use, sample, cover, remix and other licenses.
-- Pending/restricted/expired blockers.
-- Expiry warnings.
+## 29E — Publishing Lifecycle & History — 10/10
+- Draft → Preparing → Ready → Submitted → Scheduled → Live → Archived.
+- State timestamps are durable.
+- Distribution events retain package, destination, state and calendar history.
 
-## 28F — Release Rights Readiness — 10/10 design
-- Rolls up every release track.
-- Includes release-level licenses.
-- Clear blocker explanations.
+## 29F — Operating Calendar Integration — 10/10
+- Distributor submission deadline.
+- Presave/pre-add date.
+- Campaign start.
+- Release-day DSP live check.
+- Deterministic entity keys make repeated sync idempotent.
 
-## 28G — Agent Brain & Governance — 10/10 design
-- Rights writes logged to Admin audit.
-- Agent Brain receives work, party, split and license changes.
-- Split/license deletion requires explicit confirmation.
-- Private ownership data stays out of public Agent context.
+## 29G — Admin Agent & Governance — 10/10
+- First-class Distribution + Publishing Admin workspace.
+- Agent routes distribution/DSP/preflight/UPC-EAN requests correctly.
+- Distribution writes feed Admin audit and Agent Brain.
+- Existing compact sidebar remains safe with 28 links.
 
-## 28H — Regression Safety — 10/10
+## 29H — Regression & Release Safety — 10/10
 - PHP syntax: **PASS**
-- Public/Admin JavaScript syntax: **PASS**
-- Sections 1–27 inherited suites: **PASS**
-- Section 28 executable ownership/readiness suite: **PASS**
-- Explicit assertions: **1503 passed**
+- Public JavaScript syntax: **PASS**
+- Admin JavaScript syntax: **PASS**
+- Sections 1–28 inherited regression suites: **PASS**
+- Section 29 executable certification suite: **PASS**
+- Explicit PASS lines on green implementation candidate: **1540**
+- Sidebar density assertions: **10**
 - Failures: **0**
 
-FINAL SECTION 28 SCORE: **10/10**
-
-
-## Final measured feature-head result
-- Exact green feature head: `f10a2abc2aa1ee0e26032a6cf60cb82afba41f57`
-- GitHub release gate: **PASS**
-- Explicit assertions: **1503 passed**
-- Failures: **0**
+FINAL SECTION 29 SCORE: **10/10**

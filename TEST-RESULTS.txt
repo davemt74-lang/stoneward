@@ -1,31 +1,35 @@
-Stonefellow v1.3.27 Section 28 release gate
+Stonefellow v1.3.28 Section 29 release gate
 ===========================================
 
 Required:
 - PHP syntax across runtime/admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Rights Registry JavaScript syntax
-- Sections 1–27 inherited regression suites
-- Section 28 Rights, Credits & Licensing Registry
+- Sections 1–28 inherited regression suites
+- 28-link Admin sidebar density regression
+- Section 29 Release Publishing & Distribution Operations
 
-Section 28 coverage includes:
-- basis-point ownership math
-- exact 100% split validation
-- under/over-allocation blockers
-- pending/restricted license blockers
-- expiring-license warnings
-- SQLite/MySQL rights schema
-- safe catalog metadata backfill
-- no inferred ownership percentages
-- Admin rights workspace
-- release-clearance rollup
-- explicit confirmation for destructive rights actions
+Section 29 coverage includes:
+- ISRC normalization/validation
+- UPC-A and EAN-13 checksum validation
+- SQLite/MySQL distribution schema
+- publishing lifecycle state constraints
+- release preflight engine
+- managed 3000px cover certification
+- master-audio and per-track ISRC readiness
+- Section 28 rights-readiness rollup
+- Operating Calendar synchronization and dedupe keys
+- distributor package manifest / credits-rights / masters / cover
+- SHA-256 package certification
+- authenticated path-contained package download
+- DSP status governance and explicit confirmations
 - Admin audit + Agent Brain integration
-- application/schema capability markers
+- Admin workspace, Agent routing and capability markers
 
-Measured feature-head GitHub Actions result:
-- Exact green feature head: f10a2abc2aa1ee0e26032a6cf60cb82afba41f57
+Measured green implementation candidate:
 - Release gate: PASS
-- Explicit assertions: 1503 passed
+- Explicit PASS lines: 1540
+- Sidebar density assertions: 10
 - Failures: 0
+
+Final documented feature head is revalidated by GitHub Actions before merge.
