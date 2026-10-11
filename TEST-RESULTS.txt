@@ -1,5 +1,5 @@
-Stonefellow v1.3.28 Section 29 release gate
-===========================================
+Stonefellow v1.3.28 Section 29 hardened release gate
+====================================================
 
 Required:
 - PHP syntax across runtime/admin/tests
@@ -7,29 +7,33 @@ Required:
 - Admin JavaScript syntax
 - Sections 1–28 inherited regression suites
 - 28-link Admin sidebar density regression
-- Section 29 Release Publishing & Distribution Operations
+- Original Section 29 distribution certification
+- Section 29 production hardening audit
 
-Section 29 coverage includes:
-- ISRC normalization/validation
-- UPC-A and EAN-13 checksum validation
-- SQLite/MySQL distribution schema
-- publishing lifecycle state constraints
-- release preflight engine
-- managed 3000px cover certification
-- master-audio and per-track ISRC readiness
-- Section 28 rights-readiness rollup
-- Operating Calendar synchronization and dedupe keys
-- distributor package manifest / credits-rights / masters / cover
-- SHA-256 package certification
-- authenticated path-contained package download
-- DSP status governance and explicit confirmations
-- Admin audit + Agent Brain integration
-- Admin workspace, Agent routing and capability markers
+Hardening coverage includes:
+- managed-media-only distributor readiness
+- deterministic master_audio priority
+- controlled media path/file verification
+- square 3000px JPG/PNG artwork requirement
+- WAV 44.1 kHz / 16-bit minimum delivery master
+- explicit-content consistency
+- duplicate UPC/EAN prevention
+- minimized Rights Registry package projection
+- exact delivery-source fingerprint in manifest
+- stale-package detection without DSP-status false positives
+- source SHA-256 validation before packaging
+- finalized ZIP content/fingerprint/master-count verification
+- ZIP SHA-256 verification before download
+- governed release and DSP state transitions
+- package + DSP evidence for submitted/scheduled/live
+- HTTPS live destination requirement
+- calendar re-sync preservation of completion state
+- warning-free inherited regression execution
 
-Measured green implementation candidate:
+Measured green hardening candidate:
 - Release gate: PASS
-- Explicit PASS lines: 1540
-- Sidebar density assertions: 10
+- Explicit PASS lines: 1577
+- PHP warnings: 0
 - Failures: 0
 
-Final documented feature head is revalidated by GitHub Actions before merge.
+A final gate is run on the documented PR head before merge.
