@@ -12,8 +12,8 @@ Preflight covers:
 - primary artist, label, genre, language and territory
 - UPC-A / EAN-13
 - per-track ISRCs
-- audio masters
-- cover artwork and managed resolution
+- managed WAV delivery masters at 44.1 kHz / 16-bit or better
+- managed square JPG/PNG cover artwork at 3000×3000 or greater
 - © / ℗ lines
 - Section 28 composition/master ownership and license blockers
 
@@ -27,13 +27,14 @@ A green release can generate an authenticated distributor package containing:
 - `credits-rights.csv`
 - managed audio masters
 - managed front cover
-- SHA-256 package digest
+- exact delivery-source fingerprint
+- SHA-256 package digest verified again at download
 
-Stonefellow does **not** claim to submit directly to Spotify, Apple Music or other DSPs without a real distributor API. It prepares the delivery package and records external submission/live status.
+Stonefellow rechecks managed source hashes while building the ZIP, minimizes the Rights Registry data included in the manifest, and treats packages as stale whenever delivery-source content changes. Stonefellow does **not** claim to submit directly to Spotify, Apple Music or other DSPs without a real distributor API. It prepares the delivery package and records external submission/live status.
 
 ## DSP status and launch calendar
 
-The workspace tracks Spotify, Apple Music, YouTube Music, Amazon Music and Bandcamp status, external IDs and live URLs. It can also synchronize distributor deadline, presave, campaign start and release-day checks into the native Operating Calendar using deterministic milestone keys.
+The workspace tracks Spotify, Apple Music, YouTube Music, Amazon Music and Bandcamp status, external IDs and HTTPS live URLs. Publishing and DSP states follow governed forward transitions, and Submitted/Scheduled/Live require a current package plus matching DSP evidence. It can also synchronize distributor deadline, presave, campaign start and release-day checks into the native Operating Calendar using deterministic milestone keys.
 
 ---
 
