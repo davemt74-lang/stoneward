@@ -63,6 +63,7 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
             $storyRows=sf_story_list(true,'',30);usort($storyRows,fn($a,$b)=>$score(implode(' ',[(string)($b['title']??''),(string)($b['summary']??''),(string)($b['body_text']??''),(string)($b['entity']['title']??'')]))<=>$score(implode(' ',[(string)($a['title']??''),(string)($a['summary']??''),(string)($a['body_text']??''),(string)($a['entity']['title']??'')])));
             $storyLines=[];foreach($storyRows as $story){$hay=implode(' ',[(string)($story['title']??''),(string)($story['summary']??''),(string)($story['body_text']??''),(string)($story['entity']['title']??'')]);if($terms&&$score($hay)<1&&($story['entry_type']??'')!=='artist_about')continue;$storyLines[]='- '.($story['entry_type']??'story').' | '.($story['title']??'').' | '.substr(preg_replace('/\\s+/u',' ',(string)($story['summary']?:$story['body_text']))??'',0,850).(!empty($story['entity']['title'])?' | connected to '.$story['entity']['title']:'');if(count($storyLines)>=6)break;}if($storyLines)$sections[]="PUBLISHED ARTIST STORIES\n".implode("\n",$storyLines);
         }
+        if(function_exists('sf_songbook_agent_context')){$songbook=sf_songbook_agent_context($query,4);if($songbook!=='')$sections[]=$songbook;}
     }
     if($profile==='knowledge'){
         $kb=[];$kp=SF_ROOT.'/storage/knowledge/index.json';$kd=is_file($kp)?json_decode((string)file_get_contents($kp),true):[];
