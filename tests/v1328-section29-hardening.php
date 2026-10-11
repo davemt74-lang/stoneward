@@ -47,7 +47,7 @@ $manifestStart=strpos($core,'function sf_distribution_build_manifest');$manifest
 hard_ok(str_contains($manifest,'sf_distribution_rights_manifest')&&!str_contains($manifest,'sf_rights_work('),'package manifest uses sanitized rights data rather than raw registry rows');
 hard_ok(str_contains($core,'Could not reopen distribution ZIP for verification')&&str_contains($core,'master count mismatch'),'package builder verifies the finalized ZIP');
 hard_ok(str_contains($core,'sf_distribution_state_evidence'),'release state transitions require operational evidence');
-hard_ok(str_contains($core,'Release state '.$releaseState.' does not permit a destination'),'DSP status changes are constrained by release lifecycle');
+hard_ok(str_contains($core,"Release state '.\$releaseState.' does not permit a destination"),'DSP status changes are constrained by release lifecycle');
 hard_ok(str_contains($api,"['submitted','scheduled','live','archived']"),'archive release state requires explicit confirmation');
 hard_ok(str_contains($api,"['submitted','scheduled','live','failed']"),'failed DSP status requires explicit confirmation');
 hard_ok(str_contains($download,'package_stale')&&str_contains($download,'sf_distribution_storage_key'),'download rejects stale packages and uses sanitized storage keys');
