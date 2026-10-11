@@ -1,3 +1,24 @@
+# Stonefellow v1.3.30 — Section 31: Public Artist Experience & Fan Journey
+
+- Added a new **single-artist Artist Homepage plugin** managed under Admin → Settings.
+- Added a separate **Artist Homepage on/off toggle** without removing or repurposing the existing Splash toggle.
+- When the Homepage plugin is off, Stonefellow continues to use the existing Agent/Personalized Home.
+- The Homepage plugin does **not** add another Admin sidebar item; the existing 29-link navigation remains unchanged.
+- Added configurable homepage sections for Hero, Featured Release, Featured Track, Latest Releases, Upcoming Show, Featured Merch, Artist Story, Newsletter and logged-in personalization.
+- Added per-section enable/disable, ordering, copy and source controls.
+- Added smart auto-selection for newest release, featured-release track, next show and featured available merch.
+- Added server-side validation/normalization for homepage configuration and explicit content overrides.
+- Added a cinematic responsive public homepage that visually replaces the large Agent stage on Home while preserving the persistent Agent chat and music player.
+- Added live DSP links from Section 29, public show/ticket context, direct merch entry points and the existing governed newsletter signup.
+- Added logged-in **Your Stonefellow** personalization as a lower homepage layer rather than replacing the artist experience.
+- Added homepage readiness/completeness scoring in Settings.
+- Added truthful homepage journey events for real views, CTAs, release/track/show/merch actions, newsletter interaction, personalization and Agent entry.
+- Homepage event writes are disabled when the plugin is off and rate-limited when enabled.
+- Featured-track playback uses only explicitly Public Media Library audio and has no legacy catalog-audio fallback.
+- Public navigation now labels the Home route **Home** when the plugin is active and **Agent** when the legacy Agent Home is active.
+- Application advances to **1.3.30**.
+- Database schema advances to **1.3.26** via migration **2026-10-11-027**.
+
 # Stonefellow v1.3.29 — Section 30: Press Kit, EPK & Media Relations
 
 - Added first-class Admin **EPK + Press** workspace.
