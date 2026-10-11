@@ -30,13 +30,33 @@ function sf_artist_home_ensure_schema(): void {
     $now=gmdate('c');foreach(sf_artist_home_defaults() as [$key,$enabled,$position,$eyebrow,$heading,$body,$config]){$q=$pdo->prepare('SELECT 1 FROM artist_home_sections WHERE section_key=?');$q->execute([$key]);if(!$q->fetchColumn()){$q=$pdo->prepare('INSERT INTO artist_home_sections(section_key,enabled,position,eyebrow,heading,body_text,config_json,updated_at) VALUES(?,?,?,?,?,?,?,?)');$q->execute([$key,$enabled,$position,$eyebrow,$heading,$body,sf_artist_home_json($config),$now]);}}
     $done=true;
 }
+function sf_artist_home_normalize_config(string $key,array $raw): array {
+    $viewAllowed=['music','releases','shows','store','about','newsletter','archive'];
+    if($key==='hero')return [
+      'primary_label'=>sf_clean_text($raw['primary_label']??'Listen now',80),
+      'primary_view'=>in_array((string)($raw['primary_view']??''),$viewAllowed,true)?(string)$raw['primary_view']:'music',
+      'secondary_label'=>sf_clean_text($raw['secondary_label']??'Explore releases',80),
+      'secondary_view'=>in_array((string)($raw['secondary_view']??''),$viewAllowed,true)?(string)$raw['secondary_view']:'releases',
+    ];
+    if($key==='featured_release')return ['release_id'=>sf_clean_text($raw['release_id']??'',160)];
+    if($key==='featured_track')return ['track_id'=>sf_clean_text($raw['track_id']??'',160)];
+    if($key==='latest_releases'||$key==='personalized')return ['limit'=>max(2,min(6,(int)($raw['limit']??($key==='latest_releases'?3:4))))];
+    if($key==='upcoming_show')return ['show_id'=>sf_clean_text($raw['show_id']??'',160)];
+    if($key==='merch')return ['product_id'=>sf_clean_text($raw['product_id']??'',160)];
+    if($key==='artist_story')return [
+      'button_label'=>sf_clean_text($raw['button_label']??'About Stonefellow',80),
+      'button_view'=>in_array((string)($raw['button_view']??''),['about','music','archive','shows'],true)?(string)$raw['button_view']:'about',
+    ];
+    if($key==='newsletter')return ['compact'=>!empty($raw['compact'])];
+    return [];
+}
 function sf_artist_home_sections(bool $enabledOnly=false): array {
     sf_artist_home_ensure_schema();$sql='SELECT * FROM artist_home_sections'.($enabledOnly?' WHERE enabled=1':'').' ORDER BY position,section_key';$rows=sf_db()->query($sql)->fetchAll();foreach($rows as &$r){$r['enabled']=!empty($r['enabled']);$r['config']=sf_artist_home_decode($r['config_json']??'',[]);unset($r['config_json']);}unset($r);return $rows;
 }
 function sf_artist_home_section(string $key): ?array { foreach(sf_artist_home_sections(false) as $r)if($r['section_key']===$key)return $r;return null; }
 function sf_artist_home_save_section(array $raw): array {
     sf_artist_home_ensure_schema();$key=(string)($raw['section_key']??'');if(!in_array($key,sf_artist_home_keys(),true))throw new InvalidArgumentException('Unknown homepage section.');
-    $config=(array)($raw['config']??[]);$clean=[];foreach($config as $k=>$v){$k=sf_clean_text((string)$k,80);if($k==='')continue;$clean[$k]=is_bool($v)||is_int($v)?$v:sf_clean_text((string)$v,500);}
+    $clean=sf_artist_home_normalize_config($key,(array)($raw['config']??[]));
     $q=sf_db()->prepare('UPDATE artist_home_sections SET enabled=?,position=?,eyebrow=?,heading=?,body_text=?,config_json=?,updated_at=? WHERE section_key=?');$q->execute([!empty($raw['enabled'])?1:0,max(0,min(999,(int)($raw['position']??0))),sf_clean_text($raw['eyebrow']??'',120),sf_clean_text($raw['heading']??'',255),sf_clean_text($raw['body_text']??'',6000),sf_artist_home_json($clean),gmdate('c'),$key]);return sf_artist_home_section($key)?:[];
 }
 function sf_artist_home_reset(): array {
@@ -47,7 +67,7 @@ function sf_artist_home_public_media(string $type,string $id,array $roles=[]): ?
 }
 function sf_artist_home_release(string $preferred=''): ?array {
     $rows=array_values(array_filter(sf_release_rows(),fn($r)=>($r['state']??'published')==='published'&&($r['public_visible']??true)!==false));usort($rows,fn($a,$b)=>strcmp((string)($b['release_date']??''),(string)($a['release_date']??'')));
-    $r=null;if($preferred!=='')foreach($rows as $x)if((string)($x['id']??'')===$preferred){$r=$x;break;}if(!$r)$r=$rows[0]??null;if(!$r)return null;$id=(string)$r['id'];$cover=sf_artist_home_public_media('release',$id,['cover']);$d=function_exists('sf_distribution_record')?sf_distribution_record($id,false):null;$links=[];foreach((array)($d['destinations']??[]) as $x)if(($x['status']??'')==='live'&&!empty($x['release_url']))$links[]=['provider'=>(string)$x['provider'],'url'=>(string)$x['release_url']];
+    $r=null;if($preferred!=='')foreach($rows as $x)if((string)($x['id']??'')===$preferred){$r=$x;break;}if(!$r)$r=$rows[0]??null;if(!$r)return null;$id=(string)$r['id'];$cover=sf_artist_home_public_media('release',$id,['cover']);$d=function_exists('sf_distribution_record')?sf_distribution_record($id,false):null;$links=[];foreach((array)($d['destinations']??[]) as $x){$url=(string)($x['release_url']??'');if(($x['status']??'')==='live'&&$url!==''&&filter_var($url,FILTER_VALIDATE_URL)&&strtolower((string)parse_url($url,PHP_URL_SCHEME))==='https')$links[]=['provider'=>(string)$x['provider'],'url'=>$url];}
     return ['id'=>$id,'title'=>(string)($r['title']??$id),'type'=>(string)($r['type']??'release'),'release_date'=>(string)($r['release_date']??''),'description'=>(string)($r['description']??''),'track_ids'=>array_values((array)($r['track_ids']??[])),'cover'=>$cover?['url'=>$cover['url'],'alt_text'=>$cover['alt_text']??'']:null,'dsp_links'=>$links];
 }
 function sf_artist_home_track(string $preferred='',?array $release=null): ?array {
