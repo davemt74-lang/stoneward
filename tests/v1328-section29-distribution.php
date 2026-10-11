@@ -53,7 +53,7 @@ ok(str_contains($css,'.distribution-readiness')&&str_contains($css,'.distributio
 ok(str_contains($bootstrap,"require_once __DIR__ . '/distribution-core.php'"),'distribution core loads from canonical bootstrap');
 ok(str_contains($mig,"'id'=>'2026-10-10-025'")&&str_contains($mig,'sf_distribution_backfill'),'migration 025 installs and backfills distribution operations');
 ok(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.24'"),'database schema advances to 1.3.24');
-$appVersion='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm))$appVersion=$vm[1];ok(version_compare($appVersion,'1.3.28','>=')&&str_contains($version,"'database_schema_target'=>'1.3.24'"),'version endpoint reports Section 29 app 1.3.28 or newer and schema 1.3.24');
+ok(str_contains($version,"'stonefellow'=>'1.3.28'")&&str_contains($version,"'database_schema_target'=>'1.3.24'"),'version endpoint reports app 1.3.28 and schema 1.3.24');
 ok(str_contains($version,"'release_distribution'=>'preflight-metadata-identifiers-dsp-status-package-builder'"),'version endpoint advertises distribution capability');
 ok(str_contains($shell,'data-view="distribution"')&&str_contains($shell,'assets/distribution.js')&&str_contains($shell,'assets/distribution.css'),'Distribution + Publishing is a first-class Admin module');
 ok(str_contains($adminMain,"distribution:'Distribution + Publishing'")&&str_contains($adminMain,"openView('distribution')"),'Admin shell and Agent route into Distribution + Publishing');
