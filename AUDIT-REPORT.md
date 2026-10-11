@@ -1,87 +1,88 @@
-# Stonefellow v1.3.28 — Section 29 Hardened Release Publishing & Distribution Audit
+# Stonefellow v1.3.29 — Section 30 Press Kit, EPK & Media Relations Audit
 
-Section 29 was re-audited after its initial merge. The second pass treated passing tests as the starting point, not the score, and reviewed failure modes, data integrity, state transitions, package contents, privacy boundaries, storage containment and upgrade behavior.
+Section 30 was built cleanly on the hardened Section 29 mainline. The abandoned pre-Section-29 EPK branch was used only as design reference; none of its stale version/schema state was merged wholesale.
 
-## Defects found and corrected
+## 30A — EPK Records & Publishing Readiness — 10/10
+- General artist and release-linked EPKs share one canonical press-kit model.
+- Draft, Published, Private and Archived states are explicit.
+- Publishing/private access requires a current readiness pass.
+- Readiness checks title, headline, summary, bio, public press contact, HTTPS website, valid release link and explicitly Public hero media.
+- Release-specific EPKs consume the current Section 29 distribution readiness rather than duplicating release state.
+- Public/private access re-runs readiness so later media/distribution changes can safely make an outdated kit unavailable.
 
-- Legacy playback audio or artwork could satisfy preflight even though the package builder only exported managed Media Library files.
-- Media lookup did not guarantee `master_audio` was preferred over `primary_audio`.
-- Managed media records could pass readiness even when the underlying file was missing.
-- Cover preflight did not enforce square geometry or distributor-safe JPG/PNG format.
-- WAV technical quality was not enforced.
-- Calendar re-sync could reset a completed distribution milestone to pending.
-- DSP/release lifecycle states could be moved without enough operational evidence.
-- Live DSP links were not required to be valid HTTPS URLs.
-- Raw Rights Registry structures exposed more internal fields than a distributor package needs.
-- Package freshness used timestamps and could be invalidated by unrelated DSP status changes.
-- Package download did not re-verify the stored ZIP hash before serving it.
-- Package creation did not re-hash managed source files before adding them.
-- A manual audit caught and fixed a DSP URL self-assignment regression before merge.
-- Older regression tests emitted PHP warnings due to interpolated assertion literals; the warning noise is now removed.
+## 30B — Public / Private Sharing & Token Privacy — 10/10
+- Published kits resolve at /press/{slug}.
+- Private kits use a 256-bit random bearer token; only its SHA-256 hash and a short hint are stored on the EPK record.
+- Constant-time hash comparison is used.
+- Private tokens live in URL fragments, not query strings, so they are not sent in the initial page request or ordinary referrer.
+- Private EPK content is loaded by POST body with no-store JSON responses.
+- Rotating a private token invalidates the prior link.
+- Leaving Private status clears the stored token hash/hint.
+- All existing EPK visibility-state changes require explicit Admin confirmation.
+- Pretty-route state is handed from the PHP shell into the SPA correctly.
 
-## 29A — Distribution Metadata & Identifiers — 10/10
-- UPC-A / EAN-13 checksum validation.
-- Duplicate UPC/EAN assignment is blocked.
-- ISRC normalization/validation remains deterministic.
-- Explicit-release flag must agree with explicit track metadata.
-- Distribution metadata edits invalidate any previously built package.
+## 30C — Media Library & Section 29 Integration — 10/10
+- press_kit is a first-class Media Library relationship; no second uploader exists.
+- Media Library rejects orphan press-kit attachments.
+- Hero publishing uses the existing governed universal-media path.
+- Public EPK payloads return only explicitly Public EPK, release and track media.
+- Legacy catalog audio paths are never exposed as EPK previews.
+- Release-specific EPKs inherit only live HTTPS DSP links from Section 29.
+- Public track preview remains unavailable unless the Admin explicitly publishes the audio asset.
 
-## 29B — Managed Media & Preflight — 10/10
-- Distributor assets must come from controlled Media Library storage.
-- Legacy playback paths do not qualify as delivery masters.
-- Managed file existence/path containment is verified.
-- Cover art must be square, at least 3000×3000, and JPG/PNG.
-- Audio delivery requires managed WAV, at least 44.1 kHz / 16-bit, with valid channel metadata.
-- `master_audio` has deterministic priority over `primary_audio`.
+## 30D — Press Contact Directory — 10/10
+- Press contacts are intentionally separate from Fan CRM/newsletter consent semantics.
+- Unique email, name, outlet, role, location, tags and internal notes are supported.
+- Active / Do Not Contact / Archived states are explicit.
+- Non-active press contacts cannot receive outreach.
+- Contact changes feed Admin audit and Agent Brain without turning journalists into fan-marketing contacts.
 
-## 29C — Rights & Privacy Boundary — 10/10
-- Section 28 remains the authority for rights readiness.
-- Distributor manifest uses a minimized rights projection.
-- Internal rights notes, legal/internal rows and license terms are not dumped wholesale into the package.
-- Composition/master ownership readiness still blocks delivery when incomplete.
+## 30E — Governed Press Outreach — 10/10
+- Every send requires explicit Admin confirmation.
+- The Admin send control locks while delivery is in flight.
+- Private EPK sends require the current raw token in the current Admin session.
+- A press_outreach ledger row is created before calling email delivery, so attempts remain visible even if delivery fails.
+- Existing Stonefellow transactional email/outbox is reused; no shadow mailer exists.
+- Real queued/logged/sent/failed status and delivery errors are preserved.
+- Identical active/successful sends are suppressed for five minutes.
+- Failed attempts do not block immediate retry.
+- Private-link rotation changes the safe token version used for duplicate identity without storing the raw token in the press ledger.
+- Admin audit and Agent Brain never record the raw private bearer token.
 
-## 29D — Package Integrity — 10/10
-- Package contains manifest, credits/rights CSV, managed cover and one managed master per track.
-- Managed cover/master bytes are SHA-256 checked against Media Library records before packaging.
-- Final ZIP is reopened and verified.
-- Master count and source fingerprint are checked.
-- Final ZIP receives SHA-256 certification.
-- Download endpoint re-hashes the ZIP and refuses stale or corrupted packages.
+## 30F — Coverage Ledger & Truthful EPK Analytics — 10/10
+- Confirmed articles, reviews, interviews, radio, podcasts, videos, playlists and other placements are recorded separately from outreach.
+- Coverage validates linked EPK/contact IDs, HTTPS source URLs and publication dates.
+- EPK analytics record only real in-site events: view, media click, contact click, release play, download click and DSP click.
+- Event detail is allowlisted/sanitized.
+- No tracking pixel, opened_at field or invented email-open event exists.
+- Outreach and coverage remain separate fact ledgers.
 
-## 29E — Exact Package Freshness — 10/10
-- Delivery source is fingerprinted from release metadata, catalog track data, managed asset hashes/specs and sanitized rights data.
-- The source fingerprint is embedded in `manifest.json`.
-- Existing package fingerprint is compared against current source state.
-- DSP tracking changes do not incorrectly stale the package because destination status is not delivery-source content.
-- Older packages without a fingerprint are safely treated as stale.
+## 30G — Admin, Agent & UX Integration — 10/10
+- EPK + Press is a first-class Admin module.
+- Admin includes EPK readiness, share links, reusable media, contacts, outreach, coverage and real activity.
+- Raw private tokens remain browser-session scoped after rotation.
+- Admin links are subdirectory-safe.
+- Admin Agent routes EPK, media-relations, journalist, reviewer, outreach and coverage requests into EPK + Press.
+- “Record pressing / vinyl manufacturing” continues to route to POD Handoffs.
+- Agent Brain and Admin audit record governed press actions.
+- Sidebar density regression now protects all 29 Admin navigation links.
 
-## 29F — Governed Publishing Lifecycle — 10/10
-- Release transitions are constrained: Draft → Preparing → Ready → Submitted → Scheduled → Live, with governed archival.
-- Submitted/Scheduled/Live require a current package and matching DSP evidence.
-- DSP transitions are forward-governed; failure/recovery is explicit.
-- Live status requires a valid HTTPS public release URL.
-- Submitted, scheduled, live, archived and failed consequential states require explicit Admin confirmation.
+## 30H — Routing, Upgrade & Release Safety — 10/10
+- Application advances to 1.3.29.
+- Database schema advances to 1.3.25.
+- Migration 2026-10-11-026 creates press_kits, press_contacts, press_outreach, press_coverage and press_events.
+- Upgrade integrity requires all five Section 30 tables.
+- Public base-URL derivation now preserves subdirectory installs when called through API/Admin routes.
+- Server-side internal rewrites pass their initial route into the public SPA.
+- Section 29 regression was made forward-compatible without weakening its minimum app/schema guarantees.
+- PHP syntax: PASS
+- Public JavaScript syntax: PASS
+- Admin JavaScript syntax: PASS
+- Sections 1–29 inherited suites: PASS
+- 29-link sidebar density regression: PASS
+- Section 30 certification: PASS
+- Explicit PASS lines on hardened implementation candidate: 1651
+- PHP warnings: 0
+- Failures: 0
 
-## 29G — Calendar, Agent & Admin UX — 10/10
-- Calendar sync uses deterministic source keys.
-- Re-sync updates title/dates without resetting completion state.
-- Admin UI only presents governed release/DSP transitions.
-- Stale package state is visible and download is withheld until rebuilt.
-- Track delivery UI exposes managed/master technical readiness.
-- Admin Agent, Agent Brain and Admin audit remain integrated.
-- 28-link sidebar density regression remains enforced.
-
-## 29H — Regression & Release Safety — 10/10
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Sections 1–28 inherited suites: **PASS**
-- Original Section 29 certification: **PASS**
-- Section 29 hardening suite: **PASS**
-- Explicit PASS lines on measured hardening candidate: **1577**
-- PHP warnings: **0**
-- Failures: **0**
-
-FINAL SECTION 29 HARDENED SCORE: **10/10**
-
-The application remains **v1.3.28** and database schema remains **1.3.24**. This hardening requires no new database migration.
+FINAL SECTION 30 SCORE: **10/10**

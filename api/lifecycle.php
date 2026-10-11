@@ -62,7 +62,8 @@ function sf_customer_email_settings_save(array $data): array {
 function sf_public_base_url(): string {
     $configured=rtrim(sf_ai_meta_get('site.base_url',''),'/');if($configured!=='')return $configured;
     $host=(string)($_SERVER['HTTP_HOST']??'');if($host==='')return '';
-    $scheme=sf_cookie_secure()?'https':'http';$script=(string)($_SERVER['SCRIPT_NAME']??'/');$base=preg_replace('#/(api|admin)(/.*)?$#','',$script)??'';$base=rtrim(dirname($base==='/'?'':$base),'/\\');
+    $scheme=sf_cookie_secure()?'https':'http';$script=(string)($_SERVER['SCRIPT_NAME']??'/');$trimmed=preg_replace('#/(api|admin)(/.*)?$#','',$script)??$script;
+    $base=$trimmed!==$script?rtrim($trimmed,'/\\'):rtrim(dirname($script==='/'?'':$script),'/\\');
     return $scheme.'://'.$host.($base&&$base!=='.'?'/'.trim($base,'/'):'');
 }
 function sf_transactional_email(int $userId,string $email,string $subject,string $body,string $kind): array {

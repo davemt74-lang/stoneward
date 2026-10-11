@@ -1,3 +1,65 @@
+# Stonefellow v1.3.29 — Section 30: Press Kit, EPK & Media Relations
+
+Stonefellow remains a **single-artist direct-to-fan platform**. Section 30 adds a governed media-relations layer around the existing catalog, Media Library, releases, Distribution + Publishing, transactional email and Agent Brain.
+
+## Electronic press kits
+
+Admin → **EPK + Press** can create a general artist EPK or link a kit to a specific release.
+
+An EPK includes press-ready headline/summary/bio, public press contact information, reusable Media Library assets, and optional release context. Release-linked EPKs consume the same authoritative release and Distribution + Publishing data already maintained elsewhere in Stonefellow.
+
+Published and Private kits must pass current readiness. A later change that makes required media or release readiness invalid will make the EPK unavailable until it is corrected.
+
+## Public and private sharing
+
+Published EPKs use:
+
+`/press/{slug}`
+
+Private EPKs use the same route plus a bearer token in the URL **fragment**. The raw token is never stored on the EPK record; Stonefellow stores its SHA-256 hash and a short display hint. Private EPK content is fetched by POST so the bearer value is not sent in the initial page request query string.
+
+Rotating a token invalidates the previous private link. Leaving Private status clears the old token.
+
+## Media and listening
+
+EPK media reuses the central Media Library. There is no separate EPK uploader.
+
+Public EPK pages can include explicitly Public hero art, press photos, approved audio/video, documents and archive media. Release and track media are also filtered through their Public Media Library relationships. Legacy/private catalog audio is not automatically exposed.
+
+Release-linked EPKs can show live Spotify, Apple Music, YouTube Music, Amazon Music and Bandcamp links recorded by Section 29.
+
+## Press contacts and outreach
+
+Press Contacts are separate from Fan CRM because journalists, reviewers, radio programmers, podcasters and other media contacts should not inherit fan-newsletter consent semantics.
+
+Contacts support Active, Do Not Contact and Archived status. Only Active contacts may receive press outreach.
+
+Every outreach send:
+- requires explicit Admin confirmation;
+- creates a press-outreach ledger entry before delivery;
+- uses Stonefellow’s existing transactional email/outbox;
+- preserves real queued/logged/sent/failed state and delivery errors;
+- suppresses duplicate active/successful sends for five minutes;
+- allows failed attempts to retry;
+- never invents an email-open event.
+
+## Coverage and EPK analytics
+
+Coverage is a separate confirmed-fact ledger for articles, reviews, interviews, radio, podcasts, video, playlists and other placements.
+
+EPK analytics record only real Stonefellow interactions: page views, media clicks, press-contact clicks, release-track plays, downloads and DSP clicks. These events are not interpreted as email opens.
+
+## Agent Brain
+
+Admin Agent can route press-kit, journalist/reviewer, media-contact, outreach and coverage work into EPK + Press. Vinyl/record pressing remains a POD Handoff intent.
+
+EPK publishing, token rotation, press-contact changes, confirmed sends and coverage changes are recorded in Admin audit and Agent Brain without logging the raw private bearer token.
+
+Application: **1.3.29**  
+Database schema target: **1.3.25**
+
+---
+
 # Stonefellow v1.3.28 — Section 29: Release Publishing & Distribution Operations
 
 Stonefellow remains a **single-artist direct-to-fan platform**. Section 29 turns the existing release, Media Library, Rights Registry and Operating Calendar data into a governed distribution-preparation workflow.

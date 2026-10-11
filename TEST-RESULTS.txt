@@ -1,39 +1,40 @@
-Stonefellow v1.3.28 Section 29 hardened release gate
-====================================================
+Stonefellow v1.3.29 Section 30 release gate
+===========================================
 
 Required:
-- PHP syntax across runtime/admin/tests
+- PHP syntax across runtime/Admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Sections 1–28 inherited regression suites
-- 28-link Admin sidebar density regression
-- Original Section 29 distribution certification
-- Section 29 production hardening audit
+- Sections 1–29 inherited regression suites
+- 29-link Admin sidebar density regression
+- Section 30 Press Kit, EPK & Media Relations certification
 
-Hardening coverage includes:
-- managed-media-only distributor readiness
-- deterministic master_audio priority
-- controlled media path/file verification
-- square 3000px JPG/PNG artwork requirement
-- WAV 44.1 kHz / 16-bit minimum delivery master
-- explicit-content consistency
-- duplicate UPC/EAN prevention
-- minimized Rights Registry package projection
-- exact delivery-source fingerprint in manifest
-- stale-package detection without DSP-status false positives
-- source SHA-256 validation before packaging
-- finalized ZIP content/fingerprint/master-count verification
-- ZIP SHA-256 verification before download
-- governed release and DSP state transitions
-- package + DSP evidence for submitted/scheduled/live
-- HTTPS live destination requirement
-- calendar re-sync preservation of completion state
-- warning-free inherited regression execution
+Section 30 certification covers:
+- EPK slug and HTTPS validation
+- SQLite/MySQL press schema
+- current publishing-readiness gating
+- private bearer token hashing and constant-time comparison
+- URL-fragment token privacy and POST private loading
+- token invalidation on rotation / leaving Private
+- public Media Library-only EPK/release/track payloads
+- Section 29 live DSP integration
+- press contacts separate from Fan CRM
+- Do Not Contact enforcement
+- pre-delivery outreach ledger
+- real transactional outbox status/error preservation
+- duplicate-send suppression with failed-send retry
+- coverage URL/date/link validation
+- real EPK event allowlist; no invented email opens
+- Admin confirmation, audit and Agent Brain
+- media relationship existence validation
+- media-relations vs record-pressing Agent routing
+- pretty route handoff and subdirectory-safe public base URL
+- app 1.3.29 / schema 1.3.25 / migration 026
 
-Measured green hardening candidate:
+Measured hardened implementation candidate:
 - Release gate: PASS
-- Explicit PASS lines: 1577
+- Explicit PASS lines: 1651
 - PHP warnings: 0
 - Failures: 0
 
-A final gate is run on the documented PR head before merge.
+The final documented PR head is revalidated before merge.
