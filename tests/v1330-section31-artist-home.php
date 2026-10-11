@@ -40,12 +40,16 @@ ok31(str_contains($core,'sf_distribution_record'),'homepage featured release can
 ok31(str_contains($core,'sf_home_state($userId)'),'logged-in homepage reuses existing personalization rather than creating another profile model');
 ok31(str_contains($core,"if(\$key==='personalized'&&\$userId<1)continue"),'anonymous visitors never receive personalized-home data');
 ok31(str_contains($core,'function sf_artist_home_readiness'),'homepage has deterministic public-content readiness');
+ok31(str_contains($core,'function sf_artist_home_normalize_config')&&!str_contains($core,"$viewAllowed=['music','releases','shows','store','about','newsletter','archive']"),'homepage API normalizes config through a server-side destination allowlist');
+ok31(str_contains($core,'Featured release must be a published public Stonefellow release.')&&str_contains($core,'Featured track was not found in the Stonefellow catalog.')&&str_contains($core,'Featured show must be a public Stonefellow show.')&&str_contains($core,'Featured merch must be an active public Stonefellow product.'),'homepage explicit overrides are validated against authoritative Stonefellow entities');
+ok31(str_contains($core,"parse_url($url,PHP_URL_SCHEME)")&&str_contains($core,"==='https'"),'homepage defensively revalidates live DSP links as HTTPS');
 ok31(str_contains($core,'Hero section has no published site hero image')&&str_contains($core,'explicitly Public primary audio'),'readiness checks homepage visual/audio publishing quality');
 ok31(str_contains($core,"['view','hero_primary','hero_secondary','release_open','track_open','track_play','show_open','merch_open','newsletter_open','about_open','personalized_open','agent_open']"),'homepage analytics allow only real journey events');
 ok31(!str_contains($core,'email_open')&&!str_contains($core,'impression_score'),'homepage does not invent engagement signals');
 
 ok31(str_contains($settings,"'artist_homepage_enabled'"),'site settings expose Artist Homepage plugin toggle');
 ok31(str_contains($settingsApi,"'artist_homepage_enabled'=>!empty"),'Admin settings persist homepage plugin toggle');
+ok31(str_contains($publicApi,"error'=>'homepage_disabled'")&&str_contains($publicApi,"sf_artist_home_events")&&str_contains($publicApi,'>=60'),'public homepage event writes are disabled with the plugin and rate-limited when enabled');
 ok31(str_contains($adminApi,"action==='save_section'")&&str_contains($adminApi,"action==='reset_defaults'"),'homepage Admin API manages sections and governed reset');
 ok31(str_contains($adminApi,'explicit confirmation')&&str_contains($adminApi,'sf_agent_brain_log')&&str_contains($adminApi,'sf_log_admin_action'),'homepage reset is confirmed and section changes are audited');
 ok31(str_contains($adminApi,'releases')&&str_contains($adminApi,'tracks')&&str_contains($adminApi,'shows')&&str_contains($adminApi,'products'),'homepage editor receives authoritative selection references');
@@ -63,13 +67,14 @@ ok31(str_contains($adminBaseCss,'min-height:21px')&&str_contains($adminBaseCss,'
 
 ok31(str_contains($shell,"define('SF_BUILD', '1.3.30')"),'public shell advances cache-busting build to 1.3.30');
 ok31(str_contains($shell,"'artistHomepageEnabled'"),'public shell exposes homepage plugin state');
+ok31(str_contains($shell,"?'Home':'Agent'"),'public navigation labels Home when the Artist Homepage plugin is active');
 ok31(str_contains($shell,"siteSettings['splash_enabled']"),'existing splash toggle remains independently supported');
 ok31(str_contains($app,'artistHomepageEnabled')&&str_contains($app,'renderArtistHomepage'),'public app can render the Artist Homepage plugin');
 ok31(str_contains($app,'if(artistHomepageEnabled&&await renderArtistHomepage())return'),'homepage plugin cleanly falls back to the existing Home when disabled/unavailable');
 ok31(str_contains($app,"document.body.classList.add('artist-home-active')")&&str_contains($css,'body.artist-home-active .agent-stage{display:none}'),'artist homepage becomes the visual landing surface rather than stacking under the Agent stage');
 ok31(str_contains($app,'artist-home-hero')&&str_contains($app,'featured_release')&&str_contains($app,'featured_track')&&str_contains($app,'upcoming_show')&&str_contains($app,'artist_story'),'public homepage renders the core single-artist journey');
 ok31(str_contains($app,'newsletterSignupHtml(true)'),'homepage reuses existing governed newsletter signup');
-ok31(str_contains($app,'homepageTrackObject')&&str_contains($app,'t.audio?.url'),'homepage play button uses public homepage audio rather than blindly using legacy catalog audio');
+ok31(str_contains($app,'homepageTrackObject')&&str_contains($app,"audio:t.audio?.url||''")&&!str_contains($app,"audio:t.audio?.url||base.audio"),'homepage playback has no legacy catalog-audio fallback');
 ok31(str_contains($app,"homepageEvent('track_play'")&&str_contains($app,"homepageEvent('release_open'")&&str_contains($app,"homepageEvent('newsletter_open'"),'public homepage records truthful fan-journey interactions');
 ok31(str_contains($css,'.artist-homepage')&&str_contains($css,'.artist-home-release-grid')&&str_contains($css,'.artist-home-personalized'),'public homepage has dedicated responsive artist-site presentation');
 
