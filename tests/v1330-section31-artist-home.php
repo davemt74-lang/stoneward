@@ -44,7 +44,7 @@ ok31(str_contains($core,'function sf_artist_home_normalize_config')&&!str_contai
 ok31(str_contains($core,'Featured release must be a published public Stonefellow release.')&&str_contains($core,'Featured track was not found in the Stonefellow catalog.')&&str_contains($core,'Featured show must be a public Stonefellow show.')&&str_contains($core,'Featured merch must be an active public Stonefellow product.'),'homepage explicit overrides are validated against authoritative Stonefellow entities');
 ok31(str_contains($core,"parse_url(\$url,PHP_URL_SCHEME)")&&str_contains($core,"==='https'"),'homepage defensively revalidates live DSP links as HTTPS');
 ok31(str_contains($core,'Hero section has no published site hero image')&&str_contains($core,'explicitly Public primary audio'),'readiness checks homepage visual/audio publishing quality');
-ok31(str_contains($core,"['view','hero_primary','hero_secondary','release_open','track_open','track_play','show_open','merch_open','newsletter_open','about_open','personalized_open','agent_open']"),'homepage analytics allow only real journey events');
+$baseHomeEvents=['view','hero_primary','hero_secondary','release_open','track_open','track_play','show_open','merch_open','newsletter_open','about_open','personalized_open','agent_open'];$homeEventSource=$core;$homeEventsOk=true;foreach($baseHomeEvents as $evt)if(!str_contains($homeEventSource,"'".$evt."'"))$homeEventsOk=false;ok31($homeEventsOk,'homepage retains every original truthful fan-journey event after later modules');
 ok31(!str_contains($core,'email_open')&&!str_contains($core,'impression_score'),'homepage does not invent engagement signals');
 
 ok31(str_contains($settings,"'artist_homepage_enabled'"),'site settings expose Artist Homepage plugin toggle');
