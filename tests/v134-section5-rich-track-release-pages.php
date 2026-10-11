@@ -9,7 +9,7 @@ ok(str_contains($js,'function trackArtwork('),'track artwork falls back through 
 ok(str_contains($js,'function relatedTracksFor('),'related-track ranking exists');
 ok(str_contains($js,'function creditRows('),'structured track credits are rendered');
 ok(str_contains($js,'Words')&&str_contains($js,'Producer'),'songwriter and producer metadata are supported');
-ok(str_contains($js,'recording_notes')&&str_contains($js,'lyrics-panel'),'recording notes and lyrics are shown when available');
+ok(str_contains($js,'recording_notes')&&str_contains($js,'publicSongbookPanel')&&str_contains($js,'renderPublicSongbook(t.id)'),'recording notes and governed published Songbook lyrics are shown when available');
 ok(str_contains($js,'Ask about this song'),'track page exposes Ask about this song');
 ok(str_contains($js,'id="storyBuy"'),'track purchase control remains available');
 ok(str_contains($js,'id="storyAddBuild"'),'track can be added directly to a custom record');
