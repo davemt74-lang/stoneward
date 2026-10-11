@@ -17,7 +17,8 @@ function sf_admin_media_publish_image(string $entityType,string $entityId,int $l
       'show'=>['poster'],
       'campaign'=>['hero','background','offer_artwork'],
       'site'=>['logo','hero','social_share','app_icon','artist_photo'],
-      'store'=>['product_primary']
+      'store'=>['product_primary'],
+      'press_kit'=>['hero']
     ];
     if(!isset($allowed[$entityType])||!in_array($role,$allowed[$entityType],true))throw new InvalidArgumentException('Unsupported primary media role.');
     $row=sf_admin_media_link_row($linkId,$entityType,$entityId);if(($row['category']??'')!=='image')throw new InvalidArgumentException('Choose an image asset for this role.');
