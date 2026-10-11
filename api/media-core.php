@@ -23,7 +23,7 @@ function sf_media_allowed(): array {
       'audio'=>['audio/mpeg'=>['mp3'],'audio/mp3'=>['mp3'],'audio/wav'=>['wav'],'audio/x-wav'=>['wav'],'audio/wave'=>['wav'],'audio/vnd.wave'=>['wav']],
       'image'=>['image/jpeg'=>['jpg','jpeg'],'image/png'=>['png'],'image/webp'=>['webp'],'image/gif'=>['gif']],
       'video'=>['video/mp4'=>['mp4'],'video/webm'=>['webm'],'video/quicktime'=>['mov']],
-      'document'=>['application/pdf'=>['pdf'],'text/plain'=>['txt'],'text/markdown'=>['md'],'application/rtf'=>['rtf'],'text/vtt'=>['vtt']]
+      'document'=>['application/pdf'=>['pdf'],'text/plain'=>['txt','vtt'],'text/markdown'=>['md'],'application/rtf'=>['rtf'],'text/vtt'=>['vtt']]
     ];
 }
 function sf_media_detect_type(string $tmp,string $name): array {
