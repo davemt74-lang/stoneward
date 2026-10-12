@@ -14,6 +14,7 @@ $checks=[
  'Conversation viewer uses same authenticated Brain API'=>str_contains($ui,"api('agent-brain.php?conversation_id='"),
  'Conversations preserve chosen ID'=>str_contains($app,"localStorage.setItem('stonefellow.agent.conversation',cid)"),
  'New chat clears old context'=>str_contains($ui,"conversationId('')"),
+ 'New chat will not immediately restore an old thread'=>str_contains($ui,'!forceNew&&brain.conversations')&&str_contains($ui,'forceNew:true'),
  'Private transcript safely escaped'=>str_contains($ui,'esc(m.content'),
  'Conversation uses existing Agent action execution'=>str_contains($app,'send:liveAgent'),
  'Conversation full message appears in canvas log'=>str_contains($ui,'role="log"'),
