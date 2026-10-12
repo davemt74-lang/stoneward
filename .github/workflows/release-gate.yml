@@ -115,3 +115,4 @@ jobs:
           php tests/section43h-brain-privacy.php
           php tests/section43i-agent-governance.php
           php tests/section43j-release.php
+          php tests/section44a-tool-registry.php
