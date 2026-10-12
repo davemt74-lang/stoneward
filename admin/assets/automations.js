@@ -114,7 +114,7 @@
   }
   function renderAutomationEditor(){
     const e=state.editor,a=e.automation||blankAutomation(),published=a.status==='published';
-    canvas.innerHTML=head('LIFECYCLE JOURNEY',a.id?a.name:'New automation','Build a governed fan journey from a trigger, reusable audience and ordered actions.','<button class="secondary" id="automationBack" type="button">Automations</button><button class="secondary" id="automationValidate" type="button">Validate</button><button class="primary" id="automationSave" type="button">Save draft</button>'+(a.id?'<button class="'+(published?'secondary':'primary')+'" id="automationPublish" type="button">'+(published?'Pause':'Publish')+'</button><button class="secondary" id="automationRun" type="button">Run now</button>':''));
+    canvas.innerHTML=head('LIFECYCLE JOURNEY',a.id?a.name:'New automation','Build a governed fan journey from a trigger, reusable audience and ordered actions.','<button class="secondary" id="automationBack" type="button">Automations</button><button class="secondary" id="automationValidate" type="button">Validate</button><button class="secondary" id="automationAgentReview" type="button">Agent-reviewed draft</button><button class="primary" id="automationSave" type="button">Save draft</button>'+(a.id?'<button class="'+(published?'secondary':'primary')+'" id="automationPublish" type="button">'+(published?'Pause':'Publish')+'</button><button class="secondary" id="automationRun" type="button">Run now</button>':''));
     canvas.innerHTML+='<section class="panel"><form id="automationForm" class="form-grid"><label class="field span2">Name<input name="name" value="'+esc(a.name||'')+'" required></label><label class="field">Trigger<select name="trigger_type">'+[['manual','Manual only'],['crm_event','CRM event'],['segment_enter','Segment entered'],['segment_exit','Segment exited'],['scheduled','Scheduled']].map(x=>'<option value="'+x[0]+'" '+(a.trigger_type===x[0]?'selected':'')+'>'+x[1]+'</option>').join('')+'</select></label><label class="field">Audience segment<select name="segment_id"><option value="0">All CRM contacts</option>'+state.segments.map(s=>'<option value="'+s.id+'" '+(Number(a.segment_id)===Number(s.id)?'selected':'')+'>'+esc(s.name)+' · '+Number(s.member_count||0)+'</option>').join('')+'</select></label><label class="field span2">CRM event triggers<input name="trigger_events" value="'+esc(arr(a.trigger?.events).join(', '))+'" placeholder="merch_purchase, newsletter_signup"></label><label class="field">Schedule every hours<input name="interval_hours" type="number" min="1" max="8760" value="'+Number(a.trigger?.interval_hours||24)+'"></label><label class="field">Cooldown hours<input name="cooldown_hours" type="number" min="0" max="8760" value="'+Number(a.cooldown_hours||24)+'"></label><label class="field">Max runs / fan<input name="max_runs_per_contact" type="number" min="1" max="1000" value="'+Number(a.max_runs_per_contact||10)+'"></label><div class="notice span3"><strong>Governance:</strong> publishing this automation is standing Admin approval for its configured actions. Automated email still requires newsletter opt-in. Agent messages still require a linked account and the fan’s proactive-Agent permission.</div></form></section>'+
       '<section class="panel"><div class="panel-title"><div><h2>Journey steps</h2><p>Steps run in order. Wait pauses the run and the CLI scheduler resumes it when due.</p></div><div class="automation-add-steps">'+Object.entries(stepTypes).map(([k,v])=>'<button class="secondary" type="button" data-add-step="'+k+'">+ '+esc(v[0])+'</button>').join('')+'</div></div><div id="automationSteps" class="automation-steps">'+stepsHtml(a.steps||[])+'</div></section>'+
       (a.id?'<section class="panel"><div class="panel-title"><div><h2>Recent runs</h2><p>'+e.runs.length+' recent fan journeys</p></div><button class="danger" id="automationDelete" type="button">Delete automation</button></div>'+runTable(e.runs)+'</section>':'')+
@@ -122,6 +122,7 @@
     $('#automationBack').onclick=()=>{state.tab='automations';renderAutomations()};
     $('#automationSave').onclick=()=>saveAutomation('draft');
     $('#automationValidate').onclick=validateAutomation;
+    $('#automationAgentReview').onclick=reviewJourneyDraft;
     const pub=$('#automationPublish');if(pub)pub.onclick=()=>saveAutomation(published?'paused':'published');
     const run=$('#automationRun');if(run)run.onclick=runAutomation;
     const del=$('#automationDelete');if(del)del.onclick=deleteAutomation;
@@ -149,6 +150,69 @@
   }
   function moveStep(i,d){captureSteps();const a=state.editor.automation,j=i+d;if(j<0||j>=a.steps.length)return;[a.steps[i],a.steps[j]]=[a.steps[j],a.steps[i]];renderAutomationEditor()}
   function buildAutomation(statusOverride=null){const a=automationMetaFromForm($('#automationForm'));a.steps=captureSteps();if(statusOverride)a.status=statusOverride;return a}
+  async function reviewJourneyDraft(){
+    if(!state.editor)return;
+    const input=buildAutomation('draft');
+    // Never edit a published automation through an Agent draft proposal.
+    input.id=0;input.status='draft';
+    const tokenBytes=new Uint8Array(18);
+    crypto.getRandomValues(tokenBytes);
+    const requestKey='journey-'+Array.from(tokenBytes,x=>x.toString(16).padStart(2,'0')).join('');
+    const dialog=document.createElement('dialog');
+    dialog.className='agent-campaign-dialog';
+    dialog.setAttribute('aria-label','Review Agent lifecycle journey draft');
+    dialog.innerHTML='<h2>Agent journey draft approval</h2>'+
+      '<p>Stage 1: The server validates an immutable draft. No automation is published or executed.</p>'+
+      '<p id="agentJourneyStatus" role="status">Preparing the proposal…</p>'+
+      '<pre id="agentJourneyPayload" tabindex="0" style="overflow:auto;max-height:40vh;white-space:pre-wrap;overflow-wrap:anywhere"></pre>'+
+      '<p>SHA-256: <code id="agentJourneyHash" style="overflow-wrap:anywhere"></code></p>'+
+      '<form id="agentJourneyApproval" hidden><label>Stage 2: Type APPROVE to approve exactly the displayed payload<input name="confirmation" required autocomplete="off" placeholder="APPROVE"></label><button type="submit" class="primary">Approve reviewed journey</button></form>'+
+      '<button type="button" id="agentJourneyExecute" class="primary" hidden>Stage 3: Save approved unpublished draft</button>'+
+      '<button type="button" id="agentJourneyClose">Close</button>';
+    document.body.appendChild(dialog);
+    const $d=id=>dialog.querySelector(id);
+    let proposal=null;
+    const status=$d('#agentJourneyStatus');
+    dialog.addEventListener('close',()=>dialog.remove());
+    $d('#agentJourneyClose').onclick=()=>dialog.close();
+    if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');
+    try{
+      const res=await api('agent-actions.php',{action:'prepare',tool_id:'automation_draft_save',request_key:requestKey,draft:input});
+      if(!dialog.isConnected)return;
+      proposal=res.proposal;
+      status.textContent='Validated. Review all trigger rules, segments, steps and limits before approving.';
+      $d('#agentJourneyPayload').textContent=JSON.stringify(proposal.payload,null,2);
+      $d('#agentJourneyHash').textContent=proposal.payload_hash;
+      $d('#agentJourneyApproval').hidden=false;
+    }catch(e){status.textContent='Proposal preparation failed: '+e.message;return;}
+    $d('#agentJourneyApproval').onsubmit=async event=>{
+      event.preventDefault();
+      const form=event.currentTarget;
+      const button=form.querySelector('button');button.disabled=true;
+      try{
+        const response=await api('agent-actions.php',{action:'approve',proposal_id:proposal.id,payload_hash:proposal.payload_hash,typed_confirmation:form.elements.confirmation.value});
+        proposal=response.proposal;
+        if(proposal.status!=='approved')throw new Error('Approval was not confirmed.');
+        form.hidden=true;$d('#agentJourneyExecute').hidden=false;
+        status.textContent='Approved. The automation has not yet been created.';
+      }catch(e){status.textContent='Approval rejected: '+e.message;button.disabled=false;}
+    };
+    $d('#agentJourneyExecute').onclick=async event=>{
+      const button=event.currentTarget;button.disabled=true;
+      try{
+        const result=await api('agent-actions.php',{action:'execute',proposal_id:proposal.id});
+        proposal=result.proposal;
+        if(proposal.status!=='completed'||!(Number(proposal.result?.automation_id)>0))throw new Error('No confirmed draft result.');
+        const newId=Number(proposal.result.automation_id);
+        status.textContent='Unpublished journey draft created. No outreach was sent.';
+        dialog.close();
+        say('Agent-reviewed lifecycle draft saved. Review it before publishing.');
+        openAutomation(newId);
+      }catch(e){
+        status.textContent='Execution is uncertain. Check the existing automations and Agent action ledger before preparing a fresh proposal.';
+      }
+    };
+  }
   async function validateAutomation(){const status=$('#automationStatus');try{const a=buildAutomation(),j=await api('automations.php',{action:'validate_automation',steps:a.steps});status.textContent='Valid journey: '+j.steps.length+' executable steps.'}catch(e){status.textContent=e.message}}
   async function saveAutomation(statusOverride){const status=$('#automationStatus');try{let a=buildAutomation(statusOverride);if(statusOverride==='published'&&!confirm('Publish this lifecycle automation? Eligible fans can receive its configured actions automatically. Consent, cooldown and Agent permissions will still be enforced.'))return;const j=await api('automations.php',{action:'save_automation',automation:a});state.editor.automation=j.automation;say('Automation saved as '+j.automation.status+'.');openAutomation(j.automation.id)}catch(e){status.textContent=e.message}}
   async function runAutomation(){const a=state.editor.automation;if(!confirm('Run this automation now for its eligible audience? This is an explicit Admin-triggered execution.'))return;try{const j=await api('automations.php',{action:'manual_run',id:a.id,confirmed:true});say('Manual run started '+j.result.started+' journeys; '+j.result.skipped+' skipped.');openAutomation(a.id)}catch(e){alert(e.message)}}
