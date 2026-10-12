@@ -1,0 +1,51 @@
+/* Section 44I: accessible responsive Admin Agent review surfaces. */
+.agent-campaign-dialog,
+.agent-history-dialog {
+  box-sizing:border-box;
+  width:min(720px,calc(100vw - 24px));
+  max-width:720px;
+  max-height:calc(100dvh - 24px);
+  overflow:auto;
+  border:1px solid #554638;
+  border-radius:12px;
+  background:#14110e;
+  color:#f1ece5;
+  padding:24px;
+  box-shadow:0 24px 70px rgba(0,0,0,.65);
+}
+.agent-campaign-dialog::backdrop,
+.agent-history-dialog::backdrop { background:rgba(0,0,0,.72); }
+.agent-campaign-dialog label {display:block;margin:14px 0 8px;font-weight:600;}
+.agent-campaign-dialog input,
+.agent-campaign-dialog textarea,
+.agent-campaign-dialog select {
+  box-sizing:border-box;
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-height:44px;
+  margin-top:6px;
+  border:1px solid #665847;
+  border-radius:6px;
+  padding:10px 12px;
+  background:#1c1814;
+  color:#f1ece5;
+  font:inherit;
+}
+.agent-campaign-dialog textarea { min-height:110px;resize:vertical; }
+.agent-campaign-dialog button,
+.agent-history-dialog button {min-height:44px;white-space:normal;}
+.agent-campaign-dialog button:disabled {opacity:.5;cursor:not-allowed;}
+.agent-campaign-dialog :focus-visible,
+.agent-history-dialog :focus-visible {outline:3px solid #e3bc7b;outline-offset:3px;}
+.agent-history-dialog .data-table {min-width:520px;}
+.agent-history-dialog td {vertical-align:top;overflow-wrap:anywhere;}
+@media(max-width:640px) {
+  .agent-campaign-dialog,
+  .agent-history-dialog {width:calc(100vw - 12px);max-height:calc(100dvh - 12px);padding:16px;border-radius:8px;}
+  .agent-history-dialog .data-table {min-width:470px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .agent-campaign-dialog,
+  .agent-history-dialog {scroll-behavior:auto;transition:none;}
+}

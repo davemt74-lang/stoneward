@@ -20,7 +20,6 @@
     proposal=null;requestKey=newRequestKey();
     modal=document.createElement('dialog');modal.className='agent-campaign-dialog';
     modal.setAttribute('aria-label','Agent campaign draft review');
-    modal.style.cssText='border:1px solid #554638;border-radius:12px;background:#14110e;color:#f1ece5;padding:24px;width:min(640px,calc(100% - 24px));max-height:90vh;overflow:auto';
     modal.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:14px"><h2 style="margin:0">Agent campaign draft</h2><button type="button" id="agentCampaignClose" aria-label="Close campaign workbench">Close</button></div>
       <p>Prepare a private draft using Stonefellow's existing Campaign Builder. No campaign will be published and no email will be sent.</p>
       <form id="agentCampaignPrepare">
@@ -40,7 +39,7 @@
         <p id="agentCampaignSummary"></p>
         <code id="agentCampaignHash" style="overflow-wrap:anywhere"></code>
         <p>Confirm the exact saved content hash. Type APPROVE to approve only this draft.</p>
-        <form id="agentCampaignApproval"><input name="confirmation" required placeholder="Type APPROVE" autocomplete="off"><button type="submit" class="primary">Approve this exact draft</button></form>
+        <form id="agentCampaignApproval"><label>Approval phrase <input name="confirmation" required placeholder="Type APPROVE" autocomplete="off"></label><button type="submit" class="primary">Approve this exact draft</button></form>
       </section>
       <section id="agentCampaignExecution" hidden>
         <h3>Step 3: Save approved draft</h3>
@@ -129,12 +128,13 @@
       }catch(e){setStatus('Execution needs review. Check Campaign Builder and this proposal before attempting anything again.',true);}
     };
     if(modal.showModal)modal.showModal();else modal.setAttribute('open','');
+    form.elements.name.focus();
   }
   async function showHistory(){
     const data=await api('agent-actions.php');
     const history=document.createElement('dialog');
     history.setAttribute('aria-label','Reviewed Agent campaign actions');
-    history.style.cssText='border:1px solid #554638;border-radius:12px;background:#14110e;color:#f1ece5;padding:24px;width:min(790px,calc(100% - 24px));max-height:85vh;overflow:auto';
+    history.className='agent-history-dialog';
     const rows=(data.proposals||[]).map(p=>{
       const name=esc(p.payload?.name||'Campaign draft');
       const status=esc(p.status||'unknown');
@@ -169,6 +169,7 @@
     history.querySelectorAll('[data-agent-cancel-id]').forEach(b=>b.onclick=()=>recover(b,'cancel','CANCEL'));
     history.querySelectorAll('[data-agent-reconcile-id]').forEach(b=>b.onclick=()=>recover(b,'reconcile','RECONCILED'));
     if(history.showModal)history.showModal();else history.setAttribute('open','');
+    history.querySelector('#closeAgentHistory').focus();
   }
   window.SFAgentCampaigns={open,showHistory};
 })();
