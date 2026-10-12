@@ -53,8 +53,8 @@ ok41(str_contains($core,'sf_auth_revoke_all_user_sessions'),'closure revokes eve
 ok41(str_contains($api,'sf_logout_user()'),'successful closure logs out the current browser');
 
 ok41(str_contains($account,"'privacy'=>sf_privacy_state"),'Account payload exposes privacy state');
-ok41(str_contains($app,'data-view="privacy"')&&str_contains($app,'async function renderPrivacyCenter'),'Account links to a dedicated Privacy Center without a new global module');
-ok41(!str_contains($shell,'data-view="privacy"'),'Privacy Center is not added to public global navigation');
+ok41(str_contains($app,'data-view="account-privacy"')&&str_contains($app,"view==='account-privacy'")&&str_contains($app,'async function renderPrivacyCenter'),'Account links to a dedicated account-only Privacy Center route');
+ok41(str_contains($shell,'data-view="privacy"')&&!str_contains($shell,'data-view="account-privacy"'),'existing public Privacy policy remains in global navigation while account Privacy Center stays account-only');
 ok41(str_contains($app,'Save listening history')&&str_contains($app,'Use my activity for personalization'),'Privacy Center explains real runtime privacy controls');
 ok41(str_contains($app,'Download my data')&&str_contains($app,'Clear listening history')&&str_contains($app,'Reset personalization signals')&&str_contains($app,'Clear Agent conversation history'),'Privacy Center exposes export and selective reset controls');
 ok41(str_contains($app,"new Blob([JSON.stringify(data,null,2)]")&&str_contains($app,'downloadPrivacyJson'),'account export is downloaded locally as JSON');
