@@ -129,3 +129,4 @@ jobs:
           php tests/section44j-live-campaign-save.php
           php tests/section44j-release.php
           php tests/section45a-lifecycle-safety.php
+          php tests/section45b-journey-metrics.php
