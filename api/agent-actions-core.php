@@ -42,6 +42,35 @@ function sf_agent_action_normalize_campaign(array $input): array {
         'landing'=>is_array($input['landing']??null)?$input['landing']:[],
     ];
 }
+/**
+ * Strict reviewed Agent journey draft. No Agent action can publish or send:
+ * both ID and status are server-enforced at preparation and execution.
+ */
+function sf_agent_action_normalize_automation(array $input): array {
+    $name=sf_clean_text($input['name']??'',180);
+    if($name==='')throw new InvalidArgumentException('Journey name is required.');
+    $trigger=(string)($input['trigger_type']??'manual');
+    if(!in_array($trigger,['manual','crm_event','segment_enter','segment_exit','scheduled'],true))
+        throw new InvalidArgumentException('Journey trigger type is not supported.');
+    $segment=max(0,(int)($input['segment_id']??0));
+    if(in_array($trigger,['segment_enter','segment_exit'],true)&&$segment<1)
+        throw new InvalidArgumentException('A segment-triggered journey needs a saved segment.');
+    $verified=sf_automation_steps_validate((array)($input['steps']??[]));
+    if(!$verified['ok'])throw new InvalidArgumentException('Journey steps are invalid: '.implode(' ',(array)$verified['errors']));
+    $triggerCfg=is_array($input['trigger']??null)?$input['trigger']:[];
+    $events=[];
+    foreach(array_slice((array)($triggerCfg['events']??[]),0,20) as $e){
+        $v=sf_clean_text((string)$e,80);
+        if($v!=='')$events[]=$v;
+    }
+    return [
+        'id'=>0,'name'=>$name,'status'=>'draft','trigger_type'=>$trigger,
+        'trigger'=>['events'=>array_values(array_unique($events)),'interval_hours'=>max(1,min(8760,(int)($triggerCfg['interval_hours']??24)))],
+        'segment_id'=>$segment,'steps'=>$verified['steps'],
+        'cooldown_hours'=>max(24,min(8760,(int)($input['cooldown_hours']??24))),
+        'max_runs_per_contact'=>max(1,min(100,(int)($input['max_runs_per_contact']??3)))
+    ];
+}
 function sf_agent_action_hash(string $toolId,array $payload): string {
     return hash('sha256',$toolId.'|'.json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
 }
@@ -72,7 +101,7 @@ function sf_agent_action_recent(int $adminId,int $limit=25): array {
 function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,array $raw): array {
     if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
     if(!sf_agent_tool_executable($toolId,'admin',true))throw new InvalidArgumentException('Action is not available for governed preparation.');
-    $payload=sf_agent_action_normalize_campaign($raw);$hash=sf_agent_action_hash($toolId,$payload);
+    $payload=$toolId==='automation_draft_save'?sf_agent_action_normalize_automation($raw):sf_agent_action_normalize_campaign($raw);$hash=sf_agent_action_hash($toolId,$payload);
     $payloadJson=json_encode($payload,JSON_THROW_ON_ERROR);
     if(strlen($payloadJson)>131072)throw new InvalidArgumentException('Campaign proposal exceeds the permitted size.');
     sf_agent_actions_ensure_schema();$db=sf_db();
@@ -168,9 +197,15 @@ function sf_agent_action_execute(int $adminId,string $id): array {
     if($q->rowCount()!==1)throw new RuntimeException('Another operation is handling this proposal.');
     try {
         // Re-validate from the immutable approved snapshot. Never publish or send.
-        $campaign=sf_agent_action_normalize_campaign((array)$p['payload']);
-        $result=sf_campaign_save($campaign,$adminId);
-        $public=['campaign_id'=>(int)$result['id'],'status'=>'draft','name'=>(string)$result['name']];
+        if($p['tool_id']==='automation_draft_save'){
+            $draft=sf_agent_action_normalize_automation((array)$p['payload']);
+            $result=sf_automation_save($draft,$adminId);
+            $public=['automation_id'=>(int)$result['id'],'status'=>'draft','name'=>(string)$result['name']];
+        }elseif($p['tool_id']==='campaign_draft_save'){
+            $campaign=sf_agent_action_normalize_campaign((array)$p['payload']);
+            $result=sf_campaign_save($campaign,$adminId);
+            $public=['campaign_id'=>(int)$result['id'],'status'=>'draft','name'=>(string)$result['name']];
+        }else throw new RuntimeException('This tool cannot be executed here.');
         $finish=$db->prepare("UPDATE agent_action_proposals SET status='completed',result_json=?,executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'");
         $finish->execute([json_encode($public,JSON_THROW_ON_ERROR),gmdate('c'),$id,$adminId]);
         if($finish->rowCount()!==1)throw new RuntimeException('Execution status changed before the result was recorded.');

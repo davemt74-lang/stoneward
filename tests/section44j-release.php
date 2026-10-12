@@ -31,7 +31,7 @@ $checks=[
  'Schema target 1.3.34'=>str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.34'")&&str_contains($version,"'database_schema_target'=>'1.3.34'"),
  'Migration 035 installed'=>str_contains($migrations,"'id'=>'2026-10-12-035'")&&str_contains($migrations,'sf_agent_actions_ensure_schema()'),
  'Authenticated CSRF governance'=>str_contains($api,"sf_admin_require_auth($"."method!=='GET')"),
- 'Sending and publishing not executable'=>str_contains($registry,"if($"."toolId!=='campaign_draft_save')return false"),
+ 'Sending and publishing not executable'=>str_contains($registry,"if(!in_array($"."toolId,['campaign_draft_save','automation_draft_save'],true))return false"),
  'Approval requires exact digest'=>str_contains($core,'hash_equals($'."p['payload_hash']"),
  'No automatic replay of uncertain status'=>str_contains($core,"'review_required'")&&str_contains($core,"'reviewed_no_retry'"),
  'Mandatory real campaign persistence test'=>str_contains($ci,'php tests/section44j-live-campaign-save.php'),
