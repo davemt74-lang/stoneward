@@ -259,11 +259,11 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'listening_session_guided_release':
             $session=sf_agent_listening_session_create((int)$userId,$message,'guided_release',$active?:null);$action=['type'=>'start_listening_session','session'=>$session];$text='Starting a guided listen to “'.$session['title'].'.” I’ll add context between tracks when it helps.';$profile='catalog';break;
         case 'queue_open':$action=['type'=>'open_queue'];$text='Here’s your Up Next queue.';break;
-        case 'queue_clear':$action=['type'=>'queue_clear'];$text='I cleared your Up Next queue.';break;
+        case 'queue_clear':$action=['type'=>'queue_clear'];$text='I’ll clear your Up Next queue.';break;
         case 'queue_add':
         case 'queue_play_next':
         case 'queue_remove':
-            if($track){$type=$route==='queue_add'?'queue_add_track':($route==='queue_play_next'?'queue_play_next':'queue_remove_track');$action=['type'=>$type,'track_id'=>(string)$track['id']];$text=$route==='queue_add'?'Added “'.($track['title']??'').'” to Up Next.':($route==='queue_play_next'?'“'.($track['title']??'').'” will play next.':'Removed “'.($track['title']??'').'” from Up Next.');}
+            if($track){$type=$route==='queue_add'?'queue_add_track':($route==='queue_play_next'?'queue_play_next':'queue_remove_track');$action=['type'=>$type,'track_id'=>(string)$track['id']];$text=$route==='queue_add'?'I’ll add “'.($track['title']??'').'” to Up Next.':($route==='queue_play_next'?'“'.($track['title']??'').'” will play next.':'I’ll remove “'.($track['title']??'').'” from Up Next.');}
             else{$action=['type'=>'open_queue'];$text='Open Up Next and choose the track you want.';}
             break;
         case 'player_pause':$action=['type'=>'pause_player'];$text='Paused.';break;
@@ -290,7 +290,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'release_browse':$action=['type'=>'open_view','view'=>'releases'];$text='Here are the releases.';$profile='catalog';break;
         case 'playlist_open':$action=['type'=>'open_view','view'=>'account'];$text='Your playlists are in My Stonefellow.';$profile='account';break;
         case 'playlist_create':
-            $ids=sf_agent_playlist_track_ids($message,$active?:null,7,$userId);$name=sf_agent_playlist_name($message);$action=['type'=>'create_playlist','name'=>$name,'track_ids'=>$ids,'visibility'=>'private','source_type'=>'agent'];$text='I curated “'.$name.'” and saved it to your playlists.';$profile='recommendation';break;
+            $ids=sf_agent_playlist_track_ids($message,$active?:null,7,$userId);$name=sf_agent_playlist_name($message);$action=['type'=>'create_playlist','name'=>$name,'track_ids'=>$ids,'visibility'=>'private','source_type'=>'agent'];$text='I’ll create “'.$name.'” in your playlists.';$profile='recommendation';break;
         case 'playlist_save_session':
             $name=sf_agent_playlist_name($message,'Agent Listening Session');$sessionId=(string)($client['agent_listening_session_id']??'');$action=$sessionId!==''?['type'=>'save_current_listening_session','session_id'=>$sessionId,'name'=>$name]:['type'=>'save_agent_session','name'=>$name];$text=$sessionId!==''?'I’ll save this exact listening session as “'.$name.'”.':'I’ll save the recent songs I played for you as “'.$name.'”.';$profile='account';break;
         case 'listening_session_like':
@@ -425,8 +425,25 @@ function sf_anthropic_call(array $provider,string $system,array $history,string 
     $text='';foreach((array)($j['content']??[]) as $c)if(($c['type']??'')==='text')$text.=(string)($c['text']??'');$u=(array)($j['usage']??[]);
     return ['text'=>trim($text),'provider'=>'anthropic','model'=>$model,'input_tokens'=>(int)($u['input_tokens']??0),'output_tokens'=>(int)($u['output_tokens']??0),'raw_id'=>$j['id']??null];
 }
+/**
+ * Section 43I: client-supplied state is navigation context, never authority.
+ * Only bounded fields used by the routing policy can reach JEV or Agent Brain.
+ */
+function sf_agent_normalize_client_state(array $raw): array {
+    $out=[];
+    $text=['active_track_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120];
+    foreach($text as $key=>$limit){
+        if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
+    }
+    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999];
+    foreach($numbers as $key=>$max){
+        if(isset($raw[$key])&&is_numeric($raw[$key]))$out[$key]=max(0,min($max,(int)$raw[$key]));
+    }
+    return $out;
+}
+
 function sf_agent_reply(array $user,string $conversationId,string $message,array $client=[]): array {
-    sf_entitlements_ensure_schema();$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
+    sf_entitlements_ensure_schema();$client=sf_agent_normalize_client_state($client);$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
     $client['_authorized_admin']=$isAdmin;
     $decisionUsage=0;$routeSource='local';$jev=null;
     if($isAdmin||sf_can_use_ai($user,128)['ok']){
