@@ -29,6 +29,7 @@ jobs:
         run: |
           node --check assets/js/app.js
           node --check assets/js/agent-brain.js
+          node --check assets/js/agent-chat-canvas.js
           node --check assets/js/library.js
           node --check assets/js/accessibility.js
 
@@ -145,3 +146,4 @@ jobs:
           php tests/section46d-shared-orchestration.php
           php tests/section46e-customer-canvas.php
           php tests/section46f-admin-missions.php
+          php tests/section46g-customer-chat-canvas.php
