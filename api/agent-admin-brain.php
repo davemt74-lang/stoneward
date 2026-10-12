@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/agent-orchestration.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -73,11 +74,35 @@ function sf_admin_agent_plan(string $message): array {
     elseif(preg_match('/\b(conversion|engagement|analytics|performance|journey)\b/',$m)){$type='journey_report';$view='automations';}
     return ['type'=>$type,'view'=>$view,'requires_confirmation'=>in_array($type,['prepare_campaign','prepare_journey'],true),'execution'=>'proposal_or_navigation_only'];
 }
+/**
+ * Reuse the existing provider clients for conversational explanation, never
+ * for selecting permissions, approving actions, or writing to the platform.
+ */
+function sf_admin_agent_research_reply(string $message,array $context,array $prior): ?string {
+    if(!function_exists('sf_ai_llm_candidates'))return null;
+    $history=[];
+    foreach(array_slice($prior,-8) as $row){
+        if(!in_array((string)($row['role']??''),['user','assistant'],true))continue;
+        $history[]=['role'=>(string)$row['role'],'content'=>substr((string)$row['content'],0,1800)];
+    }
+    $system="You are Stonefellow's administrative research assistant. Use only the aggregate operational facts supplied. Never request or reveal any fan's private conversations or memories. Never claim to have edited CRM, sent messages, purchased, published, changed a journey or saved a campaign. The current tool contract allows no direct writes. State uncertainty if data is absent. Keep your answer under 220 words.\nAGGREGATE FACTS: ".json_encode($context,JSON_UNESCAPED_SLASHES);
+    foreach(array_slice(sf_ai_llm_candidates(),0,2) as $provider){
+        try{
+            $result=$provider['provider']==='openai'
+              ?sf_openai_call($provider,$system,$history,$message,450)
+              :sf_anthropic_call($provider,$system,$history,$message,450);
+            $answer=trim((string)($result['text']??''));
+            if($answer!=='')return substr($answer,0,2200);
+        }catch(Throwable $e){/* Never surface provider keys or internal paths. */}
+    }
+    return null;
+}
 function sf_admin_agent_reply(int $adminId,string $threadId,string $message): array {
     if($adminId<1)throw new RuntimeException('Administrator authentication required.');
     $message=trim($message);
     if($message===''||strlen($message)>4000)throw new InvalidArgumentException('Message must be 1–4000 bytes.');
     $threadId=sf_admin_agent_thread($adminId,$threadId);
+    $prior=sf_admin_agent_thread_messages($adminId,$threadId);
     sf_admin_agent_save_message($adminId,$threadId,'user',$message);
     $plan=sf_admin_agent_plan($message);$context=sf_admin_agent_operational_context();
     $types=[
@@ -89,7 +114,13 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
     ];
     $text=$types[$plan['type']];
-    $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$plan['requires_confirmation']];
+    $contract=sf_agent_orchestration_contract('admin',$plan['type']);
+    if($plan['requires_confirmation']&&!$contract['may_prepare_reviewed_proposal'])throw new RuntimeException('The reviewed action is not registered.');
+    if($plan['type']==='research'){
+        $research=sf_admin_agent_research_reply($message,$context,$prior);
+        if($research!==null)$text=$research;
+    }
+    $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract];
     sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
     return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
 }
