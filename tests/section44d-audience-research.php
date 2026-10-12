@@ -17,7 +17,7 @@ $checks=[
  'Aggregated JSON excludes emails'=>!str_contains($encoded,'@')&&!str_contains($encoded,'Secret Fan'),
  'Cap declared only when reached'=>sf_agent_audience_aggregate($rows,3)['capped']===true,
  'Requires admin authentication'=>str_contains($endpoint,'sf_admin_require_auth(false)'),
- 'Endpoint never emits raw contact array'=>!str_contains($endpoint,"'contacts'=>$contacts"),
+ 'Endpoint never emits raw contact array'=>!str_contains($endpoint,"'contacts'=>\$contacts"),
  'CRM campaign preview reuses segment match logic'=>str_contains($endpoint,'sf_campaign_audience_contacts('),
  'Workbench never claims email was sent'=>str_contains($module,'Draft does not send.'),
  'Workbench applies segment ID not contact identities'=>str_contains($module,'d.audience={segment_id:'),
