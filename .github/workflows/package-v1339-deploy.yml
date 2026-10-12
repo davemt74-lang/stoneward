@@ -1,0 +1,61 @@
+name: Stonefellow v1.3.39 Deploy Package
+
+on:
+  push:
+    branches:
+      - 'package/v1339-deploy-verified'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact merged release
+        uses: actions/checkout@v4
+        with:
+          ref: a7d0e7ba6dd19ebe2fd78853b32da0efae969eb4
+
+      - name: Build deploy overlay
+        run: |
+          set -euo pipefail
+          ZIP="Stonefellow-v1.3.39-Deploy.zip"
+          rm -f "$ZIP" "$ZIP.sha256"
+          zip -r "$ZIP" . \
+            -x '.git/*' \
+               '.github/*' \
+               'data/*' \
+               'storage/*' \
+               'config/database.php' \
+               'config/app-secret.php' \
+               'config/store.php' \
+               'assets/js/config.js' \
+               'assets/js/catalog.js' \
+               'assets/js/releases.js' \
+               "$ZIP" "$ZIP.sha256"
+          unzip -t "$ZIP"
+          sha256sum "$ZIP" > "$ZIP.sha256"
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^(data/|storage/|config/database.php$|config/app-secret.php$|config/store.php$|assets/js/(config|catalog|releases)\.js$)')" -eq 0
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^manifest.php$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^service-worker.js$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^offline.html$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^assets/js/accessibility.js$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^assets/icons/stonefellow-pwa.svg$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^tests/v1339-section40-accessibility-pwa.php$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^AUDIT-REPORT.md$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^TEST-RESULTS.txt$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^RELEASE-NOTES.md$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^UPGRADE-NOTES.md$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^upgrade.php$')" -eq 1
+          test "$(unzip -Z1 "$ZIP" | grep -Ec '^version.php$')" -eq 1
+
+      - name: Upload deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stonefellow-v1.3.39-Deploy
+          path: |
+            Stonefellow-v1.3.39-Deploy.zip
+            Stonefellow-v1.3.39-Deploy.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
