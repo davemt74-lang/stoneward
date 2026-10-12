@@ -2,7 +2,7 @@
   'use strict';
   /** One Admin chat canvas + slide-out Brain; same server-owned mission ledger. */
   let conversationId=sessionStorage.getItem('stonefellow.admin.agent.thread')||'';
-  let busy=false,lastBrain=null;
+  let busy=false,lastBrain=null,previousFocus=null;
   const ctx=()=>window.STONEFELLOW_ADMIN_CONTEXT;
   const esc=s=>ctx()?.esc?.(String(s??''))||'';
   async function load(){
@@ -64,17 +64,29 @@
   function closeBrain(){
     document.querySelector('#adminAgentBrainBackdrop')?.remove();
     document.querySelector('#adminAgentBrainDrawer')?.remove();
+    if(previousFocus&&previousFocus.isConnected)previousFocus.focus();
+    previousFocus=null;
   }
   async function showBrain(){
     const c=ctx();if(!c)return;
     closeBrain();
+    previousFocus=document.activeElement;
     const overlay=document.createElement('div');overlay.id='adminAgentBrainBackdrop';overlay.className='admin-brain-backdrop';
     const drawer=document.createElement('aside');drawer.id='adminAgentBrainDrawer';drawer.className='admin-brain-drawer';
     drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-label','Administrator Agent Brain');
     drawer.innerHTML='<div class="admin-brain-header"><div><small>STONEFELLOW</small><h2>Admin Agent Brain</h2></div><button type="button" id="closeAdminBrain" aria-label="Close Admin Brain">×</button></div><p>Operational decisions, tool authority, exact approvals and mission recovery. Customer private conversations are not exposed.</p><div id="adminBrainMissionContent" role="status">Loading mission state…</div>';
     document.body.append(overlay,drawer);
     const close=drawer.querySelector('#closeAdminBrain');close.onclick=closeBrain;overlay.onclick=closeBrain;
-    drawer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeBrain();}});
+    drawer.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){e.preventDefault();closeBrain();return;}
+      if(e.key==='Tab'){
+        const focusable=Array.from(drawer.querySelectorAll('button,a[href],input,select,textarea')).filter(el=>!el.disabled);
+        if(!focusable.length){e.preventDefault();return;}
+        const first=focusable[0],last=focusable[focusable.length-1];
+        if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+        else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+      }
+    });
     close.focus();
     try{
       const result=await c.api('agent-chat.php'),brain=result.brain||lastBrain||{};
