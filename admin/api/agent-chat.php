@@ -9,7 +9,7 @@ $adminId=(int)$admin['id'];
 header('Cache-Control: no-store, private');
 if(!$write){
     $threadId=(string)($_GET['conversation_id']??'');
-    $out=['ok'=>true,'conversations'=>sf_admin_agent_thread_list($adminId)];
+    $out=['ok'=>true,'brain'=>sf_admin_agent_brain_snapshot($adminId),'conversations'=>sf_admin_agent_thread_list($adminId)];
     if($threadId!=='')$out['messages']=sf_admin_agent_thread_messages($adminId,$threadId);
     sf_json_response($out);
 }

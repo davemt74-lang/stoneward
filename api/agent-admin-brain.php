@@ -97,6 +97,39 @@ function sf_admin_agent_research_reply(string $message,array $context,array $pri
     }
     return null;
 }
+/**
+ * Mission state comes from the existing Section 44 approved action ledger.
+ * Do not maintain a second executor or duplicate action state.
+ */
+function sf_admin_agent_mission_summary(int $adminId): array {
+    if($adminId<1)return ['missions'=>[],'counts'=>[]];
+    $rows=function_exists('sf_agent_action_recent')?sf_agent_action_recent($adminId,30):[];
+    $missions=[];$counts=[];
+    foreach($rows as $p){
+        $status=(string)($p['status']??'unknown');
+        $counts[$status]=($counts[$status]??0)+1;
+        $result=(array)($p['result']??[]);
+        $missions[]=[
+            'id'=>(string)$p['id'],
+            'name'=>substr((string)($p['payload']['name']??'Reviewed draft'),0,160),
+            'tool_id'=>(string)$p['tool_id'],
+            'status'=>$status,
+            'created_at'=>(string)($p['created_at']??''),
+            'result_entity_id'=>(int)($result['automation_id']??$result['campaign_id']??0),
+            'review_required'=>in_array($status,['review_required','executing'],true),
+        ];
+    }
+    return ['missions'=>$missions,'counts'=>$counts];
+}
+function sf_admin_agent_brain_snapshot(int $adminId): array {
+    if($adminId<1)return ['conversations'=>[],'missions'=>[]];
+    $m=sf_admin_agent_mission_summary($adminId);
+    return [
+        'scope'=>'admin','conversations'=>sf_admin_agent_thread_list($adminId),
+        'missions'=>$m['missions'],'mission_counts'=>$m['counts'],
+        'tool_inventory'=>function_exists('sf_agent_tool_inventory')?sf_agent_tool_inventory('admin'):[]
+    ];
+}
 function sf_admin_agent_reply(int $adminId,string $threadId,string $message): array {
     if($adminId<1)throw new RuntimeException('Administrator authentication required.');
     $message=trim($message);
@@ -104,11 +137,11 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     $threadId=sf_admin_agent_thread($adminId,$threadId);
     $prior=sf_admin_agent_thread_messages($adminId,$threadId);
     sf_admin_agent_save_message($adminId,$threadId,'user',$message);
-    $plan=sf_admin_agent_plan($message);$context=sf_admin_agent_operational_context();
+    $plan=sf_admin_agent_plan($message);$context=sf_admin_agent_operational_context();$missionState=sf_admin_agent_mission_summary($adminId);
     $types=[
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
-      'review_actions'=>'Open Agent actions to review exact proposals, results and any interrupted work before taking another action.',
+      'review_actions'=>'You have '.array_sum($missionState['counts']).' recent Agent missions, including '.(int)($missionState['counts']['review_required']??0).' requiring review and '.(int)($missionState['counts']['completed']??0).' completed. Open Agent actions for exact proposals, approved results, and interrupted work. Never automatically retry uncertain operations.',
       'crm_report'=>'Current CRM summary: '.$context['crm_contacts'].' contacts and '.$context['newsletter_opted_in'].' opted-in newsletter subscribers. Open CRM for eligible audience and campaign review.',
       'journey_report'=>'The last 30 days include '.(int)($context['journey_counts']['journeys_started']??0).' journey runs, '.(int)($context['journey_counts']['journeys_completed']??0).' completed and '.(int)($context['journey_counts']['journeys_failed']??0).' failed. These independent counts are not a sequential customer funnel.',
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
@@ -122,5 +155,5 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract];
     sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
-    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
+    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
 }
