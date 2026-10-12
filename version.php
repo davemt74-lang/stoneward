@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.39',
+  'stonefellow'=>'1.3.40',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
@@ -95,6 +95,10 @@ echo json_encode([
   'pwa_offline'=>'static-shell-only-no-api-account-admin-private-cache',
   'accessibility_keyboard'=>'skip-link-dialog-focus-trap-escape-focus-return-aria-current',
   'accessibility_motion'=>'reduced-motion-forced-colors-coarse-pointer-touch-targets',
+  'responsive_media'=>'media-library-320-800-1600-srcset-lazy-priority',
+  'public_media_cache'=>'uuid-etag-immutable-public-admin-no-store',
+  'core_web_vitals'=>'lcp-cls-inp-fcp-ttfb-p75-privacy-bounded',
+  'performance_intelligence'=>'core-web-vitals-growth-dashboard-agent-brief',
   'launch_templates'=>'single-album-show-campaign-custom',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
