@@ -160,6 +160,14 @@ function sf_automation_log_crm(int $contactId,?int $userId,string $eventType,str
  * outreach step. Manual run authority never substitutes for fan consent.
  */
 function sf_automation_outreach_allowed(string $type,array $contact): bool {
+    // Re-read consent from the authoritative CRM row before each outreach step,
+    // never from a snapshot captured earlier in the automation run.
+    $contactId=(int)($contact['id']??0);
+    if($contactId>0){
+        $current=sf_crm_contact_by_id($contactId);
+        if(!$current)return false;
+        $contact=$current;
+    }
     if($type==='email')
         return !empty($contact['marketing_opt_in'])&&empty($contact['unsubscribed_at']);
     if($type==='agent_message'){
