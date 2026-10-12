@@ -101,3 +101,6 @@ jobs:
           php tests/v1338-section39-public-search.php
           php tests/v1339-section40-accessibility-pwa.php
           php tests/v1340-section41-account-privacy.php
+          php tests/section42-operations-health.php
+          php tests/section42-backup-validation.php
+          php tests/section42-ops-privacy.php
