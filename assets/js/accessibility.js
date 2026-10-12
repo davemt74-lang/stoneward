@@ -19,9 +19,9 @@
     if(e.key==='Tab'&&dialog){const items=focusables(dialog);if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}
   });
   for(const id of ['notificationDrawer','queueDrawer']){const el=$('#'+id);if(!el)continue;new MutationObserver(()=>{if(!el.hidden){requestAnimationFrame(()=>focusables(el)[0]?.focus())}else if(lastOpener&&document.contains(lastOpener)){lastOpener.focus();lastOpener=null}}).observe(el,{attributes:true,attributeFilter:['hidden']})}
-  const currentView=()=>window.STONEFELLOW_INITIAL_ROUTE?.view||new URL(location.href).searchParams.get('view')||'home';
-  function markCurrent(){const v=currentView();$$('.menu-sheet [data-view]').forEach(a=>{if((a.dataset.view||'home')===v)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')})}
-  window.addEventListener('popstate',()=>setTimeout(markCurrent,0));document.addEventListener('stonefellow:navigation',()=>setTimeout(markCurrent,0));markCurrent();
+  let navView=window.STONEFELLOW_INITIAL_ROUTE?.view||new URL(location.href).searchParams.get('view')||'home';
+  function markCurrent(){const v=navView;$$('.menu-sheet [data-view]').forEach(a=>{if((a.dataset.view||'home')===v)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')})}
+  window.addEventListener('popstate',()=>setTimeout(markCurrent,0));document.addEventListener('stonefellow:navigation',e=>{navView=e.detail?.view||'home';setTimeout(markCurrent,0)});markCurrent();
   window.addEventListener('offline',()=>announce('Stonefellow is offline. Network features are unavailable.'));
   window.addEventListener('online',()=>announce('Stonefellow is back online.'));
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;if(install)install.hidden=false});
