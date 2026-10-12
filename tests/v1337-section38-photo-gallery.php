@@ -76,7 +76,7 @@ ok38(str_contains($css,'.photo-gallery-grid')&&str_contains($css,'.photo-lightbo
 
 ok38(str_contains($shell,"define('SF_BUILD', '1.3.37')")&&str_contains($shell,'href="photos" data-view="photos"'),'public shell advances 1.3.37 and exposes Photos navigation');
 ok38(str_contains($shell,"'video','photo','track'")&&str_contains($shell,"'videos','photos','contact'"),'server pretty-route handoff recognizes Photo detail and Photos hub');
-ok38(str_contains($ht,'^photos/([A-Za-z0-9_-]+)')&&str_contains($ht,'^photos/?
+ok38(str_contains($ht,'^photos/([A-Za-z0-9_-]+)')&&str_contains($ht,'^photos/?$')&&str_contains($ht,'X-Stonefellow-Build "1.3.37"'),'web server routes gallery hub/detail and reports build 1.3.37');
 
 ok38(str_contains($seo,"\$view==='photo'")&&str_contains($seo,"'@type'=>'ImageGallery'")&&str_contains($seo,"'@type'=>'ImageObject'"),'gallery detail emits ImageGallery/ImageObject structured data');
 ok38(str_contains($seo,"'photos'=>'Photos'")&&str_contains($seo,"'photos'=>'0.7'"),'Photos hub has route metadata and sitemap priority');
