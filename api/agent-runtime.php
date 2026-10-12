@@ -157,6 +157,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/play me something|listening session|keep the music going|give me a .* session|something (dark|quiet|mellow|heavy|warm|driving|acoustic|reflective)/',$q))return 'listening_session_start';
     if(preg_match('/what do you suggest today|what.s my suggestion|suggestion for today|what should i (?:do|listen to|hear) today|suggest (?:something|music) today|today.s suggestion/',$q))return 'home_suggestion';
     if(preg_match('/recommend|what should i (hear|listen)/',$q))return 'player_recommend';
+    if(preg_match('/\\b(?:admin|my admin|management)\\b.*\\b(?:campaigns?|crm|newsletter|fan segments?)\\b|\\b(?:campaigns?|crm)\\b.*\\b(?:dashboard|overview|metrics|status)\\b/',$q))return 'admin_campaign_overview';
     if(preg_match('/\b(fan community|community feed|community posts?|open community)\b/',$q))return 'community_browse';
     if(preg_match('/\b(newsletter|mailing list|email list)\b/',$q))return 'newsletter_join';
     if(preg_match('/\b(campaign|offer|free download|free song|discount|vip|exclusive|presale|early access)\b/',$q))return 'campaign_offer';
@@ -217,6 +218,16 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             break;
         case 'player_recommend':
             $track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;
+        case 'admin_campaign_overview':
+            if(empty($client['_authorized_admin'])){
+                $route='campaign_offer';$action=['type'=>'open_view','view'=>'campaigns'];$text='See current public offers and campaigns.';$profile='commerce';
+            }else{
+                $c=sf_campaign_admin_summary();$f=sf_crm_admin_summary();
+                $text='Stonefellow campaign overview: '.(int)($c['campaigns']??0).' total campaigns, '.(int)($c['active']??0).' published, '.(int)($c['participants']??0).' participants, and '.(int)($f['newsletter']??0).' opted-in newsletter contacts. Drafting, publishing, and outreach remain administrator-confirmed actions in Admin → Campaigns.';
+                $action=['type'=>'none'];
+                $profile='none';
+            }
+            break;
         case 'home_suggestion':
             if((int)$userId>0){$home=sf_home_state((int)$userId);$suggestion=(array)($home['suggestion']??[]);$action=['type'=>'open_view','view'=>'home'];$text=(string)($suggestion['title']??'I left you a suggestion on your home page.');if(!empty($suggestion['text']))$text.=' '.(string)$suggestion['text'];$profile='recommendation';}
             else{$action=['type'=>'open_view','view'=>'home'];$text='Open your Stonefellow home and I’ll give you a suggestion for today.';}
@@ -313,6 +324,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $model=trim((string)($d['model']??''))?:'typesafe/jev-1.13';
     $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??''),'notification_unread'=>(int)($client['notification_unread']??0),'latest_notification_title'=>(string)($client['latest_notification_title']??''),'current_search_query'=>(string)($client['search_query']??'')];
     $criteria=[
+        'admin_campaign_overview'=>'Administrator asks for aggregate CRM or campaign dashboard status; never expose contact records.',
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
         'player_recommend'=>'Asks for one recommendation or one next song.',
         'home_suggestion'=>'Asks for today’s personalized Stonefellow home suggestion or what the Agent suggests today.',
@@ -395,11 +407,12 @@ function sf_anthropic_call(array $provider,string $system,array $history,string 
 }
 function sf_agent_reply(array $user,string $conversationId,string $message,array $client=[]): array {
     sf_entitlements_ensure_schema();$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
+    $client['_authorized_admin']=$isAdmin;
     $decisionUsage=0;$routeSource='local';$jev=null;
     if($isAdmin||sf_can_use_ai($user,128)['ok']){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
-    $route=(string)($jev['route']??sf_agent_local_route($message,$client));$plan=sf_agent_policy($route,$message,$client,$userId);
+    $route=(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
     sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$jev['run_id']??'','status'=>$jev['status']??($routeSource==='local'?'local_fallback':'error'),'input_tokens'=>$jev['input_tokens']??0,'output_tokens'=>$jev['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action']]);
     if(!$plan['needs_llm']){
         $text=$plan['text']!==''?$plan['text']:'Ready.';
