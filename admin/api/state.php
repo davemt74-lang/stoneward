@@ -97,6 +97,7 @@ $recentSearchEvents=$pdo->query(
             u.display_name,u.email
      FROM catalog_search_events e
      LEFT JOIN users u ON u.id=e.user_id
+     WHERE e.event_type IN ('search','click','clear')
      ORDER BY e.id DESC
      LIMIT 12"
 )->fetchAll();
