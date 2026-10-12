@@ -38,10 +38,14 @@ ok39(str_contains($core,'sf_video_public_list()'),'video results use published-r
 ok39(str_contains($core,'sf_gallery_public_list()'),'photo results use published-ready galleries');
 ok39(str_contains($core,'sf_commerce_products(true)'),'store results use active public commerce records');
 ok39(str_contains($core,'sf_campaign_is_live($c)'),'offer results require a currently live campaign');
+ok39(str_contains($core,"$title=sf_clean_text((string)(\$landing['headline']??''),220)")&&!str_contains($core,"['description'=>\$snippet,'metadata'=>[(string)(\$c['name']??'')]]"),'public offer search uses public landing copy rather than internal campaign names');
 ok39(!str_contains($core,"'press'=>'")&&!str_contains($core,'sf_press_kits'),'public site search intentionally excludes EPK/press-contact content');
 ok39(!str_contains($core,'professional_inquir')&&!str_contains($core,'inquiry_'),'public site search does not index professional inquiry records');
 ok39(str_contains($core,"unset(\$fields['notes'],\$fields['archive'])"),'site-wide release search strips private/internal release notes from its search document');
-ok39(str_contains($core,'sf_search_track_fields($t)'),'track search preserves published Songbook lyric gating from Section 12');
+$publicTrackFields=sf_site_search_public_track_fields(['id'=>'demo','title'=>'Demo','release'=>'R','story'=>'Public story','mood'=>['quiet'],'themes'=>['night'],'credits'=>['Writer'],'metadata'=>['private'=>'secret'],'archive'=>['source_notes'=>'internal']]);
+ok39(!array_key_exists('metadata',$publicTrackFields)&&!array_key_exists('archive',$publicTrackFields),'public track search document excludes generic internal metadata/archive fields');
+ok39(str_contains($core,'sf_site_search_public_track_fields($t)'),'site-wide track search uses its public-only field projection');
+ok39(str_contains($core,"'lyrics'=>\$songbook?"),'public track search includes lyrics only through published Songbook gating');
 ok39(str_contains($core,'sf_site_search_image_from_media'),'site search images resolve from governed public media payloads');
 
 ok39(str_contains($api,"\$method==='GET'"),'anonymous GET site search exists');
@@ -74,7 +78,7 @@ ok39(str_contains($app,"navigate('search',{q:a.query||''"),'Agent open-site-sear
 ok39(str_contains($app,"else if(view==='search'){await renderSiteSearch(params)}"),'SPA navigation renders the Search route');
 ok39(str_contains($app,"if(view==='search')")&&str_contains($app,"new URL('search',base)"),'SPA canonical URL builder supports Search');
 ok39(str_contains($app,"e.key==='/'")&&str_contains($app,"e.ctrlKey||e.metaKey")&&str_contains($app,"e.key.toLowerCase()==='k'"),'keyboard shortcuts open/focus public Search');
-ok39(!str_contains($app,"$('[data-site-search-open]',host).forEach"),'site Search collection handlers do not misuse the single-element selector helper');
+ok39(str_contains($app,"$('[data-site-search-open]',host).forEach")&&str_contains($app,"$('[data-site-recent]',host).forEach")&&str_contains($app,"$('[data-site-suggestion]',suggestions).forEach"),'site Search collection handlers use the collection selector helper consistently');
 ok39(str_contains($app,'esc(r.title)')&&str_contains($app,'esc(r.snippet)'),'Search result title/snippet are escaped before HTML rendering');
 ok39(str_contains($css,'.site-search-module')&&str_contains($css,'.site-search-result-main')&&str_contains($css,'@media(max-width:640px)'),'Search has dedicated responsive presentation');
 
