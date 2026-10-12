@@ -17,15 +17,15 @@ $b=sf_request_json();$action=(string)($b['action']??'');
 try{
     if($action==='prepare'){
         $tool=(string)($b['tool_id']??'');
-        if(!sf_agent_tool_allowed($tool,'admin',true))sf_json_response(['ok'=>false,'error'=>'tool_not_allowed'],403);
+        if(!sf_agent_tool_executable($tool,'admin',true))sf_json_response(['ok'=>false,'error'=>'tool_not_allowed'],403);
         $draft=is_array($b['draft']??null)?$b['draft']:[];
         $proposal=sf_agent_action_prepare($uid,(string)($b['request_key']??''),$tool,$draft);
-        sf_agent_brain_log($uid,'agent_campaign','action_proposed',['route'=>'campaign_draft','action'=>$tool,'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'payload_hash'=>$proposal['payload_hash'],'requires_confirmation'=>true]);
+        sf_agent_brain_log($uid,'agent_campaign','action_proposed',['route'=>$tool==='automation_draft_save'?'journey_draft':'campaign_draft','action'=>$tool,'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'payload_hash'=>$proposal['payload_hash'],'requires_confirmation'=>true]);
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     if($action==='approve'){
         $proposal=sf_agent_action_approve($uid,(string)($b['proposal_id']??''),(string)($b['payload_hash']??''),(string)($b['typed_confirmation']??''));
-        sf_agent_brain_log($uid,'agent_campaign','action_approved',['route'=>'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
+        sf_agent_brain_log($uid,'agent_campaign','action_approved',['route'=>$proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     if($action==='cancel'||$action==='reconcile'){
@@ -43,15 +43,16 @@ try{
         $proposal=sf_agent_action_execute($uid,$id);
         // Replaying a completed request must not duplicate the Admin event trail.
         if($previous['status']!=='completed'){
-            sf_agent_brain_log($uid,'agent_campaign','action_result',['route'=>'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'campaign_id'=>$proposal['result']['campaign_id']??null,'requires_confirmation'=>true]);
-            sf_log_admin_action($uid,'agent_campaign_draft_saved','campaign',(string)($proposal['result']['campaign_id']??''),['proposal_id'=>$proposal['id']]);
+            sf_agent_brain_log($uid,'agent_campaign','action_result',['route'=>$proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'entity_id'=>$proposal['tool_id']==='automation_draft_save'?($proposal['result']['automation_id']??null):($proposal['result']['campaign_id']??null),'requires_confirmation'=>true]);
+            $isJourney=$proposal['tool_id']==='automation_draft_save';
+            sf_log_admin_action($uid,$isJourney?'agent_journey_draft_saved':'agent_campaign_draft_saved',$isJourney?'automation':'campaign',(string)($isJourney?($proposal['result']['automation_id']??''):($proposal['result']['campaign_id']??'')),['proposal_id'=>$proposal['id']]);
         }
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     sf_json_response(['ok'=>false,'error'=>'unsupported_action'],422);
 }catch(InvalidArgumentException $e){
-    sf_json_response(['ok'=>false,'error'=>'invalid_request','message'=>'Review the proposed campaign fields and confirmation.'],422);
+    sf_json_response(['ok'=>false,'error'=>'invalid_request','message'=>'Review the proposed draft fields and confirmation.'],422);
 }catch(Throwable $e){
     // Status can be inspected by proposal ID; failed/ambiguous work is never auto-retried.
-    sf_json_response(['ok'=>false,'error'=>'review_required','message'=>'The proposed action could not be confirmed. Check the proposal status and Campaign Builder before retrying.'],409);
+    sf_json_response(['ok'=>false,'error'=>'review_required','message'=>'The proposed action could not be confirmed. Check the proposal status and the corresponding Admin editor before retrying.'],409);
 }
