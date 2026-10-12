@@ -42,6 +42,7 @@ ok37(str_contains($core,'sf_inquiry_clean_body')&&str_contains($core,"[\\x00-\\x
 ok37(str_contains($core,"if(\$status==='replied')throw new RuntimeException"),'Replied cannot be manually claimed by status transition');
 ok37(str_contains($core,"\$newStatus=\$status==='sent'?'replied'"),'inquiry becomes Replied only when transactional delivery reports Sent');
 ok37(str_contains($core,'transactional_email_outbox')&&str_contains($core,"['sent','queued','logged','failed']"),'reply ledger preserves real outbox delivery state');
+ok37(str_contains($core,"status IN ('sending','queued','logged','sent')")&&str_contains($core,'already sending or was sent recently'),'backend suppresses duplicate in-flight/successful replies while allowing failed retries');
 ok37(str_contains($core,"in_array((string)\$r['status'],['spam','closed'],true)"),'closed/spam inquiries must be reopened before reply');
 ok37(!str_contains($core,'function sf_inquiry_agent_context'),'public core exposes no helper that could leak the professional inbox into general Agent context');
 
