@@ -54,7 +54,7 @@ function sf_privacy_export(int $userId,array $user): array {
 }
 function sf_privacy_anonymize_user_events(int $userId): array {
     $tables=['listening_events','catalog_search_events','discovery_events','artist_home_events','story_events','songbook_events','video_events','photo_gallery_events'];$updated=[];
-    foreach($tables as $table){try{$q=sf_db()->prepare('UPDATE '.$table.' SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$updated[$table]=$q->rowCount();}catch(Throwable $e){}}
+    foreach($tables as $table){$q=sf_db()->prepare('UPDATE '.$table.' SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$updated[$table]=$q->rowCount();}
     return $updated;
 }
 function sf_privacy_clear_search_activity(int $userId): array {$updated=[];foreach(['catalog_search_events','discovery_events'] as $table){try{$q=sf_db()->prepare('UPDATE '.$table.' SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$updated[$table]=$q->rowCount();}catch(Throwable $e){}}sf_privacy_log($userId,'search_activity_anonymized',['events'=>array_sum($updated)]);sf_log_user_activity($userId,'search_activity_cleared','Cleared identifiable search/discovery activity','account',(string)$userId);return $updated;}
@@ -71,20 +71,21 @@ function sf_privacy_closure_blockers(int $userId,array $user): array {
     try{$q=sf_db()->prepare("SELECT 1 FROM support_cases WHERE user_id=? AND status NOT IN ('closed','resolved') LIMIT 1");$q->execute([$userId]);if($q->fetchColumn()!==false)$block[]='An open support case must be resolved before account closure.';}catch(Throwable $e){}
     return array_values(array_unique($block));
 }
-function sf_privacy_delete_rows(string $table,int $userId): int {try{$q=sf_db()->prepare('DELETE FROM '.$table.' WHERE user_id=?');$q->execute([$userId]);return $q->rowCount();}catch(Throwable $e){return 0;}}
+function sf_privacy_delete_rows(string $table,int $userId): int {$q=sf_db()->prepare('DELETE FROM '.$table.' WHERE user_id=?');$q->execute([$userId]);return $q->rowCount();}
 function sf_privacy_close_account(int $userId,array $user,string $password,string $confirmation): array {
     sf_privacy_ensure_schema();if($confirmation!=='DELETE')throw new InvalidArgumentException('Type DELETE exactly to confirm account closure.');$full=sf_user_by_email((string)$user['email']);if(!$full||!password_verify($password,(string)$full['password_hash']))throw new InvalidArgumentException('Current password is incorrect.');
-    $block=sf_privacy_closure_blockers($userId,$full);if($block)throw new RuntimeException(implode(' ',$block));$pdo=sf_db();$pdo->beginTransaction();$purged=[];
+    $block=sf_privacy_closure_blockers($userId,$full);if($block)throw new RuntimeException(implode(' ',$block));$pdo=sf_db();$pdo->beginTransaction();$purged=[];$anon='closed-'.bin2hex(random_bytes(12)).'@invalid.stonefellow.local';
     try{
       $anonymized=sf_privacy_anonymize_user_events($userId);
       $agent=sf_privacy_clear_agent_history($userId);
-      foreach(['user_favorites','user_listening_progress','user_track_feedback','user_play_queue','user_saved_builds','user_library','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','user_notifications','user_activity','user_collections','user_playlists','agent_listening_sessions','community_posts','account_action_tokens','user_token_balances','token_ledger','user_subscriptions','user_trial_history'] as $table)$purged[$table]=sf_privacy_delete_rows($table,$userId);
-      try{$q=$pdo->prepare('UPDATE fan_contacts SET marketing_opt_in=0,agent_auto_engage=0,status=?,display_name=?,email=?,user_id=NULL,unsubscribed_at=?,unsubscribe_token_hash=NULL,updated_at=? WHERE user_id=?');$anon='closed-'.substr(hash('sha256',(string)$user['email'].'|'.$userId),0,20).'@invalid.stonefellow.local';$q->execute(['archived','Closed account',$anon,gmdate('c'),gmdate('c'),$userId]);}catch(Throwable $e){$anon='closed-'.substr(hash('sha256',(string)$user['email'].'|'.$userId),0,20).'@invalid.stonefellow.local';}
+      foreach(['user_sessions','user_favorites','user_listening_progress','user_track_feedback','user_play_queue','user_saved_builds','user_library','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','user_notifications','user_activity','user_collections','user_playlists','agent_listening_sessions','community_posts','account_action_tokens','user_token_balances','token_ledger','user_subscriptions','user_trial_history'] as $table)$purged[$table]=sf_privacy_delete_rows($table,$userId);
+      $q=$pdo->prepare('UPDATE fan_contacts SET marketing_opt_in=0,agent_auto_engage=0,status=?,display_name=?,email=?,user_id=NULL,unsubscribed_at=?,unsubscribe_token_hash=NULL,updated_at=? WHERE user_id=?');$q->execute(['archived','Closed account',$anon,gmdate('c'),gmdate('c'),$userId]);
+      $q=$pdo->prepare('UPDATE transactional_email_outbox SET user_id=NULL,recipient_email=? WHERE user_id=?');$q->execute([$anon,$userId]);$purged['transactional_email_identity_anonymized']=$q->rowCount();
       sf_privacy_log($userId,'account_closed',['behavior_tables_purged'=>array_sum($purged),'events_anonymized'=>array_sum($anonymized),'agent_conversations'=>$agent['conversations']??0]);
       $q=$pdo->prepare("UPDATE users SET email=?,display_name='Closed account',password_hash=?,status='closed',updated_at=?,last_login_at=NULL,email_verified_at=NULL,email_verification_sent_at=NULL WHERE id=?");$q->execute([$anon,password_hash(bin2hex(random_bytes(32)),PASSWORD_DEFAULT),gmdate('c'),$userId]);
-      try{$pdo->prepare('DELETE FROM user_profiles WHERE user_id=?')->execute([$userId]);}catch(Throwable $e){}
+      $pdo->prepare('DELETE FROM user_profiles WHERE user_id=?')->execute([$userId]);
       $pdo->commit();
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
-    if(function_exists('sf_auth_revoke_all_user_sessions'))sf_auth_revoke_all_user_sessions($userId);return ['closed'=>true,'retained'=>['historical_orders','billing_invoices','refunds','support_records'],'purged_rows'=>array_sum($purged),'anonymized_events'=>array_sum($anonymized)];
+    return ['closed'=>true,'retained'=>['historical_orders','billing_invoices','refunds','support_records'],'purged_rows'=>array_sum($purged),'anonymized_events'=>array_sum($anonymized)];
 }
 function sf_privacy_state(int $userId,array $user): array {return ['profile'=>sf_privacy_profile($userId),'closure_blockers'=>sf_privacy_closure_blockers($userId,$user),'recent_privacy_events'=>sf_privacy_event_summary($userId,8),'retention_note'=>'Account closure purges or anonymizes fan-behavior/profile data. Historical orders, invoices, refunds and support records remain as operational/accounting history.'];}
