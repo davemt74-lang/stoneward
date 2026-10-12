@@ -121,3 +121,4 @@ jobs:
           php tests/section44c-campaign-workbench.php
           php tests/section44d-audience-research.php
           php tests/section44e-published-campaign-copy.php
+          php tests/section44f-execution-governance.php
