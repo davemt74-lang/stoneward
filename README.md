@@ -1,3 +1,13 @@
+# Stonefellow v1.3.39 — Accessibility, PWA & Mobile Resilience
+
+Stonefellow can now be installed as a PWA without creating a second application or weakening privacy.
+
+The installed experience uses the same single-artist public site, persistent music player and Agent shell. Offline support is deliberately conservative: only the static shell is cached. Account data, API responses, purchases, private media and Admin surfaces always require the network.
+
+Accessibility improvements include skip navigation, named modal drawers, keyboard focus trapping/restoration, Escape behavior, aria-current navigation, reduced-motion support, forced-colors support, visible focus and coarse-pointer touch targets.
+
+---
+
 NaN# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
 
 Stonefellow now includes a governed public photo archive for a **single artist**.
