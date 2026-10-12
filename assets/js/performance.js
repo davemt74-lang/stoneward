@@ -1,0 +1,20 @@
+(() => {
+  'use strict';
+  const cfg=window.STONEFELLOW_CONFIG||{},sent=new Set(),values={},route={view:window.STONEFELLOW_INITIAL_ROUTE?.view||'home'};
+  const apiUrl=()=>String(cfg.apiBase||'api').replace(/\/$/,'')+'/performance.php';
+  const rating=(m,v)=>m==='CLS'?(v<=.1?'good':v<=.25?'needs_improvement':'poor'):m==='LCP'?(v<=2500?'good':v<=4000?'needs_improvement':'poor'):m==='INP'?(v<=200?'good':v<=500?'needs_improvement':'poor'):m==='FCP'?(v<=1800?'good':v<=3000?'needs_improvement':'poor'):(v<=800?'good':v<=1800?'needs_improvement':'poor');
+  const navType=()=>performance.getEntriesByType?.('navigation')?.[0]?.type||'';
+  function post(metric,value){if(sent.has(metric)||!Number.isFinite(value)||value<0)return;sent.add(metric);const body=JSON.stringify({metric,value,rating:rating(metric,value),route_type:route.view||'home',navigation_type:navType()});fetch(apiUrl(),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body,keepalive:true}).catch(()=>{})}
+  function flush(){for(const m of ['LCP','CLS','INP'])if(values[m]!==undefined)post(m,values[m])}
+  try{const nav=performance.getEntriesByType('navigation')[0];if(nav&&Number.isFinite(nav.responseStart))post('TTFB',Math.max(0,nav.responseStart-nav.requestStart))}catch(_){}
+  try{const fcp=performance.getEntriesByName('first-contentful-paint')[0];if(fcp)post('FCP',fcp.startTime);else new PerformanceObserver(list=>{const e=list.getEntries().find(x=>x.name==='first-contentful-paint');if(e)post('FCP',e.startTime)}).observe({type:'paint',buffered:true})}catch(_){}
+  try{new PerformanceObserver(list=>{const e=list.getEntries().at(-1);if(e)values.LCP=e.startTime}).observe({type:'largest-contentful-paint',buffered:true})}catch(_){}
+  try{values.CLS=0;new PerformanceObserver(list=>{for(const e of list.getEntries())if(!e.hadRecentInput)values.CLS+=e.value}).observe({type:'layout-shift',buffered:true})}catch(_){}
+  try{values.INP=0;new PerformanceObserver(list=>{for(const e of list.getEntries())if((e.interactionId||0)>0)values.INP=Math.max(values.INP,e.duration||0)}).observe({type:'event',buffered:true,durationThreshold:40})}catch(_){}
+  document.addEventListener('stonefellow:navigation',e=>{route.view=e.detail?.view||'home';requestAnimationFrame(()=>enhanceImages(document.querySelector('#dynamicCanvas')||document))});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flush()});window.addEventListener('pagehide',flush);
+  function mediaSrcset(src){try{const u=new URL(src,document.baseURI);if(!/\/api\/media\.php$/.test(u.pathname)||!u.searchParams.get('id'))return '';u.searchParams.delete('download');const base=new URL(u.href);const make=(v,w)=>{const x=new URL(base.href);x.searchParams.set('variant',v);return x.href+' '+w+'w'};return [make('thumb',320),make('medium',800),make('large',1600)].join(', ')}catch(_){return ''}}
+  function imageSizes(img){if(img.closest('.site-search-art'))return '88px';if(img.closest('.photo-detail-grid,.photo-gallery-grid,.artist-home-release-grid'))return '(max-width: 700px) 50vw, 33vw';if(img.closest('.story-gallery,.video-grid,.video-gallery'))return '(max-width: 700px) 100vw, 50vw';return '(max-width: 820px) 100vw, 800px'}
+  function enhanceImages(root=document){let hero=false;for(const img of root.querySelectorAll('img')){if(img.dataset.perfEnhanced)return;img.dataset.perfEnhanced='1';img.decoding='async';const priority=!hero&&!!img.closest('.artist-home-hero-media,.release-detail-hero,.track-detail-hero,.story-public-hero,.photo-detail-cover,.video-detail');const chrome=!!img.closest('.topbar,.splash-screen');if(priority){hero=true;img.loading='eager';img.fetchPriority='high'}else if(chrome)img.loading='eager';else{img.loading='lazy';img.fetchPriority='low'}const set=mediaSrcset(img.getAttribute('src')||'');if(set&&!img.srcset){img.srcset=set;img.sizes=imageSizes(img)}}}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>enhanceImages(document));else enhanceImages(document);
+})();
