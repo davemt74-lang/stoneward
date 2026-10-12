@@ -13,7 +13,7 @@ function sf_catalog():array{return [
 function sf_seo_public_track(string $id):?array{foreach(sf_catalog() as $t)if($t['id']===$id&&$id==='pubtrack')return $t;return null;}
 function sf_live_public_shows():array{return [['id'=>'show1','title'=>'Stonefellow Live']];}
 require dirname(__DIR__).'/api/agent-campaign-sources.php';
-$items=sf_agent_campaign_sources();$json=json_encode($items,JSON_THROW_ON_ERROR);
+$items=sf_agent_campaign_sources();$json=json_encode($items,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
 $endpoint=(string)file_get_contents(dirname(__DIR__).'/admin/api/agent-campaign-sources.php');
 $ui=(string)file_get_contents(dirname(__DIR__).'/admin/assets/agent-actions.js');
 $checks=[
