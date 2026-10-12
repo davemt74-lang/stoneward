@@ -32,7 +32,7 @@ ok(str_contains($crm,"'community_post'")&&str_contains($crm,'sf_log_user_activit
 ok(str_contains($adminCrm,"action==='moderate_post'")&&str_contains($admin,'Community moderation'),'Admin can moderate the fan community');
 ok(str_contains($app,'function renderCommunity(')&&str_contains($app,'communityPostForm'),'public fan community has a first-class feed and composer');
 
-ok(str_contains($crm,'20*3600'),'automatic Agent engagement has a cooldown');
+ok(str_contains($crm,'24*3600'),'automatic Agent engagement has a 24-hour cooldown');
 ok(str_contains($crm,"return null;")&&str_contains($crm,"trigger==='"),'automatic Agent does not nag without a meaningful trigger');
 ok(str_contains($crm,"account_created")&&str_contains($crm,"community_post")&&str_contains($crm,"purchase")&&str_contains($crm,"listen_complete"),'automatic Agent reacts to meaningful fan lifecycle events');
 ok(str_contains($crm,"INSERT INTO agent_brain_decisions")&&str_contains($crm,"'fan_engagement'"),'automatic fan engagement is written into Admin Agent Brain');
