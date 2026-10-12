@@ -21,6 +21,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/admin.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/campaigns.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/agent-actions.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/agent-canvas.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/media.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/video.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/gallery.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
@@ -67,6 +68,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="membership"><span>21</span>Membership + VIP</button>
         <button type="button" data-view="ticketing"><span>22</span>Tickets + VIP</button>
         <button type="button" data-view="ai"><span>23</span>AI Providers</button>
+        <button type="button" data-view="agent-chat"><span>★</span>Admin Agent Chat</button>
         <button type="button" data-view="brain"><span>24</span>Agent Brain</button>
         <button type="button" data-view="customer"><span>25</span>Customer Lifecycle</button>
         <button type="button" data-view="analytics"><span>26</span>Performance Intelligence</button>
@@ -103,6 +105,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-actions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/agent-canvas.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/media.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/video.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/gallery.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
