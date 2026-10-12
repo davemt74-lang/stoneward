@@ -126,3 +126,5 @@ jobs:
           php tests/section44h-recovery.php
           php tests/section44i-mobile-chat.php
           php tests/section44-audit-hardening.php
+          php tests/section44j-live-campaign-save.php
+          php tests/section44j-release.php
