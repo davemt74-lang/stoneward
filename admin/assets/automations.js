@@ -27,11 +27,37 @@
     const s=state.summary;
     canvas.innerHTML=head('CRM + AUTOMATION','Segments & Automations','Turn CRM, purchases and campaign behavior into reusable fan segments and governed lifecycle journeys.','<button class="secondary" id="automationTick" type="button">Run scheduler now</button>')+
       '<div class="stats"><div class="stat"><strong>'+Number(s.segments||0)+'</strong><span>Segments</span></div><div class="stat"><strong>'+Number(s.published||0)+'</strong><span>Published automations</span></div><div class="stat"><strong>'+Number(s.waiting||0)+'</strong><span>Waiting journeys</span></div><div class="stat"><strong>'+Number(s.completed||0)+'</strong><span>Completed journeys</span></div></div>'+
-      '<div class="automation-tabs">'+[['segments','Segments'],['automations','Automations'],['runs','Run history']].map(x=>'<button type="button" data-auto-tab="'+x[0]+'" class="'+(state.tab===x[0]?'active':'')+'">'+x[1]+'</button>').join('')+'</div>'+
-      '<div id="automationBody">'+(state.tab==='segments'?segmentsHtml():state.tab==='automations'?automationsHtml():runsHtml())+'</div>';
+      '<div class="automation-tabs">'+[['segments','Segments'],['automations','Automations'],['runs','Run history'],['journey','Journey Intelligence']].map(x=>'<button type="button" data-auto-tab="'+x[0]+'" class="'+(state.tab===x[0]?'active':'')+'">'+x[1]+'</button>').join('')+'</div>'+
+      '<div id="automationBody">'+(state.tab==='segments'?segmentsHtml():state.tab==='automations'?automationsHtml():state.tab==='runs'?runsHtml():journeySkeletonHtml())+'</div>';
     $('#automationTick').onclick=async()=>{if(!confirm('Run the lifecycle scheduler now? This can resume due waits and start eligible published scheduled journeys.'))return;try{const j=await api('automations.php',{action:'tick'});say('Lifecycle scheduler: '+j.result.runs_started+' started, '+j.result.runs_resumed+' resumed.');renderAutomations()}catch(e){alert(e.message)}};
     $$('[data-auto-tab]',canvas).forEach(b=>b.onclick=()=>{state.tab=b.dataset.autoTab;renderAutomations()});
-    bindCurrentTab();
+    if(state.tab==='journey')renderJourneyIntelligence();
+    else bindCurrentTab();
+  }
+  function journeySkeletonHtml(){
+    return '<section class="panel" id="fanJourneyIntelligence"><h2>Fan journey intelligence</h2><p>Loading aggregated, consent-aware journey signals…</p></section>';
+  }
+  async function renderJourneyIntelligence(days=30){
+    const mount=$('#fanJourneyIntelligence');if(!mount)return;
+    try{
+      const r=await api('fan-journeys.php?days='+encodeURIComponent(days)),journey=r.journey||{},c=journey.counts||{},rates=journey.rates||{};
+      if(!document.contains(mount))return;
+      const pct=value=>value===null||value===undefined?'—':Number(value).toFixed(1)+'%';
+      const metrics=[
+        ['Known CRM contacts',c.known_contacts],['Active CRM contacts',c.active_contacts],
+        ['Listening contacts',c.listening_contacts],['Opted-in subscribers',c.newsletter_opted_in],
+        ['Purchasing contacts',c.purchasing_contacts],['Campaign participants',c.campaign_participants],
+        ['Campaign conversions',c.campaign_conversions],['Automation runs',c.journeys_started],
+        ['Completed journeys',c.journeys_completed],['Failed journeys',c.journeys_failed]
+      ];
+      mount.innerHTML='<div class="panel-title"><div><h2>Fan journey intelligence</h2><p>Aggregate CRM, listening, campaign and automation measurements. Independent cohorts, not a fabricated sequential funnel.</p></div><button type="button" class="primary" id="journeyBuildExisting">Build journey</button></div>'+
+        '<div class="actions" role="group" aria-label="Journey measurement window">'+[7,30,90].map(n=>'<button type="button" class="secondary" data-journey-days="'+n+'" aria-pressed="'+(n===days?'true':'false')+'">'+n+' days</button>').join('')+'</div>'+
+        '<div class="stats">'+metrics.map(([label,value])=>'<div class="stat"><strong>'+Number(value||0).toLocaleString()+'</strong><span>'+esc(label)+'</span></div>').join('')+'</div>'+
+        '<div class="stats"><div class="stat"><strong>'+pct(rates.campaign_conversion_pct)+'</strong><span>Campaign entry-cohort conversion</span></div><div class="stat"><strong>'+pct(rates.journey_completion_pct)+'</strong><span>Automation completion</span></div><div class="stat"><strong>'+pct(rates.journey_failure_pct)+'</strong><span>Automation failure</span></div></div>'+
+        '<div class="notice"><strong>Measurement boundaries:</strong><ul>'+((journey.measurement_notes||[]).map(note=>'<li>'+esc(note)+'</li>').join(''))+'</ul></div>';
+      $('#journeyBuildExisting',mount).onclick=()=>openAutomation(0);
+      $('[data-journey-days]',mount).forEach(button=>button.onclick=()=>renderJourneyIntelligence(Number(button.dataset.journeyDays)));
+    }catch(e){mount.textContent='Journey intelligence is unavailable. '+(e.message||'Please try again.');}
   }
   function segmentsHtml(){
     return '<section class="panel"><div class="panel-title"><div><h2>Dynamic fan segments</h2><p>Reusable audiences calculated from CRM consent, account state, tags, purchases, campaigns and activity.</p></div><button class="primary" id="newSegment" type="button">New segment</button></div>'+
