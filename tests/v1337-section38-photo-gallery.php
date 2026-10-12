@@ -49,6 +49,7 @@ ok38(str_contains($mediaCore,"'photo_gallery'"),'central Media Library accepts p
 ok38(str_contains($mediaCore,"['cover','photo']")&&str_contains($mediaCore,"category']??'')!=='image'"),'gallery Media Library relationships accept only image assets in cover/photo roles');
 ok38(str_contains($mediaCore,'Photo gallery not found.'),'Media Library refuses orphan gallery relationships');
 ok38(str_contains($mediaLinks,"entityType==='photo_gallery'")&&str_contains($mediaLinks,'sf_gallery_get((int)$entityId,true)'),'public media-links refuses draft/unready gallery media');
+ok38(str_contains($mediaLinks,"entityType==='video_feature'")&&str_contains($mediaLinks,'sf_video_get((int)$entityId,true)'),'shared public media-links preserves Video Hub draft/privacy boundary');
 ok38(str_contains($mediaApi,"'photo_gallery'=>['cover']"),'gallery cover publication uses the universal primary-media path');
 ok38(str_contains($mediaApi,"['video_feature','photo_gallery']")&&str_contains($mediaApi,'Changing governed public media visibility requires explicit Admin confirmation.'),'gallery public/download visibility is confirmation-governed');
 ok38(str_contains($mediaApi,'Photo gallery media role must be cover or photo.'),'Admin media API prevents arbitrary gallery roles');
