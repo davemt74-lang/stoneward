@@ -34,6 +34,7 @@ jobs:
       - name: Admin JavaScript syntax
         run: |
           node --check admin/assets/admin.js
+          node --check admin/assets/agent-actions.js
           node --check admin/assets/campaigns.js
           node --check admin/assets/media.js
           node --check admin/assets/products.js
@@ -117,3 +118,4 @@ jobs:
           php tests/section43j-release.php
           php tests/section44a-tool-registry.php
           php tests/section44b-reviewed-proposals.php
+          php tests/section44c-campaign-workbench.php
