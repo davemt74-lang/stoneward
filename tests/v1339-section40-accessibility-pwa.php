@@ -14,6 +14,7 @@ $version=(string)file_get_contents($root.'/version.php');
 $admin=(string)file_get_contents($root.'/admin/index.php');
 $mig=(string)file_get_contents($root.'/api/migrations.php');
 $wf=(string)file_get_contents($root.'/.github/workflows/release-gate.yml');
+$releaseNotes=(string)file_get_contents($root.'/RELEASE-NOTES.md');
 
 ok40(str_contains($manifest,"'name'=>'Stonefellow'")&&str_contains($manifest,"'short_name'=>'Stonefellow'"),'manifest identifies the single Stonefellow app');
 ok40(str_contains($manifest,"'start_url'=>'./'")&&str_contains($manifest,"'scope'=>'./'"),'manifest is subdirectory-safe');
@@ -68,5 +69,6 @@ ok40(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.32'")&&!str_contains($m
 ok40(str_contains($admin,"define('SF_ADMIN_BUILD','1.3.39')"),'Admin asset build stays synchronized');
 ok40(substr_count($admin,'data-view="')===29,'Section 40 adds no Admin sidebar item');
 ok40(str_contains($wf,'node --check assets/js/accessibility.js')&&str_contains($wf,'php tests/v1339-section40-accessibility-pwa.php'),'release gate certifies accessibility runtime and Section 40');
+ok40(!str_contains($releaseNotes,'NaN# Stonefellow'),'release notes contain no NaN/corruption artifact');
 
 echo "Stonefellow v1.3.39 Section 40 Accessibility, PWA & Mobile Resilience audit: PASS\n";
