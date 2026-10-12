@@ -30,7 +30,7 @@ function sf_personalization_favorites(int $userId): array {
     return $out;
 }
 function sf_personalization_record_progress(int $userId,string $trackId,string $eventType,int $position,int $duration): void {
-    sf_personalization_ensure_schema();if($userId<1||!isset(sf_track_map()[$trackId]))return;$position=max(0,$position);$duration=max(0,$duration);$completed=in_array($eventType,['complete','skip'],true)?1:0;$now=gmdate('c');$driver=(string)(sf_db_config()['driver']??'');
+    sf_personalization_ensure_schema();if(function_exists('sf_privacy_listening_history_enabled')&&!sf_privacy_listening_history_enabled($userId))return;if($userId<1||!isset(sf_track_map()[$trackId]))return;$position=max(0,$position);$duration=max(0,$duration);$completed=in_array($eventType,['complete','skip'],true)?1:0;$now=gmdate('c');$driver=(string)(sf_db_config()['driver']??'');
     if($driver==='sqlite')$sql="INSERT INTO user_listening_progress(user_id,track_id,position_seconds,duration_seconds,completed,last_event_type,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET position_seconds=excluded.position_seconds,duration_seconds=CASE WHEN excluded.duration_seconds>0 THEN excluded.duration_seconds ELSE user_listening_progress.duration_seconds END,completed=excluded.completed,last_event_type=excluded.last_event_type,updated_at=excluded.updated_at";
     else $sql="INSERT INTO user_listening_progress(user_id,track_id,position_seconds,duration_seconds,completed,last_event_type,updated_at) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE position_seconds=VALUES(position_seconds),duration_seconds=IF(VALUES(duration_seconds)>0,VALUES(duration_seconds),duration_seconds),completed=VALUES(completed),last_event_type=VALUES(last_event_type),updated_at=VALUES(updated_at)";
     sf_db()->prepare($sql)->execute([$userId,$trackId,$position,$duration,$completed,$eventType,$now]);
@@ -51,6 +51,7 @@ function sf_personalization_clear_history(int $userId): array {
 
 function sf_personalization_recommendation_profile(int $userId): array {
     sf_personalization_ensure_schema();sf_ops_ensure_schema();sf_playlists_ensure_schema();sf_listening_sessions_ensure_schema();
+    if(function_exists('sf_privacy_personalization_enabled')&&!sf_privacy_personalization_enabled($userId))return ['personalized'=>false,'signal_count'=>0,'favorite_count'=>0,'listening_event_count'=>0,'playlist_track_count'=>0,'seed_scores'=>[],'seen_counts'=>[],'favorite_track_ids'=>[],'favorite_release_ids'=>[],'moods'=>[],'themes'=>[],'releases'=>[],'feedback'=>[],'preferred_energy'=>null];
     $tracks=sf_track_map();$seed=[];$moods=[];$themes=[];$releases=[];$seen=[];$favoriteTrackIds=[];$favoriteReleaseIds=[];$favoriteCount=0;$listenCount=0;$playlistCount=0;$energyWeight=0.0;$energyTotal=0.0;
     $q=sf_db()->prepare('SELECT item_type,item_id FROM user_favorites WHERE user_id=?');$q->execute([$userId]);
     foreach($q->fetchAll() as $r){

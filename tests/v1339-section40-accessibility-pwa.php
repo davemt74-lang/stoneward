@@ -22,7 +22,7 @@ ok40(str_contains($manifest,"'display'=>'standalone'")&&str_contains($manifest,"
 ok40(str_contains($manifest,"stonefellow-pwa.svg")&&str_contains($manifest,"'purpose'=>'any maskable'"),'manifest includes an app-owned maskable fallback icon');
 ok40(str_contains($manifest,'sf_seo_https_url($appIcon)'),'configured app icon must be HTTPS before manifest exposure');
 
-ok40(str_contains($sw,"stonefellow-static-v1.3.39"),'service worker cache is release-versioned');
+$swBuild='0.0.0';if(preg_match("/stonefellow-static-v([0-9.]+)/",$sw,$sm))$swBuild=$sm[1];ok40(version_compare($swBuild,'1.3.39','>='),'service worker cache remains Section 40 compatible or newer');
 ok40(str_contains($sw,"SHELL=['offline.html','assets/css/site.css','assets/js/app.js','assets/js/library.js','assets/icons/stonefellow-pwa.svg']"),'offline precache contains public static shell only');
 ok40(!str_contains($sw,'config.js')&&!str_contains($sw,'catalog.js')&&!str_contains($sw,'releases.js'),'generated catalog/config data is not precached');
 ok40(!str_contains($sw,'/api/')&&!str_contains($sw,'/admin/'),'service worker has no API/Admin caching path');
@@ -41,7 +41,7 @@ ok40(str_contains($shell,'id="notificationDrawer"')&&str_contains($shell,'role="
 ok40(str_contains($shell,'id="queueDrawer"')&&str_contains($shell,'role="dialog" aria-modal="true" aria-labelledby="queueDrawerTitle"'),'queue drawer is a named modal dialog');
 ok40(str_contains($shell,'id="installAppButton"')&&str_contains($shell,'hidden>Install Stonefellow'),'install control is progressive and hidden until eligible');
 ok40(str_contains($shell,'assets/js/accessibility.js'),'accessibility/PWA runtime loads after the main app');
-ok40(str_contains($shell,"define('SF_BUILD', '1.3.39')"),'public shell advances to v1.3.39');
+$publicBuild40='0.0.0';if(preg_match("/define\\('SF_BUILD', '([^']+)'\\)/",$shell,$bm40))$publicBuild40=$bm40[1];ok40(version_compare($publicBuild40,'1.3.39','>='),'public shell remains Section 40 compatible or newer');
 
 ok40(str_contains($a11y,"e.key==='Escape'")&&str_contains($a11y,"e.key==='Tab'"),'accessibility runtime handles Escape and trapped Tab navigation');
 ok40(str_contains($a11y,'focusables(dialog)')&&str_contains($a11y,'lastOpener.focus()'),'modal focus is trapped and restored to the opener');
@@ -59,14 +59,14 @@ ok40(str_contains($css,'pointer:coarse')&&str_contains($css,'min-height:44px'),'
 ok40(str_contains($ht,'^manifest\.webmanifest$ manifest.php'),'Apache exposes canonical manifest URL');
 ok40(str_contains($ht,'<Files "service-worker.js">')&&str_contains($ht,'no-cache, no-store, must-revalidate'),'service worker itself is never served stale');
 ok40(!str_contains($ht,'Service-Worker-Allowed'),'service worker cannot expand beyond its default app-root scope');
-ok40(str_contains($ht,'X-Stonefellow-Build "1.3.39"'),'server build header advances to v1.3.39');
+ok40(preg_match('/X-Stonefellow-Build "([0-9.]+)"/',$ht,$hm40)&&version_compare($hm40[1],'1.3.39','>='),'server build header remains Section 40 compatible or newer');
 
-ok40(str_contains($version,"'stonefellow'=>'1.3.39'"),'version endpoint reports v1.3.39');
-ok40(str_contains($version,"'database_schema_target'=>'1.3.32'"),'Section 40 intentionally adds no database migration');
+$app40='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm40))$app40=$vm40[1];ok40(version_compare($app40,'1.3.39','>='),'version endpoint remains Section 40 compatible or newer');
+$schema40='0.0.0';if(preg_match("/'database_schema_target'=>'([^']+)'/",$version,$dm40))$schema40=$dm40[1];ok40(version_compare($schema40,'1.3.32','>='),'database schema remains Section 40 compatible or newer');
 ok40(str_contains($version,"'pwa_install'=>'dynamic-manifest-install-prompt-standalone-shell'"),'version endpoint advertises PWA install support');
 ok40(str_contains($version,"'accessibility_keyboard'=>'skip-link-dialog-focus-trap-escape-focus-return-aria-current'"),'version endpoint advertises keyboard accessibility support');
-ok40(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.32'")&&!str_contains($mig,"'app_version'=>'1.3.39'"),'migration target remains unchanged with no unnecessary Section 40 migration');
-ok40(str_contains($admin,"define('SF_ADMIN_BUILD','1.3.39')"),'Admin asset build stays synchronized');
+ok40(!str_contains($mig,"'app_version'=>'1.3.39'"),'Section 40 itself still introduced no unnecessary database migration');
+ok40(preg_match("/define\\('SF_ADMIN_BUILD','([^']+)'\\)/",$admin,$am40)&&version_compare($am40[1],'1.3.39','>='),'Admin asset build remains Section 40 compatible or newer');
 ok40(substr_count($admin,'data-view="')===29,'Section 40 adds no Admin sidebar item');
 ok40(str_contains($wf,'node --check assets/js/accessibility.js')&&str_contains($wf,'php tests/v1339-section40-accessibility-pwa.php'),'release gate certifies accessibility runtime and Section 40');
 ok40(!str_contains($releaseNotes,'NaN# Stonefellow'),'release notes contain no NaN/corruption artifact');

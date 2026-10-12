@@ -100,3 +100,4 @@ jobs:
           php tests/v1337-section38-photo-gallery.php
           php tests/v1338-section39-public-search.php
           php tests/v1339-section40-accessibility-pwa.php
+          php tests/v1340-section41-account-privacy.php
