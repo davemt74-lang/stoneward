@@ -77,7 +77,7 @@ ok38(str_contains($css,'.photo-gallery-grid')&&str_contains($css,'.photo-lightbo
 
 $build38='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$b38))$build38=$b38[1];ok38(version_compare($build38,'1.3.37','>=')&&str_contains($shell,'href="photos" data-view="photos"'),'public shell remains Section 38 compatible and exposes Photos navigation');
 ok38(str_contains($shell,"'video','photo','track'")&&str_contains($shell,"\$publicInitialViews[]='photos'"),'server pretty-route handoff recognizes Photo detail and appends the Photos hub');
-$serverBuild38='0.0.0';if(preg_match('/X-Stonefellow-Build "([^"]+)"/',$ht,$hb38))$serverBuild38=$hb38[1];ok38(str_contains($ht,'^photos/([A-Za-z0-9_-]+)')&&str_contains($ht,'^photos/?
+$serverBuild38='0.0.0';if(preg_match('/X-Stonefellow-Build "([^"]+)"/',$ht,$hb38))$serverBuild38=$hb38[1];ok38(str_contains($ht,'^photos/([A-Za-z0-9_-]+)')&&str_contains($ht,'^photos/?$')&&version_compare($serverBuild38,'1.3.37','>='),'web server preserves gallery routes on Section 38-compatible build or newer');
 
 ok38(str_contains($seo,"\$view==='photo'")&&str_contains($seo,"'@type'=>'ImageGallery'")&&str_contains($seo,"'@type'=>'ImageObject'"),'gallery detail emits ImageGallery/ImageObject structured data');
 ok38(str_contains($seo,"'photos'=>'Photos'")&&str_contains($seo,"'photos'=>'0.7'"),'Photos hub has route metadata and sitemap priority');
