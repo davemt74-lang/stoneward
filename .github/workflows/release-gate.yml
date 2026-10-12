@@ -131,3 +131,4 @@ jobs:
           php tests/section45a-lifecycle-safety.php
           php tests/section45b-journey-metrics.php
           php tests/section45c-journey-builder.php
+          php tests/section45d-outreach-consent.php
