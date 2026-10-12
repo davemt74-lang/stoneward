@@ -46,6 +46,23 @@ const searchPanel=(c,s)=>{
   </section>`;
 };
 
+const siteSearchPanel=(c,s)=>{
+  const queries=s.top_queries||[],results=s.top_results||[],types=s.type_usage||[];
+  return `<section class="panel search-analytics-panel site-search-analytics-panel"><div class="panel-title"><div><h2>Site-wide search</h2><p>Public discovery across music, shows, stories, videos, photos, store products and active offers.</p></div></div>
+    <div class="stats search-analytics-stats">
+      <div class="stat"><strong>${Number(s.searches||0)}</strong><span>Site searches</span></div>
+      <div class="stat"><strong>${Number(s.click_through_rate||0)}%</strong><span>Click-through rate</span></div>
+      <div class="stat"><strong>${Number(s.zero_result_rate||0)}%</strong><span>Zero-result rate</span></div>
+      <div class="stat"><strong>${Number(s.identified_users||0)}</strong><span>Identified users</span></div>
+    </div>
+    <div class="analytics-two-col">
+      <div><h3>Top public queries</h3>${queries.length?`<div class="source-list">${queries.slice(0,10).map(x=>`<div><span>${c.esc(x.query||'')}</span><strong>${Number(x.searches||0)} searches</strong><em>${Number(x.zero_results||0)} zero</em></div>`).join('')}</div>`:'<div class="empty">No site-wide searches yet.</div>'}</div>
+      <div><h3>Most selected public results</h3>${results.length?`<div class="source-list">${results.slice(0,10).map(x=>`<div><span>${c.esc(x.title||x.id||'')}</span><strong>${Number(x.clicks||0)} clicks</strong><em>${c.esc(x.type||'result')}</em></div>`).join('')}</div>`:'<div class="empty">No selected site-search results yet.</div>'}</div>
+    </div>
+    <div><h3>Search category usage</h3>${types.length?`<div class="source-list">${types.slice(0,10).map(x=>`<div><span>${c.esc(String(x.type||'all').replaceAll('_',' '))}</span><strong>${Number(x.uses||0)}</strong><em>searches</em></div>`).join('')}</div>`:'<div class="empty">No site-search category filters used yet.</div>'}</div>
+  </section>`;
+};
+
 const libraryPanel=(c,l)=>{
   const tracks=l.top_tracks||[],releases=l.top_releases||[];
   return `<section class="panel library-analytics-panel"><div class="panel-title"><div><h2>Customer libraries</h2><p>Saved music, playlists, owned media, builds, and mixed Collections</p></div></div>
@@ -64,13 +81,13 @@ const libraryPanel=(c,l)=>{
 };
 
 const inspector=(c,sel)=>{
-  const u=sel.user||{},a=sel.analytics||{},n=sel.notification_analytics||{},search=sel.search_analytics||{},libraryStats=sel.library_analytics||{},library=sel.library||{},h=sel.history||[],activity=sel.activity||[],brain=sel.brain||[],fav=sel.favorites||{},pl=sel.playlists||[],builds=sel.builds||[],orders=sel.orders||[],cv=a.conversion||{};
+  const u=sel.user||{},a=sel.analytics||{},n=sel.notification_analytics||{},search=sel.search_analytics||{},siteSearch=sel.site_search_analytics||{},libraryStats=sel.library_analytics||{},library=sel.library||{},h=sel.history||[],activity=sel.activity||[],brain=sel.brain||[],fav=sel.favorites||{},pl=sel.playlists||[],builds=sel.builds||[],orders=sel.orders||[],cv=a.conversion||{};
   return `<section class="panel user-inspector"><div class="panel-title"><div><h2>${c.esc(u.display_name||u.email||'Customer')}</h2><p>${c.esc(u.email||'')} · joined ${c.esc(String(u.created_at||'').slice(0,10))}</p></div><button class="secondary" data-analytics-user="0" type="button">Close inspector</button></div>
     <div class="stats analytics-user-stats"><div class="stat"><strong>${Number(a.starts||0)}</strong><span>Starts</span></div><div class="stat"><strong>${Number(a.repeat_starts||0)}</strong><span>Repeat</span></div><div class="stat"><strong>${Number(a.completion_rate||0)}%</strong><span>Completion</span></div><div class="stat"><strong>${Number(a.skip_rate||0)}%</strong><span>Skip rate</span></div></div>
     <div class="analytics-commerce-strip"><div><span>Favorites</span><strong>${Number(a.favorites_added||0)}</strong></div><div><span>Playlists</span><strong>${Number(a.playlists_created||0)}</strong></div><div><span>Saved builds</span><strong>${Number(a.builds_created||0)}</strong></div><div><span>Paid orders</span><strong>${Number(a.paid_orders||0)}</strong></div><div><span>Revenue</span><strong>${c.money(a.revenue_cents||0)}</strong></div></div>
     <div class="conversion-grid compact">${funnel(c,'Favorite',cv.favorite_users,cv.favorite_rate)}${funnel(c,'Playlist',cv.playlist_users,cv.playlist_rate)}${funnel(c,'Saved build',cv.build_users,cv.build_rate)}${funnel(c,'Purchase',cv.purchase_users,cv.purchase_rate)}${funnel(c,'Custom media',cv.custom_media_users,cv.custom_media_rate)}</div>
     <div class="notification-user-summary"><strong>Notifications:</strong> ${Number(n.delivered||0)} delivered · ${Number(n.clicks||0)} clicked · ${Number(n.listen_conversions||0)} listen conversions · ${Number(n.purchase_conversions||0)} purchase conversions</div>
-    <div class="notification-user-summary search-user-summary"><strong>Search:</strong> ${Number(search.searches||0)} searches · ${Number(search.clicks||0)} result clicks · ${Number(search.click_through_rate||0)}% CTR · ${Number(search.zero_result_searches||0)} zero-result searches</div>
+    <div class="notification-user-summary search-user-summary"><strong>Search:</strong> ${Number(search.searches||0)} catalog searches · ${Number(search.clicks||0)} result clicks · ${Number(search.click_through_rate||0)}% CTR · ${Number(search.zero_result_searches||0)} zero-result searches</div><div class="notification-user-summary search-user-summary"><strong>Site search:</strong> ${Number(siteSearch.searches||0)} searches · ${Number(siteSearch.clicks||0)} result clicks · ${Number(siteSearch.click_through_rate||0)}% CTR · ${Number(siteSearch.zero_result_searches||0)} zero-result searches</div>
     <div class="notification-user-summary library-user-summary"><strong>My Library:</strong> ${Number(library.summary?.tracks||0)} tracks · ${Number(library.summary?.releases||0)} releases · ${Number(library.summary?.playlists||0)} playlists · ${Number(library.summary?.purchases||0)} owned items · ${Number(libraryStats.collections||0)} collections</div>
     ${(library.collections||[]).length?`<div class="admin-library-collections">${library.collections.slice(0,8).map(x=>`<div><strong>${c.esc(x.name)}</strong><span>${Number(x.item_count||0)} items</span></div>`).join('')}</div>`:''}
     <div class="analytics-detail-grid">
@@ -132,12 +149,13 @@ async function render(c,userId=0){
   try{
     const days=Number($('#analyticsDays')?.value||30),j=await api('analytics.php?days='+days+(userId?'&user_id='+userId:''));
     app.analytics=j;
-    const a=j.overall||{},growth=j.growth||{},tracks=a.tracks||[],users=j.users||[],daily=a.daily||[],sel=j.selected,cv=a.conversion||{},sources=a.sources||[],notifications=j.notification_analytics||{},search=j.search_analytics||{},library=j.library_analytics||{};
+    const a=j.overall||{},growth=j.growth||{},tracks=a.tracks||[],users=j.users||[],daily=a.daily||[],sel=j.selected,cv=a.conversion||{},sources=a.sources||[],notifications=j.notification_analytics||{},search=j.search_analytics||{},siteSearch=j.site_search_analytics||{},library=j.library_analytics||{};
     canvas.innerHTML=head('BUSINESS + FAN INTELLIGENCE','Performance Intelligence','Recorded revenue, fan growth, campaign attribution, merch, membership, tickets, lifecycle automation, customer care, and listening quality.',`<select id="analyticsDays" class="table-input"><option value="7" ${days===7?'selected':''}>7 days</option><option value="30" ${days===30?'selected':''}>30 days</option><option value="90" ${days===90?'selected':''}>90 days</option><option value="365" ${days===365?'selected':''}>1 year</option></select>`)+
     `<div class="stats analytics-primary-stats"><div class="stat"><strong>${Number(a.starts||0).toLocaleString()}</strong><span>Listens started</span></div><div class="stat"><strong>${Number(a.completion_rate||0)}%</strong><span>Completion rate</span></div><div class="stat"><strong>${Number(a.skip_rate||0)}%</strong><span>Skip rate</span></div><div class="stat"><strong>${Number(a.repeat_rate||0)}%</strong><span>Repeat rate</span></div></div>
     <section class="panel"><div class="panel-title"><h2>Listener conversion</h2><p>Actions after first listen inside this ${days}-day window</p></div><div class="conversion-grid">${funnel(c,'Favorite',cv.favorite_users,cv.favorite_rate)}${funnel(c,'Playlist',cv.playlist_users,cv.playlist_rate)}${funnel(c,'Saved build',cv.build_users,cv.build_rate)}${funnel(c,'Purchase',cv.purchase_users,cv.purchase_rate)}${funnel(c,'Custom media',cv.custom_media_users,cv.custom_media_rate)}</div><div class="analytics-commerce-strip"><div><span>Paid orders</span><strong>${Number(a.paid_orders||0)}</strong></div><div><span>Revenue</span><strong>${money(a.revenue_cents||0)}</strong></div><div><span>Favorites added</span><strong>${Number(a.favorites_added||0)}</strong></div><div><span>Playlists created</span><strong>${Number(a.playlists_created||0)}</strong></div><div><span>Builds created</span><strong>${Number(a.builds_created||0)}</strong></div></div></section>
     ${notificationPanel(c,notifications)}
     ${searchPanel(c,search)}
+    ${siteSearchPanel(c,siteSearch)}
     ${libraryPanel(c,library)}
     <section class="panel"><div class="panel-title"><h2>Listening quality</h2><p>Starts / completions / skips by day</p></div><div class="analytics-legend"><span><i class="start"></i>Starts</span><span><i class="complete"></i>Completed</span><span><i class="skip"></i>Skipped</span></div>${trend(c,daily)}</section>
     <div class="analytics-two-col"><section class="panel"><div class="panel-title"><h2>Playback sources</h2><p>Where listening starts</p></div>${sources.length?`<div class="source-list">${sources.map(x=>`<div><span>${esc(String(x.source||'player').replaceAll('_',' '))}</span><strong>${Number(x.starts||0)}</strong><em>${Number(x.percent||0)}%</em></div>`).join('')}</div>`:'<div class="empty">No playback sources yet.</div>'}</section><section class="panel"><div class="panel-title"><h2>Engagement totals</h2><p>${days}-day window</p></div><div class="engagement-grid"><div><strong>${Number(a.repeat_starts||0)}</strong><span>Repeat starts</span></div><div><strong>${Number(a.repeat_listeners||0)}</strong><span>Repeat listeners</span></div><div><strong>${Number(a.sessions||0)}</strong><span>Sessions</span></div><div><strong>${Number(a.listeners||0)}</strong><span>Identified listeners</span></div></div></section></div>
