@@ -1,4 +1,4 @@
-const CACHE='stonefellow-static-v1.3.41';
+const CACHE='stonefellow-static-v1.3.42';
 const SHELL=['offline.html','assets/css/site.css','assets/js/app.js','assets/js/library.js','assets/icons/stonefellow-pwa.svg'];
 const scope=()=>self.registration.scope;
 const abs=p=>new URL(p,scope()).href;

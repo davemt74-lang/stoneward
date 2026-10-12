@@ -1,3 +1,11 @@
+# Stonefellow v1.3.42 — Section 43: Agent Intelligence & Fan Engagement
+
+Stonefellow's existing single-artist Agent now has stricter public music discovery, consent-aware recommendations and proactive engagement, fan-requested favorites actions, role-gated aggregate administrator campaign briefings, validated ElevenLabs voice delivery, protected Agent Brain diagnostics, and bounded client routing state. Existing OpenAI/Claude/JEV routing, voice UX, persistent player and Agent Brain are retained.
+
+No new database tables or migration. Database schema target: **1.3.33**. See [Section 43 acceptance and tool inventory](docs/section43-agent-acceptance.md).
+
+---
+
 # Stonefellow v1.3.41 — Section 42: Production Readiness & Operational Hardening
 
 Stonefellow adds administrator-only read-only operational health diagnostics, verified backups before database migrations, upgrade failure/recovery visibility, safe browser error reporting, and release-gated deployment ZIPs with SHA-256 checksums. All Section 42 tests are included in the full release gate. Database target remains **1.3.33**; no schema migration is required. See `docs/section42-operations-acceptance.md`.
