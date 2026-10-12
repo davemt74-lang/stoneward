@@ -410,6 +410,48 @@ function sf_upgrade_backup_mysql(): array {
 function sf_upgrade_backup_database(): array {
     return sf_migration_driver()==='sqlite'?sf_upgrade_backup_sqlite():sf_upgrade_backup_mysql();
 }
+/**
+ * Section 42B: verify an upgrade backup before any migrations run.
+ * This never restores data or sends backup contents to a client.
+ */
+function sf_upgrade_verify_backup(array $backup): array {
+    $relative=(string)($backup['file']??'');
+    $driver=(string)($backup['driver']??'');
+    if(!preg_match('~^storage/backups/stonefellow-pre-upgrade-[0-9]{8}-[0-9]{6}\\.(sqlite|sql)$~D',$relative)) {
+        throw new RuntimeException('Backup file identity is invalid.');
+    }
+    if(!in_array($driver,['sqlite','mysql'],true))throw new RuntimeException('Backup database driver is invalid.');
+    $suffix=$driver==='sqlite'?'.sqlite':'.sql';
+    if(!str_ends_with($relative,$suffix))throw new RuntimeException('Backup format is invalid.');
+    $root=realpath(SF_ROOT.'/storage/backups');
+    $file=realpath(SF_ROOT.'/'.$relative);
+    if($root===false||$file===false||!str_starts_with($file,$root.DIRECTORY_SEPARATOR)||!is_file($file)) {
+        throw new RuntimeException('Backup file could not be verified.');
+    }
+    $size=(int)filesize($file);
+    if($size<256)throw new RuntimeException('Backup is unexpectedly small.');
+    $hash=hash_file('sha256',$file);
+    if(!is_string($hash)||strlen($hash)!==64)throw new RuntimeException('Backup checksum could not be computed.');
+    if($driver==='sqlite'){
+        $check=new PDO('sqlite:'.$file);
+        $check->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
+        $result=$check->query('PRAGMA quick_check')->fetchColumn();
+        if($result!=='ok')throw new RuntimeException('SQLite backup integrity verification failed.');
+    }else{
+        $fh=fopen($file,'rb');
+        if($fh===false)throw new RuntimeException('SQL backup cannot be read.');
+        try {
+            $prefix=(string)fread($fh,256);
+            fseek($fh,max(0,$size-512));
+            $tail=(string)stream_get_contents($fh);
+        }finally{fclose($fh);}
+        if(!str_starts_with($prefix,'-- Stonefellow database backup')||!str_contains($prefix,'SET FOREIGN_KEY_CHECKS=0;')||!str_contains($tail,'SET FOREIGN_KEY_CHECKS=1;')) {
+            throw new RuntimeException('SQL backup appears incomplete.');
+        }
+    }
+    return ['verified'=>true,'bytes'=>$size,'sha256'=>$hash,'driver'=>$driver];
+}
+
 function sf_migration_apply_one(array $m): array {
     $pdo=sf_db();$driver=sf_migration_driver();$start=microtime(true);$tx=false;
     try{

@@ -1,0 +1,27 @@
+name: Section 42 backup integrity
+on:
+  pull_request:
+    paths:
+      - 'api/migrations.php'
+      - 'upgrade.php'
+      - 'tests/section42-backup-validation.php'
+      - '.github/workflows/section42-backup-validation.yml'
+  push:
+    paths:
+      - 'api/migrations.php'
+      - 'upgrade.php'
+      - 'tests/section42-backup-validation.php'
+      - '.github/workflows/section42-backup-validation.yml'
+jobs:
+  backup-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax
+        run: |
+          php -l api/migrations.php
+          php -l upgrade.php
+          php -l tests/section42-backup-validation.php
+      - name: Backup integrity regression
+        run: php tests/section42-backup-validation.php

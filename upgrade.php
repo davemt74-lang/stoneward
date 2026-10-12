@@ -70,6 +70,7 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'&&$fatal===''){
                     $preflight=sf_migration_core_preflight();
                     if(!$preflight['ok'])throw new RuntimeException('Preflight failed: '.implode(' ',(array)$preflight['errors']));
                     $backup=sf_upgrade_backup_database();
+                    $backupVerification=sf_upgrade_verify_backup($backup);
                     $runResult=sf_migration_run_all((int)$admin['id'],(string)$backup['file']);
                     $integrity=sf_migration_integrity_report();
                     if(!$integrity['ok'])throw new RuntimeException('Migrations completed, but final database integrity verification found missing schema items.');
