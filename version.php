@@ -96,7 +96,7 @@ echo json_encode([
   'accessibility_keyboard'=>'skip-link-dialog-focus-trap-escape-focus-return-aria-current',
   'accessibility_motion'=>'reduced-motion-forced-colors-coarse-pointer-touch-targets',
   'responsive_media'=>'media-library-320-800-1600-srcset-lazy-priority',
-  'public_media_cache'=>'uuid-etag-immutable-public-admin-no-store',
+  'public_media_cache'=>'uuid-etag-hourly-revalidation-public-admin-no-store',
   'core_web_vitals'=>'lcp-cls-inp-fcp-ttfb-p75-privacy-bounded',
   'performance_intelligence'=>'core-web-vitals-growth-dashboard-agent-brief',
   'launch_templates'=>'single-album-show-campaign-custom',
