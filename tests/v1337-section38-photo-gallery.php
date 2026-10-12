@@ -94,7 +94,6 @@ ok38(str_contains($version,"'photo_gallery'=>'single-artist-public-gallery-manag
 ok38(str_contains($wf,'node --check admin/assets/gallery.js')&&str_contains($wf,'php tests/v1337-section38-photo-gallery.php'),'release gate includes Gallery Admin JS and Section 38 suite');
 
 echo "Stonefellow v1.3.37 Section 38 Photo Gallery & Visual Archive audit: PASS\n";
-)&&version_compare($serverBuild38,'1.3.37','>='),'web server preserves gallery routes on Section 38-compatible build or newer');
 
 ok38(str_contains($seo,"\$view==='photo'")&&str_contains($seo,"'@type'=>'ImageGallery'")&&str_contains($seo,"'@type'=>'ImageObject'"),'gallery detail emits ImageGallery/ImageObject structured data');
 ok38(str_contains($seo,"'photos'=>'Photos'")&&str_contains($seo,"'photos'=>'0.7'"),'Photos hub has route metadata and sitemap priority');
