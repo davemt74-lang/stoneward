@@ -160,6 +160,7 @@ require_once __DIR__ . '/ticketing-core.php';
 require_once __DIR__ . '/fulfillment-core.php';
 require_once __DIR__ . '/operating-calendar-core.php';
 require_once __DIR__ . '/automation-core.php';
+require_once __DIR__ . '/privacy-core.php';
 require_once __DIR__ . '/personalization-core.php';
 require_once __DIR__ . '/playlists-core.php';
 require_once __DIR__ . '/listening-sessions-core.php';
