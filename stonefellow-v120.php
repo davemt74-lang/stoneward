@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.39');
+define('SF_BUILD', '1.3.40');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -36,6 +36,8 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
+<?php if(!empty($siteSettings['artist_homepage_enabled'])&&!empty($siteSettings['media_hero'])): ?>  <link rel="preload" as="image" href="<?=sf_h((string)$siteSettings['media_hero'])?>" fetchpriority="high">
+<?php endif; ?>
   <link rel="apple-touch-icon" href="<?=sf_h(!empty($siteSettings['media_app_icon'])?$siteSettings['media_app_icon']:'assets/icons/stonefellow-pwa.svg')?>">
 <?php if($themeMeta['mode']==='system'): ?>  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="<?=sf_h($themeMeta['dark'])?>">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="<?=sf_h($themeMeta['light'])?>">
@@ -231,6 +233,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/releases.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/library.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/performance.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/accessibility.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
 </body>
 </html>
