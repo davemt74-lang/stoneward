@@ -130,3 +130,4 @@ jobs:
           php tests/section44j-release.php
           php tests/section45a-lifecycle-safety.php
           php tests/section45b-journey-metrics.php
+          php tests/section45c-journey-builder.php
