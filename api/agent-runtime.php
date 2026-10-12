@@ -145,6 +145,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(campaign|offer|free download|free song|discount|vip|exclusive|presale|early access)\b/',$q))return 'campaign_offer';
     if(preg_match('/\b(merch|merchandise|shop|store)\b/',$q))return 'store_browse';
     if(preg_match('/am i (?:on|subscribed)|my newsletter|my fan profile|fan status/',$q))return 'fan_profile';
+    if(preg_match('/\b(search|find)\b.*\b(stonefellow|site|everything|anything|stories?|videos?|photos?|galleries|shows?|merch|products?|offers?)\b|\bsearch (?:the )?(?:whole )?(?:site|stonefellow)\b/',$q))return 'site_search';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/\b(where is my order|order status|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
@@ -208,6 +209,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'player_pause':$action=['type'=>'pause_player'];$text='Paused.';break;
         case 'player_next':$action=['type'=>'next_track'];$text='Next track.';break;
         case 'player_previous':$action=['type'=>'previous_track'];$text='Going back one track.';break;
+        case 'site_search':
+            $query=sf_search_extract_intent_query($message);$search=sf_site_search(['q'=>$query,'limit'=>8]);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_site_search','query'=>$query,'result_type'=>'all'];$text=$count>0?'I found '.$count.' public Stonefellow result'.($count===1?'':'s').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open site search.":"I didn’t find a public Stonefellow match, but I’ll open site search with suggestions.";$profile='catalog';break;
         case 'catalog_search':
             $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
@@ -295,6 +298,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'queue_play_next'=>'Asks to make a named/current track play next.',
         'queue_remove'=>'Asks to remove a named/current track from Up Next.',
         'queue_clear'=>'Asks to clear the Up Next queue.',
+        'site_search'=>'Asks to search across the public Stonefellow site, including music, shows, stories, videos, photos, merch or offers.',
         'catalog_search'=>'Asks to find/search Stonefellow tracks or releases by title, mood, theme, lyric, credit, story, or other catalog clue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
         'community_browse'=>'Asks to open or browse the Stonefellow fan community or community posts.',

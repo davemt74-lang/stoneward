@@ -147,7 +147,7 @@ function sf_search_suggestions(string $query,int $limit=8): array {
     usort($rows,fn($a,$b)=>($a['distance']<=>$b['distance'])?:strlen($a['value'])<=>strlen($b['value']));return array_slice(array_column($rows,'value'),0,max(1,min(12,$limit)));
 }
 function sf_search_session_hash(string $sessionKey,?int $userId=null): string {
-    $sessionKey=trim($sessionKey);if($userId&&$userId>0)return hash('sha256','user|'.$userId.'|'.substr($sessionKey,0,160));
+    if($userId&&$userId>0)return hash('sha256','user|'.$userId);
     return hash('sha256','guest|'.sf_auth_ip_hash());
 }
 function sf_search_event_allowed(string $sessionHash): bool {
@@ -162,11 +162,11 @@ function sf_search_recent_for_user(int $userId,int $limit=8): array {
     sf_search_ensure_schema();$limit=max(1,min(30,$limit));$q=sf_db()->prepare("SELECT query_text,normalized_query,MAX(created_at) AS last_at,COUNT(*) AS uses FROM catalog_search_events WHERE user_id=? AND event_type='search' AND normalized_query<>'' GROUP BY query_text,normalized_query ORDER BY last_at DESC LIMIT ".$limit);$q->execute([$userId]);return $q->fetchAll();
 }
 function sf_search_clear_user_history(int $userId): int {
-    sf_search_ensure_schema();$q=sf_db()->prepare('DELETE FROM catalog_search_events WHERE user_id=?');$q->execute([$userId]);return $q->rowCount();
+    sf_search_ensure_schema();$q=sf_db()->prepare("DELETE FROM catalog_search_events WHERE user_id=? AND event_type IN ('search','click','clear')");$q->execute([$userId]);return $q->rowCount();
 }
 function sf_search_analytics(int $days=30,?int $userId=null): array {
     sf_search_ensure_schema();$days=max(1,min(3650,$days));$since=gmdate('c',time()-$days*86400);$args=[$since];$where='created_at>=?';if($userId!==null){$where.=' AND user_id=?';$args[]=$userId;}
-    $q=sf_db()->prepare("SELECT id,user_id,event_type,query_text,normalized_query,result_count,result_type,result_id,filters_json,created_at FROM catalog_search_events WHERE $where ORDER BY id ASC");$q->execute($args);$rows=$q->fetchAll();
+    $where.=" AND event_type IN ('search','click','clear')";$q=sf_db()->prepare("SELECT id,user_id,event_type,query_text,normalized_query,result_count,result_type,result_id,filters_json,created_at FROM catalog_search_events WHERE $where ORDER BY id ASC");$q->execute($args);$rows=$q->fetchAll();
     $searches=0;$clicks=0;$zero=0;$sessions=[];$users=[];$queries=[];$zeroQueries=[];$selected=[];$filters=[];$recent=[];
     foreach($rows as $r){$ev=(string)$r['event_type'];$sessions[(string)$r['user_id'].'|'.(string)$r['id']]=true;if((int)$r['user_id']>0)$users[(int)$r['user_id']]=true;
         if($ev==='search'){$searches++;$n=(string)$r['normalized_query'];if((int)$r['result_count']===0){$zero++;if($n!=='')$zeroQueries[$n]=($zeroQueries[$n]??0)+1;}if($n!==''){$queries[$n]??=['query'=>(string)$r['query_text'],'searches'=>0,'zero_results'=>0];$queries[$n]['searches']++;if((int)$r['result_count']===0)$queries[$n]['zero_results']++;}$fj=json_decode((string)$r['filters_json'],true);if(is_array($fj))foreach($fj as $k=>$v)if($v!==''&&$v!==0&&$v!=='all'&&$v!=='relevance')$filters[$k.'='.strval($v)]=($filters[$k.'='.strval($v)]??0)+1;
@@ -176,4 +176,104 @@ function sf_search_analytics(int $days=30,?int $userId=null): array {
     $selectedRows=[];$trackMap=sf_track_map();$releaseMap=sf_release_map();foreach(array_slice($selected,0,15,true) as $key=>$count){[$type,$id]=array_pad(explode(':',$key,2),2,'');$title=$type==='track'?(string)($trackMap[$id]['title']??$id):(string)($releaseMap[$id]['title']??$id);$selectedRows[]=['type'=>$type,'id'=>$id,'title'=>$title,'clicks'=>$count];}
     foreach(array_slice(array_reverse($rows),0,25) as $r)$recent[]=$r;
     return ['days'=>$days,'searches'=>$searches,'clicks'=>$clicks,'click_through_rate'=>sf_analytics_percent($clicks,$searches),'zero_result_searches'=>$zero,'zero_result_rate'=>sf_analytics_percent($zero,$searches),'identified_users'=>count($users),'top_queries'=>array_slice(array_values($queries),0,15),'zero_result_queries'=>array_slice(array_map(fn($q,$c)=>['query'=>$q,'count'=>$c],array_keys($zeroQueries),array_values($zeroQueries)),0,15),'top_results'=>$selectedRows,'filter_usage'=>array_slice(array_map(fn($k,$c)=>['filter'=>$k,'uses'=>$c],array_keys($filters),array_values($filters)),0,15),'recent'=>$recent];
+}
+
+
+/* Section 39 — unified public Stonefellow search.
+ * This extends the Section 12 search primitives and telemetry table without
+ * changing sf_catalog_search() or its catalog-only analytics contract.
+ */
+function sf_site_search_types(): array { return ['all','track','release','show','story','video','photo','product','campaign']; }
+function sf_site_search_params(array $raw): array {
+    $type=(string)($raw['type']??'all');if(!in_array($type,sf_site_search_types(),true))$type='all';
+    return ['q'=>sf_clean_text((string)($raw['q']??''),300),'type'=>$type,'limit'=>max(1,min(60,(int)($raw['limit']??30)))];
+}
+function sf_site_search_image_from_media(array $media,array $roles=[]): string {
+    foreach($roles as $role)foreach($media as $m)if(($m['role']??'')===$role&&($m['category']??'')==='image')return (string)($m['thumb_url']??$m['url']??'');
+    foreach($media as $m)if(($m['category']??'')==='image')return (string)($m['thumb_url']??$m['url']??'');return '';
+}
+function sf_site_search_add(array &$rows,string $query,string $type,string $id,string $slug,string $title,string $subtitle,string $snippet,string $image,string $url,array $fields,array $extra=[]): void {
+    if($id===''||$title==='')return;$match=sf_search_score_document($query,array_merge(['title'=>$title,'release'=>'','description'=>$snippet],$fields));if($query!==''&&$match['score']<=0)return;
+    $rows[]=array_merge(['type'=>$type,'id'=>$id,'slug'=>$slug,'title'=>$title,'subtitle'=>$subtitle,'snippet'=>sf_clean_text(preg_replace('/\s+/u',' ',strip_tags($snippet))??$snippet,500),'image'=>$image,'url'=>$url,'score'=>(float)$match['score'],'reason'=>$match['reason']?:ucfirst($type).' match'],$extra);
+}
+function sf_site_search_public_track_fields(array $t): array {
+    $songbook=function_exists('sf_songbook_get')?sf_songbook_get((string)($t['id']??''),true):null;
+    return [
+      'title'=>(string)($t['title']??''),
+      'release'=>(string)($t['release']??''),
+      'story'=>(string)($t['story']??''),
+      'mood'=>array_values(array_filter(array_map('strval',(array)($t['mood']??[])))),
+      'themes'=>array_values(array_filter(array_map('strval',(array)($t['themes']??[])))),
+      'credits'=>array_values(array_filter(array_map('strval',(array)($t['credits']??[])))),
+      'lyrics'=>$songbook?(string)($t['lyrics']??''):'',
+    ];
+}
+function sf_site_search_public_tracks(string $query,array &$rows): void {
+    if(!function_exists('sf_seo_public_track'))return;
+    foreach(sf_catalog() as $t){$id=(string)($t['id']??'');if($id===''||!sf_seo_public_track($id))continue;$media=function_exists('sf_media_public_links')?sf_media_public_links('track',$id):[];$image=sf_site_search_image_from_media($media,['primary_artwork','artwork']);$fields=sf_site_search_public_track_fields($t);sf_site_search_add($rows,$query,'track',$id,'',(string)($t['title']??$id),(string)($t['release']??''),(string)($t['story']??''),$image,'track/'.rawurlencode($id),$fields,['duration'=>(int)($t['duration']??0)]);}
+}
+function sf_site_search_public_releases(string $query,array &$rows): void {
+    if(!function_exists('sf_seo_public_release'))return;$trackMap=sf_track_map();
+    foreach(sf_release_rows() as $r){$id=(string)($r['id']??'');$pub=$id!==''?sf_seo_public_release($id):null;if(!$pub)continue;$media=function_exists('sf_media_public_links')?sf_media_public_links('release',$id):[];$image=sf_site_search_image_from_media($media,['cover']);$fields=sf_search_release_fields($r,$trackMap);unset($fields['notes'],$fields['archive']);sf_site_search_add($rows,$query,'release',$id,'',(string)($r['title']??$id),trim(implode(' · ',array_filter([(string)($r['type']??''),(string)($r['release_date']??'')]))),(string)($r['description']??''),$image,'release/'.rawurlencode($id),$fields);}
+}
+function sf_site_search_public_shows(string $query,array &$rows): void {
+    if(!function_exists('sf_live_public_shows'))return;
+    foreach(sf_live_public_shows() as $s){$id=(string)($s['id']??'');if($id==='')continue;$media=function_exists('sf_media_public_links')?sf_media_public_links('show',$id):[];$image=sf_site_search_image_from_media($media,['poster']);$loc=function_exists('sf_live_location')?sf_live_location($s):'';$summary=function_exists('sf_live_summary')?sf_live_summary($s,sf_track_map()):implode(' ',array_filter([(string)($s['venue']??''),$loc,(string)($s['tour']??''),(string)($s['archive_notes']??'')]));sf_site_search_add($rows,$query,'show',$id,'',(string)($s['title']??$s['venue']??'Stonefellow live'),trim(implode(' · ',array_filter([(string)($s['date']??''),(string)($s['venue']??''),$loc]))),$summary,$image,'show/'.rawurlencode($id),['description'=>$summary,'metadata'=>[(string)($s['venue']??''),$loc,(string)($s['tour']??''),(string)($s['era']??'')]]);}
+}
+function sf_site_search_public_stories(string $query,array &$rows): void {
+    if(!function_exists('sf_story_list'))return;
+    foreach(sf_story_list(true,'',500) as $s){$id=(string)($s['id']??'');$slug=(string)($s['slug']??'');if($id===''||$slug==='')continue;$media=(array)($s['media']??[]);$image=sf_site_search_image_from_media($media,['hero']);$entity=(array)($s['entity']??[]);$subtitle=trim(implode(' · ',array_filter([ucwords(str_replace('_',' ',(string)($s['entry_type']??'story'))),(string)($s['event_date']??''),(string)($s['era']??''),(string)($entity['title']??'')])));$snippet=(string)($s['summary']??$s['body_text']??'');sf_site_search_add($rows,$query,'story',$id,$slug,(string)($s['title']??$slug),$subtitle,$snippet,$image,'story/'.rawurlencode($slug),['description'=>$snippet,'metadata'=>[(string)($s['eyebrow']??''),(string)($s['era']??''),(string)($entity['title']??'')]]);}
+}
+function sf_site_search_public_videos(string $query,array &$rows): void {
+    if(!function_exists('sf_video_public_list'))return;
+    foreach(sf_video_public_list() as $v){$id=(string)($v['id']??'');$slug=(string)($v['slug']??'');if($id===''||$slug==='')continue;$poster=(array)($v['poster']??[]);$entities=(array)($v['entities']??[]);$snippet=(string)($v['description']??'');sf_site_search_add($rows,$query,'video',$id,$slug,(string)($v['title']??$slug),ucwords(str_replace('_',' ',(string)($v['kind']??'video'))),$snippet,(string)($poster['thumb_url']??$poster['url']??''),'video/'.rawurlencode($slug),['description'=>$snippet,'metadata'=>array_merge([(string)($v['kind']??'')],array_values(array_filter(array_map(fn($e)=>(string)($e['title']??''),$entities))))]);}
+}
+function sf_site_search_public_photos(string $query,array &$rows): void {
+    if(!function_exists('sf_gallery_public_list'))return;
+    foreach(sf_gallery_public_list() as $g){$id=(string)($g['id']??'');$slug=(string)($g['slug']??'');if($id===''||$slug==='')continue;$cover=(array)($g['cover']??[]);$entities=(array)($g['entities']??[]);$snippet=(string)($g['summary']??'');sf_site_search_add($rows,$query,'photo',$id,$slug,(string)($g['title']??$slug),trim(implode(' · ',array_filter([(string)($g['event_date']??''),(string)($g['location']??'')]))),$snippet,(string)($cover['thumb_url']??$cover['url']??''),'photos/'.rawurlencode($slug),['description'=>$snippet,'metadata'=>array_merge([(string)($g['location']??'')],array_values(array_filter(array_map(fn($e)=>(string)($e['title']??''),$entities))))]);}
+}
+function sf_site_search_public_products(string $query,array &$rows): void {
+    if(!function_exists('sf_commerce_products'))return;
+    foreach(sf_commerce_products(true) as $p){$id=(string)($p['id']??'');$slug=(string)($p['slug']??$id);if($id===''||$slug==='')continue;$snippet=(string)($p['description']??'');sf_site_search_add($rows,$query,'product',$id,$slug,(string)($p['title']??$slug),'Stonefellow store',$snippet,(string)($p['image']??''),'store/'.rawurlencode($slug),['description'=>$snippet],['price_cents'=>(int)($p['base_price_cents']??0),'available'=>!empty($p['available'])]);}
+}
+function sf_site_search_public_campaigns(string $query,array &$rows): void {
+    if(!function_exists('sf_campaign_list')||!function_exists('sf_campaign_is_live'))return;
+    foreach(sf_campaign_list(500) as $c){if(!sf_campaign_is_live($c))continue;$id=(string)($c['id']??'');$slug=(string)($c['slug']??'');if($id===''||$slug==='')continue;$landing=(array)($c['landing']??[]);$title=sf_clean_text((string)($landing['headline']??''),220);$snippet=sf_clean_text((string)($landing['body']??''),6000);if($title==='')continue;sf_site_search_add($rows,$query,'campaign',$id,$slug,$title,'Stonefellow offer',$snippet,(string)($c['artwork']??''),'campaign/'.rawurlencode($slug),['description'=>$snippet]);}
+}
+function sf_site_search(array $raw): array {
+    $p=sf_site_search_params($raw);$q=(string)$p['q'];$rows=[];if($q==='')return ['query'=>$p,'normalized_query'=>'','results'=>[],'result_count'=>0,'returned_count'=>0,'counts'=>[],'suggestions'=>[],'generated_at'=>gmdate('c')];
+    $loaders=['track'=>'sf_site_search_public_tracks','release'=>'sf_site_search_public_releases','show'=>'sf_site_search_public_shows','story'=>'sf_site_search_public_stories','video'=>'sf_site_search_public_videos','photo'=>'sf_site_search_public_photos','product'=>'sf_site_search_public_products','campaign'=>'sf_site_search_public_campaigns'];
+    foreach($loaders as $type=>$fn)if($p['type']==='all'||$p['type']===$type)$fn($q,$rows);
+    usort($rows,fn($a,$b)=>($b['score']<=>$a['score'])?:strcasecmp((string)$a['title'],(string)$b['title']));$allCount=count($rows);$counts=[];foreach($rows as $r)$counts[$r['type']]=($counts[$r['type']]??0)+1;$rows=array_slice($rows,0,$p['limit']);
+    return ['query'=>$p,'normalized_query'=>sf_search_normalize($q),'results'=>$rows,'result_count'=>$allCount,'returned_count'=>count($rows),'counts'=>$counts,'suggestions'=>$allCount===0?sf_site_search_suggestions($q):[],'generated_at'=>gmdate('c')];
+}
+function sf_site_search_suggestions(string $query,int $limit=8): array {
+    $q=sf_search_normalize($query);if($q==='')return [];$c=[];foreach(sf_catalog() as $t)if(function_exists('sf_seo_public_track')&&sf_seo_public_track((string)($t['id']??'')))$c[]=(string)($t['title']??'');foreach(sf_release_rows() as $r)if(function_exists('sf_seo_public_release')&&sf_seo_public_release((string)($r['id']??'')))$c[]=(string)($r['title']??'');if(function_exists('sf_live_public_shows'))foreach(sf_live_public_shows() as $s)$c[]=(string)($s['title']??$s['venue']??'');if(function_exists('sf_story_list'))foreach(sf_story_list(true,'',100) as $s)$c[]=(string)($s['title']??'');if(function_exists('sf_video_public_list'))foreach(sf_video_public_list() as $v)$c[]=(string)($v['title']??'');if(function_exists('sf_gallery_public_list'))foreach(sf_gallery_public_list() as $g)$c[]=(string)($g['title']??'');if(function_exists('sf_commerce_products'))foreach(sf_commerce_products(true) as $p)$c[]=(string)($p['title']??'');if(function_exists('sf_campaign_list')&&function_exists('sf_campaign_is_live'))foreach(sf_campaign_list(100) as $x)if(sf_campaign_is_live($x)){ $landing=(array)($x['landing']??[]);$headline=trim((string)($landing['headline']??''));if($headline!=='')$c[]=$headline; }$c=array_values(array_unique(array_filter(array_map('trim',$c))));$out=[];foreach($c as $value){$n=sf_search_normalize($value);$d=levenshtein(substr($q,0,120),substr($n,0,120));$contains=str_contains($n,$q)||str_contains($q,$n);if(!$contains&&$d>max(2,(int)floor(strlen($q)*.45)))continue;$out[]=['value'=>$value,'distance'=>$contains?0:$d];}usort($out,fn($a,$b)=>($a['distance']<=>$b['distance'])?:strlen($a['value'])<=>strlen($b['value']));return array_slice(array_column($out,'value'),0,max(1,min(12,$limit)));
+}
+function sf_site_search_result_exists(string $type,string $id): bool {
+    if(!in_array($type,array_slice(sf_site_search_types(),1),true)||$id==='')return false;
+    if($type==='track')return function_exists('sf_seo_public_track')&&sf_seo_public_track($id)!==null;
+    if($type==='release')return function_exists('sf_seo_public_release')&&sf_seo_public_release($id)!==null;
+    if($type==='show')return function_exists('sf_seo_public_show')&&sf_seo_public_show($id)!==null;
+    if($type==='story')return function_exists('sf_story_get')&&sf_story_get((int)$id,true)!==null;
+    if($type==='video')return function_exists('sf_video_public')&&sf_video_public((int)$id)!==null;
+    if($type==='photo')return function_exists('sf_gallery_public')&&sf_gallery_public((int)$id)!==null;
+    if($type==='product')return function_exists('sf_commerce_product')&&sf_commerce_product($id,true)!==null;
+    if($type==='campaign'){if(!function_exists('sf_campaign_get')||!function_exists('sf_campaign_is_live'))return false;$c=sf_campaign_get((int)$id);return $c?sf_campaign_is_live($c):false;}return false;
+}
+function sf_site_search_record_event(?int $userId,string $sessionKey,string $eventType,array $payload): void {
+    sf_search_ensure_schema();if(!in_array($eventType,['site_search','site_click'],true))return;$hash=sf_search_session_hash($sessionKey,$userId);if(!sf_search_event_allowed($hash))return;$p=sf_site_search_params((array)($payload['query']??$payload));$type=(string)($payload['result_type']??'');$id=sf_clean_text((string)($payload['result_id']??''),180);if($eventType==='site_click'&&!sf_site_search_result_exists($type,$id))return;$filters=['type'=>$p['type']];$q=sf_db()->prepare('INSERT INTO catalog_search_events(user_id,session_hash,event_type,query_text,normalized_query,result_count,result_type,result_id,filters_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)');$q->execute([$userId?:null,$hash,$eventType,(string)$p['q'],sf_search_normalize((string)$p['q']),max(0,(int)($payload['result_count']??0)),$eventType==='site_click'?$type:'',$eventType==='site_click'?$id:'',sf_ops_json($filters),gmdate('c')]);
+}
+function sf_site_search_recent_for_user(int $userId,int $limit=8): array {
+    sf_search_ensure_schema();$limit=max(1,min(30,$limit));$q=sf_db()->prepare("SELECT query_text,normalized_query,MAX(created_at) last_at,COUNT(*) uses FROM catalog_search_events WHERE user_id=? AND event_type='site_search' AND normalized_query<>'' GROUP BY query_text,normalized_query ORDER BY last_at DESC LIMIT ".$limit);$q->execute([$userId]);return $q->fetchAll();
+}
+function sf_site_search_clear_user_history(int $userId): int { sf_search_ensure_schema();$q=sf_db()->prepare("DELETE FROM catalog_search_events WHERE user_id=? AND event_type IN ('site_search','site_click')");$q->execute([$userId]);return $q->rowCount(); }
+function sf_site_search_result_title(string $type,string $id): string {
+    if($type==='track')return (string)(sf_track_map()[$id]['title']??$id);if($type==='release')return (string)(sf_release_map()[$id]['title']??$id);if($type==='show'){foreach(sf_live_public_shows() as $x)if((string)($x['id']??'')===$id)return (string)($x['title']??$x['venue']??$id);}if($type==='story'){ $x=sf_story_get((int)$id,true);return (string)($x['title']??$id);}if($type==='video'){ $x=sf_video_public((int)$id);return (string)($x['title']??$id);}if($type==='photo'){ $x=sf_gallery_public((int)$id);return (string)($x['title']??$id);}if($type==='product'){ $x=sf_commerce_product($id,true);return (string)($x['title']??$id);}if($type==='campaign'){ $x=sf_campaign_get((int)$id);return (string)($x['name']??$id);}return $id;
+}
+function sf_site_search_analytics(int $days=30,?int $userId=null): array {
+    sf_search_ensure_schema();$days=max(1,min(3650,$days));$since=gmdate('c',time()-$days*86400);$args=[$since];$where="created_at>=? AND event_type IN ('site_search','site_click')";if($userId!==null){$where.=' AND user_id=?';$args[]=$userId;}$q=sf_db()->prepare("SELECT * FROM catalog_search_events WHERE $where ORDER BY id ASC");$q->execute($args);$searches=0;$clicks=0;$zero=0;$users=[];$queries=[];$selected=[];$types=[];
+    foreach($q->fetchAll() as $r){if((int)$r['user_id']>0)$users[(int)$r['user_id']]=true;if($r['event_type']==='site_search'){$searches++;$n=(string)$r['normalized_query'];if((int)$r['result_count']===0)$zero++;if($n!==''){$queries[$n]??=['query'=>(string)$r['query_text'],'searches'=>0,'zero_results'=>0];$queries[$n]['searches']++;if((int)$r['result_count']===0)$queries[$n]['zero_results']++;}$fj=json_decode((string)$r['filters_json'],true);$type=(string)($fj['type']??'all');$types[$type]=($types[$type]??0)+1;}else{$clicks++;$key=(string)$r['result_type'].':'.(string)$r['result_id'];if($key!==':')$selected[$key]=($selected[$key]??0)+1;}}
+    uasort($queries,fn($a,$b)=>$b['searches']<=>$a['searches']);arsort($selected);arsort($types);$selectedRows=[];foreach(array_slice($selected,0,15,true) as $key=>$count){[$type,$id]=array_pad(explode(':',$key,2),2,'');$selectedRows[]=['type'=>$type,'id'=>$id,'title'=>sf_site_search_result_title($type,$id),'clicks'=>$count];}
+    return ['days'=>$days,'searches'=>$searches,'clicks'=>$clicks,'click_through_rate'=>sf_analytics_percent($clicks,$searches),'zero_result_searches'=>$zero,'zero_result_rate'=>sf_analytics_percent($zero,$searches),'identified_users'=>count($users),'top_queries'=>array_slice(array_values($queries),0,15),'top_results'=>$selectedRows,'type_usage'=>array_slice(array_map(fn($k,$c)=>['type'=>$k,'uses'=>$c],array_keys($types),array_values($types)),0,15)];
 }

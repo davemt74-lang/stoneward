@@ -72,6 +72,9 @@ function sf_seo_resolve(?string $view=null,string $id='',string $slug=''): array
     if($view===''||$view==='home'){
       $m['title']='Stonefellow — Official Artist Site';$m['description']=sf_seo_excerpt((string)($site['seo_description']??''),180)?:'Stonefellow music, releases, shows, stories, merch and direct fan experiences.';$m['canonical']=sf_seo_base_url().'/';$m['json_ld']=[sf_seo_artist_schema()];$m['server_title']='Stonefellow';$m['server_body']=$m['description'];return $m;
     }
+    if($view==='search'){
+      $m['title']='Search Stonefellow';$m['description']='Search public Stonefellow songs, releases, shows, stories, videos, photos, merch and current offers.';$m['canonical']=sf_seo_base_url().'/search';$m['robots']='noindex,follow,noarchive';$m['json_ld']=[];$m['server_title']='Search Stonefellow';$m['server_body']=$m['description'];return $m;
+    }
     if($view==='release'&&$id!==''){
       $r=sf_seo_public_release($id);if(!$r)return sf_seo_noindex($m,'Release unavailable.');
       $title=(string)($r['title']??$id);$desc=sf_seo_excerpt((string)($r['description']??$r['liner_notes']??''),180)?:$title.' by Stonefellow.';$cover=sf_seo_public_media('release',$id,['cover']);$img=sf_seo_image_url($cover,(string)($r['artwork']['cover']??$socialFallback));$url=sf_seo_base_url().'/release/'.rawurlencode($id);

@@ -97,3 +97,4 @@ jobs:
           php tests/v1335-section36-video.php
           php tests/v1336-section37-inquiries.php
           php tests/v1337-section38-photo-gallery.php
+          php tests/v1338-section39-public-search.php

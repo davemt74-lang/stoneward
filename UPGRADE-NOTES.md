@@ -1,19 +1,16 @@
-# Stonefellow v1.3.37 Upgrade Notes
+# Stonefellow v1.3.38 Upgrade Notes
 
-1. Upload/extract the v1.3.37 deploy over the existing Stonefellow installation.
-2. Preserve production-owned `data/`, `storage/`, database configuration, secrets, store configuration and generated catalog/config JS.
+1. Upload/extract the v1.3.38 deploy over the existing Stonefellow installation.
+2. Preserve production-owned `data/`, `storage/`, database configuration, secrets, store configuration and generated catalog/config JavaScript.
 3. Run `/upgrade.php`.
-4. Database target advances to **1.3.32**.
-5. Migration **2026-10-11-033** creates:
-   - `photo_galleries`
-   - `photo_gallery_events`
-6. Photo Galleries live inside Admin → Media Library; no additional sidebar item is added.
-7. Create a gallery as Draft first, then attach managed Media Library images using cover/photo roles.
-8. Before publication, make exactly one cover and at least three photos Public; all public images require alt text and minimum usable dimensions.
-9. Photographer/creator credit is recommended and surfaced as a readiness warning when absent.
-10. Gallery links may reference only currently public releases, shows and editorial stories.
-11. Publishing/archive and public/download visibility changes are explicitly confirmation-governed.
-12. Existing Video Hub and Contact routing/governance remain unchanged.
+4. Database target remains **1.3.32**. Section 39 introduces no new migration.
+5. Section 39 reuses the existing `catalog_search_events` table created by migration **2026-10-08-012**. New site-wide telemetry uses isolated event names `site_search` and `site_click`.
+6. Public navigation gains **Search** and Apache must allow the existing rewritten `/search` route.
+7. Search is intentionally **noindex,follow,noarchive** and is not added to the public sitemap.
+8. Search results are generated only from currently public/readiness-approved records. Publishing or unpublishing content changes Search eligibility immediately.
+9. Performance Intelligence gains a separate Site-wide Search panel.
+10. Existing Catalog Search & Discovery remains available under Music; its history and analytics remain separate.
+11. No Fan Community setting or CRM behavior changes in this release.
 
-Application: **1.3.37**  
+Application: **1.3.38**  
 Database schema target: **1.3.32**
