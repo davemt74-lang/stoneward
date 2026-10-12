@@ -7,11 +7,11 @@ if(!$write){
     $where=[];$args=[];
     if($userId){$where[]='b.user_id=?';$args[]=$userId;}
     if($phase!==''){$where[]='b.phase=?';$args[]=$phase;}
-    if($search!==''){$where[]='(b.route LIKE ? OR b.action LIKE ? OR b.request_excerpt LIKE ? OR b.response_excerpt LIKE ? OR u.email LIKE ?)';$like='%'.$search.'%';array_push($args,$like,$like,$like,$like,$like);}
-    $sql='SELECT b.*,u.email AS user_email,u.display_name AS user_name FROM agent_brain_decisions b LEFT JOIN users u ON u.id=b.user_id'.($where?' WHERE '.implode(' AND ',$where):'').' ORDER BY b.id DESC LIMIT '.$limit;
+    if($search!==''){$where[]='(b.route LIKE ? OR b.action LIKE ? OR b.phase LIKE ?)';$like='%'.$search.'%';array_push($args,$like,$like,$like);}
+    $sql='SELECT b.id,b.user_id,b.conversation_id,b.phase,b.route,b.action,b.context_profile,b.needs_llm,b.requires_confirmation,b.provider_status,b.input_tokens,b.output_tokens,b.created_at FROM agent_brain_decisions b'.($where?' WHERE '.implode(' AND ',$where):'').' ORDER BY b.id DESC LIMIT '.$limit;
     $q=$pdo->prepare($sql);$q->execute($args);$rows=$q->fetchAll();
     $stats=['total'=>(int)$pdo->query('SELECT COUNT(*) FROM agent_brain_decisions')->fetchColumn(),'jev_routes'=>(int)$pdo->query("SELECT COUNT(*) FROM agent_brain_decisions WHERE phase='route' AND provider_status NOT IN ('local_fallback','error')")->fetchColumn(),'llm_responses'=>(int)$pdo->query("SELECT COUNT(*) FROM agent_brain_decisions WHERE phase='response'")->fetchColumn(),'withheld'=>(int)$pdo->query("SELECT COUNT(*) FROM agent_brain_decisions WHERE phase='response_eval' AND details_json LIKE '%withhold%'")->fetchColumn(),'fan_auto_engagements'=>(int)$pdo->query("SELECT COUNT(*) FROM fan_agent_engagements WHERE status='delivered'")->fetchColumn()];
-    $fanSql='SELECT e.id,e.user_id,e.channel,e.trigger_type,e.status,e.message_text,e.reason,e.created_at,c.email AS user_email,c.display_name AS user_name FROM fan_agent_engagements e JOIN fan_contacts c ON c.id=e.contact_id'.($userId?' WHERE e.user_id='.(int)$userId:'').' ORDER BY e.id DESC LIMIT 80';$fanEngagements=$pdo->query($fanSql)->fetchAll();
+    $fanSql='SELECT e.id,e.user_id,e.channel,e.trigger_type,e.status,e.created_at FROM fan_agent_engagements e'.($userId?' WHERE e.user_id='.(int)$userId:'').' ORDER BY e.id DESC LIMIT 80';$fanEngagements=$pdo->query($fanSql)->fetchAll();
     sf_json_response(['ok'=>true,'decisions'=>$rows,'fan_engagements'=>$fanEngagements,'stats'=>$stats,'filters'=>['user_id'=>$userId,'phase'=>$phase,'q'=>$search]]);
 }
 $body=sf_request_json();if(($body['action']??'')==='clear'){$pdo->exec('DELETE FROM agent_brain_decisions');sf_log_admin_action((int)$me['id'],'agent_brain_cleared');sf_json_response(['ok'=>true]);}
