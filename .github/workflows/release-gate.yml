@@ -135,3 +135,4 @@ jobs:
           php tests/section45e-attribution-growth.php
           php tests/section45f-advisory-agent.php
           php tests/section45g-reviewed-journeys.php
+          php tests/section45h-journey-dashboard.php
