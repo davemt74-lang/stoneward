@@ -20,7 +20,7 @@ RewriteRule ^campaign/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=campaign&slu
 RewriteRule ^press/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=press&slug=$1 [QSA,L]
 RewriteRule ^story/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=story&slug=$1 [QSA,L]
 RewriteRule ^video/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=video&slug=$1 [QSA,L]
-RewriteRule ^(music|releases|shows|videos|store|about|archive)/?$ stonefellow-v120.php?view=$1 [QSA,L]
+RewriteRule ^(music|releases|shows|videos|store|about|contact|archive)/?$ stonefellow-v120.php?view=$1 [QSA,L]
 
 # Never serve a stale legacy static shell.
 RewriteRule ^index\.html$ ./ [R=302,L]
@@ -40,6 +40,6 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
 Header always set Pragma "no-cache"
 Header always set Expires "0"
-Header always set X-Stonefellow-Build "1.3.35"
+Header always set X-Stonefellow-Build "1.3.36"
 </FilesMatch>
 </IfModule>
