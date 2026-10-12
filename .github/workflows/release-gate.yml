@@ -136,3 +136,4 @@ jobs:
           php tests/section45f-advisory-agent.php
           php tests/section45g-reviewed-journeys.php
           php tests/section45h-journey-dashboard.php
+          php tests/section45i-journey-recovery.php
