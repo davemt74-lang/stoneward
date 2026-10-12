@@ -70,9 +70,9 @@ ok41(str_contains($css,'.privacy-center')&&str_contains($css,'.privacy-danger')&
 
 ok41(str_contains($boot,"require_once __DIR__ . '/privacy-core.php'"),'privacy core loads from canonical bootstrap');
 ok41(str_contains($mig,"'id'=>'2026-10-12-034'")&&str_contains($mig,'sf_privacy_ensure_schema'),'migration 034 installs profile/privacy schema');
-ok41(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.33'"),'database schema advances to 1.3.33');
+ok41(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.34'"),'database schema advances to 1.3.34');
 ok41(str_contains($mig,"'user_profiles'")&&str_contains($mig,"'user_privacy_events'"),'upgrade integrity requires Section 41 tables');
-ok41(str_contains($version,"'stonefellow'=>'1.3.42'")&&str_contains($version,"'database_schema_target'=>'1.3.33'"),'version endpoint reports app 1.3.42 and schema 1.3.33');
+ok41(str_contains($version,"'stonefellow'=>'1.3.42'")&&str_contains($version,"'database_schema_target'=>'1.3.34'"),'version endpoint reports app 1.3.42 and schema 1.3.34');
 ok41(str_contains($version,"'account_data_export'=>'profile-library-listening-purchases-agent-support-telemetry-json'"),'version endpoint advertises account data export');
 ok41(str_contains($version,"'account_closure'=>'password-delete-confirmation-subscription-order-support-blockers-anonymization'"),'version endpoint advertises governed closure');
 ok41(str_contains($shell,"define('SF_BUILD', '1.3.42')"),'public asset build advances to v1.3.42');

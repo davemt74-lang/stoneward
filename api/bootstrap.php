@@ -153,6 +153,7 @@ require_once __DIR__ . '/billing.php';
 require_once __DIR__ . '/operations.php';
 require_once __DIR__ . '/crm-core.php';
 require_once __DIR__ . '/campaign-core.php';
+require_once __DIR__ . '/agent-actions-core.php';
 require_once __DIR__ . '/media-core.php';
 require_once __DIR__ . '/commerce-core.php';
 require_once __DIR__ . '/membership-core.php';

@@ -23,7 +23,7 @@ $checks=[
  'Version endpoint 1.3.42'=>str_contains($version,"'stonefellow'=>'1.3.42'"),
  'PWA cache 1.3.42'=>str_contains($sw,'stonefellow-static-v1.3.42'),
  'Apache build header 1.3.42'=>str_contains($apache,'X-Stonefellow-Build "1.3.42"'),
- 'Schema target unchanged'=>str_contains($version,"'database_schema_target'=>'1.3.33'"),
+ 'Schema target unchanged'=>str_contains($version,"'database_schema_target'=>'1.3.34'"),
  'Existing Section 42 regressions retained'=>str_contains($workflow,'php tests/section42-backup-validation.php')&&str_contains($workflow,'php tests/section42-ops-privacy.php'),
  'Only a green main gate packages ZIP'=>str_contains($get('.github/workflows/certified-deploy.yml'),"github.event.workflow_run.conclusion == 'success'"),
  'Scope and limitations documented'=>str_contains($docs,'Production browser and provider-key smoke testing')
