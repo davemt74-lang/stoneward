@@ -15,6 +15,7 @@ function sf_agent_tool_registry(): array {
         'crm_aggregate'=>['label'=>'CRM aggregate overview','kind'=>'read','scope'=>'admin','owner'=>'api/crm-core.php','handler'=>'sf_crm_admin_summary','confirmation'=>false,'execution'=>'server'],
         'campaign_aggregate'=>['label'=>'Campaign aggregate overview','kind'=>'read','scope'=>'admin','owner'=>'api/campaign-core.php','handler'=>'sf_campaign_admin_summary','confirmation'=>false,'execution'=>'server'],
         'campaign_graph_validate'=>['label'=>'Validate campaign node graph','kind'=>'read','scope'=>'admin','owner'=>'api/campaign-core.php','handler'=>'sf_campaign_graph_validate','confirmation'=>false,'execution'=>'server'],
+        'automation_draft_save'=>['label'=>'Save reviewed lifecycle journey draft','kind'=>'write','scope'=>'admin','owner'=>'api/automation-core.php','handler'=>'sf_automation_save','confirmation'=>true,'execution'=>'governed_admin_api'],
         'campaign_draft_save'=>['label'=>'Save campaign draft','kind'=>'write','scope'=>'admin','owner'=>'api/campaign-core.php','handler'=>'sf_campaign_save','confirmation'=>true,'execution'=>'governed_admin_api'],
         'campaign_publish'=>['label'=>'Publish a campaign','kind'=>'consequential','scope'=>'admin','owner'=>'admin/api/campaigns.php','handler'=>'save','confirmation'=>true,'execution'=>'governed_admin_api'],
         'campaign_send_email'=>['label'=>'Send campaign email','kind'=>'consequential','scope'=>'admin','owner'=>'api/campaign-core.php','handler'=>'sf_campaign_send_email_node','confirmation'=>true,'execution'=>'governed_admin_api'],
@@ -48,6 +49,6 @@ function sf_agent_tool_allowed(string $toolId,string $role,bool $confirmed=false
  * Sending, publishing, purchasing and deletes remain in owner-controlled UI.
  */
 function sf_agent_tool_executable(string $toolId,string $role,bool $confirmed=false): bool {
-    if($toolId!=='campaign_draft_save')return false;
+    if(!in_array($toolId,['campaign_draft_save','automation_draft_save'],true))return false;
     return sf_agent_tool_allowed($toolId,$role,$confirmed);
 }
