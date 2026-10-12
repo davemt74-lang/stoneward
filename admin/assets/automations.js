@@ -54,8 +54,22 @@
         '<div class="actions" role="group" aria-label="Journey measurement window">'+[7,30,90].map(n=>'<button type="button" class="secondary" data-journey-days="'+n+'" aria-pressed="'+(n===days?'true':'false')+'">'+n+' days</button>').join('')+'</div>'+
         '<div class="stats">'+metrics.map(([label,value])=>'<div class="stat"><strong>'+Number(value||0).toLocaleString()+'</strong><span>'+esc(label)+'</span></div>').join('')+'</div>'+
         '<div class="stats"><div class="stat"><strong>'+pct(rates.campaign_conversion_pct)+'</strong><span>Campaign entry-cohort conversion</span></div><div class="stat"><strong>'+pct(rates.journey_completion_pct)+'</strong><span>Automation completion</span></div><div class="stat"><strong>'+pct(rates.journey_failure_pct)+'</strong><span>Automation failure</span></div></div>'+
-        '<div class="notice"><strong>Measurement boundaries:</strong><ul>'+((journey.measurement_notes||[]).map(note=>'<li>'+esc(note)+'</li>').join(''))+'</ul></div>';
+        '<div class="notice"><strong>Measurement boundaries:</strong><ul>'+((journey.measurement_notes||[]).map(note=>'<li>'+esc(note)+'</li>').join(''))+'</ul></div>'+
+        '<section class="panel" aria-label="Agent journey recommendations"><h3>Agent recommendations</h3><p>Evidence-backed suggestions only. Publishing or editing a journey requires a separate administrator action.</p><div id="journeyRecommendations" role="status">Reviewing aggregate evidence…</div></section>';
+
       $('#journeyBuildExisting',mount).onclick=()=>openAutomation(0);
+      api('fan-journey-advice.php?days='+encodeURIComponent(days)).then(advice=>{
+        const holder=$('#journeyRecommendations',mount);
+        if(!holder||!document.contains(holder))return;
+        const entries=advice.recommendations||[];
+        holder.innerHTML=entries.length?'<ul>'+entries.map((item,i)=>'<li><strong>'+esc(item.title||'Review journey')+'</strong> — '+esc(item.evidence||'')+' <button type="button" class="secondary" data-journey-review="'+i+'">Review '+esc(item.review_view||'Admin')+'</button></li>').join('')+'</ul>':'No evidence-backed suggestions are available in this reporting window.';
+        $('[data-journey-review]',holder).forEach(b=>b.onclick=()=>{
+          const selected=entries[Number(b.dataset.journeyReview)];
+          const view=String(selected?.review_view||'');
+          if(view==='automations'){state.tab='automations';renderAutomations();}
+          else if(view==='campaigns'||view==='crm')ctx.openView?.(view);
+        });
+      }).catch(()=>{const holder=$('#journeyRecommendations',mount);if(holder)holder.textContent='Journey recommendations are unavailable; no changes were made.';});
       $('[data-journey-days]',mount).forEach(button=>button.onclick=()=>renderJourneyIntelligence(Number(button.dataset.journeyDays)));
     }catch(e){mount.textContent='Journey intelligence is unavailable. '+(e.message||'Please try again.');}
   }
