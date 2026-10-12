@@ -75,9 +75,26 @@ ok38(str_contains($app,"galleryEvent(Number(g.id),'view')")&&str_contains($app,"
 ok38(str_contains($app,"shareButton('photo'"),'published gallery detail exposes canonical sharing');
 ok38(str_contains($css,'.photo-gallery-grid')&&str_contains($css,'.photo-lightbox'),'public Photo Hub/detail/lightbox have dedicated responsive styling');
 
-ok38(str_contains($shell,"define('SF_BUILD', '1.3.37')")&&str_contains($shell,'href="photos" data-view="photos"'),'public shell advances 1.3.37 and exposes Photos navigation');
+$build38='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$b38))$build38=$b38[1];ok38(version_compare($build38,'1.3.37','>=')&&str_contains($shell,'href="photos" data-view="photos"'),'public shell remains Section 38 compatible and exposes Photos navigation');
 ok38(str_contains($shell,"'video','photo','track'")&&str_contains($shell,"\$publicInitialViews[]='photos'"),'server pretty-route handoff recognizes Photo detail and appends the Photos hub');
-ok38(str_contains($ht,'^photos/([A-Za-z0-9_-]+)')&&str_contains($ht,'^photos/?$')&&str_contains($ht,'X-Stonefellow-Build "1.3.37"'),'web server routes gallery hub/detail and reports build 1.3.37');
+$serverBuild38='0.0.0';if(preg_match('/X-Stonefellow-Build "([^"]+)"/',$ht,$hb38))$serverBuild38=$hb38[1];ok38(str_contains($ht,'^photos/([A-Za-z0-9_-]+)')&&str_contains($ht,'^photos/?
+
+ok38(str_contains($seo,"\$view==='photo'")&&str_contains($seo,"'@type'=>'ImageGallery'")&&str_contains($seo,"'@type'=>'ImageObject'"),'gallery detail emits ImageGallery/ImageObject structured data');
+ok38(str_contains($seo,"'photos'=>'Photos'")&&str_contains($seo,"'photos'=>'0.7'"),'Photos hub has route metadata and sitemap priority');
+ok38(str_contains($seo,'sf_gallery_public_list')&&str_contains($seo,"\$base.'/photos/'"),'sitemap includes only gallery-public-list detail URLs');
+ok38(str_contains($agent,'sf_gallery_agent_context')&&str_contains($agent,"return 'photos_browse'")&&str_contains($agent,"case 'photos_browse'"),'public Agent has deterministic published Photo Gallery route');
+ok38(!str_contains($agent,'sf_gallery_list(false)')&&!str_contains($agent,'sf_gallery_get('),'public Agent runtime has no draft-gallery read path');
+
+ok38(str_contains($boot,"require_once __DIR__ . '/gallery-core.php'"),'gallery core loads from canonical bootstrap');
+ok38(str_contains($mig,"'id'=>'2026-10-11-033'")&&str_contains($mig,'sf_gallery_ensure_schema'),'migration 033 installs photo gallery schema');
+ok38(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.32'"),'database schema advances to 1.3.32');
+ok38(str_contains($mig,"'photo_galleries'")&&str_contains($mig,"'photo_gallery_events'"),'upgrade integrity requires both gallery tables');
+$app38='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$v38))$app38=$v38[1];ok38(version_compare($app38,'1.3.37','>=')&&str_contains($version,"'database_schema_target'=>'1.3.32'"),'version endpoint remains Section 38 compatible while schema remains 1.3.32');
+ok38(str_contains($version,"'photo_gallery'=>'single-artist-public-gallery-managed-media-visual-archive'"),'version endpoint advertises the single-artist photo gallery');
+ok38(str_contains($wf,'node --check admin/assets/gallery.js')&&str_contains($wf,'php tests/v1337-section38-photo-gallery.php'),'release gate includes Gallery Admin JS and Section 38 suite');
+
+echo "Stonefellow v1.3.37 Section 38 Photo Gallery & Visual Archive audit: PASS\n";
+)&&version_compare($serverBuild38,'1.3.37','>='),'web server preserves gallery routes on Section 38-compatible build or newer');
 
 ok38(str_contains($seo,"\$view==='photo'")&&str_contains($seo,"'@type'=>'ImageGallery'")&&str_contains($seo,"'@type'=>'ImageObject'"),'gallery detail emits ImageGallery/ImageObject structured data');
 ok38(str_contains($seo,"'photos'=>'Photos'")&&str_contains($seo,"'photos'=>'0.7'"),'Photos hub has route metadata and sitemap priority');
