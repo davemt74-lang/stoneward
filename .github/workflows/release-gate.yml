@@ -138,3 +138,4 @@ jobs:
           php tests/section45h-journey-dashboard.php
           php tests/section45i-journey-recovery.php
           php tests/section45j-release.php
+          php tests/section46a-brain-isolation.php
