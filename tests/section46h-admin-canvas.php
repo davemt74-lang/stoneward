@@ -21,7 +21,7 @@ $checks=[
  'Journey proposal routes through original Automation Builder'=>str_contains($ui,'SFAutomationsAdmin?.openAutomation?.(0)'),
  'No fan private memories rendered in Admin canvas'=>!str_contains($ui,'agent_customer_memories')&&!str_contains($ui,'fan_agent_private_messages'),
  'Explicit warning about private Customer Brain data'=>str_contains($ui,'Customer private conversations are not exposed'),
- 'Brain drawer has accessible close and Escape key'=>str_contains($ui,'aria-label=\'Close Admin Brain\'')&&str_contains($ui,"e.key==='Escape'"),
+ 'Brain drawer has accessible close and Escape key'=>str_contains($ui,'aria-label="Close Admin Brain"')&&str_contains($ui,"e.key==='Escape'")&&str_contains($ui,"e.key==='Tab'")&&str_contains($ui,'previousFocus.focus()'),
  'Mobile width caps at viewport'=>str_contains($style,'width:100vw'),
  'Keyboard focus has visible outline'=>str_contains($style,':focus-visible')
 ];
