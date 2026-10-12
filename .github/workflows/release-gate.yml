@@ -105,3 +105,4 @@ jobs:
           php tests/section42-backup-validation.php
           php tests/section42-ops-privacy.php
           php tests/section42-version-sync.php
+          php tests/section43a-agent-runtime.php
