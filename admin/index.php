@@ -101,6 +101,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/agent-actions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/media.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/video.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/gallery.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
