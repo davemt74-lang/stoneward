@@ -147,7 +147,7 @@ function sf_search_suggestions(string $query,int $limit=8): array {
     usort($rows,fn($a,$b)=>($a['distance']<=>$b['distance'])?:strlen($a['value'])<=>strlen($b['value']));return array_slice(array_column($rows,'value'),0,max(1,min(12,$limit)));
 }
 function sf_search_session_hash(string $sessionKey,?int $userId=null): string {
-    $sessionKey=trim($sessionKey);if($userId&&$userId>0)return hash('sha256','user|'.$userId.'|'.substr($sessionKey,0,160));
+    if($userId&&$userId>0)return hash('sha256','user|'.$userId);
     return hash('sha256','guest|'.sf_auth_ip_hash());
 }
 function sf_search_event_allowed(string $sessionHash): bool {
