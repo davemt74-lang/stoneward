@@ -83,12 +83,13 @@
   }
   function runsHtml(){
     return '<section class="panel"><div class="panel-title"><div><h2>Journey run history</h2><p>Per-fan execution ledger with wait, action, completion and failure state.</p></div></div>'+
-      (state.runs.length?'<table class="data-table"><thead><tr><th>Time</th><th>Automation</th><th>Fan</th><th>Status</th><th>Step</th><th></th></tr></thead><tbody>'+state.runs.map(r=>'<tr><td>'+esc((r.started_at||'').replace('T',' ').slice(0,19))+'</td><td>'+esc(r.automation_name)+'</td><td><strong>'+esc(r.display_name||'Fan')+'</strong><div class="file-list">'+esc(r.email)+'</div></td><td><span class="badge '+(r.status==='completed'?'good':r.status==='failed'?'bad':r.status==='waiting'?'warn':'')+'">'+esc(r.status.toUpperCase())+'</span></td><td>'+Number(r.current_step||0)+(r.due_at?'<div class="file-list">due '+esc(r.due_at.replace('T',' ').slice(0,19))+'</div>':'')+'</td><td><button class="secondary" type="button" data-run-open="'+r.id+'">Timeline</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">No lifecycle runs yet.</div>')+'</section>';
+      (state.runs.length?'<table class="data-table"><thead><tr><th>Time</th><th>Automation</th><th>Fan</th><th>Status</th><th>Step</th><th></th></tr></thead><tbody>'+state.runs.map(r=>'<tr><td>'+esc((r.started_at||'').replace('T',' ').slice(0,19))+'</td><td>'+esc(r.automation_name)+'</td><td><strong>'+esc(r.display_name||'Fan')+'</strong><div class="file-list">'+esc(r.email)+'</div></td><td><span class="badge '+(r.status==='completed'?'good':r.status==='failed'?'bad':r.status==='waiting'?'warn':'')+'">'+esc(r.status.toUpperCase())+'</span></td><td>'+Number(r.current_step||0)+(r.due_at?'<div class="file-list">due '+esc(r.due_at.replace('T',' ').slice(0,19))+'</div>':'')+'</td><td><button class="secondary" type="button" data-run-open="'+r.id+'">Timeline</button>'+(r.status==='review_required'?'<button class="secondary" type="button" data-run-reconcile="'+r.id+'">Mark reviewed (no replay)</button>':'')+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">No lifecycle runs yet.</div>')+'</section>';
   }
   function bindCurrentTab(){
     if(state.tab==='segments'){const n=$('#newSegment');if(n)n.onclick=()=>openSegment(0);$$('[data-segment-edit]',canvas).forEach(b=>b.onclick=()=>openSegment(Number(b.dataset.segmentEdit)))}
     if(state.tab==='automations'){const n=$('#newAutomation');if(n)n.onclick=()=>openAutomation(0);$$('[data-automation-edit]',canvas).forEach(b=>b.onclick=()=>openAutomation(Number(b.dataset.automationEdit)))}
-    if(state.tab==='runs')$$('[data-run-open]',canvas).forEach(b=>b.onclick=()=>openRun(Number(b.dataset.runOpen)));
+    if(state.tab==='runs')$('[data-run-open]',canvas).forEach(b=>b.onclick=()=>openRun(Number(b.dataset.runOpen)));
+    if(state.tab==='runs')$('[data-run-reconcile]',canvas).forEach(b=>b.onclick=()=>reviewInterruptedRun(Number(b.dataset.runReconcile)));
   }
   async function openSegment(id){
     try{let seg={id:0,name:'',rules:blankRules()},contacts=[],count=0;if(id){const j=await api('automations.php?segment_id='+encodeURIComponent(id));seg=j.segment;contacts=j.contacts||[];count=j.count||0}state.segmentEditor={segment:seg,contacts,count};renderSegmentEditor()}catch(e){alert(e.message)}
@@ -232,6 +233,15 @@
   async function runAutomation(){const a=state.editor.automation;if(!confirm('Run this automation now for its eligible audience? This is an explicit Admin-triggered execution.'))return;try{const j=await api('automations.php',{action:'manual_run',id:a.id,confirmed:true});say('Manual run started '+j.result.started+' journeys; '+j.result.skipped+' skipped.');openAutomation(a.id)}catch(e){alert(e.message)}}
   async function deleteAutomation(){const a=state.editor.automation;if(!confirm('Delete this automation and its run/event history?'))return;try{await api('automations.php',{action:'delete_automation',id:a.id});say('Automation deleted.');state.tab='automations';renderAutomations()}catch(e){alert(e.message)}}
   function runTable(rows){return rows.length?'<table class="data-table"><thead><tr><th>Time</th><th>Fan</th><th>Status</th><th>Step</th><th></th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc((r.started_at||'').replace('T',' ').slice(0,19))+'</td><td><strong>'+esc(r.display_name||'Fan')+'</strong><div class="file-list">'+esc(r.email)+'</div></td><td><span class="badge '+(r.status==='completed'?'good':r.status==='failed'?'bad':r.status==='waiting'?'warn':'')+'">'+esc(r.status)+'</span></td><td>'+Number(r.current_step||0)+'</td><td><button class="secondary" type="button" data-run-open="'+r.id+'">Timeline</button></td></tr>').join('')+'</tbody></table>':'<div class="empty">No runs yet.</div>'}
+  async function reviewInterruptedRun(runId){
+    const typed=window.prompt('First inspect the journey Timeline and check whether any outreach was already delivered. This does not undo or retry any action. Type REVIEWED to acknowledge.','');
+    if(typed!=='REVIEWED')return;
+    try{
+      await api('automations.php',{action:'acknowledge_interrupted',run_id:runId,typed_confirmation:typed});
+      say('Interrupted run acknowledged; no action was retried.');
+      await renderAutomations();
+    }catch(e){alert(e.message);}
+  }
   async function openRun(id){
     try{const j=await api('automations.php?run_id='+encodeURIComponent(id)),r=j.run,events=j.events||[];const overlay=document.createElement('div');overlay.className='automation-modal';overlay.innerHTML='<div class="automation-modal-card"><div class="panel-title"><div><div class="eyebrow">JOURNEY RUN</div><h2>'+esc(r.automation_name)+'</h2><p>'+esc(r.display_name||'Fan')+' · '+esc(r.email)+' · '+esc(r.status)+'</p></div><button class="secondary" type="button" data-auto-close>Close</button></div><div class="automation-run-timeline">'+events.map(e=>'<article><time>'+esc((e.created_at||'').replace('T',' ').slice(0,19))+'</time><strong>'+esc(String(e.event_type).replaceAll('_',' '))+'</strong><small>step '+Number(e.step_index)+'</small><code>'+esc(JSON.stringify(e.details||{}))+'</code></article>').join('')+'</div></div>';document.body.appendChild(overlay);$('[data-auto-close]',overlay).onclick=()=>overlay.remove()}catch(e){alert(e.message)}
   }
