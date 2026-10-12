@@ -21,7 +21,7 @@
       '<section class="privacy-panel"><h3>My Agent activity</h3><p>Only routing and tool status are displayed here. Full private messages remain in your own conversations.</p><ul>'+ (timeline||'<li>No recorded Agent activity yet.</li>')+'</ul></section></article>';
     const one=q=>canvas.querySelector(q),all=q=>Array.from(canvas.querySelectorAll(q));
     one('#brainAccountPrivacy').onclick=()=>navigate('account-privacy');
-    all('[data-resume]').forEach(button=>button.onclick=()=>{chooseConversation(button.dataset.resume);navigate('home');});
+    all('[data-resume]').forEach(button=>button.onclick=()=>{chooseConversation(button.dataset.resume);navigate('agent-chat');});
     all('[data-forget]').forEach(button=>button.onclick=async()=>{
       button.disabled=true;try{await post('agent-brain.php',{action:'forget',label:button.dataset.forget});await render({canvas,api,post,esc,chooseConversation,navigate});}
       catch(e){button.disabled=false;one('#brainMemoryStatus').textContent=e.message||'Could not change memory.';}
