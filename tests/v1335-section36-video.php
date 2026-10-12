@@ -84,7 +84,7 @@ ok36(str_contains($app,"navigate('video',{slug:b.dataset.videoOpen})"),'Video Hu
 ok36(str_contains($css,'.video-hub')&&str_contains($css,'.video-player-shell')&&str_contains($css,'.video-chapters'),'public Video Hub/player/chapters have dedicated responsive styling');
 
 ok36(str_contains($ht,'^video/([A-Za-z0-9_-]+)/?$')&&str_contains($ht,'shows|videos|store'),'Apache routing supports canonical video detail and hub');
-ok36(str_contains($shell,"define('SF_BUILD', '1.3.35')"),'public shell advances to v1.3.35');
+$build36='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$b36))$build36=$b36[1];ok36(version_compare($build36,'1.3.35','>='),'public shell remains Section 36 compatible or newer');
 ok36(str_contains($shell,"'video'")&&str_contains($shell,"'videos'")&&str_contains($shell,'href="videos" data-view="videos"'),'server route handoff and public nav include Videos');
 ok36(str_contains($app,"if(view==='video'&&slug)")&&str_contains($app,"'videos'].includes(view)"),'SPA canonical URL builder supports /video/{slug} and /videos');
 ok36(str_contains($seo,"'@type'=>'VideoObject'")&&str_contains($seo,"'contentUrl'")&&str_contains($seo,"'thumbnailUrl'"),'video pages emit VideoObject structured data');
@@ -104,9 +104,9 @@ ok36(str_contains($agent,"case 'videos_browse'")&&str_contains($agent,"'view'=>'
 ok36(str_contains($boot,"require_once __DIR__ . '/video-core.php'")&&strpos($boot,"video-core.php")<strpos($boot,"seo-core.php"),'Video Hub core loads before SEO resolver');
 
 ok36(str_contains($mig,"'id'=>'2026-10-11-031'")&&str_contains($mig,"'app_version'=>'1.3.35'"),'migration 031 belongs to v1.3.35');
-ok36(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.30'"),'database schema advances to 1.3.30');
+$schema36='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$m36))$schema36=$m36[1];ok36(version_compare($schema36,'1.3.30','>='),'database schema remains Section 36 compatible or newer');
 ok36(str_contains($mig,"'video_features'")&&str_contains($mig,"'video_events'"),'upgrade integrity requires Video Hub tables');
-ok36(str_contains($version,"'stonefellow'=>'1.3.35'")&&str_contains($version,"'database_schema_target'=>'1.3.30'"),'version endpoint reports v1.3.35 and DB 1.3.30');
+$app36='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$v36))$app36=$v36[1];ok36(version_compare($app36,'1.3.35','>=')&&version_compare($schema36,'1.3.30','>='),'version endpoint remains Section 36 compatible after later releases');
 ok36(str_contains($version,"'video_hub'=>'single-artist-managed-video-poster-vtt-gallery-publication'"),'version endpoint advertises managed Video Hub capability');
 ok36(str_contains($version,"'songbook_events'=>'truthful-view-section-annotation-events'"),'version endpoint retains hardened Section 35 event contract');
 ok36(str_contains($wf,'node --check admin/assets/video.js')&&str_contains($wf,'php tests/v1335-section36-video.php'),'release gate includes Video Hub Admin JS and Section 36 certification');

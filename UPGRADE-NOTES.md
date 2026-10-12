@@ -1,17 +1,18 @@
-# Stonefellow v1.3.35 Upgrade Notes
+# Stonefellow v1.3.36 Upgrade Notes
 
-1. Upload/extract the v1.3.35 deploy over the existing installation.
-2. Preserve production-owned data, storage, database configuration, secrets, store configuration and generated catalog/config JS.
+1. Upload/extract the v1.3.36 deploy over the existing installation.
+2. Preserve production-owned data, storage, database config, secrets, store config and generated catalog/config JS.
 3. Run /upgrade.php.
-4. Database target advances from 1.3.29 to 1.3.30.
-5. Migration 2026-10-11-031 creates video_features and video_events.
-6. Migration 031 refreshes Artist Homepage defaults so Featured Video appears on existing installs.
-7. Create Video Hub records from Admin → Media Library → Public Video Hub.
-8. Save Draft first, then attach managed Media Library assets.
-9. Public playback requires one Public MP4/WebM video with known duration and one Public poster at least 640×360 in either orientation.
-10. MOV can remain a private/source asset but does not satisfy public playback readiness.
-11. Optional captions must be managed WebVTT with a valid WEBVTT header.
-12. Publish only after readiness is green.
+4. Database target advances from **1.3.30** to **1.3.31**.
+5. Migration **2026-10-11-032** creates:
+   - professional_inquiries
+   - professional_inquiry_messages
+   - professional_inquiry_events
+6. Public Contact is immediately available at /contact after deployment.
+7. Professional inquiries do not create Fan CRM/newsletter contacts or marketing consent.
+8. Configure/test the existing transactional email provider before sending real Admin replies.
+9. Replies are marked Replied only after the outbox reports Sent; queued/logged/failed states remain truthful.
+10. Identical in-flight/successful replies are suppressed for five minutes; failed replies may retry immediately.
 
-Application: 1.3.35
-Database schema target: 1.3.30
+Application: **1.3.36**  
+Database schema target: **1.3.31**

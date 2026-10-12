@@ -1,3 +1,22 @@
+# Stonefellow v1.3.36 — Section 37: Contact, Booking & Professional Inquiries
+
+- Added public **Contact Stonefellow** experience for booking, press/media, licensing/sync, collaboration and general professional inquiries.
+- Professional inquiries remain separate from Fan CRM/newsletter marketing consent.
+- Added explicit inquiry-only contact permission, honeypot, rate limiting, duplicate submission protection and safe multiline validation.
+- Booking and licensing forms support context-specific fields and authoritative public track/release references.
+- Source attribution stores only the public page path and strips query strings/tokens.
+- Added a professional inbox inside **Fans + CRM** without adding another Admin sidebar item.
+- Added governed status lifecycle, internal notes, conversation history and durable inquiry events.
+- Replies use the existing transactional email/outbox and preserve real sent/queued/logged/failed delivery state.
+- Replied status cannot be manually claimed; it is set only when delivery reports Sent.
+- Added server-side five-minute duplicate suppression for identical in-flight/successful replies while allowing failed retries.
+- Status changes and reply sends require explicit Admin confirmation.
+- Admin audit and Agent Brain receive governed summaries without copying private message bodies.
+- Public Agent routes professional-contact intent to Contact but cannot read the professional inbox.
+- Added canonical /contact route, ContactPage structured data and sitemap inclusion.
+- Application advances to **1.3.36**.
+- Database schema advances to **1.3.31** via migration **2026-10-11-032**.
+
 # Stonefellow v1.3.35 — Section 36: Visual Media & Video Experience
 
 - Added governed single-artist Video Hub.

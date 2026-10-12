@@ -1,64 +1,74 @@
-# Stonefellow v1.3.35 — Section 36 Visual Media & Video Experience Audit
+# Stonefellow v1.3.36 — Section 37 Contact, Booking & Professional Inquiries Audit
 
-## 36A — Video Publication Model — 10/10
-- One canonical Video Hub model for music videos, live sessions, visualizers, behind-the-scenes, interviews and short films.
-- Video records store publication metadata only; bytes remain in Media Library.
-- Draft, Published and Archived states are explicit.
-- Publishing requires current readiness and explicit Admin confirmation.
-- Featured published video state is unique.
+Section 37 adds a governed professional-contact workflow for a single artist without turning professional contacts into Fan CRM/newsletter contacts.
 
-## 36B — Managed Media & Playback Safety — 10/10
-- Public video requires exactly one managed public playback asset and one public poster.
-- Public playback is restricted to browser-safe MP4/WebM; MOV may remain private/source media.
-- Public playback requires known managed duration.
-- Public poster must be at least 640×360 in either orientation.
-- Media delivery keeps path containment, public visibility and byte-range playback.
+## 37A — Public Contact Experience — 10/10
+- Public Contact route at /contact with dedicated responsive presentation.
+- Fixed inquiry types: Booking / Live, Press / Media, Licensing / Sync, Collaboration, General.
+- Booking and licensing expose relevant context fields without making them mandatory.
+- Public copy states the marketing-consent boundary both before and inside the form.
+- Contact permission applies only to the professional conversation.
 
-## 36C — Captions & Chapters — 10/10
-- Caption attachments are managed WebVTT assets.
-- Publication validates file extension/MIME and actual WEBVTT header.
-- Current single-language model permits at most one published caption track.
-- Language codes are normalized and validated.
-- Chapter positions are floats, sorted, de-duplicated and constrained inside duration.
+## 37B — Intake Validation, Privacy & Abuse Resistance — 10/10
+- Name, email, subject, message, inquiry type and explicit contact permission are validated server-side.
+- Optional website must use HTTPS.
+- Messages preserve safe multiline text while stripping unsafe control bytes.
+- Excessive external links are rejected.
+- Honeypot and session rate limiting reduce automated abuse.
+- Identical submissions are fingerprinted and suppressed for fifteen minutes.
+- Source attribution stores path only; query strings/tokens are stripped.
 
-## 36D — Governed Media Publication — 10/10
-- Video Hub media starts private by default.
-- Public/private and downloadable visibility changes require explicit Admin confirmation.
-- Poster publication requires server-side confirmation.
-- Visibility changes are written to Admin audit and Agent Brain.
-- No shadow uploader or duplicate media store exists.
+## 37C — Authoritative Stonefellow Context — 10/10
+- Licensing context can reference only public Stonefellow tracks/releases.
+- Public references reuse SEO/public-content eligibility rather than a shadow catalog.
+- No professional inquiry path creates or opts a contact into Fan CRM marketing.
+- Professional records remain structurally separate from fan/newsletter consent.
 
-## 36E — Public Video Hub Experience — 10/10
-- Public /videos hub and /video/{slug} detail routes.
-- Native controls, preload=metadata and playsinline; no autoplay.
-- Managed captions, chapters, linked song/release/show entities and gallery media.
-- Canonical sharing reuses the completed-share workflow.
-- Homepage supports optional Featured Video without another Admin sidebar item.
+## 37D — Professional Inbox & Admin UX — 10/10
+- Professional inbox is embedded in Fans + CRM instead of adding a 30th sidebar item.
+- Filter/search by status, inquiry type, name, email, organization and subject.
+- Conversation view preserves inbound/outbound history, delivery state and internal notes.
+- Booking/licensing context and source path are visible without exposing hidden URL queries.
+- Dedicated responsive styling covers inbox, detail and message states.
 
-## 36F — Truthful Events & Analytics — 10/10
-- Allowlisted events only: view, play, pause, 25/50/75 progress, complete, caption enable, chapter seek and entity open.
-- Progress milestones emit once per playback through a guarded loop.
-- No invented impressions or estimated watch-time events.
-- Public writes are rate-limited and require a currently public-ready video.
+## 37E — Governed Replies & Duplicate Prevention — 10/10
+- Replies use Stonefellow’s existing transactional email/outbox.
+- Every send requires explicit Admin confirmation.
+- A message ledger row is created before delivery.
+- Real sent/queued/logged/failed state and outbox error text are preserved.
+- Inquiry becomes Replied only when delivery reports Sent.
+- Closed/spam inquiries must be reopened before reply.
+- Backend suppresses identical in-flight/successful replies for five minutes.
+- Failed delivery does not block immediate retry.
+- Admin UI also locks the confirmed send flow during submission.
 
-## 36G — SEO, Homepage & Agent Integration — 10/10
-- VideoObject structured data includes poster, content URL, duration, publication date and linked entities.
-- Sitemap uses readiness-filtered public Video Hub data.
-- Canonical /videos and /video/{slug} routing works in server and SPA layers.
-- Homepage auto-selects featured published video or explicitly selects a ready public video.
-- Agent video context is sourced only from published-ready records.
+## 37F — Status, Audit & Agent Brain Governance — 10/10
+- Fixed states: New, Reviewing, Replied, Closed, Spam.
+- Replied cannot be manually claimed; it is delivery-derived.
+- Allowed transitions are explicitly bounded.
+- Consequential status changes require confirmation.
+- Status, notes and reply activity feed durable inquiry events/Admin audit.
+- Agent Brain receives governed action summaries without copying message bodies.
 
-## 36H — Upgrade & Release Safety — 10/10
-- Application: 1.3.35
-- Database target: 1.3.30
-- Migration 2026-10-11-031 creates video_features and video_events and refreshes Homepage defaults.
+## 37G — Public Agent, SEO & Privacy Boundaries — 10/10
+- Public Agent deterministically routes booking/press/licensing/collaboration/contact intent to Contact.
+- Agent can preselect inquiry type but never reads professional inbox records.
+- Contact has canonical routing, ContactPage structured data and sitemap inclusion.
+- Professional message bodies are not copied into Admin audit/Agent Brain payloads.
+- Public Agent runtime has no inquiry-list/get capability.
+
+## 37H — Migration & Release Safety — 10/10
+- Application advances to 1.3.36.
+- Database schema advances to 1.3.31.
+- Migration 2026-10-11-032 creates professional_inquiries, professional_inquiry_messages and professional_inquiry_events.
+- Upgrade integrity requires all three tables.
 - PHP syntax: PASS
 - Public JavaScript syntax: PASS
 - Admin JavaScript syntax: PASS
-- Sections 1–35 inherited suites: PASS
-- Section 36 certification: PASS
-- Explicit PASS lines: 2031
+- Sections 1–36 inherited regressions: PASS
+- Section 37 certification: PASS
+- Explicit PASS lines on hardened candidate: 2089
 - PHP warnings: 0
 - Failures: 0
 
-FINAL SECTION 36 SCORE: 10/10
+FINAL SECTION 37 SCORE: **10/10**

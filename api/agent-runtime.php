@@ -148,6 +148,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/\b(where is my order|order status|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
     if(preg_match('/\b(tickets?|rsvp|guest list|check.?in|vip tickets?|meet.?greet|presale|reservation)\b/',$q))return 'ticketing_info';
+    if(preg_match('/\b(book stonefellow|booking inquiry|booking request|hire stonefellow|contact stonefellow|professional inquiry|business inquiry|press inquiry|media inquiry|licen[sc](?:e|ing)|sync request|sync licensing|collaborat(?:e|ion))\b/',$q))return 'professional_contact';
     if(preg_match('/\b(videos?|music videos?|visualizers?|live sessions?|behind the scenes|short films?)\b/',$q))return 'videos_browse';
     if(preg_match('/\b(open|show|browse)\b.*\b(shows?|concerts?|tour dates?|live archive)\b|\b(upcoming shows?|tour dates?)\b/',$q))return 'shows_browse';
     if(preg_match('/\b(setlist|concert|gig|show|tour)\b|played live|where did .* play|when did .* play/',$q))return 'show_info';
@@ -215,6 +216,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'membership_info':$action=['type'=>'open_view','view'=>'membership'];$text='Here is your Stonefellow membership and VIP access.';$profile='account';$needs=true;break;
         case 'fan_profile':$action=['type'=>'open_view','view'=>'community'];$profile='crm';$needs=true;break;
         case 'ticketing_info':$action=['type'=>'open_view','view'=>'tickets'];$text='Here are Stonefellow ticket, RSVP, presale and VIP offers. I can explain your access, but reservations and check-in require explicit user or Admin actions.';$profile='commerce';$needs=true;break;
+        case 'professional_contact':$type=preg_match('/book|hire|booking/',$message)?'booking':(preg_match('/press|media|journalist|interview/',$message)?'press':(preg_match('/licen[sc]|sync/',$message)?'licensing':(preg_match('/collaborat/',$message)?'collaboration':'general')));$action=['type'=>'open_view','view'=>'contact','inquiry_type'=>$type];$text='Here is the Stonefellow professional contact form. Submitting it lets Stonefellow reply about that inquiry only; it does not subscribe you to marketing.';break;
         case 'videos_browse':$action=['type'=>'open_view','view'=>'videos'];$text='Here are Stonefellow’s published videos, live sessions, visualizers and films.';$profile='catalog';break;
         case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;
         case 'show_info':$action=['type'=>'open_view','view'=>'shows'];$profile='catalog';$needs=true;break;
@@ -297,6 +299,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'campaign_offer'=>'Asks about an active Stonefellow campaign, free download, discount, VIP offer, exclusive, presale, or early-access offer.',
         'store_browse'=>'Asks to browse Stonefellow merchandise, products, shop, or store.',
         'fan_profile'=>'Asks about their own fan CRM state, newsletter subscription, or fan profile.',
+        'professional_contact'=>'Asks to contact, book, hire, license/sync, collaborate with, or send a professional inquiry to Stonefellow.',
         'videos_browse'=>'Asks to browse Stonefellow videos, music videos, live sessions, visualizers, behind-the-scenes work, or short films.',
         'shows_browse'=>'Asks to browse Stonefellow shows, concerts, tour dates, or the live archive.',
         'show_info'=>'Asks about a specific show, concert, tour, venue, date, setlist, or live performance.',
