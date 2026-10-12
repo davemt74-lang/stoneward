@@ -1,3 +1,24 @@
+# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
+
+- Added the single-artist **Photo Gallery & Visual Archive** system.
+- Added Draft, Published and Archived gallery lifecycle with explicit Admin confirmation for visibility changes.
+- Added reusable gallery relationships through the central Media Library; no duplicate gallery uploader/storage system was introduced.
+- Gallery media accepts image assets only in governed cover/photo roles.
+- Publishing requires one public cover, at least three public photos, minimum public image dimensions and complete alt text.
+- Missing photographer/creator credit is surfaced as a warning.
+- Galleries can connect to currently public releases, shows and editorial stories.
+- Added embedded Photo Galleries management inside Media Library without increasing the 29-item Admin sidebar.
+- Added public Photos hub and canonical /photos/{slug} detail pages.
+- Added keyboard-aware photo lightbox with alt text, credits and copyright display.
+- Added truthful gallery view, photo-open and entity-open events with public-readiness validation and rate limiting.
+- Added published-only Agent Photo Gallery context and deterministic Photos browse intent.
+- Added ImageGallery/ImageObject SEO and public-only sitemap integration.
+- Preserved certified Video Hub confirmation/audit behavior while extending shared Media Library governance.
+- Preserved Video Hub and Contact canonical route contracts.
+- Hardened shared public media-links so draft/unready Video Hub and Photo Gallery records cannot expose media.
+- Application advances to **1.3.37**.
+- Database schema advances to **1.3.32** via migration **2026-10-11-033**.
+
 # Stonefellow v1.3.36 — Section 37: Contact, Booking & Professional Inquiries
 
 - Added public **Contact Stonefellow** experience for booking, press/media, licensing/sync, collaboration and general professional inquiries.
