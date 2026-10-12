@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/agent-customer-brain.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -457,7 +458,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         sf_log_user_activity($userId,'agent_interaction','Agent: '.$plan['route'],'agent',$conversationId,['action'=>$plan['action_name'],'needs_llm'=>false]);
         return ['text'=>$text,'provider'=>$routeSource==='jev'?'jev+policy':'stonefellow-policy','model'=>$jev['model']??'policy','input_tokens'=>(int)($jev['input_tokens']??0),'output_tokens'=>(int)($jev['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
     }
-    $context=sf_agent_context($message,$plan['context_profile'],$userId);$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
+    $context=sf_agent_context($message,$plan['context_profile'],$userId);$personalMemory=sf_agent_customer_memory_context($userId);if($personalMemory!=='')$context.="\n\n".$personalMemory;$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
     $system="You are the Stonefellow music-site agent. Be concise, warm, knowledgeable, and grounded. Use only the supplied Stonefellow context for factual claims about songs, releases, credits, purchases, or artist history. If the context lacks the answer, say so. Never claim a purchase, playback change, account change, or builder edit happened unless the Stonefellow action layer reports it. The structured route is advisory context, not permission to invent actions.\n\nROUTE: ".$plan['route']."\nCONTEXT PROFILE: ".$plan['context_profile']."\n\n".$context;
     $maxOutput=$isAdmin?700:max(96,min(700,$allow['balance']-$estimate+128));$errors=[];
     foreach(sf_ai_llm_candidates() as $provider){
