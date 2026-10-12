@@ -26,14 +26,68 @@ function sf_growth_membership(int $days): array {
 function sf_growth_crm(int $days): array {
     $since=sf_growth_since($days);return sf_growth_safe(function()use($since){sf_crm_ensure_schema();$pdo=sf_db();$q=$pdo->prepare('SELECT COUNT(*) FROM fan_contacts WHERE created_at>=?');$q->execute([$since]);$new=(int)$q->fetchColumn();$q=$pdo->prepare('SELECT COUNT(*) FROM fan_contacts WHERE marketing_opt_in=1 AND marketing_opt_in_at IS NOT NULL AND marketing_opt_in_at>=?');$q->execute([$since]);$newsletterNew=(int)$q->fetchColumn();$total=(int)$pdo->query('SELECT COUNT(*) FROM fan_contacts')->fetchColumn();$newsletter=(int)$pdo->query('SELECT COUNT(*) FROM fan_contacts WHERE marketing_opt_in=1')->fetchColumn();$stages=[];foreach($pdo->query('SELECT status,COUNT(*) c FROM fan_contacts GROUP BY status ORDER BY c DESC')->fetchAll() as $r)$stages[(string)$r['status']]=(int)$r['c'];$sources=[];$q=$pdo->prepare('SELECT source,COUNT(*) c FROM fan_contacts WHERE created_at>=? GROUP BY source ORDER BY c DESC');$q->execute([$since]);foreach($q->fetchAll() as $r)$sources[]=['source'=>(string)$r['source'],'count'=>(int)$r['c']];$weekly=[];$q=$pdo->prepare('SELECT created_at,status,marketing_opt_in FROM fan_contacts WHERE created_at>=? ORDER BY created_at');$q->execute([$since]);foreach($q->fetchAll() as $r){$ts=strtotime((string)$r['created_at'])?:time();$week=gmdate('o-\WW',$ts);$weekly[$week]??=['week'=>$week,'contacts'=>0,'newsletter'=>0,'customer_or_member'=>0];$weekly[$week]['contacts']++;if(!empty($r['marketing_opt_in']))$weekly[$week]['newsletter']++;if(in_array((string)$r['status'],['customer','member'],true))$weekly[$week]['customer_or_member']++;}return ['contacts'=>$total,'new_contacts'=>$new,'newsletter'=>$newsletter,'new_newsletter'=>$newsletterNew,'stages'=>$stages,'sources'=>$sources,'cohorts'=>array_values($weekly)];},['contacts'=>0,'new_contacts'=>0,'newsletter'=>0,'new_newsletter'=>0,'stages'=>[],'sources'=>[],'cohorts'=>[]]);
 }
+/**
+ * Independent campaign attribution: one recorded order can be credited to
+ * at most one campaign, using the earliest recorded qualifying event ID.
+ * Never expose order IDs or private fan identifiers in analytics results.
+ */
+function sf_growth_campaign_attribution(string $since): array {
+    $q=sf_db()->prepare("SELECT campaign_id,metadata_json FROM campaign_events WHERE created_at>=? AND event_type IN ('purchase_attributed','offer_redeemed') ORDER BY id LIMIT 20001");
+    $q->execute([$since]);$records=$q->fetchAll(PDO::FETCH_ASSOC);
+    $truncated=count($records)>20000;$seen=[];$byCampaign=[];
+    foreach(array_slice($records,0,20000) as $event){
+        $meta=sf_campaign_decode($event['metadata_json']??'',[]);
+        $orderId=(string)($meta['order_id']??'');
+        if($orderId==='')continue;
+        $digest=hash('sha256',$orderId);
+        if(isset($seen[$digest]))continue;
+        $seen[$digest]=true;
+        $cid=(int)$event['campaign_id'];
+        $byCampaign[$cid]??=['attributed_orders'=>0,'attributed_revenue_cents'=>0];
+        $byCampaign[$cid]['attributed_orders']++;
+        $byCampaign[$cid]['attributed_revenue_cents']+=max(0,(int)($meta['total_cents']??0));
+    }
+    return ['by_campaign'=>$byCampaign,'truncated'=>$truncated,'uniquely_attributed_orders'=>count($seen)];
+}
 function sf_growth_campaigns(int $days): array {
-    $since=sf_growth_since($days);return sf_growth_safe(function()use($since){sf_campaign_ensure_schema();$pdo=sf_db();$q=$pdo->prepare("SELECT c.id,c.name,c.goal,c.status,COUNT(DISTINCT p.id) participants,SUM(CASE WHEN p.converted_at IS NOT NULL THEN 1 ELSE 0 END) converted FROM campaigns c LEFT JOIN campaign_participants p ON p.campaign_id=c.id AND p.entered_at>=? GROUP BY c.id,c.name,c.goal,c.status ORDER BY participants DESC,c.id DESC");$q->execute([$since]);$rows=[];$attributedRevenue=0;$attributedOrders=0;$participants=0;$converted=0;
-    foreach($q->fetchAll() as $r){$cid=(int)$r['id'];$eq=$pdo->prepare("SELECT metadata_json FROM campaign_events WHERE campaign_id=? AND created_at>=? AND event_type IN ('purchase_attributed','offer_redeemed')");$eq->execute([$cid,$since]);$orders=[];$revenue=0;foreach($eq->fetchAll(PDO::FETCH_COLUMN) as $meta){$m=sf_campaign_decode($meta,[]);$oid=(string)($m['order_id']??'');if($oid!==''&&!isset($orders[$oid])){$orders[$oid]=true;$revenue+=(int)($m['total_cents']??0);}}
-      $row=['id'=>$cid,'name'=>(string)$r['name'],'goal'=>(string)$r['goal'],'status'=>(string)$r['status'],'participants'=>(int)$r['participants'],'converted'=>(int)$r['converted'],'conversion_rate'=>sf_growth_percent((int)$r['converted'],(int)$r['participants']),'attributed_orders'=>count($orders),'attributed_revenue_cents'=>$revenue];$rows[]=$row;$participants+=$row['participants'];$converted+=$row['converted'];$attributedOrders+=$row['attributed_orders'];$attributedRevenue+=$row['attributed_revenue_cents'];}
-    return ['campaigns'=>$rows,'participants'=>$participants,'converted'=>$converted,'conversion_rate'=>sf_growth_percent($converted,$participants),'attributed_orders'=>$attributedOrders,'attributed_revenue_cents'=>$attributedRevenue];},['campaigns'=>[],'participants'=>0,'converted'=>0,'conversion_rate'=>0,'attributed_orders'=>0,'attributed_revenue_cents'=>0]);
+    $since=sf_growth_since($days);
+    return sf_growth_safe(function()use($since){
+        sf_campaign_ensure_schema();$pdo=sf_db();
+        $q=$pdo->prepare("SELECT c.id,c.name,c.goal,c.status,COUNT(DISTINCT p.id) participants,COALESCE(SUM(CASE WHEN p.converted_at IS NOT NULL AND p.converted_at>=? THEN 1 ELSE 0 END),0) converted FROM campaigns c LEFT JOIN campaign_participants p ON p.campaign_id=c.id AND p.entered_at>=? GROUP BY c.id,c.name,c.goal,c.status ORDER BY participants DESC,c.id DESC");
+        $q->execute([$since,$since]);$attribution=sf_growth_campaign_attribution($since);
+        $rows=[];$attributedRevenue=0;$attributedOrders=0;$participants=0;$converted=0;
+        foreach($q->fetchAll() as $r){
+            $cid=(int)$r['id'];$a=$attribution['by_campaign'][$cid]??['attributed_orders'=>0,'attributed_revenue_cents'=>0];
+            $row=['id'=>$cid,'name'=>(string)$r['name'],'goal'=>(string)$r['goal'],'status'=>(string)$r['status'],
+               'participants'=>(int)$r['participants'],'converted'=>(int)$r['converted'],
+               'conversion_rate'=>sf_growth_percent((int)$r['converted'],(int)$r['participants']),
+               'attributed_orders'=>$a['attributed_orders'],'attributed_revenue_cents'=>$a['attributed_revenue_cents']];
+            $rows[]=$row;$participants+=$row['participants'];$converted+=$row['converted'];
+            $attributedOrders+=$row['attributed_orders'];$attributedRevenue+=$row['attributed_revenue_cents'];
+        }
+        return ['campaigns'=>$rows,'participants'=>$participants,'converted'=>$converted,
+           'conversion_rate'=>sf_growth_percent($converted,$participants),
+           'attributed_orders'=>$attributedOrders,'attributed_revenue_cents'=>$attributedRevenue,
+           'attribution_truncated'=>$attribution['truncated'],
+           'attribution_method'=>'Earliest recorded qualifying event per unique order; not causal credit'];
+    },['campaigns'=>[],'participants'=>0,'converted'=>0,'conversion_rate'=>0,
+      'attributed_orders'=>0,'attributed_revenue_cents'=>0,'attribution_truncated'=>true,
+      'attribution_method'=>'Unavailable']);
 }
 function sf_growth_automation(int $days): array {
-    $since=sf_growth_since($days);return sf_growth_safe(function()use($since){sf_automation_ensure_schema();$pdo=sf_db();$q=$pdo->prepare("SELECT a.id,a.name,COUNT(r.id) runs,SUM(CASE WHEN r.status='completed' THEN 1 ELSE 0 END) completed,SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) failed,SUM(CASE WHEN r.status='waiting' THEN 1 ELSE 0 END) waiting FROM lifecycle_automations a LEFT JOIN lifecycle_automation_runs r ON r.automation_id=a.id AND r.created_at>=? GROUP BY a.id,a.name ORDER BY runs DESC,a.id DESC");$q->execute([$since]);$rows=[];$runs=$done=$failed=$waiting=0;foreach($q->fetchAll() as $r){$row=['id'=>(int)$r['id'],'name'=>(string)$r['name'],'runs'=>(int)$r['runs'],'completed'=>(int)$r['completed'],'failed'=>(int)$r['failed'],'waiting'=>(int)$r['waiting']];$row['completion_rate']=sf_growth_percent($row['completed'],$row['runs']);$rows[]=$row;$runs+=$row['runs'];$done+=$row['completed'];$failed+=$row['failed'];$waiting+=$row['waiting'];}return ['automations'=>$rows,'runs'=>$runs,'completed'=>$done,'failed'=>$failed,'waiting'=>$waiting,'completion_rate'=>sf_growth_percent($done,$runs)];},['automations'=>[],'runs'=>0,'completed'=>0,'failed'=>0,'waiting'=>0,'completion_rate'=>0]);
+    $since=sf_growth_since($days);
+    return sf_growth_safe(function()use($since){
+        sf_automation_ensure_schema();$pdo=sf_db();
+        $q=$pdo->prepare("SELECT a.id,a.name,COUNT(r.id) runs,COALESCE(SUM(CASE WHEN r.status='completed' THEN 1 ELSE 0 END),0) completed,COALESCE(SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END),0) failed,COALESCE(SUM(CASE WHEN r.status='waiting' THEN 1 ELSE 0 END),0) waiting FROM lifecycle_automations a LEFT JOIN lifecycle_automation_runs r ON r.automation_id=a.id AND r.started_at>=? GROUP BY a.id,a.name ORDER BY runs DESC,a.id DESC");
+        $q->execute([$since]);$rows=[];$runs=$done=$failed=$waiting=0;
+        foreach($q->fetchAll() as $r){
+            $row=['id'=>(int)$r['id'],'name'=>(string)$r['name'],'runs'=>(int)$r['runs'],
+                'completed'=>(int)$r['completed'],'failed'=>(int)$r['failed'],'waiting'=>(int)$r['waiting']];
+            $row['completion_rate']=sf_growth_percent($row['completed'],$row['runs']);
+            $rows[]=$row;$runs+=$row['runs'];$done+=$row['completed'];$failed+=$row['failed'];$waiting+=$row['waiting'];
+        }
+        return ['automations'=>$rows,'runs'=>$runs,'completed'=>$done,'failed'=>$failed,'waiting'=>$waiting,'completion_rate'=>sf_growth_percent($done,$runs)];
+    },['automations'=>[],'runs'=>0,'completed'=>0,'failed'=>0,'waiting'=>0,'completion_rate'=>0]);
 }
 function sf_growth_ticketing(int $days): array {
     $since=sf_growth_since($days);return sf_growth_safe(function()use($since){sf_ticketing_ensure_schema();$pdo=sf_db();$q=$pdo->prepare("SELECT COUNT(*) reservations,COALESCE(SUM(CASE WHEN status IN ('reserved','checked_in') THEN quantity ELSE 0 END),0) reserved_qty,COALESCE(SUM(CASE WHEN status='checked_in' THEN quantity ELSE 0 END),0) checked_in_qty,COALESCE(SUM(CASE WHEN status='cancelled' THEN quantity ELSE 0 END),0) cancelled_qty FROM ticket_reservations WHERE reserved_at>=?");$q->execute([$since]);$r=$q->fetch()?:[];$offers=[];$q=$pdo->query("SELECT id,show_id,title,offer_type,status,capacity,claimed_qty FROM ticket_offers WHERE status IN ('published','paused','closed') ORDER BY claimed_qty DESC,id DESC LIMIT 100");foreach($q->fetchAll() as $o){$cap=(int)$o['capacity'];$claimed=(int)$o['claimed_qty'];$offers[]=['id'=>(int)$o['id'],'show_id'=>(string)$o['show_id'],'title'=>(string)$o['title'],'offer_type'=>(string)$o['offer_type'],'status'=>(string)$o['status'],'capacity'=>$cap,'claimed_qty'=>$claimed,'fill_rate'=>$cap>0?sf_growth_percent($claimed,$cap):0];}return ['reservations'=>(int)($r['reservations']??0),'reserved_qty'=>(int)($r['reserved_qty']??0),'checked_in_qty'=>(int)($r['checked_in_qty']??0),'cancelled_qty'=>(int)($r['cancelled_qty']??0),'checkin_rate'=>sf_growth_percent((int)($r['checked_in_qty']??0),(int)($r['reserved_qty']??0)),'offers'=>$offers];},['reservations'=>0,'reserved_qty'=>0,'checked_in_qty'=>0,'cancelled_qty'=>0,'checkin_rate'=>0,'offers'=>[]]);
