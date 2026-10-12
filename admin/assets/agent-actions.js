@@ -130,5 +130,27 @@
     };
     if(modal.showModal)modal.showModal();else modal.setAttribute('open','');
   }
-  window.SFAgentCampaigns={open};
+  async function showHistory(){
+    const data=await api('agent-actions.php');
+    const history=document.createElement('dialog');
+    history.setAttribute('aria-label','Reviewed Agent campaign actions');
+    history.style.cssText='border:1px solid #554638;border-radius:12px;background:#14110e;color:#f1ece5;padding:24px;width:min(790px,calc(100% - 24px));max-height:85vh;overflow:auto';
+    const rows=(data.proposals||[]).map(p=>{
+      const name=esc(p.payload?.name||'Campaign draft');
+      const status=esc(p.status||'unknown');
+      const when=esc(p.created_at||'');
+      const completed=Number(p.result?.campaign_id||0);
+      const action=completed?'<button type="button" data-agent-campaign-id="'+completed+'">Open draft</button>':(p.status==='review_required'||p.status==='executing'?'Review Campaign Builder manually; do not retry automatically.':'Awaiting review');
+      return '<tr><td>'+name+'</td><td>'+status+'</td><td>'+when+'</td><td>'+action+'</td></tr>';
+    }).join('');
+    history.innerHTML='<h2>Agent action timeline</h2><p>These are your reviewed Agent campaign proposals. Pending, interrupted, or uncertain operations never run automatically.</p><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Draft</th><th>Status</th><th>Created</th><th>Next step</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No Agent draft actions yet.</td></tr>')+'</tbody></table></div><button type="button" id="closeAgentHistory">Close</button>';
+    document.body.appendChild(history);
+    history.querySelector('#closeAgentHistory').onclick=()=>history.close();
+    history.addEventListener('close',()=>history.remove());
+    history.querySelectorAll('[data-agent-campaign-id]').forEach(button=>button.onclick=()=>{
+      const id=Number(button.dataset.agentCampaignId);history.close();openView('campaigns');window.SFCampaignAdmin?.openEditor?.(id);
+    });
+    if(history.showModal)history.showModal();else history.setAttribute('open','');
+  }
+  window.SFAgentCampaigns={open,showHistory};
 })();
