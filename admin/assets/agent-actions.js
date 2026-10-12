@@ -28,6 +28,8 @@
         <label>Draft name <input name="name" required maxlength="180" value="${esc(name)}"></label>
         <label>Headline <input name="headline" maxlength="255"></label>
         <label>Draft copy <textarea name="body_text" maxlength="12000" rows="4"></textarea></label>
+        <label>Existing CRM segment (optional) <select name="segment_id"><option value="">All contacts — no segment filter</option></select></label>
+        <p id="agentAudiencePreview" aria-live="polite">Audience figures will be checked using current newsletter consent.</p>
         <p id="agentCampaignStatus" role="status">Step 1: Prepare a reviewable proposal.</p>
         <button type="submit" class="primary" id="agentCampaignPrepareButton">Prepare for review</button>
       </form>
@@ -54,6 +56,21 @@
     };
     select.onchange=()=>{form.elements.name.value='';form.elements.headline.value='';form.elements.body_text.value='';switchDefaults();};
     switchDefaults();
+    const audienceSelect=form.elements.segment_id;
+    async function refreshAudience(){
+      try{
+        const id=Number(audienceSelect.value||0);
+        const data=await api('agent-audience.php'+(id?'?segment_id='+encodeURIComponent(id):''));
+        const el=$('#agentAudiencePreview');
+        if(!id){
+          el.textContent=(data.totals?.email_eligible||0)+' opted-in contacts across '+(data.totals?.contacts||0)+' CRM records. Draft does not send.';
+          audienceSelect.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());
+          for(const segment of data.segments||[]){const opt=document.createElement('option');opt.value=String(segment.id);opt.textContent=segment.name;audienceSelect.append(opt);}
+        }else el.textContent=(data.email_eligible||0)+' opted-in, '+(data.suppressed||0)+' suppressed in this '+(data.capped?'capped ':'')+'segment preview. Eligibility is rechecked at send time.';
+      }catch(e){$('#agentAudiencePreview').textContent='Audience preview unavailable; this does not authorize sending.';}
+    }
+    audienceSelect.onchange=refreshAudience;
+    refreshAudience();
     $('#agentCampaignClose').onclick=()=>modal.close();
     modal.addEventListener('close',()=>{modal.remove();modal=null;});
     form.onsubmit=async ev=>{
@@ -61,6 +78,7 @@
       if(!d){setStatus('Campaign Builder templates are unavailable.',true);return;}
       d.name=form.elements.name.value.trim();d.headline=form.elements.headline.value.trim();
       d.body_text=form.elements.body_text.value.trim();d.status='draft';d.id=0;
+      if(Number(audienceSelect.value||0)>0)d.audience={segment_id:Number(audienceSelect.value),newsletter_only:true};
       const button=$('#agentCampaignPrepareButton');button.disabled=true;
       try{
         const res=await api('agent-actions.php',{action:'prepare',request_key:requestKey,tool_id:'campaign_draft_save',draft:d});
