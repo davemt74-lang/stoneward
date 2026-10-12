@@ -60,12 +60,12 @@ ok39(str_contains($core,"event_type IN ('site_search','site_click')"),'site-sear
 ok39(str_contains($core,"event_type IN ('search','click','clear')"),'Section 12 analytics/history remain isolated from site-search events');
 ok39(str_contains($state,"WHERE e.event_type IN ('search','click','clear')"),'Admin recent catalog-search feed remains catalog-only');
 
-ok39(str_contains($shell,"define('SF_BUILD', '1.3.38')"),'public shell cache build advances to 1.3.38');
+$build39='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$bm39))$build39=$bm39[1];ok39(version_compare($build39,'1.3.38','>='),'public shell remains Section 39 compatible or newer');
 ok39(str_contains($shell,"\$publicInitialViews[]='search'"),'server pretty-route handoff explicitly appends Search without disturbing certified route order');
 ok39(str_contains($shell,'href="search" data-view="search"'),'public navigation exposes Search');
 ok39(substr_count($adminShell,'data-view="')===29,'public Search adds no Admin sidebar item');
 ok39(str_contains($ht,'^search/?$')&&str_contains($ht,'view=search'),'Apache serves canonical /search');
-ok39(str_contains($ht,'X-Stonefellow-Build "1.3.38"'),'server build header advances to 1.3.38');
+ok39(preg_match('/X-Stonefellow-Build "1\.3\.(?:3[8-9]|[4-9][0-9])"/',$ht)===1,'server build header remains Section 39 compatible or newer');
 ok39(str_contains($seo,"if(\$view==='search')")&&str_contains($seo,"'noindex,follow,noarchive'"),'Search has dedicated noindex/follow SEO policy');
 ok39(str_contains($seo,"sf_seo_base_url().'/search'"),'Search canonical strips query/filter duplicates');
 ok39(!str_contains($seo,"\$add(\$base.'/search'"),'Search page is intentionally absent from the public sitemap');
@@ -107,7 +107,7 @@ ok39(str_contains($app,"view=history.state?.view||window.STONEFELLOW_INITIAL_ROU
 ok39(!str_contains($core,"'metadata'=>\$tags")&&str_contains($core,"sf_site_search_add(\$rows,\$query,'product'"),'public product search does not index internal merch tags');
 ok39(str_contains($core,"\$headline=trim((string)(\$landing['headline']??''))")&&!str_contains($core,"\$x['headline']??\$x['name']"),'zero-result offer suggestions use public landing headlines only');
 
-ok39(str_contains($version,"'stonefellow'=>'1.3.38'"),'version endpoint reports app 1.3.38');
+$app39='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm39))$app39=$vm39[1];ok39(version_compare($app39,'1.3.38','>='),'version endpoint remains Section 39 compatible after later releases');
 ok39(str_contains($version,"'database_schema_target'=>'1.3.32'"),'Section 39 intentionally leaves database target at 1.3.32');
 ok39(str_contains($version,"'public_site_search'=>'songs-releases-shows-stories-videos-photos-products-live-offers'"),'version endpoint advertises unified public search');
 ok39(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.32'"),'migration target remains unchanged');
