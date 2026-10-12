@@ -12,7 +12,7 @@
 - App advances to **1.3.39**.
 - DB target remains **1.3.32**; no migration is introduced.
 
-NaN# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
+# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
 
 - Added the single-artist **Photo Gallery & Visual Archive** system.
 - Added Draft, Published and Archived gallery lifecycle with explicit Admin confirmation for visibility changes.
