@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/agent-runtime.php';
+require_once __DIR__.'/agent-orchestration.php';
 $u=sf_require_user(false,true);
 $b=sf_request_json();
 $message=sf_clean_text($b['message']??'',4000);
@@ -11,6 +12,7 @@ if($cid===''||!preg_match('/^[A-Za-z0-9_-]{12,80}$/',$cid))$cid='conv_'.bin2hex(
 $client=is_array($b['client_state']??null)?$b['client_state']:[];
 try{
     $r=sf_agent_reply($u,$cid,$message,$client);
+    $r['tool_contract']=sf_agent_orchestration_contract('customer',(string)($r['decision']??''));
     sf_json_response(['ok'=>true]+$r);
 }catch(RuntimeException $e){
     if($e->getMessage()==='ACTIVE_TOKENS_REQUIRED')
