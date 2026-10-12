@@ -10,5 +10,5 @@ self.addEventListener('fetch',event=>{
   const req=event.request;if(req.method!=='GET')return;const url=new URL(req.url);
   if(req.mode==='navigate'){event.respondWith(fetch(req).catch(async()=>await caches.match(abs('offline.html'))||new Response('Stonefellow is offline.',{status:503,headers:{'Content-Type':'text/plain'}})));return}
   if(!isStatic(url))return;
-  event.respondWith((async()=>{const c=await caches.open(CACHE),cached=await c.match(req);const network=fetch(req).then(async r=>{if(r.ok&&r.type==='basic'&&!/no-store/i.test(r.headers.get('Cache-Control')||''))await c.put(req,r.clone());return r}).catch(()=>null);return cached||(await network)||new Response('',{status:504})})());
+  event.respondWith((async()=>{const c=await caches.open(CACHE),cached=await c.match(req,{ignoreSearch:true});const network=fetch(req).then(async r=>{if(r.ok&&r.type==='basic'&&!/no-store/i.test(r.headers.get('Cache-Control')||''))await c.put(req,r.clone());return r}).catch(()=>null);return cached||(await network)||new Response('',{status:504})})());
 });
