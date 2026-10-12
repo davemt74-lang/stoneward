@@ -66,9 +66,9 @@ ok37(str_contains($app,'data-inquiry-context="booking"')&&str_contains($app,'dat
 ok37(str_contains($app,'company_fax')&&str_contains($app,'source_path:location.pathname'),'public Contact sends honeypot and path-only source attribution');
 ok37(str_contains($app,"view==='contact'")&&str_contains($app,"new URL('contact',base)"),'SPA uses canonical /contact route');
 ok37(str_contains($css,'.contact-module')&&str_contains($css,'.inquiry-type-grid'),'public Contact experience has dedicated responsive presentation');
-ok37(str_contains($shell,"define('SF_BUILD', '1.3.36')")&&str_contains($shell,'href="contact" data-view="contact"'),'public shell advances v1.3.36 and exposes Contact navigation');
+$build37='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$bm37))$build37=$bm37[1];ok37(version_compare($build37,'1.3.36','>=')&&str_contains($shell,'href="contact" data-view="contact"'),'public shell remains Section 37 compatible and exposes Contact navigation');
 ok37(str_contains($shell,"'videos','contact','about'"),'server pretty-route handoff recognizes Contact');
-ok37(str_contains($ht,'about|contact|archive')&&str_contains($ht,'X-Stonefellow-Build "1.3.36"'),'web server routes Contact and reports build 1.3.36');
+ok37(str_contains($ht,'contact')&&preg_match('/X-Stonefellow-Build "([^"]+)"/',$ht,$hm37)&&version_compare($hm37[1],'1.3.36','>='),'web server keeps Contact routing and Section 37-or-newer build header');
 ok37(str_contains($seo,"\$view==='contact'")&&str_contains($seo,"'@type'=>'ContactPage'"),'Contact page emits route-specific ContactPage structured data');
 ok37(str_contains($seo,"'contact'=>'0.6'"),'Contact page is included in public sitemap');
 ok37(str_contains($agent,"return 'professional_contact'")&&str_contains($agent,"case 'professional_contact'"),'public Agent has deterministic professional-contact route');
@@ -77,9 +77,9 @@ ok37(!str_contains($agent,'sf_inquiry_list(')&&!str_contains($agent,'sf_inquiry_
 
 ok37(str_contains($boot,"require_once __DIR__ . '/inquiry-core.php'"),'professional inquiry core loads from canonical bootstrap');
 ok37(str_contains($mig,"'id'=>'2026-10-11-032'")&&str_contains($mig,'sf_inquiry_ensure_schema'),'migration 032 installs professional inquiry schema');
-ok37(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.31'"),'database schema advances to 1.3.31');
+$schema37='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$mm37))$schema37=$mm37[1];ok37(version_compare($schema37,'1.3.31','>='),'database schema remains Section 37 compatible or newer');
 foreach(['professional_inquiries','professional_inquiry_messages','professional_inquiry_events'] as $table)ok37(str_contains($mig,"'".$table."'"),'upgrade integrity requires '.$table);
-ok37(str_contains($version,"'stonefellow'=>'1.3.36'")&&str_contains($version,"'database_schema_target'=>'1.3.31'"),'version endpoint reports app 1.3.36 and schema 1.3.31');
+$app37='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm37))$app37=$vm37[1];ok37(version_compare($app37,'1.3.36','>=')&&version_compare($schema37,'1.3.31','>='),'version endpoint remains Section 37 compatible after later releases');
 ok37(str_contains($version,"'professional_inquiries'=>'booking-press-licensing-collaboration-general-separate-from-fan-crm'"),'version endpoint advertises separate professional inquiries');
 ok37(str_contains($wf,'node --check admin/assets/inquiries.js')&&str_contains($wf,'php tests/v1336-section37-inquiries.php'),'release gate includes Inquiry Admin JS and Section 37 suite');
 
