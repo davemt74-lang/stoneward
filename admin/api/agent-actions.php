@@ -7,6 +7,7 @@ $admin=sf_admin_require_auth($method!=='GET');
 $uid=(int)$admin['id'];
 if($method==='GET'){
     $id=(string)($_GET['id']??'');
+    if($id==='')sf_json_response(['ok'=>true,'proposals'=>sf_agent_action_recent($uid,30)]);
     $p=sf_agent_action_get($uid,$id);
     if(!$p)sf_json_response(['ok'=>false,'error'=>'not_found'],404);
     sf_json_response(['ok'=>true,'proposal'=>$p]);
