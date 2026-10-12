@@ -104,3 +104,4 @@ jobs:
           php tests/section42-operations-health.php
           php tests/section42-backup-validation.php
           php tests/section42-ops-privacy.php
+          php tests/section42-version-sync.php
