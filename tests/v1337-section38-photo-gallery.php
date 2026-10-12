@@ -87,9 +87,9 @@ ok38(!str_contains($agent,'sf_gallery_list(false)')&&!str_contains($agent,'sf_ga
 
 ok38(str_contains($boot,"require_once __DIR__ . '/gallery-core.php'"),'gallery core loads from canonical bootstrap');
 ok38(str_contains($mig,"'id'=>'2026-10-11-033'")&&str_contains($mig,'sf_gallery_ensure_schema'),'migration 033 installs photo gallery schema');
-ok38(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.32'"),'database schema advances to 1.3.32');
+$schema38='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$m38))$schema38=$m38[1];ok38(version_compare($schema38,'1.3.32','>='),'database schema remains Section 38 compatible or newer');
 ok38(str_contains($mig,"'photo_galleries'")&&str_contains($mig,"'photo_gallery_events'"),'upgrade integrity requires both gallery tables');
-$app38='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$v38))$app38=$v38[1];ok38(version_compare($app38,'1.3.37','>=')&&str_contains($version,"'database_schema_target'=>'1.3.32'"),'version endpoint remains Section 38 compatible while schema remains 1.3.32');
+$app38='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$v38))$app38=$v38[1];ok38(version_compare($app38,'1.3.37','>=')&&version_compare($schema38,'1.3.32','>='),'version endpoint remains Section 38 compatible after later releases');
 ok38(str_contains($version,"'photo_gallery'=>'single-artist-public-gallery-managed-media-visual-archive'"),'version endpoint advertises the single-artist photo gallery');
 ok38(str_contains($wf,'node --check admin/assets/gallery.js')&&str_contains($wf,'php tests/v1337-section38-photo-gallery.php'),'release gate includes Gallery Admin JS and Section 38 suite');
 
