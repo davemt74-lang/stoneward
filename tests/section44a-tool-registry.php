@@ -6,6 +6,7 @@ $checks=[
  'Tool IDs unique'=>count($all)===count(array_unique(array_keys($all))),
  'Each tool identifies owner and handler'=>array_reduce($all,fn($ok,$t)=>$ok&&!empty($t['owner'])&&!empty($t['handler']),true),
  'Guest cannot see admin tools'=>!in_array('campaign_aggregate',$guestIds,true),
+ 'Guest cannot see signed-in tools'=>!in_array('favorite_track',$guestIds,true),
  'Fan cannot see admin tools'=>!in_array('campaign_draft_save',$fanIds,true),
  'Admin sees campaign tools'=>in_array('campaign_graph_validate',$adminIds,true),
  'No approval-free sends'=>!sf_agent_tool_allowed('campaign_send_email','admin',false),
