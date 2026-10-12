@@ -1,3 +1,29 @@
+# Stonefellow v1.3.36 — Section 37: Contact, Booking & Professional Inquiries
+
+Stonefellow now has a dedicated professional contact workflow for a **single artist**.
+
+Public visitors can use **/contact** for booking, press/media, licensing/sync, collaboration or another direct professional inquiry. These submissions are deliberately separate from Fan CRM and newsletter consent.
+
+## Professional inbox
+
+Admin → Fans + CRM includes a Professional Inquiries panel with status/type/search filters, conversation history, private notes and governed replies.
+
+Replies use Stonefellow’s transactional email outbox. The inquiry is marked Replied only when delivery reports Sent. Duplicate active/successful replies are suppressed server-side, while failed sends can be retried.
+
+## Privacy and governance
+
+- no automatic Fan CRM contact creation
+- no marketing opt-in
+- explicit permission to reply about the inquiry only
+- source page stores path only, not query strings/tokens
+- public Agent can route someone to Contact but cannot read inbox records
+- Admin audit/Agent Brain do not copy message bodies
+
+Application: **1.3.36**  
+Database schema target: **1.3.31**
+
+---
+
 # Stonefellow v1.3.35 — Section 36: Visual Media & Video Experience
 
 Stonefellow now includes a first-class single-artist Video Hub built on the existing Media Library.
