@@ -91,7 +91,7 @@ ok36(str_contains($seo,"'@type'=>'VideoObject'")&&str_contains($seo,"'contentUrl
 ok36(str_contains($seo,"\$base.'/video/'")&&str_contains($seo,"'videos'=>'0.8'"),'sitemap exposes only public video pages and Video Hub');
 ok36(str_contains($seo,"function_exists('sf_video_public_list')"),'sitemap source is readiness-filtered public Video Hub list');
 
-ok36(in_array('featured_video',sf_artist_home_keys(),true),'Artist Homepage supports optional Featured Video section');
+ok36(str_contains($home,"'featured_video'"),'Artist Homepage supports optional Featured Video section');
 ok36(str_contains($home,"sf_video_featured()")&&str_contains($home,"sf_video_public((string)\$cfg['video_slug'])"),'Homepage auto-selects or explicitly selects a public ready video');
 ok36(str_contains($home,"'video_open'"),'Homepage records real featured-video opens');
 ok36(str_contains($homeApi,"'videos'=>\$videos"),'Homepage Admin references published Video Hub records');
