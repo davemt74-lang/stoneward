@@ -55,7 +55,7 @@ ok41(str_contains($core,"'user_sessions','user_favorites'"),'persistent sessions
 ok41(str_contains($core,'UPDATE transactional_email_outbox SET user_id=NULL,recipient_email=?'),'retained transactional email rows lose the original account identity');
 ok41(str_contains($core,"DELETE FROM agent_messages WHERE user_id=?")&&!str_contains($core,"catch(Throwable \$e){}\$q=sf_db()->prepare('DELETE FROM agent_conversations"),'Agent history purge is strict and covers direct user-linked messages');
 
-ok41(str_contains($core,'sf_auth_revoke_all_user_sessions'),'closure revokes every persistent session');
+ok41(str_contains($core,"'user_sessions','user_favorites'")&&!str_contains($core,'sf_auth_revoke_all_user_sessions($userId);return'),'closure revokes persistent sessions inside the atomic purge transaction');
 ok41(str_contains($api,'sf_logout_user()'),'successful closure logs out the current browser');
 
 ok41(str_contains($account,"'privacy'=>sf_privacy_state"),'Account payload exposes privacy state');
