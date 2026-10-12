@@ -1,3 +1,9 @@
+# Stonefellow v1.3.41 — Section 42: Production Readiness & Operational Hardening
+
+Stonefellow adds administrator-only read-only operational health diagnostics, verified backups before database migrations, upgrade failure/recovery visibility, safe browser error reporting, and release-gated deployment ZIPs with SHA-256 checksums. All Section 42 tests are included in the full release gate. Database target remains **1.3.33**; no schema migration is required. See `docs/section42-operations-acceptance.md`.
+
+---
+
 # Stonefellow v1.3.40 — Section 41: Fan Account, Profile & Privacy Center
 
 - Added an account-only **Privacy & Data** center inside My Stonefellow.
