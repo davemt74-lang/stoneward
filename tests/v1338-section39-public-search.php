@@ -100,6 +100,13 @@ ok39(str_contains($analyticsApi,'sf_site_search_analytics($days,$userId)'),'Admi
 ok39(str_contains($analyticsJs,'Site-wide search')&&str_contains($analyticsJs,'Most selected public results'),'Performance Intelligence renders a distinct site-search panel');
 ok39(str_contains($analyticsJs,'Catalog search & discovery'),'existing Section 12 catalog analytics panel remains present');
 
+ok39(str_contains($core,"return hash('sha256','user|'.\$userId);")&&!str_contains($core,"'user|'.\$userId.'|'"),'signed-in search telemetry throttle identity cannot be rotated by a caller-supplied session key');
+ok39(str_contains($app,"if(view==='search'){const u=finish(new URL('search',base))")&&str_contains($app,"u.searchParams.set('q'")&&str_contains($app,"u.searchParams.set('type'"),'public Search keeps canonical /search while preserving bounded query/category state');
+ok39(str_contains($app,'const current=await siteSearchRecordClick')&&str_contains($app,"if(!current){say('That search result is no longer public or available.')"),'client refuses navigation when a selected result has become private or unavailable');
+ok39(str_contains($app,"view=history.state?.view||window.STONEFELLOW_INITIAL_ROUTE?.view")&&str_contains($app,"endsWith('/search')?'search':'home'"),'Agent client state preserves Search view across pretty-route and SPA navigation');
+ok39(!str_contains($core,"'metadata'=>\$tags")&&str_contains($core,"sf_site_search_add(\$rows,\$query,'product'"),'public product search does not index internal merch tags');
+ok39(str_contains($core,"\$headline=trim((string)(\$landing['headline']??''))")&&!str_contains($core,"\$x['headline']??\$x['name']"),'zero-result offer suggestions use public landing headlines only');
+
 ok39(str_contains($version,"'stonefellow'=>'1.3.38'"),'version endpoint reports app 1.3.38');
 ok39(str_contains($version,"'database_schema_target'=>'1.3.32'"),'Section 39 intentionally leaves database target at 1.3.32');
 ok39(str_contains($version,"'public_site_search'=>'songs-releases-shows-stories-videos-photos-products-live-offers'"),'version endpoint advertises unified public search');
