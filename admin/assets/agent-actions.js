@@ -37,7 +37,9 @@
       <section id="agentCampaignReview" hidden>
         <h3>Step 2: Exact approval</h3>
         <p id="agentCampaignSummary"></p>
-        <code id="agentCampaignHash" style="overflow-wrap:anywhere"></code>
+        <p>Read the complete server-normalized campaign below, including copy, audience rules and every Campaign Builder node. The hash applies to this saved snapshot.</p>
+        <pre id="agentCampaignExactPayload" tabindex="0" aria-label="Exact proposed campaign payload" style="max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #665847;padding:12px"></pre>
+        <p>Exact payload SHA-256:</p><code id="agentCampaignHash" style="overflow-wrap:anywhere"></code>
         <p>Confirm the exact saved content hash. Type APPROVE to approve only this draft.</p>
         <form id="agentCampaignApproval"><label>Approval phrase <input name="confirmation" required placeholder="Type APPROVE" autocomplete="off"></label><button type="submit" class="primary">Approve this exact draft</button></form>
       </section>
@@ -100,6 +102,7 @@
         proposal=res.proposal;
         setStatus('Proposal saved for exact review; no campaign has been changed.');
         $('#agentCampaignSummary').textContent=proposal.payload.name+' · '+proposal.payload.goal+' · '+proposal.payload.graph.nodes.length+' builder nodes · draft only';
+        $('#agentCampaignExactPayload').textContent=JSON.stringify(proposal.payload,null,2);
         $('#agentCampaignHash').textContent=proposal.payload_hash;
         $('#agentCampaignReview').hidden=false;form.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=true);
       }catch(e){setStatus('Proposal preparation failed: '+e.message,true);button.disabled=false;}
@@ -109,7 +112,9 @@
       const typed=ev.currentTarget.elements.confirmation.value;
       try{
         const res=await api('agent-actions.php',{action:'approve',proposal_id:proposal.id,payload_hash:proposal.payload_hash,typed_confirmation:typed});
-        proposal=res.proposal;setStatus('Exact proposal approved. No campaign has been saved yet.');
+        proposal=res.proposal;
+        if(proposal.status!=='approved')throw new Error('Approval was not confirmed; refresh the proposal.');
+        setStatus('Exact proposal approved. No campaign has been saved yet.');
         $('#agentCampaignExecution').hidden=false;$('#agentCampaignApproval').querySelectorAll('input,button').forEach(x=>x.disabled=true);
       }catch(e){setStatus('Approval was not accepted: '+e.message,true);}
     };

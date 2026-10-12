@@ -37,9 +37,15 @@ try{
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     if($action==='execute'){
-        $proposal=sf_agent_action_execute($uid,(string)($b['proposal_id']??''));
-        sf_agent_brain_log($uid,'agent_campaign','action_result',['route'=>'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'campaign_id'=>$proposal['result']['campaign_id']??null,'requires_confirmation'=>true]);
-        sf_log_admin_action($uid,'agent_campaign_draft_saved','campaign',(string)($proposal['result']['campaign_id']??''),['proposal_id'=>$proposal['id']]);
+        $id=(string)($b['proposal_id']??'');
+        $previous=sf_agent_action_get($uid,$id);
+        if(!$previous)sf_json_response(['ok'=>false,'error'=>'not_found'],404);
+        $proposal=sf_agent_action_execute($uid,$id);
+        // Replaying a completed request must not duplicate the Admin event trail.
+        if($previous['status']!=='completed'){
+            sf_agent_brain_log($uid,'agent_campaign','action_result',['route'=>'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'campaign_id'=>$proposal['result']['campaign_id']??null,'requires_confirmation'=>true]);
+            sf_log_admin_action($uid,'agent_campaign_draft_saved','campaign',(string)($proposal['result']['campaign_id']??''),['proposal_id'=>$proposal['id']]);
+        }
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     sf_json_response(['ok'=>false,'error'=>'unsupported_action'],422);

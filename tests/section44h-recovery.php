@@ -25,6 +25,8 @@ $db->prepare("UPDATE agent_action_proposals SET status='executing' WHERE id=?")-
 try{sf_agent_action_cancel(1,$c['id'],'CANCEL');$check(false,'Started action cannot cancel');}catch(RuntimeException $e){$check(true,'Started action cannot cancel');}
 try{sf_agent_action_reconcile(1,$c['id'],'WRONG');$check(false,'Exact reconcile required');}catch(InvalidArgumentException $e){$check(true,'Exact reconcile required');}
 try{sf_agent_action_reconcile(2,$c['id'],'RECONCILED');$check(false,'Other admin cannot reconcile');}catch(InvalidArgumentException $e){$check(true,'Other admin cannot reconcile');}
+try{sf_agent_action_reconcile(1,$c['id'],'RECONCILED');$check(false,'Active operation cannot be reconciled');}catch(RuntimeException $e){$check(true,'Active operation cannot be reconciled');}
+$db->prepare('UPDATE agent_action_proposals SET approved_at=? WHERE id=?')->execute(['2000-01-01T00:00:00Z',$c['id']]);
 $reviewed=sf_agent_action_reconcile(1,$c['id'],'RECONCILED');
 $check($reviewed['status']==='reviewed_no_retry','Started action reconciled manually');
 $check(sf_agent_action_reconcile(1,$c['id'],'RECONCILED')['status']==='reviewed_no_retry','Reconcile idempotent');

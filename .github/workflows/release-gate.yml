@@ -125,3 +125,4 @@ jobs:
           php tests/section44g-action-timeline.php
           php tests/section44h-recovery.php
           php tests/section44i-mobile-chat.php
+          php tests/section44-audit-hardening.php

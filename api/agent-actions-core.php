@@ -73,6 +73,8 @@ function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,
     if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
     if(!sf_agent_tool_executable($toolId,'admin',true))throw new InvalidArgumentException('Action is not available for governed preparation.');
     $payload=sf_agent_action_normalize_campaign($raw);$hash=sf_agent_action_hash($toolId,$payload);
+    $payloadJson=json_encode($payload,JSON_THROW_ON_ERROR);
+    if(strlen($payloadJson)>131072)throw new InvalidArgumentException('Campaign proposal exceeds the permitted size.');
     sf_agent_actions_ensure_schema();$db=sf_db();
     $q=$db->prepare('SELECT id,payload_hash FROM agent_action_proposals WHERE admin_user_id=? AND request_key=?');
     $q->execute([$adminId,$requestKey]);$existing=$q->fetch(PDO::FETCH_ASSOC);
@@ -80,10 +82,14 @@ function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,
         if(!hash_equals((string)$existing['payload_hash'],$hash))throw new RuntimeException('An existing request key has different content.');
         return sf_agent_action_get($adminId,(string)$existing['id']);
     }
+    // Keep proposal storage bounded while preserving idempotent existing requests.
+    $quota=$db->prepare('SELECT COUNT(*) FROM agent_action_proposals WHERE admin_user_id=? AND created_at>=?');
+    $quota->execute([$adminId,gmdate('c',time()-3600)]);
+    if((int)$quota->fetchColumn()>=40)throw new RuntimeException('Too many recent draft proposals; review the existing ones.');
     $id='act_'.bin2hex(random_bytes(16));$now=gmdate('c');
     try{
         $db->prepare('INSERT INTO agent_action_proposals(id,admin_user_id,request_key,tool_id,status,payload_json,payload_hash,result_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-          ->execute([$id,$adminId,$requestKey,$toolId,'proposed',json_encode($payload,JSON_THROW_ON_ERROR),$hash, '{}',$now]);
+          ->execute([$id,$adminId,$requestKey,$toolId,'proposed',$payloadJson,$hash, '{}',$now]);
     }catch(PDOException $e){
         $q->execute([$adminId,$requestKey]);$existing=$q->fetch(PDO::FETCH_ASSOC);
         if(!$existing||!hash_equals((string)$existing['payload_hash'],$hash))throw new RuntimeException('Proposal could not be created safely.');
@@ -102,7 +108,10 @@ function sf_agent_action_approve(int $adminId,string $id,string $expectedHash,st
     if(time()-strtotime((string)$proposal['created_at'])>86400)throw new RuntimeException('This proposal expired; prepare a fresh review.');
     $q=sf_db()->prepare("UPDATE agent_action_proposals SET status='approved',approved_at=? WHERE id=? AND admin_user_id=? AND status='proposed'");
     $q->execute([gmdate('c'),$id,$adminId]);
-    return sf_agent_action_get($adminId,$id);
+    if($q->rowCount()!==1)throw new RuntimeException('Proposal state changed before approval; refresh and review.');
+    $approved=sf_agent_action_get($adminId,$id);
+    if(!$approved||$approved['status']!=='approved')throw new RuntimeException('Approval was not confirmed.');
+    return $approved;
 }
 /**
  * Cancels only unexecuted drafts. A claimed operation cannot be cancelled
@@ -129,6 +138,12 @@ function sf_agent_action_reconcile(int $adminId,string $id,string $typed): array
     if(!$p)throw new InvalidArgumentException('Proposal not found.');
     if($p['status']==='reviewed_no_retry')return $p;
     if(!in_array($p['status'],['executing','review_required'],true))throw new RuntimeException('Only interrupted or uncertain actions can be reconciled.');
+    // An executing request may still be running. Never race an active save.
+    // Only previously approved work older than two hours can be reconciled in-place.
+    if($p['status']==='executing'){
+        $approvedAt=strtotime((string)($p['approved_at']??''));
+        if($approvedAt===false || time()-$approvedAt<7200)throw new RuntimeException('This operation may still be running. Review it after the safety window.');
+    }
     $q=sf_db()->prepare("UPDATE agent_action_proposals SET status='reviewed_no_retry' WHERE id=? AND admin_user_id=? AND status IN ('executing','review_required')");
     $q->execute([$id,$adminId]);
     if($q->rowCount()!==1)throw new RuntimeException('Proposal status changed; refresh its details.');
@@ -156,8 +171,9 @@ function sf_agent_action_execute(int $adminId,string $id): array {
         $campaign=sf_agent_action_normalize_campaign((array)$p['payload']);
         $result=sf_campaign_save($campaign,$adminId);
         $public=['campaign_id'=>(int)$result['id'],'status'=>'draft','name'=>(string)$result['name']];
-        $db->prepare("UPDATE agent_action_proposals SET status='completed',result_json=?,executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'")
-           ->execute([json_encode($public,JSON_THROW_ON_ERROR),gmdate('c'),$id,$adminId]);
+        $finish=$db->prepare("UPDATE agent_action_proposals SET status='completed',result_json=?,executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'");
+        $finish->execute([json_encode($public,JSON_THROW_ON_ERROR),gmdate('c'),$id,$adminId]);
+        if($finish->rowCount()!==1)throw new RuntimeException('Execution status changed before the result was recorded.');
     }catch(Throwable $e) {
         $db->prepare("UPDATE agent_action_proposals SET status='review_required',executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'")
            ->execute([gmdate('c'),$id,$adminId]);
