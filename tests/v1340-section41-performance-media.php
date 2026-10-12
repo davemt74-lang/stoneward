@@ -36,16 +36,16 @@ $wf=(string)file_get_contents($root.'/.github/workflows/release-gate.yml');
 
 ok41(str_contains($core,"sf_log_site_event('info','web_vital'"),'field vitals reuse the existing operational event ledger');
 ok41(!str_contains($core,'user_id')&&!str_contains($core,'REMOTE_ADDR')&&!str_contains($core,'referrer')&&!str_contains($core,'session_key'),'stored Web Vitals contain no user, IP, referrer or session identity');
-ok41(str_contains($core,"'metric'=>$e['metric']")&&str_contains($core,"'route_type'=>$e['route_type']"),'stored metric detail is minimized to bounded performance fields');
-ok41(str_contains($core,'function sf_performance_percentile')&&str_contains($core,"'p75'=>$p75"),'performance summary computes p75 server-side');
+ok41(str_contains($core,"'metric'=>\$e['metric']")&&str_contains($core,"'route_type'=>\$e['route_type']"),'stored metric detail is minimized to bounded performance fields');
+ok41(str_contains($core,'function sf_performance_percentile')&&str_contains($core,"'p75'=>\$p75"),'performance summary computes p75 server-side');
 ok41(str_contains($core,"LIMIT 10000"),'performance analytics query is bounded');
-ok41(str_contains($api,"$method==='POST'")&&str_contains($api,'count($attempts)>=40'),'public performance endpoint is POST-only and rate-limited');
+ok41(str_contains($api,"\$method==='POST'")&&str_contains($api,'count($attempts)>=40'),'public performance endpoint is POST-only and rate-limited');
 ok41(!str_contains($api,'sf_current_user')&&!str_contains($api,'HTTP_REFERER'),'performance endpoint does not attach account/referrer identity');
 
 ok41(str_contains($mediaCore,"'medium_url'=>")&&str_contains($mediaCore,"'large_url'=>")&&str_contains($mediaCore,"'srcset'=>"),'public Media Library payload exposes existing responsive image variants');
 ok41(str_contains($mediaCore,"variant=thumb 320w")&&str_contains($mediaCore,"variant=medium 800w")&&str_contains($mediaCore,"variant=large 1600w"),'responsive public srcset uses 320/800/1600 generated variants');
-ok41(str_contains($mediaApi,"else if($variant!=='original')$variant='original'"),'missing variant safely falls back to original MIME/content');
-ok41(str_contains($mediaApi,"$etag='\"'.substr(hash('sha256'"),'public media has deterministic source+variant ETags');
+ok41(str_contains($mediaApi,"else if(\$variant!=='original')\$variant='original'"),'missing variant safely falls back to original MIME/content');
+ok41(str_contains($mediaApi,"\$etag='\"'.substr(hash('sha256'"),'public media has deterministic source+variant ETags');
 ok41(str_contains($mediaApi,'public, max-age=3600, must-revalidate'),'public media caching is efficient but remains visibility-revocable');
 ok41(!str_contains($mediaApi,'immutable'),'public media is not permanently cached after visibility can change');
 ok41(str_contains($mediaApi,"trim((string)($_SERVER['HTTP_IF_NONE_MATCH']??''))===$etag")&&str_contains($mediaApi,'http_response_code(304)'),'public media supports conditional 304 responses');
@@ -65,7 +65,7 @@ ok41(str_contains($shell,'assets/js/performance.js?v=<?=rawurlencode(SF_BUILD)?>
 ok41(str_contains($shell,'rel="preload" as="image"')&&str_contains($shell,'fetchpriority="high"'),'enabled Artist Homepage hero is preloaded with high fetch priority');
 ok41(str_contains($shell,"define('SF_BUILD', '1.3.40')"),'public build advances to v1.3.40');
 
-ok41(str_contains($growth,"'performance'=>$performance"),'Core Web Vitals join existing Growth Intelligence');
+ok41(str_contains($growth,"'performance'=>\$performance"),'Core Web Vitals join existing Growth Intelligence');
 ok41(str_contains($growth,'web vitals p75 LCP'),'Admin Agent brief receives grounded p75 vitals');
 ok41(str_contains($analytics,'Core Web Vitals')&&str_contains($analytics,'Privacy-bounded public field measurements'),'Performance Intelligence visibly reports privacy-bounded field vitals');
 ok41(str_contains($analytics,"['LCP','Largest Contentful Paint']")&&str_contains($analytics,"['CLS','Cumulative Layout Shift']")&&str_contains($analytics,"['INP','Interaction to Next Paint']"),'Performance Intelligence exposes the three Core Web Vitals');
