@@ -18,6 +18,8 @@ function sf_clean_text(mixed $v,int $max=120):string{
 }
 require dirname(__DIR__).'/api/campaign-core.php';
 require dirname(__DIR__).'/api/agent-actions-core.php';
+// The production campaign schema is lazy-initialized by the first campaign API call.
+sf_campaign_ensure_schema();
 $errors=0;
 $check=static function(bool $ok,string $name)use(&$errors):void{
     echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;
