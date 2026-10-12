@@ -1,0 +1,26 @@
+name: Section 42 operational health
+on:
+  pull_request:
+    paths:
+      - 'admin/operations-health.php'
+      - 'tests/section42-operations-health.php'
+      - '.github/workflows/section42-operations-health.yml'
+  push:
+    paths:
+      - 'admin/operations-health.php'
+      - 'tests/section42-operations-health.php'
+      - '.github/workflows/section42-operations-health.yml'
+jobs:
+  operational-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP version
+        run: php -v
+      - name: PHP syntax
+        run: |
+          php -l admin/operations-health.php
+          php -l tests/section42-operations-health.php
+      - name: Static boundary checks
+        run: php tests/section42-operations-health.php
