@@ -29,6 +29,7 @@ jobs:
         run: |
           node --check assets/js/app.js
           node --check assets/js/library.js
+          node --check assets/js/accessibility.js
 
       - name: Admin JavaScript syntax
         run: |
@@ -98,3 +99,4 @@ jobs:
           php tests/v1336-section37-inquiries.php
           php tests/v1337-section38-photo-gallery.php
           php tests/v1338-section39-public-search.php
+          php tests/v1339-section40-accessibility-pwa.php

@@ -1,4 +1,18 @@
-NaN# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
+# Stonefellow v1.3.39 — Section 40: Accessibility, PWA & Mobile Resilience
+
+- Added installable Stonefellow PWA manifest with standalone launch behavior.
+- Added privacy-safe service worker caching only the static public shell.
+- Added accessible offline fallback; API/account/Admin/private pages are never cached.
+- Added progressive Install Stonefellow control.
+- Added skip navigation and focusable main content.
+- Added modal semantics, focus trapping/restoration and Escape handling for drawers.
+- Added SPA aria-current synchronization.
+- Added reduced-motion, forced-colors, focus-visible and 44px coarse-pointer support.
+- Added secure-context service-worker registration and online/offline announcements.
+- App advances to **1.3.39**.
+- DB target remains **1.3.32**; no migration is introduced.
+
+# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
 
 - Added the single-artist **Photo Gallery & Visual Archive** system.
 - Added Draft, Published and Archived gallery lifecycle with explicit Admin confirmation for visibility changes.

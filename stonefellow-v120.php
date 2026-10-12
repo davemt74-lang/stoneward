@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.38');
+define('SF_BUILD', '1.3.39');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -32,6 +32,11 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="<?=sf_h(!empty($siteSettings['media_app_icon'])?$siteSettings['media_app_icon']:'assets/icons/stonefellow-pwa.svg')?>">
 <?php if($themeMeta['mode']==='system'): ?>  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="<?=sf_h($themeMeta['dark'])?>">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="<?=sf_h($themeMeta['light'])?>">
 <?php else: ?>  <meta name="theme-color" content="<?=sf_h($themeMeta[$themeMeta['mode']])?>">
@@ -59,6 +64,8 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <style id="stonefellowTheme"><?=sf_theme_css($activeTheme)?></style>
 </head>
 <body class="<?=sf_h(trim(sf_theme_body_classes($activeTheme).' '.(($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':'')))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
+<a class="skip-link" href="#mainContent">Skip to main content</a>
+  <div id="a11yStatus" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <?php if($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!==''): ?><div class="site-announcement"><?=sf_h($siteSettings['announcement_text'])?></div><?php endif; ?>
 <?php if($siteSettings['splash_enabled']): ?>
   <section id="splashScreen" class="splash-screen" data-revision="<?=sf_h((string)$siteSettings['splash_revision'])?>" aria-label="Stonefellow welcome">
@@ -101,6 +108,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="?view=plans" data-view="plans">Plans</a>
           <a href="about" data-view="about">About</a>
           <a href="contact" data-view="contact">Contact</a>
+          <button id="installAppButton" class="menu-install" type="button" hidden>Install Stonefellow</button>
           <a href="?view=privacy" data-view="privacy">Privacy</a>
           <a href="?view=terms" data-view="terms">Terms</a>
 <?php if($currentUser): ?>
@@ -128,9 +136,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 
 <?php if($currentUser): ?>
   <div id="notificationBackdrop" class="drawer-backdrop" hidden></div>
-  <aside id="notificationDrawer" class="notification-drawer" hidden aria-label="Account activity">
+  <aside id="notificationDrawer" class="notification-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="activityDrawerTitle">
     <div class="drawer-head">
-      <div><span class="drawer-kicker">STONEFELLOW</span><h2>Activity</h2></div>
+      <div><span class="drawer-kicker">STONEFELLOW</span><h2 id="activityDrawerTitle">Activity</h2></div>
       <button id="notificationClose" type="button" aria-label="Close activity drawer">×</button>
     </div>
     <div class="drawer-tabs" role="tablist" aria-label="Activity views">
@@ -143,7 +151,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   </aside>
 <?php endif; ?>
 
-  <main class="stage">
+  <main id="mainContent" class="stage" tabindex="-1">
     <section class="agent-stage" aria-label="Stonefellow Agent">
       <button id="agentOrb" class="agent-orb" type="button" aria-label="Stonefellow Agent">
         <span class="orb-core"></span><span class="orb-ring ring-a"></span><span class="orb-ring ring-b"></span>
@@ -160,9 +168,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   </main>
 
   <div id="queueBackdrop" class="drawer-backdrop queue-backdrop" hidden></div>
-  <aside id="queueDrawer" class="queue-drawer" hidden aria-label="Up Next queue">
+  <aside id="queueDrawer" class="queue-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="queueDrawerTitle">
     <div class="queue-drawer-head">
-      <div><span class="drawer-kicker">STONEFELLOW</span><h2>Up Next</h2></div>
+      <div><span class="drawer-kicker">STONEFELLOW</span><h2 id="queueDrawerTitle">Up Next</h2></div>
       <button id="queueClose" type="button" aria-label="Close Up Next queue">×</button>
     </div>
     <div class="queue-drawer-tools"><span id="queueDrawerCount">0 tracks</span><button id="queueClear" type="button">Clear queue</button></div>
@@ -223,5 +231,6 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/releases.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/library.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/accessibility.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
 </body>
 </html>
