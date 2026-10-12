@@ -196,9 +196,21 @@ function sf_site_search_add(array &$rows,string $query,string $type,string $id,s
     if($id===''||$title==='')return;$match=sf_search_score_document($query,array_merge(['title'=>$title,'release'=>'','description'=>$snippet],$fields));if($query!==''&&$match['score']<=0)return;
     $rows[]=array_merge(['type'=>$type,'id'=>$id,'slug'=>$slug,'title'=>$title,'subtitle'=>$subtitle,'snippet'=>sf_clean_text(preg_replace('/\s+/u',' ',strip_tags($snippet))??$snippet,500),'image'=>$image,'url'=>$url,'score'=>(float)$match['score'],'reason'=>$match['reason']?:ucfirst($type).' match'],$extra);
 }
+function sf_site_search_public_track_fields(array $t): array {
+    $songbook=function_exists('sf_songbook_get')?sf_songbook_get((string)($t['id']??''),true):null;
+    return [
+      'title'=>(string)($t['title']??''),
+      'release'=>(string)($t['release']??''),
+      'story'=>(string)($t['story']??''),
+      'mood'=>array_values(array_filter(array_map('strval',(array)($t['mood']??[])))),
+      'themes'=>array_values(array_filter(array_map('strval',(array)($t['themes']??[])))),
+      'credits'=>array_values(array_filter(array_map('strval',(array)($t['credits']??[])))),
+      'lyrics'=>$songbook?(string)($t['lyrics']??''):'',
+    ];
+}
 function sf_site_search_public_tracks(string $query,array &$rows): void {
     if(!function_exists('sf_seo_public_track'))return;
-    foreach(sf_catalog() as $t){$id=(string)($t['id']??'');if($id===''||!sf_seo_public_track($id))continue;$media=function_exists('sf_media_public_links')?sf_media_public_links('track',$id):[];$image=sf_site_search_image_from_media($media,['primary_artwork','artwork']);$fields=sf_search_track_fields($t);sf_site_search_add($rows,$query,'track',$id,'',(string)($t['title']??$id),(string)($t['release']??''),(string)($t['story']??''),$image,'track/'.rawurlencode($id),$fields,['duration'=>(int)($t['duration']??0)]);}
+    foreach(sf_catalog() as $t){$id=(string)($t['id']??'');if($id===''||!sf_seo_public_track($id))continue;$media=function_exists('sf_media_public_links')?sf_media_public_links('track',$id):[];$image=sf_site_search_image_from_media($media,['primary_artwork','artwork']);$fields=sf_site_search_public_track_fields($t);sf_site_search_add($rows,$query,'track',$id,'',(string)($t['title']??$id),(string)($t['release']??''),(string)($t['story']??''),$image,'track/'.rawurlencode($id),$fields,['duration'=>(int)($t['duration']??0)]);}
 }
 function sf_site_search_public_releases(string $query,array &$rows): void {
     if(!function_exists('sf_seo_public_release'))return;$trackMap=sf_track_map();
@@ -226,7 +238,7 @@ function sf_site_search_public_products(string $query,array &$rows): void {
 }
 function sf_site_search_public_campaigns(string $query,array &$rows): void {
     if(!function_exists('sf_campaign_list')||!function_exists('sf_campaign_is_live'))return;
-    foreach(sf_campaign_list(500) as $c){if(!sf_campaign_is_live($c))continue;$id=(string)($c['id']??'');$slug=(string)($c['slug']??'');if($id===''||$slug==='')continue;$landing=(array)($c['landing']??[]);$title=(string)($landing['headline']??$c['headline']??$c['name']??$slug);$snippet=(string)($landing['body']??$c['body_text']??'');sf_site_search_add($rows,$query,'campaign',$id,$slug,$title,'Stonefellow offer',$snippet,(string)($c['artwork']??''),'campaign/'.rawurlencode($slug),['description'=>$snippet,'metadata'=>[(string)($c['name']??'')]]);}
+    foreach(sf_campaign_list(500) as $c){if(!sf_campaign_is_live($c))continue;$id=(string)($c['id']??'');$slug=(string)($c['slug']??'');if($id===''||$slug==='')continue;$landing=(array)($c['landing']??[]);$title=sf_clean_text((string)($landing['headline']??''),220);$snippet=sf_clean_text((string)($landing['body']??''),6000);if($title==='')continue;sf_site_search_add($rows,$query,'campaign',$id,$slug,$title,'Stonefellow offer',$snippet,(string)($c['artwork']??''),'campaign/'.rawurlencode($slug),['description'=>$snippet]);}
 }
 function sf_site_search(array $raw): array {
     $p=sf_site_search_params($raw);$q=(string)$p['q'];$rows=[];if($q==='')return ['query'=>$p,'normalized_query'=>'','results'=>[],'result_count'=>0,'returned_count'=>0,'counts'=>[],'suggestions'=>[],'generated_at'=>gmdate('c')];
