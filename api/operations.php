@@ -69,6 +69,7 @@ function sf_listen_record(?int $userId,string $sessionKey,string $trackId,string
     sf_ops_ensure_schema();
     if(!in_array($eventType,['start','resume','pause','complete','progress','skip'],true))throw new InvalidArgumentException('Unsupported listening event.');
     if(!preg_match('/^[A-Za-z0-9._:-]{1,180}$/',$trackId)||!isset(sf_track_map()[$trackId]))throw new InvalidArgumentException('Invalid track.');
+    if($userId&&function_exists('sf_privacy_listening_history_enabled')&&!sf_privacy_listening_history_enabled($userId))$userId=null;
     $sessionKey=preg_replace('/[^A-Za-z0-9._:-]/','',$sessionKey)??'';if($sessionKey==='')$sessionKey=bin2hex(random_bytes(12));$sessionKey=substr($sessionKey,0,128);
     $window=$eventType==='progress'?20:2;$cut=gmdate('c',time()-$window);$dupe=sf_db()->prepare('SELECT id FROM listening_events WHERE session_key=? AND track_id=? AND event_type=? AND created_at>=? ORDER BY id DESC LIMIT 1');$dupe->execute([$sessionKey,$trackId,$eventType,$cut]);if($dupe->fetchColumn()!==false)return;
     $q=sf_db()->prepare('INSERT INTO listening_events(user_id,session_key,track_id,event_type,position_seconds,duration_seconds,source,created_at) VALUES(?,?,?,?,?,?,?,?)');
