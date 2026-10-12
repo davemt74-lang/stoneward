@@ -28,6 +28,12 @@ function sf_video_media(int $id,bool $publicOnly=false): array {
     ];}
     return $out;
 }
+function sf_video_caption_valid(array $media): bool {
+    if((string)($media['extension']??'')!=='vtt'||!in_array((string)($media['mime_type']??''),['text/vtt','text/plain'],true))return false;
+    $asset=function_exists('sf_media_asset')?sf_media_asset((int)($media['asset_id']??0)):null;if(!$asset)return false;
+    $root=realpath(SF_ROOT.'/storage/media');$file=realpath(SF_ROOT.'/'.ltrim((string)($asset['stored_path']??''),'/'));if(!$root||!$file||!str_starts_with($file,$root.DIRECTORY_SEPARATOR)||!is_file($file))return false;
+    $head=file_get_contents($file,false,null,0,256);if(!is_string($head))return false;$head=preg_replace('/^\xEF\xBB\xBF/','',$head)??$head;return str_starts_with(ltrim($head," \t\r\n"),'WEBVTT');
+}
 function sf_video_entity_refs(array $row): array {
     $refs=[];$trackId=(string)($row['track_id']??'');$releaseId=(string)($row['release_id']??'');$showId=(string)($row['show_id']??'');
     if($trackId!==''){$t=function_exists('sf_seo_public_track')?sf_seo_public_track($trackId):(sf_track_map()[$trackId]??null);if($t)$refs[]=['type'=>'track','id'=>$trackId,'title'=>(string)($t['title']??$trackId)];}
@@ -40,11 +46,14 @@ function sf_video_readiness(array $row): array {
     $videos=array_values(array_filter($media,fn($m)=>$m['role']==='video'&&$m['category']==='video'));$posters=array_values(array_filter($media,fn($m)=>$m['role']==='poster'&&$m['category']==='image'));$captions=array_values(array_filter($media,fn($m)=>$m['role']==='captions'));
     $add('title',trim((string)($row['title']??''))!=='','Video title is required.');
     $add('video',count($videos)===1,'Publish exactly one managed public video asset.');
+    $playbackOk=count($videos)===1&&in_array((string)$videos[0]['mime_type'],['video/mp4','video/webm'],true)&&in_array((string)$videos[0]['extension'],['mp4','webm'],true);$add('playback_format',$playbackOk,'Public playback requires a browser-safe MP4 or WebM asset; MOV may remain a private/source asset.');
+    $duration=count($videos)===1?(float)($videos[0]['duration']??0):0.0;$add('duration',$duration>0,'Public video requires known media duration from managed metadata.');
     $add('poster',count($posters)===1,'Publish exactly one public poster image.');
-    $captionOk=true;foreach($captions as $c)if($c['extension']!=='vtt'||!in_array($c['mime_type'],['text/vtt','text/plain'],true))$captionOk=false;$add('captions',$captionOk,'Caption attachments must be managed WebVTT files.');
+    $posterOk=count($posters)===1&&min((int)($posters[0]['width']??0),(int)($posters[0]['height']??0))>=360&&max((int)($posters[0]['width']??0),(int)($posters[0]['height']??0))>=640;$add('poster_dimensions',$posterOk,'Public poster must be at least 640×360 in either landscape or portrait orientation.');
+    $captionOk=count($captions)<=1;foreach($captions as $c)if(!sf_video_caption_valid($c))$captionOk=false;$add('captions',$captionOk,'Attach at most one managed WebVTT caption file with a valid WEBVTT header.');
     $lang=(string)($row['caption_language']??'en');$add('caption_language',(bool)preg_match('/^[a-z]{2,3}(?:-[A-Z]{2})?$/',$lang),'Use a caption language code such as en or en-US.');
     $links=[['track',(string)($row['track_id']??'')],['release',(string)($row['release_id']??'')],['show',(string)($row['show_id']??'')]];$validLinks=true;foreach($links as [$type,$id]){if($id==='')continue;$ok=$type==='track'?(function_exists('sf_seo_public_track')&&sf_seo_public_track($id)):($type==='release'?(function_exists('sf_seo_public_release')&&sf_seo_public_release($id)):(function_exists('sf_seo_public_show')&&sf_seo_public_show($id)));if(!$ok)$validLinks=false;}$add('entity_links',$validLinks,'Linked song, release and show records must be currently public.');
-    $duration=(float)($videos[0]['duration']??0);$chapters=(array)($row['chapters']??sf_video_decode($row['chapters_json']??'',[]));$chapterOk=true;$prev=-1;foreach($chapters as $c){$at=(float)($c['seconds']??-1);if($at<0||$at<=$prev||($duration>0&&$at>=$duration))$chapterOk=false;$prev=$at;}$add('chapters',$chapterOk,'Chapter times must be unique, ascending and inside video duration.');
+    $chapters=(array)($row['chapters']??sf_video_decode($row['chapters_json']??'',[]));$chapterOk=true;$prev=-1;foreach($chapters as $c){$at=(float)($c['seconds']??-1);if($at<0||$at<=$prev||($duration>0&&$at>=$duration))$chapterOk=false;$prev=$at;}$add('chapters',$chapterOk,'Chapter times must be unique, ascending and inside video duration.');
     $passed=count(array_filter($checks,fn($c)=>!empty($c['ok'])));$blockers=array_values(array_map(fn($c)=>(string)$c['detail'],array_filter($checks,fn($c)=>empty($c['ok']))));return ['ready'=>!$blockers,'score'=>count($checks)?(int)round($passed*100/count($checks)):0,'checks'=>$checks,'blockers'=>$blockers,'duration'=>$duration];
 }
 function sf_video_get(int|string $id,bool $publicOnly=false): ?array {
