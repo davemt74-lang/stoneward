@@ -73,6 +73,8 @@ function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,
     if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
     if(!sf_agent_tool_executable($toolId,'admin',true))throw new InvalidArgumentException('Action is not available for governed preparation.');
     $payload=sf_agent_action_normalize_campaign($raw);$hash=sf_agent_action_hash($toolId,$payload);
+    $payloadJson=json_encode($payload,JSON_THROW_ON_ERROR);
+    if(strlen($payloadJson)>131072)throw new InvalidArgumentException('Campaign proposal exceeds the permitted size.');
     sf_agent_actions_ensure_schema();$db=sf_db();
     $q=$db->prepare('SELECT id,payload_hash FROM agent_action_proposals WHERE admin_user_id=? AND request_key=?');
     $q->execute([$adminId,$requestKey]);$existing=$q->fetch(PDO::FETCH_ASSOC);
@@ -80,10 +82,14 @@ function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,
         if(!hash_equals((string)$existing['payload_hash'],$hash))throw new RuntimeException('An existing request key has different content.');
         return sf_agent_action_get($adminId,(string)$existing['id']);
     }
+    // Keep proposal storage bounded while preserving idempotent existing requests.
+    $quota=$db->prepare('SELECT COUNT(*) FROM agent_action_proposals WHERE admin_user_id=? AND created_at>=?');
+    $quota->execute([$adminId,gmdate('c',time()-3600)]);
+    if((int)$quota->fetchColumn()>=40)throw new RuntimeException('Too many recent draft proposals; review the existing ones.');
     $id='act_'.bin2hex(random_bytes(16));$now=gmdate('c');
     try{
         $db->prepare('INSERT INTO agent_action_proposals(id,admin_user_id,request_key,tool_id,status,payload_json,payload_hash,result_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-          ->execute([$id,$adminId,$requestKey,$toolId,'proposed',json_encode($payload,JSON_THROW_ON_ERROR),$hash, '{}',$now]);
+          ->execute([$id,$adminId,$requestKey,$toolId,'proposed',$payloadJson,$hash, '{}',$now]);
     }catch(PDOException $e){
         $q->execute([$adminId,$requestKey]);$existing=$q->fetch(PDO::FETCH_ASSOC);
         if(!$existing||!hash_equals((string)$existing['payload_hash'],$hash))throw new RuntimeException('Proposal could not be created safely.');
