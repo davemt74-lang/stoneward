@@ -67,7 +67,7 @@ ok38(str_contains($adminMain,'photo galler|photo archive|visual archive'),'Admin
 
 ok38(str_contains($app,'async function renderPhotos')&&str_contains($app,'async function renderPhotoGallery'),'public app has Photo hub and gallery detail renderers');
 ok38(str_contains($app,"view==='photo'&&slug")&&str_contains($app,"new URL('photos/'+slug"),'SPA uses canonical /photos/{slug} route');
-ok38(str_contains($app,"['music','releases','shows','store','about','archive','videos','photos']"),'SPA treats /photos as a canonical public hub');
+ok38(str_contains($app,"if(view==='photos')return finish(new URL('photos',base))"),'SPA treats /photos as a dedicated canonical public hub');
 ok38(str_contains($app,'openGalleryLightbox')&&str_contains($app,"aria-modal','true")&&str_contains($app,"e.key==='Escape'"),'photo detail has keyboard-aware modal lightbox');
 ok38(str_contains($app,'alt_text')&&str_contains($app,'Photo: ')&&str_contains($app,'copyright'),'public gallery renders accessibility text, credits and copyright metadata');
 ok38(str_contains($app,"galleryEvent(Number(g.id),'view')")&&str_contains($app,"'photo_open'")&&str_contains($app,"'entity_open'"),'public gallery records truthful gallery interactions');
