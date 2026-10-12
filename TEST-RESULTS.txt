@@ -1,33 +1,38 @@
-Stonefellow v1.3.36 Section 37 hardened release gate
-=====================================================
+Stonefellow v1.3.37 Section 38 hardened release gate
+====================================================
 
 Required:
 - PHP syntax across runtime/Admin/tests
 - Public JavaScript syntax
 - Admin JavaScript syntax
-- Sections 1–36 inherited regression suites
-- Section 37 Contact, Booking & Professional Inquiries certification
+- Sections 1–37 inherited regression suites
+- Section 38 Photo Gallery & Visual Archive certification
 
-Hardened coverage:
-- professional/fan CRM consent separation
-- bounded inquiry types/statuses
-- HTTPS website validation
-- explicit inquiry-only contact permission
-- honeypot + rate limiting
-- 15-minute duplicate intake suppression
-- path-only source attribution
-- public track/release validation
-- governed status transitions
-- truthful transactional reply delivery state
-- backend duplicate-reply suppression
-- failed-reply retry
-- Admin audit + Agent Brain privacy
-- canonical Contact route, SEO and public Agent routing
-- app 1.3.36 / schema 1.3.31 / migration 032
+Section 38 certification includes:
+- bounded gallery lifecycle and unique public slugs
+- draft-before-publish workflow
+- exactly one public cover and at least three public gallery photos
+- minimum image dimensions and public alt text
+- public link integrity to releases/shows/stories
+- central Media Library image-only cover/photo relationships
+- orphan relationship rejection
+- governed public/download visibility and cover publication
+- draft/unready gallery media blocking
+- preserved Video Hub draft/public media boundary
+- Admin audit + Agent Brain
+- Photo hub/detail/lightbox accessibility and sharing
+- truthful view/photo/entity event allowlist + rate limiting
+- public-only Agent gallery context
+- ImageGallery/ImageObject SEO
+- sitemap/public-route privacy
+- preserved Section 36 Video Hub confirmation/audit/routing contracts
+- preserved Section 37 Contact route handoff
+- collection-selector safety in the shared Media UI
+- app 1.3.37 / schema 1.3.32 / migration 033
 
-Measured hardened candidate:
+Measured hardened implementation candidate:
 - Release gate: PASS
-- Explicit PASS lines: 2089
+- Explicit PASS lines: 2148
 - PHP warnings: 0
 - Failures: 0
 
