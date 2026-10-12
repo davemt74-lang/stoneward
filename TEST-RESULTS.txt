@@ -1,15 +1,36 @@
-Stonefellow v1.3.39 Section 40 release gate
-==========================================
+Stonefellow v1.3.40 Section 41 hardened release gate
+====================================================
 
-Section 40: Accessibility, PWA & Mobile Resilience
+Required:
+- PHP syntax across runtime/Admin/tests
+- Public JavaScript syntax
+- Admin JavaScript syntax
+- Sections 1–40 inherited regression suites
+- Section 41 Fan Account, Profile & Privacy Center certification
 
-Measured exact implementation head:
+Section 41 certification covers:
+- SQLite/MySQL profile/privacy schema
+- validated timezone/country/locale
+- listening-history preference enforcement in the real write path
+- personalization preference enforcement in the recommendation/Agent profile
+- comprehensive JSON account export with no deliberate secret export
+- confirmed listening/search/personalization/Agent-history reset actions
+- public Privacy policy vs account-privacy route separation
+- password + typed DELETE account closure
+- admin/billing/fulfillment/support closure blockers
+- atomic purge/anonymization rollback behavior
+- random closed-account alias
+- session/token/subscription/account-owned data purge
+- CRM + transactional-email identity anonymization
+- retained order/invoice/refund/support disclosure
+- Artist Theme integration
+- v1.3.40 PWA cache/version synchronization
+- migration 034 / schema 1.3.33
+
+Measured hardened implementation candidate:
 - Release gate: PASS
-- Explicit PASS lines: 2286
+- Explicit PASS lines: 2358
 - PHP warnings: 0
 - Failures: 0
-- Sections 1–39 inherited suites: PASS
-- Section 40 certification: PASS
-- DB migration: none required (target remains 1.3.32)
 
-Final documented head is revalidated before merge.
+The final documented PR head is revalidated before merge.
