@@ -1,0 +1,119 @@
+<?php
+declare(strict_types=1);
+/**
+ * Section 44B–F: durable, review-first governed campaign draft operations.
+ * Proposal IDs are server-created; authenticated admin identity is server-side.
+ * Any interruption after execution starts is held for operator review.
+ */
+function sf_agent_actions_ensure_schema(): void {
+    $db=sf_db();$sqlite=(string)(sf_db_config()['driver']??'')==='sqlite';
+    if($sqlite){
+        $db->exec("CREATE TABLE IF NOT EXISTS agent_action_proposals (
+          id TEXT PRIMARY KEY, admin_user_id INTEGER NOT NULL, request_key TEXT NOT NULL,
+          tool_id TEXT NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL,
+          payload_hash TEXT NOT NULL, result_json TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT NOT NULL, approved_at TEXT NULL, executed_at TEXT NULL,
+          UNIQUE(admin_user_id,request_key),
+          FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE CASCADE)");
+    }else{
+        $db->exec("CREATE TABLE IF NOT EXISTS agent_action_proposals (
+          id VARCHAR(64) PRIMARY KEY, admin_user_id BIGINT UNSIGNED NOT NULL,
+          request_key VARCHAR(100) NOT NULL, tool_id VARCHAR(80) NOT NULL,
+          status VARCHAR(32) NOT NULL, payload_json LONGTEXT NOT NULL,
+          payload_hash CHAR(64) NOT NULL, result_json LONGTEXT NOT NULL,
+          created_at VARCHAR(40) NOT NULL, approved_at VARCHAR(40) NULL,
+          executed_at VARCHAR(40) NULL, UNIQUE KEY uq_agent_action_request(admin_user_id,request_key),
+          INDEX idx_agent_action_owner_status(admin_user_id,status)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+}
+function sf_agent_action_normalize_campaign(array $input): array {
+    $graph=is_array($input['graph']??null)?$input['graph']:sf_campaign_graph_default();
+    $checked=sf_campaign_graph_validate($graph);
+    if(!$checked['ok'])throw new InvalidArgumentException('Campaign graph is invalid: '.implode(' ',(array)$checked['errors']));
+    $name=sf_clean_text($input['name']??'',180);
+    if($name==='')throw new InvalidArgumentException('Campaign name is required.');
+    return [
+        'id'=>0,'name'=>$name,'status'=>'draft','goal'=>sf_clean_text($input['goal']??'fan_acquisition',80),
+        'headline'=>sf_clean_text($input['headline']??'',255),
+        'body_text'=>sf_clean_text($input['body_text']??'',12000),
+        'graph'=>$checked['graph'],'audience'=>is_array($input['audience']??null)?$input['audience']:[],
+        'landing'=>is_array($input['landing']??null)?$input['landing']:[],
+    ];
+}
+function sf_agent_action_hash(string $toolId,array $payload): string {
+    return hash('sha256',$toolId.'|'.json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
+}
+function sf_agent_action_public(array $row): array {
+    return [
+        'id'=>(string)$row['id'],'tool_id'=>(string)$row['tool_id'],'status'=>(string)$row['status'],
+        'payload_hash'=>(string)$row['payload_hash'],'payload'=>json_decode((string)$row['payload_json'],true)?:[],
+        'result'=>json_decode((string)$row['result_json'],true)?:[],
+        'created_at'=>(string)$row['created_at'],'approved_at'=>$row['approved_at']??null,
+    ];
+}
+function sf_agent_action_get(int $adminId,string $id): ?array {
+    if($adminId<1||!preg_match('/^act_[a-f0-9]{32}$/D',$id))return null;
+    sf_agent_actions_ensure_schema();
+    $q=sf_db()->prepare('SELECT * FROM agent_action_proposals WHERE id=? AND admin_user_id=? LIMIT 1');
+    $q->execute([$id,$adminId]);$row=$q->fetch(PDO::FETCH_ASSOC);
+    return $row?sf_agent_action_public($row):null;
+}
+function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,array $raw): array {
+    if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
+    if($toolId!=='campaign_draft_save')throw new InvalidArgumentException('Action is not available for governed preparation.');
+    $payload=sf_agent_action_normalize_campaign($raw);$hash=sf_agent_action_hash($toolId,$payload);
+    sf_agent_actions_ensure_schema();$db=sf_db();
+    $q=$db->prepare('SELECT id,payload_hash FROM agent_action_proposals WHERE admin_user_id=? AND request_key=?');
+    $q->execute([$adminId,$requestKey]);$existing=$q->fetch(PDO::FETCH_ASSOC);
+    if($existing){
+        if(!hash_equals((string)$existing['payload_hash'],$hash))throw new RuntimeException('An existing request key has different content.');
+        return sf_agent_action_get($adminId,(string)$existing['id']);
+    }
+    $id='act_'.bin2hex(random_bytes(16));$now=gmdate('c');
+    try{
+        $db->prepare('INSERT INTO agent_action_proposals(id,admin_user_id,request_key,tool_id,status,payload_json,payload_hash,result_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
+          ->execute([$id,$adminId,$requestKey,$toolId,'proposed',json_encode($payload,JSON_THROW_ON_ERROR),$hash, '{}',$now]);
+    }catch(PDOException $e){
+        $q->execute([$adminId,$requestKey]);$existing=$q->fetch(PDO::FETCH_ASSOC);
+        if(!$existing||!hash_equals((string)$existing['payload_hash'],$hash))throw new RuntimeException('Proposal could not be created safely.');
+        return sf_agent_action_get($adminId,(string)$existing['id']);
+    }
+    return sf_agent_action_get($adminId,$id);
+}
+function sf_agent_action_approve(int $adminId,string $id,string $expectedHash,string $typed): array {
+    if($typed!=='APPROVE')throw new InvalidArgumentException('Type APPROVE to confirm this exact draft.');
+    $proposal=sf_agent_action_get($adminId,$id);
+    if(!$proposal)throw new InvalidArgumentException('Proposal not found.');
+    if(!preg_match('/^[a-f0-9]{64}$/D',$expectedHash)||!hash_equals($proposal['payload_hash'],$expectedHash))
+        throw new RuntimeException('The proposal changed; approval was rejected.');
+    if($proposal['status']==='approved'||$proposal['status']==='completed')return $proposal;
+    if($proposal['status']!=='proposed')throw new RuntimeException('This proposal requires administrator review.');
+    $q=sf_db()->prepare("UPDATE agent_action_proposals SET status='approved',approved_at=? WHERE id=? AND admin_user_id=? AND status='proposed'");
+    $q->execute([gmdate('c'),$id,$adminId]);
+    return sf_agent_action_get($adminId,$id);
+}
+function sf_agent_action_execute(int $adminId,string $id): array {
+    $p=sf_agent_action_get($adminId,$id);
+    if(!$p)throw new InvalidArgumentException('Proposal not found.');
+    if($p['status']==='completed')return $p;
+    if($p['status']!=='approved')throw new RuntimeException('Proposal must be approved; interrupted work requires review.');
+    if($p['tool_id']!=='campaign_draft_save')throw new RuntimeException('This tool cannot be executed here.');
+    $db=sf_db();
+    $q=$db->prepare("UPDATE agent_action_proposals SET status='executing' WHERE id=? AND admin_user_id=? AND status='approved'");
+    $q->execute([$id,$adminId]);
+    if($q->rowCount()!==1)throw new RuntimeException('Another operation is handling this proposal.');
+    try {
+        // Re-validate from the immutable approved snapshot. Never publish or send.
+        $campaign=sf_agent_action_normalize_campaign((array)$p['payload']);
+        $result=sf_campaign_save($campaign,$adminId);
+        $public=['campaign_id'=>(int)$result['id'],'status'=>'draft','name'=>(string)$result['name']];
+        $db->prepare("UPDATE agent_action_proposals SET status='completed',result_json=?,executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'")
+           ->execute([json_encode($public,JSON_THROW_ON_ERROR),gmdate('c'),$id,$adminId]);
+    }catch(Throwable $e) {
+        $db->prepare("UPDATE agent_action_proposals SET status='review_required',executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'")
+           ->execute([gmdate('c'),$id,$adminId]);
+        throw new RuntimeException('Action did not complete with confirmed results. Review the campaign list before retrying.');
+    }
+    return sf_agent_action_get($adminId,$id);
+}
