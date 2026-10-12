@@ -139,3 +139,4 @@ jobs:
           php tests/section45i-journey-recovery.php
           php tests/section45j-release.php
           php tests/section46a-brain-isolation.php
+          php tests/section46b-customer-brain.php
