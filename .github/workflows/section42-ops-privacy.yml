@@ -1,0 +1,27 @@
+name: Section 42 operational privacy
+on:
+  pull_request:
+    paths:
+      - 'admin/operations-health.php'
+      - 'upgrade.php'
+      - 'tests/section42-ops-privacy.php'
+      - '.github/workflows/section42-ops-privacy.yml'
+  push:
+    paths:
+      - 'admin/operations-health.php'
+      - 'upgrade.php'
+      - 'tests/section42-ops-privacy.php'
+      - '.github/workflows/section42-ops-privacy.yml'
+jobs:
+  ops-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax
+        run: |
+          php -l upgrade.php
+          php -l admin/operations-health.php
+          php -l tests/section42-ops-privacy.php
+      - name: Operational privacy
+        run: php tests/section42-ops-privacy.php

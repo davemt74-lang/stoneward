@@ -46,14 +46,14 @@ function sf_upgrade_format_bytes(int $bytes): string {
 
 $installed=false;$fatal='';$admin=null;$message='';$messageType='';$runResult=null;$backup=null;$integrity=null;
 try{$installed=sf_installed();if($installed){sf_db()->query('SELECT 1');$admin=sf_upgrade_admin_from_session();}}
-catch(Throwable $e){$fatal=$e->getMessage();}
+catch(Throwable $e){$fatal='The database could not be inspected. Review protected server logs and database configuration.';}
 
 if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'&&$fatal===''){
     $action=(string)($_POST['action']??'');
     if(!sf_upgrade_csrf_valid((string)($_POST['csrf']??''))){$message='The upgrade security token expired. Reload this page and try again.';$messageType='error';}
     elseif($action==='login'){
         try{$admin=sf_upgrade_admin_login((string)($_POST['email']??''),(string)($_POST['password']??''));if(!$admin){usleep(250000);$message='Administrator email or password is incorrect.';$messageType='error';}}
-        catch(Throwable $e){$message=$e->getMessage();$messageType='error';}
+        catch(Throwable $e){$message='Administrator authentication could not be completed. Review protected server logs.';$messageType='error';}
     }elseif($action==='logout'){
         sf_user_session();unset($_SESSION['sf_user_id'],$_SESSION['sf_csrf'],$_SESSION['sf_upgrade_csrf']);session_regenerate_id(true);$admin=null;$message='Upgrade session signed out.';$messageType='info';
     }elseif($action==='run'){
@@ -79,8 +79,8 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'&&$fatal===''){
                     $message='Database upgrade completed successfully. Stonefellow schema is current at '.SF_DB_SCHEMA_TARGET.'.';$messageType='success';
                 }
             }catch(Throwable $e){
-                $message=$e->getMessage();$messageType='error';
-                try{if($admin)sf_log_site_event('error','database_upgrade',$e->getMessage());}catch(Throwable $ignore){}
+                $message='Database upgrade did not complete. Review the upgrade history and protected server logs before retrying.';$messageType='error';
+                try{if($admin)sf_log_site_event('error','database_upgrade','Upgrade failed: '.get_class($e));}catch(Throwable $ignore){}
             }finally{sf_upgrade_lock_release($lock);}
         }
     }
@@ -89,7 +89,7 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'&&$fatal===''){
 $status=null;$preflight=null;$runs=[];
 if($installed&&$fatal===''&&$admin){
     try{$status=sf_migration_status();$preflight=sf_migration_core_preflight();$runs=sf_upgrade_recent_runs(12);}
-    catch(Throwable $e){$fatal=$e->getMessage();}
+    catch(Throwable $e){$fatal='The database could not be inspected. Review protected server logs and database configuration.';}
 }
 ?>
 <!doctype html>
