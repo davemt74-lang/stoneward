@@ -1,0 +1,33 @@
+name: Stonefellow Certified Deploy ZIP
+on:
+  workflow_run:
+    workflows: [Stonefellow Release Gate]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  package:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout certified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Build deploy ZIP and SHA-256
+        run: bash scripts/release-zip.sh
+      - name: Show integrity results
+        run: |
+          (cd dist && sha256sum -c stonefellow-deploy.zip.sha256)
+          unzip -l dist/stonefellow-deploy.zip | tail -2
+      - name: Publish deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: stonefellow-certified-deploy
+          path: |
+            dist/stonefellow-deploy.zip
+            dist/stonefellow-deploy.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
