@@ -134,7 +134,7 @@ ok(str_contains($agent,"'type'=>'open_search'"),'Agent emits open-search action'
 ok(str_contains($agent,"'catalog_search'=>'Asks to find/search"),'JEV criteria include catalog search');
 ok(str_contains($agent,"'current_search_query'"),'Agent routing state receives current search context');
 ok(str_contains($app,"case'open_search'"),'client executes Agent open-search action');
-ok(str_contains($app,"search_query:$('#catalogSearch'"),'client sends current search query to Agent');
+ok(str_contains($app,"search_query:$('#siteSearchInput'")&&str_contains($app,"||$('#catalogSearch'"),'client sends active site-wide or catalog search query to Agent');
 
 ok(str_contains($core,'function sf_search_analytics'),'search intelligence analytics exists');
 ok(str_contains($core,"'click_through_rate'=>"),'search click-through rate is calculated');
