@@ -104,6 +104,37 @@ function sf_agent_action_approve(int $adminId,string $id,string $expectedHash,st
     $q->execute([gmdate('c'),$id,$adminId]);
     return sf_agent_action_get($adminId,$id);
 }
+/**
+ * Cancels only unexecuted drafts. A claimed operation cannot be cancelled
+ * because it may already have produced an external side effect.
+ */
+function sf_agent_action_cancel(int $adminId,string $id,string $typed): array {
+    if($typed!=='CANCEL')throw new InvalidArgumentException('Type CANCEL to cancel this pending proposal.');
+    $p=sf_agent_action_get($adminId,$id);
+    if(!$p)throw new InvalidArgumentException('Proposal not found.');
+    if($p['status']==='cancelled')return $p;
+    if(!in_array($p['status'],['proposed','approved'],true))throw new RuntimeException('The action may already have started; it cannot be cancelled automatically.');
+    $q=sf_db()->prepare("UPDATE agent_action_proposals SET status='cancelled' WHERE id=? AND admin_user_id=? AND status IN ('proposed','approved')");
+    $q->execute([$id,$adminId]);
+    if($q->rowCount()!==1)throw new RuntimeException('The proposal state changed; refresh its status.');
+    return sf_agent_action_get($adminId,$id);
+}
+/**
+ * Manual review is a terminal acknowledgement, NOT a replay, rollback or
+ * assertion that a draft was saved. A separate new proposal must be prepared.
+ */
+function sf_agent_action_reconcile(int $adminId,string $id,string $typed): array {
+    if($typed!=='RECONCILED')throw new InvalidArgumentException('Type RECONCILED after inspecting Campaign Builder.');
+    $p=sf_agent_action_get($adminId,$id);
+    if(!$p)throw new InvalidArgumentException('Proposal not found.');
+    if($p['status']==='reviewed_no_retry')return $p;
+    if(!in_array($p['status'],['executing','review_required'],true))throw new RuntimeException('Only interrupted or uncertain actions can be reconciled.');
+    $q=sf_db()->prepare("UPDATE agent_action_proposals SET status='reviewed_no_retry' WHERE id=? AND admin_user_id=? AND status IN ('executing','review_required')");
+    $q->execute([$id,$adminId]);
+    if($q->rowCount()!==1)throw new RuntimeException('Proposal status changed; refresh its details.');
+    return sf_agent_action_get($adminId,$id);
+}
+
 function sf_agent_action_execute(int $adminId,string $id): array {
     $p=sf_agent_action_get($adminId,$id);
     if(!$p)throw new InvalidArgumentException('Proposal not found.');
