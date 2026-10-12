@@ -140,3 +140,4 @@ jobs:
           php tests/section45j-release.php
           php tests/section46a-brain-isolation.php
           php tests/section46b-customer-brain.php
+          php tests/section46c-admin-brain.php
