@@ -1,3 +1,57 @@
+# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
+
+Stonefellow now includes a governed public photo archive for a **single artist**.
+
+## Photo Galleries
+
+Photo Galleries are managed inside **Admin → Media Library**. The feature does not add another sidebar workspace.
+
+Each gallery supports:
+- Draft, Published and Archived lifecycle
+- public slug
+- title and summary
+- optional event date and location
+- optional links to a public release, show or editorial story
+- featured state
+- private Admin notes
+- managed cover and photo relationships
+
+## Media Library workflow
+
+Gallery images remain normal reusable Media Library assets.
+
+Allowed gallery roles:
+- cover
+- photo
+
+A gallery must be saved as Draft before its media can be attached. Publication requires:
+- exactly one Public cover;
+- at least three Public photos;
+- cover and photos at least 1200×600 in either orientation;
+- alt text on every Public cover/photo;
+- valid currently-public linked release/show/story context.
+
+Photographer/creator credit is recommended and appears as a readiness warning when missing.
+
+## Public experience
+
+Published-ready galleries appear in the **Photos** hub and use canonical:
+
+`/photos/{slug}`
+
+The gallery detail page includes the cover, event/location context, connected public content, public images, credits/copyright and a keyboard-aware modal lightbox.
+
+## Privacy and governance
+
+Draft, archived or readiness-blocked galleries are not returned by the public gallery resolver, sitemap, Agent context or public Media Library relationship endpoint.
+
+The shared media endpoint also preserves the Video Hub publication boundary, so extending Media Library for galleries does not expose draft Video Hub assets.
+
+Application: **1.3.37**  
+Database schema target: **1.3.32**
+
+---
+
 # Stonefellow v1.3.36 — Section 37: Contact, Booking & Professional Inquiries
 
 Stonefellow now has a dedicated professional contact workflow for a **single artist**.
