@@ -53,7 +53,10 @@ ok36(str_contains($mediaCore,"'text/plain'=>['txt','vtt']")&&str_contains($media
 ok36(str_contains($mediaCore,"'video_feature'")&&str_contains($mediaCore,'Video feature not found.'),'Media Library allows only real Video Hub relationships');
 ok36(str_contains($mediaDelivery,"extension'])==='vtt'")&&str_contains($mediaDelivery,"\$mime='text/vtt'"),'managed VTT captions are served with browser-correct MIME');
 ok36(str_contains($mediaAdmin,"'video_feature'=>['poster']"),'Admin can publish exactly one governed video poster');
+ok36(str_contains($mediaAdmin,'Changing Video Hub media visibility requires explicit Admin confirmation.')&&str_contains($mediaAdmin,'Publishing a Video Hub poster requires explicit Admin confirmation.'),'server requires confirmation for Video Hub media visibility and poster publication');
+ok36(str_contains($mediaAdmin,'video_media_visibility_changed')&&str_contains($mediaAdmin,'sf_agent_brain_log'),'Video Hub media visibility changes are audited and sent to Agent Brain');
 ok36(str_contains($mediaJs,"captions:{label:'Captions'")&&str_contains($mediaJs,'videoHubPanel'),'Media Library exposes captions role and embedded Public Video Hub');
+ok36(str_contains($mediaJs,"entityType==='video_feature'")&&str_contains($mediaJs,'confirmed:true'),'Admin confirms governed Video Hub media visibility and poster publication');
 ok36(str_contains($mediaJs,'SFVideoAdmin?.renderInto'),'Media Library loads the Video Hub publisher in place');
 
 ok36(str_contains($adminShell,'assets/video.css')&&str_contains($adminShell,'assets/video.js'),'Admin shell loads Video Hub publisher assets');
@@ -70,7 +73,8 @@ ok36(str_contains($publicApi,'count($attempts)>=90'),'public video event writes 
 ok36(str_contains($app,"async function renderVideos()")&&str_contains($app,"async function renderVideo(slug)"),'public app provides Video Hub and focused video detail');
 ok36(str_contains($app,'controls preload="metadata" playsinline')&&!str_contains($app,'<video autoplay'),'public video playback never autoplays and uses native controls');
 ok36(str_contains($app,'kind="captions"')&&str_contains($app,'srclang='),'public video player attaches managed captions');
-foreach(['progress_25','progress_50','progress_75','complete','caption_on','chapter_seek','entity_open'] as $event)ok36(str_contains($app,"'".$event."'"),'public player emits truthful '.$event.' event');
+ok36(str_contains($app,"for(const mark of [25,50,75])")&&str_contains($app,"videoEvent(Number(v.id),'progress_'+mark"),'public player emits truthful progress_25/50/75 milestones through one guarded loop');
+foreach(['complete','caption_on','chapter_seek','entity_open'] as $event)ok36(str_contains($app,"'".$event."'"),'public player emits truthful '.$event.' event');
 ok36(str_contains($app,"shareButton('video'"),'public video detail uses the existing completed-share workflow');
 ok36(str_contains($app,"navigate('video',{slug:b.dataset.videoOpen})"),'Video Hub cards open canonical focused video routes');
 ok36(str_contains($css,'.video-hub')&&str_contains($css,'.video-player-shell')&&str_contains($css,'.video-chapters'),'public Video Hub/player/chapters have dedicated responsive styling');
