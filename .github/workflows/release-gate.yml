@@ -111,3 +111,4 @@ jobs:
           php tests/section43d-favorite-actions.php
           php tests/section43e-admin-campaign-brief.php
           php tests/section43f-voice-validation.php
+          php tests/section43g-proactive-consent.php
