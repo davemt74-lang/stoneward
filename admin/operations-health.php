@@ -31,6 +31,11 @@ function sf_ops_health_checks(): array {
             $status = sf_migration_status();
             $add('Migration checksums', (int)($status['drift'] ?? 1) === 0, 'Investigate migration drift before upgrading.');
             $add('Migrations current', (int)($status['pending'] ?? 1) === 0, 'Run the administrator-approved database upgrade.');
+            $recent = sf_upgrade_recent_runs(1);
+            if ($recent) {
+                $last = (string)($recent[0]['status'] ?? '');
+                $add('Last recorded upgrade outcome', $last === 'completed', 'Review the latest database upgrade attempt in upgrade.php; an interrupted or failed upgrade needs administrator review.');
+            }
         }
     } catch (Throwable $e) {
         $add('Database diagnostics', false, 'Review protected server logs and database configuration.');
