@@ -54,7 +54,7 @@ ok41(str_contains($mediaApi,"private, no-store"),'Admin media remains no-store')
 ok41(str_contains($perf,"type:'largest-contentful-paint'")&&str_contains($perf,"type:'layout-shift'")&&str_contains($perf,"type:'event'"),'browser runtime observes LCP, CLS and INP');
 ok41(str_contains($perf,"getEntriesByName('first-contentful-paint')")&&str_contains($perf,"responseStart-nav.requestStart"),'browser runtime measures FCP and TTFB');
 ok41(str_contains($perf,"img.decoding='async'")&&str_contains($perf,"img.loading='lazy'")&&str_contains($perf,"img.fetchPriority='high'"),'browser runtime applies decoding, lazy loading and LCP priority');
-ok41(str_contains($perf,"variant','thumb'")&&str_contains($perf,"variant','medium'")&&str_contains($perf,"variant','large'"),'browser runtime builds responsive Media Library srcset candidates');
+ok41(str_contains($perf,"make('thumb',320)")&&str_contains($perf,"make('medium',800)")&&str_contains($perf,"make('large',1600)"),'browser runtime builds responsive Media Library srcset candidates');
 ok41(str_contains($perf,'new MutationObserver'),'AJAX-inserted images are optimized after SPA renders');
 ok41(str_contains($perf,"document.addEventListener('stonefellow:navigation'"),'vital/image runtime follows SPA route changes');
 ok41(str_contains($perf,"keepalive:true"),'vital delivery can complete during page lifecycle exit');
