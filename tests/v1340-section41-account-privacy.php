@@ -49,11 +49,11 @@ ok41(str_contains($core,"status='closed'")&&str_contains($core,"password_hash(bi
 ok41(str_contains($core,"UPDATE fan_contacts SET marketing_opt_in=0,agent_auto_engage=0,status=?")&&str_contains($core,'unsubscribe_token_hash=NULL'),'account closure disables marketing/Agent CRM identity');
 ok41(str_contains($core,"'user_token_balances','token_ledger','user_subscriptions','user_trial_history'"),'closure purges token/subscription entitlement rows after active billing blockers pass');
 ok41(str_contains($core,'sf_privacy_anonymize_user_events')&&str_contains($core,'SET user_id=NULL'),'closure anonymizes aggregate-compatible fan event history');
-ok41(str_contains($core,'function sf_privacy_delete_rows')&&!str_contains($core,"function sf_privacy_delete_rows(string $table,int $userId): int {try{"),'required account-closure purges do not swallow database errors');
-ok41(str_contains($core,"$anon='closed-'.bin2hex(random_bytes(12))"),'closed-account alias is random rather than derived from the former email');
+ok41(str_contains($core,'function sf_privacy_delete_rows')&&!str_contains($core,"function sf_privacy_delete_rows(string \$table,int \$userId): int {try{"),'required account-closure purges do not swallow database errors');
+ok41(str_contains($core,"\$anon='closed-'.bin2hex(random_bytes(12))"),'closed-account alias is random rather than derived from the former email');
 ok41(str_contains($core,"'user_sessions','user_favorites'"),'persistent sessions are purged inside the closure transaction');
 ok41(str_contains($core,'UPDATE transactional_email_outbox SET user_id=NULL,recipient_email=?'),'retained transactional email rows lose the original account identity');
-ok41(str_contains($core,"DELETE FROM agent_messages WHERE user_id=?")&&!str_contains($core,"catch(Throwable $e){}$q=sf_db()->prepare('DELETE FROM agent_conversations"),'Agent history purge is strict and covers direct user-linked messages');
+ok41(str_contains($core,"DELETE FROM agent_messages WHERE user_id=?")&&!str_contains($core,"catch(Throwable \$e){}\$q=sf_db()->prepare('DELETE FROM agent_conversations"),'Agent history purge is strict and covers direct user-linked messages');
 
 ok41(str_contains($core,'sf_auth_revoke_all_user_sessions'),'closure revokes every persistent session');
 ok41(str_contains($api,'sf_logout_user()'),'successful closure logs out the current browser');
