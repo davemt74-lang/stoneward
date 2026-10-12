@@ -43,7 +43,7 @@ ok38(str_contains($core,'sf_gallery_agent_context')&&str_contains($core,'sf_gall
 ok38(str_contains($publicApi,'count($attempts)>=90')&&str_contains($publicApi,'sf_gallery_public($id)'),'public gallery events are rate-limited and require a public gallery');
 ok38(str_contains($adminApi,'Changing gallery visibility requires explicit Admin confirmation.'),'gallery publication/archive transitions require Admin confirmation');
 ok38(str_contains($adminApi,'sf_log_admin_action')&&str_contains($adminApi,'sf_agent_brain_log'),'gallery Admin changes feed audit and Agent Brain');
-ok38(!str_contains($adminApi,"'notes'=>$")&&!str_contains($adminApi,'summary'=>$raw),'Admin audit/Brain does not copy private gallery notes');
+ok38(!str_contains($adminApi,"'notes'=>\$")&&!str_contains($adminApi,"summary'=>\$raw"),'Admin audit/Brain does not copy private gallery notes');
 
 ok38(str_contains($mediaCore,"'photo_gallery'"),'central Media Library accepts photo-gallery relationships');
 ok38(str_contains($mediaCore,"['cover','photo']")&&str_contains($mediaCore,"category']??'')!=='image'"),'gallery Media Library relationships accept only image assets in cover/photo roles');
