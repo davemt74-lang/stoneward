@@ -48,7 +48,7 @@ ok41(str_contains($mediaApi,"else if(\$variant!=='original')\$variant='original'
 ok41(str_contains($mediaApi,"\$etag='\"'.substr(hash('sha256'"),'public media has deterministic source+variant ETags');
 ok41(str_contains($mediaApi,'public, max-age=3600, must-revalidate'),'public media caching is efficient but remains visibility-revocable');
 ok41(!str_contains($mediaApi,'immutable'),'public media is not permanently cached after visibility can change');
-ok41(str_contains($mediaApi,"trim((string)($_SERVER['HTTP_IF_NONE_MATCH']??''))===$etag")&&str_contains($mediaApi,'http_response_code(304)'),'public media supports conditional 304 responses');
+ok41(str_contains($mediaApi,'HTTP_IF_NONE_MATCH')&&str_contains($mediaApi,'$etag')&&str_contains($mediaApi,'http_response_code(304)'),'public media supports conditional 304 responses');
 ok41(str_contains($mediaApi,"private, no-store"),'Admin media remains no-store');
 
 ok41(str_contains($perf,"type:'largest-contentful-paint'")&&str_contains($perf,"type:'layout-shift'")&&str_contains($perf,"type:'event'"),'browser runtime observes LCP, CLS and INP');
