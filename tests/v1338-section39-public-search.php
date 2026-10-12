@@ -81,6 +81,8 @@ ok39(str_contains($app,"e.key==='/'")&&str_contains($app,"e.ctrlKey||e.metaKey")
 ok39(str_contains($app,"$('[data-site-search-open]',host).forEach")&&str_contains($app,"$('[data-site-recent]',host).forEach")&&str_contains($app,"$('[data-site-suggestion]',suggestions).forEach"),'site Search collection handlers use the collection selector helper consistently');
 ok39(str_contains($app,'esc(r.title)')&&str_contains($app,'esc(r.snippet)'),'Search result title/snippet are escaped before HTML rendering');
 ok39(str_contains($css,'.site-search-module')&&str_contains($css,'.site-search-result-main')&&str_contains($css,'@media(max-width:640px)'),'Search has dedicated responsive presentation');
+ok39(str_contains($css,'.site-search-head h1{font:400 clamp(2.6rem,6vw,5.4rem)/.95 var(--display-font)')&&str_contains($css,'.site-search-copy strong{font:400 1.2rem var(--display-font)'),'Search typography inherits the governed artist display font');
+ok39(str_contains($css,'.site-search-art{')&&str_contains($css,'background:var(--surface)')&&str_contains($css,'.site-search-copy em{font-style:normal;font-size:.6rem;color:var(--muted)'),'Search surfaces and secondary copy inherit governed theme variables');
 
 ok39(str_contains($agent,"return 'site_search'"),'local Agent router can choose site-wide Search');
 ok39(str_contains($agent,"case 'site_search':"),'Agent policy executes deterministic site-wide Search');
