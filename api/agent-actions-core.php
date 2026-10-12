@@ -60,6 +60,15 @@ function sf_agent_action_get(int $adminId,string $id): ?array {
     $q->execute([$id,$adminId]);$row=$q->fetch(PDO::FETCH_ASSOC);
     return $row?sf_agent_action_public($row):null;
 }
+function sf_agent_action_recent(int $adminId,int $limit=25): array {
+    if($adminId<1)return [];
+    sf_agent_actions_ensure_schema();
+    $limit=max(1,min(50,$limit));
+    $q=sf_db()->prepare('SELECT * FROM agent_action_proposals WHERE admin_user_id=? ORDER BY created_at DESC,id DESC LIMIT '.$limit);
+    $q->execute([$adminId]);
+    return array_map('sf_agent_action_public',$q->fetchAll(PDO::FETCH_ASSOC));
+}
+
 function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,array $raw): array {
     if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
     if(!sf_agent_tool_executable($toolId,'admin',true))throw new InvalidArgumentException('Action is not available for governed preparation.');
