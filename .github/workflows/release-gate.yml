@@ -107,3 +107,4 @@ jobs:
           php tests/section42-version-sync.php
           php tests/section43a-agent-runtime.php
           php tests/section43b-agent-privacy.php
+          php tests/section43c-public-discovery.php
