@@ -267,7 +267,7 @@
     if(view==='video'&&slug)return finish(new URL('video/'+slug,base));
     if(view==='photo'&&slug)return finish(new URL('photos/'+slug,base));
     if(view==='press'&&slug){const u=new URL('press/'+slug,base);if(params.token)u.hash='token='+encodeURIComponent(String(params.token));return finish(u)}
-    if(view==='contact'){const u=finish(new URL('contact',base));if(['booking','press','licensing','collaboration','general'].includes(String(params.type||'')))u.searchParams.set('type',String(params.type));return u}if(['music','releases','shows','store','about','archive','videos','photos'].includes(view))return finish(new URL(view,base));
+    if(view==='contact'){const u=finish(new URL('contact',base));if(['booking','press','licensing','collaboration','general'].includes(String(params.type||'')))u.searchParams.set('type',String(params.type));return u}if(['music','releases','shows','store','about','archive','videos'].includes(view))return finish(new URL(view,base));if(view==='photos')return finish(new URL('photos',base));
     const u=new URL('./',base);u.searchParams.set('view',view);Object.entries(params).forEach(([k,v])=>{if(k!=='token'&&v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});return finish(u);
   }
   async function syncSeo(view,params={}){
