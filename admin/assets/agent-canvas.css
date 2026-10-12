@@ -1,0 +1,15 @@
+/* Section 46H: accessible Admin Agent canvas and slide-out Brain. */
+.admin-agent-transcript {max-height:55vh;min-height:200px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:12px 2px;}
+.admin-agent-message {max-width:92%;padding:14px;border:1px solid #60503f;border-radius:12px;overflow-wrap:anywhere;}
+.admin-agent-message.human {align-self:flex-end;background:rgba(190,155,96,.11);}
+.admin-agent-message.agent {align-self:flex-start;background:rgba(255,255,255,.04);}
+.admin-agent-message p {white-space:pre-wrap;margin:8px 0;}
+.admin-brain-backdrop {position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1490;}
+.admin-brain-drawer {position:fixed;right:0;top:0;bottom:0;width:min(450px,100vw);padding:22px;box-sizing:border-box;background:#17130f;color:#f3e8d6;border-left:1px solid #6c5845;overflow:auto;z-index:1491;box-shadow:-18px 0 60px rgba(0,0,0,.45);}
+.admin-brain-header {display:flex;justify-content:space-between;align-items:center;gap:16px;}
+.admin-brain-header button {min-width:44px;min-height:44px;}
+.admin-brain-list {padding-left:22px;display:grid;gap:10px;}
+.admin-brain-list li {overflow-wrap:anywhere;}
+.admin-brain-drawer :focus-visible,.admin-agent-transcript :focus-visible {outline:3px solid #dcb679;outline-offset:3px;}
+@media(max-width:640px){.admin-brain-drawer{padding:14px;width:100vw}.admin-agent-message{max-width:100%}.admin-agent-transcript{max-height:50dvh;}}
+@media(prefers-reduced-motion:reduce){.admin-brain-drawer,.admin-brain-backdrop{transition:none;scroll-behavior:auto;}}
