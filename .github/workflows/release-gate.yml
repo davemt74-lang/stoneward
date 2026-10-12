@@ -123,3 +123,4 @@ jobs:
           php tests/section44e-published-campaign-copy.php
           php tests/section44f-execution-governance.php
           php tests/section44g-action-timeline.php
+          php tests/section44h-recovery.php

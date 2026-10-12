@@ -28,6 +28,14 @@ try{
         sf_agent_brain_log($uid,'agent_campaign','action_approved',['route'=>'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
+    if($action==='cancel'||$action==='reconcile'){
+        $id=(string)($b['proposal_id']??'');
+        $typed=(string)($b['typed_confirmation']??'');
+        $proposal=$action==='cancel'?sf_agent_action_cancel($uid,$id,$typed):sf_agent_action_reconcile($uid,$id,$typed);
+        sf_agent_brain_log($uid,'agent_campaign','action_recovery',['route'=>'campaign_draft','action'=>$action,'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
+        sf_log_admin_action($uid,'agent_action_'.$action,'agent_action',$proposal['id'],['status'=>$proposal['status']]);
+        sf_json_response(['ok'=>true,'proposal'=>$proposal]);
+    }
     if($action==='execute'){
         $proposal=sf_agent_action_execute($uid,(string)($b['proposal_id']??''));
         sf_agent_brain_log($uid,'agent_campaign','action_result',['route'=>'campaign_draft','action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'campaign_id'=>$proposal['result']['campaign_id']??null,'requires_confirmation'=>true]);
