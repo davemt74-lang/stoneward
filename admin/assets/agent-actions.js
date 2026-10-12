@@ -140,7 +140,12 @@
       const status=esc(p.status||'unknown');
       const when=esc(p.created_at||'');
       const completed=Number(p.result?.campaign_id||0);
-      const action=completed?'<button type="button" data-agent-campaign-id="'+completed+'">Open draft</button>':(p.status==='review_required'||p.status==='executing'?'Review Campaign Builder manually; do not retry automatically.':'Awaiting review');
+      let action='Awaiting review';
+      if(completed)action='<button type="button" data-agent-campaign-id="'+completed+'">Open draft</button>';
+      else if(p.status==='proposed'||p.status==='approved')action='<button type="button" data-agent-cancel-id="'+esc(p.id)+'">Cancel pending</button>';
+      else if(p.status==='review_required'||p.status==='executing')action='<button type="button" data-agent-reconcile-id="'+esc(p.id)+'">Mark reviewed (no retry)</button>';
+      else if(p.status==='reviewed_no_retry')action='Manually reviewed; no automatic retry.';
+      else if(p.status==='cancelled')action='Cancelled before execution.';
       return '<tr><td>'+name+'</td><td>'+status+'</td><td>'+when+'</td><td>'+action+'</td></tr>';
     }).join('');
     history.innerHTML='<h2>Agent action timeline</h2><p>These are your reviewed Agent campaign proposals. Pending, interrupted, or uncertain operations never run automatically.</p><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Draft</th><th>Status</th><th>Created</th><th>Next step</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No Agent draft actions yet.</td></tr>')+'</tbody></table></div><button type="button" id="closeAgentHistory">Close</button>';
@@ -150,6 +155,19 @@
     history.querySelectorAll('[data-agent-campaign-id]').forEach(button=>button.onclick=()=>{
       const id=Number(button.dataset.agentCampaignId);history.close();openView('campaigns');window.SFCampaignAdmin?.openEditor?.(id);
     });
+    async function recover(button,action,keyword){
+      const id=action==='cancel'?button.dataset.agentCancelId:button.dataset.agentReconcileId;
+      const explanation=action==='reconcile'
+        ?'Inspect the Campaign Builder for possible partial saves first. This does NOT undo anything. Type RECONCILED to mark this action reviewed without retrying.'
+        :'Only pending, never-started work can be cancelled. Type CANCEL to confirm.';
+      const typed=window.prompt(explanation,'');
+      if(typed!==keyword)return;
+      button.disabled=true;
+      try{await api('agent-actions.php',{action,proposal_id:id,typed_confirmation:typed});history.close();await showHistory();}
+      catch(e){button.disabled=false;say('Review action failed: '+e.message);}
+    }
+    history.querySelectorAll('[data-agent-cancel-id]').forEach(b=>b.onclick=()=>recover(b,'cancel','CANCEL'));
+    history.querySelectorAll('[data-agent-reconcile-id]').forEach(b=>b.onclick=()=>recover(b,'reconcile','RECONCILED'));
     if(history.showModal)history.showModal();else history.setAttribute('open','');
   }
   window.SFAgentCampaigns={open,showHistory};
