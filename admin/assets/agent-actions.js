@@ -28,6 +28,8 @@
         <label>Draft name <input name="name" required maxlength="180" value="${esc(name)}"></label>
         <label>Headline <input name="headline" maxlength="255"></label>
         <label>Draft copy <textarea name="body_text" maxlength="12000" rows="4"></textarea></label>
+        <label>Published Stonefellow reference (optional) <select name="reference"><option value="">Write original draft copy</option></select></label>
+        <p id="agentCampaignSourceNote">Only published artist material is eligible. Review suggestions before approval.</p>
         <label>Existing CRM segment (optional) <select name="segment_id"><option value="">All contacts — no segment filter</option></select></label>
         <p id="agentAudiencePreview" aria-live="polite">Audience figures will be checked using current newsletter consent.</p>
         <p id="agentCampaignStatus" role="status">Step 1: Prepare a reviewable proposal.</p>
@@ -56,6 +58,20 @@
     };
     select.onchange=()=>{form.elements.name.value='';form.elements.headline.value='';form.elements.body_text.value='';switchDefaults();};
     switchDefaults();
+    const referenceSelect=form.elements.reference;const references=new Map();
+    api('agent-campaign-sources.php').then(data=>{
+      if(!modal?.open)return;
+      for(const source of data.sources||[]){
+        const key=source.kind+':'+source.id;references.set(key,source);
+        const option=document.createElement('option');option.value=key;option.textContent=source.label;referenceSelect.appendChild(option);
+      }
+    }).catch(()=>{$('#agentCampaignSourceNote')?.replaceChildren(document.createTextNode('Published references are unavailable; enter verified content manually.'));});
+    referenceSelect.onchange=()=>{
+      const source=references.get(referenceSelect.value);if(!source)return;
+      form.elements.headline.value=source.headline||'';
+      form.elements.body_text.value=source.body_text||'';
+      $('#agentCampaignSourceNote').textContent='Draft text reflects published '+source.kind+' content. Verify details and add your own copy before saving.';
+    };
     const audienceSelect=form.elements.segment_id;
     async function refreshAudience(){
       try{
