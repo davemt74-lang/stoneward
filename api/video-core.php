@@ -19,7 +19,7 @@ function sf_video_ensure_schema(): void {
     }$done=true;
 }
 function sf_video_clean_chapters(array $rows,float $duration=0): array {
-    $out=[];$seen=[];foreach($rows as $r){if(!is_array($r))continue;$at=max(0,round((float)($r['seconds']??0),3));$title=sf_clean_text($r['title']??'',160);if($title===''||isset($seen[(string)$at]))continue;if($duration>0&&$at>=$duration)continue;$seen[(string)$at]=true;$out[]=['seconds'=>$at,'title'=>$title];if(count($out)>=100)break;}usort($out,fn($a,$b)=>$a['seconds']<=>$b['seconds']);return $out;
+    $out=[];$seen=[];foreach($rows as $r){if(!is_array($r))continue;$at=(float)max(0.0,round((float)($r['seconds']??0),3));$title=sf_clean_text($r['title']??'',160);if($title===''||isset($seen[(string)$at]))continue;if($duration>0&&$at>=$duration)continue;$seen[(string)$at]=true;$out[]=['seconds'=>$at,'title'=>$title];if(count($out)>=100)break;}usort($out,fn($a,$b)=>$a['seconds']<=>$b['seconds']);return $out;
 }
 function sf_video_media(int $id,bool $publicOnly=false): array {
     if(!function_exists('sf_media_links'))return [];$rows=sf_media_links('video_feature',(string)$id);$out=[];
