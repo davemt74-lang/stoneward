@@ -5,12 +5,12 @@
    * history, without creating another player or chat execution API.
    */
   let active=null;
-  async function render({canvas,api,esc,send,conversationId,navigate}){
+  async function render({canvas,api,esc,send,conversationId,navigate,forceNew=false}){
     canvas.innerHTML='<article class="module"><h2>My Agent Chat</h2><p role="status">Loading your conversation…</p></article>';
     let activeId=conversationId()||'';
     let res=await api('agent-brain.php'+(activeId?'?conversation_id='+encodeURIComponent(activeId):''));
     let brain=res.brain||{};
-    if(!activeId&&brain.conversations?.[0]){
+    if(!activeId&&!forceNew&&brain.conversations?.[0]){
       activeId=brain.conversations[0].id;
       res=await api('agent-brain.php?conversation_id='+encodeURIComponent(activeId));
       brain=res.brain||brain;
@@ -27,7 +27,7 @@
       '<p id="myAgentCanvasStatus" role="status"></p></article>';
     const one=q=>canvas.querySelector(q);
     const log=one('#agentConversationMessages');if(log)log.scrollTop=log.scrollHeight;
-    one('#newAgentThread').onclick=()=>{conversationId('');render({canvas,api,esc,send,conversationId,navigate});};
+    one('#newAgentThread').onclick=()=>{conversationId('');render({canvas,api,esc,send,conversationId,navigate,forceNew:true});};
     one('#openMyAgentBrain').onclick=()=>navigate('agent-brain');
     one('#agentThreadSelect').onchange=e=>{conversationId(e.target.value);render({canvas,api,esc,send,conversationId,navigate});};
     one('#myAgentCanvasForm').onsubmit=async e=>{
