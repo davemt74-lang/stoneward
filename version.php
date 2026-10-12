@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.36',
+  'stonefellow'=>'1.3.37',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.31',
+  'database_schema_target'=>'1.3.32',
   'database_upgrader'=>'upgrade.php',
   'dashboard'=>'activity-listening-command-center',
   'personalization'=>'favorites-library-history',
@@ -84,6 +84,9 @@ echo json_encode([
   'professional_inquiries'=>'booking-press-licensing-collaboration-general-separate-from-fan-crm',
   'inquiry_governance'=>'consent-honeypot-rate-limit-dedupe-status-audit-agent-brain',
   'inquiry_replies'=>'confirmed-transactional-outbox-truthful-delivery-history',
+  'photo_gallery'=>'single-artist-public-gallery-managed-media-visual-archive',
+  'photo_gallery_readiness'=>'cover-three-photos-dimensions-alt-text-public-entity-links',
+  'photo_gallery_events'=>'truthful-view-photo-open-entity-open',
   'launch_templates'=>'single-album-show-campaign-custom',
   'chat_quick_actions'=>'record-playlist-tour-store-community-newsletter',
   'customer_lifecycle'=>'v1.1',
