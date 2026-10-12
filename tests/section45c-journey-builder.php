@@ -14,7 +14,7 @@ $checks=[
  'Percentages handle null denominator'=>str_contains($js,"value===null||value===undefined?'—'"),
  'CRM measurement caveats output escaped'=>str_contains($js,"esc(note)"),
  'Journey GET requires administrator'=>str_contains($api,'sf_admin_require_auth(false)'),
- 'API excludes non-GET mutations'=>str_contains($api,"$"."method==='GET'")||str_contains($api,"($_SERVER['REQUEST_METHOD']??'GET')!=='GET'"),
+ 'API excludes non-GET mutations'=>str_contains($api,"$"."method==='GET'")||str_contains($api,'method_not_allowed'),
 ];
 $fail=0;foreach($checks as $n=>$ok){echo ($ok?'PASS':'FAIL').' '.$n.PHP_EOL;if(!$ok)$fail++;}
 exit($fail?1:0);
