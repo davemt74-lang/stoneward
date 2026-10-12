@@ -138,6 +138,8 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
 }
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
+    if(preg_match('/\\b(?:remove|unsave)\\b.*\\b(?:favorite|favorites)\\b|\\b(?:unfavorite|unlike)\\b/',$q))return 'favorite_remove';
+    if(preg_match('/\\b(?:add|save|mark)\\b.*\\b(?:favorite|favorites)\\b|\\bfavorite (?:this|that|the)\\b/',$q))return 'favorite_save';
     if(preg_match('/\b(clear|empty) (?:the )?(?:queue|up next)\b/',$q))return 'queue_clear';
     if(preg_match('/\b(show|open|what.s in|what is in) (?:the )?(?:queue|up next)\b/',$q))return 'queue_open';
     if(preg_match('/\b(remove|delete) .* (?:from|off) (?:the )?(?:queue|up next)\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'queue_remove';
@@ -197,6 +199,18 @@ function sf_agent_local_route(string $message,array $client=[]): string {
 function sf_agent_policy(string $route,string $message,array $client=[],?int $userId=null): array {
     $active=(string)($client['active_track_id']??'');$track=sf_agent_find_track($message,$active);$action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
+        case 'favorite_save':
+        case 'favorite_remove':
+            if($track){
+                $desired=$route==='favorite_save';
+                $action=['type'=>'set_favorite_track','track_id'=>(string)$track['id'],'favorite'=>$desired];
+                $text=$desired?'I’ll add “'.($track['title']??'').'” to your favorites.':'I’ll remove “'.($track['title']??'').'” from your favorites.';
+            }else{
+                $action=['type'=>'open_library','tab'=>'tracks'];
+                $text='Open My Library and select the track you want to change.';
+            }
+            break;
+
         case 'player_play_named':
             if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='Playing “'.($track['title']??'').'.”';}
             else {$route='player_recommend';$track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}}
@@ -308,6 +322,8 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'player_pause'=>'Asks to pause or stop current music playback.',
         'player_next'=>'Asks for the next song or to skip.',
         'player_previous'=>'Asks to go back to the previous song.',
+        'favorite_save'=>'Asks to add a specific or current song to personal favorites.',
+        'favorite_remove'=>'Asks to remove a specific or current song from personal favorites.',
         'queue_open'=>'Asks to show/open the Up Next queue.',
         'queue_add'=>'Asks to add a named/current track to the end of Up Next.',
         'queue_play_next'=>'Asks to make a named/current track play next.',
