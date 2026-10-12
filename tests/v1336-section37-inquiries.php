@@ -39,16 +39,16 @@ ok37(str_contains($publicApi,"company_fax")&&str_contains($publicApi,'count($att
 ok37(str_contains($core,'substr_count(strtolower($message)')&&str_contains($core,'>5'),'inquiry message rejects excessive external links');
 ok37(str_contains($core,'sf_inquiry_validate_entity')&&str_contains($core,'sf_seo_public_track')&&str_contains($core,'sf_seo_public_release'),'licensing context only accepts public Stonefellow songs/releases');
 ok37(str_contains($core,'sf_inquiry_clean_body')&&str_contains($core,"[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]"),'multiline inquiry/reply content strips unsafe controls without flattening paragraphs');
-ok37(str_contains($core,"if($status==='replied')throw new RuntimeException"),'Replied cannot be manually claimed by status transition');
-ok37(str_contains($core,"$newStatus=$status==='sent'?'replied'"),'inquiry becomes Replied only when transactional delivery reports Sent');
+ok37(str_contains($core,"if(\$status==='replied')throw new RuntimeException"),'Replied cannot be manually claimed by status transition');
+ok37(str_contains($core,"\$newStatus=\$status==='sent'?'replied'"),'inquiry becomes Replied only when transactional delivery reports Sent');
 ok37(str_contains($core,'transactional_email_outbox')&&str_contains($core,"['sent','queued','logged','failed']"),'reply ledger preserves real outbox delivery state');
-ok37(str_contains($core,"in_array((string)$r['status'],['spam','closed'],true)"),'closed/spam inquiries must be reopened before reply');
+ok37(str_contains($core,"in_array((string)\$r['status'],['spam','closed'],true)"),'closed/spam inquiries must be reopened before reply');
 ok37(!str_contains($core,'function sf_inquiry_agent_context'),'public core exposes no helper that could leak the professional inbox into general Agent context');
 
 ok37(str_contains($adminApi,'sf_admin_require_auth'),'professional inbox requires Admin authentication');
 ok37(str_contains($adminApi,'Changing professional inquiry status requires explicit Admin confirmation.')&&str_contains($adminApi,'Sending a professional inquiry reply requires explicit Admin confirmation.'),'status changes and replies require explicit Admin confirmation');
 ok37(str_contains($adminApi,'sf_log_admin_action')&&str_contains($adminApi,'sf_agent_brain_log'),'professional inquiry mutations feed Admin audit and Agent Brain');
-ok37(!str_contains($adminApi,"'body'=>$body")&&!str_contains($adminApi,"'message_text'=>"),'Admin audit/Brain payloads do not copy professional message bodies');
+ok37(!str_contains($adminApi,"'body'=>\$body")&&!str_contains($adminApi,"'message_text'=>"),'Admin audit/Brain payloads do not copy professional message bodies');
 ok37(str_contains($adminJs,'These records are separate from Fan CRM marketing consent.'),'Admin UI clearly separates professional inquiries from Fan CRM consent');
 ok37(str_contains($adminJs,'The inquiry is marked Replied only after the outbox reports Sent.'),'Admin reply UI explains truthful delivery semantics');
 ok37(str_contains($adminJs,'Send confirmed reply')&&str_contains($adminJs,"confirm('Send this professional inquiry reply now?')"),'Admin reply UI requires explicit send confirmation');
@@ -68,10 +68,10 @@ ok37(str_contains($css,'.contact-module')&&str_contains($css,'.inquiry-type-grid
 ok37(str_contains($shell,"define('SF_BUILD', '1.3.36')")&&str_contains($shell,'href="contact" data-view="contact"'),'public shell advances v1.3.36 and exposes Contact navigation');
 ok37(str_contains($shell,"'videos','contact','about'"),'server pretty-route handoff recognizes Contact');
 ok37(str_contains($ht,'about|contact|archive')&&str_contains($ht,'X-Stonefellow-Build "1.3.36"'),'web server routes Contact and reports build 1.3.36');
-ok37(str_contains($seo,"$view==='contact'")&&str_contains($seo,"'@type'=>'ContactPage'"),'Contact page emits route-specific ContactPage structured data');
+ok37(str_contains($seo,"\$view==='contact'")&&str_contains($seo,"'@type'=>'ContactPage'"),'Contact page emits route-specific ContactPage structured data');
 ok37(str_contains($seo,"'contact'=>'0.6'"),'Contact page is included in public sitemap');
 ok37(str_contains($agent,"return 'professional_contact'")&&str_contains($agent,"case 'professional_contact'"),'public Agent has deterministic professional-contact route');
-ok37(str_contains($agent,"'inquiry_type'=>$type")&&str_contains($app,'a.inquiry_type'),'public Agent preselects the appropriate Contact inquiry type');
+ok37(str_contains($agent,"'inquiry_type'=>\$type")&&str_contains($app,'a.inquiry_type'),'public Agent preselects the appropriate Contact inquiry type');
 ok37(!str_contains($agent,'sf_inquiry_list(')&&!str_contains($agent,'sf_inquiry_get('),'public Agent runtime never reads professional inbox records');
 
 ok37(str_contains($boot,"require_once __DIR__ . '/inquiry-core.php'"),'professional inquiry core loads from canonical bootstrap');
