@@ -42,7 +42,7 @@ ok41(str_contains($core,'sf_privacy_telemetry_export'),'data export includes ide
 ok41(str_contains($core,'retention_note'),'export/Privacy Center disclose retained operational/accounting history');
 
 ok41(str_contains($api,"action==='save_profile'")&&str_contains($api,"action==='export'")&&str_contains($api,"action==='clear_history'")&&str_contains($api,"action==='reset_personalization'")&&str_contains($api,"action==='clear_search_activity'")&&str_contains($api,"action==='clear_agent_history'")&&str_contains($api,"action==='close_account'"),'privacy API exposes all governed fan privacy actions');
-ok41(substr_count($api,"empty($b['confirmed'])")>=6,'every export/destructive privacy action requires explicit confirmation');
+ok41(substr_count($api,"empty(\$b['confirmed'])")>=6,'every export/destructive privacy action requires explicit confirmation');
 ok41(str_contains($core,"\$confirmation!=='DELETE'")&&str_contains($core,'password_verify($password'),'account closure requires typed DELETE and current password');
 ok41(str_contains($core,"Administrator accounts must be transferred or demoted")&&str_contains($core,'Cancel the active paid subscription')&&str_contains($core,'physical order is still in fulfillment')&&str_contains($core,'open support case'),'account closure blocks admin, paid billing, fulfillment and unresolved support states');
 ok41(str_contains($core,"status='closed'")&&str_contains($core,"password_hash(bin2hex(random_bytes(32))"),'closed account is disabled and password is replaced with random secret');
