@@ -36,6 +36,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="<?=sf_h(!empty($siteSettings['media_app_icon'])?$siteSettings['media_app_icon']:'assets/icons/stonefellow-pwa.svg')?>">
 <?php if($themeMeta['mode']==='system'): ?>  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="<?=sf_h($themeMeta['dark'])?>">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="<?=sf_h($themeMeta['light'])?>">
 <?php else: ?>  <meta name="theme-color" content="<?=sf_h($themeMeta[$themeMeta['mode']])?>">
