@@ -1,3 +1,21 @@
+# Stonefellow v1.3.40 — Section 41: Fan Account, Profile & Privacy Center
+
+- Added an account-only **Privacy & Data** center inside My Stonefellow.
+- Added fan profile fields for timezone, country code and locale.
+- Added real privacy controls for saving listening history and using account activity for personalization.
+- When listening history is off, new listening events remain anonymous and Continue Listening stops updating.
+- When personalization is off, recommendations and Agent music ranking use no account activity signals.
+- Added confirmed JSON account-data export covering profile, library, listening, playlists, purchases, invoices, Agent conversations, support and identifiable telemetry.
+- Added confirmed controls to clear listening history, reset personalization signals, anonymize search/discovery activity and delete Agent conversation history.
+- Added governed account closure requiring current password, typed DELETE and final confirmation.
+- Account closure is blocked for Administrators, active managed paid subscriptions, unresolved physical fulfillment and open support cases.
+- Closure is transactional: required purge/anonymization failures leave the account open.
+- Closure archives CRM identity, disables marketing, anonymizes retained email-delivery identity, revokes sessions, purges account-owned behavioral data and disables login.
+- Historical orders, invoices, refunds and support records may remain as disclosed operational/accounting records.
+- Preserved the existing public legal Privacy page; the account data center uses the separate account-privacy route.
+- Public/Admin/server build and PWA cache advance together to **1.3.40**.
+- Database schema advances to **1.3.33** via migration **2026-10-12-034**.
+
 # Stonefellow v1.3.39 — Section 40: Accessibility, PWA & Mobile Resilience
 
 - Added installable Stonefellow PWA manifest with standalone launch behavior.
