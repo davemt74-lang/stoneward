@@ -119,3 +119,4 @@ jobs:
           php tests/section44a-tool-registry.php
           php tests/section44b-reviewed-proposals.php
           php tests/section44c-campaign-workbench.php
+          php tests/section44d-audience-research.php
