@@ -44,13 +44,28 @@ function sf_agent_brain_log(int $userId,string $conversationId,string $phase,arr
     $q->execute([$userId,$conversationId,$phase,(string)($data['route']??''),(string)($data['action']??''),(string)($data['context_profile']??''),!empty($data['needs_llm'])?1:0,!empty($data['requires_confirmation'])?1:0,sf_agent_excerpt($request),sf_agent_excerpt($response),(string)($data['run_id']??''),(string)($data['status']??''),(int)($data['input_tokens']??0),(int)($data['output_tokens']??0),json_encode($details,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}',gmdate('c')]);
 }
 
+/**
+ * Section 43C: only published, publicly eligible music may be offered
+ * to the fan-facing Agent. Keep the canonical SEO visibility resolver authoritative.
+ */
+function sf_agent_public_catalog(): array {
+    if(!function_exists('sf_seo_public_track'))return [];
+    $tracks=[];
+    foreach(sf_catalog() as $track) {
+        $id=(string)($track['id']??'');
+        if($id===''||!sf_seo_public_track($id))continue;
+        $tracks[]=$track;
+    }
+    return $tracks;
+}
+
 function sf_agent_context(string $query,string $profile='catalog',int $userId=0): string {
     if($profile==='none')return '';
     $terms=array_values(array_filter(preg_split('/[^a-z0-9]+/i',strtolower($query))?:[],fn($x)=>strlen($x)>2));
     $score=function(string $text)use($terms){$t=strtolower($text);$n=0;foreach($terms as $w)if(str_contains($t,$w))$n++;return $n;};
     $sections=[];
     if(in_array($profile,['catalog','knowledge','recommendation','commerce'],true)){
-        $tracks=sf_catalog();$publicTrackHay=function(array $t): string {$safe=$t;unset($safe['lyrics']);return json_encode($safe)?:'';};usort($tracks,fn($a,$b)=>$score($publicTrackHay($b))<=>$score($publicTrackHay($a)));$tracks=array_slice($tracks,0,$profile==='knowledge'?6:10);
+        $tracks=sf_agent_public_catalog();$publicTrackHay=function(array $t): string {$safe=$t;unset($safe['lyrics']);return json_encode($safe)?:'';};usort($tracks,fn($a,$b)=>$score($publicTrackHay($b))<=>$score($publicTrackHay($a)));$tracks=array_slice($tracks,0,$profile==='knowledge'?6:10);
         $lines=[];foreach($tracks as $t){$m=(array)($t['metadata']??[]);$a=(array)($t['archive']??[]);$publicMedia=[];if(function_exists('sf_media_public_links')&&!empty($t['id'])){foreach(sf_media_public_links('track',(string)$t['id']) as $pm)$publicMedia[]=(string)($pm['role']??$pm['category']).':'.(string)($pm['title']??'media');}$lines[]='- id='.($t['id']??'').' | '.($t['title']??'').' | release '.($t['release']??'').' | moods '.implode(', ',(array)($t['mood']??[])).' | story '.substr((string)($t['story']??''),0,360).' | credits '.implode('; ',(array)($t['credits']??[])).' | writer '.($m['words_by']??'').' | music '.($m['music_by']??'').' | producer '.($m['producer']??'').' | ISRC '.($m['isrc']??'').' | era '.($a['era']??'').' | version '.($a['version_type']??'').' '.($a['version_label']??'').' | recorded '.($a['recorded_date']??'').' | session '.($a['session']??'').' | personnel '.json_encode($a['personnel']??[]).' | public media '.implode(', ',$publicMedia);}
         $sections[]="CATALOG\n".implode("\n",$lines);
         $releaseLines=[];$rp=SF_ROOT.'/data/releases.json';$rels=is_file($rp)?json_decode((string)file_get_contents($rp),true):[];
@@ -96,9 +111,9 @@ function sf_agent_save_message(int $userId,string $conversationId,string $role,s
 
 function sf_agent_find_track(string $message,?string $activeId=null): ?array {
     $n=strtolower(preg_replace('/[^a-z0-9 ]+/i',' ', $message)??$message);$best=null;$bestLen=0;
-    foreach(sf_catalog() as $t){$title=strtolower(trim((string)($t['title']??'')));if($title!==''&&str_contains($n,$title)&&strlen($title)>$bestLen){$best=$t;$bestLen=strlen($title);}}
+    foreach(sf_agent_public_catalog() as $t){$title=strtolower(trim((string)($t['title']??'')));if($title!==''&&str_contains($n,$title)&&strlen($title)>$bestLen){$best=$t;$bestLen=strlen($title);}}
     if($best)return $best;
-    if($activeId)foreach(sf_catalog() as $t)if((string)($t['id']??'')===$activeId)return $t;
+    if($activeId)foreach(sf_agent_public_catalog() as $t)if((string)($t['id']??'')===$activeId)return $t;
     return null;
 }
 function sf_agent_track_score(array $t,string $message): int {
@@ -107,7 +122,7 @@ function sf_agent_track_score(array $t,string $message): int {
     $energy=(int)($t['energy']??3);if(preg_match('/quiet|mellow|soft|calm|reflective/',$q)&&$energy<=2)$score+=8;if(preg_match('/dark|heavy|loud|electric|intense/',$q)&&$energy>=4)$score+=8;if(preg_match('/drive|road|driving/',$q)&&str_contains($hay,'driv'))$score+=8;return $score;
 }
 function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $userId=null): ?array {
-    $catalog=sf_catalog();$exclude=$excludeId?[$excludeId]:[];
+    $catalog=sf_agent_public_catalog();$exclude=$excludeId?[$excludeId]:[];
     if($userId&&function_exists('sf_personalization_recommendation_profile')){
         $profile=sf_personalization_recommendation_profile($userId);$ranked=sf_personalization_rank_catalog($catalog,$profile,20,$exclude);
         $rows=[];foreach($ranked as $r){$t=null;foreach($catalog as $candidate)if((string)($candidate['id']??'')===(string)$r['track_id']){$t=$candidate;break;}if(!$t)continue;$rows[]=['t'=>$t,'s'=>(float)$r['score']+sf_agent_track_score($t,$message)*4];}
