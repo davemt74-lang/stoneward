@@ -47,6 +47,17 @@ try{
     if($action==='manual_run'){
         $id=(int)($b['id']??0);$contactId=max(0,(int)($b['contact_id']??0));if(empty($b['confirmed']))throw new RuntimeException('Manual automation run requires Admin confirmation.');$r=sf_automation_manual_run($id,(int)$me['id'],$contactId);sf_log_admin_action((int)$me['id'],'lifecycle_automation_manual_run','lifecycle_automation',(string)$id,$r);sf_agent_brain_log((int)$me['id'],'admin_lifecycle','automation_run',['route'=>'fan_automations','action'=>'manual_run','context_profile'=>'crm','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','automation_id'=>$id,'request'=>'Run lifecycle automation now','response'=>'Started '.$r['started'].' fan journeys; skipped '.$r['skipped'].'.']);sf_json_response(['ok'=>true,'result'=>$r]);
     }
+    if($action==='acknowledge_interrupted'){
+        $runId=max(0,(int)($b['run_id']??0));
+        if(!sf_automation_acknowledge_interrupted($runId,(string)($b['typed_confirmation']??'')))
+            throw new RuntimeException('This journey still requires manual review.');
+        sf_log_admin_action((int)$me['id'],'lifecycle_interrupted_reviewed','lifecycle_automation_run',(string)$runId,['status'=>'reviewed_no_retry']);
+        sf_agent_brain_log((int)$me['id'],'admin_lifecycle','run_reconciled',[
+            'route'=>'fan_automations','action'=>'acknowledge_interrupted',
+            'status'=>'reviewed_no_retry','run_id'=>$runId,'requires_confirmation'=>true
+        ]);
+        sf_json_response(['ok'=>true,'status'=>'reviewed_no_retry','run_id'=>$runId]);
+    }
     if($action==='tick'){
         $r=sf_automation_tick();sf_log_admin_action((int)$me['id'],'lifecycle_automation_tick','lifecycle_automation','scheduler',$r);sf_json_response(['ok'=>true,'result'=>$r]);
     }
