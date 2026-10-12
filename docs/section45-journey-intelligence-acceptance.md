@@ -33,7 +33,7 @@ Section 45 extends the original Stonefellow CRM, Campaign Builder, Segments & Au
 
 The Agent may prepare and save only a **new unpublished draft** (ID=0, status=draft) through the canonical sf_automation_save method. The exact server-normalized payload is shown before typed APPROVE. No email, publication, purchase, or CRM mutation occurs as an Agent execution step. Existing administrator publication remains a separate, consequential action.
 
-Consent is checked against the latest CRM record for each email and Agent message, including unsubscribe and personalization switches. A stale running journey is quarantined for manual review after two hours; it is not replayed. Acknowledgment does not undo already executed steps.
+Current marketing and personalization permissions reflect the fan's most recent consent. Consent is checked against the latest CRM record for each email and Agent message, including unsubscribe and personalization switches. A stale running journey is quarantined for manual review after two hours; it is not replayed. Acknowledgment does not undo already executed steps.
 
 ## Deployment and staging verification
 
