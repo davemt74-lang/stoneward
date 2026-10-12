@@ -52,6 +52,5 @@ Header always set X-Stonefellow-Build "1.3.39"
 <IfModule mod_headers.c>
 <Files "service-worker.js">
 Header always set Cache-Control "no-cache, no-store, must-revalidate"
-Header always set Service-Worker-Allowed "./"
 </Files>
 </IfModule>
