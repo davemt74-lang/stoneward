@@ -1,3 +1,13 @@
+# Stonefellow v1.3.43 — Section 44: Governed Agent Campaign Actions
+
+Section 44 makes the existing single-artist Stonefellow Admin Agent useful for **reviewed, permission-controlled campaign DRAFT creation**. It adds an owner-visible tool inventory; durable plan/approval/save stages; aggregate consent-aware CRM audience research; published-content draft suggestions; Agent Brain action history; exact-hash approval, execution caps and safe recovery; and mobile-friendly Admin review.
+
+**No automatic newsletter sends, campaign publication, purchases or CRM edits.** These remain in the existing owner-controlled Admin interfaces. This release upgrades the schema target to **1.3.34** (Migration **035**) using the existing `upgrade.php` workflow.
+
+See [Section 44 acceptance, security audit and deployment steps](docs/section44-agent-execution-acceptance.md).
+
+---
+
 # Stonefellow v1.3.42 — Section 43: Agent Intelligence & Fan Engagement
 
 Stonefellow's existing single-artist Agent now has stricter public music discovery, consent-aware recommendations and proactive engagement, fan-requested favorites actions, role-gated aggregate administrator campaign briefings, validated ElevenLabs voice delivery, protected Agent Brain diagnostics, and bounded client routing state. Existing OpenAI/Claude/JEV routing, voice UX, persistent player and Agent Brain are retained.
