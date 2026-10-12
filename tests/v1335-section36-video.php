@@ -39,7 +39,11 @@ ok36(substr_count($core,'CREATE TABLE IF NOT EXISTS video_events')===2,'video ev
 ok36(!str_contains($core,'stored_path TEXT')&&!str_contains($core,'video_path'),'Video Hub stores publication metadata rather than duplicate video bytes');
 ok36(str_contains($core,"sf_media_links('video_feature'"),'video publication references central Media Library relationships');
 ok36(str_contains($core,"count(\$videos)===1")&&str_contains($core,"count(\$posters)===1"),'publishing requires exactly one public managed video and poster');
-ok36(str_contains($core,"in_array(\$c['mime_type'],['text/vtt','text/plain'],true)")&&str_contains($core,"\$c['extension']!=='vtt'"),'caption readiness accepts real-world VTT MIME detection but requires .vtt');
+ok36(str_contains($core,"['video/mp4','video/webm']")&&str_contains($core,"['mp4','webm']"),'public playback readiness allows browser-safe MP4/WebM while MOV may remain a private/source asset');
+ok36(str_contains($core,'Public video requires known media duration'),'public playback requires known managed duration');
+ok36(str_contains($core,'Public poster must be at least 640×360'),'public poster readiness enforces usable dimensions');
+ok36(str_contains($core,'function sf_video_caption_valid')&&str_contains($core,"'WEBVTT'"),'caption readiness validates managed WebVTT content header, not extension alone');
+ok36(str_contains($core,'count($captions)<=1'),'single-language caption model allows at most one published caption track');
 ok36(str_contains($core,'Linked song, release and show records must be currently public.'),'video publication validates authoritative public entity links');
 ok36(str_contains($core,'Chapter times must be unique, ascending and inside video duration.'),'video publication validates chapters against duration');
 ok36(str_contains($core,"if(\$status==='published')")&&str_contains($core,'Video is blocked:'),'published videos require green readiness');
