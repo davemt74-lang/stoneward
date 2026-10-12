@@ -79,11 +79,11 @@ ok35(str_contains($siteCss,'.public-songbook-panel')&&str_contains($siteCss,'.so
 ok35(str_contains($siteCss,'font:400 clamp(1.8rem,3vw,2.8rem)/1.05 var(--display-font)')&&str_contains($siteCss,'background:var(--surface)'),'public Songbook respects the Section 34 Artist Brand tokens');
 
 ok35(str_contains($boot,"require_once __DIR__ . '/songbook-core.php'"),'Songbook core loads from canonical bootstrap');
-ok35(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.29'")&&str_contains($mig,"'id'=>'2026-10-11-030'")&&str_contains($mig,"'app_version'=>'1.3.34'"),'database target 1.3.29 includes migration 030 for v1.3.34');
+$schema35='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$sm35))$schema35=$sm35[1];ok35(version_compare($schema35,'1.3.29','>=')&&str_contains($mig,"'id'=>'2026-10-11-030'")&&str_contains($mig,"'app_version'=>'1.3.34'"),'database remains Section 35 compatible and includes migration 030');
 ok35(str_contains($mig,"'songbooks','songbook_events'"),'upgrade integrity requires Songbook tables');
-ok35(str_contains($version,"'stonefellow'=>'1.3.34'")&&str_contains($version,"'database_schema_target'=>'1.3.29'"),'version endpoint reports v1.3.34 and DB 1.3.29');
+$app35='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm35))$app35=$vm35[1];ok35(version_compare($app35,'1.3.34','>=')&&version_compare($schema35,'1.3.29','>='),'version endpoint remains Section 35 compatible after later releases');
 ok35(str_contains($version,"'songbook_privacy'=>'draft-lyrics-excluded-public-page-search-agent'"),'version endpoint advertises Songbook privacy boundary');
-ok35(str_contains($ht,'X-Stonefellow-Build "1.3.34"'),'web build header advances to v1.3.34');
+$build35='0.0.0';if(preg_match('/X-Stonefellow-Build "([^"]+)"/',$ht,$hm35))$build35=$hm35[1];ok35(version_compare($build35,'1.3.34','>='),'web build header remains Section 35 compatible or newer');
 ok35(str_contains($ht,'RewriteRule ^(?:data|config)/ - [F,L,NC]'),'web server blocks direct access to private catalog and configuration directories');
 ok35(str_contains($wf,'node --check admin/assets/songbook.js')&&str_contains($wf,'php tests/v1334-section35-songbook.php'),'release gate includes Songbook Admin JS and Section 35 certification');
 

@@ -1,75 +1,64 @@
-# Stonefellow v1.3.34 — Section 35 Lyrics, Songbook & Track Notes Audit
+# Stonefellow v1.3.35 — Section 36 Visual Media & Video Experience Audit
 
-Section 35 adds a governed public Songbook layer without duplicating canonical lyric text. Canonical lyrics remain in the private Catalog record; only an explicitly published, readiness-green Songbook can expose structured lyric content publicly.
+## 36A — Video Publication Model — 10/10
+- One canonical Video Hub model for music videos, live sessions, visualizers, behind-the-scenes, interviews and short films.
+- Video records store publication metadata only; bytes remain in Media Library.
+- Draft, Published and Archived states are explicit.
+- Publishing requires current readiness and explicit Admin confirmation.
+- Featured published video state is unique.
 
-## 35A — Canonical Lyrics Privacy — 10/10
-- Canonical lyric text remains on the private Catalog track record.
-- Songbook tables store publication metadata, structure, annotations and visibility only; lyrics are not duplicated into Songbook storage.
-- Generated public catalog JavaScript strips the lyrics field.
-- Migration 030 immediately regenerates the lyric-free public catalog asset.
-- All subsequent Admin catalog writes preserve the lyric-free public asset boundary.
-- Direct access to private data/config directories remains blocked at the web server.
+## 36B — Managed Media & Playback Safety — 10/10
+- Public video requires exactly one managed public playback asset and one public poster.
+- Public playback is restricted to browser-safe MP4/WebM; MOV may remain private/source media.
+- Public playback requires known managed duration.
+- Public poster must be at least 640×360 in either orientation.
+- Media delivery keeps path containment, public visibility and byte-range playback.
 
-## 35B — Songbook Structure & Readiness — 10/10
-- Explicit Draft / Published / Archived lifecycle.
-- Publication requires a real public Stonefellow track and canonical lyrics.
+## 36C — Captions & Chapters — 10/10
+- Caption attachments are managed WebVTT assets.
+- Publication validates file extension/MIME and actual WEBVTT header.
+- Current single-language model permits at most one published caption track.
 - Language codes are normalized and validated.
-- Section ranges must remain inside canonical lyric line bounds.
-- Sections may not overlap.
-- Every meaningful non-empty lyric line must be covered by exactly one Songbook section; structural heading lines are recognized and exempted.
-- Annotations may reference only lines covered by a Songbook section.
-- Readiness is deterministic and blocks publication when any rule fails.
+- Chapter positions are floats, sorted, de-duplicated and constrained inside duration.
 
-## 35C — Governed Publishing Lifecycle — 10/10
-- Initial publication/archival requires explicit Admin confirmation.
-- Every later visibility-state transition, including Published → Draft unpublishing, requires explicit confirmation.
-- Consequential status changes are visible in Agent Brain and Admin audit.
-- Admin UI reflects Draft / Published / Archived state and readiness before save.
+## 36D — Governed Media Publication — 10/10
+- Video Hub media starts private by default.
+- Public/private and downloadable visibility changes require explicit Admin confirmation.
+- Poster publication requires server-side confirmation.
+- Visibility changes are written to Admin audit and Agent Brain.
+- No shadow uploader or duplicate media store exists.
 
-## 35D — Admin Songbook Editor — 10/10
-- Songbook editor is embedded directly in each Catalog track workspace; no extra Admin sidebar item.
-- Canonical lyrics remain edited in the existing Catalog field.
-- Songbook controls sections, annotations, language, public songwriting credits and internal notes.
-- Automatic verse/chorus/bridge structure detection is available as an editing aid.
-- Readiness and 30-day public interaction metrics are displayed in the editor.
-- Consequential status changes require an explicit confirmation prompt.
+## 36E — Public Video Hub Experience — 10/10
+- Public /videos hub and /video/{slug} detail routes.
+- Native controls, preload=metadata and playsinline; no autoplay.
+- Managed captions, chapters, linked song/release/show entities and gallery media.
+- Canonical sharing reuses the completed-share workflow.
+- Homepage supports optional Featured Video without another Admin sidebar item.
 
-## 35E — Public Songbook Experience — 10/10
-- Track pages no longer render raw Catalog lyrics directly.
-- Public Songbook content loads only through the governed Songbook API.
-- Structured verse/chorus/bridge sections render responsively.
-- Line annotations are user-expandable.
-- Optional public songwriting credits come from canonical track metadata.
-- Collection bindings use the correct multi-element selector helper.
-- Section 34 visual theme tokens are respected.
+## 36F — Truthful Events & Analytics — 10/10
+- Allowlisted events only: view, play, pause, 25/50/75 progress, complete, caption enable, chapter seek and entity open.
+- Progress milestones emit once per playback through a guarded loop.
+- No invented impressions or estimated watch-time events.
+- Public writes are rate-limited and require a currently public-ready video.
 
-## 35F — Search & Agent Grounding — 10/10
-- Public search indexes lyric text only when that track has a currently published Songbook.
-- Draft/private Songbook lyrics do not influence public search ranking.
-- Public Agent context receives only bounded text from published Songbooks.
-- Draft lyric text is explicitly removed from public Agent track-ranking context.
-- Agent Songbook context remains query-relevant and bounded rather than dumping the entire lyric catalog.
+## 36G — SEO, Homepage & Agent Integration — 10/10
+- VideoObject structured data includes poster, content URL, duration, publication date and linked entities.
+- Sitemap uses readiness-filtered public Video Hub data.
+- Canonical /videos and /video/{slug} routing works in server and SPA layers.
+- Homepage auto-selects featured published video or explicitly selects a ready public video.
+- Agent video context is sourced only from published-ready records.
 
-## 35G — Truthful Songbook Events — 10/10
-- Public Songbook event writes are rate-limited.
-- GET is side-effect free.
-- Allowed event types match the public UI exactly: view, section_open and annotation_open.
-- Events require a currently public Songbook.
-- No fabricated share/open/impression event exists.
-- Event detail is bounded and sanitized.
+## 36H — Upgrade & Release Safety — 10/10
+- Application: 1.3.35
+- Database target: 1.3.30
+- Migration 2026-10-11-031 creates video_features and video_events and refreshes Homepage defaults.
+- PHP syntax: PASS
+- Public JavaScript syntax: PASS
+- Admin JavaScript syntax: PASS
+- Sections 1–35 inherited suites: PASS
+- Section 36 certification: PASS
+- Explicit PASS lines: 2031
+- PHP warnings: 0
+- Failures: 0
 
-## 35H — Upgrade, Regression & Release Safety — 10/10
-- Application advances to **1.3.34**.
-- Database target advances to **1.3.29**.
-- Migration **2026-10-11-030** creates `songbooks` and `songbook_events` and sanitizes the generated public catalog asset.
-- Upgrade integrity requires both Songbook tables.
-- Existing Section 1–34 regression suites remain green.
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Section 35 certification: **PASS**
-- Explicit PASS lines on hardened implementation candidate: **1956**
-- PHP warnings: **0**
-- Failures: **0**
-
-FINAL SECTION 35 SCORE: **10/10**
+FINAL SECTION 36 SCORE: 10/10

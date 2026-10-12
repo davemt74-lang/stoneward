@@ -1,3 +1,18 @@
+# Stonefellow v1.3.35 — Section 36: Visual Media & Video Experience
+
+- Added governed single-artist Video Hub.
+- Video bytes remain in central Media Library.
+- Added Draft / Published / Archived lifecycle with confirmation.
+- Public readiness requires one managed public playback asset and poster.
+- Public playback is MP4/WebM with known duration.
+- Poster dimension readiness and actual WebVTT-header validation added.
+- Added chapters, public /videos and /video/{slug}, linked entity context and gallery media.
+- Added truthful video events and VideoObject SEO/sitemap integration.
+- Added optional Artist Homepage Featured Video.
+- Added public-only Agent video context.
+- Added server-confirmed media visibility/poster publication with Admin audit + Agent Brain.
+- Application 1.3.35; DB schema 1.3.30; migration 2026-10-11-031.
+
 # Stonefellow v1.3.34 — Section 35: Lyrics, Songbook & Track Notes
 
 - Added governed Songbook publishing for Stonefellow tracks.

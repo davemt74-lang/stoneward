@@ -64,6 +64,7 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
             $storyLines=[];foreach($storyRows as $story){$hay=implode(' ',[(string)($story['title']??''),(string)($story['summary']??''),(string)($story['body_text']??''),(string)($story['entity']['title']??'')]);if($terms&&$score($hay)<1&&($story['entry_type']??'')!=='artist_about')continue;$storyLines[]='- '.($story['entry_type']??'story').' | '.($story['title']??'').' | '.substr(preg_replace('/\\s+/u',' ',(string)($story['summary']?:$story['body_text']))??'',0,850).(!empty($story['entity']['title'])?' | connected to '.$story['entity']['title']:'');if(count($storyLines)>=6)break;}if($storyLines)$sections[]="PUBLISHED ARTIST STORIES\n".implode("\n",$storyLines);
         }
         if(function_exists('sf_songbook_agent_context')){$songbook=sf_songbook_agent_context($query,4);if($songbook!=='')$sections[]=$songbook;}
+        if(function_exists('sf_video_agent_context')){$videos=sf_video_agent_context($query,5);if($videos!=='')$sections[]=$videos;}
     }
     if($profile==='knowledge'){
         $kb=[];$kp=SF_ROOT.'/storage/knowledge/index.json';$kd=is_file($kp)?json_decode((string)file_get_contents($kp),true):[];
@@ -147,6 +148,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
     if(preg_match('/\b(where is my order|order status|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
     if(preg_match('/\b(tickets?|rsvp|guest list|check.?in|vip tickets?|meet.?greet|presale|reservation)\b/',$q))return 'ticketing_info';
+    if(preg_match('/\b(videos?|music videos?|visualizers?|live sessions?|behind the scenes|short films?)\b/',$q))return 'videos_browse';
     if(preg_match('/\b(open|show|browse)\b.*\b(shows?|concerts?|tour dates?|live archive)\b|\b(upcoming shows?|tour dates?)\b/',$q))return 'shows_browse';
     if(preg_match('/\b(setlist|concert|gig|show|tour)\b|played live|where did .* play|when did .* play/',$q))return 'show_info';
     if(preg_match('/\b(archive|timeline|eras?|chronolog(?:y|ical)|recording sessions?)\b/',$q))return 'archive_browse';
@@ -213,6 +215,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'membership_info':$action=['type'=>'open_view','view'=>'membership'];$text='Here is your Stonefellow membership and VIP access.';$profile='account';$needs=true;break;
         case 'fan_profile':$action=['type'=>'open_view','view'=>'community'];$profile='crm';$needs=true;break;
         case 'ticketing_info':$action=['type'=>'open_view','view'=>'tickets'];$text='Here are Stonefellow ticket, RSVP, presale and VIP offers. I can explain your access, but reservations and check-in require explicit user or Admin actions.';$profile='commerce';$needs=true;break;
+        case 'videos_browse':$action=['type'=>'open_view','view'=>'videos'];$text='Here are Stonefellow’s published videos, live sessions, visualizers and films.';$profile='catalog';break;
         case 'shows_browse':$action=['type'=>'open_view','view'=>'shows'];$text='Here are Stonefellow’s upcoming shows and live archive.';$profile='catalog';break;
         case 'show_info':$action=['type'=>'open_view','view'=>'shows'];$profile='catalog';$needs=true;break;
         case 'archive_browse':$action=['type'=>'open_view','view'=>'archive'];$text='Here is the Stonefellow music archive — recordings, versions, sessions and releases in context.';$profile='catalog';break;
@@ -294,6 +297,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'campaign_offer'=>'Asks about an active Stonefellow campaign, free download, discount, VIP offer, exclusive, presale, or early-access offer.',
         'store_browse'=>'Asks to browse Stonefellow merchandise, products, shop, or store.',
         'fan_profile'=>'Asks about their own fan CRM state, newsletter subscription, or fan profile.',
+        'videos_browse'=>'Asks to browse Stonefellow videos, music videos, live sessions, visualizers, behind-the-scenes work, or short films.',
         'shows_browse'=>'Asks to browse Stonefellow shows, concerts, tour dates, or the live archive.',
         'show_info'=>'Asks about a specific show, concert, tour, venue, date, setlist, or live performance.',
         'archive_browse'=>'Asks to browse the Stonefellow archive, chronology, eras, recording sessions, or version history.',

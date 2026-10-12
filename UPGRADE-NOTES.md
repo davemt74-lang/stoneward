@@ -1,19 +1,17 @@
-# Stonefellow v1.3.34 Upgrade Notes
+# Stonefellow v1.3.35 Upgrade Notes
 
-1. Upload/extract the v1.3.34 deploy over the existing Stonefellow installation.
-2. Preserve production-owned `data/`, `storage/`, database configuration, secrets, store configuration and generated runtime state.
-3. Run `/upgrade.php`.
-4. Database target advances to **1.3.29**.
-5. Migration **2026-10-11-030** creates:
-   - `songbooks`
-   - `songbook_events`
-6. Migration 030 also regenerates the browser-delivered catalog asset without canonical lyric text.
-7. Existing canonical lyrics remain in the private Catalog data source.
-8. Open Admin → Catalog → a track to configure its Songbook.
-9. Save the Catalog track first after changing canonical lyrics, then update the Songbook section/annotation line mappings.
-10. A Songbook cannot publish until its readiness checks are green.
-11. Publishing, archiving and unpublishing require explicit Admin confirmation.
-12. Public search and the public Agent will not use lyric text unless that track has a currently published Songbook.
+1. Upload/extract the v1.3.35 deploy over the existing installation.
+2. Preserve production-owned data, storage, database configuration, secrets, store configuration and generated catalog/config JS.
+3. Run /upgrade.php.
+4. Database target advances from 1.3.29 to 1.3.30.
+5. Migration 2026-10-11-031 creates video_features and video_events.
+6. Migration 031 refreshes Artist Homepage defaults so Featured Video appears on existing installs.
+7. Create Video Hub records from Admin → Media Library → Public Video Hub.
+8. Save Draft first, then attach managed Media Library assets.
+9. Public playback requires one Public MP4/WebM video with known duration and one Public poster at least 640×360 in either orientation.
+10. MOV can remain a private/source asset but does not satisfy public playback readiness.
+11. Optional captions must be managed WebVTT with a valid WEBVTT header.
+12. Publish only after readiness is green.
 
-Application: **1.3.34**  
-Database schema target: **1.3.29**
+Application: 1.3.35
+Database schema target: 1.3.30

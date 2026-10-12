@@ -49,6 +49,7 @@ jobs:
           node --check admin/assets/stories.js
           node --check admin/assets/theme.js
           node --check admin/assets/songbook.js
+          node --check admin/assets/video.js
 
       - name: v1.3 regression suites
         run: |
@@ -91,3 +92,4 @@ jobs:
           php tests/v1332-section33-storytelling.php
           php tests/v1333-section34-brand-theme.php
           php tests/v1334-section35-songbook.php
+          php tests/v1335-section36-video.php

@@ -7,7 +7,8 @@ function sf_artist_home_admin_refs(): array {
   $tracks=[];foreach(sf_catalog() as $t)$tracks[]=['id'=>(string)($t['id']??''),'title'=>(string)($t['title']??''),'release'=>(string)($t['release']??'')];
   $shows=[];if(function_exists('sf_live_public_shows'))foreach(sf_live_public_shows() as $s)$shows[]=['id'=>(string)$s['id'],'title'=>(string)($s['title']??$s['venue']??$s['id']),'date'=>(string)($s['date']??''),'venue'=>(string)($s['venue']??'')];
   $products=[];if(function_exists('sf_commerce_products'))foreach(sf_commerce_products(true) as $p)$products[]=['id'=>(string)$p['id'],'title'=>(string)$p['title'],'available'=>!empty($p['available'])];
-  return ['releases'=>$releases,'tracks'=>$tracks,'shows'=>$shows,'products'=>$products];
+  $videos=[];if(function_exists('sf_video_public_list'))foreach(sf_video_public_list() as $v)$videos[]=['slug'=>(string)$v['slug'],'title'=>(string)$v['title'],'kind'=>(string)$v['kind']];
+  return ['releases'=>$releases,'tracks'=>$tracks,'shows'=>$shows,'products'=>$products,'videos'=>$videos];
 }
 if($method==='GET')sf_json_response(['ok'=>true,'site'=>sf_site_settings(),'sections'=>sf_artist_home_sections(false),'metrics'=>sf_artist_home_metrics(),'references'=>sf_artist_home_admin_refs(),'csrf'=>sf_admin_csrf()]);
 if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);

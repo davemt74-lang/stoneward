@@ -1,3 +1,36 @@
+# Stonefellow v1.3.35 — Section 36: Visual Media & Video Experience
+
+Stonefellow now includes a first-class single-artist Video Hub built on the existing Media Library.
+
+## Video Hub
+Admin → Media Library contains the Public Video Hub publisher. Video records represent music videos, live sessions, visualizers, behind-the-scenes films, interviews, short films and related Stonefellow visual work.
+
+Video records store editorial/publication metadata only. MP4/WebM/MOV files, posters, captions and gallery photos remain reusable Media Library assets.
+
+## Public publishing
+A published video must have:
+- exactly one Public managed video;
+- MP4 or WebM public playback;
+- known managed duration;
+- exactly one Public poster;
+- poster dimensions at least 640×360 in either orientation;
+- valid public song/release/show links;
+- valid chapters;
+- optional WebVTT caption file with a real WEBVTT header.
+
+MOV can remain a source/private asset but is not a browser-safe public deliverable.
+
+## Public experience
+Published-ready video appears at /videos and /video/{slug}. The detail page uses native controls, never autoplay, supports managed captions and chapters, shows linked music/live context and public gallery photos.
+
+## Events and Agent
+Video analytics record only real user interactions: view, play, pause, 25/50/75 progress, completion, caption enable, chapter seek and linked-entity open. The public Agent can browse and discuss only published-ready Video Hub records.
+
+Application: 1.3.35
+Database schema target: 1.3.30
+
+---
+
 # Stonefellow v1.3.34 — Section 35: Lyrics, Songbook & Track Notes
 
 Stonefellow now has a governed Songbook layer for publishing lyrics and lyric context without making the private Catalog lyric field automatically public.
