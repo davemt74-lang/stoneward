@@ -28,6 +28,7 @@ jobs:
       - name: Public JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/agent-brain.js
           node --check assets/js/library.js
           node --check assets/js/accessibility.js
 
@@ -142,3 +143,4 @@ jobs:
           php tests/section46b-customer-brain.php
           php tests/section46c-admin-brain.php
           php tests/section46d-shared-orchestration.php
+          php tests/section46e-customer-canvas.php
