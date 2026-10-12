@@ -19,7 +19,7 @@ function sf_fan_journey_counts(int $days=30): array {
       'newsletter_opted_in'=>$count('SELECT COUNT(*) FROM fan_contacts WHERE marketing_opt_in=1'),
       'purchasing_contacts'=>$count("SELECT COUNT(DISTINCT contact_id) FROM fan_crm_events WHERE created_at>=? AND event_type IN ('purchase','merch_purchase','campaign_purchase_attributed')",[$since]),
       'campaign_participants'=>$count('SELECT COUNT(*) FROM campaign_participants WHERE entered_at>=?',[$since]),
-      'campaign_conversions'=>$count('SELECT COUNT(*) FROM campaign_participants WHERE converted_at IS NOT NULL AND converted_at>=?',[$since]),
+      'campaign_conversions'=>$count('SELECT COUNT(*) FROM campaign_participants WHERE entered_at>=? AND converted_at IS NOT NULL AND converted_at>=?',[$since,$since]),
       'journeys_started'=>$count('SELECT COUNT(*) FROM lifecycle_automation_runs WHERE started_at>=?',[$since]),
       'journeys_completed'=>$count("SELECT COUNT(*) FROM lifecycle_automation_runs WHERE started_at>=? AND status='completed'",[$since]),
       'journeys_failed'=>$count("SELECT COUNT(*) FROM lifecycle_automation_runs WHERE started_at>=? AND status='failed'",[$since]),
@@ -36,7 +36,7 @@ function sf_fan_journey_counts(int $days=30): array {
         'Counts are independent cohorts; they are not a person-by-person sequential funnel.',
         'Subscriber count is current opted-in contacts, not newsletter signups during the period.',
         'CRM listening data requires linked accounts; anonymous listeners are not counted as contacts.',
-        'Campaign conversion dates and entry dates are each filtered to the selected period.'
+        'Campaign conversion rate uses the same entry cohort and requires conversion within the selected period.'
       ]
     ];
 }
