@@ -1,4 +1,4 @@
-# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
+NaN# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
 
 - Added the single-artist **Photo Gallery & Visual Archive** system.
 - Added Draft, Published and Archived gallery lifecycle with explicit Admin confirmation for visibility changes.

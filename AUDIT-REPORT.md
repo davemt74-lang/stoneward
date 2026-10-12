@@ -1,86 +1,82 @@
-# Stonefellow v1.3.37 — Section 38 Photo Gallery & Visual Archive Audit
+# Stonefellow v1.3.38 — Section 39 Unified Public Search & Discovery Audit
 
-Section 38 was built on the fully merged Section 37 mainline and hardened against public-media privacy, inherited Video Hub governance, canonical route compatibility, accessibility, Agent exposure, and shared Media Library regressions.
+Section 39 extends Stonefellow's existing catalog search into one governed public discovery surface for a single artist. The final audit reviewed public/private indexing boundaries, relevance, stale-result behavior, telemetry isolation, Agent routing, theme integration, SEO behavior and compatibility with Sections 12 and 34–38.
 
-## 38A — Gallery Model & Lifecycle — 10/10
-- Single-artist gallery model with Draft, Published and Archived lifecycle only.
-- Stable unique public slugs.
-- General gallery metadata includes title, summary, event date, location, featured state, sort order and private Admin notes.
-- A gallery must first exist as Draft before publishing so all public assets come through the managed Media Library.
-- Publishing requires green readiness.
-- A featured published gallery is unique.
+## 39A — Governed Public Search Corpus — 10/10
+- Public result types are fixed to Song, Release, Show, Story, Video, Photo Gallery, Store Product and currently-live Offer.
+- Tracks and releases reuse the canonical Section 32 public eligibility resolvers.
+- Shows use the public live-show resolver.
+- Stories, videos and galleries use their published/readiness-approved public resolvers.
+- Products use active public commerce records.
+- Campaign results require a currently-live campaign plus public landing headline/body copy.
+- EPK/press records, professional inquiries, Admin records and other private datasets are intentionally excluded.
+- Public track search uses a dedicated field projection: title, release, public story, mood, themes, public credits and lyrics only when a Songbook is published.
+- Generic/internal track metadata and archive fields are not indexed by site-wide public Search.
+- Public product search does not index internal merch tags.
+- Offer suggestions use public landing headlines only, never internal campaign names.
 
-## 38B — Managed Media & Publishing Readiness — 10/10
-- Gallery bytes are never duplicated into a gallery-specific storage system.
-- Photo Gallery relationships reuse the central Media Library.
-- Gallery relationships accept image assets only and roles are bounded to cover/photo.
-- Media Library refuses orphan gallery relationships.
-- Publishing requires exactly one public cover and at least three public gallery photos.
-- Public cover/photos require useful dimensions of at least 1200×600 in either orientation.
-- Every public cover/photo requires alt text.
-- Missing photographer/creator credit is surfaced as a readiness warning.
-- Public media-links refuses draft/archived/unready gallery media.
-- Shared public media-links also preserves the Video Hub publication boundary; draft/unready video media cannot be exposed through the new shared path.
+## 39B — Search API, Limits & Privacy — 10/10
+- Query length is capped at 300 characters.
+- Result type is allowlisted.
+- Result count is capped at 60.
+- Anonymous initial GET search is read-only.
+- Search/click telemetry is bounded through the existing search telemetry table and rate policy.
+- Guest telemetry identity uses server-observed IP hash rather than caller session keys.
+- Signed-in telemetry identity is bound to authenticated user only, preventing caller session-key rotation from bypassing throttles.
+- Signed-in write actions retain CSRF protection.
+- Site-search history is isolated from Section 12 catalog-search history.
+- Clearing site-search history deletes only site_search/site_click events.
 
-## 38C — Admin Governance & Shared Media Safety — 10/10
-- Photo Galleries are embedded in Media Library rather than adding a 30th Admin sidebar destination.
-- Admin can create/edit galleries, open universal media management, see readiness, and change lifecycle state.
-- Gallery publication/archive state changes require explicit Admin confirmation.
-- Gallery public/download media visibility changes are confirmation-governed.
-- Gallery cover publication uses the existing governed primary-media path.
-- Private gallery notes are not copied into Admin audit or Agent Brain payloads.
-- Admin audit and Agent Brain receive gallery changes.
-- Shared Media Library collection controls use the collection selector helper correctly.
-- Section 36 Video Hub confirmation wording, audit event names, and explicit UI confirmation paths remain intact.
+## 39C — Public Search Experience — 10/10
+- Canonical public route: /search.
+- Browser Search state uses /search?q=…&type=… rather than duplicate ?view=search URLs.
+- Search itself is noindex,follow,noarchive and is deliberately omitted from the public sitemap.
+- Results render escaped title, subtitle, snippet, reason and governed public imagery.
+- Category filter covers all public result types.
+- Recent signed-in queries, suggestions, zero-result guidance and loading/error states are supported.
+- Slash and Ctrl/Cmd-K shortcuts open/focus Search without hijacking ordinary text editing.
+- Search adds no Admin sidebar item.
+- Search styling is responsive and inherits the published Section 34 theme variables rather than hard-coded typography/colors.
 
-## 38D — Public Photo Hub, Detail & Lightbox — 10/10
-- Public Photos hub lists published-ready galleries only.
-- Canonical focused routes use /photos/{slug}.
-- Gallery detail shows cover, metadata, summary, linked entities and governed public photos.
-- Public rendering includes alt text, photographer/creator credit and copyright metadata.
-- Lightbox is keyboard-aware with Escape, previous/next arrow navigation, modal semantics and focus.
-- Published gallery pages expose the existing canonical Share workflow.
-- Responsive gallery hub/detail/lightbox presentation is dedicated and mobile-safe.
+## 39D — Result Integrity & Navigation — 10/10
+- Result destinations use existing canonical track/release/show/story/video/photo/product/campaign routes.
+- A result click is revalidated against current public availability before telemetry is recorded.
+- If content becomes private/unavailable after the search response, the client refuses navigation, informs the visitor and refreshes results.
+- Result selection telemetry occurs before successful navigation.
+- Search route state is restored after reload through the server/SPA pretty-route handoff.
 
-## 38E — Linked Public Context & Agent — 10/10
-- Gallery links may point to public release, public show and public editorial story records only.
-- Readiness blocks stale/private linked context.
-- Public detail allows contextual navigation back into release/show/story pages.
-- Public Agent context is built exclusively from published-ready gallery data.
-- Agent has deterministic Photo Gallery browse intent and no draft-gallery read path.
+## 39E — Telemetry & Intelligence — 10/10
+- Reuses catalog_search_events instead of creating a duplicate analytics table or migration.
+- New event names site_search/site_click remain isolated from legacy search/click/clear events.
+- Measures search count, selected-result count, bounded CTR, zero-result rate, category usage, top queries and most-selected public results.
+- Per-user analytics are available to Admin where applicable.
+- Admin dashboard/recent catalog-search feeds remain scoped to their original Section 12 event set.
+- Performance Intelligence displays a separate Site-wide Search panel.
 
-## 38F — SEO, Sitemap & Canonical Routing — 10/10
-- Gallery detail emits ImageGallery with ImageObject structured data.
-- Photos hub has route-specific SEO metadata.
-- Sitemap includes only gallery-public-list detail URLs.
-- Apache supports /photos and /photos/{slug}.
-- SPA canonical URL builder has a dedicated Photos hub branch.
-- Server pretty-route handoff recognizes photo detail and appends Photos without disturbing certified Contact routing.
-- Existing Video Hub Apache and SPA canonical route contracts remain unchanged.
+## 39F — Agent Integration — 10/10
+- Public Agent has a deterministic site_search route.
+- Agent queries the same canonical public search core rather than a private/LLM-created index.
+- Agent can emit open_site_search with the resolved query.
+- Client Agent state sends the active site-wide Search query with catalog Search as fallback.
+- Pretty-route/SPA navigation reports Search as the current view instead of incorrectly falling back to Home.
+- Public Agent has no EPK, inquiry or draft-content search path through Section 39.
 
-## 38G — Truthful Gallery Events & Privacy — 10/10
-- Public event allowlist is limited to view, photo_open and entity_open.
-- Public events require a currently public gallery.
-- Anonymous event writes are session-rate-limited.
-- Event detail is bounded/sanitized.
-- No impression score, email-open or inferred engagement signals are invented.
-- Public APIs never expose private gallery notes.
+## 39G — Backward Compatibility & Shared Governance — 10/10
+- Section 12 catalog Search remains available and retains its own facets/history/analytics.
+- Section 12 Agent-query regression now explicitly supports site-wide Search plus catalog fallback.
+- Section 34 theme contract remains enforced; Section 39 Search uses --display-font, --surface, --muted and other theme variables.
+- Sections 33–38 public eligibility/readiness resolvers remain authoritative.
+- Section 38 forward-version regression was repaired without weakening its minimum compatibility guarantee.
+- No database schema change is required; schema remains 1.3.32 and migration 012 remains the canonical search telemetry schema.
 
-## 38H — Release & Regression Safety — 10/10
-- Application advances to **1.3.37**.
-- Database schema target advances to **1.3.32**.
-- Migration **2026-10-11-033** creates photo_galleries and photo_gallery_events.
-- Upgrade integrity requires both gallery tables.
-- Section 36 Video Hub governance and routing regressions remain green.
-- Section 37 Contact route handoff remains green.
-- Shared Media Library selector safety is restored and certified.
-- PHP syntax: **PASS**
-- Public JavaScript syntax: **PASS**
-- Admin JavaScript syntax: **PASS**
-- Sections 1–37 inherited regression suites: **PASS**
-- Section 38 certification: **PASS**
-- Explicit PASS lines on hardened implementation candidate: **2148**
-- PHP warnings: **0**
-- Failures: **0**
+## 39H — Release Certification — 10/10
+- PHP syntax: PASS
+- Public JavaScript syntax: PASS
+- Admin JavaScript syntax: PASS
+- Sections 1–38 inherited regression suites: PASS
+- Section 39 Unified Public Search certification: PASS
+- Explicit PASS lines on final hardened implementation candidate: 2239
+- PHP warnings: 0
+- Failures: 0
 
-FINAL SECTION 38 SCORE: **10/10**
+FINAL SECTION 39 SCORE: **10/10**

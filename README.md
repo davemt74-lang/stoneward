@@ -1,4 +1,4 @@
-# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
+NaN# Stonefellow v1.3.37 — Section 38: Photo Gallery & Visual Archive
 
 Stonefellow now includes a governed public photo archive for a **single artist**.
 
