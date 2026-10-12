@@ -8,7 +8,7 @@ $ai=(string)file_get_contents($root.'/api/ai.php');
 $checks=[
  'chat authenticated'=>str_contains($chat,'sf_require_user(false,true)'),
  'chat quota failure retained'=>str_contains($chat,'active_tokens_required'),
- 'chat raw exceptions not returned'=>!str_contains($chat,"'message'=>$e->getMessage()"),
+ 'chat raw exceptions not returned'=>!str_contains($chat,"'message'=>\$e->getMessage()"),
  'chat unknown failures generic'=>str_contains($chat,'catch(Throwable $e)'),
  'voice authenticated'=>str_contains($voice,'sf_require_user(false,true)'),
  'voice quota enforced'=>str_contains($voice,'sf_can_use_ai('),
