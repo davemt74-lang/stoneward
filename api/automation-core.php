@@ -202,14 +202,21 @@ function sf_automation_process_crm_event(int $contactId,string $eventType,int $e
     if(!empty($GLOBALS['sf_automation_suppressed']))return 0;sf_automation_ensure_schema();static $guard=false;if($guard)return 0;$guard=true;$started=0;
     try{$q=sf_db()->query("SELECT id,trigger_json FROM lifecycle_automations WHERE status='published' AND trigger_type='crm_event'");foreach($q->fetchAll() as $r){$cfg=sf_auto_decode($r['trigger_json']??'',[]);$events=array_values(array_filter(array_map('strval',(array)($cfg['events']??[]))));if($events&&!in_array($eventType,$events,true))continue;if(sf_automation_start((int)$r['id'],$contactId,$eventId,'crm:'.$eventId))$started++;}sf_segment_refresh_all($contactId);}finally{$guard=false;}return $started;
 }
+/**
+ * Quarantine potentially executed steps after an abandoned worker timeout.
+ * A second worker cannot run an already-claimed operation.
+ */
+function sf_automation_quarantine_stale(): int {
+    sf_automation_ensure_schema();
+    $now=gmdate('c');$stale=gmdate('c',time()-7200);
+    $q=sf_db()->prepare("UPDATE lifecycle_automation_runs SET status='review_required',updated_at=? WHERE status='running' AND updated_at<?");
+    $q->execute([$now,$stale]);
+    return $q->rowCount();
+}
 function sf_automation_tick(): array {
     sf_automation_ensure_schema();$segments=sf_segment_refresh_all();$now=gmdate('c');$resumed=0;$scheduled=0;$started=0;
-    // An abandoned running operation may have already sent outreach; quarantine,
-    // never replay. The owner must inspect its timeline and acknowledge it.
-    $stale=gmdate('c',time()-7200);
-    $quarantine=sf_db()->prepare("UPDATE lifecycle_automation_runs SET status='review_required',updated_at=? WHERE status='running' AND updated_at<?");
-    $quarantine->execute([$now,$stale]);
-    $interrupted=$quarantine->rowCount();
+    // This only changes run status; it never replays a possibly executed step.
+    $interrupted=sf_automation_quarantine_stale();
     $q=sf_db()->prepare("SELECT r.id FROM lifecycle_automation_runs r JOIN lifecycle_automations a ON a.id=r.automation_id WHERE r.status='waiting' AND a.status='published' AND r.due_at IS NOT NULL AND r.due_at<=? ORDER BY r.due_at,r.id LIMIT 500");$q->execute([$now]);foreach($q->fetchAll(PDO::FETCH_COLUMN) as $rid){$claim=sf_db()->prepare('UPDATE lifecycle_automation_runs SET status="running",updated_at=? WHERE id=? AND status="waiting" AND due_at<=?');$claim->execute([$now,(int)$rid,$now]);if($claim->rowCount()!==1)continue;sf_automation_continue((int)$rid);$resumed++;}
     $q=sf_db()->query("SELECT * FROM lifecycle_automations WHERE status='published' AND trigger_type='scheduled'");foreach($q->fetchAll() as $raw){$a=$raw;$a['trigger']=sf_auto_decode($raw['trigger_json']??'',[]);$hours=max(1,min(8760,(int)($a['trigger']['interval_hours']??24)));$last=(string)($a['last_scheduled_at']??'');if($last!==''&&strtotime($last)>time()-$hours*3600)continue;$contacts=!empty($a['segment_id'])?sf_segment_contacts((int)$a['segment_id'],5000):sf_db()->query('SELECT * FROM fan_contacts ORDER BY id')->fetchAll();$slot=(string)floor(time()/($hours*3600));foreach($contacts as $c)if(sf_automation_start((int)$a['id'],(int)$c['id'],0,'scheduled:'.$slot))$started++;sf_db()->prepare('UPDATE lifecycle_automations SET last_scheduled_at=?,updated_at=? WHERE id=?')->execute([$now,$now,(int)$a['id']]);$scheduled++;}
     return ['segments_refreshed'=>count($segments),'runs_resumed'=>$resumed,'scheduled_automations'=>$scheduled,'runs_started'=>$started,'runs_review_required'=>$interrupted];
