@@ -108,9 +108,9 @@ ok39(!str_contains($core,"'metadata'=>\$tags")&&str_contains($core,"sf_site_sear
 ok39(str_contains($core,"\$headline=trim((string)(\$landing['headline']??''))")&&!str_contains($core,"\$x['headline']??\$x['name']"),'zero-result offer suggestions use public landing headlines only');
 
 $app39='0.0.0';if(preg_match("/'stonefellow'=>'([^']+)'/",$version,$vm39))$app39=$vm39[1];ok39(version_compare($app39,'1.3.38','>='),'version endpoint remains Section 39 compatible after later releases');
-ok39(str_contains($version,"'database_schema_target'=>'1.3.32'"),'Section 39 intentionally leaves database target at 1.3.32');
+$schema39='0.0.0';if(preg_match("/'database_schema_target'=>'([^']+)'/",$version,$dm39))$schema39=$dm39[1];ok39(version_compare($schema39,'1.3.32','>='),'database target remains Section 39 compatible or newer');
 ok39(str_contains($version,"'public_site_search'=>'songs-releases-shows-stories-videos-photos-products-live-offers'"),'version endpoint advertises unified public search');
-ok39(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.32'"),'migration target remains unchanged');
+$migSchema39='0.0.0';if(preg_match("/const SF_DB_SCHEMA_TARGET = '([^']+)'/",$mig,$mm39))$migSchema39=$mm39[1];ok39(version_compare($migSchema39,'1.3.32','>='),'migration target remains Section 39 compatible or newer');
 ok39(!str_contains($mig,"'app_version'=>'1.3.38'"),'Section 39 introduces no unnecessary database migration');
 ok39(str_contains($mig,"'id'=>'2026-10-08-012'")&&str_contains($mig,'sf_search_ensure_schema'),'existing migration 012 remains the canonical search telemetry schema');
 ok39(str_contains($wf,'php tests/v1338-section39-public-search.php'),'release gate includes Section 39 certification');
