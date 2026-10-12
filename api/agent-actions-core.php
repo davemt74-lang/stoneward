@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/agent-tool-registry.php';
 /**
  * Section 44B–F: durable, review-first governed campaign draft operations.
  * Proposal IDs are server-created; authenticated admin identity is server-side.
@@ -61,7 +62,7 @@ function sf_agent_action_get(int $adminId,string $id): ?array {
 }
 function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,array $raw): array {
     if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
-    if($toolId!=='campaign_draft_save')throw new InvalidArgumentException('Action is not available for governed preparation.');
+    if(!sf_agent_tool_executable($toolId,'admin',true))throw new InvalidArgumentException('Action is not available for governed preparation.');
     $payload=sf_agent_action_normalize_campaign($raw);$hash=sf_agent_action_hash($toolId,$payload);
     sf_agent_actions_ensure_schema();$db=sf_db();
     $q=$db->prepare('SELECT id,payload_hash FROM agent_action_proposals WHERE admin_user_id=? AND request_key=?');
@@ -89,6 +90,7 @@ function sf_agent_action_approve(int $adminId,string $id,string $expectedHash,st
         throw new RuntimeException('The proposal changed; approval was rejected.');
     if($proposal['status']==='approved'||$proposal['status']==='completed')return $proposal;
     if($proposal['status']!=='proposed')throw new RuntimeException('This proposal requires administrator review.');
+    if(time()-strtotime((string)$proposal['created_at'])>86400)throw new RuntimeException('This proposal expired; prepare a fresh review.');
     $q=sf_db()->prepare("UPDATE agent_action_proposals SET status='approved',approved_at=? WHERE id=? AND admin_user_id=? AND status='proposed'");
     $q->execute([gmdate('c'),$id,$adminId]);
     return sf_agent_action_get($adminId,$id);
@@ -98,7 +100,13 @@ function sf_agent_action_execute(int $adminId,string $id): array {
     if(!$p)throw new InvalidArgumentException('Proposal not found.');
     if($p['status']==='completed')return $p;
     if($p['status']!=='approved')throw new RuntimeException('Proposal must be approved; interrupted work requires review.');
-    if($p['tool_id']!=='campaign_draft_save')throw new RuntimeException('This tool cannot be executed here.');
+    if(!sf_agent_tool_executable($p['tool_id'],'admin',true))throw new RuntimeException('This tool cannot be executed here.');
+    if(!hash_equals($p['payload_hash'],sf_agent_action_hash($p['tool_id'],(array)$p['payload'])))
+        throw new RuntimeException('Proposal content no longer matches exact approval.');
+    if(empty($p['approved_at'])||time()-strtotime((string)$p['approved_at'])>3600){
+        sf_db()->prepare("UPDATE agent_action_proposals SET status='review_required' WHERE id=? AND admin_user_id=? AND status='approved'")->execute([$id,$adminId]);
+        throw new RuntimeException('Approval expired; prepare a fresh review.');
+    }
     $db=sf_db();
     $q=$db->prepare("UPDATE agent_action_proposals SET status='executing' WHERE id=? AND admin_user_id=? AND status='approved'");
     $q->execute([$id,$adminId]);
