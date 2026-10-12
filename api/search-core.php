@@ -166,7 +166,7 @@ function sf_search_clear_user_history(int $userId): int {
 }
 function sf_search_analytics(int $days=30,?int $userId=null): array {
     sf_search_ensure_schema();$days=max(1,min(3650,$days));$since=gmdate('c',time()-$days*86400);$args=[$since];$where='created_at>=?';if($userId!==null){$where.=' AND user_id=?';$args[]=$userId;}
-    $q=sf_db()->prepare("SELECT id,user_id,event_type,query_text,normalized_query,result_count,result_type,result_id,filters_json,created_at FROM catalog_search_events WHERE $where ORDER BY id ASC");$q->execute($args);$rows=$q->fetchAll();
+    $where.=" AND event_type IN ('search','click','clear')";$q=sf_db()->prepare("SELECT id,user_id,event_type,query_text,normalized_query,result_count,result_type,result_id,filters_json,created_at FROM catalog_search_events WHERE $where ORDER BY id ASC");$q->execute($args);$rows=$q->fetchAll();
     $searches=0;$clicks=0;$zero=0;$sessions=[];$users=[];$queries=[];$zeroQueries=[];$selected=[];$filters=[];$recent=[];
     foreach($rows as $r){$ev=(string)$r['event_type'];$sessions[(string)$r['user_id'].'|'.(string)$r['id']]=true;if((int)$r['user_id']>0)$users[(int)$r['user_id']]=true;
         if($ev==='search'){$searches++;$n=(string)$r['normalized_query'];if((int)$r['result_count']===0){$zero++;if($n!=='')$zeroQueries[$n]=($zeroQueries[$n]??0)+1;}if($n!==''){$queries[$n]??=['query'=>(string)$r['query_text'],'searches'=>0,'zero_results'=>0];$queries[$n]['searches']++;if((int)$r['result_count']===0)$queries[$n]['zero_results']++;}$fj=json_decode((string)$r['filters_json'],true);if(is_array($fj))foreach($fj as $k=>$v)if($v!==''&&$v!==0&&$v!=='all'&&$v!=='relevance')$filters[$k.'='.strval($v)]=($filters[$k.'='.strval($v)]??0)+1;
