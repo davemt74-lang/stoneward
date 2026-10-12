@@ -14,5 +14,6 @@ if(!$write){
     $fanSql='SELECT e.id,e.user_id,e.channel,e.trigger_type,e.status,e.created_at FROM fan_agent_engagements e'.($userId?' WHERE e.user_id='.(int)$userId:'').' ORDER BY e.id DESC LIMIT 80';$fanEngagements=$pdo->query($fanSql)->fetchAll();
     sf_json_response(['ok'=>true,'decisions'=>$rows,'fan_engagements'=>$fanEngagements,'stats'=>$stats,'filters'=>['user_id'=>$userId,'phase'=>$phase,'q'=>$search]]);
 }
-$body=sf_request_json();if(($body['action']??'')==='clear'){$pdo->exec('DELETE FROM agent_brain_decisions');sf_log_admin_action((int)$me['id'],'agent_brain_cleared');sf_json_response(['ok'=>true]);}
+// Customer Brain records are governed by each customer's own privacy controls.
+$body=sf_request_json();if(($body['action']??'')==='clear')sf_json_response(['ok'=>false,'error'=>'not_allowed','message'=>'Customer Brain records may only be cleared through the account privacy controls.'],403);
 sf_json_response(['ok'=>false,'message'=>'Unsupported Agent Brain action.'],422);
