@@ -42,3 +42,12 @@ function sf_agent_tool_allowed(string $toolId,string $role,bool $confirmed=false
     if(!empty($tool['confirmation'])&&!$confirmed)return false;
     return true;
 }
+
+/**
+ * Agent execution is an explicit narrow allowlist separate from tool discovery.
+ * Sending, publishing, purchasing and deletes remain in owner-controlled UI.
+ */
+function sf_agent_tool_executable(string $toolId,string $role,bool $confirmed=false): bool {
+    if($toolId!=='campaign_draft_save')return false;
+    return sf_agent_tool_allowed($toolId,$role,$confirmed);
+}
