@@ -148,7 +148,7 @@
       else if(p.status==='cancelled')action='Cancelled before execution.';
       return '<tr><td>'+name+'</td><td>'+status+'</td><td>'+when+'</td><td>'+action+'</td></tr>';
     }).join('');
-    history.innerHTML='<h2>Agent action timeline</h2><p>These are your reviewed Agent campaign proposals. Pending, interrupted, or uncertain operations never run automatically.</p><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Draft</th><th>Status</th><th>Created</th><th>Next step</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No Agent draft actions yet.</td></tr>')+'</tbody></table></div><button type="button" id="closeAgentHistory">Close</button>';
+    history.innerHTML='<h2>Agent action timeline</h2><p>These are your reviewed Agent campaign proposals. Pending, interrupted, or uncertain operations never run automatically. Review Campaign Builder manually; do not retry automatically.</p><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Draft</th><th>Status</th><th>Created</th><th>Next step</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No Agent draft actions yet.</td></tr>')+'</tbody></table></div><button type="button" id="closeAgentHistory">Close</button>';
     document.body.appendChild(history);
     history.querySelector('#closeAgentHistory').onclick=()=>history.close();
     history.addEventListener('close',()=>history.remove());
