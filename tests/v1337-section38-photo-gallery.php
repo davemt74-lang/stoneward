@@ -35,8 +35,8 @@ ok38(str_contains($core,'Publish exactly one public cover image.')&&str_contains
 ok38(str_contains($core,'1200×600')&&str_contains($core,'Every public cover/photo requires alt text.'),'gallery readiness enforces usable image dimensions and alt text');
 ok38(str_contains($core,'photographer/creator credit'),'missing photographer credit is surfaced as a warning');
 ok38(str_contains($core,'Linked release, show and story must currently be public.'),'gallery linked context must be currently public');
-ok38(str_contains($core,"if($publicOnly&&(($r['status']??'')!=='published'||empty($r['readiness']['ready'])))return null"),'public gallery resolver blocks draft/archived/unready galleries');
-ok38(str_contains($core,"$allowed=['view','photo_open','entity_open']"),'gallery analytics only record real view/photo/entity interactions');
+ok38(str_contains($core,"if(\$publicOnly&&((\$r['status']??'')!=='published'||empty(\$r['readiness']['ready'])))return null"),'public gallery resolver blocks draft/archived/unready galleries');
+ok38(str_contains($core,"\$allowed=['view','photo_open','entity_open']"),'gallery analytics only record real view/photo/entity interactions');
 ok38(!str_contains($core,'impression_score')&&!str_contains($core,'email_open'),'gallery module invents no engagement signals');
 ok38(str_contains($core,'sf_gallery_agent_context')&&str_contains($core,'sf_gallery_public_list()'),'Agent gallery context is built only from public galleries');
 
@@ -78,9 +78,9 @@ ok38(str_contains($shell,"define('SF_BUILD', '1.3.37')")&&str_contains($shell,'h
 ok38(str_contains($shell,"'video','photo','track'")&&str_contains($shell,"'videos','photos','contact'"),'server pretty-route handoff recognizes Photo detail and Photos hub');
 ok38(str_contains($ht,'^photos/([A-Za-z0-9_-]+)')&&str_contains($ht,'videos|photos|store')&&str_contains($ht,'X-Stonefellow-Build "1.3.37"'),'web server routes gallery hub/detail and reports build 1.3.37');
 
-ok38(str_contains($seo,"$view==='photo'")&&str_contains($seo,"'@type'=>'ImageGallery'")&&str_contains($seo,"'@type'=>'ImageObject'"),'gallery detail emits ImageGallery/ImageObject structured data');
+ok38(str_contains($seo,"\$view==='photo'")&&str_contains($seo,"'@type'=>'ImageGallery'")&&str_contains($seo,"'@type'=>'ImageObject'"),'gallery detail emits ImageGallery/ImageObject structured data');
 ok38(str_contains($seo,"'photos'=>'Photos'")&&str_contains($seo,"'photos'=>'0.7'"),'Photos hub has route metadata and sitemap priority');
-ok38(str_contains($seo,'sf_gallery_public_list')&&str_contains($seo,"$base.'/photos/'"),'sitemap includes only gallery-public-list detail URLs');
+ok38(str_contains($seo,'sf_gallery_public_list')&&str_contains($seo,"\$base.'/photos/'"),'sitemap includes only gallery-public-list detail URLs');
 ok38(str_contains($agent,'sf_gallery_agent_context')&&str_contains($agent,"return 'photos_browse'")&&str_contains($agent,"case 'photos_browse'"),'public Agent has deterministic published Photo Gallery route');
 ok38(!str_contains($agent,'sf_gallery_list(false)')&&!str_contains($agent,'sf_gallery_get('),'public Agent runtime has no draft-gallery read path');
 
