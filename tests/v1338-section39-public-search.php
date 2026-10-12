@@ -40,12 +40,12 @@ ok39(str_contains($core,'sf_commerce_products(true)'),'store results use active 
 ok39(str_contains($core,'sf_campaign_is_live($c)'),'offer results require a currently live campaign');
 ok39(!str_contains($core,"'press'=>'")&&!str_contains($core,'sf_press_kits'),'public site search intentionally excludes EPK/press-contact content');
 ok39(!str_contains($core,'professional_inquir')&&!str_contains($core,'inquiry_'),'public site search does not index professional inquiry records');
-ok39(str_contains($core,"unset($fields['notes'],$fields['archive'])"),'site-wide release search strips private/internal release notes from its search document');
+ok39(str_contains($core,"unset(\$fields['notes'],\$fields['archive'])"),'site-wide release search strips private/internal release notes from its search document');
 ok39(str_contains($core,'sf_search_track_fields($t)'),'track search preserves published Songbook lyric gating from Section 12');
 ok39(str_contains($core,'sf_site_search_image_from_media'),'site search images resolve from governed public media payloads');
 
-ok39(str_contains($api,"$method==='GET'"),'anonymous GET site search exists');
-ok39(str_contains($api,"$action==='search'")&&str_contains($api,"$action==='click'")&&str_contains($api,"$action==='clear_history'"),'site search API supports search/click/privacy-clear actions');
+ok39(str_contains($api,"\$method==='GET'"),'anonymous GET site search exists');
+ok39(str_contains($api,"\$action==='search'")&&str_contains($api,"\$action==='click'")&&str_contains($api,"\$action==='clear_history'"),'site search API supports search/click/privacy-clear actions');
 ok39(str_contains($api,'if($uid)sf_require_csrf()'),'signed-in site-search writes require CSRF');
 ok39(str_contains($api,'sf_site_search_result_exists($type,$id)'),'site-search click attribution revalidates current public availability');
 ok39(str_contains($api,'Search result is no longer public or available.'),'stale/private result clicks are rejected');
@@ -57,14 +57,14 @@ ok39(str_contains($core,"event_type IN ('search','click','clear')"),'Section 12 
 ok39(str_contains($state,"WHERE e.event_type IN ('search','click','clear')"),'Admin recent catalog-search feed remains catalog-only');
 
 ok39(str_contains($shell,"define('SF_BUILD', '1.3.38')"),'public shell cache build advances to 1.3.38');
-ok39(str_contains($shell,"$publicInitialViews[]='search'"),'server pretty-route handoff explicitly appends Search without disturbing certified route order');
+ok39(str_contains($shell,"\$publicInitialViews[]='search'"),'server pretty-route handoff explicitly appends Search without disturbing certified route order');
 ok39(str_contains($shell,'href="search" data-view="search"'),'public navigation exposes Search');
 ok39(substr_count($adminShell,'data-view="')===29,'public Search adds no Admin sidebar item');
 ok39(str_contains($ht,'^search/?$')&&str_contains($ht,'view=search'),'Apache serves canonical /search');
 ok39(str_contains($ht,'X-Stonefellow-Build "1.3.38"'),'server build header advances to 1.3.38');
-ok39(str_contains($seo,"if($view==='search')")&&str_contains($seo,"'noindex,follow,noarchive'"),'Search has dedicated noindex/follow SEO policy');
+ok39(str_contains($seo,"if(\$view==='search')")&&str_contains($seo,"'noindex,follow,noarchive'"),'Search has dedicated noindex/follow SEO policy');
 ok39(str_contains($seo,"sf_seo_base_url().'/search'"),'Search canonical strips query/filter duplicates');
-ok39(!str_contains($seo,"$add($base.'/search'"),'Search page is intentionally absent from the public sitemap');
+ok39(!str_contains($seo,"\$add(\$base.'/search'"),'Search page is intentionally absent from the public sitemap');
 
 ok39(str_contains($app,'function siteSearchResultHtml'),'public Search renders dedicated result cards');
 ok39(str_contains($app,"['all','track','release','show','story','video','photo','product','campaign']"),'client Search exposes the same governed result type set as the server');
@@ -80,7 +80,7 @@ ok39(str_contains($css,'.site-search-module')&&str_contains($css,'.site-search-r
 
 ok39(str_contains($agent,"return 'site_search'"),'local Agent router can choose site-wide Search');
 ok39(str_contains($agent,"case 'site_search':"),'Agent policy executes deterministic site-wide Search');
-ok39(str_contains($agent,"sf_site_search(['q'=>$query,'limit'=>8])"),'Agent queries the same canonical public search core');
+ok39(str_contains($agent,"sf_site_search(['q'=>\$query,'limit'=>8])"),'Agent queries the same canonical public search core');
 ok39(str_contains($agent,"'type'=>'open_site_search'"),'Agent emits a public Search navigation action');
 ok39(str_contains($agent,"'site_search'=>'Asks to search across the public Stonefellow site"),'JEV route criteria include site-wide Search');
 ok39(str_contains($app,"search_query:$('#siteSearchInput'"),'Agent client state includes current site-search query');
