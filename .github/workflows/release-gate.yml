@@ -141,3 +141,4 @@ jobs:
           php tests/section46a-brain-isolation.php
           php tests/section46b-customer-brain.php
           php tests/section46c-admin-brain.php
+          php tests/section46d-shared-orchestration.php
