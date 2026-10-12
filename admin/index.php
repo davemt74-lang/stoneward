@@ -68,7 +68,6 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="membership"><span>21</span>Membership + VIP</button>
         <button type="button" data-view="ticketing"><span>22</span>Tickets + VIP</button>
         <button type="button" data-view="ai"><span>23</span>AI Providers</button>
-        <button type="button" data-view="agent-chat"><span>★</span>Admin Agent Chat</button>
         <button type="button" data-view="brain"><span>24</span>Agent Brain</button>
         <button type="button" data-view="customer"><span>25</span>Customer Lifecycle</button>
         <button type="button" data-view="analytics"><span>26</span>Performance Intelligence</button>
@@ -83,6 +82,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
       <header class="admin-topbar">
         <button id="sidebarToggle" class="mobile-menu" type="button" aria-label="Open admin menu">☰</button>
         <div><div class="eyebrow">STONEFELLOW ADMIN</div><div id="viewTitle" class="view-title">Dashboard</div></div>
+        <button type="button" class="secondary" id="openAdminAgentChat">Admin Agent Chat</button>
         <div class="admin-user-menu"><span><?=htmlspecialchars((string)$adminUser['display_name'],ENT_QUOTES,'UTF-8')?></span><a href="../" target="_blank" rel="noopener" class="public-link">View site ↗</a><a href="logout.php" class="public-link">Log out</a></div>
       </header>
 
