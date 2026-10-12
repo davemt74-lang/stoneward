@@ -136,10 +136,10 @@ function sf_crm_agent_log(int $contactId,?int $userId,string $channel,string $tr
     return $id;
 }
 function sf_crm_next_agent_engagement(int $userId): ?array {
-    $c=sf_crm_sync_user($userId);if(!$c||empty($c['agent_auto_engage']))return null;$last=(string)($c['last_engaged_at']??'');
+    $c=sf_crm_sync_user($userId);if(!$c||empty($c['agent_auto_engage']))return null;if(!function_exists('sf_privacy_personalization_enabled')||!sf_privacy_personalization_enabled($userId))return null;$listenHistory=function_exists('sf_privacy_listening_history_enabled')&&sf_privacy_listening_history_enabled($userId);$last=(string)($c['last_engaged_at']??'');
     $q=sf_db()->prepare("SELECT created_at FROM fan_agent_engagements WHERE user_id=? AND status='delivered' ORDER BY id DESC LIMIT 1");$q->execute([$userId]);$lastAuto=(string)($q->fetchColumn()?:'');
-    if($lastAuto!==''&&strtotime($lastAuto)>time()-20*3600)return null;
-    $q=sf_db()->prepare("SELECT id,event_type,title,entity_type,entity_id,created_at FROM user_activity WHERE user_id=? AND created_at>=? ORDER BY id DESC LIMIT 30");$q->execute([$userId,gmdate('c',time()-21*86400)]);$events=$q->fetchAll();
+    if($lastAuto!==''&&strtotime($lastAuto)>time()-24*3600)return null;
+    $q=sf_db()->prepare("SELECT id,event_type,title,entity_type,entity_id,created_at FROM user_activity WHERE user_id=? AND created_at>=? ORDER BY id DESC LIMIT 30");$q->execute([$userId,gmdate('c',time()-7*86400)]);$events=$q->fetchAll();
     $trigger='';$reason='';$message='';$eventId=0;$communityEnabled=!empty(sf_site_settings()['fan_community_enabled']);
     foreach($events as $e){
         $type=(string)$e['event_type'];$title=(string)$e['title'];$eventId=(int)$e['id'];
@@ -147,7 +147,7 @@ function sf_crm_next_agent_engagement(int $userId): ?array {
         if($communityEnabled&&$type==='community_post'){$trigger='community_post';$reason='Fan just contributed to the community.';$message='I saw your community post. If you want to dig into anything you mentioned, ask me here and I can connect it to the music, archive, shows, or your library.';break;}
         if($type==='purchase'){$trigger='purchase';$reason='Fan recently supported Stonefellow with a purchase.';$message='Thanks for supporting Stonefellow. Your purchase is in My Library, and I can help you find related recordings or build something around it.';break;}
         if(str_contains($type,'playlist')){$trigger='playlist';$reason='Fan recently worked with a playlist.';$message='I noticed you’ve been working with playlists. Want me to help sequence one around a mood, era, or favorite track?';break;}
-        if($type==='listen_complete'){$trigger='listening';$reason='Fan recently finished a Stonefellow recording.';$message=$title!==''?$title.'. Want me to take you somewhere related in the catalog or archive?':'You finished a Stonefellow recording. Want another one that connects to it?';break;}
+        if($listenHistory&&$type==='listen_complete'){$trigger='listening';$reason='Fan recently finished a Stonefellow recording.';$message=$title!==''?$title.'. Want me to take you somewhere related in the catalog or archive?':'You finished a Stonefellow recording. Want another one that connects to it?';break;}
     }
     if($trigger==='')return null;
     $dedupe='fan:auto:'.$userId.':'.$trigger.':'.($eventId?:date('Y-m-d'));$q=sf_db()->prepare('SELECT id FROM fan_agent_engagements WHERE dedupe_key=?');$q->execute([$dedupe]);if($q->fetchColumn())return null;
