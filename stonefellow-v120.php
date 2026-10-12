@@ -118,6 +118,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="?view=library" data-view="library" id="menuLibrary">My Library</a>
           <a href="?view=account" data-view="account" id="menuAccount">My account</a>
           <a href="?view=agent-brain" data-view="agent-brain" id="menuAgentBrain">My Agent Brain</a>
+          <a href="?view=agent-chat" data-view="agent-chat" id="menuAgentChat">My Agent Chat</a>
           <a href="#" id="menuQueueLink">Up Next</a>
 <?php if(($currentUser['role']??'')==='admin'): ?>
           <a href="admin/" id="menuAdmin">Admin</a>
@@ -232,6 +233,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/releases.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/library.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-brain.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/agent-chat-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/accessibility.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
 </body>
