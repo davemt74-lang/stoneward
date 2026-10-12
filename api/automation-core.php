@@ -180,7 +180,8 @@ function sf_automation_outreach_allowed(string $type,array $contact): bool {
 }
 
 function sf_automation_continue(int $runId): ?array {
-    sf_automation_ensure_schema();$q=sf_db()->prepare('SELECT * FROM lifecycle_automation_runs WHERE id=?');$q->execute([$runId]);$run=$q->fetch();if(!$run)return null;if(in_array((string)$run['status'],['completed','failed','canceled'],true))return $run;$a=sf_automation_get((int)$run['automation_id']);$contact=sf_crm_contact_by_id((int)$run['contact_id']);if(!$a||!$contact)return null;if(($a['status']??'')!=='published')return $run;$steps=(array)$a['steps'];$start=max(0,(int)$run['current_step']);$uid=!empty($contact['user_id'])?(int)$contact['user_id']:null;
+    sf_automation_ensure_schema();$q=sf_db()->prepare('SELECT * FROM lifecycle_automation_runs WHERE id=?');$q->execute([$runId]);$run=$q->fetch();if(!$run)return null;// Never resume a waiting, completed, failed, or uncertain run without a scheduler claim.
+    if((string)$run['status']!=='running')return $run;$a=sf_automation_get((int)$run['automation_id']);$contact=sf_crm_contact_by_id((int)$run['contact_id']);if(!$a||!$contact)return null;if(($a['status']??'')!=='published')return $run;$steps=(array)$a['steps'];$start=max(0,(int)$run['current_step']);$uid=!empty($contact['user_id'])?(int)$contact['user_id']:null;
     try{
         for($i=$start;$i<count($steps);$i++){$step=$steps[$i];$type=(string)$step['type'];$cfg=(array)($step['config']??[]);$details=[];
             if($type==='wait'){$hours=max(1,min(8760,(int)($cfg['hours']??24)));$due=gmdate('c',time()+$hours*3600);sf_db()->prepare('UPDATE lifecycle_automation_runs SET status="waiting",current_step=?,due_at=?,updated_at=? WHERE id=?')->execute([$i+1,$due,gmdate('c'),$runId]);sf_automation_event((int)$a['id'],$runId,(int)$contact['id'],'waiting',$i,['hours'=>$hours,'due_at'=>$due]);return sf_automation_run($runId);}
@@ -203,9 +204,27 @@ function sf_automation_process_crm_event(int $contactId,string $eventType,int $e
 }
 function sf_automation_tick(): array {
     sf_automation_ensure_schema();$segments=sf_segment_refresh_all();$now=gmdate('c');$resumed=0;$scheduled=0;$started=0;
+    // An abandoned running operation may have already sent outreach; quarantine,
+    // never replay. The owner must inspect its timeline and acknowledge it.
+    $stale=gmdate('c',time()-7200);
+    $quarantine=sf_db()->prepare("UPDATE lifecycle_automation_runs SET status='review_required',updated_at=? WHERE status='running' AND updated_at<?");
+    $quarantine->execute([$now,$stale]);
+    $interrupted=$quarantine->rowCount();
     $q=sf_db()->prepare("SELECT r.id FROM lifecycle_automation_runs r JOIN lifecycle_automations a ON a.id=r.automation_id WHERE r.status='waiting' AND a.status='published' AND r.due_at IS NOT NULL AND r.due_at<=? ORDER BY r.due_at,r.id LIMIT 500");$q->execute([$now]);foreach($q->fetchAll(PDO::FETCH_COLUMN) as $rid){$claim=sf_db()->prepare('UPDATE lifecycle_automation_runs SET status="running",updated_at=? WHERE id=? AND status="waiting" AND due_at<=?');$claim->execute([$now,(int)$rid,$now]);if($claim->rowCount()!==1)continue;sf_automation_continue((int)$rid);$resumed++;}
     $q=sf_db()->query("SELECT * FROM lifecycle_automations WHERE status='published' AND trigger_type='scheduled'");foreach($q->fetchAll() as $raw){$a=$raw;$a['trigger']=sf_auto_decode($raw['trigger_json']??'',[]);$hours=max(1,min(8760,(int)($a['trigger']['interval_hours']??24)));$last=(string)($a['last_scheduled_at']??'');if($last!==''&&strtotime($last)>time()-$hours*3600)continue;$contacts=!empty($a['segment_id'])?sf_segment_contacts((int)$a['segment_id'],5000):sf_db()->query('SELECT * FROM fan_contacts ORDER BY id')->fetchAll();$slot=(string)floor(time()/($hours*3600));foreach($contacts as $c)if(sf_automation_start((int)$a['id'],(int)$c['id'],0,'scheduled:'.$slot))$started++;sf_db()->prepare('UPDATE lifecycle_automations SET last_scheduled_at=?,updated_at=? WHERE id=?')->execute([$now,$now,(int)$a['id']]);$scheduled++;}
-    return ['segments_refreshed'=>count($segments),'runs_resumed'=>$resumed,'scheduled_automations'=>$scheduled,'runs_started'=>$started];
+    return ['segments_refreshed'=>count($segments),'runs_resumed'=>$resumed,'scheduled_automations'=>$scheduled,'runs_started'=>$started,'runs_review_required'=>$interrupted];
+}
+/**
+ * Owner acknowledgment is terminal and does not replay, rollback or claim
+ * external messages were/weren't sent.
+ */
+function sf_automation_acknowledge_interrupted(int $runId,string $typed): bool {
+    if($runId<1||$typed!=='REVIEWED')throw new InvalidArgumentException('Type REVIEWED after inspecting the journey timeline.');
+    sf_automation_ensure_schema();
+    $q=sf_db()->prepare("UPDATE lifecycle_automation_runs SET status='reviewed_no_retry',updated_at=? WHERE id=? AND status='review_required'");
+    $q->execute([gmdate('c'),$runId]);
+    if($q->rowCount()!==1)throw new RuntimeException('This journey is not awaiting interrupted-work review.');
+    return true;
 }
 function sf_automation_manual_run(int $automationId,int $adminId,int $contactId=0): array {
     $a=sf_automation_get($automationId);if(!$a)throw new InvalidArgumentException('Automation not found.');$contacts=$contactId?[sf_crm_contact_by_id($contactId)]:(!empty($a['segment_id'])?sf_segment_contacts((int)$a['segment_id'],5000):sf_db()->query('SELECT * FROM fan_contacts ORDER BY id')->fetchAll());$started=0;$skipped=0;$stamp='manual:'.$adminId.':'.gmdate('YmdHis');
