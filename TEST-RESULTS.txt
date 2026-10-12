@@ -1,15 +1,15 @@
-Stonefellow v1.3.39 Section 40 release gate
+Stonefellow v1.3.40 Section 41 release gate
 ==========================================
 
-Section 40: Accessibility, PWA & Mobile Resilience
+Section 41: Performance, Responsive Media & Core Web Vitals
 
-Measured exact implementation head:
+Measured implementation head:
 - Release gate: PASS
-- Explicit PASS lines: 2286
+- Explicit PASS lines: 2337
 - PHP warnings: 0
 - Failures: 0
-- Sections 1–39 inherited suites: PASS
-- Section 40 certification: PASS
+- Sections 1–40 inherited suites: PASS
+- Section 41 certification: PASS
 - DB migration: none required (target remains 1.3.32)
 
 Final documented head is revalidated before merge.
