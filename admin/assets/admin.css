@@ -108,3 +108,5 @@
   .sidebar nav button{min-height:21px;padding:1px 8px;font-size:.62rem;line-height:1}
   .sidebar-foot{padding-top:7px;font-size:.64rem}
 }
+
+.web-vitals-strip .web-vital.good{border-bottom:2px solid var(--good)}.web-vitals-strip .web-vital.needs_improvement{border-bottom:2px solid var(--accent)}.web-vitals-strip .web-vital.poor{border-bottom:2px solid var(--bad)}.web-vitals-strip .web-vital em{display:block;color:var(--muted);font-size:.56rem;font-style:normal;margin-top:4px}
