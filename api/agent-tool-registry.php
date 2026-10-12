@@ -29,6 +29,7 @@ function sf_agent_tool_inventory(string $role='fan'): array {
     foreach(sf_agent_tool_registry() as $name=>$tool) {
         if($tool['scope']==='server')continue;
         if($tool['scope']==='admin'&&$role!=='admin')continue;
+        if($tool['scope']==='signed_in_fan'&&!in_array($role,['fan','admin'],true))continue;
         $result[]=['id'=>$name]+$tool;
     }
     return $result;
