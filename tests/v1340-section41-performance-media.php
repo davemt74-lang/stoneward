@@ -39,7 +39,7 @@ ok41(!str_contains($core,'user_id')&&!str_contains($core,'REMOTE_ADDR')&&!str_co
 ok41(str_contains($core,"'metric'=>\$e['metric']")&&str_contains($core,"'route_type'=>\$e['route_type']"),'stored metric detail is minimized to bounded performance fields');
 ok41(str_contains($core,'function sf_performance_percentile')&&str_contains($core,"'p75'=>\$p75"),'performance summary computes p75 server-side');
 ok41(str_contains($core,"LIMIT 10000"),'performance analytics query is bounded');
-ok41(str_contains($api,"\$method==='POST'")&&str_contains($api,'count($attempts)>=40'),'public performance endpoint is POST-only and rate-limited');
+ok41(str_contains($api,"REQUEST_METHOD")&&str_contains($api,"!=='POST'")&&str_contains($api,'count($attempts)>=40'),'public performance endpoint is POST-only and rate-limited');
 ok41(!str_contains($api,'sf_current_user')&&!str_contains($api,'HTTP_REFERER'),'performance endpoint does not attach account/referrer identity');
 
 ok41(str_contains($mediaCore,"'medium_url'=>")&&str_contains($mediaCore,"'large_url'=>")&&str_contains($mediaCore,"'srcset'=>"),'public Media Library payload exposes existing responsive image variants');
