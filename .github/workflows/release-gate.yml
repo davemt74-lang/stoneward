@@ -128,3 +128,4 @@ jobs:
           php tests/section44-audit-hardening.php
           php tests/section44j-live-campaign-save.php
           php tests/section44j-release.php
+          php tests/section45a-lifecycle-safety.php
