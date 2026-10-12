@@ -38,9 +38,29 @@ function sf_agent_uuid(): string {$b=random_bytes(16);$b[6]=chr((ord($b[6])&0x0f
 function sf_agent_excerpt(string $text,int $max=500): string {$text=preg_replace('/\s+/u',' ',trim($text))??trim($text);return function_exists('mb_substr')?mb_substr($text,0,$max):substr($text,0,$max);}
 
 function sf_agent_brain_ensure_schema(): void { sf_entitlements_ensure_schema(); }
+/**
+ * Section 43H: minimize operational trace details without losing useful
+ * route, provider, token-use, and action-status analytics.
+ */
+function sf_agent_brain_safe_details(array $details,int $depth=0): array {
+    if($depth>4)return [];
+    $safe=[];
+    foreach(array_slice($details,0,64,true) as $key=>$value){
+        $label=is_string($key)?substr($key,0,100):(string)$key;
+        $metric=in_array($label,['input_tokens','output_tokens','active_tokens_used','active_tokens_remaining'],true);
+        if(!$metric&&preg_match('/(?:secret|password|credential|api.?key|authorization|bearer|access.?token|refresh.?token|provider_error|error)/i',$label)){
+            $safe[$label]='[redacted]';continue;
+        }
+        if(is_array($value))$safe[$label]=sf_agent_brain_safe_details($value,$depth+1);
+        elseif(is_string($value))$safe[$label]=sf_agent_excerpt($value,500);
+        elseif(is_int($value)||is_float($value)||is_bool($value)||$value===null)$safe[$label]=$value;
+    }
+    return $safe;
+}
+
 function sf_agent_brain_log(int $userId,string $conversationId,string $phase,array $data): void {
     sf_agent_brain_ensure_schema();$q=sf_db()->prepare('INSERT INTO agent_brain_decisions(user_id,conversation_id,phase,route,action,context_profile,needs_llm,requires_confirmation,request_excerpt,response_excerpt,provider_run_id,provider_status,input_tokens,output_tokens,details_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-    $details=$data;$request=(string)($details['request']??'');$response=(string)($details['response']??'');unset($details['request'],$details['response']);
+    $details=$data;$request=(string)($details['request']??'');$response=(string)($details['response']??'');unset($details['request'],$details['response']);$details=sf_agent_brain_safe_details($details);
     $q->execute([$userId,$conversationId,$phase,(string)($data['route']??''),(string)($data['action']??''),(string)($data['context_profile']??''),!empty($data['needs_llm'])?1:0,!empty($data['requires_confirmation'])?1:0,sf_agent_excerpt($request),sf_agent_excerpt($response),(string)($data['run_id']??''),(string)($data['status']??''),(int)($data['input_tokens']??0),(int)($data['output_tokens']??0),json_encode($details,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}',gmdate('c')]);
 }
 
