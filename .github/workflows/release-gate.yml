@@ -133,3 +133,4 @@ jobs:
           php tests/section45c-journey-builder.php
           php tests/section45d-outreach-consent.php
           php tests/section45e-attribution-growth.php
+          php tests/section45f-advisory-agent.php
