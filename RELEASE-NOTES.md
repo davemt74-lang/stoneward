@@ -1,3 +1,17 @@
+# Stonefellow v1.3.40 — Section 41: Performance, Responsive Media & Core Web Vitals
+
+- Added responsive 320/800/1600 Media Library image delivery.
+- Added async decoding, lazy loading and fetch priority management for public images.
+- Converted the Artist Homepage hero from a CSS background into a prioritized responsive image.
+- Added ETag/304 public media delivery with one-hour revalidation; Admin media remains no-store.
+- Fixed missing-variant MIME fallback.
+- Added privacy-bounded LCP, CLS, INP, FCP and TTFB field measurements.
+- Added server-side p75/rating aggregation through the existing operational event ledger.
+- Added Core Web Vitals to Performance Intelligence and the Admin Agent brief.
+- Added performance.js to the certified PWA static shell.
+- App advances to **1.3.40**.
+- Database target remains **1.3.32**; no migration is introduced.
+
 # Stonefellow v1.3.39 — Section 40: Accessibility, PWA & Mobile Resilience
 
 - Added installable Stonefellow PWA manifest with standalone launch behavior.
