@@ -73,7 +73,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button type="button" data-view="operations"><span>28</span>Operations</button>
         <button type="button" data-view="settings"><span>29</span>Settings</button>
       </nav>
-      <div class="sidebar-foot"><span id="adminStatusDot"></span><span>Local admin</span></div>
+      <div class="sidebar-foot"><span id="adminStatusDot"></span><span>Local admin</span><a href="operations-health.php" title="View administrator operational diagnostics">Health</a></div>
     </aside>
 
     <div class="workspace">
