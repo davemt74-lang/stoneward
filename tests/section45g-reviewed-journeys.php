@@ -14,6 +14,7 @@ function sf_crm_ensure_schema():void{sf_db()->exec('CREATE TABLE IF NOT EXISTS f
 function sf_campaign_ensure_schema():void{sf_db()->exec('CREATE TABLE IF NOT EXISTS campaign_segments(id INTEGER PRIMARY KEY, name TEXT)');}
 require dirname(__DIR__).'/api/automation-core.php';
 require dirname(__DIR__).'/api/agent-actions-core.php';
+sf_automation_ensure_schema();
 $bad=0;$check=static function(bool $ok,string $label)use(&$bad):void{echo ($ok?'PASS':'FAIL').' '.$label.PHP_EOL;if(!$ok)$bad++;};
 $draft=[
  'name'=>'Follow-up journey','status'=>'published','id'=>1234,
