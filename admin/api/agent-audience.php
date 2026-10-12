@@ -2,6 +2,7 @@
 declare(strict_types=1);
 /** Section 44D: aggregate-only research. Never expose individual fan records. */
 require __DIR__.'/bootstrap.php';
+require_once SF_ROOT.'/api/agent-audience-core.php';
 $admin=sf_admin_require_auth(false);
 if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $segmentId=max(0,(int)($_GET['segment_id']??0));
@@ -9,12 +10,11 @@ if($segmentId>0){
     $segment=sf_segment_get($segmentId);
     if(!$segment)sf_json_response(['ok'=>false,'error'=>'segment_not_found'],404);
     $contacts=sf_campaign_audience_contacts(['audience'=>['segment_id'=>$segmentId]],5000);
-    $matched=count($contacts);$eligible=0;
-    foreach($contacts as $contact)if(!empty($contact['marketing_opt_in']))$eligible++;
+    $counts=sf_agent_audience_aggregate($contacts);
     sf_json_response([
         'ok'=>true,'segment'=>['id'=>$segmentId,'name'=>(string)$segment['name']],
-        'matched'=>$matched,'email_eligible'=>$eligible,'suppressed'=>$matched-$eligible,
-        'capped'=>$matched>=5000,'consent_required'=>true,
+        'matched'=>$counts['matched'],'email_eligible'=>$counts['email_eligible'],'suppressed'=>$counts['suppressed'],
+        'capped'=>$counts['capped'],'consent_required'=>true,
         'note'=>'Preview counts only; final eligibility is rechecked when a confirmed send is executed.'
     ]);
 }
