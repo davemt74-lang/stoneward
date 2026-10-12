@@ -78,8 +78,8 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
     if($userId>0&&function_exists('sf_fulfillment_agent_context')&&in_array($profile,['commerce','account','crm'],true)){$orders=sf_fulfillment_agent_context($userId);if($orders!=='')$sections[]=$orders;}
     if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products, active campaigns, ticket/VIP offers, reservation eligibility, and the signed-in fan's own order/shipment/refund status, but it may not complete a purchase, reserve ticket capacity, check in guests, reserve inventory, ship an order, confirm/refuse a refund, restock a return, close a support case, or charge money. Checkout and reservations remain user-confirmed UI actions.";
     if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, membership benefits, VIP access, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
-    if($userId>0&&function_exists('sf_membership_agent_context')&&in_array($profile,['account','commerce','crm','recommendation'],true))$sections[]=sf_membership_agent_context($userId);
-    if($userId>0&&in_array($profile,['account','crm','recommendation'],true)){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
+    if($userId>0&&function_exists('sf_membership_agent_context')&&in_array($profile,['account','commerce','crm','recommendation'],true)&&($profile!=='recommendation'||(function_exists('sf_privacy_personalization_enabled')&&sf_privacy_personalization_enabled($userId))))$sections[]=sf_membership_agent_context($userId);
+    if($userId>0&&in_array($profile,['account','crm','recommendation'],true) && ($profile!=='recommendation' || (function_exists('sf_privacy_personalization_enabled') && sf_privacy_personalization_enabled($userId)))){$crm=sf_crm_agent_context($userId);if($crm!=='')$sections[]=$crm;}
     return implode("\n\n",$sections);
 }
 
