@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.37');
+define('SF_BUILD', '1.3.38');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -18,7 +18,7 @@ $siteSettings=sf_site_settings();$themePreview=!empty($_GET['theme_preview'])&&(
 $configuredBase=rtrim(sf_public_base_url(),'/');
 $scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
 $appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
-$initialView=sf_clean_text($_GET['view']??'',40);$publicInitialViews=['press','campaign','story','video','photo','track','release','show','store','music','releases','shows','videos','contact','about','archive'];$publicInitialViews[]='photos';if(!in_array($initialView,$publicInitialViews,true))$initialView='';
+$initialView=sf_clean_text($_GET['view']??'',40);$publicInitialViews=['press','campaign','story','video','photo','track','release','show','store','music','releases','shows','videos','contact','about','archive'];$publicInitialViews[]='photos';$publicInitialViews[]='search';if(!in_array($initialView,$publicInitialViews,true))$initialView='';
 $initialId=sf_clean_text($_GET['id']??'',160);$initialSlug=sf_clean_text($_GET['slug']??'',160);
 $initialRoute=['view'=>$initialView,'id'=>$initialId,'slug'=>$initialSlug];
 $seo=sf_seo_resolve($initialView,$initialId,$initialSlug);if($themePreview){$seo['robots']='noindex,nofollow,noarchive';$seo['canonical']='';}
@@ -85,6 +85,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
         <nav>
           <a href="./" data-view="home"><?=!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent'?></a>
           <a href="music" data-view="music">Music</a>
+          <a href="search" data-view="search">Search</a>
           <a href="releases" data-view="releases">Releases</a>
           <a href="archive" data-view="archive">Music Archive</a>
           <a href="shows" data-view="shows">Shows &amp; Live</a>
