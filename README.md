@@ -1,3 +1,13 @@
+# Stonefellow v1.3.44 — Section 45: Fan Journey Intelligence
+
+Stonefellow now provides a privacy-safe view of fan engagement across CRM, linked listening, opt-in, commerce, campaigns and existing lifecycle automations. Admin Journey Intelligence includes measured performance, evidence-backed review suggestions, governed Agent-created **unpublished** journey drafts, and safe no-replay recovery of interrupted work.
+
+The new read-only reports do not infer a sequential causal funnel from unrelated aggregate counts. Email and proactive-Agent actions are still subject to the fan's most recent consent and privacy choices. **The Agent cannot publish journeys or send marketing messages autonomously.**
+
+Database target remains **1.3.34**; no new migration beyond the existing v1.3.43 target. See [Section 45 acceptance and deployment notes](docs/section45-journey-intelligence-acceptance.md).
+
+---
+
 # Stonefellow v1.3.43 — Section 44: Governed Agent Campaign Actions
 
 Section 44 makes the existing single-artist Stonefellow Admin Agent useful for **reviewed, permission-controlled campaign DRAFT creation**. It adds an owner-visible tool inventory; durable plan/approval/save stages; aggregate consent-aware CRM audience research; published-content draft suggestions; Agent Brain action history; exact-hash approval, execution caps and safe recovery; and mobile-friendly Admin review.
