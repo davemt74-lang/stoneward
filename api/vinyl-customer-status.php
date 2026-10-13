@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Read-only, owner-scoped production status shared by account API and customer Agent.
-function sf_vinyl_customer_status(int $userId, string $userEmail='', int $limit=5): array {
+function sf_vinyl_customer_status(int $userId, string $userEmail='', int $limit=5, string $onlyOrderId=''): array {
     if($userId<1)return [];
     $directory=SF_ROOT.'/storage/orders';
     $stateFile=SF_ROOT.'/storage/fulfillment/vinyl-production.json';
@@ -12,7 +12,10 @@ function sf_vinyl_customer_status(int $userId, string $userEmail='', int $limit=
     }
     $email=strtolower(trim($userEmail));
     $result=[];
-    foreach(glob($directory.'/*.json')?:[] as $file){
+    if($onlyOrderId!==''&&!preg_match('/^SF-[A-Z0-9-]+$/',$onlyOrderId))return [];
+    $files=$onlyOrderId!==''?[$directory.'/'.$onlyOrderId.'.json']:(glob($directory.'/*.json')?:[]);
+    foreach($files as $file){
+        if(!is_file($file))continue;
         $order=json_decode((string)file_get_contents($file),true);
         if(!is_array($order))continue;
         $owner=(int)($order['user_id']??0);
