@@ -196,3 +196,26 @@ jobs:
           node tests/section62-vinyl-review.js
           node tests/section62b-draft-continuity.js
           php tests/section62c-production.php
+
+      - name: Build verified deployment ZIP
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          mkdir -p dist/deploy
+          git archive HEAD | tar -x -C dist/deploy
+          rm -rf dist/deploy/.github dist/deploy/tests dist/deploy/storage
+          (cd dist/deploy && zip -q -r ../stonefellow-section62c-full-deploy.zip .)
+          (cd dist && sha256sum stonefellow-section62c-full-deploy.zip > SHA256SUMS.txt)
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          unzip -t dist/stonefellow-section62c-full-deploy.zip | tail -1
+
+      - name: Publish certified deployment ZIP
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: stonefellow-section62c-full-deployment
+          path: |
+            dist/stonefellow-section62c-full-deploy.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
