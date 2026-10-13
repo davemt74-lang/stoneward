@@ -162,12 +162,20 @@ function sf_account_library(int $userId): array {
     return $rows;
 }
 
+function sf_order_paid_for_library(array $order): bool {
+    // Never grant purchased tracks, preview modules or other library entries when payment
+    // is still pending, even if the order itself has been created.
+    return in_array((string)($order['payment']['status']??''),['paid','succeeded','simulated_paid','test_paid'],true)
+        && !in_array((string)($order['status']??''),['canceled','cancelled','refunded'],true);
+}
 function sf_account_library_add_order(int $userId,array $order): void {
-    if($userId<1) return; sf_account_data_ensure_schema(); $pdo=sf_db(); $orderId=(string)($order['id']??''); $when=(string)($order['created_at']??gmdate('c'));
+    if($userId<1 || !sf_order_paid_for_library($order))return;
+    sf_account_data_ensure_schema(); $pdo=sf_db(); $orderId=(string)($order['id']??''); $when=(string)($order['created_at']??gmdate('c'));
     foreach((array)($order['quote']['items']??[]) as $item){
         $type=(string)($item['type']??'item');
-        // A pending live payment must never grant paid digital player parts.
-        if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid','test_paid'],true))continue;
+        // Defense in depth: retain the module-specific check used by older integrations.
+        if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid','test_paid'],true) && (string)($order['payment']['status']??'')!=='succeeded')continue;
+        // The paid-order gate above protects all other purchases as well.
         $key=(string)($item['module_id']??$item['track_id']??$item['package_id']??'');
         if($key==='') $key=$type==='custom_media'?$orderId.':'.(string)($item['format']??'custom'):$orderId.':'.substr(hash('sha256',json_encode($item)?:''),0,16);
         $label=sf_clean_text($item['label']??ucfirst(str_replace('_',' ',$type)),240);
