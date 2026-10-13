@@ -71,10 +71,33 @@ function sf_smart_notification_deliver(int $userId,string $category,string $dedu
 function sf_notification_seed_baseline(int $userId,string $now): void {
     foreach(sf_release_rows() as $r){$id=(string)($r['id']??'');if($id!=='')sf_notification_dedupe_claim($userId,'release:'.$id);}
 }
+function sf_notification_generate_vinyl_updates(int $userId): int {
+    // Production milestones are transactional service updates, not marketing or draft reminders.
+    require_once __DIR__.'/vinyl-customer-status.php';
+    $q=sf_db()->prepare('SELECT email FROM users WHERE id=? AND status=? LIMIT 1');
+    $q->execute([$userId,'active']);
+    $email=(string)($q->fetchColumn()?:'');
+    if($email==='')return 0;
+    $generated=0;
+    foreach(sf_vinyl_customer_status($userId,$email,25) as $order){
+        foreach($order['events'] as $event){
+            $status=(string)($event['status']??'');$at=(string)($event['at']??'');
+            if($status===''||$at==='')continue;
+            $key='vinyl:'.hash('sha256',(string)$order['order_id'].'|'.$status.'|'.$at);
+            if(!sf_notification_dedupe_claim($userId,$key))continue;
+            $id=sf_notify_user($userId,'vinyl_production','Your vinyl order update',
+                'Order '.(string)$order['order_id'].' is now '.str_replace('_',' ',$status).'.',
+                '?view=order&id='.rawurlencode((string)$order['order_id']));
+            sf_notification_dedupe_update($userId,$key,$id);
+            $generated++;
+        }
+    }
+    return $generated;
+}
 function sf_notification_generate_for_user(int $userId): array {
     sf_notification_ensure_schema();sf_personalization_ensure_schema();sf_account_data_ensure_schema();$pdo=sf_db();$now=gmdate('c');
     $q=$pdo->prepare('SELECT baseline_at,last_run_at FROM notification_generation_state WHERE user_id=?');$q->execute([$userId]);$state=$q->fetch();
-    if(!$state){$pdo->prepare('INSERT INTO notification_generation_state(user_id,baseline_at,last_run_at) VALUES(?,?,?)')->execute([$userId,$now,$now]);sf_notification_seed_baseline($userId,$now);return ['baseline_initialized'=>true,'generated'=>0,'last_run_at'=>$now];}
+    if(!$state){$pdo->prepare('INSERT INTO notification_generation_state(user_id,baseline_at,last_run_at) VALUES(?,?,?)')->execute([$userId,$now,$now]);sf_notification_seed_baseline($userId,$now);$vinylGenerated=sf_notification_generate_vinyl_updates($userId);return ['baseline_initialized'=>true,'generated'=>$vinylGenerated,'vinyl_generated'=>$vinylGenerated,'last_run_at'=>$now];}
     $baseline=(string)$state['baseline_at'];$generated=0;$tracks=sf_track_map();
     $cutListen=gmdate('c',time()-12*3600);$q=$pdo->prepare('SELECT track_id,position_seconds,duration_seconds,updated_at FROM user_listening_progress WHERE user_id=? AND completed=0 AND position_seconds>=10 AND updated_at>=? AND updated_at<=? ORDER BY updated_at DESC LIMIT 2');$q->execute([$userId,$baseline,$cutListen]);
     foreach($q->fetchAll() as $r){$id=(string)$r['track_id'];$t=$tracks[$id]??null;if(!$t)continue;$res=sf_smart_notification_deliver($userId,'listening','listen:'.$id.':'.$r['updated_at'],'Continue “'.($t['title']??$id).'”','You left this track unfinished. Pick it up from '.floor((int)$r['position_seconds']/60).':'.str_pad((string)((int)$r['position_seconds']%60),2,'0',STR_PAD_LEFT).'.','?view=history');if($res['created'])$generated++;}
@@ -84,7 +107,7 @@ function sf_notification_generate_for_user(int $userId): array {
     $q=$pdo->prepare("SELECT MAX(created_at) FROM listening_events WHERE user_id=? AND created_at>=? AND event_type IN ('start','resume','complete')");$q->execute([$userId,$baseline]);$recent=(string)($q->fetchColumn()?:'');
     if($recent!==''){$rec=sf_personalization_recommendations($userId,1);$item=$rec['items'][0]??null;if(is_array($item)&&!empty($item['track_id'])){$id=(string)$item['track_id'];$week=gmdate('o-W');$reason=(string)(($item['reasons'][0]??'Based on your recent Stonefellow listening.'));$res=sf_smart_notification_deliver($userId,'recommendation','recommendation:'.$week.':'.$id,'A Stonefellow pick for you: '.(string)($item['title']??$id),$reason,'?view=track&id='.rawurlencode($id));if($res['created'])$generated++;}}
     $pdo->prepare('UPDATE notification_generation_state SET last_run_at=? WHERE user_id=?')->execute([$now,$userId]);
-    return ['baseline_initialized'=>false,'generated'=>$generated,'last_run_at'=>$now];
+    $vinylGenerated=sf_notification_generate_vinyl_updates($userId);return ['baseline_initialized'=>false,'generated'=>$generated+$vinylGenerated,'vinyl_generated'=>$vinylGenerated,'last_run_at'=>$now];
 }
 function sf_notification_generate_all(int $limit=500): array {
     sf_notification_ensure_schema();$limit=max(1,min(5000,$limit));$rows=sf_db()->query("SELECT id FROM users WHERE status='active' ORDER BY id ASC LIMIT ".$limit)->fetchAll();$users=0;$generated=0;$baselines=0;
