@@ -232,7 +232,7 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 @media(max-width:420px){.builder-tablist{grid-template-columns:repeat(3,minmax(0,1fr))}.builder-tab{font-size:.65rem;min-height:50px}}
 
 /* Section 68 — scoped, accessible player editor. Do not alter the full-page scroll model. */
-.turntable-settings-trigger{position:absolute;right:27%;bottom:12%;z-index:6;width:36px;height:36px;display:grid;place-items:center;padding:0;border-radius:8px;border:1px solid #c6a16c;background:linear-gradient(155deg,#46392c,#151412);box-shadow:0 3px 12px #0009;color:#f3debc;font-size:23px;line-height:1;pointer-events:auto!important;cursor:pointer;transition:background .15s ease,transform .15s ease}
+.turntable-settings-trigger{position:absolute;right:32%;bottom:12%;z-index:6;width:36px;height:36px;display:grid;place-items:center;padding:0;border-radius:8px;border:1px solid #c6a16c;background:linear-gradient(155deg,#46392c,#151412);box-shadow:0 3px 12px #0009;color:#f3debc;font-size:23px;line-height:1;pointer-events:auto!important;cursor:pointer;transition:background .15s ease,transform .15s ease}
 .turntable-settings-trigger:hover{background:#6b4b30;transform:translateY(-2px)}
 .turntable-settings-trigger:focus-visible,.builder-player-edit-button:focus-visible{outline:3px solid #f1cd90;outline-offset:3px}
 .turntable-rpm-switch{pointer-events:none}
