@@ -45,7 +45,7 @@ function sf_clean_text(mixed $v, int $max=120): string {
 
 function sf_money(int $cents): string { return number_format($cents/100, 2, '.', ''); }
 
-function sf_validate_builder(array $b, string $format): array {
+function sf_validate_builder(array $b, string $format, int $userId=0): array {
     $cfg=sf_store_config(); $tracks=sf_track_map(); $errors=[];
     if(!isset($cfg['limits'][$format])) $errors[]='Unsupported physical format.';
     $limit=(int)($cfg['limits'][$format] ?? 0); $seen=[]; $sides=[];
@@ -72,7 +72,7 @@ function sf_validate_builder(array $b, string $format): array {
     if(!in_array($back,$allowedCovers,true))$errors[]='Unknown back cover template.';
     return ['ok'=>!$errors,'errors'=>$errors,'format'=>$format,'title'=>sf_clean_text($b['title'] ?? 'My Stonefellow Record',60),
       'theme'=>sf_clean_text($b['theme'] ?? 'desert',30),'coverFront'=>$front,'coverBack'=>$back,
-      'customNote'=>sf_clean_text($b['customNote']??'',280),'sides'=>$sides];
+      'customNote'=>sf_clean_text($b['customNote']??'',280),'playerModules'=>sf_turntable_valid_selection((array)($b['playerModules']??[]),$userId),'sides'=>$sides];
 }
 
 function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array {
@@ -99,7 +99,7 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
         } elseif($type==='custom_media'){
             $format=(string)($raw['format'] ?? ''); $key=$format==='vinyl'?'custom_vinyl':($format==='cassette'?'custom_cassette':'');
             $p=$cfg['products'][$key] ?? null; if(!$p){$errors[]='Unsupported custom-media format.';continue;}
-            $builder=is_array($raw['builder'] ?? null)?$raw['builder']:[]; $valid=sf_validate_builder($builder,$format);
+            $builder=is_array($raw['builder'] ?? null)?$raw['builder']:[]; $valid=sf_validate_builder($builder,$format,$userId??0);
             if(!$valid['ok']){$errors=array_merge($errors,$valid['errors']);continue;}
             $price=(int)$p['price_cents']; $physical=true; $subtotal+=$price;
             $items[]=['type'=>'custom_media','format'=>$format,'label'=>(string)$p['label'],'price_cents'=>$price,'builder'=>$valid];
@@ -160,7 +160,7 @@ function sf_customer(array $raw, bool $physical): array {
 }
 
 function sf_build_pod_handoffs(string $orderId, array $quote, array $customer): array {
-    $out=[]; foreach($quote['items'] as $idx=>$item){ if($item['type']!=='custom_media')continue; $b=$item['builder']; $h=['schema'=>'stonefellow.pod-handoff.v1','provider'=>'file_handoff','order_id'=>$orderId,'item_index'=>$idx,'format'=>$item['format'],'title'=>$b['title'],'artwork_theme'=>$b['theme'],'sides'=>$b['sides'],'recipient'=>$customer['shipping']??null,'status'=>'ready_for_provider','created_at'=>gmdate('c')]; $path=SF_ROOT.'/storage/pod/'.$orderId.'-'.$idx.'.json'; sf_write_json($path,$h); $out[]=['item_index'=>$idx,'status'=>'ready_for_provider','file'=>basename($path)]; }
+    $out=[]; foreach($quote['items'] as $idx=>$item){ if($item['type']!=='custom_media')continue; $b=$item['builder']; $h=['schema'=>'stonefellow.pod-handoff.v1','provider'=>'file_handoff','order_id'=>$orderId,'item_index'=>$idx,'format'=>$item['format'],'title'=>$b['title'],'artwork_theme'=>$b['theme'],'artwork_front'=>$b['coverFront']??'stonefellow','artwork_back'=>$b['coverBack']??'stonefellow','dedication_note'=>$b['customNote']??'','sides'=>$b['sides'],'customer_player_preview'=>['visual_only'=>true,'components'=>$b['playerModules']??sf_turntable_module_defaults()],'recipient'=>$customer['shipping']??null,'status'=>'ready_for_provider','created_at'=>gmdate('c')]; $path=SF_ROOT.'/storage/pod/'.$orderId.'-'.$idx.'.json'; sf_write_json($path,$h); $out[]=['item_index'=>$idx,'status'=>'ready_for_provider','file'=>basename($path)]; }
     return $out;
 }
 
