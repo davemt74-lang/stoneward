@@ -208,6 +208,7 @@ jobs:
           php tests/section71-legacy-library-repair.php
           node tests/section72a-checkout-review.js
           php tests/section72b-vinyl-snapshot.php
+          php tests/section72c-payment-unlocks.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
