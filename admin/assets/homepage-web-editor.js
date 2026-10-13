@@ -96,7 +96,7 @@
         '<button type="button" class="primary" id="homepageWebAddBlock">+ Add Block</button>'+
         '<button type="button" class="secondary" id="homepageWebHero">Hero image</button>'+
         '<button type="button" class="secondary" id="homepageWebStory">Artist story</button>'+
-        '<button type="button" class="secondary" id="homepageWebTheme">Theme</button></div>'+
+        '<button type="button" class="secondary" id="homepageWebTheme">Theme</button><button type="button" class="secondary" id="homepageWebChatToggle" aria-pressed="true">Sticky Agent chat: On</button></div>'+
         '<h3 class="homepage-web-sidebar-subhead">Page sections</h3>'+
         '<nav id="homepageWebSectionNav" class="homepage-web-section-nav" aria-label="Homepage sections"></nav>'+
         '<div id="homepageWebSectionForms" class="homepage-web-section-forms" aria-label="Selected section editor"></div>'+
@@ -151,6 +151,21 @@
       $('#homepageWebHero',tools).onclick=()=>void switchToSettings('media');
       $('#homepageWebStory',tools).onclick=()=>void switchToSettings('stories');
       $('#homepageWebTheme',tools).onclick=()=>void switchToSettings('theme');
+      const chatToggle=$('#homepageWebChatToggle',tools);
+      const chatInput=()=>tools.querySelector('[data-home-section="hero"] [name="sticky_chat_enabled"]');
+      const refreshChatToggle=()=>{
+        const enabled=chatInput()?.checked!==false;
+        chatToggle.textContent='Sticky Agent chat: '+(enabled?'On':'Off');
+        chatToggle.setAttribute('aria-pressed',String(enabled));
+      };
+      chatToggle.onclick=()=>{
+        selectSection('hero');
+        const el=chatInput();if(!el)return;
+        el.checked=!el.checked;el.dispatchEvent(new Event('change',{bubbles:true}));
+        refreshChatToggle();
+      };
+      chatInput()?.addEventListener('change',refreshChatToggle);
+      refreshChatToggle();
       stage.querySelectorAll('[data-device]').forEach(button=>button.onclick=()=>{
         $('#homepageWebCanvas',stage).dataset.device=button.dataset.device;
         stage.querySelectorAll('[data-device]').forEach(el=>
