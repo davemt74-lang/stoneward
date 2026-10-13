@@ -38,3 +38,27 @@
  .admin-unified-form-content .form-grid{grid-template-columns:minmax(0,1fr)}
  .admin-unified-form-content .form-grid>.span2,.admin-unified-form-content .form-grid>.span3{grid-column:auto}
 }
+/* Section 50A/D — consistent gutters and small-screen containment. */
+.admin-canvas{box-sizing:border-box}
+.admin-canvas :is(.panel,.stats,.toolbar,.form-grid,.campaign-canvas,.knowledge-layout,.release-grid,.template-grid,.dashboard-grid,.dashboard-two-col,.ops-two-col){min-width:0;max-width:100%}
+.admin-canvas :is(.panel,.canvas-head,.dashboard-grid,.stats,.notice,.toolbar){overflow-wrap:anywhere}
+.admin-canvas :is(.panel,.form-grid,.table-scroll,.knowledge-main,.media-card,.homepage-section-card){box-sizing:border-box}
+.admin-canvas :is(input,select,textarea){min-width:0;max-width:100%}
+.admin-canvas :is(.knowledge-main,.homepage-section-list,.campaign-canvas,.editor-grid){min-width:0;max-width:100%}
+.admin-canvas :is(.table-scroll,[class*="table-wrap"]){overflow-x:auto;overscroll-behavior-x:contain}
+.admin-canvas .admin-unified-page-header{max-width:100%;min-width:0}
+.admin-canvas .admin-unified-page-header .actions{min-width:0}
+.admin-unified-form-content>*{min-width:0;max-width:100%}
+.admin-unified-form-content :is(.panel,.form-grid,.toolbar,.homepage-config-grid,.modal-columns){min-width:0;max-width:100%}
+.admin-unified-form-overlay button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:760px){
+ .admin-canvas{width:calc(100% - 28px);max-width:calc(100% - 28px);overflow-x:clip}
+ .admin-canvas .admin-unified-page-header{gap:12px}
+ .admin-canvas .admin-unified-page-header .actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));width:100%}
+ .admin-unified-form-content :is(.form-grid,.homepage-config-grid,.modal-columns){grid-template-columns:minmax(0,1fr)}
+ .admin-unified-form-content :is(.span2,.span3){grid-column:1/-1}
+}
+@media(max-width:380px){
+ .admin-canvas{width:calc(100% - 20px);max-width:calc(100% - 20px)}
+ .admin-unified-form-content{padding:12px 10px 22px}
+}
