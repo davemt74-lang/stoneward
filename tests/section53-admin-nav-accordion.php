@@ -34,7 +34,7 @@ $check['Sidebar scroll and desktop density remain enabled']=str_contains($css,'.
 $check['Expanded caret rotates and keyboard focus remains visible']=str_contains($css,'.admin-nav-category[open]>.admin-nav-summary .admin-nav-chevron')&&str_contains($css,'.admin-nav-summary:focus-visible');
 $check['Mobile categories retain usable tap sizes']=str_contains($css,'#adminNav .admin-nav-items button{min-height:38px');
 $check['Full-page editor still replaces entire Admin navigation']=str_contains($read('admin/assets/homepage-web-editor.css'),'#sidebar > :not(#homepageWebSidebar)');
-$check['No database schema bump needed']=str_contains($read('version.php'),"'database_schema_target'=>'1.3.46'");
+$check['New library migration does not modify Admin UI schema']=str_contains($read('version.php'),"'database_schema_target'=>'1.3.47'");
 $fail=0;foreach($check as $name=>$pass){echo ($pass?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$pass)$fail++;}
 echo 'Section 53: '.(count($check)-$fail).'/'.count($check).' checks passed'.PHP_EOL;
 exit($fail?1:0);
