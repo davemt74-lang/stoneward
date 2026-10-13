@@ -15,6 +15,11 @@ if($method==='GET')sf_json_response(['ok'=>true,'site'=>sf_site_settings(),'sect
 if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $b=sf_request_json();$action=(string)($b['action']??'');
 try{
+  if($action==='preview_design_draft'){
+    $sections=sf_home_design_clean((array)($b['sections']??[]));
+    $homepage=sf_artist_home_payload(0,$sections);
+    sf_json_response(['ok'=>true,'homepage'=>$homepage]);
+  }
   if($action==='save_design_draft'){
     $draft=sf_home_design_save((array)($b['sections']??[]),(int)($b['expected_revision']??-1),(string)($b['base_hash']??''));
     sf_log_admin_action((int)$me['id'],'artist_home_draft_saved','artist_home','draft',['revision'=>$draft['revision']]);
