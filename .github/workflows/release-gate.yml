@@ -37,6 +37,7 @@ jobs:
       - name: Admin JavaScript syntax
         run: |
           node --check admin/assets/admin.js
+          node --check admin/assets/sidebar-accordion.js
           node --check admin/assets/agent-canvas.js
           node --check admin/assets/agent-actions.js
           node --check admin/assets/campaigns.js
@@ -178,3 +179,5 @@ jobs:
           php tests/section50f-release.php
           php tests/section51-homepage-web-designer.php
           php tests/section52-visual-homepage-publishing.php
+          php tests/section53-admin-nav-accordion.php
+          node tests/section53-admin-nav-accordion.js

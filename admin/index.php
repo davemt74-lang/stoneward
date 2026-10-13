@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.52');
+define('SF_ADMIN_BUILD','1.3.53');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -47,36 +47,71 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <div id="adminApp" class="admin-app">
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-brand"><a href="../" target="_blank" rel="noopener">STONEFELLOW</a><span>ADMIN</span></div>
-      <nav id="adminNav">
-        <button type="button" data-view="dashboard" class="active"><span>01</span>Dashboard</button>
-        <button type="button" data-view="catalog"><span>02</span>Catalog</button>
-        <button type="button" data-view="media"><span>03</span>Media Library</button>
-        <button type="button" data-view="uploads"><span>04</span>Folder Scan & Upload</button>
-        <button type="button" data-view="templates"><span>05</span>Metadata Templates</button>
-        <button type="button" data-view="releases"><span>06</span>Releases</button>
-        <button type="button" data-view="distribution"><span>07</span>Distribution + Publishing</button>
-        <button type="button" data-view="press"><span>08</span>EPK + Press</button>
-        <button type="button" data-view="rights"><span>09</span>Rights + Licensing</button>
-        <button type="button" data-view="shows"><span>10</span>Shows + Live</button>
-        <button type="button" data-view="crm"><span>11</span>Fans + CRM</button>
-        <button type="button" data-view="automations"><span>12</span>Segments + Automations</button>
-        <button type="button" data-view="campaigns"><span>13</span>Campaigns</button>
-        <button type="button" data-view="products"><span>14</span>Merch + Products</button>
-        <button type="button" data-view="knowledge"><span>15</span>Knowledge Base</button>
-        <button type="button" data-view="orders"><span>16</span>Orders</button>
-        <button type="button" data-view="fulfillment"><span>17</span>Fulfillment + Care</button>
-        <button type="button" data-view="pod"><span>18</span>POD Handoffs</button>
-        <button type="button" data-view="users"><span>19</span>Users + Tokens</button>
-        <button type="button" data-view="packages"><span>20</span>Monthly Packages</button>
-        <button type="button" data-view="membership"><span>21</span>Membership + VIP</button>
-        <button type="button" data-view="ticketing"><span>22</span>Tickets + VIP</button>
-        <button type="button" data-view="ai"><span>23</span>AI Providers</button>
-        <button type="button" data-view="brain"><span>24</span>Agent Brain</button>
-        <button type="button" data-view="customer"><span>25</span>Customer Lifecycle</button>
-        <button type="button" data-view="analytics"><span>26</span>Performance Intelligence</button>
-        <button type="button" data-view="calendar"><span>27</span>Operating Calendar</button>
-        <button type="button" data-view="operations"><span>28</span>Operations</button>
-        <button type="button" data-view="settings"><span>29</span>Settings</button>
+      <nav id="adminNav" aria-label="Admin navigation">
+        <details class="admin-nav-category" data-nav-category="overview" open>
+          <summary class="admin-nav-summary"><span>Overview</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
+          <div class="admin-nav-items">
+            <button type="button" data-view="dashboard" class="active"><span>01</span>Dashboard</button>
+            <button type="button" data-view="analytics"><span>26</span>Performance Intelligence</button>
+            <button type="button" data-view="calendar"><span>27</span>Operating Calendar</button>
+          </div>
+        </details>
+        <details class="admin-nav-category" data-nav-category="music">
+          <summary class="admin-nav-summary"><span>Music &amp; Media</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
+          <div class="admin-nav-items">
+            <button type="button" data-view="catalog"><span>02</span>Catalog</button>
+            <button type="button" data-view="media"><span>03</span>Media Library</button>
+            <button type="button" data-view="uploads"><span>04</span>Folder Scan & Upload</button>
+            <button type="button" data-view="templates"><span>05</span>Metadata Templates</button>
+            <button type="button" data-view="releases"><span>06</span>Releases</button>
+            <button type="button" data-view="shows"><span>10</span>Shows + Live</button>
+          </div>
+        </details>
+        <details class="admin-nav-category" data-nav-category="publishing">
+          <summary class="admin-nav-summary"><span>Publishing &amp; Rights</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
+          <div class="admin-nav-items">
+            <button type="button" data-view="distribution"><span>07</span>Distribution + Publishing</button>
+            <button type="button" data-view="press"><span>08</span>EPK + Press</button>
+            <button type="button" data-view="rights"><span>09</span>Rights + Licensing</button>
+          </div>
+        </details>
+        <details class="admin-nav-category" data-nav-category="audience">
+          <summary class="admin-nav-summary"><span>Audience &amp; Marketing</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
+          <div class="admin-nav-items">
+            <button type="button" data-view="crm"><span>11</span>Fans + CRM</button>
+            <button type="button" data-view="customer"><span>25</span>Customer Lifecycle</button>
+            <button type="button" data-view="campaigns"><span>13</span>Campaigns</button>
+            <button type="button" data-view="automations"><span>12</span>Segments + Automations</button>
+          </div>
+        </details>
+        <details class="admin-nav-category" data-nav-category="commerce">
+          <summary class="admin-nav-summary"><span>Commerce &amp; VIP</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
+          <div class="admin-nav-items">
+            <button type="button" data-view="products"><span>14</span>Merch + Products</button>
+            <button type="button" data-view="orders"><span>16</span>Orders</button>
+            <button type="button" data-view="fulfillment"><span>17</span>Fulfillment + Care</button>
+            <button type="button" data-view="pod"><span>18</span>POD Handoffs</button>
+            <button type="button" data-view="membership"><span>21</span>Membership + VIP</button>
+            <button type="button" data-view="ticketing"><span>22</span>Tickets + VIP</button>
+            <button type="button" data-view="packages"><span>20</span>Monthly Packages</button>
+          </div>
+        </details>
+        <details class="admin-nav-category" data-nav-category="agent">
+          <summary class="admin-nav-summary"><span>Agent &amp; Knowledge</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
+          <div class="admin-nav-items">
+            <button type="button" data-view="brain"><span>24</span>Agent Brain</button>
+            <button type="button" data-view="knowledge"><span>15</span>Knowledge Base</button>
+            <button type="button" data-view="ai"><span>23</span>AI Providers</button>
+          </div>
+        </details>
+        <details class="admin-nav-category" data-nav-category="administration">
+          <summary class="admin-nav-summary"><span>Administration</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
+          <div class="admin-nav-items">
+            <button type="button" data-view="users"><span>19</span>Users + Tokens</button>
+            <button type="button" data-view="operations"><span>28</span>Operations</button>
+            <button type="button" data-view="settings"><span>29</span>Settings</button>
+          </div>
+        </details>
       </nav>
       <div class="sidebar-foot"><span id="adminStatusDot"></span><span>Local admin</span><a href="operations-health.php" title="View administrator operational diagnostics">Health</a></div>
     </aside>
@@ -107,6 +142,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <input id="folderInput" type="file" webkitdirectory directory multiple accept=".mp3,.wav,.wave,audio/mpeg,audio/wav" hidden>
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/settings-tabs.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/sidebar-accordion.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-actions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
