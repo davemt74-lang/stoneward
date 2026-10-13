@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-/** Section 43J certification wiring and synchronized v1.3.44 source. */
+/** Section 43J certification wiring and synchronized v1.3.45 source. */
 $root=dirname(__DIR__);
 $get=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $version=$get('version.php');
@@ -18,12 +18,12 @@ foreach($sections as $suffix){
 }
 $checks=[
  'Full Section 43A-I acceptance wired'=>$allRegistered,
- 'Public app 1.3.44'=>str_contains($public,"define('SF_BUILD', '1.3.44')"),
- 'Admin app 1.3.44'=>str_contains($admin,"define('SF_ADMIN_BUILD','1.3.44')"),
- 'Version endpoint 1.3.44'=>str_contains($version,"'stonefellow'=>'1.3.44'"),
- 'PWA cache 1.3.44'=>str_contains($sw,'stonefellow-static-v1.3.44'),
- 'Apache build header 1.3.44'=>str_contains($apache,'X-Stonefellow-Build "1.3.44"'),
- 'Schema target unchanged'=>str_contains($version,"'database_schema_target'=>'1.3.34'"),
+ 'Public app 1.3.45'=>str_contains($public,"define('SF_BUILD', '1.3.45')"),
+ 'Admin app 1.3.45'=>str_contains($admin,"define('SF_ADMIN_BUILD','1.3.45')"),
+ 'Version endpoint 1.3.45'=>str_contains($version,"'stonefellow'=>'1.3.45'"),
+ 'PWA cache 1.3.45'=>str_contains($sw,'stonefellow-static-v1.3.45'),
+ 'Apache build header 1.3.45'=>str_contains($apache,'X-Stonefellow-Build "1.3.45"'),
+ 'Schema target unchanged'=>str_contains($version,"'database_schema_target'=>'1.3.35'"),
  'Existing Section 42 regressions retained'=>str_contains($workflow,'php tests/section42-backup-validation.php')&&str_contains($workflow,'php tests/section42-ops-privacy.php'),
  'Only a green main gate packages ZIP'=>str_contains($get('.github/workflows/certified-deploy.yml'),"github.event.workflow_run.conclusion == 'success'"),
  'Scope and limitations documented'=>str_contains($docs,'Production browser and provider-key smoke testing')
