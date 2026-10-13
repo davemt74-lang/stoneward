@@ -185,6 +185,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(fan community|community feed|community posts?|open community)\b/',$q))return 'community_browse';
     if(preg_match('/\b(newsletter|mailing list|email list)\b/',$q))return 'newsletter_join';
     if(preg_match('/\b(campaign|offer|free download|free song|discount|vip|exclusive|presale|early access)\b/',$q))return 'campaign_offer';
+    if(preg_match('/\b(my (?:record )?player (?:upgrades?|parts?|modules?)|what (?:player )?parts? do i own|which (?:player )?parts? (?:are|have been) unlocked|tonearm upgrades?|turntable upgrades?|player components?|upgrade (?:my|the) (?:record )?player)\b/',$q))return 'player_parts_support';
     if(preg_match('/\b(merch|merchandise|shop|store)\b/',$q))return 'store_browse';
     if(preg_match('/am i (?:on|subscribed)|my newsletter|my fan profile|fan status/',$q))return 'fan_profile';
     if(preg_match('/\b(search|find)\b.*\b(stonefellow|site|everything|anything|stories?|videos?|photos?|galleries|shows?|merch|products?|offers?)\b|\bsearch (?:the )?(?:whole )?(?:site|stonefellow)\b/',$q))return 'site_search';
@@ -320,6 +321,23 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'builder_save':
             $action=['type'=>'builder_save'];$text='I’ll save the current build as a draft.';$profile='account';break;
         case 'cart_open':$action=['type'=>'open_view','view'=>'cart'];$text='Here’s your cart.';$profile='commerce';break;
+        case 'player_parts_support':
+            $action=['type'=>'open_view','view'=>'builder'];$profile='account';
+            $text='You can explore record player components in the Builder → Edit Record Player. Paid parts unlock only after your own confirmed checkout.';
+            if($userId!==null&&$userId>0){
+                $ownedParts=array_fill_keys(sf_turntable_owned($userId),true);
+                $premiumOwned=[];$availableParts=[];
+                foreach(sf_turntable_catalog() as $part){
+                    if((int)($part['price_cents']??0)<=0)continue;
+                    if(isset($ownedParts[(string)$part['id']]))$premiumOwned[]=(string)$part['name'];
+                    else $availableParts[]=(string)$part['name'];
+                }
+                $text='Your account has '.count($premiumOwned).' premium player upgrade'.(count($premiumOwned)===1?'':'s').' unlocked.'
+                    .($premiumOwned?' Owned: '.implode(', ',array_slice($premiumOwned,0,5)).'.':'')
+                    .($availableParts?' Available to preview: '.implode(', ',array_slice($availableParts,0,3)).'.':'')
+                    .' Open Builder → Edit Record Player to preview upgrades. Purchasing still requires checkout confirmation.';
+            }else{$text='Sign in to see your owned player upgrades. You can preview available components in Builder → Edit Record Player; purchases require checkout confirmation.';}
+            break;
         case 'order_support':
             $action=['type'=>'open_view','view'=>'account'];$profile='account';
             $text='I can show your own Stonefellow order and shipment details in My Account. I cannot change production, shipping, or refunds.';
