@@ -20,7 +20,9 @@ $checks=[
      && str_contains($main,'window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,reloadCore}'),
  'No alternate network or save endpoints introduced'=>!preg_match('/\bfetch\s*\(|\bXMLHttpRequest\b|\bapi\s*\(/',$ui),
  'Buttons are moved rather than cloned'=>str_contains($ui,'actions.append(el)')&&!str_contains($ui,'cloneNode('),
- 'Live-render DOM watching supports every Admin view'=>str_contains($ui,'new MutationObserver(()=>apply())')&&str_contains($ui,'subtree:true'),
+ 'Live-render DOM watching is batched without losing views'=>str_contains($ui,'new MutationObserver(()=>{')
+    && str_contains($ui,'requestAnimationFrame(()=>{queued=false;apply();})')
+    && str_contains($ui,'subtree:true'),
  'Already-modern Settings/Chat/Brain views are excluded'=>str_contains($ui,"['settings','agent-chat','brain'].includes(getView())"),
  'Existing Story, Gallery, Video and Shipment modals not intercepted'=>!str_contains($ui,"['storyEditorForm'")
      && !str_contains($ui,"['videoEditorForm'") && !str_contains($ui,"['galleryEditorForm'")
@@ -28,7 +30,7 @@ $checks=[
  'Existing page header actions are preserved'=>str_contains($ui,"header.querySelector(':scope > .actions')"),
  'Missing legacy page headers get a unified heading'=>str_contains($ui,'admin-unified-generated-header')&&str_contains($ui,"document.getElementById('viewTitle')"),
  'Header shows only the current Admin view new-action list'=>str_contains($ui,"const view=getView(),ids=createActions[view]||[]"),
- 'Hidden or inactive module buttons are not promoted'=>str_contains($ui,"!el.closest('[hidden]')")&&str_contains($ui,"getComputedStyle(el).display!=='none'"),
+ 'Hidden or inactive module buttons are not promoted'=>str_contains($ui,"el.closest('[hidden],[inert]')")&&str_contains($ui,"style.display==='none'")&&str_contains($ui,"el.getClientRects().length>0"),
  'Action promotion never relocates controls from existing modals'=>str_contains($ui,".media-modal,.story-modal,.admin-unified-form-overlay"),
  'All map-defined New/Add action IDs still exist in source'=>true,
  'Unified editor retains original DOM nodes and handlers'=>str_contains($ui,'const elements=Array.from(canvas.childNodes)')
@@ -66,8 +68,8 @@ $checks=[
  'Story Settings keeps independent modal workflow'=>str_contains($index,'assets/settings-tabs.js')&&str_contains($index,'assets/stories.js'),
  'No password reset or new DB migration'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.46'")
      && !str_contains($ui,'password_reset'),
- 'Frontend version synchronized to 1.3.49'=>str_contains($index,"SF_ADMIN_BUILD','1.3.49'")
-    &&str_contains($read('service-worker.js'),'stonefellow-static-v1.3.49'),
+ 'Frontend version synchronized to current release'=>str_contains($index,"SF_ADMIN_BUILD','1.3.50'")
+    &&str_contains($read('service-worker.js'),'stonefellow-static-v1.3.50'),
 ];
 // Action mappings should resolve to real control IDs, including those in the
 // main Admin controller and within independently loaded feature modules.

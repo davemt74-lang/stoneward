@@ -1,3 +1,20 @@
+# Stonefellow v1.3.50 — Section 50 Admin UI Certification
+
+- Audit all 29 Admin navigation views against shared headers, New/Add controls, responsive widths, form lifecycle, and existing action approval boundaries.
+- Fix creation-button visibility checks for hidden ancestor sections; include both Knowledge Base New Folder and Upload Files header actions.
+- Batch mutation refreshes and restore keyboard focus to the originating creation action after closing a legacy editor overlay. Preserve original save/delete/publish handlers and the unsaved-input confirmation policy.
+- Contain desktop/table/form widths and small-screen overflow with responsive page gutters and mobile editor layouts.
+- Add **Upload / choose hero image**, **Edit artist story**, and **Preview homepage** directly within the Artist Homepage editor. These navigate to the existing Site & Artist Media and Stories Settings tabs and preserve the one-artist published-media source of truth.
+- Prevent duplicated Artist Homepage section saves and resets. On API failure, retain unsaved form content and allow a safe retry.
+- Preserve all original site/private data, Administrator accounts/passwords, Agent, CRM, merch, campaign, and media permissions.
+- **No database migration required**; schema target remains 1.3.46. Advance app/PWA/Admin build caches to 1.3.50.
+- Certification comprises 50A–50F test suites, all historical regression suites, green PR/main release gates, and verified pinned main deploy ZIP with SHA-256. Automated CI does not replace a live-browser acceptance test.
+
+Application: **1.3.50**
+Database schema target: **1.3.46**
+
+---
+
 # Stonefellow v1.3.49 — Unified Admin Page Headers and Editor Overlays
 
 - Extends the Settings/Story Editor visual language across **all 29 Admin navigation views** through a shared page-header and responsive spacing layer.

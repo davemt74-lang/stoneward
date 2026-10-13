@@ -11,7 +11,7 @@
    */
   const createActions={
     templates:['newTemplate'],releases:['newRelease'],shows:['newShow'],
-    knowledge:['newKnowledgeFolder'],packages:['newPackage'],
+    knowledge:['newKnowledgeFolder','uploadKnowledge'],packages:['newPackage'],
     media:['mediaUploadLibrary','galleryNew','videoHubNew'],
     campaigns:['newCampaign'],products:['newProduct'],
     membership:['newMemberContent'],ticketing:['newTicketOffer'],
@@ -37,9 +37,16 @@
     ['pressKitForm','pressBack','press'],
     ['operatingPlanForm','planCancel','calendar']
   ];
-  let upgrading=false,lastView='',returnId='';
+  let upgrading=false,lastView='',restoreFocusId='';
   const getView=()=>String(context.app?.view||'');
-  const visible=el=>Boolean(el?.isConnected&&!el.closest('[hidden]')&&getComputedStyle(el).display!=='none');
+  function visible(el){
+    if(!el?.isConnected || el.closest('[hidden],[inert]'))return false;
+    for(let node=el;node&&node!==canvas;node=node.parentElement){
+      const style=getComputedStyle(node);
+      if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse')return false;
+    }
+    return el.getClientRects().length>0;
+  }
   function addHeader(){
     if(canvas.querySelector('.admin-unified-form-overlay'))return;
     if(['settings','agent-chat','brain'].includes(getView()))return;
@@ -75,6 +82,8 @@
     });
     if(!match)return;
     const [formId,backId]=match;
+    // Preserve a useful focus destination after the original editor re-renders.
+    restoreFocusId=(createActions[view]||[]).find(id=>document.getElementById(id))||'';
     // A standalone route is converted into a focused form section using
     // its existing DOM; no new form, database route or permissions.
     const overlay=document.createElement('div');
@@ -101,6 +110,9 @@
     canvas.append(overlay);
     document.body.classList.add('admin-unified-form-open');
     const existingBack=content.querySelector('#'+backId);
+    if(!existingBack){
+      overlay.remove();document.body.classList.remove('admin-unified-form-open');return;
+    }
     let dirty=false;
     content.addEventListener('input',e=>{if(e.target.closest('form'))dirty=true;});
     content.addEventListener('change',e=>{if(e.target.closest('form'))dirty=true;});
@@ -119,6 +131,13 @@
       dirty=false;
       if(existingBack?.isConnected)existingBack.click();
       else context.openView(view);
+      // After the original list renderer restores the page, return keyboard
+      // focus to the matching header action, not the document body.
+      requestAnimationFrame(()=>{
+        const destination=(restoreFocusId&&document.getElementById(restoreFocusId))
+          ||canvas.querySelector('.admin-unified-page-header button');
+        destination?.focus?.({preventScroll:true});
+      });
       // Editors may rerender asynchronously: cleanup runs after the next paint.
       if(!canvas.querySelector('.admin-unified-form-overlay'))
         document.body.classList.remove('admin-unified-form-open');
@@ -135,7 +154,8 @@
       else if(!e.shiftKey&&document.activeElement===fields.at(-1)){e.preventDefault();fields[0].focus();}
     });
     const focus=formId==='trackForm'?'#trackForm input':'#'+formId+' input:not([type=hidden])';
-    (overlay.querySelector(focus)||close).focus({preventScroll:true});
+    const first=overlay.querySelector(focus)||close;
+    first.focus({preventScroll:true});
   }
   function apply(){
     if(upgrading)return;
@@ -150,7 +170,14 @@
       addHeader();
     }finally{upgrading=false;}
   }
-  const observer=new MutationObserver(()=>apply());
+  // Batch mutation notifications: moving many legacy nodes should cause
+  // one upgrade pass rather than one pass for every DOM fragment.
+  let queued=false;
+  const observer=new MutationObserver(()=>{
+    if(queued)return;
+    queued=true;
+    requestAnimationFrame(()=>{queued=false;apply();});
+  });
   observer.observe(canvas,{childList:true,subtree:true});
   apply();
   window.SFAdminUnifiedUI={
