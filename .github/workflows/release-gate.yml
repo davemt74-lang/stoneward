@@ -194,3 +194,4 @@ jobs:
           php tests/section61-draft-rename.php
           node tests/section61-builder-interactions.js
           node tests/section62-vinyl-review.js
+          node tests/section62b-draft-continuity.js
