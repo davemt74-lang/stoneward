@@ -99,7 +99,7 @@ function sf_account_library_add_order(int $userId,array $order): void {
     foreach((array)($order['quote']['items']??[]) as $item){
         $type=(string)($item['type']??'item');
         // A pending live payment must never grant paid digital player parts.
-        if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid'],true))continue;
+        if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid','test_paid'],true))continue;
         $key=(string)($item['module_id']??$item['track_id']??$item['package_id']??'');
         if($key==='') $key=$type==='custom_media'?$orderId.':'.(string)($item['format']??'custom'):$orderId.':'.substr(hash('sha256',json_encode($item)?:''),0,16);
         $label=sf_clean_text($item['label']??ucfirst(str_replace('_',' ',$type)),240);

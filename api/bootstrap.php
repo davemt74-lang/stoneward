@@ -99,6 +99,14 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
             $items[]=['type'=>'custom_media','format'=>$format,'label'=>(string)$p['label'],'price_cents'=>$price,'builder'=>$valid];
         } else $errors[]='Unsupported cart item type.';
     }
+    // A bundle must not bill again for parts also present as standalone lines.
+    $requestedModules=[];foreach($items as $line)if(($line['type']??'')==='turntable_module')$requestedModules[(string)$line['module_id']]=true;
+    foreach(array_keys($requestedModules) as $id){
+        $module=sf_turntable_module($id);
+        if($module&&$module['slot']==='pack')foreach($module['includes'] as $part){
+            if(isset($requestedModules[$part])){$errors[]='Remove the duplicate player part included in '.$module['name'].'.';break;}
+        }
+    }
     if(!$items)$errors[]='Your cart is empty.';
     $shipping=$physical?(int)$cfg['shipping_flat_cents']:0;
     $campaignCode=sf_clean_text($campaignCode,80);$entitlement=$campaignCode!==''?sf_campaign_discount_by_code($campaignCode):null;
