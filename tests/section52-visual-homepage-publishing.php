@@ -18,6 +18,9 @@ function sf_ticket_public_offers(?int $uid=null,string $show=''):array{return [[
 require $root.'/api/artist-home-core.php';
 require $root.'/api/artist-home-drafts.php';
 $check=[];$initial=sf_home_design_state();
+$heroInitial=sf_artist_home_section('hero');
+$check['Sticky chat is enabled for existing and new homepages']=!empty($heroInitial['config']['sticky_chat_enabled']);
+$check['Sticky chat can be disabled without disabling the artist homepage']=sf_artist_home_normalize_config('hero',['sticky_chat_enabled'=>false])['sticky_chat_enabled']===false;
 $check['First draft uses currently published snapshot']=$initial['revision']===0&&count($initial['sections'])===11;
 $sections=$initial['sections'];$sections[0]['heading']='Unpublished visual edit';
 $draft=sf_home_design_save($sections,0,$initial['base_hash']);
@@ -43,6 +46,10 @@ $check['Stale draft reset is rejected']=fails(fn()=>sf_home_design_reset_to_live
 $check['Invalid section arrays are rejected']=fails(fn()=>sf_home_design_save([],4,$staged['base_hash']));
 $read=static fn(string $f):string=>file_get_contents($root.'/'.$f);
 $visual=$read('admin/assets/homepage-visual.js');$web=$read('admin/assets/homepage-web-editor.js');$api=$read('admin/api/homepage.php');
+$publicApp=$read('assets/js/app.js');
+$check['Public homepage toggles existing Agent composer without disabling player']=str_contains($publicApp,"home.chat_bar_enabled===false")&&str_contains($read('assets/css/site.css'),'artist-home-chat-hidden .chat-footer .chatbar')&&!str_contains($read('assets/css/site.css'),'artist-home-chat-hidden .footer-player');
+$check['Homepage sidebar exposes sticky chat toggle']=str_contains($web,'homepageWebChatToggle')&&str_contains($read('admin/assets/homepage.js'),'sticky_chat_enabled');
+$check['Canonical renderer loaded for both Admin and public pages']=str_contains($read('admin/index.php'),'artist-home-renderer.js')&&str_contains($read('stonefellow-v120.php'),'artist-home-renderer.js')&&str_contains($visual,'SFArtistHomeRenderer');
 $check['Designer exposes private save and explicit publish controls']=str_contains($visual,'save_design_draft')&&str_contains($visual,'publish_design_draft')&&str_contains($visual,'Publish live');
 $check['Canvas enables direct drag and keyboard reordering']=str_contains($visual,'ondragstart')&&str_contains($visual,"e.altKey")&&str_contains($visual,'moveCanvasSection');
 $check['Editor provides explicit draft rebase after live conflicts']=str_contains($visual,'reset_design_draft')&&str_contains($api,"if(\$action==='reset_design_draft')");
