@@ -58,7 +58,7 @@ ok(str_contains($ent,'sf_membership_state($userId,true)'),'account entitlement s
 ok(str_contains($core,'function sf_membership_discount_amount')&&str_contains($core,"==='merch'"),'member discount applies only to merch line items');
 ok(str_contains($boot,'campaign_discount_cents')&&str_contains($boot,'member_discount_cents'),'server-side quote exposes campaign and member discount components separately');
 ok(str_contains($boot,'min($subtotal,$campaignDiscount+$memberDiscount)'),'combined member plus campaign savings cannot exceed subtotal');
-ok(str_contains($quote,'sf_current_user')&&str_contains($quote,'sf_quote($cart')&&str_contains($order,'sf_quote($cart,$campaignCode'),'quote and order derive membership discount from authenticated server identity');
+ok(str_contains($quote,'sf_quote_current_user_id')&&str_contains($quote,'sf_quote($cart')&&str_contains($order,'sf_quote($cart,$campaignCode'),'quote and order derive membership discount from authenticated server identity');
 ok(str_contains($app,'Member discount')&&str_contains($app,'Campaign discount'),'cart UI explains member and campaign savings separately');
 
 ok(str_contains($core,'early_access_days')&&str_contains($core,"reason='early_access'"),'member content enforces tier early-access windows');

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.46';
+const SF_DB_SCHEMA_TARGET = '1.3.47';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -325,6 +325,13 @@ function sf_migration_definitions(): array {
                 sf_agent_feedback_ensure_schema();
             },
         ],
+        [
+            'id'=>'2026-10-13-038',
+            'app_version'=>'1.3.71',
+            'description'=>'Non-destructive repair of legacy customer library columns needed by saved drafts and record-player modules',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_account_data_ensure_schema(); },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
@@ -534,6 +541,12 @@ function sf_migration_integrity_report(): array {
     $userCols=sf_migration_columns('users');foreach(['email_verified_at','email_verification_sent_at'] as $c){$has=in_array($c,$userCols,true);$checks[]=['name'=>'users.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
     $subCols=sf_migration_columns('user_subscriptions');foreach(['provider','provider_customer_id','provider_subscription_id','cancel_at_period_end','canceled_at','grace_ends_at','last_invoice_id','last_payment_at'] as $c){$has=in_array($c,$subCols,true);$checks[]=['name'=>'user_subscriptions.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
     $pkgCols=sf_migration_columns('subscription_packages');foreach(['provider_price_id','membership_enabled','membership_rank','membership_badge','membership_benefits_json'] as $c){$has=in_array($c,$pkgCols,true);$checks[]=['name'=>'subscription_packages.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
+    $libraryCols=sf_migration_columns('user_library');
+    foreach(['item_type','item_key','label','source_order_id','metadata_json','acquired_at'] as $column){
+        $has=in_array($column,$libraryCols,true);
+        $checks[]=['name'=>'user_library.'.$column,'ok'=>$has,'detail'=>$has?'Present':'Missing'];
+        if(!$has)$ok=false;
+    }
     $aiCols=sf_migration_columns('ai_provider_settings');$has=in_array('endpoint_url',$aiCols,true);$checks[]=['name'=>'ai_provider_settings.endpoint_url','ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;
     return ['ok'=>$ok,'checks'=>$checks];
 }
