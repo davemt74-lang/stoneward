@@ -106,7 +106,8 @@
     const list=$('.homepage-section-list',sidebar);
     const from=forms().find(f=>f.dataset.homeSection===fromKey),to=forms().find(f=>f.dataset.homeSection===toKey);
     if(!list||!from||!to)return;
-    list.insertBefore(from,to);
+    const before=Array.from(list.children).indexOf(from)<Array.from(list.children).indexOf(to);
+    list.insertBefore(from,before?to.nextSibling:to);
     Array.from(list.children).forEach((f,n)=>{if(f.elements.position)f.elements.position.value=(n+1)*10;});
     list.dispatchEvent(new Event('change',{bubbles:true}));
     window.SFHomepageBuilder?.preview?.();markDirty();
