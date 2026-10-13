@@ -6,7 +6,7 @@ Options -Indexes
 <IfModule mod_rewrite.c>
 RewriteEngine On
 # Private application data/config are never web-addressable.
-RewriteRule ^(?:data|config)/ - [F,L,NC]
+RewriteRule ^(?:data|config|storage)/ - [F,L,NC]
 # PWA + SEO/crawler endpoints.
 RewriteRule ^manifest\.webmanifest$ manifest.php [L]
 # SEO/crawler endpoints.
