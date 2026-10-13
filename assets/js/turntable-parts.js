@@ -78,17 +78,18 @@
     stage.querySelector('[data-record-brand]').textContent=moduleById(sel.base)?.brand||'Stonefellow';
     const status=stage.querySelector('[data-record-state]'),isPreview=!!preview&&Object.keys(preview).length>0;
     status.textContent=isPreview?'PREVIEW · UNOWNED MODULE':(ctx.appState.playing?'PLAYING':'READY');
+    stage.querySelectorAll('[data-player-start]').forEach(button=>{button.setAttribute('aria-pressed',String(!!ctx.appState.playing));button.textContent=ctx.appState.playing?'Pause':'Start / Stop';});
     });
   }
   function renderStage(){
     const stage=document.createElement('aside');stage.className='builder-turntable-stage';stage.setAttribute('aria-label','Digital modular record player');
     stage.innerHTML='<div class="turntable-stage-body" data-base="studio" data-platter="classic" data-arm="studio" data-label="classic" data-effect="none">'+
-      '<div class="turntable-deck"><div class="turntable-deck-head"><b data-record-brand>STONEFELLOW</b><span>HIGH FIDELITY · MODULAR PLAYER</span></div>'+
+      '<div class="turntable-deck"><span class="turntable-brand-mark" aria-hidden="true">♫</span><div class="turntable-deck-head"><b data-record-brand>STONEFELLOW</b><span>HIGH FIDELITY · MODULAR PLAYER</span></div>'+
       '<div class="turntable-platter"><div class="turntable-disc"><div class="turntable-disc-grooves"></div>'+
       '<div class="turntable-center-label"><img data-record-artwork alt="Current song artwork" hidden><span data-record-fallback>SF</span><strong data-record-track>STONEFELLOW</strong><em data-record-side>SIDE A</em></div></div></div>'+
-      '<div class="turntable-tonearm"><i></i><b></b></div><div class="turntable-light"></div>'+
-      '<div class="turntable-deck-foot"><div><span>33⅓ RPM</span><strong data-record-state>READY</strong></div><span>PLAY · PAUSE IN MUSIC PLAYER</span></div>'+
-      '<div class="turntable-hardware"><i aria-hidden="true" class="turntable-hardware-screw a"></i><i aria-hidden="true" class="turntable-hardware-screw b"></i><i aria-hidden="true" class="turntable-hardware-screw c"></i><i aria-hidden="true" class="turntable-hardware-screw d"></i><span class="turntable-rpm-switch" aria-label="Speed marking">33 ⅓ &nbsp; / &nbsp; 45</span><button type="button" class="turntable-settings-trigger" data-player-editor-open aria-haspopup="dialog" aria-controls="recordPlayerEditor" aria-label="Edit record player settings" title="Edit Record Player"><span aria-hidden="true">⚙</span></button><span aria-hidden="true" class="turntable-power-switch"></span><span aria-hidden="true" class="turntable-deck-serial">SF • STUDIO / 001</span></div></div>'+
+      '<div class="turntable-arm-mount" aria-hidden="true"><img src="assets/img/turntable/default-pivot.svg" alt="" draggable="false"></div><div class="turntable-arm-swing" aria-hidden="true"><img src="assets/img/turntable/default-arm.svg" alt="" draggable="false"></div><div class="turntable-light"></div>'+
+      '<div class="turntable-deck-foot"><div><span>33⅓ RPM</span><strong data-record-state>READY</strong></div></div><div class="turntable-start-controls"><button type="button" class="turntable-start-button" data-player-start aria-label="Start or pause record playback">Start / Stop</button><span data-player-indicator aria-hidden="true"></span></div><div class="turntable-volume-control"><label for="turntableVolume">Volume</label><input id="turntableVolume" type="range" data-player-volume min="0" max="100" value="75" aria-label="Record player volume"></div><span class="turntable-deck-signature" aria-hidden="true">STONEFELLOW<span>STEREO / VINYL</span></span>'+
+      '<div class="turntable-hardware"><i aria-hidden="true" class="turntable-hardware-screw a"></i><i aria-hidden="true" class="turntable-hardware-screw b"></i><i aria-hidden="true" class="turntable-hardware-screw c"></i><i aria-hidden="true" class="turntable-hardware-screw d"></i><button type="button" class="turntable-rpm-switch" data-player-visual-speed aria-pressed="false" aria-label="Toggle vinyl animation speed (33 or 45 RPM)" title="Visual rotation: 33⅓ RPM">33⅓ / 45</button><button type="button" class="turntable-settings-trigger" data-player-editor-open aria-haspopup="dialog" aria-controls="recordPlayerEditor" aria-label="Edit record player settings" title="Edit Record Player"><span aria-hidden="true">⚙</span></button><span aria-hidden="true" class="turntable-power-switch"></span><span aria-hidden="true" class="turntable-deck-serial">SF • STUDIO / 001</span></div></div>'+
       '<div class="turntable-visual-effect" aria-hidden="true"></div></div>';
     return stage;
   }
@@ -166,7 +167,7 @@
     editor.setAttribute('aria-labelledby','playerEditorTitle');
     editor.innerHTML='<div class="turntable-editor-shell"><header class="turntable-editor-header"><div><span class="turntable-editor-kicker">STONEFELLOW · STUDIO</span><h2 id="playerEditorTitle">Edit Record Player</h2><p>Choose your player components. Owned finishes save to this record; other finishes can be previewed.</p></div><button type="button" class="turntable-editor-close" aria-label="Close player editor" data-player-editor-close>×</button></header>'+
       '<div class="turntable-editor-workspace"><div data-turntable-options class="turntable-editor-options"></div><section class="turntable-editor-preview" aria-label="Live record player preview"><div class="turntable-editor-preview-heading"><strong>Live player preview</strong><span>Visual only · changes do not alter audio</span></div><div data-player-preview class="turntable-editor-preview-canvas"></div></section></div><footer class="turntable-editor-footer"><span>Owned selections save automatically · unowned looks are previews only.</span><button type="button" data-player-editor-done>Done</button></footer></div>';
-    const previewStage=renderStage();previewStage.querySelector('[data-player-editor-open]')?.remove();
+    const previewStage=renderStage();previewStage.querySelector('[data-player-editor-open]')?.remove();previewStage.querySelector('.turntable-volume-control')?.remove();previewStage.querySelector('.turntable-start-controls')?.remove();previewStage.querySelector('[data-player-visual-speed]')?.remove();
     editor.querySelector('[data-player-preview]').appendChild(previewStage);
     editor.querySelector('[data-player-editor-close]').onclick=closeEditor;
     editor.querySelector('[data-player-editor-done]').onclick=closeEditor;
@@ -186,6 +187,25 @@
     ctx.appState.cart.push({type:'turntable_module',module_id:id});
     try{localStorage.setItem('stonefellow.cart.v03',JSON.stringify(ctx.appState.cart));}catch(_){}
     preview=null;closeEditor();ctx.say(m.name+' added to your cart. Purchases unlock after payment.',()=>ctx.navigate('cart'));
+  }
+  function wirePlayerDeckControls(stage){
+    stage.querySelector('[data-player-start]')?.addEventListener('click',()=>{
+      if(ctx?.togglePlayback)ctx.togglePlayback();
+      else if(ctx?.appState?.track)ctx.say('Use the playback bar to start or pause your music.');
+      else ctx.say('Select a Stonefellow song, then press Start / Stop.');
+    });
+    stage.querySelector('[data-player-visual-speed]')?.addEventListener('click',event=>{
+      const button=event.currentTarget;
+      const fast=button.getAttribute('aria-pressed')!=='true';
+      button.setAttribute('aria-pressed',String(fast));
+      button.title='Visual rotation: '+(fast?'45':'33⅓')+' RPM';
+      stage.classList.toggle('is-fast-spin',fast);
+    });
+    const volume=stage.querySelector('[data-player-volume]');
+    if(volume){
+      volume.value=String(Math.round(100*(ctx?.getVolume?.()??0.75)));
+      volume.addEventListener('input',()=>ctx?.setVolume?.(Number(volume.value)/100));
+    }
   }
   function decorateCatalog(){
     const list=host.querySelector('.builder-song-list'),catalog=ctx.catalog;
@@ -253,7 +273,7 @@
   function mount(context){
     ctx=context;host=context.canvas.querySelector('.builder-module');if(!host)return;
     preview=null;
-    const stage=renderStage();host.appendChild(stage);
+    const stage=renderStage();host.appendChild(stage);wirePlayerDeckControls(stage);
     makePlayerEditor();
     stage.querySelector('[data-player-editor-open]')?.addEventListener('click',event=>openPlayerEditor(event.currentTarget));
     const partBox=document.createElement('section');partBox.className='builder-parts-picker';

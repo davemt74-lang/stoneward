@@ -58,8 +58,8 @@ $check['Editor provides explicit draft rebase after live conflicts']=str_contain
 $check['Designer supports inline editable copy and undoable version restore']=str_contains($visual,'contentEditable')&&str_contains($visual,'restore_design_version');
 $check['Admin endpoint requires confirmation for publish']=str_contains($api,"if(empty(\$b['confirmed']))");
 $check['Published-site code does not read design drafts']=!str_contains($read('api/artist-home-core.php'),'artist_home_design_draft');
-$check['Admin build version is current']=str_contains($read('admin/index.php'),"SF_ADMIN_BUILD','1.3.69'");
-$check['Service worker cache advanced']=str_contains($read('service-worker.js'),'stonefellow-static-v1.3.69');
+$check['Admin build version is current']=str_contains($read('admin/index.php'),"SF_ADMIN_BUILD','1.3.70'");
+$check['Service worker cache advanced']=str_contains($read('service-worker.js'),'stonefellow-static-v1.3.70');
 $fail=0;foreach($check as $name=>$ok){echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$ok)$fail++;}
 echo 'Section 52: '.(count($check)-$fail).'/'.count($check).' checks passed'.PHP_EOL;
 exit($fail?1:0);

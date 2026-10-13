@@ -1,4 +1,4 @@
-:root{--stonefellow-builder-css-build:'1.3.69'}
+:root{--stonefellow-builder-css-build:'1.3.70'}
 
 /* Section 54 — desktop modular vinyl-builder. Mobile retains the existing builder layout. */
 .builder-parts-picker{border-top:1px solid var(--line);padding:22px 0 10px}
@@ -179,7 +179,7 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 .builder-draft-dialog .draft-modal-feedback{margin:10px 0 2px;padding:10px 12px;background:#402323;border:1px solid #955555;border-radius:6px;color:#ffd8d1;font-size:.78rem}
 .builder-draft-dialog button:disabled{opacity:.6;cursor:wait}
 @media(min-width:1024px){
-  /* v1.3.69: ONE scrollbar for the entire page. Fixed player never scrolls. */
+  /* v1.3.70: ONE scrollbar for the entire page. Fixed player never scrolls. */
   body.builder-workspace-active{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
   body.builder-workspace-active .stage{height:auto;min-height:100dvh;overflow:visible}
   body.builder-workspace-active .dynamic-canvas{height:auto;min-height:0;overflow:visible}
@@ -298,3 +298,83 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 @media(max-width:650px){.turntable-editor-dialog{overflow:hidden!important}.turntable-editor-shell{padding:16px 14px;grid-template-rows:auto minmax(0,1fr) auto}.turntable-editor-header{padding-bottom:12px}.turntable-editor-header h2{font-size:1.5rem}.turntable-editor-header p{font-size:.75rem}.turntable-editor-workspace{padding:12px 0;gap:14px;align-content:start}.turntable-editor-preview{min-height:245px}.turntable-editor-preview-heading{padding:10px 12px}.turntable-editor-options .turntable-editor-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.turntable-editor-footer span{font-size:.72rem}.turntable-catalog-notice{flex-wrap:wrap}}
 /* Preview geometry intentionally desktop-only: prevent an unstyled deck below 1024px. */
 @media(max-width:1023px){.turntable-editor-preview{display:none!important}.turntable-editor-workspace{grid-template-columns:minmax(0,1fr)}}
+
+
+/* v1.3.70 — Reference-inspired high-fidelity Stonefellow deck.
+   Two independently layered SVG images: fixed pivot + animated tonearm.
+   Critically: do NOT alter the fixed desktop stage or document scrolling rules. */
+@media(min-width:1024px){
+  .turntable-deck{
+    border-radius:12px;
+    background:
+      radial-gradient(ellipse at 42% 22%,#45403a55,transparent 45%),
+      repeating-linear-gradient(93deg,transparent 0,transparent 3px,#ffffff02 4px,#00000008 5px),
+      linear-gradient(133deg,#292723,#131312 48%,#090909 100%);
+    border:2px solid #5a4b38;
+    box-shadow:inset 0 0 0 1px #c6a26b55,inset 0 0 19px #000c,15px 19px 60px #000e;
+  }
+  .turntable-platter{
+    width:68%!important;
+    left:2.5%!important;
+    top:49%!important;
+    aspect-ratio:1;
+    background:radial-gradient(circle at 50% 47%,#0c0b0b 0 55%,#2a2724 56%,#b79b69 58%,#100f0e 60%,#c8ae7e 62%,#191716 64%,#0a0a0a 67%);
+    box-shadow:0 0 0 2px #cdb27b88,0 0 0 5px #141310,0 8px 25px #000e;
+    overflow:visible;
+  }
+  .turntable-platter:before{
+    content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;
+    background:repeating-conic-gradient(from 2deg,#d2bc7b 0 .55deg,#151411 .6deg 2.55deg);
+    -webkit-mask:radial-gradient(farthest-side,transparent 0 93%,#000 93.5% 97%,transparent 97.5%);
+    mask:radial-gradient(farthest-side,transparent 0 93%,#000 93.5% 97%,transparent 97.5%);
+    z-index:3;opacity:.9;
+  }
+  .turntable-disc{
+    width:93%;z-index:1;
+    background:
+      conic-gradient(from 15deg,#ffffff0a,transparent 28%,#00000033 48%,#ffffff0b 75%,transparent 92%),
+      repeating-radial-gradient(circle,#070707 0,#0c0c0d 2px,#1c1b1b 3px,#030303 4px,#0b0a0a 5.5px);
+    box-shadow:inset 0 0 20px #000a,inset 0 0 0 2px #b7ae9d22;
+  }
+  .turntable-center-label{
+    left:35%;top:35%;width:30%;height:30%;border:5px solid #cfa56088;
+    background:repeating-radial-gradient(circle at 50% 50%,#ed793b 0 1px,#d84c22 3px 8px);
+    color:#21100c;text-shadow:none;box-shadow:0 0 0 9px #080808,0 0 0 12px #2d2520;
+  }
+  .turntable-center-label:before{content:"";position:absolute;inset:13%;border:1px solid #2d130e55;border-radius:50%;pointer-events:none}
+  .turntable-center-label strong,.turntable-center-label em,.turntable-center-label span{color:#210d08;text-shadow:0 1px #f7a36b33;font-weight:850}
+  .turntable-center-label img{opacity:.93}
+  .turntable-brand-mark{position:absolute;top:6%;left:3%;width:7%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;color:#15110b;background:radial-gradient(circle at 35% 30%,#fff0b9,#c5a368 60%,#53401f);border:3px solid #151312;box-shadow:0 0 0 2px #b5975f,0 4px 8px #000e;font-size:clamp(14px,2vw,25px);z-index:3}
+  /* Current player alternatives can recolor SVG layers via filters, never stretch them. */
+  .turntable-stage-body[data-arm="precision"] .turntable-arm-swing img{filter:sepia(.3) saturate(1.4) brightness(1.1)}
+  .turntable-arm-mount{position:absolute;top:-2%;right:2%;width:23%;aspect-ratio:1;z-index:5;pointer-events:none}
+  .turntable-arm-mount img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 8px 7px #000b)}
+  .turntable-arm-swing{position:absolute;top:1%;left:54%;width:45%;height:96%;z-index:6;pointer-events:none;transform-origin:76% 12.5%;transform:rotate(-3deg);transition:transform 1.25s cubic-bezier(.23,.67,.22,1)}
+  .turntable-arm-swing img{display:block;width:100%;height:100%;object-fit:fill;filter:drop-shadow(4px 10px 8px #000b)}
+  .turntable-stage-body.is-playing .turntable-arm-swing{transform:rotate(18deg)}
+  .turntable-stage-body:not(.is-playing) .turntable-arm-swing{transform:rotate(-3deg)}
+  .turntable-tonearm{display:none!important}
+  .turntable-light{left:5%;bottom:17%;width:9px;height:9px;background:#e43b28;box-shadow:0 0 8px #dc3323,0 0 22px #b6372666}
+  .turntable-start-controls{position:absolute;bottom:5%;left:3%;z-index:8;display:flex;align-items:center;gap:12px}
+  .turntable-start-button{pointer-events:auto!important;cursor:pointer;border:2px solid #a79169;border-radius:4px;background:linear-gradient(#e3c58e,#857042);color:#20180c;font:700 clamp(9px,.8vw,12px) system-ui;padding:12px 14px;box-shadow:inset 0 0 0 2px #f8e2b16a,0 3px 10px #000d}
+  .turntable-start-button:hover{filter:brightness(1.14)}
+  .turntable-start-button:focus-visible,.turntable-rpm-switch:focus-visible,.turntable-volume-control input:focus-visible{outline:3px solid #f5d18e;outline-offset:3px}
+  .turntable-start-controls [data-player-indicator]{width:7px;height:7px;border-radius:50%;background:#b52d17;box-shadow:0 0 9px #ec3d2e}
+  .turntable-stage-body.is-playing [data-player-indicator]{background:#76cf6d;box-shadow:0 0 8px #66c769}
+  .turntable-volume-control{position:absolute;right:3%;top:49%;height:30%;z-index:8;display:flex;flex-direction:column;align-items:center;gap:6px;color:#d6be93;font:600 9px system-ui;letter-spacing:.08em}
+  .turntable-volume-control input{writing-mode:vertical-lr;direction:rtl;appearance:slider-vertical;width:21px;height:95%;accent-color:#c6ae7c;cursor:pointer;pointer-events:auto!important}
+  .turntable-deck-signature{position:absolute;right:19%;bottom:5%;z-index:2;font:italic 600 clamp(10px,1.1vw,17px) Georgia,serif;letter-spacing:.02em;color:#c8ac79;display:flex;flex-direction:column}
+  .turntable-deck-signature span{font:500 6px system-ui;letter-spacing:.15em;color:#9c927e;text-align:center}
+  .turntable-rpm-switch{pointer-events:auto!important;cursor:pointer;right:17%;bottom:17%;border:1px solid #85704f;border-radius:5px;background:#1e1c19;color:#debc84;padding:6px 8px;font:650 10px monospace}
+  .turntable-rpm-switch[aria-pressed="true"]{background:#61462a;border-color:#d2ab71}
+  .turntable-settings-trigger{right:17%;bottom:5%;width:35px;height:35px}
+  .turntable-power-switch{display:none}
+  .turntable-stage-body.is-fast-spin .turntable-disc{animation-duration:1.333s}
+}
+@media(prefers-reduced-motion:reduce){.turntable-arm-swing{transition:none!important}}
+@media(min-width:1024px) and (max-width:1170px){
+  .turntable-volume-control{right:2%;height:24%}
+  .turntable-rpm-switch{right:16%;bottom:18%;font-size:9px}
+  .turntable-start-button{padding:9px 11px}
+  .turntable-brand-mark{font-size:14px}
+}

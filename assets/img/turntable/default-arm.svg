@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 750" role="img" aria-label="Stonefellow animated gold tonearm and stylus">
+<defs>
+ <linearGradient id="tube" x1="0" y1="0" x2="1" y2=".22"><stop stop-color="#382518"/><stop offset=".12" stop-color="#cba367"/><stop offset=".28" stop-color="#fae4a9"/><stop offset=".43" stop-color="#e0b96c"/><stop offset=".61" stop-color="#876537"/><stop offset=".81" stop-color="#2b241b"/><stop offset="1" stop-color="#f7d391"/></linearGradient>
+ <linearGradient id="metal" x1="0" x2="1" y2=".3"><stop stop-color="#6e6b65"/><stop offset=".18" stop-color="#1a1918"/><stop offset=".4" stop-color="#414247"/><stop offset=".8" stop-color="#121315"/><stop offset="1" stop-color="#b7a586"/></linearGradient>
+ <radialGradient id="joint"><stop stop-color="#f0dba5"/><stop offset=".5" stop-color="#947148"/><stop offset="1" stop-color="#181514"/></radialGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="5" dy="8" stdDeviation="7" flood-opacity=".66"/></filter>
+</defs>
+<g filter="url(#shadow)">
+<!-- A separate anchored arm graphic. Pivot target: 455,94. The stationary pivot is another image. -->
+<circle cx="455" cy="94" r="26" fill="#161616" stroke="#bd9757" stroke-width="7"/>
+<circle cx="455" cy="94" r="14" fill="url(#joint)" stroke="#171717" stroke-width="3"/>
+<path d="M455 94 C454 175 462 287 458 359 C453 422 391 496 337 568 L252 678" fill="none" stroke="#090909" stroke-width="31" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M455 94 C454 175 462 287 458 359 C453 422 391 496 337 568 L252 678" fill="none" stroke="url(#tube)" stroke-width="21" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M449 113 C450 188 455 291 452 357 C447 419 387 494 333 566 L250 674" fill="none" stroke="#fff2cb" stroke-width="3.5" stroke-opacity=".56" stroke-linecap="round"/>
+<path d="M281 634 L226 698" stroke="#100f0d" stroke-width="28" stroke-linecap="round"/>
+<path d="M281 634 L226 698" stroke="url(#metal)" stroke-width="20" stroke-linecap="round"/>
+<path d="M292 618 L276 638" stroke="#bc9e6c" stroke-width="10"/>
+<path d="M288 618 L272 638" stroke="#17191a" stroke-width="3"/>
+<g transform="translate(226 699) rotate(39)">
+<path d="M-34 -10 L-29 -32 Q-27 -39 -19 -41 L28 -41 Q36 -39 36 -30 L31 23 Q29 32 19 35 L-28 32Z" fill="url(#metal)" stroke="#b3a17c" stroke-width="4"/>
+<rect x="-17" y="-25" width="7" height="17" rx="2" fill="#070707" stroke="#b79860" stroke-width="1.8"/>
+<rect x="7" y="-25" width="7" height="17" rx="2" fill="#070707" stroke="#b79860" stroke-width="1.8"/>
+<circle cx="-14" cy="11" r="5.6" fill="#d3af73" stroke="#1b1813" stroke-width="2"/>
+<circle cx="13" cy="11" r="5.6" fill="#d3af73" stroke="#1b1813" stroke-width="2"/>
+<path d="M-19 33 L-18 48 L18 48 L19 34Z" fill="#141516" stroke="#af8d57" stroke-width="2"/>
+<path d="M-9 49 L7 49 L3 65 L-5 65Z" fill="#cfaa69" stroke="#171715" stroke-width="2"/>
+<path d="M-1 64v15" stroke="#e9d5a0" stroke-width="3" stroke-linecap="round"/>
+</g>
+</g>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" role="img" aria-label="Stonefellow brushed brass tonearm pivot">
+<defs>
+ <radialGradient id="plate" cx=".4" cy=".36" r=".75"><stop stop-color="#655847"/><stop offset=".4" stop-color="#171716"/><stop offset=".75" stop-color="#080909"/><stop offset="1" stop-color="#9c8050"/></radialGradient>
+ <radialGradient id="cap" cx=".3" cy=".27" r=".85"><stop stop-color="#fff0c2"/><stop offset=".23" stop-color="#dfbd78"/><stop offset=".58" stop-color="#85683c"/><stop offset=".9" stop-color="#27231f"/><stop offset="1" stop-color="#d1ad61"/></radialGradient>
+ <linearGradient id="gold" x2="1" y2=".1"><stop stop-color="#392916"/><stop offset=".17" stop-color="#dfbc71"/><stop offset=".42" stop-color="#f6e3ab"/><stop offset=".65" stop-color="#a47a3d"/><stop offset=".9" stop-color="#241a12"/><stop offset="1" stop-color="#e6c47e"/></linearGradient>
+ <linearGradient id="black" x2=".7" y2="1"><stop stop-color="#64605b"/><stop offset=".38" stop-color="#20201f"/><stop offset=".75" stop-color="#0a0b0c"/><stop offset="1" stop-color="#555049"/></linearGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="2" dy="6" stdDeviation="6" flood-color="#000" flood-opacity=".75"/></filter>
+</defs>
+<g filter="url(#shadow)">
+<circle cx="180" cy="178" r="153" fill="#0b0b0b" stroke="#bfa371" stroke-width="3"/>
+<circle cx="180" cy="178" r="144" fill="url(#plate)" stroke="#302923" stroke-width="8"/>
+<circle cx="180" cy="178" r="132" fill="none" stroke="#8b713f" stroke-width="2" opacity=".65"/>
+<circle cx="180" cy="178" r="113" fill="#0e0f10" stroke="#34302b" stroke-width="12"/>
+<circle cx="180" cy="178" r="105" fill="none" stroke="#c6a265" stroke-opacity=".7" stroke-width="2"/>
+<path d="M183 30v64" stroke="url(#gold)" stroke-width="42" stroke-linecap="round"/>
+<path d="M183 27v68" stroke="#171613" stroke-width="4" stroke-dasharray="3 5" opacity=".65"/>
+<rect x="159" y="6" width="48" height="51" rx="9" fill="url(#gold)" stroke="#1d1a18" stroke-width="5"/>
+<rect x="150" y="56" width="67" height="19" rx="4" fill="#151515" stroke="#b28e57" stroke-width="2"/>
+<path d="M118 176c0-40 23-75 63-89 40 9 65 40 65 88 0 46-28 79-65 89-42-14-63-47-63-88Z" fill="url(#black)" stroke="#b49158" stroke-width="4"/>
+<circle cx="180" cy="176" r="64" fill="url(#cap)" stroke="#0d0d0e" stroke-width="9"/>
+<circle cx="180" cy="176" r="47" fill="none" stroke="#f5e3bf" stroke-opacity=".3" stroke-width="1"/>
+<circle cx="180" cy="176" r="23" fill="url(#gold)" stroke="#4f381f" stroke-width="3"/>
+<circle cx="180" cy="176" r="8" fill="#27201a"/>
+<path d="M226 230 277 269" fill="none" stroke="#161616" stroke-width="15" stroke-linecap="round"/>
+<path d="M226 230 277 269" fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round"/>
+<rect x="260" y="243" width="34" height="60" rx="8" transform="rotate(-34 277 273)" fill="url(#black)" stroke="#bf9759" stroke-width="3"/>
+<path d="M80 185h-28" stroke="#aa8c5b" stroke-width="18" stroke-linecap="round"/>
+<rect x="16" y="155" width="40" height="65" rx="14" fill="url(#black)" stroke="#c4a370" stroke-width="3"/>
+<circle cx="268" cy="124" r="26" fill="#171717" stroke="#ad8c56" stroke-width="3"/>
+<circle cx="268" cy="124" r="19" fill="none" stroke="#977b53" stroke-width="4" stroke-dasharray="1 4"/>
+<circle cx="268" cy="124" r="5" fill="#d1ae73"/>
+<circle cx="94" cy="270" r="10" fill="url(#gold)" stroke="#161514" stroke-width="4"/>
+<circle cx="258" cy="83" r="9" fill="#ddd0a6" stroke="#161514" stroke-width="4"/>
+</g>
+</svg>
