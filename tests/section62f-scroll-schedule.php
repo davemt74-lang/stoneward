@@ -15,6 +15,7 @@ $checks=[
 'Announcement and audio footer both clear the editor'=>str_contains($css,'has-announcement.has-player .builder-module{height:calc(100dvh - 96px - 184px)'),
 'Admin production rejects historical cassettes'=>str_contains(file_get_contents(__DIR__.'/../admin/api/vinyl-production.php'),'$isVinyl=true;break;')&&str_contains(file_get_contents(__DIR__.'/../admin/api/vinyl-production.php'),"==='vinyl'"),
 'Admin design proof filters cassette lines'=>str_contains(file_get_contents(__DIR__.'/../admin/assets/fulfillment.js'),"item.type==='custom_media'&&(item.format||'vinyl')==='vinyl'"),
+'Entering builder resets prior document scroll'=>str_contains(file_get_contents(__DIR__.'/../assets/js/app.js'),'window.scrollTo(0,0);renderBuilder()'),
 'Mobile hides the desktop stage'=>str_contains($css,'@media(max-width:1023px)')&&str_contains($css,'.builder-turntable-stage{display:none!important}'),
 'Notification generator runs at baseline initialization'=>str_contains($notification,'sf_notification_seed_baseline($userId,$now);$vinylGenerated=sf_notification_generate_vinyl_updates($userId)'),
 'Notification generator runs on repeat generation'=>str_contains($notification,'$vinylGenerated=sf_notification_generate_vinyl_updates($userId);return ['),
@@ -23,4 +24,4 @@ $checks=[
 'Customer Agent stays read-only'=>str_contains(file_get_contents(__DIR__.'/../api/agent-runtime.php'),'I cannot change production'),
 ];
 foreach($checks as $name=>$pass){echo ($pass?'PASS ':'FAIL ').$name."\n";if(!$pass)exit(1);}
-echo "Section 62F desktop+scheduled integration: 16/16 checks passed\n";
+echo "Section 62F desktop+scheduled integration: 17/17 checks passed\n";
