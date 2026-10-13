@@ -20,5 +20,5 @@ foreach(['vinylProductionPanel','loadVinylProduction','revision:Number(r.revisio
   if (strpos($ui,$needle)===false) {fwrite(STDERR,"FAIL UI $needle\n");exit(1);}
   echo "PASS UI $needle\n";
 }
-if (strpos(file_get_contents(__DIR__.'/../.htaccess'),'data|config|storage')===false) {fwrite(STDERR,"FAIL private storage protection\n");exit(1);}
+if (strpos(file_get_contents(__DIR__.'/../.htaccess'),'RewriteRule ^storage/')===false) {fwrite(STDERR,"FAIL private storage protection\n");exit(1);}
 echo "Section 62C production checks passed\n";
