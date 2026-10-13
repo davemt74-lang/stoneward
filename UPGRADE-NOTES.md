@@ -1,3 +1,19 @@
+# Stonefellow v1.3.46 — Section 47 Release Notes
+
+1. Make a verified backup of the current database and private data before uploading this version.
+2. Upload/extract the **certified v1.3.46 ZIP** into the existing site without deleting production-owned `data/`, `storage/`, environment/secrets or generated catalog configuration.
+3. Keep existing user records and password hashes unchanged. This release has **no password-reset or first-admin creation step**.
+4. Open `/upgrade.php` as an authenticated administrator and run the pending migration after its backup/preflight.
+5. Migration **2026-10-12-037** adds `agent_mission_plans` and `agent_response_feedback`. Both are additive with no users-table changes.
+6. Confirm the public and Admin Agents load, that Customer memories/conversations remain private, and that reviewed actions still require separate exact approval.
+7. Customer response ratings are stored privately, included in account privacy export and cleared with Agent history. Admin ratings remain operational and Admin-owned.
+8. Clear the browser/PWA cached shell if an older version remains visible; the cache advances to **stonefellow-static-v1.3.46**.
+
+Application: **1.3.46**  
+Database schema target: **1.3.46**
+
+---
+
 # Stonefellow v1.3.40 Upgrade Notes
 
 1. Upload/extract the v1.3.40 deploy over the existing installation.

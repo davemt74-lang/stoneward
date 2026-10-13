@@ -160,3 +160,4 @@ jobs:
           php tests/section47g-specialist-delegation.php
           php tests/section47h-chat-handoffs.php
           php tests/section47i-feedback-recovery.php
+          php tests/section47j-release.php

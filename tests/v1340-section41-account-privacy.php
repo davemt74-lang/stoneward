@@ -70,15 +70,17 @@ ok41(str_contains($css,'.privacy-center')&&str_contains($css,'.privacy-danger')&
 
 ok41(str_contains($boot,"require_once __DIR__ . '/privacy-core.php'"),'privacy core loads from canonical bootstrap');
 ok41(str_contains($mig,"'id'=>'2026-10-12-034'")&&str_contains($mig,'sf_privacy_ensure_schema'),'migration 034 installs profile/privacy schema');
-ok41(str_contains($mig,"const SF_DB_SCHEMA_TARGET = '1.3.35'"),'database schema advances to 1.3.35');
+preg_match("/const SF_DB_SCHEMA_TARGET = '([0-9.]+)'/",$mig,$schemaMatch);$target=$schemaMatch[1]??'';
+preg_match("/define\('SF_BUILD', '([0-9.]+)'\)/",$shell,$buildMatch);$build=$buildMatch[1]??'';
+ok41($target!==''&&version_compare($target,'1.3.35','>='),'Section 41 database baseline is retained by later additive migrations');
 ok41(str_contains($mig,"'user_profiles'")&&str_contains($mig,"'user_privacy_events'"),'upgrade integrity requires Section 41 tables');
-ok41(str_contains($version,"'stonefellow'=>'1.3.45'")&&str_contains($version,"'database_schema_target'=>'1.3.35'"),'version endpoint reports app 1.3.45 and schema 1.3.35');
+ok41(str_contains($version,"'stonefellow'=>'".$build."'")&&str_contains($version,"'database_schema_target'=>'".$target."'"),'version endpoint matches current application and schema');
 ok41(str_contains($version,"'account_data_export'=>'profile-library-listening-purchases-agent-support-telemetry-json'"),'version endpoint advertises account data export');
 ok41(str_contains($version,"'account_closure'=>'password-delete-confirmation-subscription-order-support-blockers-anonymization'"),'version endpoint advertises governed closure');
-ok41(str_contains($shell,"define('SF_BUILD', '1.3.45')"),'public asset build advances to v1.3.45');
-ok41(str_contains($admin,"define('SF_ADMIN_BUILD','1.3.45')"),'Admin asset build stays synchronized at v1.3.45');
-ok41(str_contains($ht,'X-Stonefellow-Build "1.3.45"'),'server build header advances to v1.3.45');
-ok41(str_contains($sw,'stonefellow-static-v1.3.45'),'PWA cache advances with the changed public app');
+ok41($build!==''&&version_compare($build,'1.3.45','>='),'public build preserves the 46J baseline');
+ok41(str_contains($admin,"define('SF_ADMIN_BUILD','".$build."')"),'Admin asset build stays synchronized');
+ok41(str_contains($ht,'X-Stonefellow-Build "'.$build.'"'),'server build header tracks current release');
+ok41(str_contains($sw,'stonefellow-static-v'.$build),'PWA cache advances with the current public app');
 ok41(str_contains($section40,'version_compare($swBuild,\'1.3.39\',\'>=\')')&&str_contains($section40,'version_compare($publicBuild40,\'1.3.39\',\'>=\')'),'Section 40 PWA/accessibility regression remains forward-compatible without weakening its minimum');
 ok41(str_contains($wf,'php tests/v1340-section41-account-privacy.php'),'release gate includes Section 41 certification');
 

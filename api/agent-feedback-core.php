@@ -51,11 +51,29 @@ function sf_agent_feedback_recent(string $scope,int $ownerId,int $limit=50): arr
     $q=sf_db()->prepare('SELECT response_message_id,rating,updated_at FROM agent_response_feedback WHERE scope=? AND owner_user_id=? ORDER BY updated_at DESC,id DESC LIMIT '.max(1,min(100,$limit)));
     $q->execute([$scope,$ownerId]);return $q->fetchAll(PDO::FETCH_ASSOC);
 }
+/**
+ * Privacy export: retrieve all feedback for the owner, not just the UI's
+ * bounded recent history. No private prompt/response text is stored here.
+ */
+function sf_agent_feedback_export(string $scope,int $ownerId): array {
+    if(!sf_agent_feedback_valid_scope($scope,$ownerId))return [];
+    sf_agent_feedback_ensure_schema();
+    $q=sf_db()->prepare('SELECT response_message_id,rating,updated_at FROM agent_response_feedback WHERE scope=? AND owner_user_id=? ORDER BY id ASC');
+    $q->execute([$scope,$ownerId]);
+    return $q->fetchAll(PDO::FETCH_ASSOC);
+}
 function sf_agent_feedback_summary(string $scope,int $ownerId): array {
-    $data=sf_agent_feedback_recent($scope,$ownerId,100);
+    if(!sf_agent_feedback_valid_scope($scope,$ownerId))
+        return ['total'=>0,'helpful'=>0,'not_helpful'=>0,'guidance'=>''];
+    sf_agent_feedback_ensure_schema();
+    $q=sf_db()->prepare('SELECT rating,COUNT(*) AS total FROM agent_response_feedback WHERE scope=? AND owner_user_id=? GROUP BY rating');
+    $q->execute([$scope,$ownerId]);
     $helpful=0;$notHelpful=0;
-    foreach($data as $row){if(($row['rating']??'')==='helpful')$helpful++;elseif(($row['rating']??'')==='not_helpful')$notHelpful++;}
-    return ['total'=>count($data),'helpful'=>$helpful,'not_helpful'=>$notHelpful,
+    foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row){
+        if(($row['rating']??'')==='helpful')$helpful+=(int)$row['total'];
+        elseif(($row['rating']??'')==='not_helpful')$notHelpful+=(int)$row['total'];
+    }
+    return ['total'=>$helpful+$notHelpful,'helpful'=>$helpful,'not_helpful'=>$notHelpful,
         'guidance'=>$notHelpful>0?'Earlier replies were rated not helpful. Ask for clarification rather than inventing missing details.':''];
 }
 /** No schema DDL inside account closure's transaction; fail on real DB errors. */
