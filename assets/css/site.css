@@ -397,7 +397,7 @@ button,.text-control,.tiny-control,.buy-primary,input,select,textarea{border-rad
 .artist-home-custom-ticket-mark{color:#c9a180;font-weight:600;letter-spacing:.16em;font-size:.76rem}
 .artist-home-custom-copy{display:flex;flex-direction:column;gap:8px;flex:1;padding:clamp(16px,2.5vw,25px);min-width:0}
 .artist-home-custom-copy small{letter-spacing:.13em;text-transform:uppercase;color:#cba581;font-size:.65rem}
-.artist-home-custom-copy h3{font:400 clamp(1.2rem,2vw,1.8rem) Georgia,serif;line-height:1.2;margin:0}
+.artist-home-custom-copy h3{font-family:var(--display-font);font-weight:400;font-size:clamp(1.2rem,2vw,1.8rem);line-height:1.2;margin:0}
 .artist-home-custom-copy>p{font-size:.84rem;line-height:1.6;color:#c5bbb1;margin:0}
 .artist-home-custom-action{margin-top:auto;padding-top:12px}
 .artist-home-custom-action .buy-primary{min-height:42px}
