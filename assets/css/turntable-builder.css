@@ -1,4 +1,4 @@
-:root{--stonefellow-builder-css-build:'1.3.60'}
+:root{--stonefellow-builder-css-build:'1.3.61'}
 
 /* Section 54 — desktop modular vinyl-builder. Mobile retains the existing builder layout. */
 .builder-parts-picker{border-top:1px solid var(--line);padding:22px 0 10px}
@@ -136,3 +136,86 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 @media(min-width:1024px){.builder-left-rail{gap:0;padding-top:20px}.builder-turntable-stage{height:calc(100dvh - 64px);min-height:530px}.turntable-deck{left:75%;top:50%;transform:translate(-50%,-50%) rotate(-90deg)}}
 @media(max-width:1023px){.builder-left-rail{gap:0}.builder-tablist{margin-top:16px}.builder-tab{min-height:50px;font-size:clamp(.6rem,1.6vw,.73rem)}}
 @media(max-width:420px){.builder-tab{padding:9px 2px;font-size:.6rem}.builder-tab-panel .builder-art-previews{gap:8px}}
+
+/* Section 61: scrolling, precision-cropped right-stage player and detailed hardware. */
+.builder-notice{margin:12px 0 0;padding:12px 15px;border:1px solid #76624a;border-left:3px solid #d1ad70;border-radius:6px;background:#221d18;color:#f6e8cf;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere}
+.builder-notice[hidden]{display:none!important}
+.builder-notice[data-kind="success"]{background:#1b241e;border-color:#50765d;border-left-color:#a1c5a3;color:#dcf0df}
+.builder-notice[data-kind="error"]{background:#2e1d1d;border-color:#8d4949;border-left-color:#e49a8f;color:#ffd5cf}
+.builder-draft-row{display:flex!important;align-items:center;gap:10px;padding:10px 12px;min-width:0}
+.builder-draft-row>button[data-builder-draft-load]{flex:1 1 auto;min-width:0;text-align:left;overflow-wrap:anywhere}
+.builder-draft-row .builder-draft-manage{flex:0 0 auto;border:1px solid #705a42;border-radius:5px;background:#201a16;color:#e4cba5;padding:9px 11px;font-size:.72rem;cursor:pointer}
+.builder-draft-row .builder-draft-manage:hover{background:#413023}
+.builder-local-name{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.builder-local-name strong{font-weight:600}
+.builder-local-name small{color:var(--muted);font-size:.71rem}
+.builder-drafts-local-title{padding:12px;border-bottom:1px solid var(--line);font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}
+.builder-draft-guest-copy{padding:4px 12px 12px;margin:0!important}
+.builder-draft-dialog{width:min(490px,calc(100vw - 32px));max-height:min(92dvh,760px);padding:0;background:linear-gradient(145deg,#221d18,#100f0e);color:#eee5d9;border:1px solid #746453;border-radius:14px;box-shadow:0 20px 70px #000d,0 0 0 1px #ffffff0e;overflow-y:auto}
+.builder-draft-dialog::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(7px)}
+.builder-draft-dialog .draft-modal-shell{padding:clamp(20px,3vw,32px)}
+.builder-draft-dialog .draft-modal-kicker{font-size:.65rem;letter-spacing:.2em;font-weight:700;color:#d9b982;margin-bottom:15px}
+.builder-draft-dialog .draft-modal-heading{display:flex;justify-content:space-between;gap:15px;align-items:flex-start;margin-bottom:22px}
+.builder-draft-dialog h2{font:400 clamp(1.55rem,3vw,2.1rem)/1.15 var(--display-font);margin:0 0 8px;color:#fff8f0}
+.builder-draft-dialog p{margin:0;color:#baa997;font-size:.8rem;line-height:1.55}
+.builder-draft-dialog .draft-modal-x{flex:0 0 34px;width:34px;height:34px;background:#231e19;color:#eee4d8;border:1px solid #4f453b;border-radius:7px;font-size:1.3rem;cursor:pointer}
+.builder-draft-dialog label{display:block;color:#e3d2bd;font-size:.75rem;font-weight:600;margin-bottom:9px}
+.builder-draft-dialog input{width:100%;padding:13px 14px;box-sizing:border-box;background:#0c0b0a;color:#fff8f0;font-size:.92rem;border:1px solid #786550;border-radius:8px;outline-offset:2px}
+.builder-draft-dialog input:focus-visible,.builder-draft-dialog button:focus-visible{outline:2px solid #d0ad72}
+.builder-draft-dialog .draft-modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+.builder-draft-dialog .draft-modal-actions button{min-height:42px;padding:11px 16px;border-radius:7px;cursor:pointer}
+.builder-draft-dialog .draft-modal-primary{background:#d8b77f;border:1px solid #d8b77f;color:#17110c;font-weight:750}
+.builder-draft-dialog .draft-modal-outline{background:transparent;border:1px solid #655647;color:#e4d5c3}
+.builder-draft-dialog .draft-modal-separator{border-top:1px solid #514335;margin:24px 0}
+.builder-draft-dialog .draft-modal-danger{display:flex;gap:16px;align-items:center;justify-content:space-between}
+.builder-draft-dialog .draft-modal-danger>div{display:grid;gap:7px}
+.builder-draft-dialog .draft-modal-danger strong{font-size:.81rem;color:#f5ede4}
+.builder-draft-dialog .draft-modal-danger small{font-size:.7rem;color:#bcae9b;line-height:1.45}
+.builder-draft-dialog .draft-modal-delete{background:#442525;border:1px solid #a66161;color:#ffd8d3;border-radius:7px;padding:11px 13px;cursor:pointer;white-space:nowrap;font-weight:650}
+.builder-draft-dialog .draft-modal-confirm{padding:17px;margin-top:18px;border:1px solid #8e5555;border-radius:9px;background:#2d1d1c}
+.builder-draft-dialog .draft-modal-confirm[hidden],.builder-draft-dialog .draft-modal-feedback[hidden]{display:none!important}
+.builder-draft-dialog .draft-modal-confirm strong{display:block;margin-bottom:9px;color:#ffedea;font-size:.95rem}
+.builder-draft-dialog .draft-modal-confirm p{color:#e0b8b3}
+.builder-draft-dialog .draft-modal-feedback{margin:10px 0 2px;padding:10px 12px;background:#402323;border:1px solid #955555;border-radius:6px;color:#ffd8d1;font-size:.78rem}
+.builder-draft-dialog button:disabled{opacity:.6;cursor:wait}
+@media(min-width:1024px){
+  /* Normal document scroll: do not pin the player to the viewport. */
+  .builder-turntable-stage{position:relative!important;top:auto!important;align-self:start;overflow:clip;min-height:0;height:clamp(640px,calc(100dvh - 76px),1080px);pointer-events:none}
+  .turntable-stage-body{position:absolute;inset:0}
+  /* Crop through the outer grooves, leaving the center label and a slim vinyl band. */
+  .turntable-deck{left:calc(100% - 26px)!important;top:50%;transform:translate(-50%,-50%) rotate(-90deg)}
+  .turntable-deck-head{letter-spacing:.2em}
+  .turntable-platter{box-shadow:0 0 0 5px #090909,0 0 0 8px #99968466,0 8px 22px #000d}
+  .turntable-disc{background:repeating-radial-gradient(circle at center,#141414 0px,#050505 2px,#232323 3px,#070707 5px);box-shadow:inset 0 0 21px #000a,inset 0 0 0 2px #625d5755}
+  .turntable-tonearm{border-radius:5px;box-shadow:5px 8px 11px #000b, inset 1px 0 1px #fff7;background:linear-gradient(90deg,#23211f 0%,#8c8173 18%,#ede4d7 38%,#b6b5b2 53%,#8c8882 72%,#272521 100%)}
+  /* Square machined pivot and rectangular headshell replace the round cartoon head. */
+  .turntable-tonearm:before{top:-3%;left:-70%;width:240%;height:10%;background:linear-gradient(145deg,#d7d1c6,#6c675e 35%,#252321 70%,#b1a393);border:2px solid #9a8c7a;clip-path:polygon(0 10%,85% 0,100% 20%,100% 88%,20% 100%,0 82%);border-radius:2px;box-shadow:0 3px 10px #000b}
+  .turntable-tonearm:after{bottom:-3%;left:-47%;width:180%;height:13%;background:linear-gradient(145deg,#c2b7a6,#30302e 38%,#11110f 70%);border:2px solid #b9ac91;border-radius:2px;clip-path:polygon(0 0,100% 4%,98% 92%,15% 100%,0 85%);transform:rotate(24deg)}
+  .turntable-tonearm>i{display:block;position:absolute;top:5%;left:25%;height:6%;width:50%;border:1px solid #272520;border-radius:1px;background:repeating-linear-gradient(90deg,#6a655d 0 2px,#aba59b 2px 4px)}
+  .turntable-tonearm>b{display:block;position:absolute;bottom:-11%;left:40%;width:3px;height:17%;border:0;background:linear-gradient(#b1a9a0,#dcd4ba);transform:rotate(24deg);box-shadow:1px 1px 2px #000}
+  .turntable-hardware{position:absolute;inset:0;pointer-events:none;color:#b4aa98}
+  .turntable-hardware-screw{position:absolute;width:10px;height:10px;border-radius:1px;background:linear-gradient(140deg,#aba69b,#45423e);box-shadow:inset 0 0 0 2px #282725,0 0 0 1px #a6a09a}
+  .turntable-hardware-screw:after{content:"";position:absolute;width:7px;height:1px;left:2px;top:5px;background:#292724;transform:rotate(35deg)}
+  .turntable-hardware-screw.a{left:30px;top:26px}.turntable-hardware-screw.b{right:30px;top:26px}
+  .turntable-hardware-screw.c{left:30px;bottom:26px}.turntable-hardware-screw.d{right:30px;bottom:26px}
+  .turntable-rpm-switch{position:absolute;right:15%;bottom:13%;font:650 10px monospace;letter-spacing:.1em}
+  .turntable-power-switch{position:absolute;right:16%;bottom:9%;height:13px;width:31px;border:1px solid #777065;border-radius:3px;background:linear-gradient(90deg,#161412 51%,#978c7f 51%)}
+  .turntable-deck-serial{position:absolute;right:13%;top:6%;font:600 8px monospace;letter-spacing:.19em;color:#7c7569}
+}
+@media(max-width:650px){.builder-draft-dialog .draft-modal-danger{align-items:stretch;flex-direction:column}.builder-draft-dialog .draft-modal-delete{align-self:flex-start}}
+
+@media(min-width:1024px) and (max-width:1199px){.turntable-deck{left:calc(100% - 110px)!important}}
+
+/* Section 61 — six workflow tabs, with all available songs separate from Side A/B. */
+.builder-tablist{grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;gap:2px;border-radius:8px}
+.builder-tab{min-height:49px;padding:11px 8px;letter-spacing:.01em;font-size:clamp(.68rem,.85vw,.78rem)}
+.builder-tab-panel .builder-catalog{margin:0}
+.builder-catalog-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.builder-song-count{font-size:.72rem;color:var(--muted)}
+.builder-sides-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+.builder-sides-heading h3{font:650 .72rem/1.4 var(--ui-font,system-ui);letter-spacing:.15em;margin:0;color:var(--accent)}
+.builder-tab-panel .builder-song-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.builder-catalog-row{min-width:0}
+.builder-catalog-row .builder-song[disabled]{opacity:.62;cursor:not-allowed}
+@media(max-width:1120px){.builder-tab{font-size:.69rem}}
+@media(max-width:420px){.builder-tablist{grid-template-columns:repeat(3,minmax(0,1fr))}.builder-tab{font-size:.65rem;min-height:50px}}

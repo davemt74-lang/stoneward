@@ -81,6 +81,29 @@ function sf_account_save_build(int $userId,array $raw,int $id=0): array {
     throw new RuntimeException('Saved build could not be reloaded.');
 }
 
+/** Rename a stored draft without overwriting track order, cover art, or note. */
+function sf_account_rename_build(int $userId,int $id,string $name): array {
+    if($userId<1||$id<1)throw new InvalidArgumentException('Invalid saved draft.');
+    $name=sf_clean_text($name,60);
+    if($name==='')throw new InvalidArgumentException('Enter a draft name.');
+    sf_account_data_ensure_schema();$pdo=sf_db();
+    $pdo->beginTransaction();
+    try {
+        $q=$pdo->prepare('SELECT build_json FROM user_saved_builds WHERE id=? AND user_id=?');
+        $q->execute([$id,$userId]);$raw=$q->fetchColumn();
+        if($raw===false)throw new RuntimeException('Saved draft not found in this account.');
+        $build=json_decode((string)$raw,true);
+        if(!is_array($build))throw new RuntimeException('Stored draft is invalid.');
+        $build['title']=$name;
+        $now=gmdate('c');
+        $q=$pdo->prepare('UPDATE user_saved_builds SET name=?,build_json=?,updated_at=? WHERE id=? AND user_id=?');
+        $q->execute([$name,json_encode($build,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE),$now,$id,$userId]);
+        $pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    foreach(sf_account_saved_builds($userId) as $row)if((int)$row['id']===$id)return $row;
+    throw new RuntimeException('Renamed draft could not be reloaded.');
+}
+
 function sf_account_delete_build(int $userId,int $id): void {
     sf_account_data_ensure_schema();
     $q=sf_db()->prepare('DELETE FROM user_saved_builds WHERE id=? AND user_id=?'); $q->execute([$id,$userId]);

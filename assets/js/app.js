@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.60';
+  window.STONEFELLOW_APP_BUILD='1.3.61';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu');
@@ -601,9 +601,127 @@
   function localFill(side='both'){const targets=side==='both'?['A','B']:[side],added=[];for(const target of targets){for(const t of localFillOrder()){if(has(t.id))continue;if(Number(t.duration||0)<=remainingTime(target)){st.builder[target].push(t.id);added.push(t.id);if(remainingTime(target)<30)break}}}persist();return added}
   async function fillBuild(side='both'){if(!['A','B','both'].includes(side))side='both';try{if(st.auth.authenticated){const j=await secureJsonPost('builds.php',{action:'suggest',build:st.builder,side});st.builder={...defaultBuild(),...(j.build||st.builder),version:4};persist();renderBuilder();const count=(j.added?.A?.length||0)+(j.added?.B?.length||0);say(count?(j.personalized?'Filled the remaining time using your Stonefellow listening profile.':'Filled the remaining time with the best-fitting eligible tracks.'):'There is no eligible track that fits the remaining time.');return}await loadPersonalization();const added=localFill(side);renderBuilder();say(added.length?'Filled the remaining time. Sign in to make this personalized.':'There is no eligible track that fits the remaining time.')}catch(e){say(e.message)}}
   async function loadBuilderDrafts(force=false){if(!st.auth.authenticated){st.builderDrafts={...st.builderDrafts,loaded:true,items:[],activeId:0};localStorage.removeItem('stonefellow.build.draft.id');return[]}if(st.builderDrafts.loaded&&!force)return st.builderDrafts.items;try{const j=await api('builds.php');if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf;const items=j.builds||[];let activeId=Number(st.builderDrafts.activeId||0);if(activeId&&!items.some(x=>Number(x.id)===activeId)){activeId=0;localStorage.removeItem('stonefellow.build.draft.id')}st.builderDrafts={...st.builderDrafts,loaded:true,items,activeId};return st.builderDrafts.items}catch(_){st.builderDrafts={...st.builderDrafts,loaded:true,items:[]};return[]}}
-  async function saveBuilderDraft(showAccount=false){persist();if(!st.auth.authenticated){say('Saved on this device. Sign in to keep drafts in your Stonefellow account.');renderBuilder();return null}try{if(!st.builderDrafts.loaded)await loadBuilderDrafts(true);const j=await secureJsonPost('builds.php',{action:'save',id:Number(st.builderDrafts.activeId||0),build:st.builder});st.builderDrafts={loaded:true,items:j.builds||[],activeId:Number(j.build?.id||0)};localStorage.setItem('stonefellow.build.draft.id',String(st.builderDrafts.activeId||0));if(j.build?.build)st.builder={...defaultBuild(),...j.build.build,version:4};persist();say('Saved “'+st.builder.title+'” to your Stonefellow drafts.',showAccount?()=>renderAccount():()=>renderBuilder());return j.build}catch(e){say(e.message);return null}}
-  function loadBuilderDraft(id){const row=(st.builderDrafts.items||[]).find(x=>Number(x.id)===Number(id));if(!row?.build)return;st.builder={...defaultBuild(),...row.build,version:4};st.builderDrafts.activeId=Number(row.id);localStorage.setItem('stonefellow.build.draft.id',String(row.id));persist();renderBuilder();say('Loaded “'+(row.name||st.builder.title)+'.”')}
-  async function deleteBuilderDraft(id){if(!confirm('Delete this saved draft?'))return;try{const j=await secureJsonPost('builds.php',{action:'delete',id:Number(id)});st.builderDrafts.items=j.builds||[];if(Number(st.builderDrafts.activeId)===Number(id)){st.builderDrafts.activeId=0;localStorage.removeItem('stonefellow.build.draft.id')}renderBuilder();say('Saved draft deleted.')}catch(e){say(e.message)}}
+  let builderDraftBusy=false,builderNotice={text:'',kind:'info'};
+  function showBuilderNotice(text,kind='info'){
+    builderNotice={text:String(text||''),kind:kind==='error'?'error':kind==='success'?'success':'info'};
+    const target=$('#builderFeedback',canvas);
+    if(target){target.textContent=builderNotice.text;target.dataset.kind=builderNotice.kind;target.hidden=!builderNotice.text;}
+  }
+  async function saveBuilderDraft(showAccount=false){
+    if(builderDraftBusy)return null;
+    builderDraftBusy=true;
+    const button=$('#saveBuild',canvas);
+    if(button){button.disabled=true;button.textContent='Saving…';}
+    showBuilderNotice('Saving your record draft…');
+    try{
+      persist();
+      if(!st.auth.authenticated){
+        builderTab='saved-drafts';renderBuilder();
+        showBuilderNotice('Saved on this device. Sign in to sync drafts with your account.','success');
+        return {id:'local',name:st.builder.title,build:st.builder};
+      }
+      if(!st.builderDrafts.loaded)await loadBuilderDrafts(true);
+      const result=await secureJsonPost('builds.php',{action:'save',id:Number(st.builderDrafts.activeId||0),build:st.builder});
+      if(!result?.build?.id)throw new Error('The server did not confirm the saved draft.');
+      st.builderDrafts={loaded:true,items:result.builds||[],activeId:Number(result.build.id)};
+      localStorage.setItem('stonefellow.build.draft.id',String(st.builderDrafts.activeId));
+      if(result.build.build)st.builder={...defaultBuild(),...result.build.build,version:4};
+      persist();
+      builderTab='saved-drafts';
+      renderBuilder();
+      showBuilderNotice('Saved “'+st.builder.title+'” to your drafts.','success');
+      if(showAccount)renderAccount();
+      return result.build;
+    }catch(e){
+      const detail=e?.message||'Save failed. Please try again.';
+      showBuilderNotice('Draft not saved: '+detail,'error');
+      console.error('Stonefellow draft save failed',e);
+      return null;
+    }finally{
+      builderDraftBusy=false;
+      if(button?.isConnected){button.disabled=false;button.textContent=st.auth.authenticated?'Save draft':'Save locally';}
+    }
+  }
+  function loadBuilderDraft(id){
+    const row=(st.builderDrafts.items||[]).find(x=>Number(x.id)===Number(id));
+    if(!row?.build)return;
+    st.builder={...defaultBuild(),...row.build,version:4};st.builderDrafts.activeId=Number(row.id);
+    localStorage.setItem('stonefellow.build.draft.id',String(row.id));
+    persist();builderTab='song-lists';renderBuilder();
+    showBuilderNotice('Loaded “'+(row.name||st.builder.title)+'”.','success');
+  }
+  function openBuilderDraftModal(value){
+    if(document.querySelector('#builderDraftModal'))return;
+    const local=String(value)==='local';
+    const row=local?{id:'local',name:st.builder.title}:st.builderDrafts.items.find(x=>Number(x.id)===Number(value));
+    if(!row)return;
+    const dialog=document.createElement('dialog');dialog.className='builder-draft-dialog';dialog.id='builderDraftModal';
+    dialog.setAttribute('aria-labelledby','builderDraftModalTitle');
+    dialog.innerHTML='<div class="draft-modal-shell"><div class="draft-modal-kicker">STONEFELLOW · MY LIBRARY</div>'+
+      '<div class="draft-modal-heading"><div><h2 id="builderDraftModalTitle">Manage saved draft</h2><p>Rename your record edition or remove this saved version.</p></div>'+
+      '<button type="button" class="draft-modal-x" data-draft-dismiss aria-label="Close draft manager">×</button></div>'+
+      '<form id="builderDraftRenameForm"><label for="builderDraftName">Draft name</label>'+
+      '<input id="builderDraftName" name="name" maxlength="60" required value="'+esc(row.name||'My Stonefellow Record')+'" autocomplete="off">'+
+      '<div class="draft-modal-feedback" id="builderDraftModalFeedback" role="alert" hidden></div>'+
+      '<div class="draft-modal-actions"><button type="submit" class="draft-modal-primary" data-draft-rename>Save name</button>'+
+      '<button type="button" class="draft-modal-outline" data-draft-dismiss>Cancel</button></div></form>'+
+      '<div class="draft-modal-separator"></div><div class="draft-modal-danger"><div><strong>Delete this draft</strong>'+
+      '<small>Delete only this saved version. Your purchased music will not be affected.</small></div>'+
+      '<button type="button" class="draft-modal-delete" data-draft-delete>Delete draft</button></div>'+
+      '<div class="draft-modal-confirm" id="builderDraftDeleteConfirm" hidden><strong>Delete “'+esc(row.name)+'”?</strong>'+
+      '<p>This cannot be undone. Your other drafts and purchases are kept.</p>'+
+      '<div class="draft-modal-actions"><button type="button" class="draft-modal-delete" data-draft-confirm>Yes, delete draft</button>'+
+      '<button type="button" class="draft-modal-outline" data-draft-keep>Keep draft</button></div></div></div>';
+    document.body.appendChild(dialog);
+    dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+    dialog.querySelectorAll('[data-draft-dismiss]').forEach(b=>b.addEventListener('click',()=>dialog.close()));
+    const form=dialog.querySelector('#builderDraftRenameForm');
+    const nameInput=dialog.querySelector('#builderDraftName');
+    const feedback=dialog.querySelector('#builderDraftModalFeedback');
+    const renameButton=dialog.querySelector('[data-draft-rename]');
+    const error=message=>{feedback.hidden=false;feedback.textContent=message;};
+    form.addEventListener('submit',async e=>{
+      e.preventDefault();
+      const name=nameInput.value.trim();
+      if(!name){error('Enter a name for this draft.');nameInput.focus();return;}
+      renameButton.disabled=true;renameButton.textContent='Saving…';feedback.hidden=true;
+      try{
+        if(local){st.builder.title=name;persist();}
+        else{
+          const result=await secureJsonPost('builds.php',{action:'rename',id:Number(row.id),name});
+          st.builderDrafts.items=result.builds||[];
+          if(Number(st.builderDrafts.activeId)===Number(row.id)){st.builder.title=name;persist();}
+        }
+        dialog.close();builderTab='saved-drafts';renderBuilder();
+        showBuilderNotice('Renamed draft to “'+name+'”.','success');
+      }catch(e){error(e?.message||'Unable to rename this draft.');renameButton.disabled=false;renameButton.textContent='Save name';}
+    });
+    const confirm=dialog.querySelector('#builderDraftDeleteConfirm');
+    dialog.querySelector('[data-draft-delete]').onclick=()=>{confirm.hidden=false;dialog.querySelector('[data-draft-confirm]').focus();};
+    dialog.querySelector('[data-draft-keep]').onclick=()=>{confirm.hidden=true;nameInput.focus();};
+    dialog.querySelector('[data-draft-confirm]').onclick=async e=>{
+      const button=e.currentTarget;button.disabled=true;button.textContent='Deleting…';feedback.hidden=true;
+      try{
+        if(local){
+          localStorage.removeItem('stonefellow.build.v04');
+          st.builder=defaultBuild();st.builderDrafts.activeId=0;
+          localStorage.removeItem('stonefellow.build.draft.id');
+        }else{
+          const result=await secureJsonPost('builds.php',{action:'delete',id:Number(row.id)});
+          st.builderDrafts.items=result.builds||[];
+          if(Number(st.builderDrafts.activeId)===Number(row.id)){
+            st.builderDrafts.activeId=0;localStorage.removeItem('stonefellow.build.draft.id');
+          }
+        }
+        dialog.close();builderTab='saved-drafts';renderBuilder();
+        showBuilderNotice('Draft deleted. Your other drafts and purchased music are unchanged.','success');
+      }catch(e){error(e?.message||'Unable to delete this draft.');button.disabled=false;button.textContent='Yes, delete draft';}
+    };
+    if(typeof dialog.showModal==='function')dialog.showModal();
+    else dialog.setAttribute('open','');
+    nameInput.focus();nameInput.select();
+  }
+  function deleteBuilderDraft(id){openBuilderDraftModal(id);}
   function builderArtworkTiles(){const ids=selectedBuildIds().slice(0,4),tiles=ids.map(id=>{const t=trackById(id),art=t?trackArtwork(t):'';return art?'<img src="'+esc(art)+'" alt="">':'<span>'+esc((t?.title||'SF').slice(0,2).toUpperCase())+'</span>'});while(tiles.length<4)tiles.push('<span>SF</span>');return tiles.join('')}
   function builderSideLimit(builder=st.builder){return cfg.formats[builder?.format||st.builder.format]?.sideLimitSeconds||1200}
   function builderSequencePreview(builder=st.builder){const sideLimit=builderSideLimit(builder),renderSide=side=>{const ids=builder?.[side]||[],rows=ids.map((id,i)=>{const t=trackById(id);return t?'<li><span>'+(i+1)+'. '+esc(t.title)+'</span><small>'+time(t.duration)+'</small></li>':''}).join('');const secs=ids.reduce((n,id)=>n+Number(trackById(id)?.duration||0),0);return '<div class="build-sequence-side"><div><strong>Side '+side+'</strong><span>'+time(secs)+' / '+time(sideLimit)+'</span></div><ol>'+(rows||'<li class="empty">Empty</li>')+'</ol></div>'};return '<div class="build-sequence-preview">'+renderSide('A')+renderSide('B')+'</div>'}
@@ -617,22 +735,23 @@
   function builderCartItem(){return {type:'custom_media',format:st.builder.format,builder:{version:4,format:st.builder.format,title:st.builder.title,theme:st.builder.theme,A:[...st.builder.A],B:[...st.builder.B],coverFront:st.builder.coverFront||'stonefellow',coverBack:st.builder.coverBack||'stonefellow',customNote:String(st.builder.customNote||'').slice(0,280)}}}
   function addBuildToCart(){const duplicates=duplicateBuildIds();if(duplicates.length){say('Remove duplicate tracks before ordering this build.');return}if(!st.builder.A.length&&!st.builder.B.length){say('Add at least one song before ordering this build.');return}if(['A','B'].some(side=>sideTime(side)>limit())){say('One side is over the format time limit. Shorten it before ordering.');return}st.cart=st.cart.filter(x=>x.type!=='custom_media');st.cart.push(builderCartItem());persistCart();say('Your exact '+st.builder.format+' sequence is in the cart.',renderCart)}
   // Preserve the active tab when the builder re-renders after an edit.
-  let builderTab='song-lists';
+  let builderTab='songs';
   function renderBuilder(){
     st.builder.format='vinyl';
     const fmt=cfg.formats[st.builder.format]||{label:st.builder.format},theme=(cfg.artworkThemes||[]).find(x=>x.id===st.builder.theme)||cfg.artworkThemes?.[0]||{className:''},dups=duplicateBuildIds(),drafts=st.builderDrafts.items||[],activeDraft=drafts.find(x=>Number(x.id)===Number(st.builderDrafts.activeId||0));
     // Historical cassette builds remain in the account; this page builds vinyl only.
     const preview='<div class="object-sleeve '+theme.className+' builder-sleeve-v2"><div class="builder-art-grid">'+builderArtworkTiles()+'</div><div class="builder-preview-overlay"><strong>'+esc(st.builder.title)+'</strong><small>STONEFELLOW · CUSTOM EDITION</small></div></div>';
-    const draftsHtml=st.auth.authenticated?'<details class="builder-drafts" '+(drafts.length?'':'open')+'><summary>Saved drafts <span>'+drafts.length+'</span></summary><div class="builder-draft-list">'+(drafts.length?drafts.map(d=>'<div class="builder-draft-row '+(Number(d.id)===Number(st.builderDrafts.activeId)?'active':'')+'"><button type="button" data-builder-draft-load="'+d.id+'"><strong>'+esc(d.name)+'</strong><small>'+esc(String(d.format||'vinyl').toUpperCase())+' · '+esc(String(d.updated_at||'').replace('T',' ').slice(0,19))+'</small></button><button type="button" data-builder-draft-delete="'+d.id+'" aria-label="Delete '+esc(d.name)+'">×</button></div>').join(''):'<p class="player-note">Save this build to keep a draft in your account.</p>')+'</div></details>':'<details class="builder-drafts" open><summary>Saved drafts <span>0</span></summary><div class="builder-draft-list"><p class="player-note">Sign in to save drafts across devices.</p></div></details>';
-    const tabs=[['saved-drafts','Saved Drafts'],['album-artwork','Album Artwork'],['song-lists','Song Lists'],['personal-notes','Personal Notes'],['submit','Submit']];
-    if(!tabs.some(([id])=>id===builderTab))builderTab='song-lists';
+    const draftsHtml=st.auth.authenticated?'<details class="builder-drafts" open><summary>Saved drafts <span>'+drafts.length+'</span></summary><div class="builder-draft-list">'+(drafts.length?drafts.map(d=>'<div class="builder-draft-row '+(Number(d.id)===Number(st.builderDrafts.activeId)?'active':'')+'"><button type="button" data-builder-draft-load="'+d.id+'"><strong>'+esc(d.name)+'</strong><small>'+esc(String(d.format||'vinyl').toUpperCase())+' · '+esc(String(d.updated_at||'').replace('T',' ').slice(0,19))+'</small></button><button type="button" class="builder-draft-manage" data-builder-draft-manage="'+d.id+'" aria-label="Rename or delete '+esc(d.name)+'">Manage</button></div>').join(''):'<p class="player-note">Save this build to keep a draft in your account.</p>')+'</div></details>':'<div class="builder-drafts"><div class="builder-drafts-local-title">Saved on this device</div><div class="builder-draft-row"><div class="builder-local-name"><strong>'+esc(st.builder.title||'My Stonefellow Record')+'</strong><small>'+esc(st.builder.savedAt?'Updated '+String(st.builder.savedAt).replace('T',' ').slice(0,19):'Current local edition')+'</small></div><button type="button" class="builder-draft-manage" data-builder-draft-manage="local">Manage</button></div><p class="player-note builder-draft-guest-copy">Sign in to sync this draft across devices.</p></div>';
+    const tabs=[['songs','Songs'],['song-lists','Song Lists'],['album-artwork','Album Artwork'],['personal-notes','Personal Notes'],['saved-drafts','Saved Drafts'],['submit','Submit']];
+    if(!tabs.some(([id])=>id===builderTab))builderTab='songs';
     const panel=(id,body)=>'<section class="builder-tab-panel" id="builder-panel-'+id+'" role="tabpanel" aria-labelledby="builder-tab-'+id+'" tabindex="0" '+(builderTab===id?'':'hidden')+'>'+body+'</section>';
     const nav='<div class="builder-tablist" role="tablist" aria-label="Vinyl record builder sections">'+tabs.map(([id,name])=>'<button type="button" class="builder-tab" id="builder-tab-'+id+'" role="tab" data-builder-tab="'+id+'" aria-controls="builder-panel-'+id+'" aria-selected="'+(builderTab===id?'true':'false')+'" tabindex="'+(builderTab===id?'0':'-1')+'">'+name+'</button>').join('')+'</div>';
     const artwork='<div class="builder-layout builder-artwork-layout"><div class="builder-object"><div class="builder-settings"><label class="builder-title-label" for="mixTitle">Edition title</label><input id="mixTitle" maxlength="60" value="'+esc(st.builder.title)+'" aria-label="Custom record title"><div class="theme-switch" role="group" aria-label="Cover color theme">'+(cfg.artworkThemes||[]).map(x=>'<button type="button" title="'+esc(x.label)+'" aria-label="'+esc(x.label)+' artwork" data-theme="'+esc(x.id)+'" class="'+x.className+' '+(x.id===st.builder.theme?'active':'')+'"></button>').join('')+'</div></div>'+preview+'<div class="object-meta">'+esc(fmt.label)+' • custom edition'+(activeDraft?' • draft #'+activeDraft.id:'')+'</div></div></div><div data-builder-player-options></div>';
-    const songs=(dups.length?'<div class="builder-warning"><strong>Duplicate tracks detected.</strong><span>Each song can appear only once on a physical build.</span><button type="button" id="dedupeBuild">Remove duplicates</button></div>':'')+'<div class="sides" aria-label="Vinyl sides"><div class="side-card" data-side="A"></div><div class="side-card" data-side="B"></div></div><div class="builder-catalog"><div class="builder-catalog-head"><span>ADD A SONG</span><button class="text-control" id="agentChoose" type="button">Fill remaining time</button></div><div class="builder-song-list"></div></div>';
+    const songs='<div class="builder-catalog" aria-label="Stonefellow songs"><div class="builder-catalog-head"><strong>STONEFELLOW SONGS</strong><span class="builder-song-count">'+catalog.length+' available</span></div><p class="player-note">Browse every available track. Add eligible songs to your record or preview a song first.</p><div class="builder-song-list"></div></div>';
+    const songLists=(dups.length?'<div class="builder-warning"><strong>Duplicate tracks detected.</strong><span>Each song can appear only once on a physical build.</span><button type="button" id="dedupeBuild">Remove duplicates</button></div>':'')+'<div class="builder-sides-heading"><h3>YOUR RECORD SIDES</h3><button class="text-control" id="agentChoose" type="button">Fill remaining time</button></div><div class="sides" aria-label="Vinyl sides"><div class="side-card" data-side="A"></div><div class="side-card" data-side="B"></div></div>';
     const notes='<div class="builder-personal-note"><h3>Your personal dedication</h3><p class="player-note">Add an optional message to the back of your Stonefellow record. Maximum 280 characters.</p></div>';
     const submit='<div class="builder-submit-review"><h3>Review your custom vinyl</h3><p class="player-note">Side A: '+st.builder.A.length+' tracks · '+time(sideTime('A'))+' / '+time(limit())+'</p><p class="player-note">Side B: '+st.builder.B.length+' tracks · '+time(sideTime('B'))+' / '+time(limit())+'</p></div><div class="builder-footer"><button class="buy-primary" id="orderBuild" type="button">Review custom vinyl in cart</button><button class="text-control" id="saveBuild" type="button">'+(st.auth.authenticated?(st.builderDrafts.activeId?'Update draft':'Save draft'):'Save locally')+'</button><button class="text-control" id="exportBuild" type="button">Export build</button><button class="text-control" id="clearBuild" type="button">Start over</button><span class="saved-badge">'+(st.builder.savedAt?'Last saved '+esc(String(st.builder.savedAt).replace('T',' ').slice(0,19)):'')+'</span></div>';
-    canvas.innerHTML='<article class="module builder-module" aria-label="Custom vinyl record builder"><div class="builder-left-rail">'+nav+panel('saved-drafts',draftsHtml)+panel('album-artwork',artwork)+panel('song-lists',songs)+panel('personal-notes',notes)+panel('submit',submit)+'</div></article>';
+    canvas.innerHTML='<article class="module builder-module" aria-label="Custom vinyl record builder"><div class="builder-left-rail">'+nav+'<div class="builder-notice" id="builderFeedback" data-kind="'+esc(builderNotice.kind)+'" role="status" aria-live="polite" '+(builderNotice.text?'':'hidden')+'>'+esc(builderNotice.text)+'</div>'+panel('songs',songs)+panel('song-lists',songLists)+panel('album-artwork',artwork)+panel('personal-notes',notes)+panel('saved-drafts',draftsHtml)+panel('submit',submit)+'</div></article>';
     const buttons=$$('[data-builder-tab]',canvas);
     const activateTab=(id,focus=false)=>{
       if(!tabs.some(([key])=>key===id))return;
@@ -665,10 +784,10 @@
     $$('[data-fill-side]',canvas).forEach(b=>b.onclick=()=>fillBuild(b.dataset.fillSide));
     $$('[data-theme]',canvas).forEach(b=>b.onclick=()=>{st.builder.theme=b.dataset.theme;persist();renderBuilder()});
     $$('[data-builder-draft-load]',canvas).forEach(b=>b.onclick=()=>loadBuilderDraft(b.dataset.builderDraftLoad));
-    $$('[data-builder-draft-delete]',canvas).forEach(b=>b.onclick=()=>deleteBuilderDraft(b.dataset.builderDraftDelete));
+    $$('[data-builder-draft-manage]',canvas).forEach(b=>b.onclick=()=>openBuilderDraftModal(b.dataset.builderDraftManage));
     const title=$('#mixTitle',canvas);if(title)title.onchange=e=>{st.builder.title=e.target.value.trim()||'My Stonefellow Record';persist();renderBuilder()};
-    const sl=$('.builder-song-list',canvas);catalog.filter(t=>t.podEligible).forEach(t=>{const b=document.createElement('button');b.type='button';b.className='builder-song';const added=has(t.id);b.disabled=added;b.innerHTML='<span><strong>'+esc(t.title)+'</strong><small>'+esc((t.mood||[]).join(' • '))+' • '+time(t.duration)+'</small></span><span>'+(added?'✓':'+')+'</span>';b.onclick=()=>{const r=add(t);if(r.ok){renderBuilder();say('Added “'+t.title+'” to Side '+r.side+'.')}else say(r.why==='full'?'That will not fit on either side.':'That track is already on your build.')};sl.appendChild(b)});
-    $('#agentChoose',canvas).onclick=()=>fillBuild('both');$('#orderBuild',canvas).onclick=addBuildToCart;$('#saveBuild',canvas).onclick=()=>saveBuilderDraft(false);$('#exportBuild',canvas).onclick=()=>{persist();download('stonefellow-'+norm(st.builder.title).replace(/ /g,'-')+'-build.json',{artist:'Stonefellow',...st.builder,tracks:{A:st.builder.A.map(trackById),B:st.builder.B.map(trackById)}});say('Exported your build as JSON.')};$('#clearBuild',canvas).onclick=()=>{st.builder=defaultBuild();st.builderDrafts.activeId=0;localStorage.removeItem('stonefellow.build.draft.id');persist();renderBuilder();say('Blank build. Start anywhere you want.')};const dd=$('#dedupeBuild',canvas);if(dd)dd.onclick=dedupeBuild;
+    const sl=$('.builder-song-list',canvas);catalog.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='builder-song';const added=has(t.id),eligible=!!t.podEligible;b.disabled=added||!eligible;b.title=!eligible?'Not available for custom vinyl':added?'Already on your record':'Add to this record';b.innerHTML='<span><strong>'+esc(t.title)+'</strong><small>'+esc((t.mood||[]).join(' • '))+' • '+time(t.duration)+'</small></span><span>'+(added?'✓':eligible?'+':'Preview only')+'</span>';b.onclick=()=>{const r=add(t);if(r.ok){renderBuilder();say('Added “'+t.title+'” to Side '+r.side+'.')}else say(r.why==='full'?'That will not fit on either side.':'That track is already on your build.')};sl.appendChild(b)});
+    $('#agentChoose',canvas).onclick=()=>fillBuild('both');$('#orderBuild',canvas).onclick=addBuildToCart;$('#saveBuild',canvas).onclick=()=>{void saveBuilderDraft(false);};$('#exportBuild',canvas).onclick=()=>{persist();download('stonefellow-'+norm(st.builder.title).replace(/ /g,'-')+'-build.json',{artist:'Stonefellow',...st.builder,tracks:{A:st.builder.A.map(trackById),B:st.builder.B.map(trackById)}});say('Exported your build as JSON.')};$('#clearBuild',canvas).onclick=()=>{st.builder=defaultBuild();st.builderDrafts.activeId=0;localStorage.removeItem('stonefellow.build.draft.id');persist();renderBuilder();say('Blank build. Start anywhere you want.')};const dd=$('#dedupeBuild',canvas);if(dd)dd.onclick=dedupeBuild;
     window.StonefellowTurntable?.mount?.({canvas,appState:st,catalog,releases,esc,persist,play,trackById,trackArtwork,say,navigate,money,renderBuilder});
     if(st.auth.authenticated&&!st.builderDrafts.loaded)loadBuilderDrafts().then(()=>{const u=new URL(location.href);if((u.searchParams.get('view')||'home')==='builder')renderBuilder()});
   }

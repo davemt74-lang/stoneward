@@ -32,10 +32,10 @@ ok(str_contains($app,'function localFill('),'guest fallback fill remains availab
 ok(str_contains($app,'async function loadBuilderDrafts'),'account draft loading exists');
 ok(str_contains($app,'async function saveBuilderDraft'),'account draft saving exists');
 ok(str_contains($app,'function loadBuilderDraft'),'saved draft loading exists');
-ok(str_contains($app,'async function deleteBuilderDraft'),'saved draft deletion exists');
+ok(str_contains($app,'function openBuilderDraftModal(')&&str_contains($app,"data-draft-confirm")&&str_contains($app,"action:'delete'"),'saved draft deletion requires a confirmation modal');
 ok(str_contains($app,"stonefellow.build.draft.id"),'active draft identity persists across reloads');
 ok(str_contains($app,"items.some(x=>Number(x.id)===activeId)")&&str_contains($app,"localStorage.removeItem('stonefellow.build.draft.id')"),'stale draft identity is cleared across account changes');
-ok(str_contains($app,"data-builder-draft-load")&&str_contains($app,"data-builder-draft-delete"),'builder exposes draft load/delete controls');
+ok(str_contains($app,"data-builder-draft-load")&&str_contains($app,"data-builder-draft-manage"),'builder exposes per-draft load and management controls');
 ok(str_contains($app,"st.builderDrafts.activeId?'Update draft':'Save draft'"),'draft save updates an active draft instead of duplicating it');
 ok(str_contains($app,"if(!st.builderDrafts.loaded)await loadBuilderDrafts(true)"),'account draft ownership is reconciled before save');
 

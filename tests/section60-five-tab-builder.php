@@ -4,20 +4,22 @@ $root=dirname(__DIR__);$read=static fn($p)=>(string)file_get_contents($root.'/'.
 $app=$read('assets/js/app.js');$parts=$read('assets/js/turntable-parts.js');$css=$read('assets/css/turntable-builder.css');$boot=$read('api/bootstrap.php');$html=$read('stonefellow-v120.php');$road=$read('docs/stonefellow-player-platform-roadmap.md');
 $pos=strpos($app,'function renderBuilder(){');$end=strpos($app,'async function quoteCart()',$pos);
 $builder=substr($app,$pos,$end-$pos);
-$tabs=['saved-drafts'=>'Saved Drafts','album-artwork'=>'Album Artwork','song-lists'=>'Song Lists','personal-notes'=>'Personal Notes','submit'=>'Submit'];
+$tabs=['songs'=>'Songs','song-lists'=>'Song Lists','album-artwork'=>'Album Artwork','personal-notes'=>'Personal Notes','saved-drafts'=>'Saved Drafts','submit'=>'Submit'];
 $checks=[];
-$checks['Exactly five purpose-built tabs defined']=preg_match_all("/\['(saved-drafts|album-artwork|song-lists|personal-notes|submit)','([^']+)'\]/",$builder)==5;
+$checks['Exactly six purpose-built tabs defined']=preg_match_all("/\['(songs|song-lists|album-artwork|personal-notes|saved-drafts|submit)','([^']+)'\]/",$builder)==6;
 foreach($tabs as $id=>$label){$checks[$label.' has named tab and panel']=str_contains($builder,"['".$id."','".$label."']")&&str_contains($builder,"panel('".$id."',");}
 $checks['Accessible ARIA tablist, tabs and tabpanels']=str_contains($builder,'role="tablist"')&&str_contains($builder,'role="tab"')&&str_contains($builder,'role="tabpanel"')&&str_contains($builder,'aria-controls="builder-panel-')&&str_contains($builder,'aria-labelledby="builder-tab-');
 $checks['Keyboard arrows Home End select tabs']=str_contains($builder,"e.key==='ArrowRight'")&&str_contains($builder,"e.key==='ArrowLeft'")&&str_contains($builder,"e.key==='Home'")&&str_contains($builder,"e.key==='End'");
-$checks['State persists through edit re-renders']=str_contains($app,"let builderTab='song-lists'")&&str_contains($builder,'builderTab=id;');
+$checks['State persists through edit re-renders']=str_contains($app,"let builderTab='songs'")&&str_contains($builder,'builderTab=id;');
 $checks['Only active tabpanel is visible']=str_contains($builder,'region.hidden=!active')&&str_contains($css,'.builder-tab-panel[hidden]{display:none!important}');
 $checks['Cassette format buttons removed']=!str_contains($builder,'data-format=')&&!str_contains($builder,'format-switch')&&str_contains($builder,"st.builder.format='vinyl'");
 $checks['Historic cassette orders remain supported']=str_contains($boot,"$"."format==='cassette'")&&str_contains($read('api/account-data.php'),"['vinyl','cassette']");
-$checks['Saved Drafts loads and deletes without changing behavior']=str_contains($builder,"data-builder-draft-load")&&str_contains($builder,"data-builder-draft-delete");
+$checks['Saved Drafts loads and deletes without changing behavior']=str_contains($builder,"data-builder-draft-load")&&str_contains($builder,"data-builder-draft-manage");
 $checks['Album Artwork keeps title and theme']=str_contains($builder,'id="mixTitle"')&&str_contains($builder,'data-theme=');
 $checks['Album Artwork supports independent front/back templates']=str_contains($parts,'data-cover-select="coverFront"')&&str_contains($parts,'data-cover-select="coverBack"');
-$checks['Song Lists retains Side A/B ordering and filters']=str_contains($builder,'data-side="A"')&&str_contains($builder,'data-side="B"')&&str_contains($parts,'data-builder-category')&&str_contains($parts,'data-builder-release')&&str_contains($builder,'r.ondragstart');
+$checks['Song Lists retains sides and ordering']=str_contains($builder,'data-side="A"')&&str_contains($builder,'data-side="B"')&&str_contains($builder,'r.ondragstart')&&str_contains($builder,'agentChoose');
+$checks['Songs owns catalog separately with all available public tracks']=str_contains($builder,"panel('songs',songs)")&&str_contains($builder,"panel('song-lists',songLists)")&&str_contains($builder,'catalog.forEach(t=>')&&str_contains($parts,'data-builder-category')&&str_contains($parts,'data-builder-release');
+$checks['Saved drafts is second to last']=strpos($builder,"panel('personal-notes',notes)")<strpos($builder,"panel('saved-drafts',draftsHtml)")&&strpos($builder,"panel('saved-drafts',draftsHtml)")<strpos($builder,"panel('submit',submit)");
 $checks['Personal Notes separated from album artwork']=str_contains($parts,'function decorateNotes()')&&str_contains($parts,"host.querySelector('.builder-personal-note')")&&!str_contains($parts,'Custom note<textarea');
 $checks['Note field persists on input with length count']=str_contains($parts,'input.maxLength=280')&&str_contains($parts,"input.addEventListener('input'")&&str_contains($parts,'ctx.persist()');
 $checks['Submit retains cart, save, export and reset']=str_contains($builder,"$('#orderBuild',canvas).onclick")&&str_contains($builder,"$('#saveBuild',canvas).onclick")&&str_contains($builder,"$('#exportBuild',canvas).onclick")&&str_contains($builder,"$('#clearBuild',canvas).onclick");
