@@ -434,3 +434,11 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
   .cart-module .cart-lines .cart-line{gap:12px}
   .cart-quote-error{flex-direction:column;align-items:stretch}
 }
+
+/* Section 72E: production milestones live in the normal customer-order page flow. */
+.order-vinyl-timeline{overflow:visible}
+.order-vinyl-timeline .vinyl-milestones{list-style:none;padding:0 0 0 18px;margin:15px 0 4px;border-left:2px solid #846b49;display:grid;gap:14px}
+.order-vinyl-timeline .vinyl-milestones li{position:relative;display:flex;flex-direction:column;gap:4px;padding-left:12px;font-size:.91rem;overflow-wrap:anywhere}
+.order-vinyl-timeline .vinyl-milestones li:before{content:"";position:absolute;left:-24px;top:5px;border-radius:50%;width:9px;height:9px;background:#c7a77b;box-shadow:0 0 0 3px #161412}
+.order-vinyl-timeline .vinyl-milestones small{color:var(--muted,#baaa97);font-size:.76rem}
+@media(max-width:720px){.order-vinyl-timeline{padding-inline:clamp(14px,4vw,22px)}}
