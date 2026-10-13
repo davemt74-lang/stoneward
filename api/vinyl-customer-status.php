@@ -12,7 +12,10 @@ function sf_vinyl_customer_status(int $userId, string $userEmail='', int $limit=
     }
     $email=strtolower(trim($userEmail));
     $result=[];
-    foreach(glob($directory.'/*.json')?:[] as $file){
+    if($exactOrderId!==''&&!preg_match('/^SF-[A-Z0-9-]+$/',$exactOrderId))return [];
+    $files=$exactOrderId!==''?[$directory.'/'.$exactOrderId.'.json']:(glob($directory.'/*.json')?:[]);
+    foreach($files as $file){
+        if(!is_file($file))continue;
         $order=json_decode((string)file_get_contents($file),true);
         if(!is_array($order))continue;
         $owner=(int)($order['user_id']??0);
