@@ -96,7 +96,7 @@ ok36(str_contains($home,"sf_video_featured()")&&str_contains($home,"sf_video_pub
 ok36(str_contains($home,"'video_open'"),'Homepage records real featured-video opens');
 ok36(str_contains($homeApi,"'videos'=>\$videos"),'Homepage Admin references published Video Hub records');
 ok36(str_contains($homeAdmin,"if(key==='featured_video')")&&str_contains($homeAdmin,'Auto — featured published video'),'Homepage editor can select or auto-pick featured video');
-ok36(str_contains($app,"k==='featured_video'")&&str_contains($app,'data-home-video'),'public Homepage renders a Featured Video section');
+ok36(str_contains(file_get_contents($root.'/assets/js/artist-home-renderer.js'),"k==='featured_video'")&&str_contains($app,'data-home-video'),'public Homepage renders a Featured Video section');
 ok36(str_contains($mig,'sf_artist_home_ensure_schema()'),'migration 031 seeds missing Featured Video homepage defaults on existing installs');
 
 ok36(str_contains($agent,'sf_video_agent_context')&&str_contains($agent,"return 'videos_browse'"),'Agent grounds video facts and recognizes video browse intent');
