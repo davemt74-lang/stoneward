@@ -28,6 +28,8 @@ jobs:
       - name: Public JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/build-integrity.js
+          node --check service-worker.js
           node --check assets/js/artist-home-renderer.js
           node --check assets/js/agent-brain.js
           node --check assets/js/agent-chat-canvas.js
@@ -186,3 +188,4 @@ jobs:
           node tests/section57-admin-render-recovery.js
           php tests/section54-modular-turntable.php
           php tests/section58-fullwidth-builder.php
+          node tests/section58b-builder-asset-integrity.js
