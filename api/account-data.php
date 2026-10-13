@@ -174,7 +174,7 @@ function sf_account_library_add_order(int $userId,array $order): void {
     foreach((array)($order['quote']['items']??[]) as $item){
         $type=(string)($item['type']??'item');
         // Defense in depth: retain the module-specific check used by older integrations.
-        if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid','test_paid'],true))continue;
+        if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid','test_paid'],true) && (string)($order['payment']['status']??'')!=='succeeded')continue;
         // The paid-order gate above protects all other purchases as well.
         $key=(string)($item['module_id']??$item['track_id']??$item['package_id']??'');
         if($key==='') $key=$type==='custom_media'?$orderId.':'.(string)($item['format']??'custom'):$orderId.':'.substr(hash('sha256',json_encode($item)?:''),0,16);
