@@ -6,7 +6,7 @@
 
 ## Inventory — existing capabilities (not a new execution grant)
 
-The Section 44 server-owned registry `api/agent-tool-registry.php` already declares 16 tool metadata entries. Section 46's shared `api/agent-orchestration.php` maps specific Customer and Admin intents to some of them. Section 47A validates that existing inventory; it does **not** create a second tool engine.
+The Section 44 server-owned registry `api/agent-tool-registry.php` already declares 17 tool metadata entries. Section 46's shared `api/agent-orchestration.php` maps specific Customer and Admin intents to some of them. Section 47A validates that existing inventory; it does **not** create a second tool engine.
 
 | Authority / consumer | Registered tools | Implementation / control |
 | --- | --- | --- |

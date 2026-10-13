@@ -127,7 +127,8 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
     return [
         'scope'=>'admin','conversations'=>sf_admin_agent_thread_list($adminId),
         'missions'=>$m['missions'],'mission_counts'=>$m['counts'],
-        'tool_inventory'=>function_exists('sf_agent_tool_inventory')?sf_agent_tool_inventory('admin'):[]
+        'tool_inventory'=>function_exists('sf_agent_tool_inventory')?sf_agent_tool_inventory('admin'):[],
+        'skill_inventory'=>sf_agent_skill_inventory('admin')
     ];
 }
 function sf_admin_agent_reply(int $adminId,string $threadId,string $message): array {

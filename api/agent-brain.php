@@ -2,12 +2,14 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/agent-runtime.php';
+require_once __DIR__.'/agent-skill-registry.php';
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';
 $user=sf_require_user(false,$write);
 $userId=(int)$user['id'];
 header('Cache-Control: no-store, private');
 if(!$write){
     $snapshot=sf_agent_customer_brain_snapshot($userId);
+    $snapshot['skill_inventory']=sf_agent_skill_inventory('customer');
     $conversation=sf_clean_text($_GET['conversation_id']??'',80);
     if($conversation!==''&&preg_match('/^[A-Za-z0-9_-]{12,80}$/D',$conversation)){
         $snapshot['messages']=sf_agent_history($userId,$conversation,30);

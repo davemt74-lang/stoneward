@@ -1,37 +1,25 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__.'/agent-tool-registry.php';
+require_once __DIR__.'/agent-skill-registry.php';
 /**
  * Shared server-side capability contract used by both distinct Agent Brains.
- * The client may display an action, but may never acquire authority by naming it.
+ * The skill inventory provides names/intents, but never execution authority.
+ * Only existing authenticated handlers can perform a reviewed action.
  */
 function sf_agent_orchestration_contract(string $scope,string $intent): array {
-    $mapping=[
-      'customer'=>[
-        'public_catalog_search'=>'public_catalog_search',
-        'favorite_save'=>'favorite_track',
-        'favorite_remove'=>'favorite_track',
-        'create_playlist'=>'create_playlist',
-        'player_recommend'=>'recommend_public_track'
-      ],
-      'admin'=>[
-        'crm_report'=>'crm_aggregate',
-        'journey_report'=>'campaign_aggregate',
-        'prepare_campaign'=>'campaign_draft_save',
-        'prepare_journey'=>'automation_draft_save',
-        'review_actions'=>'agent_brain_log'
-      ]
-    ];
-    $toolId=$mapping[$scope][$intent]??null;
+    $skill=sf_agent_skill_for_intent($scope,$intent);
+    $toolId=$skill['tool_id']??null;
+    // Historical operational audit view is an internal navigation intent:
+    // it must never become a discoverable or executable skill.
+    if($scope==='admin' && $intent==='review_actions')$toolId='agent_brain_log';
     $registered=$toolId!==null?(sf_agent_tool_registry()[$toolId]??null):null;
-    $role=$scope==='admin'?'admin':($scope==='customer'?'fan':'guest');
-    $discovery=$registered && sf_agent_tool_allowed($toolId,$role,false);
-    $proposal=$registered && in_array($toolId,['campaign_draft_save','automation_draft_save'],true)
+    $role=sf_agent_skill_context_role($scope)??'guest';
+    $discovery=$skill!==null && $registered && sf_agent_tool_allowed($toolId,$role,false);
+    $proposal=$skill!==null && $registered
+       && (bool)$skill['may_prepare_reviewed_proposal']
        && sf_agent_tool_executable($toolId,$role,true);
-    // Internal audit entries are never customer-discoverable tools.
-    if($toolId==='agent_brain_log'){$discovery=false;$proposal=false;}
     return [
-      'scope'=>$scope,'intent'=>$intent,'tool_id'=>$toolId,
+      'scope'=>$scope,'intent'=>$intent,'skill_id'=>$skill['id']??null,'tool_id'=>$toolId,
       'registered'=>(bool)$registered,
       'may_read_or_navigate'=>(bool)$discovery,
       'may_prepare_reviewed_proposal'=>(bool)$proposal,
