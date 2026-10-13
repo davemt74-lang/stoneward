@@ -11,6 +11,10 @@ $checks=[
 'Announcement height considered'=>str_contains($css,'has-announcement .dynamic-canvas{height:calc(100dvh - 96px)}'),
 'Left rail independently scrolls'=>str_contains($css,'.builder-left-rail{min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden'),
 'Right turntable stage fills locked viewport'=>str_contains($css,'.builder-turntable-stage{position:relative!important;top:auto!important;align-self:stretch;overflow:clip;min-height:0;height:100%;max-height:100%'),
+'Expanded audio footer stays clear of editor'=>str_contains($css,'has-player .builder-module{height:calc(100dvh - 64px - 184px)'),
+'Announcement and audio footer both clear the editor'=>str_contains($css,'has-announcement.has-player .builder-module{height:calc(100dvh - 96px - 184px)'),
+'Admin production rejects historical cassettes'=>str_contains(file_get_contents(__DIR__.'/../admin/api/vinyl-production.php'),"($item['format']??'vinyl')==='vinyl'"),
+'Admin design proof filters cassette lines'=>str_contains(file_get_contents(__DIR__.'/../admin/assets/fulfillment.js'),"item.type==='custom_media'&&(item.format||'vinyl')==='vinyl'"),
 'Mobile hides the desktop stage'=>str_contains($css,'@media(max-width:1023px)')&&str_contains($css,'.builder-turntable-stage{display:none!important}'),
 'Notification generator runs at baseline initialization'=>str_contains($notification,'sf_notification_seed_baseline($userId,$now);$vinylGenerated=sf_notification_generate_vinyl_updates($userId)'),
 'Notification generator runs on repeat generation'=>str_contains($notification,'$vinylGenerated=sf_notification_generate_vinyl_updates($userId);return ['),
@@ -19,4 +23,4 @@ $checks=[
 'Customer Agent stays read-only'=>str_contains(file_get_contents(__DIR__.'/../api/agent-runtime.php'),'I cannot change production'),
 ];
 foreach($checks as $name=>$pass){echo ($pass?'PASS ':'FAIL ').$name."\n";if(!$pass)exit(1);}
-echo "Section 62F desktop+scheduled integration: 12/12 checks passed\n";
+echo "Section 62F desktop+scheduled integration: 16/16 checks passed\n";
