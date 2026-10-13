@@ -146,7 +146,7 @@ function sf_artist_home_public_blocks(array $raw,int $userId=0): array {
         $published=false;
         foreach(sf_release_rows() as $r)if((string)($r['id']??'')===$ref && ($r['state']??'published')==='published'&&($r['public_visible']??true)!==false){$published=true;break;}
         if($published){$candidate=sf_artist_home_release($ref);if((string)($candidate['id']??'')===$ref)$data=$candidate;}
-      }elseif($type==='merch')$data=sf_commerce_product($ref,true);
+      }elseif($type==='merch'){$candidate=sf_artist_home_product($ref);if((string)($candidate['id']??'')===$ref)$data=$candidate;}
       elseif($type==='ticket'){
         if($offers===null)$offers=sf_ticket_public_offers($userId>0?$userId:null);
         foreach($offers as $ticket)if((string)($ticket['id']??'')===$ref){$data=$ticket;break;}
