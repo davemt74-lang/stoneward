@@ -14,13 +14,13 @@ $other=['id'=>'SF-OTHER-099','user_id'=>8,'created_at'=>'2026-10-13T00:00:00Z',
 'customer'=>['email'=>'owner@example.com'],'quote'=>['items'=>[['type'=>'custom_media','format'=>'vinyl']]]];
 file_put_contents($root.'/storage/orders/SF-OTHER-099.json',json_encode($other));
 file_put_contents($root.'/storage/fulfillment/vinyl-production.json',json_encode([
- 'SF-20261013-001'=>['status'=>'quality_check','updated_at'=>'2026-10-13T19:00:00Z',
+ 'SF-20261013-001'=>['status'=>'quality_check','updated_at'=>'2025-10-13T19:00:00Z',
  'events'=>[['at'=>'2026-10-13T18:00:00Z','to'=>'quality_check','note'=>'PRIVATE ADMIN NOTE','admin_id'=>44]]]
 ]));
 require __DIR__.'/../api/vinyl-customer-status.php';
 function pass72e(bool $ok,string $what):void{if(!$ok){fwrite(STDERR,"FAIL $what\n");exit(1);}echo "PASS $what\n";}
 $latest=sf_vinyl_customer_status(7,'owner@example.com',25);
-pass72e(count($latest)===25,'Overview bounded to 25 vinyl orders');
+pass72e(count($latest)===25&&!in_array('SF-20261013-001',array_column($latest,'order_id'),true),'Old order excluded by overview cutoff');
 $old=sf_vinyl_customer_status(7,'owner@example.com',1,'SF-20261013-001');
 pass72e(count($old)===1,'Exact lookup retrieves selected order independent of result cutoff');
 pass72e($old[0]['status']==='quality_check','Admin production stage included');
