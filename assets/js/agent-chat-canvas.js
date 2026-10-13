@@ -16,6 +16,8 @@
       brain=res.brain||brain;
     }
     const messages=res.brain?res.brain.messages||res.messages||[]:res.messages||[];
+    const recentPlans=(brain.planned_missions||[]).slice(0,4);
+    const missionCards=recentPlans.map(p=>'<li><strong>Mission '+esc(String(p.id||'').slice(0,8))+'</strong><ul>'+((p.steps||[]).slice(0,4).map(s=>'<li>'+esc(s.intent)+' · '+esc(s.status)+(s.requires_exact_approval?' (approval required)':'')+'</li>').join(''))+'</ul></li>').join('');
     const threadOptions=(brain.conversations||[]).map(t=>'<option value="'+esc(t.id)+'" '+(t.id===activeId?'selected':'')+'>'+esc(t.title||'Conversation')+'</option>').join('');
     canvas.innerHTML='<article class="module customer-agent-chat"><div class="module-kicker">PERSONAL MUSIC COMPANION</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h2>My Agent Chat</h2><div><button type="button" id="newAgentThread" class="text-control">New chat</button> <button type="button" id="openMyAgentBrain" class="text-control">My Agent Brain</button></div></div>'+
@@ -23,12 +25,18 @@
       '<label>Conversation <select id="agentThreadSelect"><option value="">New conversation</option>'+threadOptions+'</select></label>'+
       '<div class="agent-message-history" id="agentConversationMessages" role="log" aria-live="polite" aria-label="Agent conversation" style="max-height:55vh;overflow-y:auto;margin:14px 0">'+
       (messages.length?messages.map(m=>'<article class="agent-chat-bubble" style="padding:12px;margin:8px 0;border:1px solid #5e4e3c;border-radius:10px"><strong>'+(m.role==='assistant'?'Stonefellow Agent':'You')+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(m.content||'')+'</p></article>').join(''):'<p>Start a conversation with your Agent below.</p>')+'</div>'+
+      '<section class="privacy-panel"><h3>Recent governed mission steps</h3><p>These are recent plans across your private conversations. Opening a tool is not approval to save changes.</p><ul>'+(missionCards||'<li>No saved plans yet.</li>')+'</ul><div class="auth-actions"><button type="button" data-agent-navigate="music" class="text-control">Explore published music</button><button type="button" data-agent-navigate="library" class="text-control">Review my playlists</button><button type="button" data-agent-navigate="agent-brain" class="text-control">Review Agent Brain</button></div></section>'+ 
       '<form id="myAgentCanvasForm" class="auth-form"><label>Message to Stonefellow<input name="message" required maxlength="320" placeholder="What should we listen to tonight?"></label><button class="buy-primary" type="submit">Send to Agent</button></form>'+
       '<p id="myAgentCanvasStatus" role="status"></p></article>';
     const one=q=>canvas.querySelector(q);
     const log=one('#agentConversationMessages');if(log)log.scrollTop=log.scrollHeight;
     one('#newAgentThread').onclick=()=>{conversationId('');render({canvas,api,esc,send,conversationId,navigate,forceNew:true});};
     one('#openMyAgentBrain').onclick=()=>navigate('agent-brain');
+    canvas.querySelectorAll('[data-agent-navigate]').forEach(button=>button.onclick=()=>{
+      const allowed={music:['music',{}],library:['library',{tab:'playlists'}],'agent-brain':['agent-brain',{}]};
+      const destination=allowed[button.dataset.agentNavigate];
+      if(destination)navigate(destination[0],destination[1]);
+    });
     one('#agentThreadSelect').onchange=e=>{conversationId(e.target.value);render({canvas,api,esc,send,conversationId,navigate});};
     one('#myAgentCanvasForm').onsubmit=async e=>{
       e.preventDefault();
