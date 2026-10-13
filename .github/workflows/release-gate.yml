@@ -28,6 +28,7 @@ jobs:
       - name: Public JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/artist-home-renderer.js
           node --check assets/js/agent-brain.js
           node --check assets/js/agent-chat-canvas.js
           node --check assets/js/library.js
