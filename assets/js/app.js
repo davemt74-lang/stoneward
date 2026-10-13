@@ -460,8 +460,8 @@
     $$('[data-home-play]',canvas).forEach(b=>b.onclick=()=>{const sec=(home.sections||[]).find(x=>x.section_key==='featured_track'),t=sec?.data;if(t){homepageEvent('track_play','featured_track','track',t.id);play(homepageTrackObject(t),0,'artist_home')}});
     $$('[data-home-video]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('video_open','featured_video','video',b.dataset.homeVideo);navigate('video',{slug:b.dataset.homeVideo})});
     $$('[data-home-show]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('show_open','upcoming_show','show',b.dataset.homeShow);navigate('show',{id:b.dataset.homeShow})});
-    $('[data-home-store]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('merch_open','merch','store',b.dataset.homeStore);navigate('store',{slug:b.dataset.homeStore})});
-    $('[data-home-ticket-offer]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('show_open','custom_blocks','ticket',b.dataset.homeTicketOffer);navigate('tickets',{offer_id:b.dataset.homeTicketOffer})});
+    $$('[data-home-store]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('merch_open','merch','store',b.dataset.homeStore);navigate('store',{slug:b.dataset.homeStore})});
+    $$('[data-home-ticket-offer]',canvas).forEach(b=>b.onclick=()=>{homepageEvent('show_open','custom_blocks','ticket',b.dataset.homeTicketOffer);navigate('tickets',{offer_id:b.dataset.homeTicketOffer})});
     $$('[data-home-dsp]',canvas).forEach(a=>a.onclick=()=>homepageEvent('release_open','featured_release','dsp',''));
     $$('[data-home-ticket]',canvas).forEach(a=>a.onclick=()=>homepageEvent('show_open','upcoming_show','ticket',''));
     const agentBtn=$('[data-home-agent]',canvas);if(agentBtn)agentBtn.onclick=()=>{homepageEvent('agent_open','hero');input?.focus();agent('idle','Ask me about a song, a release, a show, or what you should hear first.')};
