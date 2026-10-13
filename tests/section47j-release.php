@@ -46,13 +46,13 @@ $checks['Repeated migration never deletes existing mission history']=(int)$db->q
 $checks['Repeated migration never deletes feedback history']=(int)$db->query('SELECT COUNT(*) FROM agent_response_feedback')->fetchColumn()===1;
 $checks['User hashes also survive repeat migration']=$db->query('SELECT password_hash FROM users WHERE id=10')->fetchColumn()===$hash2;
 $checks['Migration checksum is stable']=count($matches)===1&&sf_migration_checksum($matches[0])===sf_migration_checksum($matches[0]);
-$build='1.3.46';
-$checks['Public and Admin version 1.3.46 synchronized']=str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '".$build."')")
+$build='1.3.47';$schema='1.3.46';
+$checks['Public and Admin release version synchronized']=str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '".$build."')")
    &&str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$build."')");
 $checks['PWA and Apache headers synchronized']=str_contains($read('service-worker.js'),'stonefellow-static-v'.$build)
    &&str_contains($read('.htaccess'),'X-Stonefellow-Build "'.$build.'"');
 $checks['Version endpoint declares application and schema target']=str_contains($read('version.php'),"'stonefellow'=>'".$build."'")
-   &&str_contains($read('version.php'),"'database_schema_target'=>'".$build."'");
+   &&str_contains($read('version.php'),"'database_schema_target'=>'".$schema."'");
 $ci=$read('.github/workflows/release-gate.yml');
 $sections=['47a-capability-audit','47b-skill-registry','47c-mission-planning','47d-customer-context','47e-admin-intelligence','47f-proactive-research','47g-specialist-delegation','47h-chat-handoffs','47i-feedback-recovery','47j-release'];
 $all=true;foreach($sections as $s)$all=$all&&is_file($root.'/tests/section'.$s.'.php')&&str_contains($ci,'php tests/section'.$s.'.php');

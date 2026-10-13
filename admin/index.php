@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.46');
+define('SF_ADMIN_BUILD','1.3.47');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -88,14 +88,15 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 
       <main id="adminCanvas" class="admin-canvas" aria-live="polite"></main>
 
-      <footer class="admin-chat-footer">
+      <footer class="admin-chat-footer" aria-label="Admin Agent sticky composer">
         <div class="agent-strip"><button id="adminOrb" type="button" class="admin-orb" aria-label="Stonefellow Admin Agent"></button><span id="agentStatus">IDLE</span><p id="agentMessage">Ask me to scan a folder, create a metadata template, find missing ISRCs, or show the catalog.</p></div>
         <form id="adminChatForm" class="admin-chatbar" autocomplete="off">
           <label class="sr-only" for="adminChatInput">Ask Stonefellow Admin</label>
-          <input id="adminChatInput" type="text" maxlength="400" placeholder="Ask Stonefellow Admin anything…">
+          <textarea id="adminChatInput" rows="1" maxlength="4000" placeholder="Message your Admin Agent…" aria-label="Message your Admin Agent"></textarea>
           <button id="adminVoiceButton" type="button" class="chat-button" aria-label="Voice input">◉</button>
-          <button type="submit" class="chat-button send" aria-label="Send">↑</button>
+          <button type="submit" class="chat-button send" aria-label="Send message">↑</button>
         </form>
+        <span id="adminAgentComposerStatus" class="sr-only" role="status" aria-live="polite"></span>
       </footer>
     </div>
   </div>
