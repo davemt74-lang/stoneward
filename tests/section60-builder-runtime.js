@@ -7,7 +7,9 @@ const src=fs.readFileSync(require('node:path').join(__dirname,'../assets/js/app.
 const start=src.indexOf('  function renderBuilder(){');
 const end=src.indexOf('\n  async function quoteCart()',start);
 assert.ok(start>0&&end>start,'actual renderBuilder function must exist');
-const code="let builderTab='songs';let builderNotice={text:'',kind:'info'};\n"+src.slice(start,end)+"\nthis.renderBuilder=renderBuilder;";
+const reviewStart=src.indexOf('  function builderReviewProblems(){');
+assert.ok(reviewStart>0&&reviewStart<start,'review validation helper must precede renderer');
+const code="let builderTab='songs';let builderNotice={text:'',kind:'info'};\n"+src.slice(reviewStart,src.indexOf('  function addBuildToCart(){',reviewStart))+src.slice(start,end)+"\nthis.renderBuilder=renderBuilder;";
 const names=['songs','song-lists','album-artwork','personal-notes','saved-drafts','submit'];
 function el(){return{hidden:false,innerHTML:'',onclick:null,onkeydown:null,dataset:{},classList:{toggle(){}},setAttribute(name,value){this[name]=value},focus(){this.focused=true},appendChild(){}}}
 const tabButtons=names.map(name=>Object.assign(el(),{dataset:{builderTab:name}}));
