@@ -72,7 +72,7 @@ function sf_validate_builder(array $b, string $format, int $userId=0): array {
     if(!in_array($back,$allowedCovers,true))$errors[]='Unknown back cover template.';
     return ['ok'=>!$errors,'errors'=>$errors,'format'=>$format,'title'=>sf_clean_text($b['title'] ?? 'My Stonefellow Record',60),
       'theme'=>sf_clean_text($b['theme'] ?? 'desert',30),'coverFront'=>$front,'coverBack'=>$back,
-      'customNote'=>sf_clean_text($b['customNote']??'',280),'playerModules'=>sf_turntable_valid_selection((array)($b['playerModules']??[]),$userId),'sides'=>$sides];
+      'customNote'=>sf_clean_text($b['customNote']??'',280),'playerModules'=>!empty($b['playerModules'])?sf_turntable_valid_selection((array)$b['playerModules'],$userId):sf_turntable_module_defaults(),'sides'=>$sides];
 }
 
 function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array {
