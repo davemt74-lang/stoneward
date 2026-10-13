@@ -55,6 +55,8 @@
   }
   async function saveSection(e){
     e.preventDefault();
+    // Full-page designer is staged: never allow legacy section submit to publish.
+    if(window.SFHomepageVisual?.active?.())return window.SFHomepageVisual.saveDraft();
     const f=e.currentTarget;
     if(f.dataset.saving==='1')return false; // prevent duplicate section edits on repeated clicks
     const key=f.dataset.homeSection,status=$('.homepage-save-status',f),button=f.querySelector('[type="submit"]');
