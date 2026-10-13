@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/agent-orchestration.php';
+require_once __DIR__.'/agent-mission-planner.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -128,7 +129,8 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
         'scope'=>'admin','conversations'=>sf_admin_agent_thread_list($adminId),
         'missions'=>$m['missions'],'mission_counts'=>$m['counts'],
         'tool_inventory'=>function_exists('sf_agent_tool_inventory')?sf_agent_tool_inventory('admin'):[],
-        'skill_inventory'=>sf_agent_skill_inventory('admin')
+        'skill_inventory'=>sf_agent_skill_inventory('admin'),
+        'planned_missions'=>sf_agent_mission_plan_recent('admin',$adminId)
     ];
 }
 function sf_admin_agent_reply(int $adminId,string $threadId,string $message): array {
@@ -139,6 +141,9 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     $prior=sf_admin_agent_thread_messages($adminId,$threadId);
     sf_admin_agent_save_message($adminId,$threadId,'user',$message);
     $plan=sf_admin_agent_plan($message);$context=sf_admin_agent_operational_context();$missionState=sf_admin_agent_mission_summary($adminId);
+    $missionPlan=sf_agent_mission_plan('admin',$message,$plan['type']);
+    if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
+        $missionPlan=sf_agent_mission_plan_save('admin',$adminId,$threadId,$message,$missionPlan);}
     $types=[
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
@@ -154,7 +159,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
         $research=sf_admin_agent_research_reply($message,$context,$prior);
         if($research!==null)$text=$research;
     }
-    $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract];
+    $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan];
     sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
-    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
+    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'mission_plan'=>$missionPlan,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
 }
