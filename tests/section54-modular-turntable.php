@@ -26,7 +26,7 @@ $checks['Saved build preserves cover art and custom note']=str_contains($account
 $checks['Agent fill preserves builder artwork and parts']=str_contains($account,"'playerModules'=>$"."build['playerModules']");
 $checks['Desktop-only immersive player stage']=str_contains($css,'@media(min-width:1024px)')&&str_contains($css,'@media(max-width:1023px)');
 $checks['Sideways player fits available desktop stage']=str_contains($css,'--deck-width:clamp(450px,69vh,690px)')&&str_contains($css,'--deck-height:clamp(690px,80vw,1080px)');
-$checks['Reversed physical player cropped to the right']=str_contains($css,'transform:translate(-50%,-50%) rotate(90deg)')&&str_contains($css,'left:calc(100% - clamp(320px,32vw,540px))!important')&&str_contains($css,'overflow:clip');
+$checks['Correctly proportioned landscape deck on the right']=str_contains($css,'transform:translateY(-50%) rotate(0deg)')&&str_contains($css,'aspect-ratio:1.45')&&str_contains($css,'position:fixed!important')&&str_contains($css,'overflow:clip');
 $checks['90 degree orientation applies only on desktop']=str_contains($css,'@media(min-width:1024px)')&&str_contains($css,'@media(max-width:1023px)')&&!str_contains($css,'rotate(-45deg)');
 $checks['Old short viewport rotation override removed']=!str_contains($css,'.turntable-deck{height:max(620px,97vh)}');
 $checks['Vinyl spins only on playback']=str_contains($app,'StonefellowTurntable?.sync')&&str_contains($css,'.turntable-stage-body.is-playing .turntable-disc');

@@ -5,14 +5,14 @@ $notification=file_get_contents(__DIR__.'/../api/notification-core.php');
 $endpoint=file_get_contents(__DIR__.'/../api/notifications.php');
 $cron=file_get_contents(__DIR__.'/../cron-notifications.php');
 $checks=[
-'Normal page scrolling restored'=>str_contains($css,'body.builder-workspace-active{height:auto;overflow-y:auto}'),
-'Page stage allowed to extend'=>str_contains($css,'body.builder-workspace-active .stage{height:auto;min-height:calc(100dvh - 64px);overflow:visible}'),
-'Canvas no longer traps scroll'=>str_contains($css,'body.builder-workspace-active .dynamic-canvas{height:auto;min-height:0;overflow:visible}'),
-'Builder follows panel content'=>str_contains($css,'body.builder-workspace-active .builder-module{height:auto;min-height:calc(100dvh - 64px)'),
-'No left-hand scrollbar'=>str_contains($css,'.builder-left-rail{height:auto;min-height:0;max-height:none;overflow:visible;scrollbar-gutter:auto;'),
-'Sticky player with viewport offset'=>str_contains($css,'.builder-turntable-stage{position:sticky!important;top:76px!important'),
-'Announcement sticky offset'=>str_contains($css,'has-announcement .builder-turntable-stage{top:108px!important'),
-'Bottom chat footer still protected'=>str_contains($css,'padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))'),
+'Normal document scroll remains enabled'=>str_contains($css,'body.builder-workspace-active{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}'),
+'Grid follows page flow'=>str_contains($css,'body.builder-workspace-active .builder-module{height:auto;min-height:100dvh;align-items:start;overflow:visible;'),
+'Left editor does not scroll independently'=>str_contains($css,'.builder-left-rail{height:auto;min-height:0;max-height:none;overflow:visible;'),
+'Right player stationary in viewport'=>str_contains($css,'.builder-turntable-stage{position:fixed!important;'),
+'No scrollbar within right stage'=>str_contains($css,'max-height:none;overflow:clip;pointer-events:none;z-index:1;'),
+'Landscape deck sized to panel'=>str_contains($css,'aspect-ratio:1.45;transform:translateY(-50%) rotate(0deg)'),
+'Announcement offset preserved'=>str_contains($css,'has-announcement .builder-turntable-stage{top:108px!important;'),
+'Footer clearance preserved'=>str_contains($css,'padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))'),
 'Admin production rejects historical cassettes'=>str_contains(file_get_contents(__DIR__.'/../admin/api/vinyl-production.php'),'$isVinyl=true;break;')&&str_contains(file_get_contents(__DIR__.'/../admin/api/vinyl-production.php'),"==='vinyl'"),
 'Admin design proof filters cassette lines'=>str_contains(file_get_contents(__DIR__.'/../admin/assets/fulfillment.js'),"item.type==='custom_media'&&(item.format||'vinyl')==='vinyl'"),
 'Entering builder resets prior document scroll'=>str_contains(file_get_contents(__DIR__.'/../assets/js/app.js'),'window.scrollTo(0,0);renderBuilder()'),
