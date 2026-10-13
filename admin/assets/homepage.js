@@ -90,5 +90,5 @@
     try{await api('homepage.php',{action:'reset_defaults',confirmed:true});say('Artist Homepage reset to the Stonefellow defaults.');await renderInto(state.mount)}
     catch(e){say(e.message||'Reset failed. Your sections have not been replaced.');if(button)button.disabled=false}
   }
-  window.SFArtistHomeAdmin={renderInto,saveAll};
+  window.SFArtistHomeAdmin={renderInto,saveAll,getData:()=>state.data};
 })();
