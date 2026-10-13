@@ -20,7 +20,7 @@ foreach(['Unsafe color'=>['accent'=>'red'],'Unsafe image'=>['image'=>'javascript
 }
 $boot=$read('api/bootstrap.php');$account=$read('api/account-data.php');$app=$read('assets/js/app.js');$parts=$read('assets/js/turntable-parts.js');$css=$read('assets/css/turntable-builder.css');
 $checks['Quote ignores client pricing']=str_contains($boot,'sf_turntable_quote(sf_clean_text(');
-$checks['Paid-only entitlement grant']=str_contains($account,"if($"."type==='turntable_module'&&!in_array(")&&str_contains($account,"['paid','simulated_paid']");
+$checks['Paid-only entitlement grant']=str_contains($account,"if($"."type==='turntable_module'&&!in_array(")&&str_contains($account,"['paid','simulated_paid','test_paid']");
 $checks['Draft checks slot ownership']=str_contains($account,'sf_turntable_valid_selection(');
 $checks['Saved build preserves cover art and custom note']=str_contains($account,"'coverFront'=>")&&str_contains($account,"'coverBack'=>")&&str_contains($account,"'customNote'=>");
 $checks['Agent fill preserves builder artwork and parts']=str_contains($account,"'playerModules'=>$"."build['playerModules']");
@@ -31,6 +31,8 @@ $checks['Current track art, title and side visible']=str_contains($parts,'data-r
 $checks['Catalog search / mood / release filter']=str_contains($parts,'data-builder-search')&&str_contains($parts,'data-builder-category')&&str_contains($parts,'data-builder-release');
 $checks['Admin module authoring requires authorization']=str_contains($read('admin/api/turntable-modules.php'),'sf_admin_require_auth($write)');
 $checks['Effects do not claim audio changes']=str_contains($parts,'Visual effect packs change the turntable appearance only');
+$checks['Both simulated payment methods grant licenses']=str_contains($account,"'test_paid'")&&str_contains($read('api/bootstrap.php'),"'simulated_paid'")&&str_contains($read('api/bootstrap.php'),"'test_paid'");
+$checks['Pack component duplication rejected in quote']=str_contains($boot,'A bundle must not bill again for parts')&&str_contains($boot,"'slot']==='pack'");
 $checks['Cart and checkout identify digital modules']=str_contains($app,"item.type==='turntable_module'")&&str_contains($app,"x.type==='turntable_module'");
 $checks['Account library keys digital module license']=str_contains($account,"$"."item['module_id']");
 $checks['Public and Admin load new runtimes']=str_contains($read('stonefellow-v120.php'),'assets/js/turntable-parts.js')&&str_contains($read('admin/index.php'),'assets/turntable-modules.js');
