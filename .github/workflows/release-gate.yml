@@ -151,3 +151,4 @@ jobs:
           php tests/section46h-admin-canvas.php
           php tests/section46i-dual-brain-isolation.php
           php tests/section46j-release.php
+          php tests/section47a-capability-audit.php
