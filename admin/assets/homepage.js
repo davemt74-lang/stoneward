@@ -56,7 +56,7 @@
   async function saveSection(e){
     e.preventDefault();
     const f=e.currentTarget;
-    if(f.dataset.saving==='1')return; // prevent duplicate section edits on repeated clicks
+    if(f.dataset.saving==='1')return false; // prevent duplicate section edits on repeated clicks
     const key=f.dataset.homeSection,status=$('.homepage-save-status',f),button=f.querySelector('[type="submit"]');
     f.dataset.saving='1';if(button)button.disabled=true;
     if(status)status.textContent='Saving…';
@@ -65,11 +65,22 @@
       await api('homepage.php',{action:'save_section',section});
       if(status)status.textContent='Saved';
       say('Artist Homepage '+label(key)+' section saved.');
+      return true;
     }catch(x){
       if(status)status.textContent=x.message||'Save failed. Your changes remain in the editor.';
+      return false;
     }finally{
       f.dataset.saving='0';if(button)button.disabled=false;
     }
+  }
+  async function saveAll(root=state.mount){
+    const forms=Array.from(root?.querySelectorAll('[data-home-section]')||[]);
+    if(!forms.length)throw new Error('Homepage sections are not available to save.');
+    for(const form of forms){
+      const success=await saveSection({preventDefault(){},currentTarget:form});
+      if(!success)return false;
+    }
+    return true;
   }
   async function resetDefaults(){
     const button=$('#homepageReset',state.mount);
@@ -79,5 +90,5 @@
     try{await api('homepage.php',{action:'reset_defaults',confirmed:true});say('Artist Homepage reset to the Stonefellow defaults.');await renderInto(state.mount)}
     catch(e){say(e.message||'Reset failed. Your sections have not been replaced.');if(button)button.disabled=false}
   }
-  window.SFArtistHomeAdmin={renderInto};
+  window.SFArtistHomeAdmin={renderInto,saveAll};
 })();
