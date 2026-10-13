@@ -66,7 +66,7 @@
       '<div class="turntable-center-label"><img data-record-artwork alt="Current song artwork" hidden><span data-record-fallback>SF</span><strong data-record-track>STONEFELLOW</strong><em data-record-side>SIDE A</em></div></div></div>'+
       '<div class="turntable-tonearm"><i></i><b></b></div><div class="turntable-light"></div>'+
       '<div class="turntable-deck-foot"><div><span>33⅓ RPM</span><strong data-record-state>READY</strong></div><span>PLAY · PAUSE IN MUSIC PLAYER</span></div>'+
-      '<div class="turntable-hardware"><i aria-hidden="true" class="turntable-hardware-screw a"></i><i aria-hidden="true" class="turntable-hardware-screw b"></i><i aria-hidden="true" class="turntable-hardware-screw c"></i><i aria-hidden="true" class="turntable-hardware-screw d"></i><span class="turntable-rpm-switch" aria-label="Speed marking">33 ⅓ &nbsp; / &nbsp; 45</span><button type="button" class="turntable-settings-trigger" data-player-editor-open aria-label="Edit record player settings" title="Edit Record Player"><span aria-hidden="true">⚙</span></button><span aria-hidden="true" class="turntable-power-switch"></span><span aria-hidden="true" class="turntable-deck-serial">SF • STUDIO / 001</span></div></div>'+
+      '<div class="turntable-hardware"><i aria-hidden="true" class="turntable-hardware-screw a"></i><i aria-hidden="true" class="turntable-hardware-screw b"></i><i aria-hidden="true" class="turntable-hardware-screw c"></i><i aria-hidden="true" class="turntable-hardware-screw d"></i><span class="turntable-rpm-switch" aria-label="Speed marking">33 ⅓ &nbsp; / &nbsp; 45</span><button type="button" class="turntable-settings-trigger" data-player-editor-open aria-haspopup="dialog" aria-controls="recordPlayerEditor" aria-label="Edit record player settings" title="Edit Record Player"><span aria-hidden="true">⚙</span></button><span aria-hidden="true" class="turntable-power-switch"></span><span aria-hidden="true" class="turntable-deck-serial">SF • STUDIO / 001</span></div></div>'+
       '<div class="turntable-visual-effect" aria-hidden="true"></div></div>';
     return stage;
   }
@@ -136,7 +136,7 @@
     setEditorTab(activeTab);
   }
   function makePlayerEditor(){
-    editor?.close?.();editor?.remove?.();
+    if(editor?.open)editor.close();editor?.remove?.();
     editor=document.createElement('dialog');editor.id='recordPlayerEditor';editor.className='turntable-editor-dialog';
     editor.setAttribute('aria-labelledby','playerEditorTitle');
     editor.innerHTML='<div class="turntable-editor-shell"><header class="turntable-editor-header"><div><span class="turntable-editor-kicker">STONEFELLOW · STUDIO</span><h2 id="playerEditorTitle">Edit Record Player</h2><p>Choose your player components. Owned finishes save to this record; other finishes can be previewed.</p></div><button type="button" class="turntable-editor-close" aria-label="Close player editor" data-player-editor-close>×</button></header>'+
@@ -230,7 +230,7 @@
     makePlayerEditor();
     stage.querySelector('[data-player-editor-open]')?.addEventListener('click',event=>openPlayerEditor(event.currentTarget));
     const partBox=document.createElement('section');partBox.className='builder-parts-picker';
-    partBox.innerHTML='<button type="button" class="builder-player-edit-button" data-player-editor-open><span aria-hidden="true">⚙</span> Edit Record Player</button><p class="player-note">Customize the base, platter, tonearm, center label, effects and upgrade packs.</p>';
+    partBox.innerHTML='<button type="button" class="builder-player-edit-button" data-player-editor-open aria-haspopup="dialog" aria-controls="recordPlayerEditor"><span aria-hidden="true">⚙</span> Edit Record Player</button><p class="player-note">Customize the base, platter, tonearm, center label, effects and upgrade packs.</p>';
     host.querySelector('[data-builder-player-options]')?.append(partBox);
     partBox.querySelector('[data-player-editor-open]')?.addEventListener('click',event=>openPlayerEditor(event.currentTarget));
     decorateCatalog();decorateArtwork();decorateNotes();renderPartList();drawTrack();
