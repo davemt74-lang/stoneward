@@ -8,7 +8,7 @@
   function configFields(section,refs){
     const c=section.config||{},key=section.section_key;
     if(key==='custom_blocks')return '<p class="homepage-block-note">Use the web editor to add and arrange Release, Ticket, Merch, and Editorial blocks.</p>';
-    if(key==='hero')return '<div class="homepage-config-grid"><label class="field">Primary button<input name="primary_label" value="'+esc(c.primary_label||'Listen now')+'"></label><label class="field">Primary destination<select name="primary_view">'+['music','releases','shows','store','about','newsletter'].map(v=>option(v,label(v),c.primary_view||'music')).join('')+'</select></label><label class="field">Secondary button<input name="secondary_label" value="'+esc(c.secondary_label||'Explore releases')+'"></label><label class="field">Secondary destination<select name="secondary_view">'+['releases','music','shows','store','about','newsletter'].map(v=>option(v,label(v),c.secondary_view||'releases')).join('')+'</select></label></div>';
+    if(key==='hero')return '<div class="homepage-config-grid"><label class="field">Primary button<input name="primary_label" value="'+esc(c.primary_label||'Listen now')+'"></label><label class="field">Primary destination<select name="primary_view">'+['music','releases','shows','store','about','newsletter'].map(v=>option(v,label(v),c.primary_view||'music')).join('')+'</select></label><label class="field">Secondary button<input name="secondary_label" value="'+esc(c.secondary_label||'Explore releases')+'"></label><label class="field">Secondary destination<select name="secondary_view">'+['releases','music','shows','store','about','newsletter'].map(v=>option(v,label(v),c.secondary_view||'releases')).join('')+'</select></label><label class="check-field span2"><input type="checkbox" name="sticky_chat_enabled" '+(c.sticky_chat_enabled!==false?'checked':'')+'> Show sticky ChatGPT-style Agent chat bar on homepage</label></div>';
     if(key==='featured_release')return '<label class="field">Featured release<select name="release_id">'+option('','Auto — newest published release',c.release_id||'')+(refs.releases||[]).map(r=>option(r.id,r.title+(r.date?' · '+r.date:''),c.release_id||'')).join('')+'</select></label>';
     if(key==='featured_track')return '<label class="field">Featured track<select name="track_id">'+option('','Auto — first track from featured release',c.track_id||'')+(refs.tracks||[]).map(t=>option(t.id,t.title+(t.release?' · '+t.release:''),c.track_id||'')).join('')+'</select></label>';
     if(key==='latest_releases')return '<label class="field">Number of releases<select name="limit">'+[2,3,4,5,6].map(v=>option(v,String(v),Number(c.limit||3))).join('')+'</select></label>';
@@ -42,7 +42,7 @@
   function readConfig(form,key){
     const v=n=>form.elements[n]?.value??'',checked=n=>!!form.elements[n]?.checked;
     if(key==='custom_blocks')return window.SFHomepageBuilder?.getConfig?.(form)||{blocks:[]};
-    if(key==='hero')return {primary_label:v('primary_label'),primary_view:v('primary_view'),secondary_label:v('secondary_label'),secondary_view:v('secondary_view')};
+    if(key==='hero')return {primary_label:v('primary_label'),primary_view:v('primary_view'),secondary_label:v('secondary_label'),secondary_view:v('secondary_view'),sticky_chat_enabled:checked('sticky_chat_enabled')};
     if(key==='featured_release')return {release_id:v('release_id')};
     if(key==='featured_track')return {track_id:v('track_id')};
     if(key==='latest_releases'||key==='personalized')return {limit:Number(v('limit')||0)};
