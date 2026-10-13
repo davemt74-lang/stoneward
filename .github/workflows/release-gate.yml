@@ -166,3 +166,9 @@ jobs:
           php tests/admin-agent-sticky-composer.php
           php tests/settings-tabs-story-modal.php
           php tests/admin-unified-ui.php
+          php tests/section50a-admin-page-audit.php
+          php tests/section50b-admin-actions.php
+          php tests/section50c-admin-forms.php
+          php tests/section50d-admin-responsive.php
+          php tests/section50e-homepage-story-media.php
+          php tests/section50f-release.php
