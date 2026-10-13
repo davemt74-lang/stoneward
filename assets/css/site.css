@@ -407,3 +407,7 @@ button,.text-control,.tiny-control,.buy-primary,input,select,textarea{border-rad
  .artist-home-custom-card.compact{flex-direction:column}
  .artist-home-custom-card.compact .artist-home-custom-art{width:100%;aspect-ratio:4/3}
 }
+
+/* Homepage Designer: the existing ChatGPT-style Agent composer is an optional sticky homepage section; music player and social links stay available. */
+body.artist-home-active.artist-home-chat-hidden .chat-footer .chatbar,
+body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{display:none!important}

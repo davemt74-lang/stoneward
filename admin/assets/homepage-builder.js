@@ -36,6 +36,9 @@
   }
   function currentForms(){return Array.from((model?.formsRoot||model?.mount)?.querySelectorAll('.homepage-section-list [data-home-section]')||[])}
   function preview(){
+    if(window.SFHomepageVisual?.active?.()){
+      window.SFHomepageVisual.refresh();return;
+    }
     const host=(model?.previewRoot||model?.mount)?.querySelector('#homepageBuilderPreview');
     if(!host)return;
     const forms=currentForms(),hero=forms.find(f=>f.dataset.homeSection==='hero'),site=model.data?.site||{};
@@ -94,20 +97,20 @@
         };
         row.querySelector('[data-block-remove]').onclick=()=>{
           if(!confirm('Remove this block? Save this section to apply the change.'))return;
-          row.remove();requestPreview();
+          row.remove();list.dispatchEvent(new Event('change',{bubbles:true}));requestPreview();
         };
         row.querySelectorAll('[data-block-move]').forEach(b=>b.onclick=()=>{
           const rows=Array.from(list.children),n=rows.indexOf(row),next=n+Number(b.dataset.blockMove);
           if(next<0||next>=rows.length)return;
           if(next<n)list.insertBefore(row,rows[next]);else list.insertBefore(rows[next],row);
-          requestPreview();
+          list.dispatchEvent(new Event('change',{bubbles:true}));requestPreview();
         });
         row.ondragstart=e=>e.dataTransfer.setData('text/plain',row.dataset.homeBlockId);
         row.ondragover=e=>e.preventDefault();
         row.ondrop=e=>{
           e.preventDefault();
           const from=Array.from(list.children).find(x=>x.dataset.homeBlockId===e.dataTransfer.getData('text/plain'));
-          if(from&&from!==row){list.insertBefore(from,row);requestPreview();}
+          if(from&&from!==row){list.insertBefore(from,row);list.dispatchEvent(new Event('change',{bubbles:true}));requestPreview();}
         };
       });
     }
@@ -122,27 +125,22 @@
       connect();list.lastElementChild.querySelector('[data-block-field="heading"]')?.focus();
       requestPreview();
     };
+    model.connectBlocks=connect;
     connect();
     form.addEventListener('input',requestPreview);
     form.addEventListener('change',requestPreview);
   }
-  let moving=false;
-  async function moveSection(form,delta){
-    if(moving)return;
+  function moveSection(form,delta){
     const list=(model.formsRoot||model.mount).querySelector('.homepage-section-list');
     const current=Array.from(list.children),i=current.indexOf(form),next=i+delta;
     if(i<0||next<0||next>=current.length)return;
-    const desired=current.slice();[desired[i],desired[next]]=[desired[next],desired[i]];
-    moving=true;
-    try{
-      const answer=await model.api('homepage.php',{action:'reorder_sections',keys:desired.map(x=>x.dataset.homeSection)});
-      if(delta<0)list.insertBefore(form,current[next]);else list.insertBefore(current[next],form);
-      const pos=new Map((answer.sections||[]).map(x=>[x.section_key,Number(x.position||0)]));
-      currentForms().forEach(f=>{if(pos.has(f.dataset.homeSection))f.elements.position.value=pos.get(f.dataset.homeSection)});
-      requestPreview();model.say('Section order saved.');
-    }catch(e){model.say(e.message||'Could not move section.');}
-    finally{moving=false;}
+    if(delta<0)list.insertBefore(form,current[next]);else list.insertBefore(current[next],form);
+    Array.from(list.children).forEach((f,n)=>{f.elements.position.value=(n+1)*10;});
+    list.dispatchEvent(new Event('change',{bubbles:true}));
+    requestPreview();
+    model.say('Order changed in draft. Save draft to keep it.');
   }
+  function reconnect(){model?.connectBlocks?.();requestPreview();}
   function mount(options){
     model=options;
     const list=model.mount?.querySelector('.homepage-section-list');
@@ -185,5 +183,5 @@
     model.previewRoot=roots?.previewRoot||model.mount;
     requestPreview();
   }
-  window.SFHomepageBuilder={mount,getConfig,relocate,preview:requestPreview};
+  window.SFHomepageBuilder={mount,getConfig,relocate,preview:requestPreview,blockHtml,reconnect};
 })();

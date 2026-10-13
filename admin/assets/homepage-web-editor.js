@@ -50,8 +50,8 @@
   function exit(force=false){
     if(!stage)return true;
     if(saving)return false;
-    if(!force&&dirty&&!confirm('Discard unsaved homepage changes and exit the designer?'))return false;
-    window.removeEventListener('keydown',onKeyDown,true);
+    if(!force&&(dirty||window.SFHomepageVisual?.isDirty?.())&&!confirm('Discard unsaved homepage changes and exit the designer?'))return false;
+    window.removeEventListener('keydown',onKeyDown,true);window.SFHomepageVisual?.close?.();
     window.SFHomepageBuilder?.relocate?.(null);
     stage.remove();tools.remove();stage=tools=source=null;
     shell.classList.remove('homepage-web-design-mode','homepage-editor-tools-open');
@@ -78,7 +78,7 @@
       exit();
     }
     if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){
-      event.preventDefault();void saveAll();
+      event.preventDefault();void (window.SFHomepageVisual?.saveDraft?.()||saveAll());
     }
   }
   async function open(){
@@ -96,7 +96,7 @@
         '<button type="button" class="primary" id="homepageWebAddBlock">+ Add Block</button>'+
         '<button type="button" class="secondary" id="homepageWebHero">Hero image</button>'+
         '<button type="button" class="secondary" id="homepageWebStory">Artist story</button>'+
-        '<button type="button" class="secondary" id="homepageWebTheme">Theme</button></div>'+
+        '<button type="button" class="secondary" id="homepageWebTheme">Theme</button><button type="button" class="secondary" id="homepageWebChatToggle" aria-pressed="true">Sticky Agent chat: On</button></div>'+
         '<h3 class="homepage-web-sidebar-subhead">Page sections</h3>'+
         '<nav id="homepageWebSectionNav" class="homepage-web-section-nav" aria-label="Homepage sections"></nav>'+
         '<div id="homepageWebSectionForms" class="homepage-web-section-forms" aria-label="Selected section editor"></div>'+
@@ -130,6 +130,7 @@
       $('#homepageWebCanvas',stage).replaceChildren(preview);
       window.SFHomepageBuilder.relocate({formsRoot:tools,previewRoot:stage});
       renderSectionNav();
+      window.SFHomepageVisual?.open?.(window.SFArtistHomeAdmin.getData());
       selectSection('hero');
       formsEl.addEventListener('input',()=>{dirty=true;status('Unsaved changes.');});
       formsEl.addEventListener('change',()=>{dirty=true;renderSectionNav();status('Unsaved changes.');});
@@ -138,7 +139,7 @@
           dirty=true;status('Unsaved block changes.');
         }
       });
-      $('#homepageWebSave',stage).onclick=()=>void saveAll();
+      $('#homepageWebSave',stage).onclick=()=>void (window.SFHomepageVisual?.saveDraft?.()||saveAll());
       $('#homepageWebExit',stage).onclick=()=>exit();
       $('#homepageWebExitSide',tools).onclick=()=>exit();
       $('#homepageWebTools',stage).onclick=()=>shell.classList.toggle('homepage-editor-tools-open');
@@ -150,6 +151,21 @@
       $('#homepageWebHero',tools).onclick=()=>void switchToSettings('media');
       $('#homepageWebStory',tools).onclick=()=>void switchToSettings('stories');
       $('#homepageWebTheme',tools).onclick=()=>void switchToSettings('theme');
+      const chatToggle=$('#homepageWebChatToggle',tools);
+      const chatInput=()=>tools.querySelector('[data-home-section="hero"] [name="sticky_chat_enabled"]');
+      const refreshChatToggle=()=>{
+        const enabled=chatInput()?.checked!==false;
+        chatToggle.textContent='Sticky Agent chat: '+(enabled?'On':'Off');
+        chatToggle.setAttribute('aria-pressed',String(enabled));
+      };
+      chatToggle.onclick=()=>{
+        selectSection('hero');
+        const el=chatInput();if(!el)return;
+        el.checked=!el.checked;el.dispatchEvent(new Event('change',{bubbles:true}));
+        refreshChatToggle();
+      };
+      chatInput()?.addEventListener('change',refreshChatToggle);
+      refreshChatToggle();
       stage.querySelectorAll('[data-device]').forEach(button=>button.onclick=()=>{
         $('#homepageWebCanvas',stage).dataset.device=button.dataset.device;
         stage.querySelectorAll('[data-device]').forEach(el=>
@@ -166,5 +182,5 @@
       throw e;
     }finally{opening=false;}
   }
-  window.SFHomepageWebEditor={open,exit,isOpen:()=>!!stage};
+  window.SFHomepageWebEditor={open,exit,markClean:()=>{dirty=false;},isOpen:()=>!!stage};
 })();
