@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.53');
+define('SF_BUILD', '1.3.54');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -61,6 +61,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php foreach((array)$seo['json_ld'] as $structured): ?>  <script type="application/ld+json" data-seo-jsonld="1"><?=json_encode($structured,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script>
 <?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/turntable-builder.css?v=<?=rawurlencode(SF_BUILD)?>">
   <style id="stonefellowTheme"><?=sf_theme_css($activeTheme)?></style>
 </head>
 <body class="<?=sf_h(trim(sf_theme_body_classes($activeTheme).' '.(($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':'')))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
@@ -235,6 +236,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/agent-brain.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-chat-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/artist-home-renderer.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/turntable-parts.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/accessibility.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
 </body>
