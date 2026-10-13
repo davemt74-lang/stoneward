@@ -38,7 +38,7 @@ assert.equal((canvas.innerHTML.match(/role="tab"/g)||[]).length,5);
 assert.equal((canvas.innerHTML.match(/role="tabpanel"/g)||[]).length,5);
 assert.ok(!canvas.innerHTML.includes('data-format="cassette"'));
 assert.ok(!canvas.innerHTML.includes('format-switch'));
-assert.equal(tabButtons.find(b=>b.dataset.builderTab==='song-lists')['aria-selected'],'true');
+assert.match(canvas.innerHTML,/<button[^>]*id="builder-tab-song-lists"[^>]*aria-selected="true"/,'initial selected state is encoded in rendered HTML');
 console.log('PASS real builder renders five accessible tabs and vinyl-only sequence');
 tabButtons[3].onclick();
 assert.equal(panels['personal-notes'].hidden,false);
