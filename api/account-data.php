@@ -37,6 +37,7 @@ function sf_account_library_repair_schema(PDO $pdo, string $driver): void {
     }
     // A legacy table can contain multiple rows with no item key. Preserve each
     // row and assign a stable, distinct fallback rather than failing a new unique index.
+    if((int)$pdo->query("SELECT COUNT(*) FROM user_library WHERE item_key='' OR item_key IS NULL")->fetchColumn()===0)return;
     if($driver==='sqlite'){
         $pdo->exec("UPDATE user_library SET item_key='legacy-' || id WHERE item_key='' OR item_key IS NULL");
     }else{
@@ -44,20 +45,105 @@ function sf_account_library_repair_schema(PDO $pdo, string $driver): void {
     }
 }
 
+/**
+ * Older installations can contain user_saved_builds without the columns used by
+ * today's record builder. CREATE TABLE IF NOT EXISTS does not upgrade such tables.
+ * Repair columns in place; retain IDs, account ownership and existing draft JSON.
+ */
+function sf_account_saved_builds_repair_schema(PDO $pdo, string $driver): void {
+    if($driver==='sqlite'){
+        $rows=$pdo->query('PRAGMA table_info(user_saved_builds)')->fetchAll();
+        $existing=array_fill_keys(array_map(static fn($r)=>(string)$r['name'],$rows),true);
+        $spec=[
+            'name'=>"TEXT NOT NULL DEFAULT ''",
+            'format'=>"TEXT NOT NULL DEFAULT ''",
+            'build_json'=>"TEXT NOT NULL DEFAULT ''",
+            'created_at'=>"TEXT NOT NULL DEFAULT ''",
+            'updated_at'=>"TEXT NOT NULL DEFAULT ''",
+        ];
+    }else{
+        $rows=$pdo->query('SHOW COLUMNS FROM `user_saved_builds`')->fetchAll();
+        $existing=array_fill_keys(array_map(static fn($r)=>(string)$r['Field'],$rows),true);
+        $spec=[
+            'name'=>"VARCHAR(160) NOT NULL DEFAULT ''",
+            'format'=>"VARCHAR(24) NOT NULL DEFAULT ''",
+            'build_json'=>"LONGTEXT NULL",
+            'created_at'=>"VARCHAR(40) NOT NULL DEFAULT ''",
+            'updated_at'=>"VARCHAR(40) NOT NULL DEFAULT ''",
+        ];
+    }
+    $missing=array_diff_key($spec,$existing);
+    if(!$missing)return; // Already-current database: no full-table write.
+    foreach($missing as $column=>$definition){
+        $pdo->exec('ALTER TABLE user_saved_builds ADD COLUMN `'.$column.'` '.$definition);
+    }
+    $now=gmdate('c');
+    $update=$pdo->prepare('UPDATE user_saved_builds SET name=?,format=?,build_json=?,created_at=?,updated_at=? WHERE id=?');
+    foreach($pdo->query('SELECT * FROM user_saved_builds')->fetchAll() as $row){
+        $id=(int)$row['id'];
+        $originalJson=(string)($row['build_json']??'');
+        $json=$originalJson;
+        $payload=json_decode($json,true);
+        // Some early installations used a different column for the same payload.
+        if(!is_array($payload)){
+            foreach(['data_json','build_data','snapshot_json'] as $legacyColumn){
+                if(!isset($existing[$legacyColumn]))continue;
+                $candidate=(string)($row[$legacyColumn]??'');
+                $decoded=json_decode($candidate,true);
+                if(is_array($decoded)){$payload=$decoded;$json=$candidate;break;}
+            }
+        }
+        if(!is_array($payload))$payload=[];
+        $name=(string)($row['name']??'');
+        if(trim($name)===''){
+            $name=trim((string)($row['title']??$row['legacy_title']??$payload['title']??''));
+            if($name==='')$name='Saved record #'.$id;
+            $name=substr($name,0,160);
+        }
+        $format=(string)($row['format']??'');
+        if($format==='')$format=in_array((string)($payload['format']??''),['vinyl','cassette'],true)?(string)$payload['format']:'vinyl';
+        if($json===''||!is_array(json_decode($json,true))){
+            $payload=array_merge(['title'=>$name,'format'=>$format,'A'=>[],'B'=>[]],$payload);
+            $json=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        }
+        $created=(string)($row['created_at']??'');
+        $updated=(string)($row['updated_at']??'');
+        if($created==='')$created=$updated!==''?$updated:$now;
+        if($updated==='')$updated=$created;
+        if($name===(string)($row['name']??'') && $format===(string)($row['format']??'')
+            && $json===$originalJson && $created===(string)($row['created_at']??'')
+            && $updated===(string)($row['updated_at']??''))continue;
+        $update->execute([$name,$format,$json,$created,$updated,$id]);
+    }
+}
+
+/** Draft storage is independent of library and entitlement migrations. */
+function sf_account_draft_ensure_schema(): void {
+    static $done=false;
+    if($done)return;
+    $pdo=sf_db();$driver=(string)(sf_db_config()['driver']??'');
+    if($driver==='sqlite'){
+        $hasTable=(bool)$pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='user_saved_builds'")->fetchColumn();
+        if(!$hasTable)$pdo->exec("CREATE TABLE IF NOT EXISTS user_saved_builds (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,format TEXT NOT NULL,build_json TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)");
+    }elseif($driver==='mysql'){
+        $hasTable=(bool)$pdo->query("SHOW TABLES LIKE 'user_saved_builds'")->fetchColumn();
+        if(!$hasTable)$pdo->exec("CREATE TABLE IF NOT EXISTS user_saved_builds (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,user_id BIGINT UNSIGNED NOT NULL,name VARCHAR(160) NOT NULL,format VARCHAR(24) NOT NULL,build_json LONGTEXT NOT NULL,created_at VARCHAR(40) NOT NULL,updated_at VARCHAR(40) NOT NULL,INDEX idx_user_saved_builds_user(user_id,updated_at),CONSTRAINT fk_saved_build_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }else{throw new RuntimeException('Unsupported database driver for saved drafts.');}
+    sf_account_saved_builds_repair_schema($pdo,$driver);
+    $done=true;
+}
+
 function sf_account_data_ensure_schema(): void {
     static $done=false;
-    if($done) return;
-    $pdo=sf_db();
-    $driver=(string)(sf_db_config()['driver']??'');
+    if($done)return;
+    sf_account_draft_ensure_schema();
+    $pdo=sf_db();$driver=(string)(sf_db_config()['driver']??'');
     if($driver==='sqlite'){
-        $pdo->exec("CREATE TABLE IF NOT EXISTS user_saved_builds (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,format TEXT NOT NULL,build_json TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)");
-        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_user_saved_builds_user ON user_saved_builds(user_id,updated_at)");
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_library (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_type TEXT NOT NULL,item_key TEXT NOT NULL,label TEXT NOT NULL,source_order_id TEXT NOT NULL DEFAULT '',metadata_json TEXT NOT NULL DEFAULT '{}',acquired_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)");
         sf_account_library_repair_schema($pdo,$driver);
         $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_library_unique ON user_library(user_id,item_type,item_key,source_order_id)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_user_library_user ON user_library(user_id,acquired_at)");
-    } else {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS user_saved_builds (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,user_id BIGINT UNSIGNED NOT NULL,name VARCHAR(160) NOT NULL,format VARCHAR(24) NOT NULL,build_json LONGTEXT NOT NULL,created_at VARCHAR(40) NOT NULL,updated_at VARCHAR(40) NOT NULL,INDEX idx_user_saved_builds_user(user_id,updated_at),CONSTRAINT fk_saved_build_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }else{
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_library (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,user_id BIGINT UNSIGNED NOT NULL,item_type VARCHAR(40) NOT NULL,item_key VARCHAR(160) NOT NULL,label VARCHAR(255) NOT NULL,source_order_id VARCHAR(100) NOT NULL DEFAULT '',metadata_json LONGTEXT NOT NULL,acquired_at VARCHAR(40) NOT NULL,UNIQUE KEY idx_user_library_unique(user_id,item_type,item_key,source_order_id),INDEX idx_user_library_user(user_id,acquired_at),CONSTRAINT fk_library_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
     sf_account_library_repair_schema($pdo,$driver);
@@ -79,8 +165,30 @@ function sf_account_normalize_build(array $raw,int $userId=0): array {
             if(count($sides[$side])>=30) break;
         }
     }
+    $requested=(array)($raw['playerModules']??[]);
+    $defaults=function_exists('sf_turntable_module_defaults')?sf_turntable_module_defaults():sf_turntable_valid_selection([],$userId);
+    $onlyDefaults=true;
+    foreach($requested as $slot=>$value){
+        if(!isset($defaults[$slot])||!is_string($value)||$value!==$defaults[$slot]){$onlyDefaults=false;break;}
+    }
+    $pending=[];
+    if($onlyDefaults){$modules=$defaults;}
+    else{
+        try{$modules=sf_turntable_valid_selection($requested,$userId);}
+        catch(PDOException $e){
+            // A saved draft cannot grant paid modules.
+            $modules=$defaults;
+            foreach($defaults as $slot=>$defaultId){
+                $id=$requested[$slot]??null;
+                if(!is_string($id)||strlen($id)>70)continue;
+                $module=function_exists('sf_turntable_module')?sf_turntable_module($id,false):null;
+                if($module&&$module['slot']===$slot)$pending[$slot]=$id;
+            }
+            error_log('Stonefellow draft module validation deferred. SQLSTATE '.(string)$e->getCode());
+        }
+    }
     return ['version'=>4,'format'=>$format,'title'=>$title,'theme'=>$theme,'A'=>$sides['A'],'B'=>$sides['B'],
-      'playerModules'=>sf_turntable_valid_selection((array)($raw['playerModules']??[]),$userId),
+      'playerModules'=>$modules,'pendingPlayerModules'=>$pending,
       'coverFront'=>sf_clean_text($raw['coverFront']??'stonefellow',70),'coverBack'=>sf_clean_text($raw['coverBack']??'stonefellow',70),
       'customNote'=>sf_clean_text($raw['customNote']??'',280),'savedAt'=>gmdate('c')];
 }
@@ -98,7 +206,7 @@ function sf_account_build_fill_suggestions(int $userId,array $raw,string $side='
 }
 
 function sf_account_saved_builds(int $userId): array {
-    sf_account_data_ensure_schema();
+    sf_account_draft_ensure_schema();
     $q=sf_db()->prepare('SELECT id,name,format,build_json,created_at,updated_at FROM user_saved_builds WHERE user_id=? ORDER BY updated_at DESC,id DESC');
     $q->execute([$userId]); $rows=[];
     foreach($q->fetchAll() as $r){
@@ -110,7 +218,7 @@ function sf_account_saved_builds(int $userId): array {
 }
 
 function sf_account_save_build(int $userId,array $raw,int $id=0): array {
-    sf_account_data_ensure_schema();
+    sf_account_draft_ensure_schema();
     $build=sf_account_normalize_build($raw,$userId);
     $now=gmdate('c'); $pdo=sf_db();
     if($id>0){
@@ -131,7 +239,7 @@ function sf_account_rename_build(int $userId,int $id,string $name): array {
     if($userId<1||$id<1)throw new InvalidArgumentException('Invalid saved draft.');
     $name=sf_clean_text($name,60);
     if($name==='')throw new InvalidArgumentException('Enter a draft name.');
-    sf_account_data_ensure_schema();$pdo=sf_db();
+    sf_account_draft_ensure_schema();$pdo=sf_db();
     $pdo->beginTransaction();
     try {
         $q=$pdo->prepare('SELECT build_json FROM user_saved_builds WHERE id=? AND user_id=?');
@@ -150,7 +258,7 @@ function sf_account_rename_build(int $userId,int $id,string $name): array {
 }
 
 function sf_account_delete_build(int $userId,int $id): void {
-    sf_account_data_ensure_schema();
+    sf_account_draft_ensure_schema();
     $q=sf_db()->prepare('DELETE FROM user_saved_builds WHERE id=? AND user_id=?'); $q->execute([$id,$userId]);
 }
 

@@ -16,7 +16,7 @@ $defs=sf_migration_definitions();
 $matches=array_values(array_filter($defs,fn($m)=>$m['id']==='2026-10-12-037'));
 $old=array_values(array_filter($defs,fn($m)=>$m['id']==='2026-10-12-036'));
 $checks=[
- 'Release target is 1.3.47'=>SF_DB_SCHEMA_TARGET==='1.3.47',
+ 'Release target is 1.3.48'=>SF_DB_SCHEMA_TARGET==='1.3.48',
  'Exactly one additive migration 037'=>count($matches)===1,
  'Next library-repair migration registered'=>count(array_filter($defs,fn($m)=>$m['id']==='2026-10-13-038'))===1,
  'Prior migration 036 remains unmodified'=>count($old)===1&&$old[0]['app_version']==='1.3.45'&&$old[0]['revision']==='1',
@@ -47,7 +47,7 @@ $checks['Repeated migration never deletes existing mission history']=(int)$db->q
 $checks['Repeated migration never deletes feedback history']=(int)$db->query('SELECT COUNT(*) FROM agent_response_feedback')->fetchColumn()===1;
 $checks['User hashes also survive repeat migration']=$db->query('SELECT password_hash FROM users WHERE id=10')->fetchColumn()===$hash2;
 $checks['Migration checksum is stable']=count($matches)===1&&sf_migration_checksum($matches[0])===sf_migration_checksum($matches[0]);
-$build='1.3.72';$schema='1.3.47';
+$build='1.3.72';$schema='1.3.48';
 $checks['Public and Admin release version synchronized']=str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '".$build."')")
    &&str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$build."')");
 $checks['PWA and Apache headers synchronized']=str_contains($read('service-worker.js'),'stonefellow-static-v'.$build)
