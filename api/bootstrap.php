@@ -82,6 +82,10 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
             $items[]=['type'=>'track','track_id'=>$id,'label'=>(string)$t['title'],'price_cents'=>$price]; $subtotal+=$price;
         } elseif($type==='merch'){
             $merch=sf_commerce_quote_item($raw);if(!$merch['ok']){$errors[]=$merch['error'];continue;}$item=$merch['item'];$items[]=$item;$subtotal+=(int)$item['price_cents'];if(!empty($item['physical']))$physical=true;
+        } elseif($type==='turntable_module'){
+            $quoted=sf_turntable_quote(sf_clean_text($raw['module_id']??'',70),$userId);
+            if(!$quoted['ok']){$errors[]=$quoted['error'];continue;}
+            $item=$quoted['item'];$items[]=$item;$subtotal+=(int)$item['price_cents'];
         } elseif($type==='custom_media'){
             $format=(string)($raw['format'] ?? ''); $key=$format==='vinyl'?'custom_vinyl':($format==='cassette'?'custom_cassette':'');
             $p=$cfg['products'][$key] ?? null; if(!$p){$errors[]='Unsupported custom-media format.';continue;}
@@ -156,6 +160,7 @@ require_once __DIR__ . '/campaign-core.php';
 require_once __DIR__ . '/agent-actions-core.php';
 require_once __DIR__ . '/media-core.php';
 require_once __DIR__ . '/commerce-core.php';
+require_once __DIR__ . '/turntable-core.php';
 require_once __DIR__ . '/membership-core.php';
 require_once __DIR__ . '/ticketing-core.php';
 require_once __DIR__ . '/fulfillment-core.php';

@@ -34,7 +34,10 @@ function sf_account_normalize_build(array $raw): array {
             if(count($sides[$side])>=30) break;
         }
     }
-    return ['version'=>4,'format'=>$format,'title'=>$title,'theme'=>$theme,'A'=>$sides['A'],'B'=>$sides['B'],'savedAt'=>gmdate('c')];
+    return ['version'=>4,'format'=>$format,'title'=>$title,'theme'=>$theme,'A'=>$sides['A'],'B'=>$sides['B'],
+      'playerModules'=>sf_turntable_valid_selection((array)($raw['playerModules']??[]),$GLOBALS['sf_build_user_id']??0),
+      'coverFront'=>sf_clean_text($raw['coverFront']??'stonefellow',70),'coverBack'=>sf_clean_text($raw['coverBack']??'stonefellow',70),
+      'customNote'=>sf_clean_text($raw['customNote']??'',280),'savedAt'=>gmdate('c')];
 }
 
 function sf_account_build_fill_suggestions(int $userId,array $raw,string $side='both'): array {
@@ -46,7 +49,7 @@ function sf_account_build_fill_suggestions(int $userId,array $raw,string $side='
     $duration=function(array $ids)use($map): int {$sum=0;foreach($ids as $id)$sum+=(int)($map[$id]['duration']??0);return $sum;};
     $sides=['A'=>$build['A'],'B'=>$build['B']];$targets=$side==='both'?['A','B']:[$side];$added=['A'=>[],'B'=>[]];
     foreach($targets as $target){$remain=max(0,$limit-$duration($sides[$target]));foreach($ordered as $k=>$id){if(isset($used[$id]))continue;$dur=(int)($map[$id]['duration']??0);if($dur<1||$dur>$remain)continue;$sides[$target][]=$id;$added[$target][]=$id;$used[$id]=true;$remain-=$dur;if($remain<30)break;}}
-    return ['build'=>['version'=>4,'format'=>$build['format'],'title'=>$build['title'],'theme'=>$build['theme'],'A'=>$sides['A'],'B'=>$sides['B'],'savedAt'=>gmdate('c')],'added'=>$added,'limit_seconds'=>$limit,'personalized'=>(bool)($profile['personalized']??false)];
+    return ['build'=>['version'=>4,'format'=>$build['format'],'title'=>$build['title'],'theme'=>$build['theme'],'A'=>$sides['A'],'B'=>$sides['B'],'playerModules'=>$build['playerModules'],'coverFront'=>$build['coverFront'],'coverBack'=>$build['coverBack'],'customNote'=>$build['customNote'],'savedAt'=>gmdate('c')],'added'=>$added,'limit_seconds'=>$limit,'personalized'=>(bool)($profile['personalized']??false)];
 }
 
 function sf_account_saved_builds(int $userId): array {
@@ -63,7 +66,9 @@ function sf_account_saved_builds(int $userId): array {
 
 function sf_account_save_build(int $userId,array $raw,int $id=0): array {
     sf_account_data_ensure_schema();
-    $build=sf_account_normalize_build($raw); $now=gmdate('c'); $pdo=sf_db();
+    $GLOBALS['sf_build_user_id']=$userId;
+    try{$build=sf_account_normalize_build($raw);}finally{unset($GLOBALS['sf_build_user_id']);}
+    $now=gmdate('c'); $pdo=sf_db();
     if($id>0){
         $q=$pdo->prepare('SELECT id,created_at FROM user_saved_builds WHERE id=? AND user_id=? LIMIT 1'); $q->execute([$id,$userId]); $old=$q->fetch();
         if(!$old) throw new RuntimeException('Saved build not found.');
@@ -94,7 +99,9 @@ function sf_account_library_add_order(int $userId,array $order): void {
     if($userId<1) return; sf_account_data_ensure_schema(); $pdo=sf_db(); $orderId=(string)($order['id']??''); $when=(string)($order['created_at']??gmdate('c'));
     foreach((array)($order['quote']['items']??[]) as $item){
         $type=(string)($item['type']??'item');
-        $key=(string)($item['track_id']??$item['package_id']??'');
+        // A pending live payment must never grant paid digital player parts.
+        if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid'],true))continue;
+        $key=(string)($item['module_id']??$item['track_id']??$item['package_id']??'');
         if($key==='') $key=$type==='custom_media'?$orderId.':'.(string)($item['format']??'custom'):$orderId.':'.substr(hash('sha256',json_encode($item)?:''),0,16);
         $label=sf_clean_text($item['label']??ucfirst(str_replace('_',' ',$type)),240);
         $meta=json_encode($item,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}';
