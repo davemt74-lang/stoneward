@@ -217,6 +217,22 @@ function sf_account_saved_builds(int $userId): array {
     return $rows;
 }
 
+/** Keep recognized mandatory columns from older record builders synchronized. */
+function sf_account_draft_legacy_fields(PDO $pdo,array $build,string $now,bool $creating=false): array {
+    $driver=(string)(sf_db_config()['driver']??'');
+    $rows=$driver==='sqlite'?$pdo->query('PRAGMA table_info(user_saved_builds)')->fetchAll()
+        :$pdo->query('SHOW COLUMNS FROM `user_saved_builds`')->fetchAll();
+    $present=[];
+    foreach($rows as $row)$present[(string)($driver==='sqlite'?$row['name']:$row['Field'])]=true;
+    $json=json_encode($build,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+    $fields=[];
+    foreach(['title','legacy_title'] as $column)if(isset($present[$column]))$fields[$column]=$build['title'];
+    foreach(['data_json','build_data','snapshot_json'] as $column)if(isset($present[$column]))$fields[$column]=$json;
+    if($creating&&isset($present['created']))$fields['created']=$now;
+    if(isset($present['updated']))$fields['updated']=$now;
+    return $fields;
+}
+
 function sf_account_save_build(int $userId,array $raw,int $id=0): array {
     sf_account_draft_ensure_schema();
     $build=sf_account_normalize_build($raw,$userId);
@@ -224,11 +240,23 @@ function sf_account_save_build(int $userId,array $raw,int $id=0): array {
     if($id>0){
         $q=$pdo->prepare('SELECT id,created_at FROM user_saved_builds WHERE id=? AND user_id=? LIMIT 1'); $q->execute([$id,$userId]); $old=$q->fetch();
         if(!$old) throw new RuntimeException('Saved build not found.');
-        $u=$pdo->prepare('UPDATE user_saved_builds SET name=?,format=?,build_json=?,updated_at=? WHERE id=? AND user_id=?');
-        $u->execute([$build['title'],$build['format'],json_encode($build,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE),$now,$id,$userId]);
+        $json=json_encode($build,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        $extra=sf_account_draft_legacy_fields($pdo,$build,$now);
+        $values=[$build['title'],$build['format'],$json,$now];
+        $set='name=?,format=?,build_json=?,updated_at=?';
+        foreach($extra as $column=>$value){$set.=',`'.$column.'`=?';$values[]=$value;}
+        $values[]=$id;$values[]=$userId;
+        $u=$pdo->prepare('UPDATE user_saved_builds SET '.$set.' WHERE id=? AND user_id=?');
+        $u->execute($values);
     } else {
-        $i=$pdo->prepare('INSERT INTO user_saved_builds(user_id,name,format,build_json,created_at,updated_at) VALUES(?,?,?,?,?,?)');
-        $i->execute([$userId,$build['title'],$build['format'],json_encode($build,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE),$now,$now]); $id=(int)$pdo->lastInsertId();
+        $json=json_encode($build,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        $columns=['user_id','name','format','build_json','created_at','updated_at'];
+        $values=[$userId,$build['title'],$build['format'],$json,$now,$now];
+        foreach(sf_account_draft_legacy_fields($pdo,$build,$now,true) as $column=>$value){$columns[]=$column;$values[]=$value;}
+        $names=implode(',',array_map(static fn(string $col):string=>'`'.$col.'`',$columns));
+        $marks=implode(',',array_fill(0,count($columns),'?'));
+        $i=$pdo->prepare('INSERT INTO user_saved_builds('.$names.') VALUES('.$marks.')');
+        $i->execute($values);$id=(int)$pdo->lastInsertId();
     }
     foreach(sf_account_saved_builds($userId) as $row) if((int)$row['id']===$id) return $row;
     throw new RuntimeException('Saved build could not be reloaded.');
@@ -249,8 +277,18 @@ function sf_account_rename_build(int $userId,int $id,string $name): array {
         if(!is_array($build))throw new RuntimeException('Stored draft is invalid.');
         $build['title']=$name;
         $now=gmdate('c');
-        $q=$pdo->prepare('UPDATE user_saved_builds SET name=?,build_json=?,updated_at=? WHERE id=? AND user_id=?');
-        $q->execute([$name,json_encode($build,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE),$now,$id,$userId]);
+        $json=json_encode($build,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+        $extra=sf_account_draft_legacy_fields($pdo,$build,$now);
+        if(!$extra){
+            $q=$pdo->prepare('UPDATE user_saved_builds SET name=?,build_json=?,updated_at=? WHERE id=? AND user_id=?');
+            $q->execute([$name,$json,$now,$id,$userId]);
+        }else{
+            $set='name=?,build_json=?,updated_at=?';$values=[$name,$json,$now];
+            foreach($extra as $column=>$value){$set.=',`'.$column.'`=?';$values[]=$value;}
+            $values[]=$id;$values[]=$userId;
+            $q=$pdo->prepare('UPDATE user_saved_builds SET '.$set.' WHERE id=? AND user_id=?');
+            $q->execute($values);
+        }
         $pdo->commit();
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     foreach(sf_account_saved_builds($userId) as $row)if((int)$row['id']===$id)return $row;

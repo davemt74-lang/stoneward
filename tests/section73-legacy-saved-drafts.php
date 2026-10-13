@@ -21,10 +21,10 @@ $db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
 $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE,PDO::FETCH_ASSOC);
 $db->exec('PRAGMA foreign_keys=ON');
 $db->exec('CREATE TABLE users(id INTEGER PRIMARY KEY); INSERT INTO users(id) VALUES(11),(12)');
-$db->exec('CREATE TABLE user_saved_builds (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,title TEXT NOT NULL,build_json TEXT NOT NULL)');
+$db->exec('CREATE TABLE user_saved_builds (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,title TEXT NOT NULL,data_json TEXT NOT NULL,build_json TEXT NOT NULL)');
 $original=['title'=>'Old vinyl','format'=>'vinyl','A'=>['song-1'],'B'=>[],'customNote'=>'Keep this dedication'];
-$q=$db->prepare('INSERT INTO user_saved_builds(user_id,title,build_json) VALUES(?,?,?)');
-$q->execute([11,'Personal Vinyl',json_encode($original,JSON_THROW_ON_ERROR)]);
+$q=$db->prepare('INSERT INTO user_saved_builds(user_id,title,data_json,build_json) VALUES(?,?,?,?)');
+$q->execute([11,'Personal Vinyl',json_encode($original,JSON_THROW_ON_ERROR),json_encode($original,JSON_THROW_ON_ERROR)]);
 $oldId=(int)$db->lastInsertId();
 function sf_db():PDO{return $GLOBALS['sqlite'];}
 function sf_db_config():array{return ['driver'=>'sqlite'];}
@@ -42,6 +42,8 @@ $raw=['title'=>'New custom record','format'=>'vinyl','A'=>['song-1'],'B'=>[],'pl
 $created=sf_account_save_build(11,$raw);
 $checks['Default record saves with unrelated entitlement DB broken']=($created['name']??'')==='New custom record'&&(int)$created['id']>0;
 $checks['Default record save never queried entitlement database']=$GLOBALS['ownershipQueries']===0;
+$legacyNew=$db->query('SELECT title,data_json FROM user_saved_builds WHERE id='.(int)$created['id'])->fetch();
+$checks['Legacy title and required JSON fields populated on new insert']=$legacyNew['title']==='New custom record'&&(json_decode((string)$legacyNew['data_json'],true)['title']??'')==='New custom record';
 $checks['Other accounts cannot list these drafts']=sf_account_saved_builds(12)===[];
 $premium=$raw;$premium['playerModules']['arm']='arm-precision';
 $pending=sf_account_save_build(11,$premium);
