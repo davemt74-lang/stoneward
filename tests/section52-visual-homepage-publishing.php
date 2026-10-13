@@ -38,7 +38,7 @@ $before=sf_home_design_hash(sf_home_design_snapshot());
 $check['Unpublished catalog references block publishing']=fails(fn()=>sf_home_design_publish($staged['revision'],$before));
 $check['Failed publish rolls back all section changes']=sf_home_design_hash(sf_home_design_snapshot())===$before;
 $check['Invalid section arrays are rejected']=fails(fn()=>sf_home_design_save([],4,$staged['base_hash']));
-$read=static fn(string $f):(string)=>file_get_contents($root.'/'.$f);
+$read=static fn(string $f):string=>file_get_contents($root.'/'.$f);
 $visual=$read('admin/assets/homepage-visual.js');$web=$read('admin/assets/homepage-web-editor.js');$api=$read('admin/api/homepage.php');
 $check['Designer exposes private save and explicit publish controls']=str_contains($visual,'save_design_draft')&&str_contains($visual,'publish_design_draft')&&str_contains($visual,'Publish live');
 $check['Designer supports inline editable copy and undoable version restore']=str_contains($visual,'contentEditable')&&str_contains($visual,'restore_design_version');
