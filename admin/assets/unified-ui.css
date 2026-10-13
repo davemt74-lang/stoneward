@@ -62,3 +62,19 @@
  .admin-canvas{width:calc(100% - 20px);max-width:calc(100% - 20px)}
  .admin-unified-form-content{padding:12px 10px 22px}
 }
+
+/* Section 50A: legacy top-level panels had zero inline padding in Admin CSS. */
+.admin-canvas > .panel,
+.admin-canvas > section.panel{
+  padding-inline:clamp(12px,2vw,20px);
+}
+.admin-unified-form-content > .panel,
+.admin-unified-form-content > section.panel{
+  padding-inline:clamp(12px,2vw,20px);
+}
+@media(max-width:760px){
+  .admin-canvas > .panel,.admin-canvas > section.panel,
+  .admin-unified-form-content > .panel,.admin-unified-form-content > section.panel{
+    padding-inline:12px;
+  }
+}
