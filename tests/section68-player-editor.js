@@ -12,10 +12,10 @@ const state={builder:{playerModules:{...defaults}}};let persisted=0,drawn=0,focu
 const tabs=all.map(slot=>({dataset:{playerTab:slot},attrs:{},setAttribute(k,v){this.attrs[k]=v;},focus(){focuses++;}}));
 const panels=all.map(slot=>({dataset:{playerPanel:slot},hidden:false}));
 const baseSelect={dataset:{ttSlot:'base'},value:'base-studio',focus(){}};
-const box={innerHTML:'',querySelectorAll(q){if(q==='[data-player-tab]')return tabs;if(q==='[data-tt-slot]')return [baseSelect];return [];}};
+const box={innerHTML:'',querySelector(q){return null;},querySelectorAll(q){if(q==='[data-player-tab]')return tabs;if(q==='[data-tt-slot]')return [baseSelect];return [];}};
 const editor={isConnected:true,open:false,querySelectorAll(q){return q==='[data-player-tab]'?tabs:panels;},querySelector(q){if(q==='[data-turntable-options]')return box;const match=q.match(/data-player-tab="([^"]+)"/);return match?tabs.find(t=>t.dataset.playerTab===match[1]):null;},showModal(){this.open=true;},close(){this.open=false;}};
 const sandbox={
-  SLOTS:slots,LABELS:{base:'Player base',platter:'Record platter',arm:'Tonearm',label:'Center label',effect:'Visual effects',pack:'Experience packs'},editor,activeTab:'base',preview:null,registry:{modules:mods,owned:Object.values(defaults),defaults},
+  catalogLoaded:true,catalogLoading:false,catalogError:'',SLOTS:slots,LABELS:{base:'Player base',platter:'Record platter',arm:'Tonearm',label:'Center label',effect:'Visual effects',pack:'Experience packs'},editor,activeTab:'base',preview:null,registry:{modules:mods,owned:Object.values(defaults),defaults},
   ctx:{appState:state,persist(){persisted++;}},returnFocus:null,
   defaults:()=>defaults,installed:()=>({...defaults,...state.builder.playerModules}),
   selected:()=>({...defaults,...state.builder.playerModules,...(sandbox.preview||{})}),
