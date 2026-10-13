@@ -158,3 +158,4 @@ jobs:
           php tests/section47e-admin-intelligence.php
           php tests/section47f-proactive-research.php
           php tests/section47g-specialist-delegation.php
+          php tests/section47h-chat-handoffs.php
