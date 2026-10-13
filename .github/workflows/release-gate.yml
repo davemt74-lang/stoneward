@@ -209,6 +209,7 @@ jobs:
           node tests/section72a-checkout-review.js
           php tests/section72b-vinyl-snapshot.php
           php tests/section72c-payment-unlocks.php
+          php tests/section72d-agent-upgrades.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
