@@ -50,8 +50,8 @@
   function exit(force=false){
     if(!stage)return true;
     if(saving)return false;
-    if(!force&&dirty&&!confirm('Discard unsaved homepage changes and exit the designer?'))return false;
-    window.removeEventListener('keydown',onKeyDown,true);
+    if(!force&&(dirty||window.SFHomepageVisual?.isDirty?.())&&!confirm('Discard unsaved homepage changes and exit the designer?'))return false;
+    window.removeEventListener('keydown',onKeyDown,true);window.SFHomepageVisual?.close?.();
     window.SFHomepageBuilder?.relocate?.(null);
     stage.remove();tools.remove();stage=tools=source=null;
     shell.classList.remove('homepage-web-design-mode','homepage-editor-tools-open');
@@ -78,7 +78,7 @@
       exit();
     }
     if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){
-      event.preventDefault();void saveAll();
+      event.preventDefault();void (window.SFHomepageVisual?.saveDraft?.()||saveAll());
     }
   }
   async function open(){
@@ -130,6 +130,7 @@
       $('#homepageWebCanvas',stage).replaceChildren(preview);
       window.SFHomepageBuilder.relocate({formsRoot:tools,previewRoot:stage});
       renderSectionNav();
+      window.SFHomepageVisual?.open?.(window.SFArtistHomeAdmin.getData());
       selectSection('hero');
       formsEl.addEventListener('input',()=>{dirty=true;status('Unsaved changes.');});
       formsEl.addEventListener('change',()=>{dirty=true;renderSectionNav();status('Unsaved changes.');});
@@ -138,7 +139,7 @@
           dirty=true;status('Unsaved block changes.');
         }
       });
-      $('#homepageWebSave',stage).onclick=()=>void saveAll();
+      $('#homepageWebSave',stage).onclick=()=>void (window.SFHomepageVisual?.saveDraft?.()||saveAll());
       $('#homepageWebExit',stage).onclick=()=>exit();
       $('#homepageWebExitSide',tools).onclick=()=>exit();
       $('#homepageWebTools',stage).onclick=()=>shell.classList.toggle('homepage-editor-tools-open');
