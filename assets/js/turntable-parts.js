@@ -156,7 +156,7 @@
     preview=null;
     const stage=renderStage();host.appendChild(stage);
     const partBox=document.createElement('section');partBox.className='builder-parts-picker';partBox.dataset.turntableOptions='';
-    host.querySelector('.builder-footer')?.before(partBox);
+    host.querySelector('.builder-left-rail > .builder-footer')?.before(partBox);
     decorateCatalog();decorateArtwork();renderPartList();drawTrack();
     if(!registry){const expected=host;load().then(()=>{
       if(host===expected&&expected.isConnected){renderPartList();drawTrack();}

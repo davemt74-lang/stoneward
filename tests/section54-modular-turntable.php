@@ -25,9 +25,9 @@ $checks['Draft checks slot ownership']=str_contains($account,'sf_turntable_valid
 $checks['Saved build preserves cover art and custom note']=str_contains($account,"'coverFront'=>")&&str_contains($account,"'coverBack'=>")&&str_contains($account,"'customNote'=>");
 $checks['Agent fill preserves builder artwork and parts']=str_contains($account,"'playerModules'=>$"."build['playerModules']");
 $checks['Desktop-only immersive player stage']=str_contains($css,'@media(min-width:1024px)')&&str_contains($css,'@media(max-width:1023px)');
-$checks['75px vertical margin for rotated player']=str_contains($css,'--deck-cross:max(420px,calc(100dvh - 150px))');
-$checks['Physical player bottom is cropped at right screen edge']=str_contains($css,'transform:translate(-50%,-50%) rotate(-90deg)')&&str_contains($css,'--deck-overhang:clamp(170px,20vw,300px)')&&str_contains($css,'left:calc(100% - var(--deck-overhang))');
-$checks['Sideways orientation only applies on desktop']=str_contains($css,'@media(min-width:1024px)')&&str_contains($css,'@media(max-width:1023px){.builder-turntable-stage{display:none!important}')&&!str_contains($css,'transform:rotate(-3deg)');
+$checks['Angled player uses large desktop viewport geometry']=str_contains($css,'--deck-width:clamp(510px,70vh,770px)')&&str_contains($css,'--deck-height:clamp(760px,96vh,1060px)');
+$checks['Physical player bottom is cropped lower-right']=str_contains($css,'transform:translate(-50%,-50%) rotate(-45deg)')&&str_contains($css,'left:81%')&&str_contains($css,'overflow:clip');
+$checks['45 degree angle applies only on desktop']=str_contains($css,'@media(min-width:1024px)')&&str_contains($css,'@media(max-width:1023px)')&&!str_contains($css,'rotate(-90deg)');
 $checks['Old short viewport rotation override removed']=!str_contains($css,'.turntable-deck{height:max(620px,97vh)}');
 $checks['Vinyl spins only on playback']=str_contains($app,'StonefellowTurntable?.sync')&&str_contains($css,'.turntable-stage-body.is-playing .turntable-disc');
 $checks['Current track art, title and side visible']=str_contains($parts,'data-record-track')&&str_contains($parts,'data-record-side')&&str_contains($parts,'data-record-artwork');
