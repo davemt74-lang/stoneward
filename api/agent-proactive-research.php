@@ -27,13 +27,22 @@ function sf_agent_proactive_admin_research(array $aggregateFacts): array {
 function sf_agent_proactive_customer_suggestion(int $userId): ?array {
     if($userId<1 || !function_exists('sf_privacy_personalization_enabled')
         || !sf_privacy_personalization_enabled($userId)
-        || !function_exists('sf_crm_sync_user')
+        || !function_exists('sf_agent_customer_memory_list') || !function_exists('sf_db')
         || !function_exists('sf_agent_recommend_track'))return null;
-    // Read the owner's stored opt-in. Defaults/guest state never authorize
-    // proactive engagement. Do not invoke the engagement dispatcher here.
+    // Require BOTH a stored CRM opt-in and an explicit owner-saved preference.
+    // Defaults and guest state are insufficient; never dispatch from this read.
     try{
-        $contact=sf_crm_sync_user($userId);
-        if(!is_array($contact)||empty($contact['agent_auto_engage']))return null;
+        $q=sf_db()->prepare('SELECT agent_auto_engage FROM fan_contacts WHERE user_id=? LIMIT 1');
+        $q->execute([$userId]);
+        if((int)($q->fetchColumn()?:0)!==1)return null;
+        $explicit=false;
+        foreach(sf_agent_customer_memory_list($userId) as $row){
+            $key=strtolower(trim((string)($row['memory_key']??'')));
+            $value=strtolower(trim((string)($row['memory_text']??'')));
+            if(in_array($key,['proactive suggestions','proactive recommendations'],true)
+                && in_array($value,['yes','on','enabled'],true)){$explicit=true;break;}
+        }
+        if(!$explicit)return null;
         $track=sf_agent_recommend_track('Suggest a discovery from the public Stonefellow catalog',null,$userId);
     }catch(Throwable $e){return null;}
     if(!is_array($track)||trim((string)($track['id']??''))==='')return null;
