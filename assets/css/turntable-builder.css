@@ -179,24 +179,23 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 .builder-draft-dialog .draft-modal-feedback{margin:10px 0 2px;padding:10px 12px;background:#402323;border:1px solid #955555;border-radius:6px;color:#ffd8d1;font-size:.78rem}
 .builder-draft-dialog button:disabled{opacity:.6;cursor:wait}
 @media(min-width:1024px){
-  /* v1.3.66: normal document scrolling; ONLY the player stays sticky. */
-  body.builder-workspace-active{height:auto;overflow-y:auto}
-  body.builder-workspace-active .stage{height:auto;min-height:calc(100dvh - 64px);overflow:visible}
+  /* v1.3.67: ONE scrollbar for the entire page. Fixed player never scrolls. */
+  body.builder-workspace-active{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
+  body.builder-workspace-active .stage{height:auto;min-height:100dvh;overflow:visible}
   body.builder-workspace-active .dynamic-canvas{height:auto;min-height:0;overflow:visible}
-  body.builder-workspace-active .builder-module{height:auto;min-height:calc(100dvh - 64px);align-items:start;overflow:clip;padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))}
-  /* Neither column has a private scrolling region or scrollbar. */
-  .builder-left-rail{height:auto;min-height:0;max-height:none;overflow:visible;scrollbar-gutter:auto;padding-bottom:24px}
-  .builder-turntable-stage{position:sticky!important;top:76px!important;align-self:start;overflow:clip;min-height:0;height:calc(100dvh - 88px);max-height:none;pointer-events:none}
-  body.builder-workspace-active.has-announcement .builder-turntable-stage{top:108px!important;height:calc(100dvh - 120px)}
-  .turntable-stage-body{position:absolute;inset:0}
-  /* Reverse the old -90-degree chassis by 180 degrees: pivot upper right. */
-  .turntable-deck{left:calc(100% - clamp(320px,32vw,540px))!important;top:50%;transform:translate(-50%,-50%) rotate(90deg)}
-  /* Keep track labels upright when the chassis is turned. */
-  .turntable-center-label{transform:rotate(-90deg)}
-  /* Printed deck branding belongs in the product UI, not on the chassis. */
+  body.builder-workspace-active .builder-module{height:auto;min-height:100dvh;align-items:start;overflow:visible;padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))}
+  .builder-left-rail{height:auto;min-height:0;max-height:none;overflow:visible;scrollbar-gutter:auto;padding-bottom:30px}
+  /* Use FIXED, not sticky: overflow or transforms higher in the page must not move the player. */
+  .builder-turntable-stage{position:fixed!important;grid-column:auto;grid-row:auto;right:0;left:auto;top:76px!important;bottom:auto;align-self:auto;width:calc(100vw - clamp(440px,36vw,550px));height:calc(100dvh - 186px);min-height:0;max-height:none;overflow:clip;pointer-events:none;z-index:1;isolation:isolate}
+  body.builder-workspace-active.has-announcement .builder-turntable-stage{top:108px!important;height:calc(100dvh - 218px)}
+  .turntable-stage-body{position:absolute;inset:0;--deck-width:min(84%,700px);--deck-height:auto}
+  /* Landscape, unrotated chassis: no distorted 1080px-wide rotated panel. */
+  .turntable-deck{left:auto!important;right:clamp(10px,2.2vw,36px);top:48%;width:min(84%,700px);height:auto;aspect-ratio:1.45;transform:translateY(-50%) rotate(0deg);border-radius:28px}
+  .turntable-platter{left:3%;top:50%;width:67%;aspect-ratio:1;transform:translateY(-50%)}
+  .turntable-center-label{transform:none}
   .turntable-deck-head,.turntable-deck-foot,.turntable-deck-serial{display:none}
-  /* Physical arm: pivot at upper right after chassis rotation; stylus on vinyl. */
-  .turntable-tonearm{top:9%;left:19%;width:6%;height:27%;transform:rotate(-42deg);transform-origin:50% 14%}
+  /* Pivot at upper right; arm sweeps down-left onto the groove, with angular cartridge. */
+  .turntable-tonearm{top:10%;left:89%;width:5%;height:58%;transform:rotate(47deg);transform-origin:50% 8%;border-radius:6px;box-shadow:5px 7px 12px #000c;background:linear-gradient(90deg,#24221f,#7d776f 18%,#dfd8c8 42%,#8a8985 64%,#201f1d)}
   .turntable-platter{box-shadow:0 0 0 5px #090909,0 0 0 8px #99968466,0 8px 22px #000d}
   .turntable-disc{background:repeating-radial-gradient(circle at center,#141414 0px,#050505 2px,#232323 3px,#070707 5px);box-shadow:inset 0 0 21px #000a,inset 0 0 0 2px #625d5755}
   .turntable-tonearm{border-radius:5px;box-shadow:5px 8px 11px #000b, inset 1px 0 1px #fff7;background:linear-gradient(90deg,#23211f 0%,#8c8173 18%,#ede4d7 38%,#b6b5b2 53%,#8c8882 72%,#272521 100%)}
@@ -216,7 +215,7 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 }
 @media(max-width:650px){.builder-draft-dialog .draft-modal-danger{align-items:stretch;flex-direction:column}.builder-draft-dialog .draft-modal-delete{align-self:flex-start}}
 
-@media(min-width:1024px) and (max-width:1199px){.turntable-deck{left:calc(100% - clamp(330px,37vw,410px))!important}}
+@media(min-width:1024px) and (max-width:1199px){.turntable-deck{width:min(92%,540px);right:8px}}
 
 /* Section 61 — six workflow tabs, with all available songs separate from Side A/B. */
 .builder-tablist{grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;gap:2px;border-radius:8px}
