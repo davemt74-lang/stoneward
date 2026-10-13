@@ -187,6 +187,8 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
   body.builder-workspace-active.has-announcement .dynamic-canvas{height:calc(100dvh - 96px)}
   body.builder-workspace-active .builder-module{height:calc(100dvh - 64px - 96px);min-height:0;overflow:hidden;align-items:stretch;padding-bottom:0;overscroll-behavior:contain}
   body.builder-workspace-active.has-announcement .builder-module{height:calc(100dvh - 96px - 96px)}
+  body.builder-workspace-active.has-player .builder-module{height:calc(100dvh - 64px - 184px)}
+  body.builder-workspace-active.has-announcement.has-player .builder-module{height:calc(100dvh - 96px - 184px)}
   .builder-left-rail{min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding-bottom:24px}
   .builder-turntable-stage{position:relative!important;top:auto!important;align-self:stretch;overflow:clip;min-height:0;height:100%;max-height:100%;pointer-events:none}
   .turntable-stage-body{position:absolute;inset:0}
