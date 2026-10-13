@@ -9,8 +9,8 @@ $checks=[
  'Fixed stage has no scrollbar'=>str_contains($css,'max-height:none;overflow:clip;pointer-events:none;z-index:1;'),
  'Header and announcement top offsets'=>str_contains($css,'top:76px!important')&&str_contains($css,'has-announcement .builder-turntable-stage{top:108px!important'),
  'Proportioned landscape chassis'=>str_contains($css,'aspect-ratio:1.45;transform:translateY(-50%) rotate(0deg)'),
- 'Platter fits landscape chassis'=>str_contains($css,'.turntable-platter{left:3%;top:50%;width:67%;aspect-ratio:1;'),
- 'Tonearm pivot upper right'=>str_contains($css,'.turntable-tonearm{top:10%;left:89%;width:5%;height:58%;transform:rotate(47deg)'),
+ 'Platter fits landscape chassis'=>str_contains($css,'.turntable-platter{left:4%;top:50%;width:62%;aspect-ratio:1;'),
+ 'Tonearm pivot upper right'=>str_contains($css,'.turntable-tonearm{top:10%;left:89%;width:3%;height:58%;transform:rotate(47deg)'),
  'Chassis brand text removed'=>str_contains($css,'.turntable-deck-head,.turntable-deck-foot,.turntable-deck-serial{display:none}'),
  'Mobile retains its own scrolling and hidden player'=>str_contains($css,'@media(max-width:1023px)')&&str_contains($css,'.builder-turntable-stage{display:none!important}'),
 ];
