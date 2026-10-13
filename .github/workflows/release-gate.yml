@@ -154,3 +154,4 @@ jobs:
           php tests/section47a-capability-audit.php
           php tests/section47b-skill-registry.php
           php tests/section47c-mission-planning.php
+          php tests/section47d-customer-context.php

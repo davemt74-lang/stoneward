@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/agent-customer-brain.php';
+require_once __DIR__.'/agent-customer-context.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -144,12 +145,13 @@ function sf_agent_track_score(array $t,string $message): int {
 }
 function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $userId=null): ?array {
     $catalog=sf_agent_public_catalog();$exclude=$excludeId?[$excludeId]:[];
+    $preferenceTerms=$userId!==null?sf_agent_customer_preference_terms($userId):[];
     if($userId&&function_exists('sf_personalization_recommendation_profile')){
         $profile=sf_personalization_recommendation_profile($userId);$ranked=sf_personalization_rank_catalog($catalog,$profile,20,$exclude);
-        $rows=[];foreach($ranked as $r){$t=null;foreach($catalog as $candidate)if((string)($candidate['id']??'')===(string)$r['track_id']){$t=$candidate;break;}if(!$t)continue;$rows[]=['t'=>$t,'s'=>(float)$r['score']+sf_agent_track_score($t,$message)*4];}
+        $rows=[];foreach($ranked as $r){$t=null;foreach($catalog as $candidate)if((string)($candidate['id']??'')===(string)$r['track_id']){$t=$candidate;break;}if(!$t)continue;$rows[]=['t'=>$t,'s'=>(float)$r['score']+sf_agent_track_score($t,$message)*4+sf_agent_customer_track_affinity_score($t,$preferenceTerms)];}
         if($rows){usort($rows,fn($a,$b)=>$b['s']<=>$a['s']);return $rows[0]['t']??null;}
     }
-    $rows=[];foreach($catalog as $t){if($excludeId&&($t['id']??'')===$excludeId)continue;$rows[]=['t'=>$t,'s'=>sf_agent_track_score($t,$message)];}
+    $rows=[];foreach($catalog as $t){if($excludeId&&($t['id']??'')===$excludeId)continue;$rows[]=['t'=>$t,'s'=>sf_agent_track_score($t,$message)+sf_agent_customer_track_affinity_score($t,$preferenceTerms)];}
     usort($rows,fn($a,$b)=>$b['s']<=>$a['s']);return $rows[0]['t']??null;
 }
 function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mix'): string {
