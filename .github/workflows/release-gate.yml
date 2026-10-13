@@ -183,4 +183,5 @@ jobs:
           php tests/section52-visual-homepage-publishing.php
           php tests/section53-admin-nav-accordion.php
           node tests/section53-admin-nav-accordion.js
+          node tests/section57-admin-render-recovery.js
           php tests/section54-modular-turntable.php
