@@ -202,6 +202,7 @@ jobs:
           php tests/section62f-notification-runtime.php
           php tests/section62f-scroll-schedule.php
           node tests/section68-player-editor.js
+          node tests/section69-editor-loading.js
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

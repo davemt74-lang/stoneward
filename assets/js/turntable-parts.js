@@ -4,26 +4,45 @@
   const SLOTS=['base','platter','arm','label','effect'];
   const LABELS={base:'Player base',platter:'Record platter',arm:'Tonearm',label:'Center label',effect:'Visual effects',pack:'Experience packs'};
   const DEFAULTS={base:'base-studio',platter:'platter-classic',arm:'arm-studio',label:'label-classic',effect:'effect-none'};
-  let registry=null,loading=null,ctx=null,host=null,preview=null,artState={side:'A'},version=0,editor=null,activeTab='base',returnFocus=null;
+  // Always usable built-in catalog; paid choices and ownership remain server-authoritative.
+  const BUILTIN_MODULES=[['base','base-studio','Studio Turntable','studio'],['platter','platter-classic','Classic Grooved Vinyl','classic'],['arm','arm-studio','Studio Tonearm','studio'],['label','label-classic','Classic Center Label','classic'],['effect','effect-none','Clean Playback','none']].map(([slot,id,name,visual])=>({slot,id,name,visual,brand:'Stonefellow',price_cents:0,includes:[],active:true}));
+  let registry=null,loading=null,catalogLoaded=false,catalogLoading=false,catalogError='',ctx=null,host=null,preview=null,artState={side:'A'},version=0,editor=null,activeTab='base',returnFocus=null;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=c=>'$'+(Math.max(0,Number(c)||0)/100).toFixed(2);
-  const getModules=()=>registry?.modules||[];
+  const getModules=()=>registry?.modules||BUILTIN_MODULES;
   const moduleById=id=>getModules().find(m=>m.id===id);
   const defaults=()=>registry?.defaults||DEFAULTS;
   const installed=()=>({...defaults(),...(ctx?.appState.builder.playerModules||{})});
   const selected=()=>({...installed(),...(preview||{})});
   const owned=id=>!!registry?.owned?.includes(id) || Object.values(defaults()).includes(id);
   const current=()=>ctx?.appState.builder||{};
-  const apiUrl=()=>((window.STONEFELLOW_CONFIG||{}).apiBase||'api')+'/turntable-modules.php';
+  const apiUrl=()=>((window.STONEFELLOW_CONFIG||{}).apiBase||'api').replace(/\/$/,'')+'/turntable-modules.php';
   async function load(){
-    if(registry)return registry;
-    if(!loading)loading=fetch(apiUrl(),{credentials:'same-origin',cache:'no-store'}).then(async r=>{
-      const data=await r.json();if(!r.ok||!data.ok)throw new Error('Player options unavailable.');
-      registry=data;return data;
-    }).finally(()=>{loading=null;});
+    if(catalogLoaded)return registry;
+    if(loading)return loading;
+    const generation=version;
+    catalogLoading=true;catalogError='';
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),8000);
+    loading=fetch(apiUrl(),{credentials:'same-origin',cache:'no-store',signal:controller.signal}).then(async response=>{
+      let result;
+      try{result=await response.json();}catch(_){throw new Error('The player catalog returned invalid JSON.');}
+      if(!response.ok||result?.ok!==true)throw new Error(result?.message||'The player catalog request failed ('+response.status+').');
+      if(!Array.isArray(result.modules)||!Array.isArray(result.owned)||!result.defaults||typeof result.defaults!=='object')throw new Error('Player catalog data is incomplete.');
+      if(generation!==version)return null;
+      registry=result;catalogLoaded=true;catalogError=typeof result.warning==='string'?result.warning:'';
+      return registry;
+    }).catch(error=>{
+      if(generation===version)catalogError=error?.name==='AbortError'?'The player catalog timed out.':(error?.message||'The player catalog could not be loaded.');
+      throw error;
+    }).finally(()=>{
+      clearTimeout(timeout);
+      if(generation===version){loading=null;catalogLoading=false;renderPartList();drawTrack();}
+    });
     return loading;
   }
-  function invalidate(){registry=null;loading=null;version++;}
+  function invalidate(){registry=null;loading=null;catalogLoaded=false;catalogLoading=false;catalogError='';version++;}
+  function retryCatalog(){invalidate();renderPartList();load().catch(()=>{});}
   function sideForTrack(track,builder){
     if(!track)return 'A';
     const id=String(track.id);
@@ -37,7 +56,9 @@
     return appState?.track||trackById?.(b[artState.side]?.[0])||trackById?.(b.A?.[0])||trackById?.(b.B?.[0])||null;
   }
   function drawTrack(){
-    const stage=host?.querySelector('.turntable-stage-body');if(!stage||!ctx)return;
+    const main=host?.querySelector('.turntable-stage-body');if(!main||!ctx)return;
+    const stages=[main,editor?.querySelector('.turntable-editor-preview .turntable-stage-body')].filter(Boolean);
+    stages.forEach(stage=>{
     const t=shownTrack(),side=sideForTrack(t,current()),sel=selected(),label=moduleById(sel.label);
     const title=stage.querySelector('[data-record-track]'),sideText=stage.querySelector('[data-record-side]'),
           image=stage.querySelector('[data-record-artwork]'),fallback=stage.querySelector('[data-record-fallback]');
@@ -57,6 +78,7 @@
     stage.querySelector('[data-record-brand]').textContent=moduleById(sel.base)?.brand||'Stonefellow';
     const status=stage.querySelector('[data-record-state]'),isPreview=!!preview&&Object.keys(preview).length>0;
     status.textContent=isPreview?'PREVIEW · UNOWNED MODULE':(ctx.appState.playing?'PLAYING':'READY');
+    });
   }
   function renderStage(){
     const stage=document.createElement('aside');stage.className='builder-turntable-stage';stage.setAttribute('aria-label','Digital modular record player');
@@ -90,22 +112,23 @@
     renderPartList();
     if(!editor.open)editor.showModal();
     setEditorTab(activeTab,true);
+    if(!catalogLoaded&&!catalogLoading)load().catch(()=>{});
   }
   function renderPartList(){
     const box=editor?.querySelector('[data-turntable-options]');
     if(!box)return;
-    if(!registry){box.innerHTML='<p class="player-note" role="status">Loading record player options…</p>';return;}
+    // Render built-in options immediately, even before the live catalog is ready.
     const installedParts=installed(),sel=selected();
     const tabs='<div class="turntable-editor-tabs" role="tablist" aria-label="Record player components">'+
       TABS.map(slot=>'<button type="button" role="tab" id="player-tab-'+slot+'" data-player-tab="'+slot+'" aria-controls="player-panel-'+slot+'" aria-selected="'+(slot===activeTab)+'" tabindex="'+(slot===activeTab?'0':'-1')+'">'+esc(slot==='pack'?'Packs':LABELS[slot])+'</button>').join('')+'</div>';
     const panels=TABS.map(slot=>{
       if(slot==='pack')return '<section role="tabpanel" class="turntable-editor-panel" id="player-panel-pack" data-player-panel="pack" aria-labelledby="player-tab-pack" '+(activeTab!=='pack'?'hidden':'')+'>'+
         '<h3>Upgrade packages</h3><p class="player-note">Build a complete look with matching components.</p>'+
-        '<div class="turntable-pack-list">'+getModules().filter(m=>m.slot==='pack').map(m=>
+        '<div class="turntable-pack-list">'+(!catalogLoaded?'<p class="player-note">Upgrade packages will appear here when the live catalog is available.</p>':'')+getModules().filter(m=>m.slot==='pack').map(m=>
           '<div class="turntable-pack"><span><b>'+esc(m.name)+'</b><small>'+esc((m.includes||[]).map(id=>moduleById(id)?.name||id).join(' · '))+'</small></span>'+
           (owned(m.id)?'<span class="turntable-owned">Owned</span>':'<button type="button" data-tt-buy="'+esc(m.id)+'">Get pack · '+money(m.price_cents)+'</button>')+'</div>').join('')+'</div>'+
         '<p class="player-note">Visual effect packs change the turntable appearance only; they do not alter the sound or mastering.</p></section>';
-      const parts=getModules().filter(m=>m.slot===slot),active=sel[slot]||installedParts[slot],isLocked=!owned(active);
+      const parts=getModules().filter(m=>m.slot===slot),requested=sel[slot]||installedParts[slot],active=parts.some(m=>m.id===requested)?requested:defaults()[slot],isLocked=catalogLoaded&&!owned(active);
       const chosen=moduleById(active);
       return '<section role="tabpanel" class="turntable-editor-panel" id="player-panel-'+slot+'" data-player-panel="'+slot+'" aria-labelledby="player-tab-'+slot+'" '+(activeTab!==slot?'hidden':'')+'>'+
         '<h3>'+esc(LABELS[slot])+'</h3><p class="player-note">'+
@@ -115,7 +138,9 @@
         (isLocked?'<button type="button" class="turntable-unlock" data-tt-buy="'+esc(active)+'">Unlock '+money(chosen?.price_cents)+'</button>':'<small>Owned · available in your library</small>')+'</div>'+
         '<p class="player-note">'+(isLocked?'Preview only — purchase the module to save this finish.':'Installed · this appearance is saved with your record design.')+'</p></section>';
     }).join('');
-    box.innerHTML=tabs+'<div class="turntable-editor-panels">'+panels+'</div>';
+    const notice=!catalogLoaded?'<div class="turntable-catalog-notice" role="status"><div><strong>'+(catalogLoading?'Loading the complete player catalog…':'Built-in player options are ready')+'</strong><p>'+esc(catalogError||(catalogLoading?'The editor remains usable while more options load.':'The live catalog is unavailable. Retry to load owned and premium modules.'))+'</p></div>'+(!catalogLoading?'<button type="button" data-player-catalog-retry>Retry catalog</button>':'')+'</div>':(catalogError?'<div class="turntable-catalog-notice" role="status">'+esc(catalogError)+'</div>':'');
+    box.innerHTML=notice+tabs+'<div class="turntable-editor-panels">'+panels+'</div>';
+    box.querySelector('[data-player-catalog-retry]')?.addEventListener('click',retryCatalog);
     box.querySelectorAll('[data-player-tab]').forEach(button=>{
       button.onclick=()=>setEditorTab(button.dataset.playerTab);
       button.onkeydown=event=>{
@@ -140,7 +165,9 @@
     editor=document.createElement('dialog');editor.id='recordPlayerEditor';editor.className='turntable-editor-dialog';
     editor.setAttribute('aria-labelledby','playerEditorTitle');
     editor.innerHTML='<div class="turntable-editor-shell"><header class="turntable-editor-header"><div><span class="turntable-editor-kicker">STONEFELLOW · STUDIO</span><h2 id="playerEditorTitle">Edit Record Player</h2><p>Choose your player components. Owned finishes save to this record; other finishes can be previewed.</p></div><button type="button" class="turntable-editor-close" aria-label="Close player editor" data-player-editor-close>×</button></header>'+
-      '<div data-turntable-options></div><footer class="turntable-editor-footer"><span>Changes to owned parts are saved automatically.</span><button type="button" data-player-editor-done>Done</button></footer></div>';
+      '<div class="turntable-editor-workspace"><div data-turntable-options class="turntable-editor-options"></div><section class="turntable-editor-preview" aria-label="Live record player preview"><div class="turntable-editor-preview-heading"><strong>Live player preview</strong><span>Visual only · changes do not alter audio</span></div><div data-player-preview class="turntable-editor-preview-canvas"></div></section></div><footer class="turntable-editor-footer"><span>Owned selections save automatically · unowned looks are previews only.</span><button type="button" data-player-editor-done>Done</button></footer></div>';
+    const previewStage=renderStage();previewStage.querySelector('[data-player-editor-open]')?.remove();
+    editor.querySelector('[data-player-preview]').appendChild(previewStage);
     editor.querySelector('[data-player-editor-close]').onclick=closeEditor;
     editor.querySelector('[data-player-editor-done]').onclick=closeEditor;
     editor.addEventListener('close',()=>{
@@ -234,9 +261,7 @@
     host.querySelector('[data-builder-player-options]')?.append(partBox);
     partBox.querySelector('[data-player-editor-open]')?.addEventListener('click',event=>openPlayerEditor(event.currentTarget));
     decorateCatalog();decorateArtwork();decorateNotes();renderPartList();drawTrack();
-    if(!registry){const expected=host;load().then(()=>{
-      if(host===expected&&expected.isConnected){renderPartList();drawTrack();}
-    }).catch(()=>{const box=editor?.querySelector('[data-turntable-options]');if(box)box.innerHTML='<p class="player-note" role="alert">Player catalog unavailable. Your saved design and standard record builder still work.</p><button type="button" data-player-retry>Retry loading player options</button>';box?.querySelector('[data-player-retry]')?.addEventListener('click',()=>{invalidate();renderPartList();load().then(()=>{renderPartList();drawTrack();}).catch(()=>renderPartList());});});}
+    if(!catalogLoaded&&!catalogLoading)load().catch(()=>{});
   }
   function sync(track,playing,builder){if(!host?.isConnected)return;drawTrack();}
   window.StonefellowTurntable={mount,sync,invalidate,sideForTrack,defaults,owned};
