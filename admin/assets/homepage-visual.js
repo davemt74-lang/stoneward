@@ -91,6 +91,15 @@
       announce('Homepage published atomically as version #'+result.version+'.');
     }catch(e){announce(e.message||'Publish failed; public homepage is unchanged.');}
   }
+  async function reloadLive(){
+    if(!confirm('Discard this homepage draft and load the currently published homepage?'))return;
+    try{
+      const result=await ctx.api('homepage.php',{action:'reset_design_draft',confirmed:true,
+        expected_revision:draft.revision,base_hash:draft.base_hash});
+      draft=result.draft;dirty=false;window.SFHomepageWebEditor?.markClean?.();
+      hydrate(draft.sections);announce('Draft replaced with current published homepage. Nothing was published.');
+    }catch(e){announce(e.message||'Could not reset draft.');}
+  }
   async function restore(){
     const v=Number($('#homepageVisualVersions',root)?.value||0);if(!v)return;
     if(dirty&&!confirm('Discard unsaved edits and stage the selected older version?'))return;
@@ -180,9 +189,10 @@
     const actions=$('.homepage-web-toolbar-actions',root);
     const original=$('#homepageWebSave',root);
     if(original){original.textContent='Save draft';original.id='homepageVisualSave';original.onclick=()=>void saveDraft();}
-    actions.insertAdjacentHTML('beforeend','<button type="button" class="primary" id="homepageVisualPublish">Publish live</button><select id="homepageVisualVersions" aria-label="Homepage versions"></select><button type="button" class="secondary" id="homepageVisualRestore">Restore to draft</button>');
+    actions.insertAdjacentHTML('beforeend','<button type="button" class="primary" id="homepageVisualPublish">Publish live</button><select id="homepageVisualVersions" aria-label="Homepage versions"></select><button type="button" class="secondary" id="homepageVisualRestore">Restore to draft</button><button type="button" class="secondary" id="homepageVisualReload">Reload live</button>');
     $('#homepageVisualPublish',root).onclick=()=>void publish();
-    $('#homepageVisualRestore',root).onclick=()=>void restore();versionList();
+    $('#homepageVisualRestore',root).onclick=()=>void restore();
+    $('#homepageVisualReload',root).onclick=()=>void reloadLive();versionList();
     const preview=$('#homepageBuilderPreview',root);
     observer=new MutationObserver(()=>{if(observer){observer.disconnect();decorate();observer.observe(preview,{childList:true});}});
     observer.observe(preview,{childList:true});
