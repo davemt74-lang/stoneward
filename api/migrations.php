@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.34';
+const SF_DB_SCHEMA_TARGET = '1.3.35';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -300,6 +300,18 @@ function sf_migration_definitions(): array {
             'description'=>'Governed durable Agent action proposals, exact approval ledger and manual recovery state',
             'revision'=>'1',
             'apply'=>function(): void { sf_agent_actions_ensure_schema(); },
+        ],
+        [
+            'id'=>'2026-10-12-036',
+            'app_version'=>'1.3.45',
+            'description'=>'Separate consent-scoped customer Agent memories and owner-scoped Admin Agent conversations',
+            'revision'=>'1',
+            'apply'=>function(): void {
+                require_once SF_ROOT.'/api/agent-customer-brain.php';
+                require_once SF_ROOT.'/api/agent-admin-brain.php';
+                sf_agent_customer_memory_ensure_schema();
+                sf_admin_agent_ensure_schema();
+            },
         ],
     ];
 }

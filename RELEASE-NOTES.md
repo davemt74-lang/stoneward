@@ -1,3 +1,13 @@
+# Stonefellow v1.3.45 — Section 46: Dual Agent Brain & Unified Canvas
+
+Stonefellow now uses a **private customer Agent Brain per authenticated account**, a **separate operational Admin Agent Brain per administrator**, and one shared server-governed tool registry. Customers can manage explicitly saved preferences and private conversations inside My Agent Brain and My Agent Chat; Admin receives an operational chat workspace with an Agent Brain sidebar, missions, evidence and exact-review approvals. Customer chat content and individual memory are never included in Admin operational reporting.
+
+The integration retains the existing music player, Campaign/Automation Builders, permission checks, Section 44 approval ledger and Section 45 no-replay recovery. **Schema 1.3.35** adds migration 036 for the new durable Brain tables. Existing data is preserved by the standard upgrade workflow.
+
+Full implementation, privacy boundaries and deployment checklist: [Section 46 acceptance notes](docs/section46-dual-agent-brain-acceptance.md).
+
+---
+
 # Stonefellow v1.3.44 — Section 45: Fan Journey Intelligence
 
 Stonefellow now provides a privacy-safe view of fan engagement across CRM, linked listening, opt-in, commerce, campaigns and existing lifecycle automations. Admin Journey Intelligence includes measured performance, evidence-backed review suggestions, governed Agent-created **unpublished** journey drafts, and safe no-replay recovery of interrupted work.
