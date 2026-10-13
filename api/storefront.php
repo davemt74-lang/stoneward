@@ -1,7 +1,19 @@
 <?php
-declare(strict_types=1); require __DIR__.'/bootstrap.php';
-$cfg=sf_store_config();$products=[];
-foreach((array)($cfg['products']??[]) as $id=>$p){$media=function_exists('sf_media_public_links')?sf_media_public_links('store',(string)$id):[];$primary=null;foreach($media as $m)if(($m['role']??'')==='product_primary'){$primary=$m;break;}if(!$primary)foreach($media as $m)if(($m['category']??'')==='image'){$primary=$m;break;}$products[]=['id'=>$id,'kind'=>'builder','label'=>(string)($p['label']??$id),'price_cents'=>(int)($p['price_cents']??0),'format'=>(string)($p['format']??''),'image'=>$primary['url']??'','media'=>$media,'available'=>true];}
-foreach(sf_commerce_products(true) as $p)$products[]=['id'=>(string)$p['id'],'slug'=>(string)$p['slug'],'kind'=>'merch','label'=>(string)$p['title'],'description'=>(string)$p['description'],'category'=>(string)$p['category'],'price_cents'=>(int)$p['base_price_cents'],'compare_at_price_cents'=>(int)$p['compare_at_price_cents'],'physical'=>!empty($p['physical']),'featured'=>!empty($p['featured']),'available'=>!empty($p['available']),'low_stock'=>!empty($p['low_stock']),'max_per_order'=>(int)$p['max_per_order'],'image'=>(string)$p['image'],'media'=>(array)$p['media'],'variants'=>(array)$p['variants'],'tags'=>(array)$p['tags']];
-$releases=[];foreach(sf_releases() as $r)if(!empty($r['purchasable'])&&($r['state']??'')==='published')$releases[]=['id'=>$r['id'],'title'=>$r['title'],'price_cents'=>(int)round(((float)($r['digital_price']??10))*100),'artwork'=>$r['artwork']['cover']??''];
-sf_json_response(['ok'=>true,'currency'=>(string)($cfg['currency']??'USD'),'products'=>$products,'releases'=>$releases,'merch_summary'=>sf_commerce_summary()]);
+declare(strict_types=1);
+try {
+    require __DIR__.'/bootstrap.php';
+    require __DIR__.'/storefront-core.php';
+    if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET')
+        sf_json_response(['ok'=>false,'message'=>'Method not allowed.'],405);
+    sf_json_response(sf_storefront_payload());
+} catch(Throwable $e) {
+    $ref='STORE-'.strtoupper(bin2hex(random_bytes(5)));
+    error_log('Stonefellow '.$ref.' storefront response '.get_class($e).' detail='.$e->getMessage());
+    $error=['ok'=>false,'message'=>'Store information could not be loaded (reference '.$ref.').','error_ref'=>$ref];
+    if(function_exists('sf_json_response'))sf_json_response($error,503);
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($error,JSON_UNESCAPED_SLASHES);
+    exit;
+}

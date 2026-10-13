@@ -220,6 +220,7 @@ jobs:
           node tests/section72e-customer-production.js
           php tests/section72e-exact-lookup.php
           php tests/section73-legacy-saved-drafts.php
+          php tests/section74-storefront-runtime.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
