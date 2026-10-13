@@ -152,3 +152,4 @@ jobs:
           php tests/section46i-dual-brain-isolation.php
           php tests/section46j-release.php
           php tests/section47a-capability-audit.php
+          php tests/section47b-skill-registry.php
