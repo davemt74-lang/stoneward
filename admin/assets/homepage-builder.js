@@ -127,7 +127,7 @@
   let moving=false;
   async function moveSection(form,delta){
     if(moving)return;
-    const list=model.mount.querySelector('.homepage-section-list');
+    const list=(model.formsRoot||model.mount).querySelector('.homepage-section-list');
     const current=Array.from(list.children),i=current.indexOf(form),next=i+delta;
     if(i<0||next<0||next>=current.length)return;
     const desired=current.slice();[desired[i],desired[next]]=[desired[next],desired[i]];
