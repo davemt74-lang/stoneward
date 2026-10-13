@@ -126,22 +126,15 @@
     form.addEventListener('input',requestPreview);
     form.addEventListener('change',requestPreview);
   }
-  let moving=false;
-  async function moveSection(form,delta){
-    if(moving)return;
+  function moveSection(form,delta){
     const list=(model.formsRoot||model.mount).querySelector('.homepage-section-list');
     const current=Array.from(list.children),i=current.indexOf(form),next=i+delta;
     if(i<0||next<0||next>=current.length)return;
-    const desired=current.slice();[desired[i],desired[next]]=[desired[next],desired[i]];
-    moving=true;
-    try{
-      const answer=await model.api('homepage.php',{action:'reorder_sections',keys:desired.map(x=>x.dataset.homeSection)});
-      if(delta<0)list.insertBefore(form,current[next]);else list.insertBefore(current[next],form);
-      const pos=new Map((answer.sections||[]).map(x=>[x.section_key,Number(x.position||0)]));
-      currentForms().forEach(f=>{if(pos.has(f.dataset.homeSection))f.elements.position.value=pos.get(f.dataset.homeSection)});
-      requestPreview();model.say('Section order saved.');
-    }catch(e){model.say(e.message||'Could not move section.');}
-    finally{moving=false;}
+    if(delta<0)list.insertBefore(form,current[next]);else list.insertBefore(current[next],form);
+    Array.from(list.children).forEach((f,n)=>{f.elements.position.value=(n+1)*10;});
+    list.dispatchEvent(new Event('change',{bubbles:true}));
+    requestPreview();
+    model.say('Order changed in draft. Save draft to keep it.');
   }
   function mount(options){
     model=options;
