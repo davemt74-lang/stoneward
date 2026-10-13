@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Read-only, owner-scoped production status shared by account API and customer Agent.
-function sf_vinyl_customer_status(int $userId, string $userEmail='', int $limit=5): array {
+function sf_vinyl_customer_status(int $userId, string $userEmail='', int $limit=5, string $exactOrderId=''): array {
     if($userId<1)return [];
     $directory=SF_ROOT.'/storage/orders';
     $stateFile=SF_ROOT.'/storage/fulfillment/vinyl-production.json';
