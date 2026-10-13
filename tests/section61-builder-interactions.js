@@ -2,7 +2,7 @@
 /* Execute real save/rename/delete handlers with deterministic DOM + account API mocks. */
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const src=fs.readFileSync(require('node:path').join(__dirname,'../assets/js/app.js'),'utf8');
-const first=src.indexOf('  let builderDraftBusy=false,builderNotice='),last=src.indexOf('  function builderArtworkTiles()',first);
+const first=src.indexOf('  // Draft comparisons exclude local savedAt timestamps'),last=src.indexOf('  function builderArtworkTiles()',first);
 assert.ok(first>=0&&last>first);
 const handlers=src.slice(first,last)+'\nthis.saveBuilderDraft=saveBuilderDraft;this.openBuilderDraftModal=openBuilderDraftModal;this.showBuilderNotice=showBuilderNotice;';
 const state={auth:{authenticated:false},builder:{title:'Original',A:['song-1'],B:[],format:'vinyl'},builderDrafts:{loaded:true,items:[],activeId:0}};
