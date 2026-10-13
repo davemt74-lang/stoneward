@@ -601,6 +601,19 @@
   function localFill(side='both'){const targets=side==='both'?['A','B']:[side],added=[];for(const target of targets){for(const t of localFillOrder()){if(has(t.id))continue;if(Number(t.duration||0)<=remainingTime(target)){st.builder[target].push(t.id);added.push(t.id);if(remainingTime(target)<30)break}}}persist();return added}
   async function fillBuild(side='both'){if(!['A','B','both'].includes(side))side='both';try{if(st.auth.authenticated){const j=await secureJsonPost('builds.php',{action:'suggest',build:st.builder,side});st.builder={...defaultBuild(),...(j.build||st.builder),version:4};persist();renderBuilder();const count=(j.added?.A?.length||0)+(j.added?.B?.length||0);say(count?(j.personalized?'Filled the remaining time using your Stonefellow listening profile.':'Filled the remaining time with the best-fitting eligible tracks.'):'There is no eligible track that fits the remaining time.');return}await loadPersonalization();const added=localFill(side);renderBuilder();say(added.length?'Filled the remaining time. Sign in to make this personalized.':'There is no eligible track that fits the remaining time.')}catch(e){say(e.message)}}
   async function loadBuilderDrafts(force=false){if(!st.auth.authenticated){st.builderDrafts={...st.builderDrafts,loaded:true,items:[],activeId:0};localStorage.removeItem('stonefellow.build.draft.id');return[]}if(st.builderDrafts.loaded&&!force)return st.builderDrafts.items;try{const j=await api('builds.php');if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf;const items=j.builds||[];let activeId=Number(st.builderDrafts.activeId||0);if(activeId&&!items.some(x=>Number(x.id)===activeId)){activeId=0;localStorage.removeItem('stonefellow.build.draft.id')}st.builderDrafts={...st.builderDrafts,loaded:true,items,activeId};return st.builderDrafts.items}catch(_){st.builderDrafts={...st.builderDrafts,loaded:true,items:[]};return[]}}
+  // Draft comparisons exclude local savedAt timestamps and preserve the full design payload.
+  const builderDraftFingerprint=build=>JSON.stringify({
+    title:build.title,theme:build.theme,format:build.format,
+    A:build.A,B:build.B,coverFront:build.coverFront,coverBack:build.coverBack,
+    customNote:build.customNote,playerModules:build.playerModules
+  });
+  let builderCleanFingerprint=null;
+  function builderHasUnsavedChanges(){
+    return builderCleanFingerprint!==null&&builderDraftFingerprint(st.builder)!==builderCleanFingerprint;
+  }
+  function confirmBuilderReplacement(){
+    return !builderHasUnsavedChanges()||(typeof window.confirm==='function'&&window.confirm('This design has unsaved changes. Discard those edits and load another design?'));
+  }
   let builderDraftBusy=false,builderNotice={text:'',kind:'info'};
   function showBuilderNotice(text,kind='info'){
     builderNotice={text:String(text||''),kind:kind==='error'?'error':kind==='success'?'success':'info'};
@@ -627,6 +640,7 @@
       localStorage.setItem('stonefellow.build.draft.id',String(st.builderDrafts.activeId));
       if(result.build.build)st.builder={...defaultBuild(),...result.build.build,version:4};
       persist();
+      builderCleanFingerprint=builderDraftFingerprint(st.builder);
       builderTab='saved-drafts';
       renderBuilder();
       showBuilderNotice('Saved “'+st.builder.title+'” to your drafts.','success');
@@ -644,8 +658,9 @@
   }
   function loadBuilderDraft(id){
     const row=(st.builderDrafts.items||[]).find(x=>Number(x.id)===Number(id));
-    if(!row?.build)return;
-    st.builder={...defaultBuild(),...row.build,version:4};st.builderDrafts.activeId=Number(row.id);
+    if(!row?.build||!confirmBuilderReplacement())return;
+    st.builder={...defaultBuild(),...row.build,version:4};
+    builderCleanFingerprint=builderDraftFingerprint(st.builder);st.builderDrafts.activeId=Number(row.id);
     localStorage.setItem('stonefellow.build.draft.id',String(row.id));
     persist();builderTab='song-lists';renderBuilder();
     showBuilderNotice('Loaded “'+(row.name||st.builder.title)+'”.','success');
@@ -814,7 +829,7 @@
     $$('[data-builder-draft-manage]',canvas).forEach(b=>b.onclick=()=>openBuilderDraftModal(b.dataset.builderDraftManage));
     const title=$('#mixTitle',canvas);if(title)title.onchange=e=>{st.builder.title=e.target.value.trim()||'My Stonefellow Record';persist();renderBuilder()};
     const sl=$('.builder-song-list',canvas);catalog.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='builder-song';const added=has(t.id),eligible=!!t.podEligible;b.disabled=added||!eligible;b.title=!eligible?'Not available for custom vinyl':added?'Already on your record':'Add to this record';b.innerHTML='<span><strong>'+esc(t.title)+'</strong><small>'+esc((t.mood||[]).join(' • '))+' • '+time(t.duration)+'</small></span><span>'+(added?'✓':eligible?'+':'Preview only')+'</span>';b.onclick=()=>{const r=add(t);if(r.ok){renderBuilder();say('Added “'+t.title+'” to Side '+r.side+'.')}else say(r.why==='full'?'That will not fit on either side.':'That track is already on your build.')};sl.appendChild(b)});
-    $('#agentChoose',canvas).onclick=()=>fillBuild('both');$('#orderBuild',canvas).onclick=addBuildToCart;$('#saveBuild',canvas).onclick=()=>{void saveBuilderDraft(false);};$('#exportBuild',canvas).onclick=()=>{persist();download('stonefellow-'+norm(st.builder.title).replace(/ /g,'-')+'-build.json',{artist:'Stonefellow',...st.builder,tracks:{A:st.builder.A.map(trackById),B:st.builder.B.map(trackById)}});say('Exported your build as JSON.')};$('#clearBuild',canvas).onclick=()=>{st.builder=defaultBuild();st.builderDrafts.activeId=0;localStorage.removeItem('stonefellow.build.draft.id');persist();renderBuilder();say('Blank build. Start anywhere you want.')};const dd=$('#dedupeBuild',canvas);if(dd)dd.onclick=dedupeBuild;
+    $('#agentChoose',canvas).onclick=()=>fillBuild('both');$('#orderBuild',canvas).onclick=addBuildToCart;$('#saveBuild',canvas).onclick=()=>{void saveBuilderDraft(false);};$('#exportBuild',canvas).onclick=()=>{persist();download('stonefellow-'+norm(st.builder.title).replace(/ /g,'-')+'-build.json',{artist:'Stonefellow',...st.builder,tracks:{A:st.builder.A.map(trackById),B:st.builder.B.map(trackById)}});say('Exported your build as JSON.')};$('#clearBuild',canvas).onclick=()=>{if(!confirmBuilderReplacement())return;st.builder=defaultBuild();builderCleanFingerprint=builderDraftFingerprint(st.builder);st.builderDrafts.activeId=0;localStorage.removeItem('stonefellow.build.draft.id');persist();renderBuilder();say('Blank build. Start anywhere you want.')};const dd=$('#dedupeBuild',canvas);if(dd)dd.onclick=dedupeBuild;
     window.StonefellowTurntable?.mount?.({canvas,appState:st,catalog,releases,esc,persist,play,trackById,trackArtwork,say,navigate,money,renderBuilder});
     if(st.auth.authenticated&&!st.builderDrafts.loaded)loadBuilderDrafts().then(()=>{const u=new URL(location.href);if((u.searchParams.get('view')||'home')==='builder')renderBuilder()});
   }
