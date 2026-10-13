@@ -49,10 +49,30 @@
     return {};
   }
   async function saveSection(e){
-    e.preventDefault();const f=e.currentTarget,key=f.dataset.homeSection,status=$('.homepage-save-status',f);if(status)status.textContent='Saving…';
+    e.preventDefault();
+    const f=e.currentTarget;
+    if(f.dataset.saving==='1')return; // prevent duplicate section edits on repeated clicks
+    const key=f.dataset.homeSection,status=$('.homepage-save-status',f),button=f.querySelector('[type="submit"]');
+    f.dataset.saving='1';if(button)button.disabled=true;
+    if(status)status.textContent='Saving…';
     const section={section_key:key,enabled:f.elements.enabled.checked,position:Number(f.elements.position.value||0),eyebrow:f.elements.eyebrow.value,heading:f.elements.heading.value,body_text:f.elements.body_text.value,config:readConfig(f,key)};
-    try{await api('homepage.php',{action:'save_section',section});if(status)status.textContent='Saved';say('Artist Homepage '+label(key)+' section saved.');setTimeout(()=>{if(status)status.textContent=''},1800)}catch(x){if(status)status.textContent=x.message}
+    try{
+      await api('homepage.php',{action:'save_section',section});
+      if(status)status.textContent='Saved';
+      say('Artist Homepage '+label(key)+' section saved.');
+    }catch(x){
+      if(status)status.textContent=x.message||'Save failed. Your changes remain in the editor.';
+    }finally{
+      f.dataset.saving='0';if(button)button.disabled=false;
+    }
   }
-  async function resetDefaults(){if(!confirm('Reset every Artist Homepage section to the Stonefellow defaults? Your section copy, order, selections and enabled states will be replaced.'))return;try{await api('homepage.php',{action:'reset_defaults',confirmed:true});say('Artist Homepage reset to the Stonefellow defaults.');renderInto(state.mount)}catch(e){say(e.message)}}
+  async function resetDefaults(){
+    const button=$('#homepageReset',state.mount);
+    if(button?.disabled)return;
+    if(!confirm('Reset every Artist Homepage section to the Stonefellow defaults? Your section copy, order, selections and enabled states will be replaced.'))return;
+    if(button)button.disabled=true;
+    try{await api('homepage.php',{action:'reset_defaults',confirmed:true});say('Artist Homepage reset to the Stonefellow defaults.');await renderInto(state.mount)}
+    catch(e){say(e.message||'Reset failed. Your sections have not been replaced.');if(button)button.disabled=false}
+  }
   window.SFArtistHomeAdmin={renderInto};
 })();
