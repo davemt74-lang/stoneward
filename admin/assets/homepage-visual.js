@@ -142,46 +142,97 @@
     });
   }
 
+
   let previewTimer=null,previewRevision=0,previewBusy=false;
-  const money=cents=>'
-    const canvas=$('#homepageBuilderPreview',root);if(!canvas)return;
-    const visualSections=$$('.homepage-preview-row,.homepage-preview-block-group',canvas);
-    const others=forms().filter(f=>f.dataset.homeSection!=='hero'&&f.elements.enabled?.checked)
-      .sort((a,b)=>Number(a.elements.position.value)-Number(b.elements.position.value));
-    const hero=forms().find(f=>f.dataset.homeSection==='hero');
-    const heroHeading=$('.homepage-preview-hero-copy h3',canvas),heroBody=$('.homepage-preview-hero-copy p',canvas);
-    if(hero){editable(heroHeading,field(hero,'heading'));editable(heroBody,field(hero,'body_text'));}
-    visualSections.forEach((el,i)=>{
-      const f=others[i];if(!f)return;
-      el.dataset.visualSection=f.dataset.homeSection;
-      el.tabIndex=0;
-      el.draggable=true;
-      el.ondragstart=e=>{e.dataTransfer.setData('text/plain',f.dataset.homeSection);e.dataTransfer.effectAllowed='move';};
+  const money=cents=>'$'+(Math.max(0,Number(cents)||0)/100).toFixed(2);
+  function publicMarkup(sections){
+    const render=window.SFArtistHomeRenderer?.renderSection;
+    if(typeof render!=='function')throw new Error('Public homepage renderer is unavailable.');
+    const helpers={
+      esc,
+      time(value){const n=Math.max(0,Math.floor(Number(value)||0));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');},
+      homepageMoney:money,
+      newsletterSignupHtml:()=>'<div class="newsletter-form"><input disabled type="email" placeholder="Email address"><button disabled type="button">Sign up</button></div>',
+      homeTrackCard:item=>'<div class="home-track-card">'+esc(item?.title||'Track')+'</div>'
+    };
+    return (sections||[]).map(section=>render(section,helpers)
+      .replace('<section ','<section data-home-key="'+esc(section.section_key)+'" ')).join('');
+  }
+  function bindCanonicalFrame(frame){
+    const doc=frame.contentDocument;
+    if(!doc||!doc.body)return;
+    frame.style.height=Math.max(doc.documentElement.scrollHeight,doc.body.scrollHeight,540)+'px';
+    doc.addEventListener('click',event=>{
+      if(event.target.closest('[contenteditable]'))return;
+      event.preventDefault();
+      const section=event.target.closest('[data-home-key]');
+      if(section)selected(section.dataset.homeKey);
+    },true);
+    $$('[data-home-key]',doc).forEach(el=>{
+      const key=el.dataset.homeKey,f=forms().find(x=>x.dataset.homeSection===key);
+      if(!f)return;
+      el.tabIndex=0;el.draggable=true;
+      el.ondragstart=e=>{e.dataTransfer.setData('text/plain',key);e.dataTransfer.effectAllowed='move';};
       el.ondragover=e=>{e.preventDefault();e.dataTransfer.dropEffect='move';};
-      el.ondrop=e=>{e.preventDefault();moveCanvasSection(e.dataTransfer.getData('text/plain'),f.dataset.homeSection);};
+      el.ondrop=e=>{e.preventDefault();moveCanvasSection(e.dataTransfer.getData('text/plain'),key);};
       el.onkeydown=e=>{if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){
-        e.preventDefault();const enabled=forms().filter(x=>x.elements.enabled?.checked&&x.dataset.homeSection!=='hero');
-        const i=enabled.indexOf(f),dest=enabled[i+(e.key==='ArrowUp'?-1:1)];if(dest)moveCanvasSection(f.dataset.homeSection,dest.dataset.homeSection);
+        e.preventDefault();
+        const enabled=forms().filter(x=>x.elements.enabled?.checked&&x.dataset.homeSection!=='hero');
+        const i=enabled.indexOf(f),dest=enabled[i+(e.key==='ArrowUp'?-1:1)];
+        if(dest)moveCanvasSection(key,dest.dataset.homeSection);
       }};
-      if(!el.querySelector('.homepage-visual-select')){
-        const b=document.createElement('button');b.type='button';b.className='homepage-visual-select';
-        b.textContent='Edit '+f.dataset.homeSection.replaceAll('_',' ');
-        b.onclick=()=>selected(f.dataset.homeSection);
-        el.prepend(b);
+      editable(el.querySelector(key==='hero'?'h1':'h2'),field(f,'heading'));
+      editable(el.querySelector('.artist-home-copy'),field(f,'body_text'));
+      if(key==='custom_blocks'){
+        const enabled=$$('#homepageBlockList > [data-home-block-id]',sidebar).filter(x=>x.querySelector('[data-block-field="enabled"]')?.checked);
+        $$('.artist-home-custom-card',el).forEach((card,i)=>{
+          const block=enabled[i];if(!block)return;
+          editable(card.querySelector('h3'),block.querySelector('[data-block-field="heading"]'));
+          editable(card.querySelector('.artist-home-custom-copy > p:not(.artist-home-meta)'),block.querySelector('[data-block-field="body_text"]'));
+        });
       }
-      const h=el.querySelector(':scope > strong');
-      editable(h,field(f,'heading'));
-    });
-    const blockForms=$$('#homepageBlockList > [data-home-block-id]',sidebar);
-    $$('.homepage-preview-tile',canvas).forEach((el,i)=>{
-      const enabled=blockForms.filter(f=>f.querySelector('[data-block-field="enabled"]')?.checked);
-      const f=enabled[i];if(!f)return;
-      const h=$('strong',el),body=$('p',el);
-      editable(h,f.querySelector('[data-block-field="heading"]'));
-      editable(body,f.querySelector('[data-block-field="body_text"]'));
-      el.onclick=e=>{if(e.target.closest('[contenteditable]'))return;selected('custom_blocks');f.scrollIntoView({block:'nearest'});};
+      const button=doc.createElement('button');
+      button.type='button';button.className='sf-visual-section-select';
+      button.textContent='Edit section · drag to move';
+      button.onclick=()=>selected(key);el.prepend(button);
     });
   }
+  async function renderCanonical(){
+    if(!root||previewBusy)return;
+    previewBusy=true;
+    const token=previewRevision,holder=$('#homepageBuilderPreview',root);
+    try{
+      const result=await ctx.api('homepage.php',{action:'preview_design_draft',sections:collect()});
+      if(!root||token!==previewRevision)return;
+      const html=publicMarkup(result.homepage?.sections||[]);
+      const stickyChat=result.homepage?.chat_bar_enabled!==false;
+      const frame=document.createElement('iframe');
+      frame.title='Actual homepage design — private draft preview';
+      frame.className='homepage-visual-public-frame';
+      frame.setAttribute('sandbox','allow-same-origin');
+      frame.referrerPolicy='same-origin';
+      const styles='body{margin:0}.artist-homepage{max-width:none;width:100%}'+
+        '.sf-visual-section-select{display:block;position:relative;z-index:20;margin:8px 12px;padding:5px 10px;cursor:pointer;background:#201b16;color:#f8e6d5;border:1px solid #bd956c;border-radius:3px;font-size:12px}'+
+        '[contenteditable]:hover{outline:1px dashed #c68f5b;outline-offset:3px}[contenteditable]:focus{outline:2px solid #e8b079;outline-offset:3px}'+
+        '[data-home-key]{position:relative;min-height:50px}'+
+        '.sf-visual-chat-footer{position:sticky;bottom:0;z-index:60;padding:12px 18px;background:linear-gradient(180deg,transparent,#090807 32%)}'+
+        '.sf-visual-chatbar{display:grid;grid-template-columns:35px 1fr 35px 35px;align-items:center;gap:6px;max-width:760px;margin:auto;border:1px solid #574637;border-radius:24px;background:#161310;color:#e6ddd4;padding:12px 14px;font:14px sans-serif}'+
+        '.sf-visual-chatbar span:not(:nth-child(2)){text-align:center;font-size:20px}.sf-visual-chatbar span:nth-child(2){color:#b1a99d}';
+      const chat=stickyChat?'<footer class="sf-visual-chat-footer"><div class="sf-visual-chatbar"><span>+</span><span>Ask Stonefellow anything…</span><span>◉</span><span>↑</span></div></footer>':'';
+      frame.srcdoc='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+        '<link rel="stylesheet" href="../assets/css/site.css?v=1.3.52"><style>'+styles+'</style></head>'+
+        '<body class="artist-home-active"><article class="artist-homepage">'+html+'</article>'+chat+'</body></html>';
+      frame.addEventListener('load',()=>bindCanonicalFrame(frame),{once:true});
+      holder.replaceChildren(frame);
+    }catch(e){if(holder&&!holder.querySelector('iframe'))holder.textContent=e.message||'Draft preview unavailable';}
+    finally{previewBusy=false;if(root&&token!==previewRevision)requestCanonical();}
+  }
+  function requestCanonical(){
+    if(!root)return;
+    previewRevision++;clearTimeout(previewTimer);
+    previewTimer=setTimeout(()=>{if(previewBusy){requestCanonical();return;}void renderCanonical();},220);
+  }
+  function decorate(){ /* canonical renderer owns canvas; no duplicate mock renderer */ }
   function open(data){
     root=$('#homepageWebStage');sidebar=$('#homepageWebSidebar');
     if(!root||!sidebar)return;
@@ -206,144 +257,4 @@
   }
   function close(){observer?.disconnect();observer=null;clearTimeout(previewTimer);previewRevision++;root=sidebar=null;dirty=false;}
   window.SFHomepageVisual={open,close,saveDraft,active:()=>!!root,refresh:requestCanonical,isDirty:()=>dirty};
-})();
-+(Math.max(0,Number(cents)||0)/100).toFixed(2);
-  function publicMarkup(sections){
-    const render=window.SFArtistHomeRenderer?.renderSection;
-    if(typeof render!=='function')throw new Error('Public homepage renderer is unavailable.');
-    const helpers={esc,time:value=>{
-      const n=Math.max(0,Math.floor(Number(value)||0));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
-    },homepageMoney:money,newsletterSignupHtml:()=>'<div class="newsletter-form"><label>Email <input type="email" disabled placeholder="Email address"></label><button type="button" disabled>Sign up</button></div>',
-      homeTrackCard:item=>'<div class="home-track-card">'+esc(item?.title||'Track')+'</div>'};
-    return (sections||[]).map(section=>{
-      const html=render(section,helpers);
-      return html.replace('<section ','<section data-home-key="'+esc(section.section_key)+'" ');
-    }).join('');
-  }
-  function bindCanonicalFrame(frame){
-    const doc=frame.contentDocument;
-    if(!doc)return;
-    const syncHeight=()=>{
-      const docEl=doc.documentElement,body=doc.body;
-      frame.style.height=Math.max(docEl?.scrollHeight||0,body?.scrollHeight||0,540)+'px';
-    };
-    const ro=new ResizeObserver(syncHeight);
-    if(doc.body)ro.observe(doc.body);
-    frame.addEventListener('load',()=>ro.disconnect(),{once:true}); // disconnect on replacement
-    doc.addEventListener('click',event=>{event.preventDefault();const key=event.target.closest('[data-home-key]')?.dataset.homeKey;if(key&&!event.target.closest('[contenteditable]'))selected(key);},true);
-    $('[data-home-key]',doc).forEach(el=>{
-      const key=el.dataset.homeKey,f=forms().find(x=>x.dataset.homeSection===key);
-      if(!f)return;
-      el.tabIndex=0;el.draggable=true;
-      el.ondragstart=e=>{e.dataTransfer.setData('text/plain',key);e.dataTransfer.effectAllowed='move';};
-      el.ondragover=e=>{e.preventDefault();e.dataTransfer.dropEffect='move';};
-      el.ondrop=e=>{e.preventDefault();moveCanvasSection(e.dataTransfer.getData('text/plain'),key);};
-      el.onkeydown=e=>{if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){
-        e.preventDefault();const enabled=forms().filter(x=>x.elements.enabled?.checked&&x.dataset.homeSection!=='hero');
-        const i=enabled.indexOf(f),dest=enabled[i+(e.key==='ArrowUp'?-1:1)];
-        if(dest)moveCanvasSection(key,dest.dataset.homeSection);
-      }};
-      const heading=el.querySelector(key==='hero'?'h1':'h2');
-      editable(heading,field(f,'heading'));
-      editable(el.querySelector('.artist-home-copy'),field(f,'body_text'));
-      if(key==='custom_blocks'){
-        const enabled=$('#homepageBlockList>[data-home-block-id]',sidebar).filter(x=>x.querySelector('[data-block-field="enabled"]')?.checked);
-        $('.artist-home-custom-card',el).forEach((card,i)=>{
-          const block=enabled[i];if(!block)return;
-          editable(card.querySelector('h3'),block.querySelector('[data-block-field="heading"]'));
-          editable(card.querySelector('.artist-home-custom-copy>p:not(.artist-home-meta)'),block.querySelector('[data-block-field="body_text"]'));
-        });
-      }
-      const b=doc.createElement('button');b.type='button';b.className='sf-visual-section-select';
-      b.textContent='Edit section · drag to move';b.onclick=()=>selected(key);el.prepend(b);
-    });
-    syncHeight();
-  }
-  async function renderCanonical(){
-    if(!root||previewBusy)return;
-    previewBusy=true;const token=++previewRevision;
-    const holder=$('#homepageBuilderPreview',root);
-    try{
-      const result=await ctx.api('homepage.php',{action:'preview_design_draft',sections:collect()});
-      if(!root||token!==previewRevision)return;
-      const html=publicMarkup(result.homepage?.sections||[]);
-      const stickyChat=result.homepage?.chat_bar_enabled!==false;
-      const frame=document.createElement('iframe');
-      frame.title='Actual public homepage design · private draft preview';
-      frame.className='homepage-visual-public-frame';
-      frame.sandbox='allow-same-origin';
-      frame.referrerPolicy='same-origin';
-      frame.srcdoc='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../assets/css/site.css?v=1.3.52"><style>body{margin:0} .artist-homepage{width:100%;max-width:none} .sf-visual-section-select{display:block;position:relative;z-index:20;margin:8px 12px;padding:5px 10px;cursor:pointer;background:#201b16;color:#f8e6d5;border:1px solid #bd956c;border-radius:3px;font-size:12px} [contenteditable]:hover{outline:1px dashed #c68f5b;outline-offset:3px} [contenteditable]:focus{outline:2px solid #e8b079;outline-offset:3px} [data-home-key]{position:relative;min-height:50px} .sf-visual-chat-footer{position:sticky;bottom:0;z-index:60;padding:12px 18px;background:linear-gradient(180deg,transparent,#090807 32%)}.sf-visual-chatbar{display:grid;grid-template-columns:35px 1fr 35px 35px;align-items:center;gap:6px;max-width:760px;margin:auto;border:1px solid #574637;border-radius:24px;background:#161310;color:#e6ddd4;padding:12px 14px;font:14px sans-serif}.sf-visual-chatbar span:not(:nth-child(2)){text-align:center;font-size:20px}.sf-visual-chatbar span:nth-child(2){color:#b1a99d}</style></head><body class="artist-home-active"><article class="artist-homepage">'+html+'</article>'+(stickyChat?'<div class="sf-visual-chat-footer" aria-label="Sticky Stonefellow Agent chat preview"><div class="sf-visual-chatbar"><span>+</span><span>Ask Stonefellow anything…</span><span>◉</span><span>↑</span></div></div>':'')+'</body></html>';
-      frame.addEventListener('load',()=>bindCanonicalFrame(frame),{once:true});
-      holder.replaceChildren(frame);
-    }catch(e){if(holder&&!holder.querySelector('iframe'))holder.textContent=e.message||'Draft preview unavailable';}
-    finally{previewBusy=false;if(root&&token!==previewRevision)requestCanonical();}
-  }
-  function requestCanonical(){
-    if(!root)return;
-    previewRevision++;clearTimeout(previewTimer);
-    previewTimer=setTimeout(()=>{if(previewBusy){requestCanonical();return;}void renderCanonical();},220);
-  }
-  function decorate(){
-    const canvas=$('#homepageBuilderPreview',root);if(!canvas)return;
-    const visualSections=$$('.homepage-preview-row,.homepage-preview-block-group',canvas);
-    const others=forms().filter(f=>f.dataset.homeSection!=='hero'&&f.elements.enabled?.checked)
-      .sort((a,b)=>Number(a.elements.position.value)-Number(b.elements.position.value));
-    const hero=forms().find(f=>f.dataset.homeSection==='hero');
-    const heroHeading=$('.homepage-preview-hero-copy h3',canvas),heroBody=$('.homepage-preview-hero-copy p',canvas);
-    if(hero){editable(heroHeading,field(hero,'heading'));editable(heroBody,field(hero,'body_text'));}
-    visualSections.forEach((el,i)=>{
-      const f=others[i];if(!f)return;
-      el.dataset.visualSection=f.dataset.homeSection;
-      el.tabIndex=0;
-      el.draggable=true;
-      el.ondragstart=e=>{e.dataTransfer.setData('text/plain',f.dataset.homeSection);e.dataTransfer.effectAllowed='move';};
-      el.ondragover=e=>{e.preventDefault();e.dataTransfer.dropEffect='move';};
-      el.ondrop=e=>{e.preventDefault();moveCanvasSection(e.dataTransfer.getData('text/plain'),f.dataset.homeSection);};
-      el.onkeydown=e=>{if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){
-        e.preventDefault();const enabled=forms().filter(x=>x.elements.enabled?.checked&&x.dataset.homeSection!=='hero');
-        const i=enabled.indexOf(f),dest=enabled[i+(e.key==='ArrowUp'?-1:1)];if(dest)moveCanvasSection(f.dataset.homeSection,dest.dataset.homeSection);
-      }};
-      if(!el.querySelector('.homepage-visual-select')){
-        const b=document.createElement('button');b.type='button';b.className='homepage-visual-select';
-        b.textContent='Edit '+f.dataset.homeSection.replaceAll('_',' ');
-        b.onclick=()=>selected(f.dataset.homeSection);
-        el.prepend(b);
-      }
-      const h=el.querySelector(':scope > strong');
-      editable(h,field(f,'heading'));
-    });
-    const blockForms=$$('#homepageBlockList > [data-home-block-id]',sidebar);
-    $$('.homepage-preview-tile',canvas).forEach((el,i)=>{
-      const enabled=blockForms.filter(f=>f.querySelector('[data-block-field="enabled"]')?.checked);
-      const f=enabled[i];if(!f)return;
-      const h=$('strong',el),body=$('p',el);
-      editable(h,f.querySelector('[data-block-field="heading"]'));
-      editable(body,f.querySelector('[data-block-field="body_text"]'));
-      el.onclick=e=>{if(e.target.closest('[contenteditable]'))return;selected('custom_blocks');f.scrollIntoView({block:'nearest'});};
-    });
-  }
-  function open(data){
-    root=$('#homepageWebStage');sidebar=$('#homepageWebSidebar');
-    if(!root||!sidebar)return;
-    draft=data.draft;versions=data.versions||[];
-    // Rehydrate the draft after the existing homepage forms have mounted.
-    hydrate(draft.sections||data.sections||[]);
-    const actions=$('.homepage-web-toolbar-actions',root);
-    const original=$('#homepageWebSave',root);
-    if(original){original.textContent='Save draft';original.id='homepageVisualSave';original.onclick=()=>void saveDraft();}
-    actions.insertAdjacentHTML('beforeend','<button type="button" class="primary" id="homepageVisualPublish">Publish live</button><select id="homepageVisualVersions" aria-label="Homepage versions"></select><button type="button" class="secondary" id="homepageVisualRestore">Restore to draft</button><button type="button" class="secondary" id="homepageVisualReload">Reload live</button>');
-    $('#homepageVisualPublish',root).onclick=()=>void publish();
-    $('#homepageVisualRestore',root).onclick=()=>void restore();
-    $('#homepageVisualReload',root).onclick=()=>void reloadLive();versionList();
-    const preview=$('#homepageBuilderPreview',root);
-    observer=new MutationObserver(()=>{if(observer){observer.disconnect();decorate();observer.observe(preview,{childList:true});}});
-    observer.observe(preview,{childList:true});
-    decorate();
-    sidebar.addEventListener('input',markDirty);
-    sidebar.addEventListener('change',markDirty);
-    announce('Private draft. Edit text directly on canvas; save and publish are separate.');
-  }
-  function close(){observer?.disconnect();observer=null;root=sidebar=null;dirty=false;}
-  window.SFHomepageVisual={open,close,saveDraft,isDirty:()=>dirty};
 })();
