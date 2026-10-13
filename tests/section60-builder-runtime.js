@@ -26,7 +26,7 @@ const canvas=el();
 const sandbox={canvas,st:state,cfg:{formats:{vinyl:{label:'12-inch vinyl'},cassette:{label:'Cassette'}},artworkThemes:[]},
   catalog:[],releases:[],window:{StonefellowTurntable:{mount(){}}},document:{createElement(){return el()}},
   $,$$,esc:x=>String(x??''),time:n=>String(n),sideTime:side=>state.builder[side].length*200,limit:()=>1200,
-  builderArtworkTiles:()=>'',duplicateBuildIds:()=>[],trackById:()=>null,has:()=>false,
+  builderArtworkTiles:()=>'',duplicateBuildIds:()=>[],trackById:()=>null,trackArtwork:()=>'',navigate(){},money:()=>'$0.00',has:()=>false,
   fillBuild(){},move(){},transfer(){},remove(){},relocateTrack(){},add(){},play(){},
   persist(){},renderCart(){},saveBuilderDraft(){},addBuildToCart(){},download(){},persistCart(){},say(){},
   norm:x=>x,defaultBuild:()=>build,loadBuilderDraft(){},deleteBuilderDraft(){},clearBuild(){},dedupeBuild(){},
