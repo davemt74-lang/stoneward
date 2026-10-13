@@ -31,8 +31,8 @@
       $$('[data-home-section]',state.mount).forEach(f=>f.onsubmit=e=>saveSection(e,d.references||{}));
       const reset=$('#homepageReset',state.mount);if(reset)reset.onclick=resetDefaults;
       const hero=$('#homepageOpenHero',state.mount),story=$('#homepageOpenStory',state.mount);
-      if(hero)hero.onclick=()=>window.SFSettingsTabs?.open?.('media').catch(e=>say(e.message));
-      if(story)story.onclick=()=>window.SFSettingsTabs?.open?.('stories').catch(e=>say(e.message));
+      if(hero)hero.onclick=()=>Promise.resolve().then(()=>window.SFSettingsTabs.open('media')).catch(e=>say(e.message));
+      if(story)story.onclick=()=>Promise.resolve().then(()=>window.SFSettingsTabs.open('stories')).catch(e=>say(e.message));
     }catch(e){state.mount.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
   }
   function readConfig(form,key){

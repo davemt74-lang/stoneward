@@ -14,10 +14,11 @@
     ['database','Database Upgrade'],
     ['session','Admin Session']
   ];
-  let selected='site',currentActivator=null;
+  let selected='site',currentActivator=null,mountedRoot=null;
 
   async function mount(root){
     if(!root)return;
+    mountedRoot=root;
     const panels=Array.from(root.children).filter(el=>el.matches('section.panel'));
     if(panels.length!==sections.length){
       // Preserve the original sections if a future release changes the markup.
@@ -108,7 +109,7 @@
   }
   async function open(key){
     if(!sections.some(([id])=>id===key))throw new Error('Unknown Settings section');
-    if(!currentActivator)throw new Error('Settings workspace is not open');
+    if(!currentActivator||!mountedRoot?.isConnected)throw new Error('Settings workspace is not open');
     await currentActivator(key,true);
   }
   window.SFSettingsTabs={mount,open};
