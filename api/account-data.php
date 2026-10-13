@@ -35,6 +35,13 @@ function sf_account_library_repair_schema(PDO $pdo, string $driver): void {
         // Names/definitions above are constants, never user-controlled SQL.
         $pdo->exec('ALTER TABLE user_library ADD COLUMN `'.$column.'` '.$definition);
     }
+    // A legacy table can contain multiple rows with no item key. Preserve each
+    // row and assign a stable, distinct fallback rather than failing a new unique index.
+    if($driver==='sqlite'){
+        $pdo->exec("UPDATE user_library SET item_key='legacy-' || id WHERE item_key='' OR item_key IS NULL");
+    }else{
+        $pdo->exec("UPDATE user_library SET item_key=CONCAT('legacy-',id) WHERE item_key='' OR item_key IS NULL");
+    }
 }
 
 function sf_account_data_ensure_schema(): void {
@@ -46,6 +53,7 @@ function sf_account_data_ensure_schema(): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_saved_builds (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,format TEXT NOT NULL,build_json TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_user_saved_builds_user ON user_saved_builds(user_id,updated_at)");
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_library (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_type TEXT NOT NULL,item_key TEXT NOT NULL,label TEXT NOT NULL,source_order_id TEXT NOT NULL DEFAULT '',metadata_json TEXT NOT NULL DEFAULT '{}',acquired_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)");
+        sf_account_library_repair_schema($pdo,$driver);
         $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_library_unique ON user_library(user_id,item_type,item_key,source_order_id)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_user_library_user ON user_library(user_id,acquired_at)");
     } else {
