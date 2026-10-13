@@ -56,6 +56,19 @@ $db->beginTransaction();$deleted=sf_agent_feedback_clear('customer',1);$db->comm
 $checks['Privacy clear works inside transaction']=$deleted===1&&!sf_agent_feedback_recent('customer',1);
 $checks['Customer privacy clear cannot affect Admin feedback']=count(sf_agent_feedback_recent('admin',9))===1;
 $checks['Other Customer clear does nothing']=sf_agent_feedback_clear('customer',2)===0;
+// The export must not truncate accounts with over 100 rated replies.
+$insertMessage=$db->prepare("INSERT INTO agent_messages(id,user_id,role,content) VALUES(?,?,?,?)");
+for($i=1000;$i<1121;$i++){
+    $insertMessage->execute([$i,1,'assistant','Private content must not be copied into feedback']);
+    sf_agent_feedback_save('customer',1,$i,'helpful');
+}
+$fullExport=sf_agent_feedback_export('customer',1);
+$checks['Privacy export includes all 121 feedback entries']=count($fullExport)===121;
+$checks['Recent display remains bounded to 100']=count(sf_agent_feedback_recent('customer',1,100))===100;
+$checks['Complete export excludes message text']=!str_contains(json_encode($fullExport),'Private content');
+$checks['More than 100 ratings do not expose Admin records']=count(sf_agent_feedback_export('admin',9))===1;
+$checks['Bulk feedback deletion clears all exported entries']=sf_agent_feedback_clear('customer',1)===121
+    && sf_agent_feedback_export('customer',1)===[];
 $previous=$db;$db=new PDO('sqlite::memory:');$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
 $checks['Privacy deletion tolerates not-yet-created table']=sf_agent_feedback_clear('customer',1)===0;
 $db=$previous;
@@ -69,7 +82,7 @@ $files=[
  'admin/assets/agent-canvas.js'=>"c.api('agent-feedback.php'",
 ];
 foreach($files as $file=>$needle)$checks['Integration: '.$file]=str_contains(file_get_contents($root.'/'.$file),$needle);
-$checks['Customer feedback export available']=str_contains(file_get_contents($root.'/api/privacy-core.php'),"'agent_response_feedback'=>sf_agent_feedback_recent(");
+$checks['Customer feedback export available']=str_contains(file_get_contents($root.'/api/privacy-core.php'),"'agent_response_feedback'=>sf_agent_feedback_export(");
 $checks['Customer Chat uses only numeric message identifiers']=str_contains(file_get_contents($root.'/api/agent-brain.php'),'SELECT id FROM agent_messages WHERE conversation_id=? AND user_id=?');
 $checks['Admin Chat uses owner-scoped assistant IDs']=str_contains(file_get_contents($root.'/api/agent-admin-brain.php'),'SELECT id,role,content,action_json,created_at FROM admin_agent_messages');
 $checks['No raw text column in new feedback table']=!str_contains(file_get_contents($root.'/api/agent-feedback-core.php'),'message_text LONGTEXT');

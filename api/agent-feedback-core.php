@@ -51,6 +51,17 @@ function sf_agent_feedback_recent(string $scope,int $ownerId,int $limit=50): arr
     $q=sf_db()->prepare('SELECT response_message_id,rating,updated_at FROM agent_response_feedback WHERE scope=? AND owner_user_id=? ORDER BY updated_at DESC,id DESC LIMIT '.max(1,min(100,$limit)));
     $q->execute([$scope,$ownerId]);return $q->fetchAll(PDO::FETCH_ASSOC);
 }
+/**
+ * Privacy export: retrieve all feedback for the owner, not just the UI's
+ * bounded recent history. No private prompt/response text is stored here.
+ */
+function sf_agent_feedback_export(string $scope,int $ownerId): array {
+    if(!sf_agent_feedback_valid_scope($scope,$ownerId))return [];
+    sf_agent_feedback_ensure_schema();
+    $q=sf_db()->prepare('SELECT response_message_id,rating,updated_at FROM agent_response_feedback WHERE scope=? AND owner_user_id=? ORDER BY id ASC');
+    $q->execute([$scope,$ownerId]);
+    return $q->fetchAll(PDO::FETCH_ASSOC);
+}
 function sf_agent_feedback_summary(string $scope,int $ownerId): array {
     $data=sf_agent_feedback_recent($scope,$ownerId,100);
     $helpful=0;$notHelpful=0;

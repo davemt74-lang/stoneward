@@ -31,6 +31,7 @@ $missionCols=sf_migration_columns('agent_mission_plans');
 $feedbackCols=sf_migration_columns('agent_response_feedback');
 $checks['Mission schema contains owner and scope boundaries']=in_array('scope',$missionCols,true)&&in_array('owner_user_id',$missionCols,true)&&in_array('conversation_id',$missionCols,true);
 $checks['Feedback schema contains owner/role and exact response ID']=in_array('scope',$feedbackCols,true)&&in_array('owner_user_id',$feedbackCols,true)&&in_array('response_message_id',$feedbackCols,true);
+$checks['Privacy export is complete beyond recent display limit']=str_contains($read('api/privacy-core.php'),"'agent_response_feedback'=>sf_agent_feedback_export('customer',");
 $checks['No raw private response text in feedback schema']=!in_array('content',$feedbackCols,true)&&!in_array('message_text',$feedbackCols,true);
 $checks['Existing users and password hashes preserved']=(int)$db->query('SELECT COUNT(*) FROM users')->fetchColumn()===2
     && $db->query('SELECT password_hash FROM users WHERE id=1')->fetchColumn()===$hash1
