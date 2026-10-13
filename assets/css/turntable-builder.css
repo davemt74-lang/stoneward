@@ -180,6 +180,11 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 .builder-draft-dialog button:disabled{opacity:.6;cursor:wait}
 @media(min-width:1024px){
   /* Section 62E: builder owns a viewport-height work area; only the left editor scrolls. */
+  /* Prevent the document itself from scrolling on desktop; keep scrolling in the left rail. */
+  body.builder-workspace-active{height:100dvh;overflow:hidden}
+  body.builder-workspace-active .stage{height:100dvh;min-height:0;overflow:hidden;padding-bottom:0}
+  body.builder-workspace-active .dynamic-canvas{height:calc(100dvh - 64px);min-height:0;overflow:hidden}
+  body.builder-workspace-active.has-announcement .dynamic-canvas{height:calc(100dvh - 96px)}
   body.builder-workspace-active .builder-module{height:calc(100dvh - 64px - 96px);min-height:0;overflow:hidden;align-items:stretch;padding-bottom:0;overscroll-behavior:contain}
   body.builder-workspace-active.has-announcement .builder-module{height:calc(100dvh - 96px - 96px)}
   .builder-left-rail{min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding-bottom:24px}
