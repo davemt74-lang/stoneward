@@ -20,6 +20,12 @@ try{
     sf_log_admin_action((int)$me['id'],'artist_home_draft_saved','artist_home','draft',['revision'=>$draft['revision']]);
     sf_json_response(['ok'=>true,'draft'=>$draft]);
   }
+  if($action==='reset_design_draft'){
+    if(empty($b['confirmed']))throw new InvalidArgumentException('Discarding the draft requires confirmation.');
+    $draft=sf_home_design_reset_to_live((int)($b['expected_revision']??-1),(string)($b['base_hash']??''));
+    sf_log_admin_action((int)$me['id'],'artist_home_draft_rebased','artist_home','draft',['revision'=>$draft['revision']]);
+    sf_json_response(['ok'=>true,'draft'=>$draft]);
+  }
   if($action==='publish_design_draft'){
     if(empty($b['confirmed']))throw new InvalidArgumentException('Publishing requires explicit confirmation.');
     $published=sf_home_design_publish((int)($b['revision']??-1),(string)($b['published_hash']??''));
