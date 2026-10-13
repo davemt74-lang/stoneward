@@ -179,8 +179,11 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 .builder-draft-dialog .draft-modal-feedback{margin:10px 0 2px;padding:10px 12px;background:#402323;border:1px solid #955555;border-radius:6px;color:#ffd8d1;font-size:.78rem}
 .builder-draft-dialog button:disabled{opacity:.6;cursor:wait}
 @media(min-width:1024px){
-  /* Normal document scroll: do not pin the player to the viewport. */
-  .builder-turntable-stage{position:relative!important;top:auto!important;align-self:start;overflow:clip;min-height:0;height:clamp(640px,calc(100dvh - 76px),1080px);pointer-events:none}
+  /* Section 62E: builder owns a viewport-height work area; only the left editor scrolls. */
+  body.builder-workspace-active .builder-module{height:calc(100dvh - 64px - 96px);min-height:0;overflow:hidden;align-items:stretch;padding-bottom:0;overscroll-behavior:contain}
+  body.builder-workspace-active.has-announcement .builder-module{height:calc(100dvh - 96px - 96px)}
+  .builder-left-rail{min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding-bottom:24px}
+  .builder-turntable-stage{position:relative!important;top:auto!important;align-self:stretch;overflow:clip;min-height:0;height:100%;max-height:100%;pointer-events:none}
   .turntable-stage-body{position:absolute;inset:0}
   /* Crop through the outer grooves, leaving the center label and a slim vinyl band. */
   .turntable-deck{left:calc(100% - 26px)!important;top:50%;transform:translate(-50%,-50%) rotate(-90deg)}
