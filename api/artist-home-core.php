@@ -160,8 +160,8 @@ function sf_artist_home_public_blocks(array $raw,int $userId=0): array {
     return $out;
 }
 
-function sf_artist_home_payload(int $userId=0): array {
-    $site=sf_site_settings();$sections=[];$featuredRelease=null;$publicAbout=null;if(function_exists('sf_story_about_payload')){$storytelling=sf_story_about_payload();$publicAbout=$storytelling['about']??null;}foreach(sf_artist_home_sections(true) as $s){$key=(string)$s['section_key'];$cfg=(array)$s['config'];$data=null;$heading=(string)$s['heading'];$bodyText=(string)$s['body_text'];
+function sf_artist_home_payload(int $userId=0,?array $sectionsOverride=null): array {
+    $site=sf_site_settings();$sections=[];$featuredRelease=null;$publicAbout=null;if(function_exists('sf_story_about_payload')){$storytelling=sf_story_about_payload();$publicAbout=$storytelling['about']??null;}foreach(($sectionsOverride??sf_artist_home_sections(true)) as $s){if(empty($s['enabled']))continue;$key=(string)$s['section_key'];$cfg=(array)$s['config'];$data=null;$heading=(string)$s['heading'];$bodyText=(string)$s['body_text'];
       if($key==='hero'){$data=['hero_image'=>(string)($site['media_hero']??''),'artist_photo'=>(string)($site['media_artist_photo']??''),'logo'=>(string)($site['media_logo']??''),'primary_label'=>$cfg['primary_label']??'Listen now','primary_view'=>$cfg['primary_view']??'music','secondary_label'=>$cfg['secondary_label']??'Explore releases','secondary_view'=>$cfg['secondary_view']??'releases'];}
       elseif($key==='featured_release'){$featuredRelease=sf_artist_home_release((string)($cfg['release_id']??''));$data=$featuredRelease;}
       elseif($key==='featured_track'){$data=sf_artist_home_track((string)($cfg['track_id']??''),$featuredRelease?:sf_artist_home_release(''));}
