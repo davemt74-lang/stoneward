@@ -20,7 +20,9 @@ $checks=[
      && str_contains($main,'window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,reloadCore}'),
  'No alternate network or save endpoints introduced'=>!preg_match('/\bfetch\s*\(|\bXMLHttpRequest\b|\bapi\s*\(/',$ui),
  'Buttons are moved rather than cloned'=>str_contains($ui,'actions.append(el)')&&!str_contains($ui,'cloneNode('),
- 'Live-render DOM watching supports every Admin view'=>str_contains($ui,'new MutationObserver(()=>apply())')&&str_contains($ui,'subtree:true'),
+ 'Live-render DOM watching is batched without losing views'=>str_contains($ui,'new MutationObserver(()=>{')
+    && str_contains($ui,'requestAnimationFrame(()=>{queued=false;apply();})')
+    && str_contains($ui,'subtree:true'),
  'Already-modern Settings/Chat/Brain views are excluded'=>str_contains($ui,"['settings','agent-chat','brain'].includes(getView())"),
  'Existing Story, Gallery, Video and Shipment modals not intercepted'=>!str_contains($ui,"['storyEditorForm'")
      && !str_contains($ui,"['videoEditorForm'") && !str_contains($ui,"['galleryEditorForm'")
