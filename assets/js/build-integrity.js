@@ -29,7 +29,7 @@
         }
       }
       if(window.caches?.keys){
-        for(const key of await caches.keys())if(key.startsWith('stonefellow-static-'))await caches.delete(key);
+        for(const key of await window.caches.keys())if(key.startsWith('stonefellow-static-'))await window.caches.delete(key);
       }
       window.location.reload();
     }catch(e){
