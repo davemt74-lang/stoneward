@@ -9,7 +9,7 @@ echo json_encode([
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.46',
+  'database_schema_target'=>'1.3.47',
   'homepage_web_designer'=>'visual-inline-editing-private-drafts-atomic-publishing-version-history',
   'customer_agent_brain'=>'per-account-explicit-memory-private-conversation-consent-and-deletion',
   'admin_agent_brain'=>'separate-operational-chat-proposals-and-mission-ledger',
