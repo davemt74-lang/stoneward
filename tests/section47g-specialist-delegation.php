@@ -61,8 +61,8 @@ $checks['Customer privacy clear revokes assignments']=sf_agent_mission_plan_clea
 $checks['Admin plans survive unrelated Customer clear']=sf_agent_specialist_assignments('admin',11,$a['id'])===$adminDelegates;
 $adminSource=(string)file_get_contents(dirname(__DIR__).'/api/agent-admin-brain.php');
 $fanSource=(string)file_get_contents(dirname(__DIR__).'/api/agent-brain.php');
-$checks['Authenticated Admin Brain reads owner assignments']=str_contains($adminSource,"sf_agent_specialist_recent('admin',$adminId)");
-$checks['Authenticated Customer Brain reads owner assignments']=str_contains($fanSource,"sf_agent_specialist_recent('customer',$userId)");
+$checks['Authenticated Admin Brain reads owner assignments']=str_contains($adminSource,"sf_agent_specialist_recent('admin',".'$adminId'.")");
+$checks['Authenticated Customer Brain reads owner assignments']=str_contains($fanSource,"sf_agent_specialist_recent('customer',".'$userId'.")");
 $checks['Customer UI shows truthful specialist state']=str_contains(file_get_contents(dirname(__DIR__).'/assets/js/agent-brain.js'),'My Agent specialists');
 $checks['Admin UI shows truthful specialist state']=str_contains(file_get_contents(dirname(__DIR__).'/admin/assets/agent-canvas.js'),'Specialist assignments');
 $bad=0;foreach($checks as $name=>$ok){echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$ok)$bad++;}
