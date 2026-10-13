@@ -190,3 +190,4 @@ jobs:
           php tests/section58-fullwidth-builder.php
           node tests/section58b-builder-asset-integrity.js
           php tests/section60-five-tab-builder.php
+          node tests/section60-builder-runtime.js
