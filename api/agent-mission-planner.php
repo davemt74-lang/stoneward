@@ -96,6 +96,7 @@ function sf_agent_mission_plan_load(string $scope,int $ownerId,string $missionId
 
 function sf_agent_mission_plan_save(string $scope,int $ownerId,string $conversationId,string $message,array $plan): array {
     if(!in_array($scope,['customer','admin'],true)||$ownerId<1
+        ||trim($message)===''||strlen($message)>4000
         ||!preg_match('/^[a-zA-Z0-9_-]{12,80}$/D',$conversationId)
         ||($plan['scope']??null)!==$scope
         ||($plan['writes_executed']??null)!==0
@@ -108,7 +109,10 @@ function sf_agent_mission_plan_save(string $scope,int $ownerId,string $conversat
             || $contract['skill_id']!==($step['skill_id']??null)
             || (int)($step['order']??0)!==$index+1
             || !in_array($step['status']??'',['read_available','read_completed','approval_required'],true)
-            || ($contract['requires_exact_approval'] && ($step['status']??'')!=='approval_required'))
+            || ($contract['requires_exact_approval'] && ($step['status']??'')!=='approval_required')
+            || (($step['status']??'')==='read_completed' && !($scope==='admin'
+                && in_array($step['intent'],['crm_report','journey_report'],true)
+                && ($step['evidence']['source']??'')==='admin_aggregate')))
             throw new InvalidArgumentException('Mission tool or approval mismatch.');
     }
     sf_agent_mission_ensure_schema();
@@ -136,4 +140,31 @@ function sf_agent_mission_plan_recent(string $scope,int $ownerId,int $limit=10):
         if($item!==null)$out[]=$item;
     }
     return $out;
+}
+
+/** Complete privacy export; never mix scopes or owners. */
+function sf_agent_mission_plan_export(string $scope,int $ownerId): array {
+    if(!in_array($scope,['customer','admin'],true)||$ownerId<1)return [];
+    sf_agent_mission_ensure_schema();
+    $q=sf_db()->prepare('SELECT mission_id FROM agent_mission_plans WHERE scope=? AND owner_user_id=? ORDER BY created_at ASC,mission_id ASC');
+    $q->execute([$scope,$ownerId]);$out=[];
+    foreach($q->fetchAll(PDO::FETCH_COLUMN) as $id){
+        $item=sf_agent_mission_plan_load($scope,$ownerId,(string)$id);
+        if($item!==null)$out[]=$item;
+    }
+    return $out;
+}
+
+/** Never create a MySQL table/implicit-commit while closing an account. */
+function sf_agent_mission_plan_clear(string $scope,int $ownerId): int {
+    if(!in_array($scope,['customer','admin'],true)||$ownerId<1)return 0;
+    try{
+        $q=sf_db()->prepare('DELETE FROM agent_mission_plans WHERE scope=? AND owner_user_id=?');
+        $q->execute([$scope,$ownerId]);return $q->rowCount();
+    }catch(PDOException $e){
+        $missing=in_array((string)$e->getCode(),['42S02'],true)
+            || str_contains(strtolower($e->getMessage()),'no such table');
+        if($missing)return 0;
+        throw $e;
+    }
 }
