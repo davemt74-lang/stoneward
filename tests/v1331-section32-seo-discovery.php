@@ -74,7 +74,7 @@ ok32(strpos($app,"await navigator.share")<strpos($app,"share_target:'native'"),'
 ok32(strpos($app,'await navigator.clipboard.writeText')<strpos($app,"share_target:'copy'"),'copy-share attribution is recorded only after copy succeeds');
 ok32(str_contains($app,'data-merch-open')&&str_contains($app,"navigate('store',{slug:b.dataset.merchOpen})"),'store cards open canonical focused product routes');
 ok32(str_contains($app,'function merchDetailHtml')&&str_contains($app,"renderStore(params={})"),'direct product route renders focused merch detail');
-ok32(str_contains($storefront,"'slug'=>(string)\$p['slug']"),'storefront API exposes canonical product slug');
+ok32(str_contains($storefront,"require __DIR__.'/storefront-core.php'")&&str_contains((string)file_get_contents($root.'/api/storefront-core.php'),"'slug'=>(string)\$p['slug']"),'storefront API exposes canonical product slug');
 ok32(str_contains($css,'.merch-detail-module')&&str_contains($css,'.seo-server-snapshot'),'focused merch and crawl snapshot have dedicated responsive presentation');
 
 ok32(substr_count($core,'CREATE TABLE IF NOT EXISTS discovery_events')===2,'discovery event schema supports SQLite and MySQL');
