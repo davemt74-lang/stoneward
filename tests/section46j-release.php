@@ -24,8 +24,13 @@ $wired=true;
 foreach($sections as $x){$p='tests/section46'.$x.'.php';$wired=$wired&&is_file($root.'/'.$p)&&str_contains($ci,'php '.$p);}
 $check('Sections 46A-I all tested in release gate',$wired);
 $check('Section 46J release audit itself release-gated',str_contains($ci,'php tests/section46j-release.php'));
-$check('Release version synchronized across PHP/Admin/PWA/Apache',str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '1.3.45')")&&str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','1.3.45')")&&str_contains($read('version.php'),"'stonefellow'=>'1.3.45'")&&str_contains($read('service-worker.js'),'stonefellow-static-v1.3.45')&&str_contains($read('.htaccess'),'X-Stonefellow-Build "1.3.45"'));
-$check('Database target and endpoint synchronized to 1.3.35',SF_DB_SCHEMA_TARGET==='1.3.35'&&str_contains($read('version.php'),"'database_schema_target'=>'1.3.35'"));
+preg_match("/define\\('SF_BUILD',\\s*'([0-9.]+)'\\)/",$read('stonefellow-v120.php'),$vMatch);$build=$vMatch[1]??'';
+$check('46J baseline retained with synchronized release versions',version_compare($build,'1.3.45','>=')
+    &&str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$build."')")
+    &&str_contains($read('version.php'),"'stonefellow'=>'".$build."'")
+    &&str_contains($read('service-worker.js'),'stonefellow-static-v'.$build)
+    &&str_contains($read('.htaccess'),'X-Stonefellow-Build "'.$build.'"'));
+$check('Database target and endpoint remain synchronized after 46J',version_compare(SF_DB_SCHEMA_TARGET,'1.3.35','>=')&&str_contains($read('version.php'),"'database_schema_target'=>'".SF_DB_SCHEMA_TARGET."'"));
 $definitions=sf_migration_definitions();$found=null;
 foreach($definitions as $definition)if($definition['id']==='2026-10-12-036')$found=$definition;
 $check('New dual Brain migration registered exactly once',count(array_filter($definitions,fn($x)=>$x['id']==='2026-10-12-036'))===1);
