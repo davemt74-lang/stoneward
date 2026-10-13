@@ -46,8 +46,9 @@ function sf_agent_mission_plan(string $scope,string $message,string $primaryInte
 
 /** Read-only reconciliation against already authorized Admin aggregate context. */
 function sf_agent_mission_apply_admin_facts(array $plan,array $facts): array {
-    if(($plan['scope']??'')!=='admin')return $plan;
-    foreach($plan['steps']??[] as &$step){
+    if(($plan['scope']??'')!=='admin'||!isset($plan['steps'])||!is_array($plan['steps']))return $plan;
+    // Mutate the actual plan array: null-coalescing inside foreach creates a copy.
+    foreach($plan['steps'] as &$step){
         if(($step['status']??'')!=='read_available')continue;
         if($step['intent']==='crm_report' && isset($facts['crm_contacts'],$facts['newsletter_opted_in'])){
             $step['status']='read_completed';
