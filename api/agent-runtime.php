@@ -190,7 +190,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(search|find)\b.*\b(stonefellow|site|everything|anything|stories?|videos?|photos?|galleries|shows?|merch|products?|offers?)\b|\bsearch (?:the )?(?:whole )?(?:site|stonefellow)\b/',$q))return 'site_search';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
-    if(preg_match('/\b(where is my order|order status|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
+    if(preg_match('/\b(where is my order|where is my vinyl|my vinyl|my record order|order status|vinyl production|custom record|pressing status|artwork approval|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
     if(preg_match('/\b(tickets?|rsvp|guest list|check.?in|vip tickets?|meet.?greet|presale|reservation)\b/',$q))return 'ticketing_info';
     if(preg_match('/\b(book stonefellow|booking inquiry|booking request|hire stonefellow|contact stonefellow|professional inquiry|business inquiry|press inquiry|media inquiry|licen[sc](?:e|ing)|sync request|sync licensing|collaborat(?:e|ion))\b/',$q))return 'professional_contact';
     if(preg_match('/\b(videos?|music videos?|visualizers?|live sessions?|behind the scenes|short films?)\b/',$q))return 'videos_browse';
@@ -321,7 +321,20 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             $action=['type'=>'builder_save'];$text='I’ll save the current build as a draft.';$profile='account';break;
         case 'cart_open':$action=['type'=>'open_view','view'=>'cart'];$text='Here’s your cart.';$profile='commerce';break;
         case 'order_support':
-            $action=['type'=>'open_view','view'=>'account'];$text='I can show your own Stonefellow order, shipment, refund and support-case status. I cannot change fulfillment or confirm a refund for you.';$profile='account';break;
+            $action=['type'=>'open_view','view'=>'account'];$profile='account';
+            $text='I can show your own Stonefellow order and shipment details in My Account. I cannot change production, shipping, or refunds.';
+            if($userId!==null && $userId>0 && preg_match('/vinyl|custom record|production|pressing|artwork approval|where is my order|order status/i',$message)){
+                require_once __DIR__.'/vinyl-customer-status.php';
+                $q=sf_db()->prepare('SELECT email FROM users WHERE id=? LIMIT 1');$q->execute([$userId]);
+                $owned=sf_vinyl_customer_status($userId,(string)($q->fetchColumn()?:''),3);
+                if($owned){
+                    $latest=$owned[0];
+                    $text='Your custom vinyl order '.(string)$latest['order_id'].' is currently '.str_replace('_',' ',(string)$latest['status']).'. '
+                        .'Shipping is '.str_replace('_',' ',(string)$latest['shipping_status']).'. '
+                        .'I can open My Account for more information.';
+                }else{$text='I could not find a vinyl production update associated with your account. You can check My Account for order details.';}
+            }
+            break;
         case 'purchase_request':$action=['type'=>'open_view','view'=>'cart'];$text='I can take you to the cart. You’ll confirm the purchase yourself at checkout.';$profile='commerce';$confirm=true;break;
         case 'notifications_open':$action=['type'=>'open_notifications'];$count=(int)($client['notification_unread']??0);$text=$count>0?'You have '.$count.' unread notification'.($count===1?'':'s').'. I’ll open them.':'You’re caught up. I’ll open your activity drawer.';$profile='account';break;
         case 'notification_preferences':$action=['type'=>'open_view','view'=>'account'];$text='Your notification preferences are in My account. You can control in-app and email reminders there.';$profile='account';break;
