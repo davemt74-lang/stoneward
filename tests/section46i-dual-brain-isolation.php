@@ -29,7 +29,7 @@ $db->exec("INSERT INTO agent_conversations VALUES('conv_priv_bbbb2222',2,'Second
 $db->exec("INSERT INTO agent_brain_decisions(user_id,conversation_id,phase,route,action,provider_status,created_at) VALUES(1,'conv_priv_aaaa1111','route','playlist','none','completed','2026-10-12'),(2,'conv_priv_bbbb2222','route','play','none','completed','2026-10-12')");
 $first=sf_agent_customer_brain_snapshot(1);$second=sf_agent_customer_brain_snapshot(2);
 $check('Fan snapshots show exactly one owned thread',count($first['conversations'])===1&&count($second['conversations'])===1);
-$check('Fan decisions are owner-isolated',count($first['decisions'])===1&&count($second['decisions'])===1&&$first['decisions'][0]['user_id']===1);
+$check('Fan decisions are owner-isolated',count($first['decisions'])===1&&count($second['decisions'])===1&&$first['decisions'][0]['conversation_id']==='conv_priv_aaaa1111');
 $adminThread=sf_admin_agent_thread(10);
 sf_admin_agent_save_message(10,$adminThread,'user','How many opted-in contacts?');
 $check('Admin conversations stored separately',(int)$db->query('SELECT COUNT(*) FROM admin_agent_messages')->fetchColumn()===1);
