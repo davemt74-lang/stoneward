@@ -48,25 +48,36 @@
   }
   async function render(){
     const c=ctx();if(!c)return;
-    c.canvas.innerHTML=c.head('ADMIN AGENT · OPERATIONS','Stonefellow Admin Agent','A separate Admin Brain for operational research, reviewed proposals and mission history. It cannot read customer private Agent memory.', '<button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain <span aria-hidden="true">↗</span></button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button>')+
-      '<section class="panel"><div class="admin-agent-transcript" id="adminAgentTranscript" role="log" aria-live="polite"><p>Loading your operational conversation…</p></div><form id="adminAgentCanvasForm" class="form-grid"><label class="field span3">Ask Admin Agent<input name="message" required maxlength="4000" placeholder="Review our fan journeys and prepare a follow-up campaign"></label><div class="actions span3"><button class="primary" type="submit">Send message</button></div><p id="adminAgentCanvasStatus" role="status" class="span3"></p></form></section>';
-    const get=await load();lastBrain=get.brain||null;
-    const transcript=c.canvas.querySelector('#adminAgentTranscript');
-    const items=get.messages||[];
-    transcript.innerHTML=items.length?items.map(messageHtml).join(''):'<p>Ask your Admin Agent about CRM performance, campaigns, fan journeys or the next reviewed action.</p>';
-    transcript.scrollTop=transcript.scrollHeight;
-    bindActions(transcript);
-    c.canvas.querySelector('#adminAgentOpenBrain').onclick=showBrain;
-    c.canvas.querySelector('#adminAgentNewThread').onclick=()=>{conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');render().catch(e=>c.say(e.message));};
-    c.canvas.querySelector('#adminAgentCanvasForm').onsubmit=async e=>{
-      e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
-      const msg=form.elements.message.value.trim();
-      try{await send(msg);}catch(err){const status=c.canvas.querySelector('#adminAgentCanvasStatus');if(status)status.textContent='Request unavailable. No action was executed.';}
-      finally{button.disabled=false;}
+    c.canvas.innerHTML=
+      '<div class="admin-agent-chat" id="adminAgentChat">'+
+      '<header class="admin-agent-chat-heading"><div><small>ADMIN AGENT · OPERATIONS</small><p>Private Admin Brain · CRM, campaigns and operational research</p></div>'+
+      '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
+      '<section class="admin-agent-chat-thread" aria-label="Admin Agent conversation">'+
+      '<div class="admin-agent-transcript" id="adminAgentTranscript" role="log" aria-live="polite" aria-relevant="additions text"><p>Loading your conversation…</p></div></section>'+
+      '<p class="admin-agent-chat-status" id="adminAgentChatStatus" role="status"></p>'+
+      '</div>';
+    const root=c.canvas.querySelector('#adminAgentChat');
+    root.querySelector('#adminAgentOpenBrain').onclick=showBrain;
+    root.querySelector('#adminAgentNewThread').onclick=()=>{
+      conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');
+      render().then(()=>document.querySelector('#adminChatInput')?.focus()).catch(e=>c.say(e.message));
     };
+    try{
+      const get=await load();if(!root.isConnected)return;
+      lastBrain=get.brain||null;
+      const transcript=root.querySelector('#adminAgentTranscript'),items=get.messages||[];
+      transcript.innerHTML=items.length?items.map(messageHtml).join(''):
+        '<div class="admin-agent-welcome"><h2>What can I help with?</h2><p>Ask about fans, campaigns, media or operational decisions.</p></div>';
+      bindActions(transcript);
+      transcript.scrollTop=transcript.scrollHeight;
+    }catch(err){
+      if(root.isConnected)root.querySelector('#adminAgentTranscript').innerHTML=
+        '<p class="admin-agent-load-error">Conversation unavailable. Your saved messages have not been changed.</p>';
+      throw err;
+    }
   }
   async function send(text){
-    if(busy)return;
+    if(busy)throw new Error('An Admin Agent request is already in progress.');
     const c=ctx();if(!c)throw new Error('Admin workspace unavailable.');
     const message=String(text||'').trim();if(!message)return;
     busy=true;
@@ -75,7 +86,7 @@
       conversationId=r.conversation_id||conversationId;
       if(conversationId)sessionStorage.setItem('stonefellow.admin.agent.thread',conversationId);
       c.openView('agent-chat');
-      c.say(r.text||'Admin Agent is ready.');
+      const status=c.canvas.querySelector('#adminAgentChatStatus');if(status)status.textContent='';
       return r;
     }finally{busy=false;}
   }

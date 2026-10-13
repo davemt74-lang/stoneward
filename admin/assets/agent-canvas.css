@@ -13,3 +13,37 @@
 .admin-brain-drawer :focus-visible,.admin-agent-transcript :focus-visible {outline:3px solid #dcb679;outline-offset:3px;}
 @media(max-width:640px){.admin-brain-drawer{padding:14px;width:100vw}.admin-agent-message{max-width:100%}.admin-agent-transcript{max-height:50dvh;}}
 @media(prefers-reduced-motion:reduce){.admin-brain-drawer,.admin-brain-backdrop{transition:none;scroll-behavior:auto;}}
+
+/* One sticky ChatGPT-style composer; conversation is the only input surface. */
+.admin-app.admin-agent-chat-active .workspace{height:100dvh;min-height:0;padding-bottom:0;display:flex;flex-direction:column;overflow:hidden}
+.admin-app.admin-agent-chat-active .admin-topbar{flex:0 0 76px}
+.admin-app.admin-agent-chat-active .admin-canvas{width:min(980px,calc(100% - 40px));flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 0 112px}
+.admin-agent-chat{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
+.admin-agent-chat-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;border-bottom:1px solid var(--line);padding:8px 0 15px;flex-wrap:wrap}
+.admin-agent-chat-heading small{color:var(--accent);font-size:.63rem;letter-spacing:.14em}
+.admin-agent-chat-heading p{font-size:.75rem;line-height:1.45;color:var(--muted);margin:6px 0 0}
+.admin-agent-chat-controls{display:flex;gap:8px;flex-wrap:wrap}
+.admin-agent-chat-thread{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}
+.admin-agent-chat .admin-agent-transcript{flex:1;min-height:0;max-height:none;min-width:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:thin;padding:20px 4px 8px}
+.admin-agent-chat .admin-agent-message{max-width:min(730px,94%);width:fit-content;min-width:0}
+.admin-agent-chat .admin-agent-welcome{margin:auto;text-align:center;max-width:450px;padding:20px}
+.admin-agent-welcome h2{font-family:Georgia,serif;font-size:clamp(1.4rem,3vw,2.2rem);font-weight:400;margin:0 0 10px}
+.admin-agent-welcome p,.admin-agent-load-error{color:var(--muted);font-size:.86rem;line-height:1.5}
+.admin-agent-chat-status{margin:0;min-height:1em;font-size:.73rem;color:var(--muted)}
+.admin-app.admin-agent-chat-active .agent-strip{display:none}
+.admin-app.admin-agent-chat-active .admin-chat-footer{padding:10px 18px max(14px,env(safe-area-inset-bottom));}
+.admin-chat-footer .admin-chatbar{grid-template-columns:minmax(0,1fr) 46px 46px;align-items:end;border-radius:26px}
+.admin-chat-footer .admin-chatbar textarea{display:block;width:100%;height:44px;min-height:44px;max-height:160px;resize:none;overflow-y:auto;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);padding:11px 14px;font-size:1rem;line-height:1.4;box-shadow:none}
+.admin-chat-footer .admin-chatbar:focus-within{border-color:var(--accent)}
+.admin-chat-footer .admin-chatbar [type="submit"]:disabled{opacity:.55;cursor:wait}
+.admin-chat-footer textarea:focus-visible{outline:0}
+.admin-chat-footer button:focus-visible,.admin-agent-chat button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:760px){
+ .admin-app.admin-agent-chat-active .admin-topbar{flex-basis:76px}
+ .admin-app.admin-agent-chat-active .admin-canvas{width:calc(100% - 28px);padding:10px 0 102px}
+ .admin-agent-chat-heading{align-items:flex-start}
+ .admin-agent-chat-controls .secondary{min-height:40px}
+ .admin-app.admin-agent-chat-active .admin-chat-footer{padding:8px 12px max(10px,env(safe-area-inset-bottom))}
+ .admin-agent-chat .admin-agent-message{max-width:100%}
+}
+@media(max-width:420px){.admin-agent-chat-heading p{font-size:.7rem}.admin-agent-chat-controls{width:100%}.admin-agent-chat-controls .secondary{flex:1}.admin-chat-footer .admin-chatbar{grid-template-columns:minmax(0,1fr) 42px 42px}}
