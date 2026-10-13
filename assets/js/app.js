@@ -733,7 +733,32 @@
     const b=x.builder||{};return '<div class="cart-line cart-custom-build"><div class="cart-custom-main"><strong>'+esc(b.title||'Custom '+x.format)+'</strong><small>Custom '+esc(x.format)+' · exact sequence</small>'+builderSequencePreview(b)+'</div><button type="button" data-remove="'+i+'" aria-label="Remove item">×</button></div>'
   }
   function builderCartItem(){return {type:'custom_media',format:st.builder.format,builder:{version:4,format:st.builder.format,title:st.builder.title,theme:st.builder.theme,A:[...st.builder.A],B:[...st.builder.B],coverFront:st.builder.coverFront||'stonefellow',coverBack:st.builder.coverBack||'stonefellow',customNote:String(st.builder.customNote||'').slice(0,280)}}}
-  function addBuildToCart(){const duplicates=duplicateBuildIds();if(duplicates.length){say('Remove duplicate tracks before ordering this build.');return}if(!st.builder.A.length&&!st.builder.B.length){say('Add at least one song before ordering this build.');return}if(['A','B'].some(side=>sideTime(side)>limit())){say('One side is over the format time limit. Shorten it before ordering.');return}st.cart=st.cart.filter(x=>x.type!=='custom_media');st.cart.push(builderCartItem());persistCart();say('Your exact '+st.builder.format+' sequence is in the cart.',renderCart)}
+  function builderReviewProblems(){
+    const problems=[];
+    if(!String(st.builder.title||'').trim())problems.push('Add a record title.');
+    if(!st.builder.A.length&&!st.builder.B.length)problems.push('Add at least one song.');
+    if(duplicateBuildIds().length)problems.push('Remove duplicate songs.');
+    for(const side of ['A','B']){
+      if(sideTime(side)>limit())problems.push('Shorten Side '+side+' to fit the time limit.');
+      for(const id of st.builder[side]){
+        const track=trackById(id);
+        if(!track||!track.podEligible)problems.push('Side '+side+' contains a song no longer eligible for custom vinyl.');
+      }
+    }
+    return [...new Set(problems)];
+  }
+  function addBuildToCart(){
+    const problems=builderReviewProblems();
+    if(problems.length){
+      builderTab='submit';renderBuilder();
+      showBuilderNotice(problems.join(' '),'error');
+      return;
+    }
+    st.cart=st.cart.filter(x=>x.type!=='custom_media');
+    st.cart.push(builderCartItem());persistCart();
+    showBuilderNotice('Added your reviewed vinyl design to the cart. Checkout is the next step.','success');
+    say('Your custom vinyl design is in the cart. Review the total and complete checkout.',renderCart);
+  }
   // Preserve the active tab when the builder re-renders after an edit.
   let builderTab='songs';
   function renderBuilder(){
@@ -750,7 +775,9 @@
     const songs='<div class="builder-catalog" aria-label="Stonefellow songs"><div class="builder-catalog-head"><strong>STONEFELLOW SONGS</strong><span class="builder-song-count">'+catalog.length+' available</span></div><p class="player-note">Browse every available track. Add eligible songs to your record or preview a song first.</p><div class="builder-song-list"></div></div>';
     const songLists=(dups.length?'<div class="builder-warning"><strong>Duplicate tracks detected.</strong><span>Each song can appear only once on a physical build.</span><button type="button" id="dedupeBuild">Remove duplicates</button></div>':'')+'<div class="builder-sides-heading"><h3>YOUR RECORD SIDES</h3><button class="text-control" id="agentChoose" type="button">Fill remaining time</button></div><div class="sides" aria-label="Vinyl sides"><div class="side-card" data-side="A"></div><div class="side-card" data-side="B"></div></div>';
     const notes='<div class="builder-personal-note"><h3>Your personal dedication</h3><p class="player-note">Add an optional message to the back of your Stonefellow record. Maximum 280 characters.</p></div>';
-    const submit='<div class="builder-submit-review"><h3>Review your custom vinyl</h3><p class="player-note">Side A: '+st.builder.A.length+' tracks · '+time(sideTime('A'))+' / '+time(limit())+'</p><p class="player-note">Side B: '+st.builder.B.length+' tracks · '+time(sideTime('B'))+' / '+time(limit())+'</p></div><div class="builder-footer"><button class="buy-primary" id="orderBuild" type="button">Review custom vinyl in cart</button><button class="text-control" id="saveBuild" type="button">'+(st.auth.authenticated?(st.builderDrafts.activeId?'Update draft':'Save draft'):'Save locally')+'</button><button class="text-control" id="exportBuild" type="button">Export build</button><button class="text-control" id="clearBuild" type="button">Start over</button><span class="saved-badge">'+(st.builder.savedAt?'Last saved '+esc(String(st.builder.savedAt).replace('T',' ').slice(0,19)):'')+'</span></div>';
+    const problems=builderReviewProblems();
+    const reviewSide=side=>'<section class="builder-review-side" aria-label="Side '+side+' song review"><h4>Side '+side+' · '+st.builder[side].length+' songs · '+time(sideTime(side))+' / '+time(limit())+'</h4>'+(st.builder[side].length?'<ol>'+st.builder[side].map(id=>{const t=trackById(id);return '<li>'+esc(t?.title||'Unavailable song')+' <small>'+time(Number(t?.duration||0))+'</small></li>'}).join('')+'</ol>':'<p class="player-note">No songs selected.</p>')+'</section>';
+    const submit='<div class="builder-submit-review"><h3>Review your custom vinyl</h3><p class="player-note">Confirm the edition title, song order, artwork and dedication before proceeding to your cart.</p><p><strong>Edition:</strong> '+esc(st.builder.title)+'</p><p><strong>Artwork:</strong> '+esc(st.builder.theme)+' · Front: '+esc(st.builder.coverFront||'stonefellow')+' · Back: '+esc(st.builder.coverBack||'stonefellow')+'</p>'+reviewSide('A')+reviewSide('B')+(st.builder.customNote?'<p><strong>Personal dedication:</strong> '+esc(st.builder.customNote)+'</p>':'')+(problems.length?'<div class="builder-warning" role="alert"><strong>Before checkout</strong><ul>'+problems.map(p=>'<li>'+esc(p)+'</li>').join('')+'</ul></div>':'<p class="player-note" role="status">Ready for cart review. No payment or production order is created until checkout.</p>')+'</div><div class="builder-footer"><button class="buy-primary" id="orderBuild" type="button">Review custom vinyl in cart</button><button class="text-control" id="saveBuild" type="button">'+(st.auth.authenticated?(st.builderDrafts.activeId?'Update draft':'Save draft'):'Save locally')+'</button><button class="text-control" id="exportBuild" type="button">Export build</button><button class="text-control" id="clearBuild" type="button">Start over</button><span class="saved-badge">'+(st.builder.savedAt?'Last saved '+esc(String(st.builder.savedAt).replace('T',' ').slice(0,19)):'')+'</span></div>';
     canvas.innerHTML='<article class="module builder-module" aria-label="Custom vinyl record builder"><div class="builder-left-rail">'+nav+'<div class="builder-notice" id="builderFeedback" data-kind="'+esc(builderNotice.kind)+'" role="status" aria-live="polite" '+(builderNotice.text?'':'hidden')+'>'+esc(builderNotice.text)+'</div>'+panel('songs',songs)+panel('song-lists',songLists)+panel('album-artwork',artwork)+panel('personal-notes',notes)+panel('saved-drafts',draftsHtml)+panel('submit',submit)+'</div></article>';
     const buttons=$$('[data-builder-tab]',canvas);
     const activateTab=(id,focus=false)=>{
