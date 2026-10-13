@@ -190,7 +190,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(search|find)\b.*\b(stonefellow|site|everything|anything|stories?|videos?|photos?|galleries|shows?|merch|products?|offers?)\b|\bsearch (?:the )?(?:whole )?(?:site|stonefellow)\b/',$q))return 'site_search';
     if(preg_match('/\b(find|search)\b.*\b(song|songs|track|tracks|music|release|releases)\b|\b(songs?|tracks?|music)\s+(?:about|with|for)\b|show (?:me )?.*(?:songs?|tracks?) (?:about|with)/',$q))return 'catalog_search';
     if(preg_match('/catalog|show (me )?(songs|music)|look around/',$q))return 'catalog_browse';
-    if(preg_match('/\b(where is my order|order status|vinyl production|custom record|pressing status|artwork approval|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
+    if(preg_match('/\b(where is my order|where is my vinyl|my vinyl|my record order|order status|vinyl production|custom record|pressing status|artwork approval|tracking|shipment|shipped|delivery|refund|return|support case|customer support|order help)\b/',$q))return 'order_support';
     if(preg_match('/\b(tickets?|rsvp|guest list|check.?in|vip tickets?|meet.?greet|presale|reservation)\b/',$q))return 'ticketing_info';
     if(preg_match('/\b(book stonefellow|booking inquiry|booking request|hire stonefellow|contact stonefellow|professional inquiry|business inquiry|press inquiry|media inquiry|licen[sc](?:e|ing)|sync request|sync licensing|collaborat(?:e|ion))\b/',$q))return 'professional_contact';
     if(preg_match('/\b(videos?|music videos?|visualizers?|live sessions?|behind the scenes|short films?)\b/',$q))return 'videos_browse';
