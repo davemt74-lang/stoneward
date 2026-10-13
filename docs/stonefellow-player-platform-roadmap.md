@@ -2,8 +2,8 @@
 Updated 2026-10-12 | Source baseline v1.3.55 | Desktop sideways turntable CSS release v1.3.56
 
 ## Non-negotiable player layout
-- Desktop record-builder's digital turntable rotates **90 degrees counterclockwise**.
-- The physical **bottom** edge points to screen-right and approximately one quarter of the sideways player extends beyond the right viewport.
+- Desktop record-builder's digital turntable rotates **45 degrees counterclockwise** as of v1.3.58.
+- The physical **bottom** edge points toward the lower-right viewport and approximately one quarter of the sideways player extends beyond the right viewport.
 - Use the desktop stage only at 1024px+; the mobile builder stays in its existing layout.
 - Keep roughly 75px breathing room above/below the rotated, screen-height player.
 - The record spins on real audio playback only; track artwork, title and Side A/B continue to update.
@@ -32,3 +32,10 @@ Updated 2026-10-12 | Source baseline v1.3.55 | Desktop sideways turntable CSS re
 - Deliver SHA-256 checked website deployment ZIP from the certified main commit.
 - A production payment that is not settled cannot unlock paid modules or generated outputs.
 - Capture original uploads and generated results as separate files with provenance, authorization flags and track-specific usage permissions.
+
+## Section 58 — builder workspace refinement (v1.3.58)
+- Global site header only above the full-width builder; the Agent orb, idle status, and spoken message no longer occupy a separate top row in this view.
+- Left control rail (360–440px) starts with Vinyl/Cassette then Saved Drafts, Cover Design, Side A/B, Add Song, player add-ons and Checkout/Save/Export controls.
+- Edition name and stock colors remain editable inside Cover Design rather than a hero section.
+- Right turntable chassis sits on the oversized, clipped player stage at **45° counterclockwise**, bottom pointing down/right. Its record platter animation remains independent of the chassis transform.
+- Existing mobile view is stacked; page bottom reserves sticky composer space. Existing real DSP, premium effects, managed Admin front/back artwork and paid AI generation remain future sections.

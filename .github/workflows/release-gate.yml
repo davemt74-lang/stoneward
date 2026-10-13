@@ -185,3 +185,4 @@ jobs:
           node tests/section53-admin-nav-accordion.js
           node tests/section57-admin-render-recovery.js
           php tests/section54-modular-turntable.php
+          php tests/section58-fullwidth-builder.php
