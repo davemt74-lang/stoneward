@@ -206,6 +206,7 @@ jobs:
           php tests/section70-layered-turntable.php
           php tests/section71-cart-pricing-layout.php
           php tests/section71-legacy-library-repair.php
+          node tests/section72a-checkout-review.js
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
