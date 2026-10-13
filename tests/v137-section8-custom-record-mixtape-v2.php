@@ -41,7 +41,7 @@ ok(str_contains($app,"if(!st.builderDrafts.loaded)await loadBuilderDrafts(true)"
 
 ok(str_contains($app,'function builderArtworkTiles'),'builder creates artwork tile preview from selected tracks');
 ok(str_contains($app,'builder-art-grid'),'vinyl sleeve preview uses artwork grid');
-ok(str_contains($app,'builder-cassette-v2'),'cassette has dedicated v2 visual preview');
+ok(!str_contains($app,'builder-cassette-v2')&&str_contains($app,"st.builder.format='vinyl'"),'builder now provides vinyl-only preview while historical cassette orders remain supported');
 ok(str_contains($css,'.builder-sleeve-v2')&&str_contains($css,'.builder-art-grid'),'builder artwork preview is styled');
 ok(str_contains($css,'.builder-drafts')&&str_contains($css,'.builder-draft-row'),'saved draft UI is styled');
 
