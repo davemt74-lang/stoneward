@@ -191,11 +191,11 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
   .turntable-stage-body{position:absolute;inset:0;--deck-width:min(84%,700px);--deck-height:auto}
   /* Landscape, unrotated chassis: no distorted 1080px-wide rotated panel. */
   .turntable-deck{left:auto!important;right:clamp(10px,2.2vw,36px);top:48%;width:min(84%,700px);height:auto;aspect-ratio:1.45;transform:translateY(-50%) rotate(0deg);border-radius:28px}
-  .turntable-platter{left:3%;top:50%;width:67%;aspect-ratio:1;transform:translateY(-50%)}
+  .turntable-platter{left:4%;top:50%;width:62%;aspect-ratio:1;transform:translateY(-50%)}
   .turntable-center-label{transform:none}
   .turntable-deck-head,.turntable-deck-foot,.turntable-deck-serial{display:none}
   /* Pivot at upper right; arm sweeps down-left onto the groove, with angular cartridge. */
-  .turntable-tonearm{top:10%;left:89%;width:5%;height:58%;transform:rotate(47deg);transform-origin:50% 8%;border-radius:6px;box-shadow:5px 7px 12px #000c;background:linear-gradient(90deg,#24221f,#7d776f 18%,#dfd8c8 42%,#8a8985 64%,#201f1d)}
+  .turntable-tonearm{top:10%;left:89%;width:3%;height:58%;transform:rotate(47deg);transform-origin:50% 8%;border-radius:6px;box-shadow:5px 7px 12px #000c;background:linear-gradient(90deg,#24221f,#7d776f 18%,#dfd8c8 42%,#8a8985 64%,#201f1d)}
   .turntable-platter{box-shadow:0 0 0 5px #090909,0 0 0 8px #99968466,0 8px 22px #000d}
   .turntable-disc{background:repeating-radial-gradient(circle at center,#141414 0px,#050505 2px,#232323 3px,#070707 5px);box-shadow:inset 0 0 21px #000a,inset 0 0 0 2px #625d5755}
   .turntable-tonearm{border-radius:5px;box-shadow:5px 8px 11px #000b, inset 1px 0 1px #fff7;background:linear-gradient(90deg,#23211f 0%,#8c8173 18%,#ede4d7 38%,#b6b5b2 53%,#8c8882 72%,#272521 100%)}
