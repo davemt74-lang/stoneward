@@ -31,13 +31,39 @@
   async function openOrder(id){
     try{const j=await api('fulfillment.php?order_id='+encodeURIComponent(id));state.order=j;renderOrder()}catch(e){say(e.message)}
   }
+  async function loadVinylProduction(orderId){
+    try{
+      const data=await api('vinyl-production.php?order_id='+encodeURIComponent(orderId));
+      const box=$('#vinylProductionPanel',canvas);if(!box)return;
+      const r=data.record||{},stages=data.stages||[],index=stages.indexOf(r.status),next=stages[index+1],events=r.events||[];
+      box.innerHTML='<div class="panel-title"><div><h2>Custom vinyl production</h2><p>Artwork approval, pressing and quality control. Shipping is managed separately.</p></div>'+badge(r.status)+'</div>'+
+        '<p>Stage '+(index+1)+' of '+stages.length+' · revision '+Number(r.revision||0)+'</p>'+
+        (next?'<form id="vinylAdvanceForm" class="form-grid"><label class="field">Next milestone<input readonly value="'+esc(label(next))+'"></label><label class="field">Production note<input name="note" maxlength="500" placeholder="Optional internal note"></label><div class="actions span3"><button class="primary" type="submit">Confirm '+esc(label(next))+'</button></div></form>':'<p>Production stages complete. Arrange shipment through Fulfillment.</p>')+
+        '<h3>Production history</h3>'+(events.length?'<ol>'+events.map(e=>'<li><strong>'+esc(label(e.to))+'</strong> · '+esc(dt(e.at))+' · '+esc(e.note||'No note')+'</li>').join('')+'</ol>':'<div class="empty">No production transitions yet.</div>');
+      const form=$('#vinylAdvanceForm',box);
+      if(form)form.onsubmit=async event=>{
+        event.preventDefault();
+        if(!confirm('Advance this vinyl order to '+label(next)+'?'))return;
+        const button=form.querySelector('button[type="submit"]');button.disabled=true;
+        try{
+          const updated=await api('vinyl-production.php',{action:'advance',order_id:orderId,status:next,revision:Number(r.revision),confirmed:true,note:new FormData(form).get('note')||''});
+          say('Vinyl production status saved.');await loadVinylProduction(orderId);
+        }catch(e){alert(e.message);button.disabled=false;}
+      };
+    }catch(e){
+      const box=$('#vinylProductionPanel',canvas);
+      if(box)box.innerHTML='<div class="empty">Production details unavailable: '+esc(e.message)+'</div>';
+    }
+  }
   function renderOrder(){
     const j=state.order,o=j.order||{},q=o.quote||{},f=o.fulfillment||{},ships=j.shipments||[],refunds=j.refunds||[],cases=j.cases||[];
     canvas.innerHTML=head('FULFILLMENT + CARE',o.id||'Order','Shipment, refund and customer-care history.','<button class="secondary" id="fulfillBack" type="button">Back</button><button class="secondary" id="openLegacyOrder" type="button">Open Orders record</button>')+
       '<div class="stats"><div class="stat"><strong>'+esc(o.status||'')+'</strong><span>Order state</span></div><div class="stat"><strong>'+esc(f.status||'pending')+'</strong><span>Fulfillment</span></div><div class="stat"><strong>'+money(q.total_cents||0)+'</strong><span>Total</span></div><div class="stat"><strong>'+ships.length+'</strong><span>Shipments</span></div></div>'+
+      (JSON.stringify(q).includes('\\"custom_media\\"')?'<section class="panel" id="vinylProductionPanel"><p>Loading production stages…</p></section>':'')+
       '<section class="fulfillment-grid"><div class="panel"><div class="panel-title"><div><h2>Shipments</h2><p>Each tracking record is independently auditable.</p></div><button class="primary" type="button" id="newShipment">Add shipment</button></div>'+(ships.length?ships.map(shipmentCard).join(''):'<div class="empty">No shipment records yet.</div>')+'</div>'+
       '<div class="panel"><div class="panel-title"><div><h2>Refunds + returns</h2><p>Refund confirmation and inventory restocking are separate decisions.</p></div><button class="secondary" type="button" id="requestRefund">Request refund</button></div>'+(refunds.length?refunds.map(refundCard).join(''):'<div class="empty">No refund records.</div>')+(String(f.status)==='returned'?'<button class="secondary" id="restockReturn" type="button">Restock returned merchandise</button>':'')+'</div></section>'+
       '<section class="panel"><div class="panel-title"><div><h2>Care cases</h2><p>Cases linked to this order.</p></div></div>'+(cases.length?cases.map(c=>'<button class="care-inline" type="button" data-order-case="'+c.id+'"><span><strong>'+esc(c.case_key)+'</strong><small>'+esc(c.subject)+'</small></span>'+badge(c.status)+'</button>').join(''):'<div class="empty">No support cases for this order.</div>')+'</section>';
+    if(JSON.stringify(q).includes('\\"custom_media\\"'))void loadVinylProduction(o.id);
     $('#fulfillBack').onclick=renderFulfillment;
     $('#openLegacyOrder').onclick=()=>{openView('orders');setTimeout(()=>{const b=document.querySelector('[data-order-id="'+CSS.escape(o.id)+'"]');if(b)b.click()},50)};
     $('#newShipment').onclick=()=>shipmentModal(o.id,null);
