@@ -48,3 +48,12 @@ Updated 2026-10-12 | Source baseline v1.3.55 | Desktop sideways turntable CSS re
 - Physical deck rotates 90° counterclockwise; its bottom points to the right screen edge, with a responsive stage fit and independent record spin.
 - Vinyl order quotes now include server-validated front/back artwork and custom note (280-character cap), and user-saved drafts keep their original account data.
 - Future roadmap still includes fully managed Admin-uploaded front/back artwork templates and real audio DSP effects, in addition to per-user player profiles and AI-powered music generation.
+
+## Section 61 — Songs catalog, saved-draft management and turntable detail (v1.3.61)
+- Six tabs in order: **Songs**, **Song Lists**, **Album Artwork**, **Personal Notes**, **Saved Drafts**, **Submit**. Six tabs use a readable 3×2 grid in the left rail and remain keyboard accessible.
+- Songs displays the complete public music catalog with filters, album artwork, and preview controls; non-vinyl-eligible tracks are shown but cannot be added to a custom record. Song Lists contains Side A/B, duration meters, ordering, and fill controls only; the catalog is not duplicated.
+- Save Draft reports a visible saving/success/error state, including a useful guest/local save message. Saved drafts are second-to-last with individual Manage actions, a styled Rename/Delete modal, and a separate irreversible-delete confirmation.
+- Rename is an account-scoped, transactional update that changes the draft name and its serialized title without altering tracks, artwork, and notes; deletion preserves unrelated drafts and purchased music.
+- The 90° turntable follows document scroll rather than sticking to the viewport, with right-hand clipping that leaves the record label and a slim band of vinyl visible. Narrow desktop rules protect the label from cropping.
+- Additional realistic turntable hardware: fine platter grooves, machined pivot, angular tonearm cartridge (no rounded head), chassis screws, power and speed switches, etched serial detail.
+- The roadmap still includes real audio-processing effect/DSP packages, per-user player designs, fully administered front/back cover uploads/templates, and paid AI music generation.

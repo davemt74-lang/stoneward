@@ -191,3 +191,5 @@ jobs:
           node tests/section58b-builder-asset-integrity.js
           php tests/section60-five-tab-builder.php
           node tests/section60-builder-runtime.js
+          php tests/section61-draft-rename.php
+          node tests/section61-builder-interactions.js

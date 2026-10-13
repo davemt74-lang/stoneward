@@ -65,7 +65,8 @@
       '<div class="turntable-platter"><div class="turntable-disc"><div class="turntable-disc-grooves"></div>'+
       '<div class="turntable-center-label"><img data-record-artwork alt="Current song artwork" hidden><span data-record-fallback>SF</span><strong data-record-track>STONEFELLOW</strong><em data-record-side>SIDE A</em></div></div></div>'+
       '<div class="turntable-tonearm"><i></i><b></b></div><div class="turntable-light"></div>'+
-      '<div class="turntable-deck-foot"><div><span>33⅓ RPM</span><strong data-record-state>READY</strong></div><span>PLAY · PAUSE IN MUSIC PLAYER</span></div></div>'+
+      '<div class="turntable-deck-foot"><div><span>33⅓ RPM</span><strong data-record-state>READY</strong></div><span>PLAY · PAUSE IN MUSIC PLAYER</span></div>'+
+      '<div class="turntable-hardware" aria-hidden="true"><i class="turntable-hardware-screw a"></i><i class="turntable-hardware-screw b"></i><i class="turntable-hardware-screw c"></i><i class="turntable-hardware-screw d"></i><span class="turntable-rpm-switch">33 ⅓ &nbsp; / &nbsp; 45</span><span class="turntable-power-switch"></span><span class="turntable-deck-serial">SF • STUDIO / 001</span></div></div>'+
       '<div class="turntable-visual-effect" aria-hidden="true"></div></div>';
     return stage;
   }
@@ -107,14 +108,14 @@
     const list=host.querySelector('.builder-song-list'),catalog=ctx.catalog;
     if(!list)return;
     const all=Array.from(list.querySelectorAll('.builder-song'));
-    const cats=[...new Set(catalog.filter(t=>t.podEligible).flatMap(t=>(t.mood||[]).map(x=>String(x).trim()).filter(Boolean)))].sort();
-    const releases=[...new Set(catalog.filter(t=>t.podEligible).map(t=>t.release||'Stonefellow'))].sort();
+    const cats=[...new Set(catalog.flatMap(t=>(t.mood||[]).map(x=>String(x).trim()).filter(Boolean)))].sort();
+    const releases=[...new Set(catalog.map(t=>t.release||'Stonefellow'))].sort();
     const filters=document.createElement('div');filters.className='builder-catalog-filters';
     filters.innerHTML='<input type="search" data-builder-search placeholder="Search songs…" aria-label="Search catalog">'+
       '<select data-builder-category aria-label="Filter by category"><option value="">All categories</option>'+cats.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select>'+
       '<select data-builder-release aria-label="Filter by release"><option value="">All releases</option>'+releases.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select>';
     list.before(filters);
-    const tracks=catalog.filter(t=>t.podEligible);
+    const tracks=catalog;
     all.forEach((b,i)=>{
       const t=tracks[i];if(!t)return;b.dataset.search=(t.title+' '+(t.mood||[]).join(' ')+' '+(t.release||'')).toLowerCase();
       b.dataset.category=(t.mood||[]).join('|');b.dataset.release=t.release||'Stonefellow';
