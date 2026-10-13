@@ -190,7 +190,7 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
   body.builder-workspace-active.has-announcement .builder-turntable-stage{top:108px!important;height:calc(100dvh - 120px)}
   .turntable-stage-body{position:absolute;inset:0}
   /* Reverse the old -90-degree chassis by 180 degrees: pivot upper right. */
-  .turntable-deck{left:calc(100% - clamp(140px,17vw,290px))!important;top:50%;transform:translate(-50%,-50%) rotate(90deg)}
+  .turntable-deck{left:calc(100% - clamp(320px,32vw,540px))!important;top:50%;transform:translate(-50%,-50%) rotate(90deg)}
   /* Keep track labels upright when the chassis is turned. */
   .turntable-center-label{transform:rotate(-90deg)}
   /* Printed deck branding belongs in the product UI, not on the chassis. */
@@ -216,7 +216,7 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 }
 @media(max-width:650px){.builder-draft-dialog .draft-modal-danger{align-items:stretch;flex-direction:column}.builder-draft-dialog .draft-modal-delete{align-self:flex-start}}
 
-@media(min-width:1024px) and (max-width:1199px){.turntable-deck{left:calc(100% - clamp(120px,16vw,185px))!important}}
+@media(min-width:1024px) and (max-width:1199px){.turntable-deck{left:calc(100% - clamp(280px,32vw,355px))!important}}
 
 /* Section 61 — six workflow tabs, with all available songs separate from Side A/B. */
 .builder-tablist{grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;gap:2px;border-radius:8px}
