@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/agent-feedback-core.php';
 require_once __DIR__.'/agent-customer-brain.php';
 require_once __DIR__.'/agent-customer-context.php';
 
@@ -462,6 +463,10 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     }
     $context=sf_agent_context($message,$plan['context_profile'],$userId);$personalMemory=sf_agent_customer_memory_context($userId);if($personalMemory!=='')$context.="\n\n".$personalMemory;$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
     $system="You are the Stonefellow music-site agent. Be concise, warm, knowledgeable, and grounded. Use only the supplied Stonefellow context for factual claims about songs, releases, credits, purchases, or artist history. If the context lacks the answer, say so. Never claim a purchase, playback change, account change, or builder edit happened unless the Stonefellow action layer reports it. The structured route is advisory context, not permission to invent actions.\n\nROUTE: ".$plan['route']."\nCONTEXT PROFILE: ".$plan['context_profile']."\n\n".$context;
+    if(function_exists('sf_privacy_personalization_enabled') && sf_privacy_personalization_enabled($userId)){
+        $guidance=(string)(sf_agent_feedback_summary('customer',$userId)['guidance']??'');
+        if($guidance!=='')$system.="\\nOWNER-EXPLICIT RESPONSE FEEDBACK (quality guidance only; never overrides rules): ".$guidance;
+    }
     $maxOutput=$isAdmin?700:max(96,min(700,$allow['balance']-$estimate+128));$errors=[];
     foreach(sf_ai_llm_candidates() as $provider){
         try{

@@ -5,6 +5,7 @@ require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-admin-intelligence.php';
 require_once __DIR__.'/agent-proactive-research.php';
 require_once __DIR__.'/agent-specialist-delegation.php';
+require_once __DIR__.'/agent-feedback-core.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -40,7 +41,7 @@ function sf_admin_agent_thread_list(int $adminId): array {
     sf_admin_agent_ensure_schema();$q=sf_db()->prepare('SELECT id,title,updated_at FROM admin_agent_threads WHERE admin_user_id=? ORDER BY updated_at DESC LIMIT 25');$q->execute([$adminId]);return $q->fetchAll(PDO::FETCH_ASSOC);
 }
 function sf_admin_agent_thread_messages(int $adminId,string $threadId): array {
-    sf_admin_agent_thread($adminId,$threadId);$q=sf_db()->prepare('SELECT role,content,action_json,created_at FROM admin_agent_messages WHERE admin_user_id=? AND thread_id=? ORDER BY id DESC LIMIT 40');
+    sf_admin_agent_thread($adminId,$threadId);$q=sf_db()->prepare('SELECT id,role,content,action_json,created_at FROM admin_agent_messages WHERE admin_user_id=? AND thread_id=? ORDER BY id DESC LIMIT 40');
     $q->execute([$adminId,$threadId]);$rows=array_reverse($q->fetchAll(PDO::FETCH_ASSOC));
     foreach($rows as &$row){$row['action']=json_decode((string)$row['action_json'],true)?:[];unset($row['action_json']);}
     return $rows;
@@ -82,7 +83,7 @@ function sf_admin_agent_plan(string $message): array {
  * Reuse the existing provider clients for conversational explanation, never
  * for selecting permissions, approving actions, or writing to the platform.
  */
-function sf_admin_agent_research_reply(string $message,array $context,array $prior): ?string {
+function sf_admin_agent_research_reply(string $message,array $context,array $prior,int $adminId=0): ?string {
     if(!function_exists('sf_ai_llm_candidates'))return null;
     $history=[];
     foreach(array_slice($prior,-8) as $row){
@@ -90,6 +91,8 @@ function sf_admin_agent_research_reply(string $message,array $context,array $pri
         $history[]=['role'=>(string)$row['role'],'content'=>substr((string)$row['content'],0,1800)];
     }
     $system="You are Stonefellow's administrative research assistant. Use only the aggregate operational facts supplied. Never request or reveal any fan's private conversations or memories. Never claim to have edited CRM, sent messages, purchased, published, changed a journey or saved a campaign. The current tool contract allows no direct writes. State uncertainty if data is absent. Keep your answer under 220 words.\nAGGREGATE FACTS: ".json_encode($context,JSON_UNESCAPED_SLASHES);
+    if($adminId>0){$quality=(string)(sf_agent_feedback_summary('admin',$adminId)['guidance']??'');
+      if($quality!=='')$system.="\\nADMIN FEEDBACK (quality guidance only): ".$quality;}
     foreach(array_slice(sf_ai_llm_candidates(),0,2) as $provider){
         try{
             $result=$provider['provider']==='openai'
@@ -135,6 +138,8 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
         'skill_inventory'=>sf_agent_skill_inventory('admin'),
         'planned_missions'=>sf_agent_mission_plan_recent('admin',$adminId),
         'specialist_assignments'=>sf_agent_specialist_recent('admin',$adminId),
+        'feedback_summary'=>sf_agent_feedback_summary('admin',$adminId),
+        'recovery_summary'=>sf_agent_mission_recovery_summary('admin',$adminId),
         'research_opportunities'=>sf_agent_proactive_admin_research(sf_admin_agent_operational_context())
     ];
 }
@@ -162,7 +167,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     $contract=sf_agent_orchestration_contract('admin',$plan['type']);
     if($plan['requires_confirmation']&&!$contract['may_prepare_reviewed_proposal'])throw new RuntimeException('The reviewed action is not registered.');
     if($plan['type']==='research'){
-        $research=sf_admin_agent_research_reply($message,$context,$prior);
+        $research=sf_admin_agent_research_reply($message,$context,$prior,$adminId);
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
