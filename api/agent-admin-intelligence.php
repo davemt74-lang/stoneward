@@ -13,7 +13,7 @@ function sf_admin_agent_decision_brief(array $aggregates): array {
         if(!array_key_exists($key,$row))return null;
         $value=$row[$key];
         if(!is_int($value) && !is_float($value) && !(is_string($value)&&preg_match('/^[0-9]{1,12}$/D',$value)))return null;
-        if((float)$value<0 || (float)$value>1000000000)return null;
+        if(!is_finite((float)$value) || (float)$value<0 || (float)$value>1000000000)return null;
         return (int)$value;
     };
     $contacts=$number($aggregates,'crm_contacts');
