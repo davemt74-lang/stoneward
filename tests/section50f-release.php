@@ -6,11 +6,11 @@ $admin=$read('admin/index.php');$public=$read('stonefellow-v120.php');$version=$
 $cache=$read('service-worker.js');$apache=$read('.htaccess');$mig=$read('api/migrations.php');
 $gate=$read('.github/workflows/release-gate.yml');
 $checks=[
- 'Section 50 release version is 1.3.69'=>str_contains($public,"define('SF_BUILD', '1.3.69')"),
- 'Admin build is the same version'=>str_contains($admin,"SF_ADMIN_BUILD','1.3.69'"),
- 'Public version endpoint matches release'=>str_contains($version,"'stonefellow'=>'1.3.69'"),
- 'PWA shell cache invalidated for UI assets'=>str_contains($cache,'stonefellow-static-v1.3.69'),
- 'Apache build header matches release'=>str_contains($apache,'X-Stonefellow-Build "1.3.69"'),
+ 'Section 50 release version is 1.3.70'=>str_contains($public,"define('SF_BUILD', '1.3.70')"),
+ 'Admin build is the same version'=>str_contains($admin,"SF_ADMIN_BUILD','1.3.70'"),
+ 'Public version endpoint matches release'=>str_contains($version,"'stonefellow'=>'1.3.70'"),
+ 'PWA shell cache invalidated for UI assets'=>str_contains($cache,'stonefellow-static-v1.3.70'),
+ 'Apache build header matches release'=>str_contains($apache,'X-Stonefellow-Build "1.3.70"'),
  'Database target remains 1.3.46 for UI-only change'=>str_contains($version,"'database_schema_target'=>'1.3.46'")&&str_contains($mig,"SF_DB_SCHEMA_TARGET = '1.3.46'"),
  'Migration 037 remains additive and preserved'=>str_contains($mig,"'id'=>'2026-10-12-037'"),
  'No user or administrator password rewrite in new UI'=>!str_contains($read('admin/assets/unified-ui.js'),'password_hash')&&!str_contains($read('admin/assets/homepage.js'),'password_hash'),
