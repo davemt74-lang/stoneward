@@ -29,7 +29,7 @@ $checks['Mobile stack and hidden decorative stage retained']=str_contains($css,'
 $checks['Sticky footer protected by desktop and mobile bottom padding']=str_contains($css,'calc(190px + env(safe-area-inset-bottom,0px))')&&str_contains($css,'calc(160px + env(safe-area-inset-bottom,0px))');
 $checks['Reduced motion animation opt out retained']=str_contains($css,'@media(prefers-reduced-motion:reduce)')&&str_contains($css,'.turntable-disc{animation:none!important}');
 $checks['Front back note modules and catalog remain']=str_contains($turntable,'data-cover-select')&&str_contains($turntable,'dataset.recordNote')&&str_contains($turntable,'data-builder-search')&&str_contains($turntable,'data-tt-slot');
-$checks['No database migration required']=str_contains($read('version.php'),"'database_schema_target'=>'1.3.46'");
+$checks['Unrelated builder changes preserve library schema upgrade']=str_contains($read('version.php'),"'database_schema_target'=>'1.3.47'");
 $checks['Regression added to release gate']=str_contains($gate,'php tests/section58-fullwidth-builder.php');
 $failed=0;foreach($checks as $name=>$pass){echo ($pass?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$pass)$failed++;}
 echo 'Section 58: '.(count($checks)-$failed).'/'.count($checks).' checks passed'.PHP_EOL;
