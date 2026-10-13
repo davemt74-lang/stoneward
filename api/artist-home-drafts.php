@@ -113,3 +113,16 @@ function sf_home_design_restore(int $version,int $expectedRevision,string $baseH
     // Restore only to draft; publishing still requires explicit review and confirmation.
     return sf_home_design_save(sf_artist_home_decode($raw,[]),$expectedRevision,$baseHash);
 }
+
+function sf_home_design_reset_to_live(int $expectedRevision,string $expectedBase): array {
+    sf_home_design_schema();
+    $current=sf_home_design_state();
+    if($current['revision']!==$expectedRevision||!hash_equals($current['base_hash'],$expectedBase))
+        throw new RuntimeException('Draft changed. Reload before replacing it.');
+    if($expectedRevision===0)return $current;
+    $published=sf_home_design_snapshot();$hash=sf_home_design_hash($published);
+    $q=sf_db()->prepare('UPDATE artist_home_design_draft SET revision=revision+1,base_hash=?,snapshot_json=?,updated_at=? WHERE id=1 AND revision=? AND base_hash=?');
+    $q->execute([$hash,sf_artist_home_json($published),gmdate('c'),$expectedRevision,$expectedBase]);
+    if($q->rowCount()!==1)throw new RuntimeException('Draft changed. Reload before replacing it.');
+    return sf_home_design_state();
+}
