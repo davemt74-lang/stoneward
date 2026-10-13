@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/agent-orchestration.php';
 require_once __DIR__.'/agent-mission-planner.php';
+require_once __DIR__.'/agent-admin-intelligence.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -141,6 +142,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     $prior=sf_admin_agent_thread_messages($adminId,$threadId);
     sf_admin_agent_save_message($adminId,$threadId,'user',$message);
     $plan=sf_admin_agent_plan($message);$context=sf_admin_agent_operational_context();$missionState=sf_admin_agent_mission_summary($adminId);
+    $brief=sf_admin_agent_decision_brief($context);
     $missionPlan=sf_agent_mission_plan('admin',$message,$plan['type']);
     if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
         $missionPlan=sf_agent_mission_plan_save('admin',$adminId,$threadId,$message,$missionPlan);}
@@ -159,7 +161,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
         $research=sf_admin_agent_research_reply($message,$context,$prior);
         if($research!==null)$text=$research;
     }
-    $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan];
+    $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
     sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
-    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'mission_plan'=>$missionPlan,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
+    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'mission_plan'=>$missionPlan,'insights'=>$brief,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
 }
