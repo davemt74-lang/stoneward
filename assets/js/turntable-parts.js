@@ -4,7 +4,7 @@
   const SLOTS=['base','platter','arm','label','effect'];
   const LABELS={base:'Player base',platter:'Record platter',arm:'Tonearm',label:'Center label',effect:'Visual effects',pack:'Experience packs'};
   const DEFAULTS={base:'base-studio',platter:'platter-classic',arm:'arm-studio',label:'label-classic',effect:'effect-none'};
-  let registry=null,loading=null,ctx=null,host=null,preview=null,artState={side:'A'},version=0;
+  let registry=null,loading=null,ctx=null,host=null,preview=null,artState={side:'A'},version=0,editor=null,activeTab='base',returnFocus=null;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=c=>'$'+(Math.max(0,Number(c)||0)/100).toFixed(2);
   const getModules=()=>registry?.modules||[];
@@ -66,33 +66,89 @@
       '<div class="turntable-center-label"><img data-record-artwork alt="Current song artwork" hidden><span data-record-fallback>SF</span><strong data-record-track>STONEFELLOW</strong><em data-record-side>SIDE A</em></div></div></div>'+
       '<div class="turntable-tonearm"><i></i><b></b></div><div class="turntable-light"></div>'+
       '<div class="turntable-deck-foot"><div><span>33⅓ RPM</span><strong data-record-state>READY</strong></div><span>PLAY · PAUSE IN MUSIC PLAYER</span></div>'+
-      '<div class="turntable-hardware" aria-hidden="true"><i class="turntable-hardware-screw a"></i><i class="turntable-hardware-screw b"></i><i class="turntable-hardware-screw c"></i><i class="turntable-hardware-screw d"></i><span class="turntable-rpm-switch">33 ⅓ &nbsp; / &nbsp; 45</span><span class="turntable-power-switch"></span><span class="turntable-deck-serial">SF • STUDIO / 001</span></div></div>'+
+      '<div class="turntable-hardware"><i aria-hidden="true" class="turntable-hardware-screw a"></i><i aria-hidden="true" class="turntable-hardware-screw b"></i><i aria-hidden="true" class="turntable-hardware-screw c"></i><i aria-hidden="true" class="turntable-hardware-screw d"></i><span class="turntable-rpm-switch" aria-label="Speed marking">33 ⅓ &nbsp; / &nbsp; 45</span><button type="button" class="turntable-settings-trigger" data-player-editor-open aria-haspopup="dialog" aria-controls="recordPlayerEditor" aria-label="Edit record player settings" title="Edit Record Player"><span aria-hidden="true">⚙</span></button><span aria-hidden="true" class="turntable-power-switch"></span><span aria-hidden="true" class="turntable-deck-serial">SF • STUDIO / 001</span></div></div>'+
       '<div class="turntable-visual-effect" aria-hidden="true"></div></div>';
     return stage;
   }
+
+  const TABS=[...SLOTS,'pack'];
+  function closeEditor(){if(editor?.open)editor.close();}
+  function setEditorTab(tab,focus=false){
+    if(!editor||!TABS.includes(tab))return;
+    activeTab=tab;
+    editor.querySelectorAll('[data-player-tab]').forEach(button=>{
+      const on=button.dataset.playerTab===tab;
+      button.setAttribute('aria-selected',String(on));button.tabIndex=on?0:-1;
+    });
+    editor.querySelectorAll('[data-player-panel]').forEach(panel=>{panel.hidden=panel.dataset.playerPanel!==tab;});
+    if(focus)editor.querySelector('[data-player-tab="'+tab+'"]')?.focus();
+  }
+  function openPlayerEditor(trigger){
+    if(!editor||!editor.isConnected)return;
+    returnFocus=trigger||document.activeElement;
+    activeTab='base';
+    renderPartList();
+    if(!editor.open)editor.showModal();
+    setEditorTab(activeTab,true);
+  }
   function renderPartList(){
-    const box=host.querySelector('[data-turntable-options]');if(!box)return;
-    if(!registry){box.innerHTML='<p class="player-note">Loading available player parts…</p>';return;}
+    const box=editor?.querySelector('[data-turntable-options]');
+    if(!box)return;
+    if(!registry){box.innerHTML='<p class="player-note" role="status">Loading record player options…</p>';return;}
     const installedParts=installed(),sel=selected();
-    box.innerHTML='<div class="turntable-part-heading"><strong>Customize your digital player</strong><span>Try any look. Purchase a module to keep it.</span></div>'+
-      SLOTS.map(slot=>{
-        const parts=getModules().filter(m=>m.slot===slot),active=sel[slot]||installedParts[slot],isLocked=!owned(active);
-        return '<div class="turntable-part-row"><label for="tt-'+slot+'">'+LABELS[slot]+'</label><select id="tt-'+slot+'" data-tt-slot="'+slot+'">'+
-          parts.map(m=>'<option value="'+esc(m.id)+'" '+(m.id===active?'selected':'')+'>'+esc(m.name)+(owned(m.id)?' · Owned':' · '+money(m.price_cents))+'</option>').join('')+
-          '</select>'+(isLocked?'<button type="button" class="turntable-unlock" data-tt-buy="'+esc(active)+'">Unlock '+money(moduleById(active)?.price_cents)+'</button>':'<small>Installed · available in your library</small>')+'</div>';
-      }).join('')+
-      '<div class="turntable-pack-list"><strong>Upgrade packages</strong>'+getModules().filter(m=>m.slot==='pack').map(m=>
-        '<div class="turntable-pack"><span><b>'+esc(m.name)+'</b><small>'+esc(m.includes.map(id=>moduleById(id)?.name||id).join(' · '))+'</small></span>'+
-        (owned(m.id)?'<span class="turntable-owned">Owned</span>':'<button type="button" data-tt-buy="'+esc(m.id)+'">Get pack · '+money(m.price_cents)+'</button>')+'</div>').join('')+'</div>'+
-      '<p class="player-note">Visual effect packs change the turntable appearance only; they do not alter the sound or mastering.</p>';
+    const tabs='<div class="turntable-editor-tabs" role="tablist" aria-label="Record player components">'+
+      TABS.map(slot=>'<button type="button" role="tab" id="player-tab-'+slot+'" data-player-tab="'+slot+'" aria-controls="player-panel-'+slot+'" aria-selected="'+(slot===activeTab)+'" tabindex="'+(slot===activeTab?'0':'-1')+'">'+esc(slot==='pack'?'Packs':LABELS[slot])+'</button>').join('')+'</div>';
+    const panels=TABS.map(slot=>{
+      if(slot==='pack')return '<section role="tabpanel" class="turntable-editor-panel" id="player-panel-pack" data-player-panel="pack" aria-labelledby="player-tab-pack" '+(activeTab!=='pack'?'hidden':'')+'>'+
+        '<h3>Upgrade packages</h3><p class="player-note">Build a complete look with matching components.</p>'+
+        '<div class="turntable-pack-list">'+getModules().filter(m=>m.slot==='pack').map(m=>
+          '<div class="turntable-pack"><span><b>'+esc(m.name)+'</b><small>'+esc((m.includes||[]).map(id=>moduleById(id)?.name||id).join(' · '))+'</small></span>'+
+          (owned(m.id)?'<span class="turntable-owned">Owned</span>':'<button type="button" data-tt-buy="'+esc(m.id)+'">Get pack · '+money(m.price_cents)+'</button>')+'</div>').join('')+'</div>'+
+        '<p class="player-note">Visual effect packs change the turntable appearance only; they do not alter the sound or mastering.</p></section>';
+      const parts=getModules().filter(m=>m.slot===slot),active=sel[slot]||installedParts[slot],isLocked=!owned(active);
+      const chosen=moduleById(active);
+      return '<section role="tabpanel" class="turntable-editor-panel" id="player-panel-'+slot+'" data-player-panel="'+slot+'" aria-labelledby="player-tab-'+slot+'" '+(activeTab!==slot?'hidden':'')+'>'+
+        '<h3>'+esc(LABELS[slot])+'</h3><p class="player-note">'+
+        esc(({base:'Choose the materials and finish of the turntable.',platter:'Customize the vinyl platter and groove appearance.',arm:'Choose your tonearm finish and precision styling.',label:'Choose the center-label appearance.',effect:'Add decorative light and atmosphere effects.'})[slot])+'</p>'+
+        '<div class="turntable-part-row"><label for="tt-'+slot+'">Select '+esc(LABELS[slot].toLowerCase())+'</label><select id="tt-'+slot+'" data-tt-slot="'+slot+'">'+
+        parts.map(m=>'<option value="'+esc(m.id)+'" '+(m.id===active?'selected':'')+'>'+esc(m.name)+(owned(m.id)?' · Owned':' · '+money(m.price_cents))+'</option>').join('')+'</select>'+
+        (isLocked?'<button type="button" class="turntable-unlock" data-tt-buy="'+esc(active)+'">Unlock '+money(chosen?.price_cents)+'</button>':'<small>Owned · available in your library</small>')+'</div>'+
+        '<p class="player-note">'+(isLocked?'Preview only — purchase the module to save this finish.':'Installed · this appearance is saved with your record design.')+'</p></section>';
+    }).join('');
+    box.innerHTML=tabs+'<div class="turntable-editor-panels">'+panels+'</div>';
+    box.querySelectorAll('[data-player-tab]').forEach(button=>{
+      button.onclick=()=>setEditorTab(button.dataset.playerTab);
+      button.onkeydown=event=>{
+        const i=TABS.indexOf(button.dataset.playerTab);
+        const next=event.key==='ArrowRight'?TABS[(i+1)%TABS.length]:event.key==='ArrowLeft'?TABS[(i+TABS.length-1)%TABS.length]:event.key==='Home'?TABS[0]:event.key==='End'?TABS[TABS.length-1]:null;
+        if(next){event.preventDefault();setEditorTab(next,true);}
+      };
+    });
     box.querySelectorAll('[data-tt-slot]').forEach(select=>select.onchange=()=>{
       const slot=select.dataset.ttSlot,id=select.value;
       if(!moduleById(id))return;
       if(owned(id)){ctx.appState.builder.playerModules={...installedParts,[slot]:id};preview=null;ctx.persist();}
       else preview={[slot]:id};
       renderPartList();drawTrack();
+      editor?.querySelector('[data-tt-slot="'+slot+'"]')?.focus();
     });
     box.querySelectorAll('[data-tt-buy]').forEach(button=>button.onclick=()=>purchase(button.dataset.ttBuy));
+    setEditorTab(activeTab);
+  }
+  function makePlayerEditor(){
+    if(editor?.open)editor.close();editor?.remove?.();
+    editor=document.createElement('dialog');editor.id='recordPlayerEditor';editor.className='turntable-editor-dialog';
+    editor.setAttribute('aria-labelledby','playerEditorTitle');
+    editor.innerHTML='<div class="turntable-editor-shell"><header class="turntable-editor-header"><div><span class="turntable-editor-kicker">STONEFELLOW · STUDIO</span><h2 id="playerEditorTitle">Edit Record Player</h2><p>Choose your player components. Owned finishes save to this record; other finishes can be previewed.</p></div><button type="button" class="turntable-editor-close" aria-label="Close player editor" data-player-editor-close>×</button></header>'+
+      '<div data-turntable-options></div><footer class="turntable-editor-footer"><span>Changes to owned parts are saved automatically.</span><button type="button" data-player-editor-done>Done</button></footer></div>';
+    editor.querySelector('[data-player-editor-close]').onclick=closeEditor;
+    editor.querySelector('[data-player-editor-done]').onclick=closeEditor;
+    editor.addEventListener('close',()=>{
+      preview=null;drawTrack();
+      if(returnFocus?.isConnected)returnFocus.focus();
+      returnFocus=null;
+    });
+    document.body.appendChild(editor);
   }
   function purchase(id){
     const m=moduleById(id);if(!m||owned(id))return;
@@ -102,7 +158,7 @@
     }
     ctx.appState.cart.push({type:'turntable_module',module_id:id});
     try{localStorage.setItem('stonefellow.cart.v03',JSON.stringify(ctx.appState.cart));}catch(_){}
-    preview=null;ctx.say(m.name+' added to your cart. Purchases unlock after payment.',()=>ctx.navigate('cart'));
+    preview=null;closeEditor();ctx.say(m.name+' added to your cart. Purchases unlock after payment.',()=>ctx.navigate('cart'));
   }
   function decorateCatalog(){
     const list=host.querySelector('.builder-song-list'),catalog=ctx.catalog;
@@ -171,12 +227,16 @@
     ctx=context;host=context.canvas.querySelector('.builder-module');if(!host)return;
     preview=null;
     const stage=renderStage();host.appendChild(stage);
-    const partBox=document.createElement('section');partBox.className='builder-parts-picker';partBox.dataset.turntableOptions='';
+    makePlayerEditor();
+    stage.querySelector('[data-player-editor-open]')?.addEventListener('click',event=>openPlayerEditor(event.currentTarget));
+    const partBox=document.createElement('section');partBox.className='builder-parts-picker';
+    partBox.innerHTML='<button type="button" class="builder-player-edit-button" data-player-editor-open aria-haspopup="dialog" aria-controls="recordPlayerEditor"><span aria-hidden="true">⚙</span> Edit Record Player</button><p class="player-note">Customize the base, platter, tonearm, center label, effects and upgrade packs.</p>';
     host.querySelector('[data-builder-player-options]')?.append(partBox);
+    partBox.querySelector('[data-player-editor-open]')?.addEventListener('click',event=>openPlayerEditor(event.currentTarget));
     decorateCatalog();decorateArtwork();decorateNotes();renderPartList();drawTrack();
     if(!registry){const expected=host;load().then(()=>{
       if(host===expected&&expected.isConnected){renderPartList();drawTrack();}
-    }).catch(()=>{const box=expected.querySelector('[data-turntable-options]');if(box)box.innerHTML='<p class="player-note">Player catalog unavailable. The default player and record builder still work.</p>';});}
+    }).catch(()=>{const box=editor?.querySelector('[data-turntable-options]');if(box)box.innerHTML='<p class="player-note" role="alert">Player catalog unavailable. Your saved design and standard record builder still work.</p><button type="button" data-player-retry>Retry loading player options</button>';box?.querySelector('[data-player-retry]')?.addEventListener('click',()=>{invalidate();renderPartList();load().then(()=>{renderPartList();drawTrack();}).catch(()=>renderPartList());});});}
   }
   function sync(track,playing,builder){if(!host?.isConnected)return;drawTrack();}
   window.StonefellowTurntable={mount,sync,invalidate,sideForTrack,defaults,owned};
