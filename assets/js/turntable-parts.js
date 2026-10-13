@@ -136,7 +136,7 @@
     filters.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',apply));
   }
   function decorateArtwork(){
-    const container=host.querySelector('.builder-object');if(!container)return;
+    const container=host.querySelector('.builder-artwork-layout .builder-object');if(!container)return;
     const currentTrack=shownTrack(),art=currentTrack?ctx.trackArtwork(currentTrack):'';
     const templates=[{id:'stonefellow',name:'Stonefellow Original'},{id:'desert',name:'Desert Edition'},{id:'midnight',name:'Midnight Edition'},{id:'analog',name:'Analog Edition'}];
     const extra=document.createElement('div');extra.className='builder-art-editor';
@@ -146,18 +146,33 @@
       '<div class="builder-cover-face back" data-cover-back="'+esc(back)+'"><strong>'+esc(current().title||'Custom Edition')+'</strong><small>BACK</small><p>'+esc(current().customNote||'Your custom record story')+'</p></div></div>'+
       '<div class="builder-art-fields"><label>Front artwork<select data-cover-select="coverFront">'+templates.map(x=>'<option value="'+x.id+'" '+(x.id===front?'selected':'')+'>'+x.name+'</option>').join('')+'</select></label>'+
       '<label>Back artwork<select data-cover-select="coverBack">'+templates.map(x=>'<option value="'+x.id+'" '+(x.id===back?'selected':'')+'>'+x.name+'</option>').join('')+'</select></label>'+
-      '<label class="builder-note">Custom note<textarea rows="3" maxlength="280" data-record-note placeholder="Write a personal dedication for the back cover…">'+esc(current().customNote||'')+'</textarea></label></div>';
+      '</div>';
     container.appendChild(extra);
     extra.querySelectorAll('[data-cover-select]').forEach(s=>s.onchange=()=>{current()[s.dataset.coverSelect]=s.value;ctx.persist();ctx.renderBuilder();});
-    extra.querySelector('[data-record-note]').onchange=e=>{current().customNote=e.target.value.slice(0,280);ctx.persist();ctx.renderBuilder();};
+  }
+  function decorateNotes(){
+    const section=host.querySelector('.builder-personal-note');if(!section)return;
+    const label=document.createElement('label');label.className='builder-note';label.htmlFor='builderPersonalNote';label.textContent='Your message';
+    const input=document.createElement('textarea');input.id='builderPersonalNote';input.dataset.recordNote='';
+    input.rows=6;input.maxLength=280;
+    input.placeholder='Write a personal dedication for the back cover…';input.value=current().customNote||'';
+    const count=document.createElement('small');count.className='builder-note-count';count.textContent=input.value.length+' / 280';
+    input.addEventListener('input',()=>{
+      current().customNote=input.value.slice(0,280);
+      count.textContent=current().customNote.length+' / 280';
+      const back=host.querySelector('.builder-cover-face.back p');
+      if(back)back.textContent=current().customNote||'Your custom record story';
+      ctx.persist();
+    });
+    label.append(input);section.append(label,count);
   }
   function mount(context){
     ctx=context;host=context.canvas.querySelector('.builder-module');if(!host)return;
     preview=null;
     const stage=renderStage();host.appendChild(stage);
     const partBox=document.createElement('section');partBox.className='builder-parts-picker';partBox.dataset.turntableOptions='';
-    host.querySelector('.builder-left-rail > .builder-footer')?.before(partBox);
-    decorateCatalog();decorateArtwork();renderPartList();drawTrack();
+    host.querySelector('[data-builder-player-options]')?.append(partBox);
+    decorateCatalog();decorateArtwork();decorateNotes();renderPartList();drawTrack();
     if(!registry){const expected=host;load().then(()=>{
       if(host===expected&&expected.isConnected){renderPartList();drawTrack();}
     }).catch(()=>{const box=expected.querySelector('[data-turntable-options]');if(box)box.innerHTML='<p class="player-note">Player catalog unavailable. The default player and record builder still work.</p>';});}

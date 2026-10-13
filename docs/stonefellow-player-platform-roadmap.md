@@ -39,3 +39,12 @@ Updated 2026-10-12 | Source baseline v1.3.55 | Desktop sideways turntable CSS re
 - Edition name and stock colors remain editable inside Cover Design rather than a hero section.
 - Right turntable chassis sits on the oversized, clipped player stage at **45° counterclockwise**, bottom pointing down/right. Its record platter animation remains independent of the chassis transform.
 - Existing mobile view is stacked; page bottom reserves sticky composer space. Existing real DSP, premium effects, managed Admin front/back artwork and paid AI generation remain future sections.
+
+## Section 60 — Five-tab vinyl builder and true 90° player (v1.3.60)
+- Builder format switch (Vinyl/Cassette) retired: current builder supports vinyl only; historic cassette orders and saved draft records remain stored.
+- Left rail consists of five accessible, keyboard-operated tabs: Saved Drafts, Album Artwork, Song Lists, Personal Notes and Submit. Each section has one associated tab panel; tab changes never reload the page or stop music.
+- Album Artwork contains edition title, theme, front/back sleeve selections, and optional paid turntable parts; the personal dedication moved to Personal Notes.
+- Song Lists owns Side A/B, drag/drop sequencing, fill controls, catalog search and per-song previews. Submit owns quote/cart action, draft saving, export and start-over.
+- Physical deck rotates 90° counterclockwise; its bottom points to the right screen edge, with a responsive stage fit and independent record spin.
+- Vinyl order quotes now include server-validated front/back artwork and custom note (280-character cap), and user-saved drafts keep their original account data.
+- Future roadmap still includes fully managed Admin-uploaded front/back artwork templates and real audio DSP effects, in addition to per-user player profiles and AI-powered music generation.

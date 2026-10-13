@@ -11,7 +11,7 @@ const stylesheet=fs.readFileSync(root+'/assets/css/turntable-builder.css','utf8'
 const html=fs.readFileSync(root+'/stonefellow-v120.php','utf8');
 const versions={html:/define\('SF_BUILD', '([^']+)'\)/.exec(html)?.[1],script:/STONEFELLOW_APP_BUILD='([^']+)'/.exec(app)?.[1],
   css:/--stonefellow-builder-css-build:'([^']+)'/.exec(stylesheet)?.[1],serviceWorker:/const BUILD='([^']+)'/.exec(sw)?.[1]};
-assert.ok(Object.values(versions).every(v=>v==='1.3.59'),JSON.stringify(versions));
+assert.ok(Object.values(versions).every(v=>v==='1.3.60'),JSON.stringify(versions));
 assert.ok(html.includes('assets/js/build-integrity.js?v=<?=rawurlencode(SF_BUILD)?>'));
 assert.ok(!sw.includes('c.match(req,{ignoreSearch:true})'));
 console.log('PASS expected versions agree across HTML / JavaScript / CSS / offline worker');
@@ -23,7 +23,7 @@ class MockResponse {
 let offline=false;
 const stored=new Map();
 const cache={put:async(request,result)=>stored.set(request.url,result.clone()),match:async request=>stored.get(request.url),add:async request=>stored.set(request.url,new MockResponse('PRECACHED'))};
-const caches={open:async()=>cache,keys:async()=>['stonefellow-static-v1.3.58','stonefellow-static-v1.3.59'],delete:async()=>true,match:async()=>null};
+const caches={open:async()=>cache,keys:async()=>['stonefellow-static-v1.3.58','stonefellow-static-v1.3.60'],delete:async()=>true,match:async()=>null};
 const handlers={};
 const self={location:{origin:'https://stonefellow.test'},registration:{scope:'https://stonefellow.test/'},
   addEventListener:(name,cb)=>handlers[name]=cb,skipWaiting:async()=>{},clients:{claim:async()=>{}}};
@@ -36,7 +36,7 @@ async function handled(url){
   return await(await output).text();
 }
 (async()=>{
-  const endpoint='https://stonefellow.test/assets/js/app.js?v=1.3.59';
+  const endpoint='https://stonefellow.test/assets/js/app.js?v=1.3.60';
   stored.set(endpoint,new MockResponse('STALE CODE'));
   assert.equal(await handled(endpoint),'FRESH '+endpoint,'network must win over stale cache');
   assert.equal(await(await cache.match(new Request(endpoint))).text(),'FRESH '+endpoint,'fresh response should overwrite cache');
@@ -53,10 +53,10 @@ async function handled(url){
   function makeDOM(){return {
     baseURI:'https://stonefellow.test/',
     body:{appendChild:node=>{banner=node}},
-    documentElement:{},querySelector:sel=>sel==='meta[name="stonefellow-build"]'?{content:'1.3.59'}:null,
+    documentElement:{},querySelector:sel=>sel==='meta[name="stonefellow-build"]'?{content:'1.3.60'}:null,
     createElement:tag=>({tag,style:{},children:[],setAttribute(){},addEventListener(name,fn){this.listeners={...(this.listeners||{}),[name]:fn}},append(...nodes){this.children.push(...nodes)}})};
   }
-  const cssStyle={getPropertyValue:()=>"'1.3.59'"};
+  const cssStyle={getPropertyValue:()=>"'1.3.60'"};
   const browser={ST0:false,STONEFELLOW_APP_BUILD:'1.3.58',location:{reload:()=>reloads++},
     caches:{keys:async()=>['stonefellow-static-v1.3.58','unrelated-data'],delete:async key=>{cleared.push(key);return true}}};
   const browserCtx={window:browser,document:makeDOM(),getComputedStyle:()=>cssStyle,
@@ -73,8 +73,8 @@ async function handled(url){
   console.log('PASS stale app auto-repairs only Stonefellow static cache and registration');
 
   let cleanBanner=null;
-  vm.runInNewContext(integrity,{window:{STONEFELLOW_APP_BUILD:'1.3.59'},document:{
-    querySelector:()=>({content:'1.3.59'}),documentElement:{},body:{appendChild:el=>{cleanBanner=el}},createElement(){throw Error('no banner on clean build')}},
+  vm.runInNewContext(integrity,{window:{STONEFELLOW_APP_BUILD:'1.3.60'},document:{
+    querySelector:()=>({content:'1.3.60'}),documentElement:{},body:{appendChild:el=>{cleanBanner=el}},createElement(){throw Error('no banner on clean build')}},
     getComputedStyle:()=>cssStyle,console},{filename:'build-integrity.js'});
   assert.equal(cleanBanner,null);
   console.log('PASS matching app+CSS build renders normally without disrupting user data');
