@@ -18,7 +18,7 @@
   }
   function extractConfig(f){
     const key=f.dataset.homeSection,v=n=>field(f,n)?.value||'';
-    if(key==='hero')return {primary_label:v('primary_label'),primary_view:v('primary_view'),secondary_label:v('secondary_label'),secondary_view:v('secondary_view')};
+    if(key==='hero')return {primary_label:v('primary_label'),primary_view:v('primary_view'),secondary_label:v('secondary_label'),secondary_view:v('secondary_view'),sticky_chat_enabled:!!field(f,'sticky_chat_enabled')?.checked};
     if(key==='featured_release')return {release_id:v('release_id')};
     if(key==='featured_track')return {track_id:v('track_id')};
     if(key==='latest_releases'||key==='personalized')return {limit:Number(v('limit'))};
@@ -267,12 +267,13 @@
       const result=await ctx.api('homepage.php',{action:'preview_design_draft',sections:collect()});
       if(!root||token!==previewRevision)return;
       const html=publicMarkup(result.homepage?.sections||[]);
+      const stickyChat=result.homepage?.chat_bar_enabled!==false;
       const frame=document.createElement('iframe');
       frame.title='Actual public homepage design · private draft preview';
       frame.className='homepage-visual-public-frame';
       frame.sandbox='allow-same-origin';
       frame.referrerPolicy='same-origin';
-      frame.srcdoc='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../assets/css/site.css?v=1.3.52"><style>body{margin:0} .artist-homepage{width:100%;max-width:none} .sf-visual-section-select{display:block;position:relative;z-index:20;margin:8px 12px;padding:5px 10px;cursor:pointer;background:#201b16;color:#f8e6d5;border:1px solid #bd956c;border-radius:3px;font-size:12px} [contenteditable]:hover{outline:1px dashed #c68f5b;outline-offset:3px} [contenteditable]:focus{outline:2px solid #e8b079;outline-offset:3px} [data-home-key]{position:relative;min-height:50px}</style></head><body class="artist-home-active"><article class="artist-homepage">'+html+'</article></body></html>';
+      frame.srcdoc='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../assets/css/site.css?v=1.3.52"><style>body{margin:0} .artist-homepage{width:100%;max-width:none} .sf-visual-section-select{display:block;position:relative;z-index:20;margin:8px 12px;padding:5px 10px;cursor:pointer;background:#201b16;color:#f8e6d5;border:1px solid #bd956c;border-radius:3px;font-size:12px} [contenteditable]:hover{outline:1px dashed #c68f5b;outline-offset:3px} [contenteditable]:focus{outline:2px solid #e8b079;outline-offset:3px} [data-home-key]{position:relative;min-height:50px} .sf-visual-chat-footer{position:sticky;bottom:0;z-index:60;padding:12px 18px;background:linear-gradient(180deg,transparent,#090807 32%)}.sf-visual-chatbar{display:grid;grid-template-columns:35px 1fr 35px 35px;align-items:center;gap:6px;max-width:760px;margin:auto;border:1px solid #574637;border-radius:24px;background:#161310;color:#e6ddd4;padding:12px 14px;font:14px sans-serif}.sf-visual-chatbar span:not(:nth-child(2)){text-align:center;font-size:20px}.sf-visual-chatbar span:nth-child(2){color:#b1a99d}</style></head><body class="artist-home-active"><article class="artist-homepage">'+html+'</article>'+(stickyChat?'<div class="sf-visual-chat-footer" aria-label="Sticky Stonefellow Agent chat preview"><div class="sf-visual-chatbar"><span>+</span><span>Ask Stonefellow anything…</span><span>◉</span><span>↑</span></div></div>':'')+'</body></html>';
       frame.addEventListener('load',()=>bindCanonicalFrame(frame),{once:true});
       holder.replaceChildren(frame);
     }catch(e){if(holder&&!holder.querySelector('iframe'))holder.textContent=e.message||'Draft preview unavailable';}
