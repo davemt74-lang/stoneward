@@ -161,3 +161,4 @@ jobs:
           php tests/section47h-chat-handoffs.php
           php tests/section47i-feedback-recovery.php
           php tests/section47j-release.php
+          php tests/admin-agent-sticky-composer.php
