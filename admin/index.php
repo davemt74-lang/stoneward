@@ -106,7 +106,6 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <input id="folderInput" type="file" webkitdirectory directory multiple accept=".mp3,.wav,.wave,audio/mpeg,audio/wav" hidden>
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/settings-tabs.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
-  <script src="assets/unified-ui.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-actions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
@@ -128,5 +127,6 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/stories.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/songbook.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/theme.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/unified-ui.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
 </body>
 </html>
