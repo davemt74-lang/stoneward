@@ -4,6 +4,7 @@ require_once __DIR__.'/agent-orchestration.php';
 require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-admin-intelligence.php';
 require_once __DIR__.'/agent-proactive-research.php';
+require_once __DIR__.'/agent-specialist-delegation.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -133,6 +134,7 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
         'tool_inventory'=>function_exists('sf_agent_tool_inventory')?sf_agent_tool_inventory('admin'):[],
         'skill_inventory'=>sf_agent_skill_inventory('admin'),
         'planned_missions'=>sf_agent_mission_plan_recent('admin',$adminId),
+        'specialist_assignments'=>sf_agent_specialist_recent('admin',$adminId),
         'research_opportunities'=>sf_agent_proactive_admin_research(sf_admin_agent_operational_context())
     ];
 }

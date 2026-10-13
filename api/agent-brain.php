@@ -5,6 +5,7 @@ require_once __DIR__.'/agent-runtime.php';
 require_once __DIR__.'/agent-skill-registry.php';
 require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-proactive-research.php';
+require_once __DIR__.'/agent-specialist-delegation.php';
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';
 $user=sf_require_user(false,$write);
 $userId=(int)$user['id'];
@@ -13,6 +14,7 @@ if(!$write){
     $snapshot=sf_agent_customer_brain_snapshot($userId);
     $snapshot['skill_inventory']=sf_agent_skill_inventory('customer');
     $snapshot['planned_missions']=sf_agent_mission_plan_recent('customer',$userId);
+    $snapshot['specialist_assignments']=sf_agent_specialist_recent('customer',$userId);
     $snapshot['proactive_suggestion']=sf_agent_proactive_customer_suggestion($userId);
     $conversation=sf_clean_text($_GET['conversation_id']??'',80);
     if($conversation!==''&&preg_match('/^[A-Za-z0-9_-]{12,80}$/D',$conversation)){
