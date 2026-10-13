@@ -39,7 +39,8 @@ function sf_agent_mission_plan(string $scope,string $message,string $primaryInte
             'may_execute_directly'=>false
         ];
     }
-    return ['schema'=>'stonefellow.mission-plan.v1','scope'=>$scope,'status'=>'planned_review_required',
+    $needsReview=(bool)array_filter($steps,fn($step)=>$step['requires_exact_approval']);
+    return ['schema'=>'stonefellow.mission-plan.v1','scope'=>$scope,'status'=>$needsReview?'planned_review_required':'planned_read_only',
         'steps'=>$steps,'step_limit'=>4,'writes_executed'=>0];
 }
 
@@ -99,13 +100,18 @@ function sf_agent_mission_plan_save(string $scope,int $ownerId,string $conversat
         ||trim($message)===''||strlen($message)>4000
         ||!preg_match('/^[a-zA-Z0-9_-]{12,80}$/D',$conversationId)
         ||($plan['scope']??null)!==$scope
+        ||($plan['schema']??null)!=='stonefellow.mission-plan.v1'
+        ||!in_array(($plan['status']??''),['planned_review_required','planned_read_only'],true)
+        ||($plan['step_limit']??null)!==4
         ||($plan['writes_executed']??null)!==0
         ||count($plan['steps']??[])<2||count($plan['steps']??[])>4)
         throw new InvalidArgumentException('Invalid governed mission.');
     foreach($plan['steps'] as $index=>$step){
         $contract=sf_agent_orchestration_contract($scope,(string)($step['intent']??''));
         if(!$contract['registered'] || !$contract['skill_id']
-            || $contract['may_execute_directly'] || $contract['tool_id']!==($step['tool_id']??null)
+            || $contract['may_execute_directly'] || ($step['may_execute_directly']??null)!==false
+            || ($step['requires_exact_approval']??null)!==$contract['requires_exact_approval']
+            || $contract['tool_id']!==($step['tool_id']??null)
             || $contract['skill_id']!==($step['skill_id']??null)
             || (int)($step['order']??0)!==$index+1
             || !in_array($step['status']??'',['read_available','read_completed','approval_required'],true)
