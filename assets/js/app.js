@@ -272,7 +272,7 @@
     if(!st.auth.authenticated){renderLogin();return;}
     if(!window.SFCustomerAgentChat?.render){canvas.textContent='Agent Chat is unavailable.';return;}
     await window.SFCustomerAgentChat.render({
-      canvas,api,esc,navigate,send:liveAgent,
+      canvas,api,esc,navigate,post:secureJsonPost,send:liveAgent,
       conversationId:cid=>{
         if(cid===undefined)return st.conversationId;
         st.conversationId=cid;

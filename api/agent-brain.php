@@ -6,6 +6,7 @@ require_once __DIR__.'/agent-skill-registry.php';
 require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-proactive-research.php';
 require_once __DIR__.'/agent-specialist-delegation.php';
+require_once __DIR__.'/agent-feedback-core.php';
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';
 $user=sf_require_user(false,$write);
 $userId=(int)$user['id'];
@@ -15,10 +16,17 @@ if(!$write){
     $snapshot['skill_inventory']=sf_agent_skill_inventory('customer');
     $snapshot['planned_missions']=sf_agent_mission_plan_recent('customer',$userId);
     $snapshot['specialist_assignments']=sf_agent_specialist_recent('customer',$userId);
+    $snapshot['feedback_summary']=sf_agent_feedback_summary('customer',$userId);
+    $snapshot['recovery_summary']=sf_agent_mission_recovery_summary('customer',$userId);
     $snapshot['proactive_suggestion']=sf_agent_proactive_customer_suggestion($userId);
     $conversation=sf_clean_text($_GET['conversation_id']??'',80);
     if($conversation!==''&&preg_match('/^[A-Za-z0-9_-]{12,80}$/D',$conversation)){
         $snapshot['messages']=sf_agent_history($userId,$conversation,30);
+        // Canvas-only reply IDs: never add API-only fields to LLM history.
+        $ids=sf_db()->prepare('SELECT id FROM agent_messages WHERE conversation_id=? AND user_id=? ORDER BY id DESC LIMIT 30');
+        $ids->execute([$conversation,$userId]);$replyIds=array_reverse($ids->fetchAll(PDO::FETCH_COLUMN));
+        foreach($snapshot['messages'] as $i=>&$entry)$entry['id']=(int)($replyIds[$i]??0);
+        unset($entry);
     }
     sf_json_response(['ok'=>true,'brain'=>$snapshot]);
 }
