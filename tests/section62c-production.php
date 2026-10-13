@@ -10,12 +10,15 @@ foreach ([
   'confirmation'=>'confirmed',
   'ordered milestones'=>'production_complete',
   'audit trail'=>'admin_id',
+  'simulated payment support'=>'simulated_paid',
+  'paid test order support'=>'paid_',
 ] as $label=>$needle) {
   if (strpos($api,$needle)===false) { fwrite(STDERR,"FAIL $label\n");exit(1); }
   echo "PASS $label\n";
 }
-foreach(['vinylProductionPanel','loadVinylProduction','revision:Number(r.revision)'] as $needle) {
+foreach(['vinylProductionPanel','loadVinylProduction','revision:Number(r.revision)','Vinyl design proof','coverFront','customNote','sideReview'] as $needle) {
   if (strpos($ui,$needle)===false) {fwrite(STDERR,"FAIL UI $needle\n");exit(1);}
   echo "PASS UI $needle\n";
 }
-echo "Section 62C: 10/10 checks passed\n";
+if (strpos(file_get_contents(__DIR__.'/../.htaccess'),'RewriteRule ^storage/')===false) {fwrite(STDERR,"FAIL private storage protection\n");exit(1);}
+echo "Section 62C production checks passed\n";
