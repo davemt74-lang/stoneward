@@ -1,3 +1,18 @@
+# Stonefellow v1.3.49 — Unified Admin Page Headers and Editor Overlays
+
+- Extends the Settings/Story Editor visual language across **all 29 Admin navigation views** through a shared page-header and responsive spacing layer.
+- Existing section-level New/Add controls are elevated into the page header when the underlying module already provides that action.
+- Existing create/edit views for tracks, releases, shows, templates, products, packages, campaigns, member content, ticket offers, audience segments, automations, EPKs, and launch plans are presented as responsive overlay form sections instead of replacing the whole visible page layout.
+- Specialized existing modals (stories, videos, galleries, contact dialogs, shipments, refunds, coverage, milestone edits) remain governed by their own original code.
+- The existing form elements and bound event handlers are **moved, never cloned**: saves, publish confirmations, media upload permissions, approval paths and status validation remain authoritative in the original modules.
+- Long editors scroll vertically without horizontal layout overflow. Keyboard Escape/Tab focus handling, close confirmation for unsaved inputs, and a mobile full-screen editor are provided.
+- This is a UI-only release: no schema change, new authentication path, contact permission, database migration, or password reset. Database schema target remains **1.3.46**.
+
+Application: **1.3.49**  
+Database schema target: **1.3.46**
+
+---
+
 # Stonefellow v1.3.48 — Tabbed Settings and Modal Story Editor
 
 - **Settings** is now a ten-tab workspace: Public Site, Visual Theme, Artist Homepage, Stories, Site & Artist Media, Folder Access, Upload Limits, Password, Database Upgrade, and Admin Session.

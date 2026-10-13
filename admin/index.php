@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.48');
+define('SF_ADMIN_BUILD','1.3.49');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -38,6 +38,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/homepage.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/stories.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/settings-tabs.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/unified-ui.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/songbook.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/theme.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
 </head>
@@ -105,6 +106,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <input id="folderInput" type="file" webkitdirectory directory multiple accept=".mp3,.wav,.wave,audio/mpeg,audio/wav" hidden>
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/settings-tabs.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/unified-ui.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-actions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
