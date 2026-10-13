@@ -197,6 +197,7 @@ jobs:
           node tests/section62b-draft-continuity.js
           php tests/section62c-production.php
           php tests/section62d-agent-production.php
+          php tests/section62e-independent-scroll.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
