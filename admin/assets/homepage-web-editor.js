@@ -167,5 +167,5 @@
       throw e;
     }finally{opening=false;}
   }
-  window.SFHomepageWebEditor={open,exit,isOpen:()=>!!stage};
+  window.SFHomepageWebEditor={open,exit,markClean:()=>{dirty=false;},isOpen:()=>!!stage};
 })();
