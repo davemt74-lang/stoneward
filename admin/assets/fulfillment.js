@@ -57,7 +57,7 @@
   }
   function renderOrder(){
     const j=state.order,o=j.order||{},q=o.quote||{},f=o.fulfillment||{},ships=j.shipments||[],refunds=j.refunds||[],cases=j.cases||[];
-    const vinylItems=Array.isArray(q.items)?q.items.filter(item=>item.type==='custom_media'):[];
+    const vinylItems=Array.isArray(q.items)?q.items.filter(item=>item.type==='custom_media'&&(item.format||'vinyl')==='vinyl'):[];
     const sideReview=(build,side)=>{const tracks=build?.sides?.[side]?.tracks||[];return '<div class="fulfillment-vinyl-side"><strong>Side '+side+'</strong> · '+tracks.length+' songs · '+Math.round(Number(build?.sides?.[side]?.duration||0)/60)+' min<ol>'+tracks.map(t=>'<li>'+esc(t.title||t.id)+' <small>('+Math.round(Number(t.duration||0))+' sec)</small></li>').join('')+'</ol></div>';};
     const vinylReview=vinylItems.map((item,i)=>{const b=item.builder||{};return '<div class="fulfillment-card"><div><div class="eyebrow">CUSTOM VINYL '+(i+1)+'</div><h3>'+esc(b.title||'Untitled edition')+'</h3><p><strong>Format:</strong> '+esc(item.format||'vinyl')+'</p><p><strong>Artwork:</strong> '+esc(b.theme||'')+' · Front '+esc(b.coverFront||'')+' · Back '+esc(b.coverBack||'')+'</p><p><strong>Personal dedication:</strong> '+esc(b.customNote||'None')+'</p>'+sideReview(b,'A')+sideReview(b,'B')+'</div></div>';}).join('');
     canvas.innerHTML=head('FULFILLMENT + CARE',o.id||'Order','Shipment, refund and customer-care history.','<button class="secondary" id="fulfillBack" type="button">Back</button><button class="secondary" id="openLegacyOrder" type="button">Open Orders record</button>')+

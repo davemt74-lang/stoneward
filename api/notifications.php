@@ -5,21 +5,6 @@ require_once __DIR__.'/agent-runtime.php';
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';$u=sf_require_user(false,$write);$uid=(int)$u['id'];sf_ops_ensure_schema();sf_notification_ensure_schema();
 if(!$write){
     $generation=sf_notification_generate_for_user($uid);
-    require_once __DIR__.'/vinyl-customer-status.php';
-    $vinyl=sf_vinyl_customer_status($uid,(string)($u['email']??''),15);
-    $vinylGenerated=0;
-    foreach($vinyl as $item){
-        foreach($item['events'] as $event){
-            $status=(string)($event['status']??'');
-            $at=(string)($event['at']??'');
-            if($status===''||$at==='')continue;
-            $key='vinyl:'.hash('sha256',(string)$item['order_id'].'|'.$status.'|'.$at);
-            $notice=sf_smart_notification_deliver($uid,'build',$key,'Your vinyl order update',
-                'Order '.(string)$item['order_id'].' is now '.str_replace('_',' ',$status).'.','?view=account');
-            if(!empty($notice['created']))$vinylGenerated++;
-        }
-    }
-    $generation['vinyl_generated']=$vinylGenerated;
     sf_json_response(['ok'=>true,'unread'=>sf_notification_unread_count($uid),'notifications'=>sf_smart_user_notifications($uid),'preferences'=>sf_notification_preferences($uid),'generation'=>$generation,'history'=>sf_user_history($uid),'listening_preview'=>sf_personalization_history($uid,12),'brain'=>sf_user_brain_timeline($uid),'csrf'=>sf_user_csrf()]);
 }
 $b=sf_request_json();$action=(string)($b['action']??'');

@@ -11,8 +11,11 @@ try {
   $snapshot=sf_fulfillment_order_snapshot($id);
   $order=(array)($snapshot['order']??[]);
   $quote=(array)($order['quote']??[]);
-  $json=json_encode($quote,JSON_UNESCAPED_SLASHES);
-  if(!is_string($json)||!str_contains($json,'"custom_media"')) sf_json_response(['ok'=>false,'message'=>'No custom vinyl product on this order.'],404);
+  $isVinyl=false;
+  foreach((array)($quote['items']??[]) as $item){
+    if(is_array($item)&&($item['type']??'')==='custom_media'&&($item['format']??'vinyl')==='vinyl'){$isVinyl=true;break;}
+  }
+  if(!$isVinyl) sf_json_response(['ok'=>false,'message'=>'No custom vinyl product on this order.'],404);
   $dir=SF_ROOT.'/storage/fulfillment';
   if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir)) throw new RuntimeException('Production storage unavailable.');
   $path=$dir.'/vinyl-production.json';
