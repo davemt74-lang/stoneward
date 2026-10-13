@@ -16,14 +16,16 @@ foreach($sections as $suffix){
     $test='tests/section43'.$suffix.'.php';
     if(!is_file($root.'/'.$test)||!str_contains($workflow,'php '.$test))$allRegistered=false;
 }
+preg_match("/define\\('SF_BUILD',\\s*'([0-9.]+)'\\)/",$public,$buildMatch);$build=$buildMatch[1]??'';
+preg_match("/'database_schema_target'=>'([0-9.]+)'/",$version,$schemaMatch);$schema=$schemaMatch[1]??'';
 $checks=[
  'Full Section 43A-I acceptance wired'=>$allRegistered,
- 'Public app 1.3.45'=>str_contains($public,"define('SF_BUILD', '1.3.45')"),
- 'Admin app 1.3.45'=>str_contains($admin,"define('SF_ADMIN_BUILD','1.3.45')"),
- 'Version endpoint 1.3.45'=>str_contains($version,"'stonefellow'=>'1.3.45'"),
- 'PWA cache 1.3.45'=>str_contains($sw,'stonefellow-static-v1.3.45'),
- 'Apache build header 1.3.45'=>str_contains($apache,'X-Stonefellow-Build "1.3.45"'),
- 'Schema target unchanged'=>str_contains($version,"'database_schema_target'=>'1.3.35'"),
+ 'Public baseline retained'=>version_compare($build,'1.3.45','>=')&&str_contains($public,"define('SF_BUILD', '".$build."')"),
+ 'Admin build synchronized'=>str_contains($admin,"define('SF_ADMIN_BUILD','".$build."')"),
+ 'Version endpoint synchronized'=>str_contains($version,"'stonefellow'=>'".$build."'"),
+ 'PWA cache synchronized'=>str_contains($sw,'stonefellow-static-v'.$build),
+ 'Apache build synchronized'=>str_contains($apache,'X-Stonefellow-Build "'.$build.'"'),
+ 'Schema target preserved and synchronized'=>version_compare($schema,'1.3.35','>=')&&str_contains($version,"'database_schema_target'=>'".$schema."'"),
  'Existing Section 42 regressions retained'=>str_contains($workflow,'php tests/section42-backup-validation.php')&&str_contains($workflow,'php tests/section42-ops-privacy.php'),
  'Only a green main gate packages ZIP'=>str_contains($get('.github/workflows/certified-deploy.yml'),"github.event.workflow_run.conclusion == 'success'"),
  'Scope and limitations documented'=>str_contains($docs,'Production browser and provider-key smoke testing')

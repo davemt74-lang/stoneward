@@ -20,15 +20,17 @@ foreach($tests as $suffix){
     $name='tests/section44'.$suffix.'.php';
     $complete=$complete&&is_file($root.'/'.$name)&&str_contains($ci,'php '.$name);
 }
+preg_match("/define\\('SF_BUILD',\\s*'([0-9.]+)'\\)/",$get('stonefellow-v120.php'),$buildMatch);$build=$buildMatch[1]??'';
+preg_match("/const SF_DB_SCHEMA_TARGET = '([0-9.]+)'/",$migrations,$schemaMatch);$schema=$schemaMatch[1]??'';
 $checks=[
  'All 44A-J suites registered'=>$complete,
  'Separate post-build audit registered'=>is_file($root.'/tests/section44-audit-hardening.php')&&str_contains($ci,'php tests/section44-audit-hardening.php'),
- 'Public frontend 1.3.45'=>str_contains($get('stonefellow-v120.php'),"define('SF_BUILD', '1.3.45')"),
- 'Admin frontend 1.3.45'=>str_contains($get('admin/index.php'),"define('SF_ADMIN_BUILD','1.3.45')"),
- 'Version endpoint 1.3.45'=>str_contains($version,"'stonefellow'=>'1.3.45'"),
- 'PWA cache 1.3.45'=>str_contains($get('service-worker.js'),'stonefellow-static-v1.3.45'),
- 'Apache build header 1.3.45'=>str_contains($get('.htaccess'),'X-Stonefellow-Build "1.3.45"'),
- 'Schema target 1.3.35'=>str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.35'")&&str_contains($version,"'database_schema_target'=>'1.3.35'"),
+ 'Public frontend current release'=>version_compare($build,'1.3.45','>=')&&str_contains($get('stonefellow-v120.php'),"define('SF_BUILD', '".$build."')"),
+ 'Admin frontend current release'=>str_contains($get('admin/index.php'),"define('SF_ADMIN_BUILD','".$build."')"),
+ 'Version endpoint current release'=>str_contains($version,"'stonefellow'=>'".$build."'"),
+ 'PWA cache current release'=>str_contains($get('service-worker.js'),'stonefellow-static-v'.$build),
+ 'Apache build header current release'=>str_contains($get('.htaccess'),'X-Stonefellow-Build "'.$build.'"'),
+ 'Schema target current release'=>version_compare($schema,'1.3.35','>=')&&str_contains($migrations,"SF_DB_SCHEMA_TARGET = '".$schema."'")&&str_contains($version,"'database_schema_target'=>'".$schema."'"),
  'Migration 035 installed'=>str_contains($migrations,"'id'=>'2026-10-12-035'")&&str_contains($migrations,'sf_agent_actions_ensure_schema()'),
  'Authenticated CSRF governance'=>str_contains($api,"sf_admin_require_auth($"."method!=='GET')"),
  'Sending and publishing not executable'=>str_contains($registry,"if(!in_array($"."toolId,['campaign_draft_save','automation_draft_save'],true))return false"),

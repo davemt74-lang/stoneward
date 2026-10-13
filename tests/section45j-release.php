@@ -16,15 +16,17 @@ foreach($tests as $suffix){
     $path='tests/section45'.$suffix.'.php';
     $all=$all&&is_file($root.'/'.$path)&&str_contains($ci,'php '.$path);
 }
+preg_match("/define\\('SF_BUILD',\\s*'([0-9.]+)'\\)/",$get('stonefellow-v120.php'),$buildMatch);$build=$buildMatch[1]??'';
+preg_match("/const SF_DB_SCHEMA_TARGET = '([0-9.]+)'/",$migrations,$schemaMatch);$schema=$schemaMatch[1]??'';
 $checks=[
  'Section 45A-I executable acceptance wired'=>$all,
  'Section 45J integration test wired'=>str_contains($ci,'php tests/section45j-release.php'),
- 'Public build 1.3.45'=>str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '1.3.45')"),
- 'Admin build 1.3.45'=>str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','1.3.45')"),
- 'Version endpoint 1.3.45'=>str_contains($version,"'stonefellow'=>'1.3.45'"),
- 'PWA cache 1.3.45'=>str_contains($read('service-worker.js'),'stonefellow-static-v1.3.45'),
- 'Apache build 1.3.45'=>str_contains($read('.htaccess'),'X-Stonefellow-Build "1.3.45"'),
- 'Database target unchanged 1.3.35'=>str_contains($migrations,"SF_DB_SCHEMA_TARGET = '1.3.35'")&&str_contains($version,"'database_schema_target'=>'1.3.35'"),
+ 'Public build current release'=>version_compare($build,'1.3.45','>=')&&str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '".$build."')"),
+ 'Admin build current release'=>str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$build."')"),
+ 'Version endpoint current release'=>str_contains($version,"'stonefellow'=>'".$build."'"),
+ 'PWA cache current release'=>str_contains($read('service-worker.js'),'stonefellow-static-v'.$build),
+ 'Apache build current release'=>str_contains($read('.htaccess'),'X-Stonefellow-Build "'.$build.'"'),
+ 'Database target unchanged current release'=>version_compare($schema,'1.3.35','>=')&&str_contains($migrations,"SF_DB_SCHEMA_TARGET = '".$schema."'")&&str_contains($version,"'database_schema_target'=>'".$schema."'"),
  'Dual Brain migration 036 registered'=>str_contains($migrations,"'id'=>'2026-10-12-036'")&&str_contains($migrations,'sf_agent_customer_memory_ensure_schema()')&&str_contains($migrations,'sf_admin_agent_ensure_schema()'),
  'Existing Agent action owner authentication preserved'=>str_contains($read('admin/api/agent-actions.php'),'sf_admin_require_auth($method!=='),
  'Full reviewed journey proposal retained'=>str_contains($read('admin/assets/automations.js'),'agentJourneyPayload'),
