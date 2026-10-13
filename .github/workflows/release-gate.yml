@@ -53,6 +53,7 @@ jobs:
           node --check admin/assets/homepage.js
           node --check admin/assets/stories.js
           node --check admin/assets/settings-tabs.js
+          node --check admin/assets/unified-ui.js
           node --check admin/assets/theme.js
           node --check admin/assets/songbook.js
           node --check admin/assets/video.js
@@ -164,3 +165,4 @@ jobs:
           php tests/section47j-release.php
           php tests/admin-agent-sticky-composer.php
           php tests/settings-tabs-story-modal.php
+          php tests/admin-unified-ui.php
