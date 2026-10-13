@@ -105,6 +105,15 @@
     content.addEventListener('input',e=>{if(e.target.closest('form'))dirty=true;});
     content.addEventListener('change',e=>{if(e.target.closest('form'))dirty=true;});
     content.addEventListener('submit',()=>{dirty=false;},true);
+    // The original Back button must follow the same unsaved-edit guard as
+    // Escape, the backdrop and the new Close editor button.
+    content.addEventListener('click',event=>{
+      if(!event.target.closest('#'+backId))return;
+      if(dirty&&!window.confirm('Discard unsaved changes and close this editor?')){
+        event.preventDefault();event.stopImmediatePropagation();return;
+      }
+      dirty=false;
+    },true);
     function dismiss(){
       if(dirty&&!window.confirm('Discard unsaved changes and close this editor?'))return;
       dirty=false;
