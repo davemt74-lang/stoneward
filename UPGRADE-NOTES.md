@@ -1,3 +1,17 @@
+# Stonefellow v1.3.51 — Full-Page Homepage Designer & Homepage Blocks
+
+Open **Admin → Settings → Artist Homepage → Open Full-Page Web Editor**. The Admin sidebar temporarily becomes Homepage Designer tools. The main workspace presents a visual draft canvas with desktop/tablet/mobile widths, section ordering, block controls, Save all, Public preview and Exit.
+
+Admins may add, reorder, hide and edit **published release, ticket/VIP, active merch and editorial text cards** using the existing authenticated homepage section API. Published item prices, dates, artwork and access remain owned by their canonical catalog, store and ticket systems. Unpublished references disappear from public output.
+
+The editor canvas is a **local draft representation**; the Public preview link opens the exact public renderer after changes have been saved. Section saves proceed in sequence and stop on an error. Media publishing and Artist Story Editor remain separate governed workflows.
+
+The new custom_blocks section uses the **existing artist_home_sections table**. On existing installations, a disabled default row is added idempotently. No schema target change (still 1.3.46), Admin password reset or private-data modification. Back up before deployment and preserve private configuration/data.
+
+Application: **1.3.51** · Database schema target: **1.3.46**
+
+---
+
 # Stonefellow v1.3.50 — Section 50 Admin UI Certification
 
 - Audit all 29 Admin navigation views against shared headers, New/Add controls, responsive widths, form lifecycle, and existing action approval boundaries.

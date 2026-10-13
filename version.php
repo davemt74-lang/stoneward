@@ -3,13 +3,14 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.50',
+  'stonefellow'=>'1.3.51',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
   'database_schema_target'=>'1.3.46',
+  'homepage_web_designer'=>'full-page-sidebar-replacement-release-ticket-merch-story-blocks',
   'customer_agent_brain'=>'per-account-explicit-memory-private-conversation-consent-and-deletion',
   'admin_agent_brain'=>'separate-operational-chat-proposals-and-mission-ledger',
   'dual_agent_canvas'=>'customer-private-chat-and-admin-right-brain-panel',
