@@ -52,7 +52,14 @@ function sf_membership_sync_crm(int $userId,?array $state=null): void {
 function sf_membership_can(int $userId,string $benefit): bool {$s=sf_membership_state($userId,false);return !empty($s['active'])&&!empty($s['benefits'][$benefit]);}
 function sf_membership_discount_percent(?int $userId): int {if(!$userId)return 0;$s=sf_membership_state($userId,false);return $s['active']?max(0,min(100,(int)($s['benefits']['merch_discount_percent']??0))):0;}
 function sf_membership_discount_amount(?int $userId,array $items): int {
-    $pct=sf_membership_discount_percent($userId);if($pct<=0)return 0;$eligible=0;foreach($items as $i)if(($i['type']??'')==='merch')$eligible+=(int)($i['price_cents']??0);return min($eligible,(int)round($eligible*$pct/100));
+    // Only merchandise qualifies. Do not initialize the membership/CRM schema just to
+    // quote vinyl, digital tracks or player modules; older installs may not have it yet.
+    $eligible=0;
+    foreach($items as $item)if(($item['type']??'')==='merch')$eligible+=max(0,(int)($item['price_cents']??0));
+    if(!$userId||$eligible===0)return 0;
+    $pct=sf_membership_discount_percent($userId);
+    if($pct<=0)return 0;
+    return min($eligible,(int)round($eligible*$pct/100));
 }
 function sf_membership_content_get(int|string $id): ?array {
     sf_membership_ensure_schema();$col=is_int($id)||ctype_digit((string)$id)?'id':'slug';$q=sf_db()->prepare("SELECT mc.*,p.name minimum_package_name FROM membership_content mc LEFT JOIN subscription_packages p ON p.id=mc.minimum_package_id WHERE mc.$col=? LIMIT 1");$q->execute([$id]);$r=$q->fetch();return $r?:null;
