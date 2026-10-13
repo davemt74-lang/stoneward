@@ -155,3 +155,4 @@ jobs:
           php tests/section47b-skill-registry.php
           php tests/section47c-mission-planning.php
           php tests/section47d-customer-context.php
+          php tests/section47e-admin-intelligence.php
