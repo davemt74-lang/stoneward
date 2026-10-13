@@ -74,7 +74,7 @@
     try{
       const result=await ctx.api('homepage.php',{action:'save_design_draft',
         sections:collect(),expected_revision:draft.revision,base_hash:draft.base_hash});
-      draft=result.draft;dirty=false;announce('Draft saved privately · revision '+draft.revision+'. Public homepage is unchanged.');
+      draft=result.draft;dirty=false;window.SFHomepageWebEditor?.markClean?.();announce('Draft saved privately · revision '+draft.revision+'. Public homepage is unchanged.');
       return true;
     }catch(e){announce(e.message||'Draft save failed');return false;}
     finally{saving=false;}
@@ -97,7 +97,7 @@
     try{
       const result=await ctx.api('homepage.php',{action:'restore_design_version',version:v,
         expected_revision:draft.revision,base_hash:draft.base_hash});
-      draft=result.draft;dirty=false;hydrate(draft.sections);
+      draft=result.draft;dirty=false;window.SFHomepageWebEditor?.markClean?.();hydrate(draft.sections);
       announce('Version #'+v+' restored to your private draft. Review, then publish to go live.');
     }catch(e){announce(e.message||'Version restore failed.');}
   }
