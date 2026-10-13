@@ -48,6 +48,8 @@ $read=static fn(string $f):string=>file_get_contents($root.'/'.$f);
 $visual=$read('admin/assets/homepage-visual.js');$web=$read('admin/assets/homepage-web-editor.js');$api=$read('admin/api/homepage.php');
 $publicApp=$read('assets/js/app.js');
 $check['Public homepage toggles existing Agent composer without disabling player']=str_contains($publicApp,"home.chat_bar_enabled===false")&&str_contains($read('assets/css/site.css'),'artist-home-chat-hidden .chat-footer .chatbar')&&!str_contains($read('assets/css/site.css'),'artist-home-chat-hidden .footer-player');
+$check['Designer preserves draft workflow when legacy Save Section is clicked']=str_contains($read('admin/assets/homepage.js'),'if(window.SFHomepageVisual?.active?.())return window.SFHomepageVisual.saveDraft()');
+$check['Live homepage iframe fills responsive canvas width']=str_contains($read('admin/assets/homepage-web-editor.css'),'.homepage-visual-public-frame')&&str_contains($read('admin/assets/homepage-visual.js'),'frame.srcdoc');
 $check['Homepage sidebar exposes sticky chat toggle']=str_contains($web,'homepageWebChatToggle')&&str_contains($read('admin/assets/homepage.js'),'sticky_chat_enabled');
 $check['Canonical renderer loaded for both Admin and public pages']=str_contains($read('admin/index.php'),'artist-home-renderer.js')&&str_contains($read('stonefellow-v120.php'),'artist-home-renderer.js')&&str_contains($visual,'SFArtistHomeRenderer');
 $check['Designer exposes private save and explicit publish controls']=str_contains($visual,'save_design_draft')&&str_contains($visual,'publish_design_draft')&&str_contains($visual,'Publish live');
