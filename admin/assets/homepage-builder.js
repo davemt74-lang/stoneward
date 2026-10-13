@@ -114,6 +114,8 @@
     host.querySelector('#homepageBlockAdd').onclick=()=>{
       if(list.children.length>=24){model.say('Maximum 24 homepage blocks.');return;}
       const type=host.querySelector('#homepageBlockNewType').value;
+      form.elements.enabled.checked=true; // adding a block also enables its parent section
+      form.elements.enabled.dispatchEvent(new Event('change',{bubbles:true}));
       // IDs are display identities only. The backend verifies all input data.
       const id='block_'+Math.random().toString(36).slice(2,12)+Date.now().toString(36);
       list.insertAdjacentHTML('beforeend',blockHtml({id,type,enabled:type==='text'}));
