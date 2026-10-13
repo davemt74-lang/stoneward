@@ -3,7 +3,8 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $admin=sf_admin_require_auth($method!=='GET');
-$id=sf_clean_text($method==='GET'?($_GET['order_id']??''):((sf_request_json())['order_id']??''),100);
+$body=$method==='POST'?sf_request_json():[];
+$id=sf_clean_text($method==='GET'?($_GET['order_id']??''):($body['order_id']??''),100);
 if($id==='' || !preg_match('/^[a-zA-Z0-9_-]{1,100}$/',$id)) sf_json_response(['ok'=>false,'message'=>'Valid order ID required.'],422);
 try {
   sf_fulfillment_ensure_schema();
@@ -24,7 +25,6 @@ try {
     $record=$records[$id]??['order_id'=>$id,'status'=>'awaiting_artwork_review','revision'=>0,'events'=>[],'updated_at'=>null];
     $stages=['awaiting_artwork_review','artwork_approved','in_production','quality_check','production_complete'];
     if($method==='POST'){
-      $body=sf_request_json();
       if(($body['action']??'')!=='advance') sf_json_response(['ok'=>false,'message'=>'Unsupported production action.'],422);
       $expected=(int)($body['revision']??-1);
       if($expected!==(int)$record['revision']) sf_json_response(['ok'=>false,'message'=>'Production state has changed. Refresh before editing.'],409);
