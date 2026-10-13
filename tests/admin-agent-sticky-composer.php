@@ -43,7 +43,7 @@ $checks=[
  'Existing Admin exact approval action stays in owner view'=>str_contains($chat,"SFAgentCampaigns?.open?.('newsletter')") && str_contains($chat,"SFAutomationsAdmin?.openAutomation?.(0)"),
  'No customer Brain data displayed'=>!str_contains($chat,'agent_customer_memories') && !str_contains($chat,'customer_private_messages'),
  'Deployment cache version retains the sticky composer release baseline'=>preg_match("/SF_ADMIN_BUILD','([0-9.]+)'/",$html,$buildCheck) && version_compare($buildCheck[1]??'0','1.3.47','>=') && str_contains($get('service-worker.js'),'stonefellow-static-v'.($buildCheck[1]??'')),
- 'Database target includes additive library repair'=>str_contains($get('version.php'),"'database_schema_target'=>'1.3.47'"),
+ 'Database target includes additive library repair'=>str_contains($get('version.php'),"'database_schema_target'=>'1.3.48'"),
 ];
 $fail=0;
 foreach($checks as $name=>$pass){echo ($pass?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$pass)$fail++;}
