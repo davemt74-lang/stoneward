@@ -19,7 +19,7 @@ function sf_account_data_ensure_schema(): void {
     $done=true;
 }
 
-function sf_account_normalize_build(array $raw): array {
+function sf_account_normalize_build(array $raw,int $userId=0): array {
     $format=in_array((string)($raw['format']??''),['vinyl','cassette'],true)?(string)$raw['format']:'vinyl';
     $title=sf_clean_text($raw['title']??'My Stonefellow Record',120);
     if($title==='') $title='My Stonefellow Record';
@@ -35,13 +35,13 @@ function sf_account_normalize_build(array $raw): array {
         }
     }
     return ['version'=>4,'format'=>$format,'title'=>$title,'theme'=>$theme,'A'=>$sides['A'],'B'=>$sides['B'],
-      'playerModules'=>sf_turntable_valid_selection((array)($raw['playerModules']??[]),$GLOBALS['sf_build_user_id']??0),
+      'playerModules'=>sf_turntable_valid_selection((array)($raw['playerModules']??[]),$userId),
       'coverFront'=>sf_clean_text($raw['coverFront']??'stonefellow',70),'coverBack'=>sf_clean_text($raw['coverBack']??'stonefellow',70),
       'customNote'=>sf_clean_text($raw['customNote']??'',280),'savedAt'=>gmdate('c')];
 }
 
 function sf_account_build_fill_suggestions(int $userId,array $raw,string $side='both'): array {
-    $build=sf_account_normalize_build($raw);$cfg=sf_store_config();$limit=(int)($cfg['limits'][$build['format']]??0);if($limit<1)throw new RuntimeException('Unsupported build format.');
+    $build=sf_account_normalize_build($raw,$userId);$cfg=sf_store_config();$limit=(int)($cfg['limits'][$build['format']]??0);if($limit<1)throw new RuntimeException('Unsupported build format.');
     $side=in_array($side,['A','B','both'],true)?$side:'both';$map=sf_track_map();$used=array_fill_keys(array_merge($build['A'],$build['B']),true);$profile=sf_personalization_recommendation_profile($userId);
     $ranked=sf_personalization_rank_catalog(sf_catalog(),$profile,60,array_keys($used));$ordered=[];
     foreach($ranked as $r){$id=(string)($r['track_id']??'');$t=$map[$id]??null;if(!$t||empty($t['podEligible']))continue;$ordered[]=$id;}
@@ -66,8 +66,7 @@ function sf_account_saved_builds(int $userId): array {
 
 function sf_account_save_build(int $userId,array $raw,int $id=0): array {
     sf_account_data_ensure_schema();
-    $GLOBALS['sf_build_user_id']=$userId;
-    try{$build=sf_account_normalize_build($raw);}finally{unset($GLOBALS['sf_build_user_id']);}
+    $build=sf_account_normalize_build($raw,$userId);
     $now=gmdate('c'); $pdo=sf_db();
     if($id>0){
         $q=$pdo->prepare('SELECT id,created_at FROM user_saved_builds WHERE id=? AND user_id=? LIMIT 1'); $q->execute([$id,$userId]); $old=$q->fetch();
