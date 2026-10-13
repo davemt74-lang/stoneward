@@ -28,7 +28,9 @@ try {
       if(($body['action']??'')!=='advance') sf_json_response(['ok'=>false,'message'=>'Unsupported production action.'],422);
       $expected=(int)($body['revision']??-1);
       if($expected!==(int)$record['revision']) sf_json_response(['ok'=>false,'message'=>'Production state has changed. Refresh before editing.'],409);
-      if(!in_array((string)($order['status']??''),['paid','completed','confirmed','fulfilled'],true)) sf_json_response(['ok'=>false,'message'=>'Only confirmed paid orders may advance production.'],422);
+      $orderStatus=(string)($order['status']??'');$paymentStatus=(string)($order['payment']['status']??'');
+      $isPaid=str_starts_with($orderStatus,'paid_')||in_array($orderStatus,['paid','completed','fulfilled'],true)||in_array($paymentStatus,['paid','test_paid','simulated_paid','succeeded'],true);
+      if(!$isPaid || in_array($orderStatus,['refunded','partially_refunded','canceled','cancelled'],true)) sf_json_response(['ok'=>false,'message'=>'Only confirmed paid orders may advance production.'],422);
       $next=sf_clean_text($body['status']??'',60);
       $currentIndex=array_search($record['status'],$stages,true);
       if($currentIndex===false||!isset($stages[$currentIndex+1])||$stages[$currentIndex+1]!==$next) sf_json_response(['ok'=>false,'message'=>'Choose the next production stage in sequence.'],422);
