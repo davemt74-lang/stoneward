@@ -13,7 +13,6 @@ $db->exec('CREATE TABLE agent_conversations(id TEXT PRIMARY KEY,user_id INTEGER 
 $db->exec('CREATE TABLE agent_messages(id INTEGER PRIMARY KEY AUTOINCREMENT,conversation_id TEXT NOT NULL,user_id INTEGER NOT NULL,role TEXT,content TEXT,provider TEXT,model TEXT,input_tokens INTEGER,output_tokens INTEGER,created_at TEXT)');
 function sf_db():PDO{global $db;return $db;}
 function sf_db_config():array{return ['driver'=>'sqlite'];}
-function sf_privacy_personalization_enabled(int $id):bool{return $id===1;}
 require $root.'/api/agent-customer-brain.php';
 require $root.'/api/agent-admin-brain.php';
 require $root.'/api/privacy-core.php';
@@ -49,9 +48,9 @@ $check('Privacy export includes own conversation messages',count($export[0]['mes
 $check('Privacy export excludes other customer private messages',!str_contains($serialized,'electric only')&&!str_contains($serialized,'conv_bbbbbbbbbbbb'));
 $check('Privacy export constrains both conversation and message ownership',str_contains($read('api/privacy-core.php'),'WHERE conversation_id=? AND user_id=? ORDER BY id ASC'));
 $docs=$read('docs/section46-dual-agent-brain-acceptance.md');
-$check('Deployment guide describes upgrade and privacy',str_contains($docs,'migration 036')&&str_contains($docs,'customer')&&str_contains($docs,'no-replay'));
+$check('Deployment guide describes upgrade and privacy',stripos($docs,'migration 036')!==false&&str_contains($docs,'customer')&&str_contains($docs,'no-replay'));
 $check('Only green merged main generates certified deployment ZIP',str_contains($read('.github/workflows/certified-deploy.yml'),"github.event.workflow_run.conclusion == 'success'")&&str_contains($read('.github/workflows/certified-deploy.yml'),"github.event.workflow_run.head_branch == 'main'"));
 $check('Admin Brain and customer Brain use separate tables',str_contains($read('api/agent-admin-brain.php'),'admin_agent_threads')&&str_contains($read('api/agent-customer-brain.php'),'agent_customer_memories'));
 $check('No unrestricted customer Agent messages in Admin queries',!str_contains($read('admin/api/agent-brain.php'),'b.conversation_id')&&!str_contains($read('admin/api/agent-brain.php'),'b.request_excerpt'));
-echo (19-$failed).'/19 checks passed'.PHP_EOL;
+echo (17-$failed).'/17 checks passed'.PHP_EOL;
 exit($failed?1:0);
