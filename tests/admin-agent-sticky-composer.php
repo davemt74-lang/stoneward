@@ -42,7 +42,7 @@ $checks=[
  'Agent Brain stays a separate slide-out right panel'=>str_contains($chat,"className='admin-brain-drawer'") && str_contains($css,'right:0;top:0;bottom:0'),
  'Existing Admin exact approval action stays in owner view'=>str_contains($chat,"SFAgentCampaigns?.open?.('newsletter')") && str_contains($chat,"SFAutomationsAdmin?.openAutomation?.(0)"),
  'No customer Brain data displayed'=>!str_contains($chat,'agent_customer_memories') && !str_contains($chat,'customer_private_messages'),
- 'Deployment cache version advanced'=>str_contains($html,"SF_ADMIN_BUILD','1.3.47'") && str_contains($get('service-worker.js'),'stonefellow-static-v1.3.47'),
+ 'Deployment cache version retains the sticky composer release baseline'=>preg_match("/SF_ADMIN_BUILD','([0-9.]+)'/",$html,$buildCheck) && version_compare($buildCheck[1]??'0','1.3.47','>=') && str_contains($get('service-worker.js'),'stonefellow-static-v'.($buildCheck[1]??'')),
  'Database target unchanged for UI-only update'=>str_contains($get('version.php'),"'database_schema_target'=>'1.3.46'"),
 ];
 $fail=0;

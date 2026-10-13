@@ -1,3 +1,18 @@
+# Stonefellow v1.3.48 — Tabbed Settings and Modal Story Editor
+
+- **Settings** is now a ten-tab workspace: Public Site, Visual Theme, Artist Homepage, Stories, Site & Artist Media, Folder Access, Upload Limits, Password, Database Upgrade, and Admin Session.
+- **+ New Story** appears at the top of Settings regardless of the selected tab and opens a focused editor modal.
+- Existing stories also open in the modal for editing. After saving a new draft the modal remains open so Hero, Inline, and Gallery media can be attached using the existing universal Media Library controls.
+- Modal keyboard support includes Escape and focus trapping. Unsaved edits require confirmation before closing. Sections load when first selected and remain mounted between tab changes, preserving unsaved form fields.
+- Responsive tabs scroll horizontally instead of overflowing the right column.
+- No new database migration or administrator password changes. The schema target remains **1.3.46**.
+- Back up production data before uploading; preserve existing configuration and private files. Refresh cached Admin assets after deployment.
+
+Application: **1.3.48**
+Database schema target: **1.3.46**
+
+---
+
 # Stonefellow v1.3.47 — Admin Agent Chat UI Consolidation
 
 - Admin Agent Chat now uses the **existing sticky ChatGPT-style footer composer only**. The duplicate middle-of-page form has been removed.

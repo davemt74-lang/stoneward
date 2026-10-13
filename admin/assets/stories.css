@@ -1,1 +1,27 @@
 .story-stats{margin-bottom:14px}.story-admin-layout{display:grid;grid-template-columns:minmax(220px,.7fr) minmax(0,2fr);gap:12px}.story-admin-list{border:1px solid var(--line);max-height:760px;overflow:auto}.story-admin-row{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);padding:10px;display:flex;justify-content:space-between;gap:12px;text-align:left}.story-admin-row:hover,.story-admin-row.active{background:rgba(255,255,255,.035)}.story-admin-row span{display:grid;gap:3px}.story-admin-row span:last-child{text-align:right;justify-items:end}.story-admin-row strong{font:400 .86rem Georgia,serif}.story-admin-row small{color:var(--muted);font-size:.6rem}.story-admin-row b{font-size:.58rem;letter-spacing:.08em;color:var(--accent)}.story-editor-host{border:1px solid var(--line);padding:14px}.story-editor-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}.story-editor-head h2{margin:.2em 0;font:400 1.55rem Georgia,serif}.story-editor-head p{color:var(--muted);max-width:650px;font-size:.72rem}.story-readiness{display:flex;gap:14px;align-items:center;border:1px solid var(--line);padding:10px 12px;margin-bottom:12px}.story-readiness.ready{border-color:#405337}.story-readiness.blocked{border-color:#6b5032}.story-readiness>strong{font:400 1.7rem Georgia,serif}.story-readiness>div{display:grid;gap:4px}.story-readiness small{font-size:.62rem;color:var(--muted)}.story-editor-form{display:grid;grid-template-columns:1fr 1fr;gap:9px}.story-editor-form .span2{grid-column:1/-1}.story-editor-form textarea[name="body_text"]{min-height:260px;line-height:1.55}.story-editor-linked{display:grid;grid-template-columns:1fr 2fr;gap:9px;border:1px dashed var(--line);padding:9px}.story-link-label{display:flex;align-items:center;color:var(--muted);font-size:.67rem}.story-media-wrap{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}@media(max-width:900px){.story-admin-layout{grid-template-columns:1fr}.story-admin-list{max-height:260px}.story-editor-form,.story-editor-linked{grid-template-columns:1fr}.story-editor-form .span2{grid-column:auto}.story-editor-head{display:grid}}
+/* Focused Story Editor dialog; no long inline form inside Settings. */
+.story-admin-list-full{max-height:none;min-width:0;margin-bottom:6px}
+.story-admin-list-full .story-admin-row{min-height:64px;padding:12px 16px;align-items:center}
+.story-modal-open{overflow:hidden}
+.story-modal-backdrop{position:fixed;inset:0;z-index:110;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:clamp(12px,3vw,36px);overscroll-behavior:contain}
+.story-modal{width:min(960px,100%);height:min(900px,calc(100dvh - 32px));min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid var(--line2);background:var(--bg);box-shadow:0 24px 90px rgba(0,0,0,.55);overflow:hidden}
+.story-modal-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px clamp(16px,3vw,28px);border-bottom:1px solid var(--line);flex:none;background:var(--panel)}
+.story-modal-top strong{display:block;margin:4px 0 0;font:400 1.35rem Georgia,serif}
+.story-modal-top button{flex:0 0 auto}
+.story-modal-content{min-height:0;min-width:0;overflow-x:hidden;overflow-y:auto;padding:clamp(14px,3vw,28px);overscroll-behavior:contain}
+.story-modal-content .story-editor-head{min-width:0;flex-wrap:wrap}
+.story-modal-content .story-editor-form{min-width:0}
+.story-modal-content .story-editor-form>*{min-width:0}
+.story-modal-content .story-media-wrap{min-width:0;max-width:100%}
+.story-modal-content .universal-media{min-width:0;max-width:100%}
+.story-modal-backdrop button:focus-visible,.story-modal-backdrop input:focus-visible,.story-modal-backdrop textarea:focus-visible,.story-modal-backdrop select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:760px){
+ .story-modal-backdrop{padding:0;align-items:stretch}
+ .story-modal{height:100dvh;max-height:100dvh;border:0;width:100%;padding-bottom:env(safe-area-inset-bottom)}
+ .story-modal-top{padding:12px 14px}
+ .story-modal-top strong{font-size:1.15rem}
+ .story-modal-content{padding:14px 12px 22px}
+ .story-modal-content .story-editor-form{grid-template-columns:minmax(0,1fr)}
+ .story-modal-content .story-editor-form .span2{grid-column:auto}
+ .story-modal-content .story-editor-linked{grid-template-columns:minmax(0,1fr)}
+}

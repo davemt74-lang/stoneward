@@ -46,7 +46,8 @@ ok33(str_contains($app,'trackStoryLinks')&&str_contains($app,'releaseStoryLinks'
 # 33C — Admin editor and publishing governance
 ok33(str_contains($adminIndex,'assets/stories.css')&&str_contains($adminIndex,'assets/stories.js'),'Storytelling Admin assets load in the existing application');
 ok33(substr_count($adminIndex,'<button type="button" data-view=')===29,'Storytelling adds no 30th Admin sidebar item');
-ok33(str_contains($adminMain,'id="storytellingPanel"')&&str_contains($adminMain,"SFStoriesAdmin?.renderInto?.('storytellingPanel')"),'Storytelling editor lives inside Settings');
+$settingsTabs=file_get_contents($root.'/admin/assets/settings-tabs.js');
+ok33(str_contains($adminMain,'id="storytellingPanel"')&&str_contains($settingsTabs,"SFStoriesAdmin?.renderInto?.('storytellingPanel')"),'Storytelling editor remains available under the Settings Stories tab');
 ok33(str_contains($adminMain,'Artist Story, Editorial & Timeline lives in Settings.'),'Admin Agent routes storytelling requests to the embedded editor');
 ok33(str_contains($adminApi,'$existing===null?in_array($target')&&str_contains($adminApi,'Publishing or archiving a story requires explicit Admin confirmation.'),'API requires confirmation even for a brand-new direct publish/archive');
 ok33(str_contains($adminJs,'consequential=statusChanged')&&str_contains($adminJs,"confirm('Change this story status to '+status+'?')")&&str_contains($adminJs,'confirmed:consequential'),'Admin editor mirrors consequential publish/archive confirmation');

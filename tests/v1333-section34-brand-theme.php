@@ -80,7 +80,8 @@ ok34(str_contains($siteCss,'.story-lede,.story-rich-copy p')&&str_contains($site
 # 34F — Settings/editor integration
 ok34(str_contains($adminIndex,'assets/theme.css')&&str_contains($adminIndex,'assets/theme.js'),'Artist Brand Admin assets remain loaded after later releases');
 ok34(substr_count($adminIndex,'<button type="button" data-view=')===29,'Artist Brand adds no 30th Admin sidebar item');
-ok34(str_contains($adminMain,'id="themePanel"')&&str_contains($adminMain,"SFThemeAdmin?.renderInto?.('themePanel')"),'Artist Brand editor is embedded in Settings');
+$settingsTabs=file_get_contents($root.'/admin/assets/settings-tabs.js');
+ok34(str_contains($adminMain,'id="themePanel"')&&str_contains($settingsTabs,"SFThemeAdmin?.renderInto?.('themePanel')"),'Artist Brand remains available under the lazy-loaded Visual Theme settings tab');
 ok34(str_contains($adminMain,'Artist Brand & Visual Theme lives in Settings.'),'Admin Agent routes appearance requests to the theme editor');
 ok34(str_contains($adminJs,'type="color"')&&str_contains($adminJs,'name="max_width"')&&str_contains($adminJs,'name="display_font"'),'theme editor exposes bounded colors, width and typography');
 ok34(str_contains($adminCss,'.theme-preview-grid')&&str_contains($adminCss,'.theme-contrast-list'),'Admin provides visual preview and contrast detail');

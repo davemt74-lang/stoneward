@@ -2,7 +2,7 @@
   'use strict';
   const ctx=window.STONEFELLOW_ADMIN_CONTEXT;if(!ctx)return;
   const {api,canvas,esc,say}=ctx,$=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const state={data:null,mount:null,current:0};
+  const state={data:null,mount:null,current:0,dialog:null,dirty:false,returnFocus:null};
   const typeLabels={artist_about:'Artist About',essay:'Editorial Essay',release_story:'Release Story',track_story:'Track Story',show_story:'Show Story',milestone:'Timeline Milestone'};
   const label=s=>typeLabels[s]||String(s||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
   async function load(){state.data=await api('stories.php');return state.data}
@@ -22,19 +22,122 @@
   }
   function blank(){return {id:0,slug:'',entry_type:'essay',title:'',eyebrow:'',summary:'',body_text:'',status:'draft',entity_type:'',entity_id:'',event_date:null,era:'',featured:false,position:0,seo_title:'',seo_description:'',readiness:{score:0,ready:false,blockers:['Save the draft before publishing.'],warnings:[]}}}
   async function renderInto(target='storytellingPanel'){
-    state.mount=typeof target==='string'?document.getElementById(target):target;if(!state.mount)return;state.mount.innerHTML='<div class="empty compact">Loading Storytelling…</div>';
-    try{const d=await load(),rows=d.stories||[],m=d.metrics||{},current=state.current?rows.find(x=>Number(x.id)===Number(state.current)):null;if(!current&&state.current)state.current=0;
-      state.mount.innerHTML='<div class="panel-title"><div><h2>Artist Story, Editorial & Timeline</h2><p>Single-artist editorial around Stonefellow’s real songs, releases, shows and history — not a generic CMS.</p></div><button class="secondary" id="storyNew" type="button">New story</button></div><div class="stats story-stats"><div class="stat"><strong>'+Number(m.published||0)+'</strong><span>Published</span></div><div class="stat"><strong>'+Number(m.drafts||0)+'</strong><span>Drafts</span></div><div class="stat"><strong>'+Number(m.events?.view||0)+'</strong><span>Story views · 30d</span></div><div class="stat"><strong>'+Number(m.events?.share||0)+'</strong><span>Shares · 30d</span></div></div><div class="story-admin-layout"><aside class="story-admin-list">'+(rows.length?rows.map(listRow).join(''):'<div class="empty compact">No editorial stories yet.</div>')+'</aside><section id="storyEditorHost" class="story-editor-host">'+editor(current||blank(),d.references||{})+'</section></div>';
-      bindEditor(current||blank(),d.references||{});$$('[data-story-open]',state.mount).forEach(b=>b.onclick=()=>{state.current=Number(b.dataset.storyOpen);renderInto(state.mount)});$('#storyNew',state.mount).onclick=()=>{state.current=0;const host=$('#storyEditorHost',state.mount);host.innerHTML=editor(blank(),d.references||{});bindEditor(blank(),d.references||{})};
-    }catch(e){state.mount.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+    state.mount=typeof target==='string'?document.getElementById(target):target;
+    if(!state.mount)return;
+    state.mount.innerHTML='<div class="empty compact">Loading Storytelling…</div>';
+    try{
+      const d=await load(),rows=d.stories||[],m=d.metrics||{};
+      state.mount.innerHTML='<div class="panel-title"><div><h2>Artist Story, Editorial &amp; Timeline</h2>'+
+        '<p>Manage your artist biography, essays, release and track stories. Select a story to edit it in a focused window, or use New Story at the top of Settings.</p></div>'+
+        '<a class="secondary" href="../about" target="_blank" rel="noopener">Preview About</a></div>'+
+        '<div class="stats story-stats"><div class="stat"><strong>'+Number(m.published||0)+'</strong><span>Published</span></div>'+
+        '<div class="stat"><strong>'+Number(m.drafts||0)+'</strong><span>Drafts</span></div>'+
+        '<div class="stat"><strong>'+Number(m.events?.view||0)+'</strong><span>Story views · 30d</span></div>'+
+        '<div class="stat"><strong>'+Number(m.events?.share||0)+'</strong><span>Shares · 30d</span></div></div>'+
+        '<div class="story-admin-list story-admin-list-full" aria-label="Saved stories">'+
+        (rows.length?rows.map(listRow).join(''):'<div class="empty compact">No stories yet. Use New Story above to create your first draft.</div>')+'</div>';
+      $$('[data-story-open]',state.mount).forEach(b=>b.onclick=()=>{
+        const found=rows.find(x=>Number(x.id)===Number(b.dataset.storyOpen));
+        if(found){state.current=Number(found.id);openEditor(found,d.references||{});}
+      });
+    }catch(e){state.mount.innerHTML='<div class="empty" role="alert">'+esc(e.message)+'</div>';}
+  }
+  function closeEditor(force=false){
+    if(!state.dialog)return true;
+    if(!force&&state.dirty&&!confirm('Discard unsaved changes to this story?'))return false;
+    state.dialog.remove();
+    state.dialog=null;
+    state.dirty=false;
+    document.body.classList.remove('story-modal-open');
+    if(state.returnFocus?.isConnected)state.returnFocus.focus();
+    state.returnFocus=null;
+    return true;
+  }
+  function openEditor(story,refs){
+    if(!state.dialog){
+      state.returnFocus=document.activeElement;
+      const backdrop=document.createElement('div');
+      backdrop.className='story-modal-backdrop';
+      backdrop.innerHTML='<div class="story-modal" role="dialog" aria-modal="true" aria-labelledby="storyModalLabel">'+
+        '<header class="story-modal-top"><div><div class="eyebrow">STONEFELLOW EDITORIAL</div>'+
+        '<strong id="storyModalLabel">Story Editor</strong></div>'+
+        '<button type="button" class="secondary" data-story-close aria-label="Close story editor">Close ×</button></header>'+
+        '<div class="story-modal-content" id="storyModalContent"></div></div>';
+      backdrop.addEventListener('click',ev=>{if(ev.target===backdrop)closeEditor();});
+      backdrop.querySelector('[data-story-close]').onclick=()=>closeEditor();
+      backdrop.addEventListener('keydown',ev=>{
+        if(ev.key==='Escape'){ev.preventDefault();closeEditor();return;}
+        if(ev.key!=='Tab')return;
+        const items=Array.from(backdrop.querySelectorAll('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled])')).filter(el=>el.getClientRects().length);
+        if(!items.length)return;
+        if(ev.shiftKey&&document.activeElement===items[0]){ev.preventDefault();items[items.length-1].focus();}
+        else if(!ev.shiftKey&&document.activeElement===items[items.length-1]){ev.preventDefault();items[0].focus();}
+      });
+      document.body.appendChild(backdrop);
+      document.body.classList.add('story-modal-open');
+      state.dialog=backdrop;
+    }
+    state.dirty=false;
+    state.dialog.querySelector('#storyModalLabel').textContent=Number(story.id||0)?'Edit Story':'New Story';
+    state.dialog.querySelector('#storyModalContent').innerHTML=editor(story,refs);
+    state.dialog.querySelector('.story-modal').scrollTop=0;
+    bindEditor(story,refs);
+    state.dialog.querySelector('input[name="title"]')?.focus();
+  }
+  async function openNew(){
+    if(!state.data)await load();
+    state.current=0;
+    openEditor(blank(),state.data?.references||{});
   }
   function bindEditor(e,refs){
-    const f=$('#storyEditorForm',state.mount);if(!f)return;const type=f.elements.entry_type;type.onchange=()=>{const temp={...e,entry_type:type.value,entity_type:'',entity_id:''};$('#storyEntityFields',f).innerHTML=entityFields(temp,refs);bindEntityType(f,refs)};bindEntityType(f,refs);f.onsubmit=x=>saveStory(x,e);
-    const del=$('#storyDelete',state.mount);if(del)del.onclick=()=>deleteStory(Number(e.id));
-    if(e.id)window.SFMediaAdmin?.bindEntityMedia?.('story_entry',String(e.id),{roles:['hero','inline','gallery'],publishRoles:['hero']});
+    const f=$('#storyEditorForm',state.dialog);if(!f)return;const type=f.elements.entry_type;type.onchange=()=>{const temp={...e,entry_type:type.value,entity_type:'',entity_id:''};$('#storyEntityFields',f).innerHTML=entityFields(temp,refs);bindEntityType(f,refs)};bindEntityType(f,refs);f.onsubmit=x=>saveStory(x,e);
+    const del=$('#storyDelete',state.dialog);if(del)del.onclick=()=>deleteStory(Number(e.id));
+    f.addEventListener('input',()=>{state.dirty=true;});
+    f.addEventListener('change',()=>{state.dirty=true;});
+    if(e.id)window.SFMediaAdmin?.bindEntityMedia?.('story_entry',String(e.id),{roles:['hero','inline','gallery'],publishRoles:['hero']},state.dialog);
   }
   function bindEntityType(f,refs){const t=f.elements.entity_type;if(t&&t.tagName==='SELECT')t.onchange=()=>{const host=$('#storyEntityFields',f),e={entry_type:f.elements.entry_type.value,entity_type:t.value,entity_id:''};host.innerHTML=entityFields(e,refs);bindEntityType(f,refs)}}
-  async function saveStory(ev,existing){ev.preventDefault();const f=ev.currentTarget,d=new FormData(f),status=String(d.get('status')||'draft'),statusChanged=String(existing.status||'draft')!==status,consequential=statusChanged&&['published','archived'].includes(status);if(consequential&&!confirm('Change this story status to '+status+'?'))return;const story={id:Number(d.get('id')||0),entry_type:d.get('entry_type'),status,title:d.get('title'),slug:d.get('slug'),eyebrow:d.get('eyebrow'),summary:d.get('summary'),body_text:d.get('body_text'),entity_type:d.get('entity_type')||'',entity_id:d.get('entity_id')||'',event_date:d.get('event_date')||'',era:d.get('era'),featured:d.get('featured')==='on',position:Number(d.get('position')||0),seo_title:d.get('seo_title'),seo_description:d.get('seo_description')};const statusEl=$('#storySaveStatus',f);statusEl.textContent='Saving…';try{const j=await api('stories.php',{action:'save',story,confirmed:consequential});state.current=Number(j.story.id);say('Story saved as '+j.story.status+'.');renderInto(state.mount)}catch(x){statusEl.textContent=x.message}}
-  async function deleteStory(id){if(!confirm('Delete this draft/archive story permanently?'))return;try{await api('stories.php',{action:'delete',id,confirmed:true});state.current=0;say('Story deleted.');renderInto(state.mount)}catch(e){say(e.message)}}
-  window.SFStoriesAdmin={renderInto};
+  async function saveStory(ev,existing){
+    ev.preventDefault();
+    const f=ev.currentTarget,d=new FormData(f),status=String(d.get('status')||'draft');
+    const statusChanged=String(existing.status||'draft')!==status;
+    const consequential=statusChanged&&['published','archived'].includes(status);
+    if(consequential&&!confirm('Change this story status to '+status+'?'))return;
+    const story={
+      id:Number(d.get('id')||0),entry_type:d.get('entry_type'),status,
+      title:d.get('title'),slug:d.get('slug'),eyebrow:d.get('eyebrow'),
+      summary:d.get('summary'),body_text:d.get('body_text'),
+      entity_type:d.get('entity_type')||'',entity_id:d.get('entity_id')||'',
+      event_date:d.get('event_date')||'',era:d.get('era'),
+      featured:d.get('featured')==='on',position:Number(d.get('position')||0),
+      seo_title:d.get('seo_title'),seo_description:d.get('seo_description')
+    };
+    const statusEl=$('#storySaveStatus',f),submit=f.querySelector('button[type="submit"]');
+    statusEl.textContent='Saving…';submit.disabled=true;
+    try{
+      const response=await api('stories.php',{action:'save',story,confirmed:consequential});
+      state.current=Number(response.story.id);
+      state.dirty=false;
+      say('Story saved as '+response.story.status+'.');
+      // Keep the modal open so the newly saved story can receive hero/gallery
+      // assets without navigating away or losing its editing context.
+      await renderInto(state.mount);
+      openEditor(response.story,state.data?.references||{});
+    }catch(err){
+      statusEl.textContent=err.message||'Story could not be saved.';
+      submit.disabled=false;
+    }
+  }
+  async function deleteStory(id){
+    if(!confirm('Delete this draft/archive story permanently?'))return;
+    try{
+      await api('stories.php',{action:'delete',id,confirmed:true});
+      state.current=0;
+      closeEditor(true);
+      say('Story deleted.');
+      await renderInto(state.mount);
+    }catch(err){say(err.message);}
+  }
+  window.SFStoriesAdmin={renderInto,openNew,close:closeEditor};
+
 })();
