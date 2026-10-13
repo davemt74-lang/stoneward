@@ -1,0 +1,40 @@
+/* Unified Admin UI: shared headers, header creation actions and focused editors. */
+.admin-canvas{min-width:0;max-width:100%;overflow-wrap:break-word}
+.admin-canvas>.canvas-head{min-width:0;max-width:100%;align-items:center}
+.admin-canvas>.canvas-head>div:first-child{flex:1 1 250px;min-width:0}
+.admin-canvas>.canvas-head>.actions{flex:0 1 auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px;min-width:0}
+.admin-canvas>.canvas-head>.actions>button{min-height:43px;white-space:normal;text-align:center}
+.admin-unified-generated-header{margin-bottom:22px}
+.admin-canvas .panel{min-width:0;max-width:100%}
+.admin-canvas .panel>.panel-title{min-width:0;max-width:100%;flex-wrap:wrap;gap:12px}
+.admin-canvas .panel>.panel-title>div{min-width:0;max-width:100%}
+.admin-canvas .form-grid,.admin-canvas .toolbar,.admin-canvas .stats{min-width:0;max-width:100%}
+.admin-canvas form input,.admin-canvas form select,.admin-canvas form textarea{max-width:100%}
+.admin-canvas .table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.admin-canvas .data-table{max-width:none}
+.admin-unified-form-open{overflow:hidden}
+.admin-unified-form-overlay{position:fixed;inset:0;z-index:75;background:rgba(0,0,0,.83);display:flex;justify-content:center;align-items:center;padding:clamp(10px,2.5vw,32px);overflow:hidden;overscroll-behavior:contain}
+.admin-unified-form-shell{display:flex;flex-direction:column;width:min(1120px,100%);max-width:100%;min-width:0;height:min(930px,calc(100dvh - 32px));background:var(--bg);border:1px solid var(--line2);box-shadow:0 28px 90px rgba(0,0,0,.65);overflow:hidden}
+.admin-unified-form-bar{display:flex;flex:none;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.admin-unified-form-bar strong{font:400 1.05rem Georgia,serif;min-width:0;overflow-wrap:anywhere}
+.admin-unified-form-bar button{white-space:nowrap}
+.admin-unified-form-content{flex:1;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:clamp(16px,2.7vw,30px)}
+.admin-unified-form-content>.canvas-head{margin-bottom:22px;min-width:0}
+.admin-unified-form-content .form-grid{min-width:0}
+.admin-unified-form-content .form-grid>*{min-width:0}
+.admin-unified-form-content>.breadcrumbs{margin:0 0 12px}
+.admin-unified-form-content>.canvas-head h1{font-size:clamp(1.5rem,4vw,2.35rem)}
+.admin-unified-form-content .table-scroll,.admin-unified-form-content .campaign-canvas{max-width:100%}
+.admin-unified-form-overlay :is(button,input,textarea,select,a):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:900px){.admin-canvas>.canvas-head{align-items:flex-start;gap:14px}.admin-canvas>.canvas-head>.actions{width:100%;justify-content:flex-start}}
+@media(max-width:760px){
+ .admin-canvas>.canvas-head{display:flex;flex-wrap:wrap;margin-bottom:16px}
+ .admin-canvas>.canvas-head>.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));width:100%}
+ .admin-canvas>.canvas-head>.actions>button{white-space:normal;min-width:0}
+ .admin-unified-form-overlay{padding:0}
+ .admin-unified-form-shell{height:100dvh;max-height:100dvh;width:100%;border:0;padding-bottom:env(safe-area-inset-bottom)}
+ .admin-unified-form-bar{padding:12px 14px}
+ .admin-unified-form-content{padding:14px 12px 26px}
+ .admin-unified-form-content .form-grid{grid-template-columns:minmax(0,1fr)}
+ .admin-unified-form-content .form-grid>.span2,.admin-unified-form-content .form-grid>.span3{grid-column:auto}
+}
