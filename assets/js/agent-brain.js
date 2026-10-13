@@ -7,7 +7,7 @@
   async function render({canvas,api,post,esc,chooseConversation,navigate}){
     canvas.innerHTML='<article class="module"><h2>Your Agent Brain</h2><p role="status">Loading your private Agent context…</p></article>';
     const response=await api('agent-brain.php');
-    const brain=response.brain||{},memories=brain.memories||[],threads=brain.conversations||[],decisions=brain.decisions||[],plans=brain.planned_missions||[];
+    const brain=response.brain||{},memories=brain.memories||[],threads=brain.conversations||[],decisions=brain.decisions||[],plans=brain.planned_missions||[],suggestion=brain.proactive_suggestion||null;
     const cards=memories.map(m=>'<div class="brain-memory-row" style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #655744"><div><strong>'+esc(m.memory_key)+'</strong><p>'+esc(m.memory_text)+'</p></div><button type="button" class="text-control" data-forget="'+esc(m.memory_key)+'">Forget</button></div>').join('');
     const conversations=threads.map(t=>'<button type="button" class="text-control" data-resume="'+esc(t.id)+'" style="display:block;text-align:left;width:100%;margin:8px 0">'+esc(t.title||'Conversation')+' <small>'+esc((t.updated_at||'').slice(0,16))+'</small></button>').join('');
     const missionLines=plans.slice(0,10).map(p=>'<li>'+esc((p.steps||[]).map(s=>s.intent+': '+s.status).join(' → '))+'</li>').join('');
@@ -19,6 +19,7 @@
       (brain.personalization_enabled?'<form id="brainRemember" class="auth-form"><label>Memory label<input name="label" maxlength="60" required placeholder="music preference"></label><label>What would you like the Agent to remember?<textarea name="text" maxlength="1200" required rows="3" placeholder="I enjoy acoustic recordings…"></textarea></label><button class="buy-primary" type="submit">Save preference</button></form>':'')+
       '<p id="brainMemoryStatus" role="status" class="player-note"></p></section>'+
       '<section class="privacy-panel"><h3>My conversations</h3>'+(conversations||'<p>Your conversations will appear here after chatting with Stonefellow.</p>')+'</section>'+
+      '<section class="privacy-panel"><h3>Published music suggestion</h3><p>Opt in by saving a preference labeled “proactive suggestions” with the text “yes”. You can forget it anytime. Existing CRM engagement consent is also required.</p>'+(suggestion?'<p><strong>'+esc(suggestion.title)+'</strong> — '+esc(suggestion.reason)+'</p>':'<p>No opted-in suggestion available.</p>')+'</section>'+ 
       '<section class="privacy-panel"><h3>My mission plans</h3><p>Writes require separate approval; nothing here is automatically saved or sent.</p><ul>'+(missionLines||'<li>No mission plans yet.</li>')+'</ul></section>'+ 
       '<section class="privacy-panel"><h3>My Agent activity</h3><p>Only routing and tool status are displayed here. Full private messages remain in your own conversations.</p><ul>'+ (timeline||'<li>No recorded Agent activity yet.</li>')+'</ul></section></article>';
     const one=q=>canvas.querySelector(q),all=q=>Array.from(canvas.querySelectorAll(q));
