@@ -1,3 +1,17 @@
+# Stonefellow v1.3.47 — Admin Agent Chat UI Consolidation
+
+- Admin Agent Chat now uses the **existing sticky ChatGPT-style footer composer only**. The duplicate middle-of-page form has been removed.
+- The footer supports a multiline message (Enter to send, Shift+Enter for a newline) and preserves drafts on request failures.
+- The conversation scrolls inside its own region, with the Agent Brain opening as a right-side drawer.
+- The Admin sidebar can scroll independently on shorter screens. The original governed Admin Agent endpoint, conversation ID, and approvals remain unchanged.
+- This is a UI-only upgrade: **no new database migration** and no password or account changes. The schema target remains **1.3.46**.
+- Back up production first, preserve the existing data/storage/secrets and run the normal `upgrade.php` preflight. Refresh the browser/PWA to clear cached assets.
+
+Application: **1.3.47**  
+Database schema target: **1.3.46**
+
+---
+
 # Stonefellow v1.3.46 — Section 47 Release Notes
 
 1. Make a verified backup of the current database and private data before uploading this version.

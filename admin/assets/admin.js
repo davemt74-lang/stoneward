@@ -311,7 +311,7 @@
   function bindAgent(){
     const form=$('#adminChatForm'),input=$('#adminChatInput'),voice=$('#adminVoiceButton');
     const sendButton=form.querySelector('button[type="submit"]');
-    let pending=false,recognition=null;
+    let pending=false,recognition=null,voiceSubmitted=false;
     const resize=()=>{input.style.height='auto';input.style.height=Math.min(160,Math.max(44,input.scrollHeight))+'px';};
     input.addEventListener('input',resize);
     input.addEventListener('keydown',e=>{
@@ -343,7 +343,7 @@
     const R=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(R){
       recognition=new R();recognition.lang='en-US';recognition.interimResults=true;
-      voice.onclick=()=>{if(pending)return;try{recognition.start();voice.classList.add('active');agent('listening','Listening…');}catch(_){}};
+      voice.onclick=()=>{if(pending)return;voiceSubmitted=false;try{recognition.start();voice.classList.add('active');agent('listening','Listening…');}catch(_){}};
       recognition.onresult=e=>{
         let transcript='';let final=false;
         for(let i=0;i<e.results.length;i++){
@@ -351,7 +351,7 @@
           if(e.results[i].isFinal)final=true;
         }
         input.value=transcript.trim();resize();
-        if(final){voice.classList.remove('active');void submit();}
+        if(final&&!voiceSubmitted){voiceSubmitted=true;voice.classList.remove('active');void submit();}
       };
       recognition.onend=()=>{voice.classList.remove('active');agent('idle');};
       recognition.onerror=()=>{voice.classList.remove('active');agent('idle','Voice input unavailable. You can still type.');};

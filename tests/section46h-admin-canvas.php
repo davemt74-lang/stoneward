@@ -11,7 +11,7 @@ $checks=[
  'Admin Agent canvas module loaded'=>str_contains($layout,'assets/agent-canvas.js'),
  'Admin Agent CSS loaded'=>str_contains($layout,'assets/agent-canvas.css'),
  'Existing openView routes into Agent canvas'=>str_contains($admin,"'agent-chat':()=>window.SFAdminAgentCanvas?.render?.()"),
- 'Existing footer and Voice send through same Agent controller'=>substr_count($admin,'window.SFAdminAgentCanvas?.send?.(input.value)')===2,
+ 'Sticky footer and voice reuse the one Admin Agent send controller'=>str_contains($layout,'id="adminChatForm"') && str_contains($admin,'window.SFAdminAgentCanvas.send(message)') && str_contains($admin,'recognition.onresult'),
  'Conversation persists in Admin-only storage'=>str_contains($ui,"stonefellow.admin.agent.thread"),
  'Chat API is authenticated Admin only'=>str_contains($api,'sf_admin_require_auth($write)'),
  'Canvas is not an independent mission executor'=>str_contains($ui,"c.api('agent-chat.php'")&&!str_contains($ui,"sf_campaign_save("),
