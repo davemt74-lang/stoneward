@@ -21,7 +21,7 @@ const checks=[
  ['No duplicate internal stage scroll',css.includes('.order-vinyl-timeline{overflow:visible}')],
  ['Accessible section label',html.includes('aria-label="Vinyl production status"')],
  ['HTML escaped in production status',!malicious.includes('<img ')&&malicious.includes('&lt;img')],
- ['HTML escaped in event label',!malicious.includes('<script>')&&malicious.includes('&lt;script>')],
+ ['HTML escaped in event label',!malicious.includes('<script>')&&malicious.includes('&lt;script&gt;')],
  ['Customer fetch uses authenticated endpoint',js.includes("'customer-order.php?id='")],
  ['Order ownership checked before reading vinyl',php.indexOf("if($orderUserId!==")<php.indexOf("sf_vinyl_customer_status(")],
  ['Response sends owner-scoped status',php.includes("'vinyl_production'=>$vinyl")],
