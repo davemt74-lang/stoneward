@@ -1,0 +1,39 @@
+name: Stonefellow Vinyl Certified Package
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'admin/api/vinyl-production.php'
+      - 'admin/assets/fulfillment.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  certify-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate production release
+        run: |
+          php -l admin/api/vinyl-production.php
+          node --check admin/assets/fulfillment.js
+          php tests/section62c-production.php
+      - name: Create full source deployment archive
+        run: |
+          mkdir -p dist/deploy
+          git archive HEAD | tar -x -C dist/deploy
+          rm -rf dist/deploy/.github dist/deploy/tests
+          cd dist/deploy
+          zip -q -r ../stonefellow-section62c-full-deploy.zip .
+          cd ..
+          sha256sum stonefellow-section62c-full-deploy.zip > SHA256SUMS.txt
+          unzip -t stonefellow-section62c-full-deploy.zip | tail -1
+          sha256sum -c SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stonefellow-section62c-deployment
+          path: |
+            dist/stonefellow-section62c-full-deploy.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
