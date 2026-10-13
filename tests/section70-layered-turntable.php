@@ -10,7 +10,7 @@ $checks=[
  'Separate fixed pivot image'=>str_contains($js,'assets/img/turntable/default-pivot.svg')&&str_contains($css,'.turntable-arm-mount img'),
  'Both image assets are SVG'=>str_contains($arm,'<svg ')&&str_contains($pivot,'<svg '),
  'Pivot image is not animated'=>!str_contains($css,'.turntable-stage-body.is-playing .turntable-arm-mount'),
- 'Arm rotates on playback'=>str_contains($css,'.turntable-stage-body.is-playing .turntable-arm-swing{transform:rotate(5deg)}'),
+ 'Arm rotates on playback'=>str_contains($css,'.turntable-stage-body.is-playing .turntable-arm-swing{transform:rotate(18deg)}'),
  'Audio remains separate from the animation'=>str_contains($js,'Visual rotation: '),
  'Real Start/Stop wired'=>str_contains($js,'ctx.togglePlayback()')&&str_contains($app,'togglePlayback:()=>'),
  'Volume control wired to real audio'=>str_contains($app,'setVolume:value=>')&&str_contains($js,'ctx?.setVolume?.('),
