@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 $root=dirname(__DIR__);
-$read=static fn(string $p):(string)=>file_get_contents($root.'/'.$p);
+$read=static fn(string $p):string => (string)file_get_contents($root.'/'.$p);
 $index=$read('admin/index.php');
 $main=$read('admin/assets/admin.js');
 $ui=$read('admin/assets/unified-ui.js');
