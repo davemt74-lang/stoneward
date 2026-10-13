@@ -58,8 +58,8 @@ $check=[
  'Existing Story Editor exposed with backward-compatible render method'=>str_contains($stories,'window.SFStoriesAdmin={renderInto,openNew,close:closeEditor}'),
  'No schema migration or password reset from UI change'=>str_contains($get('version.php'),"'database_schema_target'=>'1.3.46'")
     && !str_contains($settings,'change_password'),
- 'All asset versions synchronized to 1.3.48'=>str_contains($markup,"SF_ADMIN_BUILD','1.3.48'")
-    && str_contains($get('service-worker.js'),'stonefellow-static-v1.3.48'),
+ 'All asset versions synchronized to current release'=>str_contains($markup,"SF_ADMIN_BUILD','1.3.49'")
+    && str_contains($get('service-worker.js'),'stonefellow-static-v1.3.49'),
 ];
 $failed=0;
 foreach($check as $name=>$passed){echo ($passed?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$passed)$failed++;}
