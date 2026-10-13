@@ -53,6 +53,7 @@ jobs:
           node --check admin/assets/homepage.js
           node --check admin/assets/homepage-builder.js
           node --check admin/assets/homepage-web-editor.js
+          node --check admin/assets/homepage-visual.js
           node --check admin/assets/stories.js
           node --check admin/assets/settings-tabs.js
           node --check admin/assets/unified-ui.js
@@ -175,3 +176,4 @@ jobs:
           php tests/section50e-homepage-story-media.php
           php tests/section50f-release.php
           php tests/section51-homepage-web-designer.php
+          php tests/section52-visual-homepage-publishing.php
