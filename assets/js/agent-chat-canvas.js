@@ -17,7 +17,12 @@
     }
     const messages=res.brain?res.brain.messages||res.messages||[]:res.messages||[];
     const recentPlans=(brain.planned_missions||[]).slice(0,4);
-    const missionCards=recentPlans.map(p=>'<li><strong>Mission '+esc(String(p.id||'').slice(0,8))+'</strong><ul>'+((p.steps||[]).slice(0,4).map(s=>'<li>'+esc(s.intent)+' · '+esc(s.status)+(s.requires_exact_approval?' (approval required)':'')+'</li>').join(''))+'</ul></li>').join('');
+    const safeStepRoute={public_catalog_search:'music',player_recommend:'music',create_playlist:'library',favorite_save:'library',favorite_remove:'library'};
+    const missionCards=recentPlans.map(p=>'<li><strong>Mission '+esc(String(p.id||'').slice(0,8))+'</strong><ul>'+((p.steps||[]).slice(0,4).map(s=>{
+      const route=safeStepRoute[s.intent];
+      return '<li>'+esc(s.intent)+' · '+esc(s.status)+(s.requires_exact_approval?' (approval required)':'')+
+        (route?'<button type="button" class="text-control" data-agent-navigate="'+route+'" aria-label="Open '+esc(s.intent)+' tool">Open tool</button>':'')+'</li>';
+    }).join(''))+'</ul></li>').join('');
     const threadOptions=(brain.conversations||[]).map(t=>'<option value="'+esc(t.id)+'" '+(t.id===activeId?'selected':'')+'>'+esc(t.title||'Conversation')+'</option>').join('');
     canvas.innerHTML='<article class="module customer-agent-chat"><div class="module-kicker">PERSONAL MUSIC COMPANION</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h2>My Agent Chat</h2><div><button type="button" id="newAgentThread" class="text-control">New chat</button> <button type="button" id="openMyAgentBrain" class="text-control">My Agent Brain</button></div></div>'+
