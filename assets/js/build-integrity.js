@@ -23,9 +23,11 @@
     try{
       if(navigator.serviceWorker?.getRegistrations){
         const registrations=await navigator.serviceWorker.getRegistrations();
+        const ownWorker=new URL('service-worker.js',document.baseURI);
         for(const registration of registrations){
           const script=registration.active?.scriptURL||registration.waiting?.scriptURL||registration.installing?.scriptURL||'';
-          if(script.includes('/service-worker.js'))await registration.unregister();
+          const worker=script?new URL(script,document.baseURI):null;
+          if(worker&&worker.origin===ownWorker.origin&&worker.pathname===ownWorker.pathname)await registration.unregister();
         }
       }
       if(window.caches?.keys){

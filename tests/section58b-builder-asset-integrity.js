@@ -51,6 +51,7 @@ async function handled(url){
   let reloads=0,cleared=[],unregistered=0,banner=null;
   const session=new Map();
   function makeDOM(){return {
+    baseURI:'https://stonefellow.test/',
     body:{appendChild:node=>{banner=node}},
     documentElement:{},querySelector:sel=>sel==='meta[name="stonefellow-build"]'?{content:'1.3.59'}:null,
     createElement:tag=>({tag,style:{},children:[],setAttribute(){},addEventListener(name,fn){this.listeners={...(this.listeners||{}),[name]:fn}},append(...nodes){this.children.push(...nodes)}})};
@@ -60,8 +61,8 @@ async function handled(url){
     caches:{keys:async()=>['stonefellow-static-v1.3.58','unrelated-data'],delete:async key=>{cleared.push(key);return true}}};
   const browserCtx={window:browser,document:makeDOM(),getComputedStyle:()=>cssStyle,
     navigator:{serviceWorker:{getRegistrations:async()=>[{active:{scriptURL:'https://stonefellow.test/service-worker.js'},unregister:async()=>{unregistered++;return true}},
-         {active:{scriptURL:'https://stonefellow.test/other-worker.js'},unregister:async()=>{throw Error('wrong unregister')}}]}},
-    sessionStorage:{getItem:key=>session.get(key)||null,setItem:(key,val)=>session.set(key,val)},console};
+         {active:{scriptURL:'https://stonefellow.test/other-app/service-worker.js'},unregister:async()=>{throw Error('wrong unregister')}}]}},
+    sessionStorage:{getItem:key=>session.get(key)||null,setItem:(key,val)=>session.set(key,val)},console,URL};
   vm.runInNewContext(integrity,browserCtx,{filename:'build-integrity.js'});
   // Promise chain includes service worker unregister + cache cleanup + reload
   await new Promise(resolve=>setImmediate(resolve));
