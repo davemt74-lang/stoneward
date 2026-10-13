@@ -63,10 +63,17 @@ function sf_agent_feedback_export(string $scope,int $ownerId): array {
     return $q->fetchAll(PDO::FETCH_ASSOC);
 }
 function sf_agent_feedback_summary(string $scope,int $ownerId): array {
-    $data=sf_agent_feedback_recent($scope,$ownerId,100);
+    if(!sf_agent_feedback_valid_scope($scope,$ownerId))
+        return ['total'=>0,'helpful'=>0,'not_helpful'=>0,'guidance'=>''];
+    sf_agent_feedback_ensure_schema();
+    $q=sf_db()->prepare('SELECT rating,COUNT(*) AS total FROM agent_response_feedback WHERE scope=? AND owner_user_id=? GROUP BY rating');
+    $q->execute([$scope,$ownerId]);
     $helpful=0;$notHelpful=0;
-    foreach($data as $row){if(($row['rating']??'')==='helpful')$helpful++;elseif(($row['rating']??'')==='not_helpful')$notHelpful++;}
-    return ['total'=>count($data),'helpful'=>$helpful,'not_helpful'=>$notHelpful,
+    foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row){
+        if(($row['rating']??'')==='helpful')$helpful+=(int)$row['total'];
+        elseif(($row['rating']??'')==='not_helpful')$notHelpful+=(int)$row['total'];
+    }
+    return ['total'=>$helpful+$notHelpful,'helpful'=>$helpful,'not_helpful'=>$notHelpful,
         'guidance'=>$notHelpful>0?'Earlier replies were rated not helpful. Ask for clarification rather than inventing missing details.':''];
 }
 /** No schema DDL inside account closure's transaction; fail on real DB errors. */

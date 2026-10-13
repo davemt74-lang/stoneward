@@ -65,6 +65,7 @@ for($i=1000;$i<1121;$i++){
 $fullExport=sf_agent_feedback_export('customer',1);
 $checks['Privacy export includes all 121 feedback entries']=count($fullExport)===121;
 $checks['Recent display remains bounded to 100']=count(sf_agent_feedback_recent('customer',1,100))===100;
+$checks['Feedback totals cover complete history, not only recent 100']=sf_agent_feedback_summary('customer',1)['total']===121;
 $checks['Complete export excludes message text']=!str_contains(json_encode($fullExport),'Private content');
 $checks['More than 100 ratings do not expose Admin records']=count(sf_agent_feedback_export('admin',9))===1;
 $checks['Bulk feedback deletion clears all exported entries']=sf_agent_feedback_clear('customer',1)===121
