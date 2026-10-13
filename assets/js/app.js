@@ -436,8 +436,8 @@
             cta='<button type="button" class="text-control" data-home-view="about">'+esc(block.button_label||'Our story')+'</button>';
           }
           const meta=type==='release'?[item.type,item.release_date].filter(Boolean).join(' · '):
-            type==='ticket'?[item.show_date,item.venue].filter(Boolean).join(' · '):
-            type==='merch'?homepageMoney(item.price_cents||0):'';
+            type==='ticket'?[item.show_date,item.venue,(item.price_cents>0?homepageMoney(item.price_cents):'RSVP / free'),(item.access?.allowed===false?'Access restrictions apply':'')].filter(Boolean).join(' · '):
+            type==='merch'?[homepageMoney(item.price_cents||0),item.available===false?'Currently unavailable':''].filter(Boolean).join(' · '):'';
           return '<article class="artist-home-custom-card '+esc(type+wide+compact)+'">'+
             (art?'<div class="artist-home-custom-art">'+art+'</div>':'')+
             '<div class="artist-home-custom-copy"><small>'+esc(type==='ticket'?'Tickets + VIP':type==='merch'?'Merch':type==='release'?'Release':'Story')+'</small>'+
