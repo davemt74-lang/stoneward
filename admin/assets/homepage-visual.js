@@ -66,6 +66,8 @@
         window.SFHomepageBuilder.reconnect?.();
       }
     }
+    const chat=$('#homepageWebChatToggle',sidebar),chatInput=$('[name="sticky_chat_enabled"]',forms().find(x=>x.dataset.homeSection==='hero'));
+    if(chat&&chatInput){chat.textContent='Sticky Agent chat: '+(chatInput.checked?'On':'Off');chat.setAttribute('aria-pressed',String(chatInput.checked));}
     window.SFHomepageBuilder?.preview?.();
   }
   async function saveDraft(){
