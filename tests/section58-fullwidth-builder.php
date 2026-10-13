@@ -8,7 +8,7 @@ $builderStart=strpos($app,'function renderBuilder(){');$builderEnd=strpos($app,'
 $builder=substr($app,$builderStart,$builderEnd-$builderStart);
 $checks['Builder render path exists']=is_int($builderStart)&&is_int($builderEnd)&&$builderStart<$builderEnd;
 $checks['Route-scoped full-width mode toggled during navigation']=str_contains($app,"document.body.classList.toggle('builder-workspace-active',view==='builder')");
-$checks['Standalone Agent orb/message hidden only on builder']=str_contains($css,'body.builder-workspace-active .agent-stage{display:none!important}')&&!preg_match('/(?<![a-zA-Z0-9\\.])\\.agent-stage\\{display:none!important\\}/',$css);
+$checks['Standalone Agent orb/message hidden only on builder']=str_contains($css,'body.builder-workspace-active .agent-stage{display:none!important}')&&!preg_match('/(?:^|\\n)\\s*\\.agent-stage\\{display:none!important\\}/',$css);
 $checks['Global site header and footer chat preserved']=str_contains($site,'<header')&&str_contains($site,'id="mainContent"')&&str_contains($site,'class="chat-footer"');
 $checks['Full bleed overrides narrow default stage']=str_contains($css,'body.builder-workspace-active .stage{width:100%;max-width:none')&&str_contains($css,'body.builder-workspace-active .dynamic-canvas{width:100%;max-width:none');
 $checks['True grid keeps left rail narrow and player flexible']=str_contains($css,'grid-template-columns:minmax(360px,440px) minmax(0,1fr)');
