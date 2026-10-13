@@ -4,26 +4,45 @@
   const SLOTS=['base','platter','arm','label','effect'];
   const LABELS={base:'Player base',platter:'Record platter',arm:'Tonearm',label:'Center label',effect:'Visual effects',pack:'Experience packs'};
   const DEFAULTS={base:'base-studio',platter:'platter-classic',arm:'arm-studio',label:'label-classic',effect:'effect-none'};
-  let registry=null,loading=null,ctx=null,host=null,preview=null,artState={side:'A'},version=0,editor=null,activeTab='base',returnFocus=null;
+  // Always usable built-in catalog; paid choices and ownership remain server-authoritative.
+  const BUILTIN_MODULES=[['base','base-studio','Studio Turntable','studio'],['platter','platter-classic','Classic Grooved Vinyl','classic'],['arm','arm-studio','Studio Tonearm','studio'],['label','label-classic','Classic Center Label','classic'],['effect','effect-none','Clean Playback','none']].map(([slot,id,name,visual])=>({slot,id,name,visual,brand:'Stonefellow',price_cents:0,includes:[],active:true}));
+  let registry=null,loading=null,catalogLoaded=false,catalogLoading=false,catalogError='',ctx=null,host=null,preview=null,artState={side:'A'},version=0,editor=null,activeTab='base',returnFocus=null;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=c=>'$'+(Math.max(0,Number(c)||0)/100).toFixed(2);
-  const getModules=()=>registry?.modules||[];
+  const getModules=()=>registry?.modules||BUILTIN_MODULES;
   const moduleById=id=>getModules().find(m=>m.id===id);
   const defaults=()=>registry?.defaults||DEFAULTS;
   const installed=()=>({...defaults(),...(ctx?.appState.builder.playerModules||{})});
   const selected=()=>({...installed(),...(preview||{})});
   const owned=id=>!!registry?.owned?.includes(id) || Object.values(defaults()).includes(id);
   const current=()=>ctx?.appState.builder||{};
-  const apiUrl=()=>((window.STONEFELLOW_CONFIG||{}).apiBase||'api')+'/turntable-modules.php';
+  const apiUrl=()=>((window.STONEFELLOW_CONFIG||{}).apiBase||'api').replace(/\/$/,'')+'/turntable-modules.php';
   async function load(){
-    if(registry)return registry;
-    if(!loading)loading=fetch(apiUrl(),{credentials:'same-origin',cache:'no-store'}).then(async r=>{
-      const data=await r.json();if(!r.ok||!data.ok)throw new Error('Player options unavailable.');
-      registry=data;return data;
-    }).finally(()=>{loading=null;});
+    if(catalogLoaded)return registry;
+    if(loading)return loading;
+    const generation=version;
+    catalogLoading=true;catalogError='';
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),8000);
+    loading=fetch(apiUrl(),{credentials:'same-origin',cache:'no-store',signal:controller.signal}).then(async response=>{
+      let result;
+      try{result=await response.json();}catch(_){throw new Error('The player catalog returned invalid JSON.');}
+      if(!response.ok||result?.ok!==true)throw new Error(result?.message||'The player catalog request failed ('+response.status+').');
+      if(!Array.isArray(result.modules)||!Array.isArray(result.owned)||!result.defaults||typeof result.defaults!=='object')throw new Error('Player catalog data is incomplete.');
+      if(generation!==version)return null;
+      registry=result;catalogLoaded=true;catalogError=typeof result.warning==='string'?result.warning:'';
+      return registry;
+    }).catch(error=>{
+      if(generation===version)catalogError=error?.name==='AbortError'?'The player catalog timed out.':(error?.message||'The player catalog could not be loaded.');
+      throw error;
+    }).finally(()=>{
+      clearTimeout(timeout);
+      if(generation===version){loading=null;catalogLoading=false;renderPartList();drawTrack();}
+    });
     return loading;
   }
-  function invalidate(){registry=null;loading=null;version++;}
+  function invalidate(){registry=null;loading=null;catalogLoaded=false;catalogLoading=false;catalogError='';version++;}
+  function retryCatalog(){invalidate();renderPartList();load().catch(()=>{});}
   function sideForTrack(track,builder){
     if(!track)return 'A';
     const id=String(track.id);
@@ -37,7 +56,9 @@
     return appState?.track||trackById?.(b[artState.side]?.[0])||trackById?.(b.A?.[0])||trackById?.(b.B?.[0])||null;
   }
   function drawTrack(){
-    const stage=host?.querySelector('.turntable-stage-body');if(!stage||!ctx)return;
+    const main=host?.querySelector('.turntable-stage-body');if(!main||!ctx)return;
+    const stages=[main,editor?.querySelector('.turntable-editor-preview .turntable-stage-body')].filter(Boolean);
+    stages.forEach(stage=>{
     const t=shownTrack(),side=sideForTrack(t,current()),sel=selected(),label=moduleById(sel.label);
     const title=stage.querySelector('[data-record-track]'),sideText=stage.querySelector('[data-record-side]'),
           image=stage.querySelector('[data-record-artwork]'),fallback=stage.querySelector('[data-record-fallback]');
@@ -57,6 +78,7 @@
     stage.querySelector('[data-record-brand]').textContent=moduleById(sel.base)?.brand||'Stonefellow';
     const status=stage.querySelector('[data-record-state]'),isPreview=!!preview&&Object.keys(preview).length>0;
     status.textContent=isPreview?'PREVIEW · UNOWNED MODULE':(ctx.appState.playing?'PLAYING':'READY');
+    });
   }
   function renderStage(){
     const stage=document.createElement('aside');stage.className='builder-turntable-stage';stage.setAttribute('aria-label','Digital modular record player');
