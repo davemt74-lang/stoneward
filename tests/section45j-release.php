@@ -16,7 +16,7 @@ foreach($tests as $suffix){
     $path='tests/section45'.$suffix.'.php';
     $all=$all&&is_file($root.'/'.$path)&&str_contains($ci,'php '.$path);
 }
-preg_match("/define\\('SF_BUILD',\\s*'([0-9.]+)'\\)/",$get('stonefellow-v120.php'),$buildMatch);$build=$buildMatch[1]??'';
+preg_match("/define\\('SF_BUILD',\\s*'([0-9.]+)'\\)/",$read('stonefellow-v120.php'),$buildMatch);$build=$buildMatch[1]??'';
 preg_match("/const SF_DB_SCHEMA_TARGET = '([0-9.]+)'/",$migrations,$schemaMatch);$schema=$schemaMatch[1]??'';
 $checks=[
  'Section 45A-I executable acceptance wired'=>$all,
