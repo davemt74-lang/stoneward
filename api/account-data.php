@@ -1,6 +1,42 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Restore missing columns on legacy user_library tables without dropping or replacing data.
+ * Old installations may already have user_library, so CREATE TABLE IF NOT EXISTS cannot
+ * add the columns expected by saved-draft and player-module account requests.
+ */
+function sf_account_library_repair_schema(PDO $pdo, string $driver): void {
+    if($driver==='sqlite'){
+        $rows=$pdo->query('PRAGMA table_info(user_library)')->fetchAll();
+        $existing=array_fill_keys(array_map(static fn($r)=>(string)$r['name'],$rows),true);
+        $spec=[
+            'item_type'=>"TEXT NOT NULL DEFAULT ''",
+            'item_key'=>"TEXT NOT NULL DEFAULT ''",
+            'label'=>"TEXT NOT NULL DEFAULT ''",
+            'source_order_id'=>"TEXT NOT NULL DEFAULT ''",
+            'metadata_json'=>"TEXT NOT NULL DEFAULT '{}'",
+            'acquired_at'=>"TEXT NOT NULL DEFAULT ''",
+        ];
+    }else{
+        $rows=$pdo->query('SHOW COLUMNS FROM `user_library`')->fetchAll();
+        $existing=array_fill_keys(array_map(static fn($r)=>(string)$r['Field'],$rows),true);
+        $spec=[
+            'item_type'=>"VARCHAR(40) NOT NULL DEFAULT ''",
+            'item_key'=>"VARCHAR(160) NOT NULL DEFAULT ''",
+            'label'=>"VARCHAR(255) NOT NULL DEFAULT ''",
+            'source_order_id'=>"VARCHAR(100) NOT NULL DEFAULT ''",
+            'metadata_json'=>"LONGTEXT NULL",
+            'acquired_at'=>"VARCHAR(40) NOT NULL DEFAULT ''",
+        ];
+    }
+    foreach($spec as $column=>$definition){
+        if(isset($existing[$column]))continue;
+        // Names/definitions above are constants, never user-controlled SQL.
+        $pdo->exec('ALTER TABLE user_library ADD COLUMN `'.$column.'` '.$definition);
+    }
+}
+
 function sf_account_data_ensure_schema(): void {
     static $done=false;
     if($done) return;
@@ -16,6 +52,7 @@ function sf_account_data_ensure_schema(): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_saved_builds (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,user_id BIGINT UNSIGNED NOT NULL,name VARCHAR(160) NOT NULL,format VARCHAR(24) NOT NULL,build_json LONGTEXT NOT NULL,created_at VARCHAR(40) NOT NULL,updated_at VARCHAR(40) NOT NULL,INDEX idx_user_saved_builds_user(user_id,updated_at),CONSTRAINT fk_saved_build_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_library (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,user_id BIGINT UNSIGNED NOT NULL,item_type VARCHAR(40) NOT NULL,item_key VARCHAR(160) NOT NULL,label VARCHAR(255) NOT NULL,source_order_id VARCHAR(100) NOT NULL DEFAULT '',metadata_json LONGTEXT NOT NULL,acquired_at VARCHAR(40) NOT NULL,UNIQUE KEY idx_user_library_unique(user_id,item_type,item_key,source_order_id),INDEX idx_user_library_user(user_id,acquired_at),CONSTRAINT fk_library_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
+    sf_account_library_repair_schema($pdo,$driver);
     $done=true;
 }
 
