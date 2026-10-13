@@ -5,14 +5,14 @@ $notification=file_get_contents(__DIR__.'/../api/notification-core.php');
 $endpoint=file_get_contents(__DIR__.'/../api/notifications.php');
 $cron=file_get_contents(__DIR__.'/../cron-notifications.php');
 $checks=[
-'Builder body cannot scroll on desktop'=>str_contains($css,'body.builder-workspace-active{height:100dvh;overflow:hidden}'),
-'Main desktop stage clipped to viewport'=>str_contains($css,'body.builder-workspace-active .stage{height:100dvh;min-height:0;overflow:hidden;padding-bottom:0}'),
-'Canvas does not overflow document'=>str_contains($css,'body.builder-workspace-active .dynamic-canvas{height:calc(100dvh - 64px);min-height:0;overflow:hidden}'),
-'Announcement height considered'=>str_contains($css,'has-announcement .dynamic-canvas{height:calc(100dvh - 96px)}'),
-'Left rail independently scrolls'=>str_contains($css,'.builder-left-rail{min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden'),
-'Right turntable stage fills locked viewport'=>str_contains($css,'.builder-turntable-stage{position:relative!important;top:auto!important;align-self:stretch;overflow:clip;min-height:0;height:100%;max-height:100%'),
-'Expanded audio footer stays clear of editor'=>str_contains($css,'has-player .builder-module{height:calc(100dvh - 64px - 184px)'),
-'Announcement and audio footer both clear the editor'=>str_contains($css,'has-announcement.has-player .builder-module{height:calc(100dvh - 96px - 184px)'),
+'Normal page scrolling restored'=>str_contains($css,'body.builder-workspace-active{height:auto;overflow-y:auto}'),
+'Page stage allowed to extend'=>str_contains($css,'body.builder-workspace-active .stage{height:auto;min-height:calc(100dvh - 64px);overflow:visible}'),
+'Canvas no longer traps scroll'=>str_contains($css,'body.builder-workspace-active .dynamic-canvas{height:auto;min-height:0;overflow:visible}'),
+'Builder follows panel content'=>str_contains($css,'body.builder-workspace-active .builder-module{height:auto;min-height:calc(100dvh - 64px)'),
+'No left-hand scrollbar'=>str_contains($css,'.builder-left-rail{height:auto;min-height:0;max-height:none;overflow:visible;scrollbar-gutter:auto;'),
+'Sticky player with viewport offset'=>str_contains($css,'.builder-turntable-stage{position:sticky!important;top:76px!important'),
+'Announcement sticky offset'=>str_contains($css,'has-announcement .builder-turntable-stage{top:108px!important'),
+'Bottom chat footer still protected'=>str_contains($css,'padding-bottom:calc(190px + env(safe-area-inset-bottom,0px))'),
 'Admin production rejects historical cassettes'=>str_contains(file_get_contents(__DIR__.'/../admin/api/vinyl-production.php'),'$isVinyl=true;break;')&&str_contains(file_get_contents(__DIR__.'/../admin/api/vinyl-production.php'),"==='vinyl'"),
 'Admin design proof filters cassette lines'=>str_contains(file_get_contents(__DIR__.'/../admin/assets/fulfillment.js'),"item.type==='custom_media'&&(item.format||'vinyl')==='vinyl'"),
 'Entering builder resets prior document scroll'=>str_contains(file_get_contents(__DIR__.'/../assets/js/app.js'),'window.scrollTo(0,0);renderBuilder()'),
