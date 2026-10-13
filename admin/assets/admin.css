@@ -111,3 +111,23 @@
 
 /* Keep the full Admin navigation usable on shorter/mobile displays. */
 .sidebar nav{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}.sidebar-foot{flex-shrink:0}
+
+/* Section 53 — compact, independently collapsible and keyboard-accessible Admin navigation categories. */
+.sidebar #adminNav{display:block;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;overscroll-behavior:contain}
+#adminNav .admin-nav-category{display:block;margin:0 0 3px;border-bottom:1px solid var(--line)}
+#adminNav .admin-nav-summary{display:flex;align-items:center;justify-content:space-between;gap:9px;list-style:none;cursor:pointer;min-height:39px;padding:9px 11px 9px 9px;color:#c9c1b5;font-size:.67rem;font-weight:700;letter-spacing:.095em;text-transform:uppercase;user-select:none}
+#adminNav .admin-nav-summary::-webkit-details-marker{display:none}
+#adminNav .admin-nav-summary:hover{background:#171410;color:var(--ink)}
+#adminNav .admin-nav-summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:3px}
+#adminNav .admin-nav-chevron{display:inline-block;flex:0 0 8px;width:8px;height:8px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform .15s ease;margin-right:4px;color:#8d8376}
+#adminNav .admin-nav-category[open]>.admin-nav-summary .admin-nav-chevron{transform:rotate(45deg)}
+#adminNav .admin-nav-category[open]>.admin-nav-summary{color:var(--accent)}
+#adminNav .admin-nav-category:has([data-view].active)>.admin-nav-summary{color:var(--accent)}
+#adminNav .admin-nav-items{display:grid;gap:1px;padding:1px 0 8px 7px}
+#adminNav .admin-nav-items button{width:100%;text-wrap:balance}
+#adminNav .admin-nav-items button:hover{background:#181511;color:var(--ink)}
+#adminNav .admin-nav-items button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+#adminNav .admin-nav-items button[aria-current=page]{border-left-color:var(--accent);background:#1c1813}
+@media(max-height:760px){#adminNav .admin-nav-summary{min-height:34px;padding-top:6px;padding-bottom:6px}#adminNav .admin-nav-items{padding-bottom:5px}}
+@media(max-width:760px){#adminNav .admin-nav-summary{min-height:44px}#adminNav .admin-nav-items button{min-height:38px;font-size:.72rem}}
+@media(prefers-reduced-motion:reduce){#adminNav .admin-nav-chevron{transition:none}}
