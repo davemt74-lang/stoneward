@@ -2,11 +2,14 @@
 declare(strict_types=1);
 $css=file_get_contents(__DIR__.'/../assets/css/turntable-builder.css');
 $checks=[
- 'Desktop editor constrained to viewport'=>str_contains($css,'body.builder-workspace-active .builder-module{height:calc(100dvh - 64px - 96px)'),
- 'Outer desktop builder does not scroll'=>str_contains($css,'min-height:0;overflow:hidden;align-items:stretch;padding-bottom:0'),
- 'Left column independently scrolls'=>str_contains($css,'.builder-left-rail{min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden'),
- 'Right turntable stage remains stationary'=>str_contains($css,'.builder-turntable-stage{position:relative!important;top:auto!important;align-self:stretch;overflow:clip;min-height:0;height:100%;max-height:100%'),
- 'Announcement header height accommodated'=>str_contains($css,'has-announcement .builder-module{height:calc(100dvh - 96px - 96px)'),
+ 'Page scroll restored'=>str_contains($css,'body.builder-workspace-active{height:auto;overflow-y:auto}'),
+ 'Builder height follows content'=>str_contains($css,'body.builder-workspace-active .builder-module{height:auto;min-height:calc(100dvh - 64px)'),
+ 'Left rail has no private scroll container'=>str_contains($css,'.builder-left-rail{height:auto;min-height:0;max-height:none;overflow:visible;scrollbar-gutter:auto;'),
+ 'Turntable stays sticky'=>str_contains($css,'.builder-turntable-stage{position:sticky!important;top:76px!important;align-self:start;overflow:clip;'),
+ 'Announcement offset accounted for'=>str_contains($css,'has-announcement .builder-turntable-stage{top:108px!important'),
+ 'Rotated chassis orientation'=>str_contains($css,'transform:translate(-50%,-50%) rotate(90deg)'),
+ 'Reversed tonearm pivot'=>str_contains($css,'.turntable-tonearm{top:9%;left:19%;width:6%;height:46%;transform:rotate(-30deg)'),
+ 'No visible deck branding'=>str_contains($css,'.turntable-deck-head,.turntable-deck-foot,.turntable-deck-serial{display:none}'),
  'Mobile turntable stays hidden'=>str_contains($css,'.builder-turntable-stage{display:none!important}'),
 ];
 foreach($checks as $label=>$pass){if(!$pass){fwrite(STDERR,"FAIL $label\n");exit(1);}echo "PASS $label\n";}
