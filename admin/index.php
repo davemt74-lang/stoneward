@@ -126,6 +126,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/inquiries.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/homepage-builder.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/homepage.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/js/artist-home-renderer.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/homepage-visual.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/homepage-web-editor.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/stories.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
