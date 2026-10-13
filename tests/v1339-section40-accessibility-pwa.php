@@ -23,7 +23,7 @@ ok40(str_contains($manifest,"stonefellow-pwa.svg")&&str_contains($manifest,"'pur
 ok40(str_contains($manifest,'sf_seo_https_url($appIcon)'),'configured app icon must be HTTPS before manifest exposure');
 
 $swBuild='0.0.0';if(preg_match("/stonefellow-static-v([0-9.]+)/",$sw,$sm))$swBuild=$sm[1];ok40(version_compare($swBuild,'1.3.39','>='),'service worker cache remains Section 40 compatible or newer');
-ok40(str_contains($sw,"SHELL=['offline.html','assets/css/site.css','assets/js/app.js','assets/js/library.js','assets/js/agent-brain.js','assets/js/agent-chat-canvas.js','assets/icons/stonefellow-pwa.svg']"),'offline precache contains public static shell only');
+ok40(str_contains($sw,"SHELL=['offline.html','assets/css/site.css','assets/js/app.js','assets/js/artist-home-renderer.js','assets/js/library.js','assets/js/agent-brain.js','assets/js/agent-chat-canvas.js','assets/icons/stonefellow-pwa.svg']"),'offline precache contains public static shell only');
 ok40(!str_contains($sw,'config.js')&&!str_contains($sw,'catalog.js')&&!str_contains($sw,'releases.js'),'generated catalog/config data is not precached');
 ok40(!str_contains($sw,'/api/')&&!str_contains($sw,'/admin/'),'service worker has no API/Admin caching path');
 ok40(str_contains($sw,"req.mode==='navigate'")&&str_contains($sw,"fetch(req).catch"),'navigation is network-first with offline fallback');
