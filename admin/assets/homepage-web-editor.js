@@ -38,7 +38,7 @@
     if(button)button.disabled=true;
     status('Saving homepage sections…');
     try{
-      const result=await window.SFArtistHomeAdmin?.saveAll?.(source);
+      const result=await window.SFArtistHomeAdmin?.saveAll?.(tools);
       if(!result)throw new Error('Some sections could not be saved; check the highlighted editor fields.');
       dirty=false;
       status('All homepage sections saved. Published site updates when its homepage plugin is enabled.');
@@ -52,6 +52,7 @@
     if(saving)return false;
     if(!force&&dirty&&!confirm('Discard unsaved homepage changes and exit the designer?'))return false;
     window.removeEventListener('keydown',onKeyDown,true);
+    window.SFHomepageBuilder?.relocate?.(null);
     stage.remove();tools.remove();stage=tools=source=null;
     shell.classList.remove('homepage-web-design-mode','homepage-editor-tools-open');
     dirty=false;
@@ -127,6 +128,7 @@
       if(!formsEl||!preview)throw new Error('Homepage editor did not provide its section forms and preview.');
       $('#homepageWebSectionForms',tools).append(formsEl);
       $('#homepageWebCanvas',stage).replaceChildren(preview);
+      window.SFHomepageBuilder.relocate({formsRoot:tools,previewRoot:stage});
       renderSectionNav();
       selectSection('hero');
       formsEl.addEventListener('input',()=>{dirty=true;status('Unsaved changes.');});
@@ -156,6 +158,7 @@
       window.addEventListener('keydown',onKeyDown,true);
       $('#homepageWebSave',stage).focus({preventScroll:true});
     }catch(e){
+      window.SFHomepageBuilder?.relocate?.(null);
       if(stage){stage.remove();stage=null;}
       if(tools){tools.remove();tools=null;}
       source=null;
