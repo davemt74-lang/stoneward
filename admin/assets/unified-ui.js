@@ -35,11 +35,11 @@
     ['segmentForm','segmentBack','automations'],
     ['automationForm','automationBack','automations'],
     ['pressKitForm','pressBack','press'],
-    ['operatingPlanForm','operatingPlanBack','calendar']
+    ['operatingPlanForm','planCancel','calendar']
   ];
   let upgrading=false,lastView='',returnId='';
   const getView=()=>String(context.app?.view||'');
-  const visible=el=>Boolean(el?.isConnected&&!el.closest('[hidden]'));
+  const visible=el=>Boolean(el?.isConnected&&!el.closest('[hidden]')&&getComputedStyle(el).display!=='none');
   function addHeader(){
     if(canvas.querySelector('.admin-unified-form-overlay'))return;
     if(['settings','agent-chat','brain'].includes(getView()))return;
