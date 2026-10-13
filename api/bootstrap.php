@@ -72,6 +72,7 @@ function sf_validate_builder(array $b, string $format): array {
 function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array {
     if(count($cart)>20) return ['ok'=>false,'errors'=>['Cart is too large.']];
     $cfg=sf_store_config(); $tracks=sf_track_map(); $errors=[]; $items=[]; $subtotal=0; $physical=false;
+    $turntableInCart=[];
     foreach($cart as $i=>$raw){
         if(!is_array($raw)){ $errors[]="Invalid item at position $i."; continue; }
         $type=(string)($raw['type'] ?? '');
@@ -83,6 +84,9 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
         } elseif($type==='merch'){
             $merch=sf_commerce_quote_item($raw);if(!$merch['ok']){$errors[]=$merch['error'];continue;}$item=$merch['item'];$items[]=$item;$subtotal+=(int)$item['price_cents'];if(!empty($item['physical']))$physical=true;
         } elseif($type==='turntable_module'){
+            $requestedModule=sf_clean_text($raw['module_id']??'',70);
+            if(isset($turntableInCart[$requestedModule])){$errors[]='A player module can only be purchased once per order.';continue;}
+            $turntableInCart[$requestedModule]=true;
             $quoted=sf_turntable_quote(sf_clean_text($raw['module_id']??'',70),$userId);
             if(!$quoted['ok']){$errors[]=$quoted['error'];continue;}
             $item=$quoted['item'];$items[]=$item;$subtotal+=(int)$item['price_cents'];
