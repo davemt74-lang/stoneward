@@ -136,6 +136,7 @@
     requestPreview();
     model.say('Order changed in draft. Save draft to keep it.');
   }
+  function reconnect(){ const f=currentForms().find(x=>x.dataset.homeSection==='custom_blocks'); const host=f?.querySelector('.homepage-config'); if(!host)return;const list=host.querySelector('#homepageBlockList'); if(list) { const old=host.querySelector('#homepageBlockAdd'); /* existing delegated controls attach when rebuilt through initBlocks */ } }
   function mount(options){
     model=options;
     const list=model.mount?.querySelector('.homepage-section-list');
@@ -178,5 +179,5 @@
     model.previewRoot=roots?.previewRoot||model.mount;
     requestPreview();
   }
-  window.SFHomepageBuilder={mount,getConfig,relocate,preview:requestPreview};
+  window.SFHomepageBuilder={mount,getConfig,relocate,preview:requestPreview,blockHtml,reconnect};
 })();
