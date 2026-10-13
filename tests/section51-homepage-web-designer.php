@@ -64,7 +64,7 @@ $checks=[
  'Sidebar provides Add Block, Hero, Story and Theme controls'=>str_contains($web,'homepageWebAddBlock')&&str_contains($web,"switchToSettings('media')")&&str_contains($web,"switchToSettings('stories')")&&str_contains($web,"switchToSettings('theme')"),
  'Responsive preview supports all three devices'=>str_contains($css,'data-device=desktop')&&str_contains($css,'data-device=tablet')&&str_contains($css,'data-device=phone'),
  'Public render supports four block types and ticket CTA'=>str_contains($read('assets/js/artist-home-renderer.js'),"if(k==='custom_blocks')")&&str_contains($app,'data-home-ticket-offer')&&str_contains($app,'data-home-release')&&str_contains($app,'data-home-store'),
- 'Block configuration and source references use original data'=>str_contains($builder,'getConfig')&&str_contains($read('admin/api/homepage.php'),"'tickets'=>$tickets"),
+ 'Block configuration and source references use original data'=>str_contains($builder,'getConfig')&&str_contains($read('admin/api/homepage.php'),"'tickets'=>\$tickets"),
  'New feature does not add another Admin sidebar item'=>substr_count($shell,'data-view="')===29,
  'Release version advances all JS assets'=>str_contains($shell,"SF_ADMIN_BUILD','1.3.73'")&&str_contains($read('service-worker.js'),'stonefellow-static-v1.3.73'),
  'Additive library schema target retained'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.48'"),
