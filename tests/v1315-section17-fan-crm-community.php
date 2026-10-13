@@ -45,7 +45,7 @@ ok(str_contains($agent,'sf_crm_agent_context($userId)'),'Agent reasoning can use
 ok(str_contains($adminHtml,'data-view="crm"')&&str_contains($adminHtml,'Fans + CRM'),'Admin has a dedicated Fans + CRM workspace');
 ok(str_contains($admin,'function renderCRM()')&&str_contains($admin,'function renderCRMContact('),'Admin CRM includes contact list and cross-system fan detail');
 ok(str_contains($adminCrm,'sf_crm_admin_contact_detail')&&str_contains($adminCrm,"action==='send_agent_message'"),'Admin CRM can inspect fan history and send governed in-app Agent outreach');
-ok(str_contains($app,'function renderStore(')&&str_contains($store,"'products'=>"),'Merch Store shortcut opens a server-backed current storefront');
+ok(str_contains($app,'function renderStore(')&&str_contains($store,"require __DIR__.'/storefront-core.php'")&&str_contains(src('api/storefront-core.php'),"'products'=>"),'Merch Store shortcut opens a server-backed current storefront');
 ok(str_contains($html,'id="chatQuickButton"')&&str_contains($html,'id="chatQuickMenu"'),'chat footer has the requested plus quick-action control');
 foreach(['record','playlist','shows','store','community','newsletter'] as $action)ok(str_contains($html,'data-quick-action="'.$action.'"'),'quick menu includes '.$action);
 ok(str_contains($app,'function handleQuickAction(')&&str_contains($app,"action==='playlist'")&&str_contains($app,"action==='shows'")&&str_contains($app,"action==='store'"),'quick actions are wired to real workflows');
