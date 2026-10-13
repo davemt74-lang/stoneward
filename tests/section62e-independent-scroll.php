@@ -8,7 +8,7 @@ $checks=[
  'Turntable stays sticky'=>str_contains($css,'.builder-turntable-stage{position:sticky!important;top:76px!important;align-self:start;overflow:clip;'),
  'Announcement offset accounted for'=>str_contains($css,'has-announcement .builder-turntable-stage{top:108px!important'),
  'Rotated chassis orientation'=>str_contains($css,'transform:translate(-50%,-50%) rotate(90deg)'),
- 'Reversed tonearm pivot'=>str_contains($css,'.turntable-tonearm{top:9%;left:19%;width:6%;height:46%;transform:rotate(-30deg)'),
+ 'Reversed tonearm pivot'=>str_contains($css,'.turntable-tonearm{top:9%;left:19%;width:6%;height:27%;transform:rotate(-42deg)'),
  'No visible deck branding'=>str_contains($css,'.turntable-deck-head,.turntable-deck-foot,.turntable-deck-serial{display:none}'),
  'Mobile turntable stays hidden'=>str_contains($css,'.builder-turntable-stage{display:none!important}'),
 ];
