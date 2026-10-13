@@ -66,7 +66,13 @@ function sf_validate_builder(array $b, string $format): array {
         $sides[$side]=['duration'=>$duration,'tracks'=>$rows];
     }
     if(count($seen)===0) $errors[]='Add at least one track before ordering.';
-    return ['ok'=>!$errors,'errors'=>$errors,'format'=>$format,'title'=>sf_clean_text($b['title'] ?? 'My Stonefellow Record',60),'theme'=>sf_clean_text($b['theme'] ?? 'desert',30),'sides'=>$sides];
+    $allowedCovers=['stonefellow','desert','midnight','analog'];
+    $front=sf_clean_text($b['coverFront']??'stonefellow',70);$back=sf_clean_text($b['coverBack']??'stonefellow',70);
+    if(!in_array($front,$allowedCovers,true))$errors[]='Unknown front cover template.';
+    if(!in_array($back,$allowedCovers,true))$errors[]='Unknown back cover template.';
+    return ['ok'=>!$errors,'errors'=>$errors,'format'=>$format,'title'=>sf_clean_text($b['title'] ?? 'My Stonefellow Record',60),
+      'theme'=>sf_clean_text($b['theme'] ?? 'desert',30),'coverFront'=>$front,'coverBack'=>$back,
+      'customNote'=>sf_clean_text($b['customNote']??'',280),'sides'=>$sides];
 }
 
 function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array {

@@ -1,4 +1,4 @@
-:root{--stonefellow-builder-css-build:'1.3.59'}
+:root{--stonefellow-builder-css-build:'1.3.60'}
 
 /* Section 54 — desktop modular vinyl-builder. Mobile retains the existing builder layout. */
 .builder-parts-picker{border-top:1px solid var(--line);padding:22px 0 10px}
@@ -57,10 +57,10 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
   .builder-catalog-row .builder-song{min-width:0;overflow-wrap:anywhere}
   .builder-footer{display:flex;flex-wrap:wrap;gap:10px}
   .builder-turntable-stage{display:block;grid-column:2;grid-row:1;position:sticky;top:64px;height:calc(100dvh - 64px);min-height:600px;overflow:clip;pointer-events:none;z-index:1;isolation:isolate}
-  .turntable-stage-body{--deck-accent:#c5ad86;--deck-width:clamp(510px,70vh,770px);--deck-height:clamp(760px,96vh,1060px);position:absolute;inset:0}
-  /* Bottom of the physical chassis points down/right and extends beyond viewport.
+  .turntable-stage-body{--deck-accent:#c5ad86;--deck-width:clamp(450px,69vh,690px);--deck-height:clamp(690px,80vw,1080px);position:absolute;inset:0}
+  /* Bottom of the physical chassis points to the right and extends beyond viewport.
      The vinyl-disc animation is independent of this static rotation. */
-  .turntable-deck{position:absolute;left:81%;top:calc(50% + clamp(80px,13vh,145px));width:var(--deck-width);height:var(--deck-height);border-radius:45px;background:linear-gradient(140deg,#34302b 0%,#1c1b1b 55%,#0e0e0e 100%);border:2px solid #55504a;box-shadow:inset 0 0 0 15px #24201f,inset 0 0 0 17px #6e6153,24px 28px 80px #000b;transform:translate(-50%,-50%) rotate(-45deg);transform-origin:center center}
+  .turntable-deck{position:absolute;left:75%;top:50%;width:var(--deck-width);height:var(--deck-height);border-radius:45px;background:linear-gradient(140deg,#34302b 0%,#1c1b1b 55%,#0e0e0e 100%);border:2px solid #55504a;box-shadow:inset 0 0 0 15px #24201f,inset 0 0 0 17px #6e6153,24px 28px 80px #000b;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center center}
   .turntable-deck-head{position:absolute;top:34px;left:7%;right:30%;display:flex;flex-direction:column;gap:8px;letter-spacing:.18em;font-size:.85rem;color:var(--deck-accent)}
   .turntable-deck-head span{font-size:.56rem;color:#8d8681;letter-spacing:.13em}
   .turntable-platter{position:absolute;width:82%;aspect-ratio:1/1;top:13%;left:1.5%;border-radius:50%;background:radial-gradient(circle,#151414 55%,#999 57%,#171616 59%,#000 62%,#888 63%,#171717 65%);box-shadow:0 0 0 5px #090909,0 8px 20px #000b;display:grid;place-items:center}
@@ -102,3 +102,37 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 }
 @media(max-width:620px){.turntable-part-row{grid-template-columns:1fr}.builder-catalog-filters{grid-template-columns:1fr}.builder-art-fields{grid-template-columns:1fr}.builder-art-fields .builder-note{grid-column:auto}}
 @media(prefers-reduced-motion:reduce){.turntable-disc{animation:none!important}}
+
+/* Section 60 — five accessible tabs, one persistent player stage */
+.builder-tablist{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;border:1px solid var(--line);background:var(--line);border-radius:7px;overflow:hidden;width:100%;min-width:0}
+.builder-tab{border:0;border-bottom:2px solid transparent;min-height:54px;min-width:0;padding:9px 3px;cursor:pointer;line-height:1.24;font-size:clamp(.6rem,.85vw,.72rem);text-wrap:balance;color:var(--muted);background:#14110f}
+.builder-tab[aria-selected="true"]{color:var(--ink);background:var(--soft);border-bottom-color:var(--accent);font-weight:700}
+.builder-tab:hover{color:var(--ink)}.builder-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;z-index:2;position:relative}
+.builder-tab-panel{min-width:0;width:100%;padding-top:15px}
+.builder-tab-panel[hidden]{display:none!important}
+.builder-tab-panel .builder-layout{display:block;margin:0}
+.builder-tab-panel .builder-object{display:flex;flex-direction:column;align-items:stretch;width:100%;max-width:none;min-height:0;padding:16px;gap:14px;overflow:hidden}
+.builder-tab-panel .builder-settings{display:grid;grid-template-columns:minmax(0,1fr) auto;width:100%;gap:9px;align-items:center;margin:0}
+.builder-tab-panel .builder-settings>.builder-title-label{grid-column:1/-1}
+.builder-tab-panel .builder-settings>input{min-width:0;width:100%;border-radius:6px}
+.builder-tab-panel .builder-art-editor{width:100%;margin:0}
+.builder-tab-panel .builder-object>.object-sleeve{width:min(230px,100%);height:auto;aspect-ratio:1/1;min-height:0;max-width:none;margin:0 auto}
+.builder-tab-panel .builder-object>.object-meta{text-align:center}
+.builder-tab-panel .builder-art-previews,.builder-tab-panel .builder-art-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.builder-tab-panel .builder-catalog{margin:16px 0 0}
+.builder-tab-panel .builder-song-list{min-width:0}
+.builder-tab-panel .sides{display:grid;grid-template-columns:1fr;gap:14px}
+.builder-tab-panel .side-card{min-width:0;overflow:hidden}
+.builder-tab-panel .builder-parts-picker{min-width:0}
+.builder-tab-panel .builder-personal-note{display:flex;flex-direction:column;gap:12px}
+.builder-tab-panel .builder-personal-note h3,.builder-submit-review h3{font:400 1.35rem var(--display-font);margin:0}
+.builder-tab-panel .builder-note{display:flex;flex-direction:column;gap:8px;font-size:.84rem}
+.builder-tab-panel .builder-note textarea{width:100%;min-height:166px;box-sizing:border-box;background:var(--surface);color:var(--ink);padding:13px;border:1px solid var(--line2);border-radius:7px;resize:vertical;font:inherit}
+.builder-tab-panel .builder-note-count{text-align:right;font-size:.7rem;color:var(--muted)}
+.builder-tab-panel .builder-submit-review{margin:0 0 18px;border:1px solid var(--line);border-radius:7px;padding:18px}
+.builder-tab-panel .builder-submit-review .player-note{margin:10px 0 0}
+.builder-tab-panel .builder-footer{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.builder-tab-panel .builder-footer .buy-primary{flex:1 1 100%}
+@media(min-width:1024px){.builder-left-rail{gap:0;padding-top:20px}.builder-turntable-stage{height:calc(100dvh - 64px);min-height:530px}.turntable-deck{left:75%;top:50%;transform:translate(-50%,-50%) rotate(-90deg)}}
+@media(max-width:1023px){.builder-left-rail{gap:0}.builder-tablist{margin-top:16px}.builder-tab{min-height:50px;font-size:clamp(.6rem,1.6vw,.73rem)}}
+@media(max-width:420px){.builder-tab{padding:9px 2px;font-size:.6rem}.builder-tab-panel .builder-art-previews{gap:8px}}
