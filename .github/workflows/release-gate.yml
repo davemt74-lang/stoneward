@@ -51,6 +51,8 @@ jobs:
           node --check admin/assets/distribution.js
           node --check admin/assets/press.js
           node --check admin/assets/homepage.js
+          node --check admin/assets/homepage-builder.js
+          node --check admin/assets/homepage-web-editor.js
           node --check admin/assets/stories.js
           node --check admin/assets/settings-tabs.js
           node --check admin/assets/unified-ui.js
@@ -172,3 +174,4 @@ jobs:
           php tests/section50d-admin-responsive.php
           php tests/section50e-homepage-story-media.php
           php tests/section50f-release.php
+          php tests/section51-homepage-web-designer.php

@@ -68,8 +68,9 @@ $checks=[
  'Story Settings keeps independent modal workflow'=>str_contains($index,'assets/settings-tabs.js')&&str_contains($index,'assets/stories.js'),
  'No password reset or new DB migration'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.46'")
      && !str_contains($ui,'password_reset'),
- 'Frontend version synchronized to current release'=>str_contains($index,"SF_ADMIN_BUILD','1.3.50'")
-    &&str_contains($read('service-worker.js'),'stonefellow-static-v1.3.50'),
+ 'Frontend/Admin and PWA versions remain synchronized'=>preg_match("/SF_ADMIN_BUILD','([0-9.]+)'/",$index,$sync)
+    &&version_compare($sync[1]??'0','1.3.50','>=')
+    &&str_contains($read('service-worker.js'),'stonefellow-static-v'.($sync[1]??'')),
 ];
 // Action mappings should resolve to real control IDs, including those in the
 // main Admin controller and within independently loaded feature modules.

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 function sf_artist_home_json(array $v): string { return json_encode($v,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?: '{}'; }
 function sf_artist_home_decode(mixed $v,array $fallback=[]): array { $d=is_array($v)?$v:json_decode((string)$v,true); return is_array($d)?$d:$fallback; }
-function sf_artist_home_keys(): array { return ['hero','featured_release','featured_track','latest_releases','featured_video','upcoming_show','merch','artist_story','newsletter','personalized']; }
+function sf_artist_home_keys(): array { return ['hero','featured_release','featured_track','latest_releases','featured_video','upcoming_show','merch','custom_blocks','artist_story','newsletter','personalized']; }
 function sf_artist_home_defaults(): array {
     return [
       ['hero',1,10,'STONEFELLOW','Music made to be lived with.','Listen to the songs, follow the stories, see what is next, and make something of your own.',['primary_label'=>'Listen now','primary_view'=>'music','secondary_label'=>'Explore releases','secondary_view'=>'releases']],
@@ -13,6 +13,7 @@ function sf_artist_home_defaults(): array {
       ['featured_video',1,45,'WATCH','Stonefellow on film','Music videos, live sessions, visualizers and other moving-image work.',['video_slug'=>'']],
       ['upcoming_show',1,50,'LIVE','Next show','Upcoming Stonefellow live date.',['show_id'=>'']],
       ['merch',1,60,'DIRECT FROM STONEFELLOW','Featured merch','Music, objects, and limited pieces available directly.',['product_id'=>'']],
+      ['custom_blocks',0,65,'FEATURED','Explore Stonefellow','Featured releases, ticket offers, merch and stories.',['blocks'=>[]]],
       ['artist_story',1,70,'ABOUT STONEFELLOW','One artist. One evolving catalog.','Stonefellow is David Evans’ music project — songs, recordings, live work, and the stories around them.',['button_label'=>'About Stonefellow','button_view'=>'about']],
       ['newsletter',1,80,'STAY CONNECTED','Hear what is next','New music, shows, releases, and selected Stonefellow updates.',['compact'=>false]],
       ['personalized',1,90,'FOR YOU','Your Stonefellow','Continue listening, revisit favorites, and pick up where you left off.',['limit'=>4]],
@@ -33,6 +34,31 @@ function sf_artist_home_ensure_schema(): void {
 }
 function sf_artist_home_normalize_config(string $key,array $raw): array {
     $viewAllowed=['music','releases','shows','store','about','newsletter'];
+    if($key==='custom_blocks'){
+      $items=$raw['blocks']??[];
+      if(!is_array($items)||count($items)>24)throw new InvalidArgumentException('Homepage can contain up to 24 custom blocks.');
+      $result=[];$ids=[];
+      foreach($items as $item){
+        if(!is_array($item))throw new InvalidArgumentException('Invalid homepage block.');
+        $kind=(string)($item['type']??'');
+        if(!in_array($kind,['release','ticket','merch','text'],true))throw new InvalidArgumentException('Unsupported homepage block type.');
+        $id=(string)($item['id']??'');
+        if(!preg_match('/^[a-zA-Z0-9_-]{8,48}$/D',$id))$id=bin2hex(random_bytes(8));
+        if(isset($ids[$id]))throw new InvalidArgumentException('Duplicate homepage block.');
+        $ids[$id]=true;
+        $reference=sf_clean_text($item['reference_id']??'',160);
+        $enabled=!empty($item['enabled']);
+        if($kind!=='text'&&$reference===''&&$enabled)throw new InvalidArgumentException('Select a published item before enabling a homepage block.');
+        if($kind==='text')$reference='';
+        $layout=in_array((string)($item['layout']??''),['card','wide','compact'],true)?(string)$item['layout']:'card';
+        $result[]=['id'=>$id,'type'=>$kind,'reference_id'=>$reference,
+          'heading'=>sf_clean_text($item['heading']??'',140),
+          'body_text'=>sf_clean_text($item['body_text']??'',500),
+          'button_label'=>sf_clean_text($item['button_label']??'',70),
+          'layout'=>$layout,'enabled'=>$enabled];
+      }
+      return ['blocks'=>$result];
+    }
     if($key==='hero')return [
       'primary_label'=>sf_clean_text($raw['primary_label']??'Listen now',80),
       'primary_view'=>in_array((string)($raw['primary_view']??''),$viewAllowed,true)?(string)$raw['primary_view']:'music',
@@ -64,6 +90,24 @@ function sf_artist_home_save_section(array $raw): array {
     if($key==='featured_video'&&!empty($clean['video_slug'])&&(!function_exists('sf_video_public')||!sf_video_public((string)$clean['video_slug'])))throw new InvalidArgumentException('Featured video must be a published ready Stonefellow video.');
     if($key==='upcoming_show'&&!empty($clean['show_id'])&&(!function_exists('sf_live_show_by_id')||!sf_live_show_by_id((string)$clean['show_id'])))throw new InvalidArgumentException('Featured show must be a public Stonefellow show.');
     if($key==='merch'&&!empty($clean['product_id'])&&(!function_exists('sf_commerce_product')||!sf_commerce_product((string)$clean['product_id'],true)))throw new InvalidArgumentException('Featured merch must be an active public Stonefellow product.');
+    if($key==='custom_blocks'){
+      // Never let an admin accidentally feature a draft release, unpublished
+      // ticket offer or inactive merch item. Existing blocks may be hidden
+      // after their referenced source is unpublished.
+      foreach($clean['blocks'] as $block){
+        if(!$block['enabled']||$block['type']==='text')continue;
+        $ref=$block['reference_id'];$valid=false;
+        if($block['type']==='release')foreach(sf_release_rows() as $r){
+          if((string)($r['id']??'')===$ref&&($r['state']??'published')==='published'&&($r['public_visible']??true)!==false){$valid=true;break;}
+        }
+        elseif($block['type']==='merch')$valid=(bool)sf_commerce_product($ref,true);
+        elseif($block['type']==='ticket'){
+          foreach(sf_ticket_public_offers(null) as $offer)
+            if((string)$offer['id']===$ref){$valid=true;break;}
+        }
+        if(!$valid)throw new InvalidArgumentException('Homepage block references a missing or unpublished '.$block['type'].' item.');
+      }
+    }
     $q=sf_db()->prepare('UPDATE artist_home_sections SET enabled=?,position=?,eyebrow=?,heading=?,body_text=?,config_json=?,updated_at=? WHERE section_key=?');$q->execute([!empty($raw['enabled'])?1:0,max(0,min(999,(int)($raw['position']??0))),sf_clean_text($raw['eyebrow']??'',120),sf_clean_text($raw['heading']??'',255),sf_clean_text($raw['body_text']??'',6000),sf_artist_home_json($clean),gmdate('c'),$key]);return sf_artist_home_section($key)?:[];
 }
 function sf_artist_home_reset(): array {
@@ -90,6 +134,32 @@ function sf_artist_home_product(string $preferred=''): ?array {
     return ['id'=>(string)$p['id'],'slug'=>(string)$p['slug'],'title'=>(string)$p['title'],'description'=>(string)$p['description'],'price_cents'=>(int)$p['base_price_cents'],'compare_at_price_cents'=>(int)$p['compare_at_price_cents'],'available'=>!empty($p['available']),'image'=>(string)($p['image']??'')];
 }
 function sf_artist_home_latest_releases(int $limit=3): array { $rows=[];foreach(sf_release_rows() as $r){if(($r['state']??'published')!=='published'||($r['public_visible']??true)===false)continue;$x=sf_artist_home_release((string)($r['id']??''));if($x)$rows[]=$x;}usort($rows,fn($a,$b)=>strcmp((string)$b['release_date'],(string)$a['release_date']));return array_slice($rows,0,max(1,min(6,$limit))); }
+function sf_artist_home_public_blocks(array $raw,int $userId=0): array {
+    $items=(array)($raw['blocks']??[]);$out=[];
+    $offers=null;
+    foreach($items as $item){
+      if(!is_array($item)||empty($item['enabled']))continue;
+      $type=(string)($item['type']??'');$ref=(string)($item['reference_id']??'');
+      $data=null;
+      if($type==='text')$data=['title'=>(string)($item['heading']??''),'description'=>(string)($item['body_text']??'')];
+      elseif($type==='release'){
+        $published=false;
+        foreach(sf_release_rows() as $r)if((string)($r['id']??'')===$ref && ($r['state']??'published')==='published'&&($r['public_visible']??true)!==false){$published=true;break;}
+        if($published){$candidate=sf_artist_home_release($ref);if((string)($candidate['id']??'')===$ref)$data=$candidate;}
+      }elseif($type==='merch'){$candidate=sf_artist_home_product($ref);if((string)($candidate['id']??'')===$ref)$data=$candidate;}
+      elseif($type==='ticket'){
+        if($offers===null)$offers=sf_ticket_public_offers($userId>0?$userId:null);
+        foreach($offers as $ticket)if((string)($ticket['id']??'')===$ref){$data=$ticket;break;}
+      }
+      if(!$data)continue;
+      $out[]=['id'=>(string)($item['id']??''),'type'=>$type,
+        'heading'=>(string)($item['heading']??''),'body_text'=>(string)($item['body_text']??''),
+        'button_label'=>(string)($item['button_label']??''),
+        'layout'=>(string)($item['layout']??'card'),'data'=>$data];
+    }
+    return $out;
+}
+
 function sf_artist_home_payload(int $userId=0): array {
     $site=sf_site_settings();$sections=[];$featuredRelease=null;$publicAbout=null;if(function_exists('sf_story_about_payload')){$storytelling=sf_story_about_payload();$publicAbout=$storytelling['about']??null;}foreach(sf_artist_home_sections(true) as $s){$key=(string)$s['section_key'];$cfg=(array)$s['config'];$data=null;$heading=(string)$s['heading'];$bodyText=(string)$s['body_text'];
       if($key==='hero'){$data=['hero_image'=>(string)($site['media_hero']??''),'artist_photo'=>(string)($site['media_artist_photo']??''),'logo'=>(string)($site['media_logo']??''),'primary_label'=>$cfg['primary_label']??'Listen now','primary_view'=>$cfg['primary_view']??'music','secondary_label'=>$cfg['secondary_label']??'Explore releases','secondary_view'=>$cfg['secondary_view']??'releases'];}
@@ -99,6 +169,7 @@ function sf_artist_home_payload(int $userId=0): array {
       elseif($key==='featured_video'){$data=!empty($cfg['video_slug'])&&function_exists('sf_video_public')?sf_video_public((string)$cfg['video_slug']):(function_exists('sf_video_featured')?sf_video_featured():null);}
       elseif($key==='upcoming_show'){$data=sf_artist_home_show((string)($cfg['show_id']??''));}
       elseif($key==='merch'){$data=sf_artist_home_product((string)($cfg['product_id']??''));}
+      elseif($key==='custom_blocks'){$data=sf_artist_home_public_blocks($cfg,$userId);if(!$data)continue;}
       elseif($key==='artist_story'){$storyHero='';if($publicAbout&&function_exists('sf_story_media')){foreach(sf_story_media((int)$publicAbout['id'],true) as $pm)if(($pm['role']??'')==='hero'&&($pm['category']??'')==='image'){$storyHero=(string)($pm['url']??'');break;}}if($publicAbout){$heading=(string)($publicAbout['title']?:$heading);$source=(string)($publicAbout['summary']?:$publicAbout['body_text']);$bodyText=trim((string)(preg_replace('/\\s+/u',' ',$source)??$source));if(function_exists('mb_substr'))$bodyText=mb_substr($bodyText,0,700);else$bodyText=substr($bodyText,0,700);}$data=['artist_photo'=>$storyHero!==''?$storyHero:(string)($site['media_artist_photo']??''),'button_label'=>$cfg['button_label']??'About Stonefellow','button_view'=>$cfg['button_view']??'about','story_source'=>$publicAbout?'storytelling':'homepage_fallback','story_id'=>(int)($publicAbout['id']??0),'story_slug'=>(string)($publicAbout['slug']??'')];}
       elseif($key==='newsletter'){$data=['compact'=>!empty($cfg['compact'])];}
       elseif($key==='personalized'){$data=$userId>0?sf_home_state($userId):null;}
