@@ -2,7 +2,9 @@
 
 **Release:** Stonefellow v1.3.45  
 **Database schema target:** 1.3.35  
-**Upgrade migration:** 2026-10-12-036, initializes customer-specific memories and separate administrator conversations. The existing installer/upgrade.php backup, checksum verification, locking, and safe migration path remain authoritative.
+**Upgrade migration:** 2026-10-12-036, initializes customer-specific memories and separate administrator conversations.
+
+Migration 036 is idempotent, is applied through the existing administrator upgrade system, and initializes only the new Brain tables without modifying customer private conversation content. The existing installer/upgrade.php backup, checksum verification, locking, and safe migration path remain authoritative.
 
 ## Product model
 
