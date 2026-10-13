@@ -16,7 +16,7 @@ $checks=[
 'Agent response does not write production'=>str_contains($agent,"case 'order_support':")&&str_contains($agent,'I cannot change production'),
 'Milestone notifications use user ID'=>str_contains($notifyCore,'sf_vinyl_customer_status($userId'),
 'Milestones deduplicated'=>str_contains($notifyCore,"'vinyl:'.hash("),
-'Transactional status delivered from central notification generator'=>str_contains($notifyCore,"sf_notify_user($userId,'vinyl_production'")
+'Transactional status delivered from central notification generator'=>str_contains($notifyCore,"sf_notify_user($userId,'vinyl_production'"),
 'Customer account returns only owned vinyl'=>str_contains($account,'sf_vinyl_customer_status($uid'),
 'Customer order card renders production state'=>str_contains($ui,'o.vinyl_production.status'),
 ];
