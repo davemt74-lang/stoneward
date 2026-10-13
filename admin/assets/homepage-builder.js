@@ -94,20 +94,20 @@
         };
         row.querySelector('[data-block-remove]').onclick=()=>{
           if(!confirm('Remove this block? Save this section to apply the change.'))return;
-          row.remove();requestPreview();
+          row.remove();list.dispatchEvent(new Event('change',{bubbles:true}));requestPreview();
         };
         row.querySelectorAll('[data-block-move]').forEach(b=>b.onclick=()=>{
           const rows=Array.from(list.children),n=rows.indexOf(row),next=n+Number(b.dataset.blockMove);
           if(next<0||next>=rows.length)return;
           if(next<n)list.insertBefore(row,rows[next]);else list.insertBefore(rows[next],row);
-          requestPreview();
+          list.dispatchEvent(new Event('change',{bubbles:true}));requestPreview();
         });
         row.ondragstart=e=>e.dataTransfer.setData('text/plain',row.dataset.homeBlockId);
         row.ondragover=e=>e.preventDefault();
         row.ondrop=e=>{
           e.preventDefault();
           const from=Array.from(list.children).find(x=>x.dataset.homeBlockId===e.dataTransfer.getData('text/plain'));
-          if(from&&from!==row){list.insertBefore(from,row);requestPreview();}
+          if(from&&from!==row){list.insertBefore(from,row);list.dispatchEvent(new Event('change',{bubbles:true}));requestPreview();}
         };
       });
     }
@@ -122,6 +122,7 @@
       connect();list.lastElementChild.querySelector('[data-block-field="heading"]')?.focus();
       requestPreview();
     };
+    model.connectBlocks=connect;
     connect();
     form.addEventListener('input',requestPreview);
     form.addEventListener('change',requestPreview);
@@ -136,7 +137,7 @@
     requestPreview();
     model.say('Order changed in draft. Save draft to keep it.');
   }
-  function reconnect(){ const f=currentForms().find(x=>x.dataset.homeSection==='custom_blocks'); const host=f?.querySelector('.homepage-config'); if(!host)return;const list=host.querySelector('#homepageBlockList'); if(list) { const old=host.querySelector('#homepageBlockAdd'); /* existing delegated controls attach when rebuilt through initBlocks */ } }
+  function reconnect(){model?.connectBlocks?.();requestPreview();}
   function mount(options){
     model=options;
     const list=model.mount?.querySelector('.homepage-section-list');
