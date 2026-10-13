@@ -67,7 +67,7 @@ $checks=[
  'Block configuration and source references use original data'=>str_contains($builder,'getConfig')&&str_contains($read('admin/api/homepage.php'),"'tickets'=>$tickets"),
  'New feature does not add another Admin sidebar item'=>substr_count($shell,'data-view="')===29,
  'Release version advances all JS assets'=>str_contains($shell,"SF_ADMIN_BUILD','1.3.72'")&&str_contains($read('service-worker.js'),'stonefellow-static-v1.3.72'),
- 'Additive library schema target retained'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.47'"),
+ 'Additive library schema target retained'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.48'"),
 ];
 $check=array_merge($check,$checks);
 $failed=0;foreach($check as $name=>$ok){echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$ok)$failed++;}

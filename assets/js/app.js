@@ -654,7 +654,9 @@
       builderCleanFingerprint=builderDraftFingerprint(st.builder);
       builderTab='saved-drafts';
       renderBuilder();
-      showBuilderNotice('Saved “'+st.builder.title+'” to your drafts.','success');
+      showBuilderNotice(result.build.build?.pendingPlayerModules && Object.keys(result.build.build.pendingPlayerModules).length
+        ?'Draft saved. Some player upgrades need ownership verification before checkout.'
+        :'Saved “'+st.builder.title+'” to your drafts.','success');
       if(showAccount)renderAccount();
       return result.build;
     }catch(e){

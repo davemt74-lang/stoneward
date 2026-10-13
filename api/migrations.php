@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.47';
+const SF_DB_SCHEMA_TARGET = '1.3.48';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -332,6 +332,13 @@ function sf_migration_definitions(): array {
             'revision'=>'1',
             'apply'=>function(): void { sf_account_data_ensure_schema(); },
         ],
+        [
+            'id'=>'2026-10-13-039',
+            'app_version'=>'1.3.72',
+            'description'=>'Restore missing legacy saved-draft columns and preserve existing customer record builds',
+            'revision'=>'1',
+            'apply'=>function(): void { sf_account_saved_builds_repair_schema(sf_db(),sf_migration_driver()); },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
@@ -541,6 +548,12 @@ function sf_migration_integrity_report(): array {
     $userCols=sf_migration_columns('users');foreach(['email_verified_at','email_verification_sent_at'] as $c){$has=in_array($c,$userCols,true);$checks[]=['name'=>'users.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
     $subCols=sf_migration_columns('user_subscriptions');foreach(['provider','provider_customer_id','provider_subscription_id','cancel_at_period_end','canceled_at','grace_ends_at','last_invoice_id','last_payment_at'] as $c){$has=in_array($c,$subCols,true);$checks[]=['name'=>'user_subscriptions.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
     $pkgCols=sf_migration_columns('subscription_packages');foreach(['provider_price_id','membership_enabled','membership_rank','membership_badge','membership_benefits_json'] as $c){$has=in_array($c,$pkgCols,true);$checks[]=['name'=>'subscription_packages.'.$c,'ok'=>$has,'detail'=>$has?'Present':'Missing'];if(!$has)$ok=false;}
+    $draftCols=sf_migration_columns('user_saved_builds');
+    foreach(['name','format','build_json','created_at','updated_at'] as $column){
+        $has=in_array($column,$draftCols,true);
+        $checks[]=['name'=>'user_saved_builds.'.$column,'ok'=>$has,'detail'=>$has?'Present':'Missing'];
+        if(!$has)$ok=false;
+    }
     $libraryCols=sf_migration_columns('user_library');
     foreach(['item_type','item_key','label','source_order_id','metadata_json','acquired_at'] as $column){
         $has=in_array($column,$libraryCols,true);

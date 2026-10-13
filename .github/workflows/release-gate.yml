@@ -20,6 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure PHP with real database drivers
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql
+          coverage: none
+
       - name: PHP syntax
         run: |
           set -euo pipefail
@@ -212,6 +219,7 @@ jobs:
           php tests/section72d-agent-upgrades.php
           node tests/section72e-customer-production.js
           php tests/section72e-exact-lookup.php
+          php tests/section73-legacy-saved-drafts.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
