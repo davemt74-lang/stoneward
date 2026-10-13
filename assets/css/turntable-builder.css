@@ -1,4 +1,4 @@
-:root{--stonefellow-builder-css-build:'1.3.67'}
+:root{--stonefellow-builder-css-build:'1.3.68'}
 
 /* Section 54 — desktop modular vinyl-builder. Mobile retains the existing builder layout. */
 .builder-parts-picker{border-top:1px solid var(--line);padding:22px 0 10px}
@@ -179,7 +179,7 @@ body.builder-workspace-active .builder-module{width:100%;max-width:none;margin:0
 .builder-draft-dialog .draft-modal-feedback{margin:10px 0 2px;padding:10px 12px;background:#402323;border:1px solid #955555;border-radius:6px;color:#ffd8d1;font-size:.78rem}
 .builder-draft-dialog button:disabled{opacity:.6;cursor:wait}
 @media(min-width:1024px){
-  /* v1.3.67: ONE scrollbar for the entire page. Fixed player never scrolls. */
+  /* v1.3.68: ONE scrollbar for the entire page. Fixed player never scrolls. */
   body.builder-workspace-active{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
   body.builder-workspace-active .stage{height:auto;min-height:100dvh;overflow:visible}
   body.builder-workspace-active .dynamic-canvas{height:auto;min-height:0;overflow:visible}
