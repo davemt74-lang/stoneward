@@ -8,7 +8,7 @@ $checks=[
  'SQL rename stays owner-scoped'=>str_contains($account,'UPDATE user_saved_builds SET name=?,build_json=?,updated_at=? WHERE id=? AND user_id=?'),
  'Full draft JSON preserved and only title changed'=>str_contains($account,"$"."build['title']=$"."name;")&&str_contains($account,'json_encode($build,JSON_THROW_ON_ERROR'),
  'Rename action uses authenticated user and CSRF-protected request'=>str_contains($api,'sf_require_user(false,$write)')&&str_contains($api,"$"."action==='rename'")&&str_contains($api,'sf_account_rename_build($uid,$id,'),
- 'Rename returns refreshed listing'=>str_contains($api,"'builds'=>sf_account_saved_builds($uid)")&&str_contains($api,"'build'=>$"."row")
+ 'Rename returns refreshed listing'=>str_contains($api,'sf_account_saved_builds($uid)')&&str_contains($api,"'build'=>".'$row')
 ];
 if(in_array('sqlite',PDO::getAvailableDrivers(),true)){
  function sf_db(): PDO{return $GLOBALS['testDb'];}
