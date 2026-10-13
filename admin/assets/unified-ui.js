@@ -104,7 +104,7 @@
     let dirty=false;
     content.addEventListener('input',e=>{if(e.target.closest('form'))dirty=true;});
     content.addEventListener('change',e=>{if(e.target.closest('form'))dirty=true;});
-    content.addEventListener('submit',()=>{dirty=false;},true);
+    // Keep dirty state until navigation/re-render; failed API saves must not discard changes.
     // The original Back button must follow the same unsaved-edit guard as
     // Escape, the backdrop and the new Close editor button.
     content.addEventListener('click',event=>{
