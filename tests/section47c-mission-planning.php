@@ -66,7 +66,7 @@ $checks['Forged tool substitution rejected']=$reject($forged);
 $forged=$evaluated;$forged['scope']='customer';
 $checks['Forged scope denied']=$reject($forged);
 $forged=$evaluated;$forged['steps'][0]['evidence']=['source'=>'forged'];
-$checks['Read evidence cannot be arbitrary']=true;
+$checks['Read evidence cannot be arbitrary']=$reject($forged);
 // A read claim cannot be completed without source proof.
 $forged=$admin;$forged['steps'][0]['status']='read_completed';
 $checks['Unverified completed read rejected']=$reject($forged);
@@ -80,12 +80,12 @@ $checks['Admin plan survives unrelated Customer deletion']=count(sf_agent_missio
 $privacy=(string)file_get_contents(dirname(__DIR__).'/api/privacy-core.php');
 $adminBrain=(string)file_get_contents(dirname(__DIR__).'/api/agent-admin-brain.php');
 $customerChat=(string)file_get_contents(dirname(__DIR__).'/api/agent-chat.php');
-$checks['Privacy export includes owner-scoped plans']=str_contains($privacy,"sf_agent_mission_plan_export('customer',$userId)");
-$checks['Privacy clear includes owner-scoped plans']=str_contains($privacy,"sf_agent_mission_plan_clear('customer',$userId)");
-$checks['Admin already-authorized chat saves governed plan']=str_contains($adminBrain,"sf_agent_mission_plan_save('admin',$adminId");
-$checks['Customer already-authorized chat saves governed plan']=str_contains($customerChat,"sf_agent_mission_plan_save('customer',(int)$u['id']");
-$checks['Both Brain read models include staged plans']=str_contains($adminBrain,"sf_agent_mission_plan_recent('admin',$adminId)")
-  && str_contains(file_get_contents(dirname(__DIR__).'/api/agent-brain.php'),"sf_agent_mission_plan_recent('customer',$userId)");
+$checks['Privacy export includes owner-scoped plans']=str_contains($privacy,"sf_agent_mission_plan_export('customer',".'$userId'.")");
+$checks['Privacy clear includes owner-scoped plans']=str_contains($privacy,"sf_agent_mission_plan_clear('customer',".'$userId'.")");
+$checks['Admin already-authorized chat saves governed plan']=str_contains($adminBrain,"sf_agent_mission_plan_save('admin',".'$adminId');
+$checks['Customer already-authorized chat saves governed plan']=str_contains($customerChat,"sf_agent_mission_plan_save('customer',(int)".'$u'."['id']");
+$checks['Both Brain read models include staged plans']=str_contains($adminBrain,"sf_agent_mission_plan_recent('admin',".'$adminId'.")")
+  && str_contains(file_get_contents(dirname(__DIR__).'/api/agent-brain.php'),"sf_agent_mission_plan_recent('customer',".'$userId'.")");
 $checks['Both canvases show separate mission stage states']=str_contains(file_get_contents(dirname(__DIR__).'/assets/js/agent-brain.js'),'My mission plans')
   && str_contains(file_get_contents(dirname(__DIR__).'/admin/assets/agent-canvas.js'),'Planned missions');
 $failed=0;foreach($checks as $name=>$ok){echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$ok)$failed++;}
