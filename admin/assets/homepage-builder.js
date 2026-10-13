@@ -36,6 +36,9 @@
   }
   function currentForms(){return Array.from((model?.formsRoot||model?.mount)?.querySelectorAll('.homepage-section-list [data-home-section]')||[])}
   function preview(){
+    if(window.SFHomepageVisual?.active?.()){
+      window.SFHomepageVisual.refresh();return;
+    }
     const host=(model?.previewRoot||model?.mount)?.querySelector('#homepageBuilderPreview');
     if(!host)return;
     const forms=currentForms(),hero=forms.find(f=>f.dataset.homeSection==='hero'),site=model.data?.site||{};
