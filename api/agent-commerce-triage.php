@@ -78,7 +78,7 @@ function sf_agent_commerce_reply_draft(array $order,string $topic):array {
     return [
         'order_id'=>$id,'topic'=>$topic,
         'subject'=>'Stonefellow order '.$id.' — support follow-up',
-        'text'=>'Hello,\n\n'.$templates[$topic].'\n\nStonefellow Support',
+        'text'=>"Hello,\n\n".$templates[$topic]."\n\nStonefellow Support",
         'state'=>'unsent_draft','delivery_enabled'=>false,
         'may_execute'=>false,'requires_human_review'=>true
     ];
