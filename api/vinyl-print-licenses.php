@@ -189,3 +189,38 @@ function sf_vinyl_license_assert_available(array $ids,array $balances):void {
         if((int)($balances[(string)$id]['available']??0)<1)
             throw new RuntimeException('Additional vinyl print license required for song '.(string)$id.'.');
 }
+
+/** Called by the authenticated vinyl Admin route. This re-reads real paid
+ * grants while holding the same durable file lock used for worker jobs.
+ * Simultaneous pressing requests cannot spend the same print credit.
+ */
+function sf_kunaki_job_enqueue_licensed(array $job):array {
+    $key=(string)($job['job_id']??'');
+    $owner=(int)($job['owner_id']??0);
+    $ids=(array)($job['license_track_ids']??[]);
+    if(!preg_match('/^KJP-[A-F0-9]{24}$/D',$key)||$owner<1||!$ids
+        ||count($ids)!==count(array_unique($ids))
+        ||count($ids)>40)throw new InvalidArgumentException('Incomplete print-license reservation.');
+    return sf_kunaki_queue_operation(static function(array &$jobs)use($job,$key,$owner,$ids):array {
+        if(isset($jobs[$key])){
+            $old=(array)$jobs[$key];
+            if(($old['proof_sha256']??'')!==($job['proof_sha256']??'')
+                ||(int)($old['owner_id']??0)!==$owner)
+                throw new RuntimeException('Publishing job identity already belongs to another design.');
+            return [$old,false];
+        }
+        $library=sf_account_library($owner);
+        $orders=[];
+        foreach($library as $entry){
+            $sourceId=(string)($entry['source_order_id']??'');
+            if($sourceId!==''&&!array_key_exists($sourceId,$orders))
+                $orders[$sourceId]=sf_read_order($sourceId);
+        }
+        $balances=sf_vinyl_license_balances($owner,$library,$orders,$jobs);
+        sf_vinyl_license_assert_available($ids,$balances);
+        $job['license_reservation']='one_per_track_this_pressing';
+        $job['license_reserved_at']=gmdate('c');
+        $jobs[$key]=$job;
+        return [$job,true];
+    });
+}
