@@ -51,6 +51,7 @@ function sf_billing_settings_save(array $data): array {
     $webhook=trim((string)($data['stripe_webhook_secret']??''));if($webhook!==''){$webhookPayload=sf_ai_encrypt($webhook);$webhookHint=sf_ai_hint($webhook);}if(!empty($data['clear_webhook_secret'])){$webhookPayload='';$webhookHint='';}
     if($enabled&&(($secretPayload===''&&!sf_connect_active())||$webhookPayload===''))throw new InvalidArgumentException('Stripe requires both the secret API key and webhook signing secret before it can be enabled.');
     if($enabled&&sf_ai_meta_get('billing.stripe_direct_account_id','')!==''&&!sf_cert_certified())throw new InvalidArgumentException('Direct merchant cannot be activated before independently verified Stripe sandbox payment and refund acceptance.');
+    if($enabled&&sf_ai_meta_get('billing.stripe_direct_account_id','')!==''&&($mode!=='test'||(sf_store_config()['mode']??'')!=='stripe_test'))throw new InvalidArgumentException('A verified direct Stripe test merchant cannot be enabled in live or simulated Store mode.');
     sf_ai_meta_set('billing.mode',$mode);sf_ai_meta_set('billing.provider',$provider);sf_ai_meta_set('billing.stripe_enabled',$enabled?'1':'0');sf_ai_meta_set('billing.stripe_secret_payload',$secretPayload);sf_ai_meta_set('billing.stripe_key_hint',$secretHint);sf_ai_meta_set('billing.stripe_webhook_payload',$webhookPayload);sf_ai_meta_set('billing.stripe_webhook_hint',$webhookHint);return sf_billing_settings();
 }
 function sf_billing_secret(string $key): string {$payload=sf_ai_meta_get($key,'');return $payload===''?'':sf_ai_decrypt($payload);}
@@ -62,7 +63,9 @@ function sf_stripe_webhook_secret(): string { return sf_billing_secret('billing.
 // billing.stripe_sandbox_certified alone is never sufficient: the certificate
 // must still match the current account, webhook, key and recent transaction receipts.
 function sf_stripe_configured(): bool {
-    if(sf_ai_meta_get('billing.stripe_direct_account_id','')!==''&&!sf_cert_certified())return false;
+    if(sf_ai_meta_get('billing.stripe_direct_account_id','')!==''){
+        if(!sf_cert_certified()||(sf_store_config()['mode']??'')!=='stripe_test')return false;
+    }
     $s=sf_billing_settings();
     return $s['provider']==='stripe'&&$s['stripe_enabled']&&$s['stripe_key_configured']&&$s['stripe_webhook_configured'];
 }

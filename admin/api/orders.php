@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
+require_once SF_ROOT.'/api/store-order-visibility.php';
 
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';
 $me=sf_admin_require_auth($write);
@@ -71,17 +72,19 @@ function sf_admin_order_sync_pod(string $orderId,string $status): void {
 if(!$write){
     $id=sf_clean_text($_GET['id']??'',100);
     if($id!==''){
-        $o=sf_read_order($id);if(!$o)sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);
+        $o=sf_read_order($id);if(!$o||!sf_store_customer_order_visible($o))sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);
         unset($o['confirmation_token_hash']);
         sf_json_response(['ok'=>true,'order'=>$o,'summary'=>sf_admin_order_public($o),'csrf'=>sf_admin_csrf()]);
     }
-    $rows=[];foreach(sf_admin_orders() as $o)$rows[]=sf_admin_order_public($o);
+    $rows=[];foreach(sf_admin_orders() as $o)if(sf_store_customer_order_visible($o))$rows[]=sf_admin_order_public($o);
     sf_json_response(['ok'=>true,'orders'=>$rows,'csrf'=>sf_admin_csrf()]);
 }
 
 $b=sf_request_json();$action=(string)($b['action']??'');
 if($action==='reconcile_stripe_payment'){
     $id=sf_clean_text($b['id']??'',100);
+    $candidate=sf_read_order($id);
+    if(!$candidate||!sf_store_customer_order_visible($candidate))sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);
     try {
         require_once SF_ROOT.'/api/store-payments.php';
         require_once SF_ROOT.'/api/store-reconciliation.php';
@@ -99,6 +102,8 @@ if($action==='reconcile_stripe_payment'){
 }
 if($action==='request_stripe_refund'){
     $id=sf_clean_text($b['id']??'',100);
+    $candidate=sf_read_order($id);
+    if(!$candidate||!sf_store_customer_order_visible($candidate))sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);
     $amount=(int)($b['amount_cents']??0);
     $reason=(string)($b['reason']??'requested_by_customer');
     $requestKey=(string)($b['request_key']??'');
@@ -119,7 +124,7 @@ if($action==='request_stripe_refund'){
     }
 }
 if($action==='update_fulfillment'){
-    $id=sf_clean_text($b['id']??'',100);$orderMutationLock=sf_admin_order_mutation_lock($id);$o=sf_read_order($id);if(!$o)sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);
+    $id=sf_clean_text($b['id']??'',100);$orderMutationLock=sf_admin_order_mutation_lock($id);$o=sf_read_order($id);if(!$o||!sf_store_customer_order_visible($o))sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);
     if(empty($o['quote']['physical']))sf_json_response(['ok'=>false,'message'=>'This order does not require physical fulfillment.'],422);
     if(($o['payment']['provider']??'')==='stripe'&&($o['payment']['status']??'')!=='paid')sf_json_response(['ok'=>false,'message'=>'Stripe payment must be webhook-confirmed before order fulfillment can change.'],409);
     $status=(string)($b['status']??'pending');
@@ -158,13 +163,13 @@ if($action==='update_fulfillment'){
     sf_json_response(['ok'=>true,'order'=>sf_admin_order_public($o),'csrf'=>sf_admin_csrf()]);
 }
 if($action==='update_order_status'){
-    $id=sf_clean_text($b['id']??'',100);$orderMutationLock=sf_admin_order_mutation_lock($id);$o=sf_read_order($id);if(!$o)sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);$target=(string)($b['status']??'');$allowed=['canceled','refund_requested','refunded'];if(!in_array($target,$allowed,true))sf_json_response(['ok'=>false,'message'=>'Invalid order state.'],422);
+    $id=sf_clean_text($b['id']??'',100);$orderMutationLock=sf_admin_order_mutation_lock($id);$o=sf_read_order($id);if(!$o||!sf_store_customer_order_visible($o))sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);$target=(string)($b['status']??'');$allowed=['canceled','refund_requested','refunded'];if(!in_array($target,$allowed,true))sf_json_response(['ok'=>false,'message'=>'Invalid order state.'],422);
     $provider=(string)($o['payment']['provider']??'');$method=(string)($o['payment']['method']??'');if($provider==='stripe')sf_json_response(['ok'=>false,'message'=>'Stripe order payment state must be updated by verified Stripe events or provider-backed refund operations.'],409);if($target==='refunded'&&!in_array($provider,['test','cash_simulation'],true)&&!in_array($method,['test','cash'],true))sf_json_response(['ok'=>false,'message'=>'This payment requires a provider-side refund. Mark it refund requested until the payment provider confirms the refund.'],422);
     if($provider==='stripe'&&$target==='canceled')sf_json_response(['ok'=>false,'message'=>'A Stripe order cannot be canceled locally while its Checkout Session may still accept payment. Expire the Stripe Checkout Session first.'],409);
     $previous=(string)($o['status']??'');$now=gmdate('c');$o['status']=$target;if($target==='refunded')$o['payment']['status']='refunded';if(in_array($target,['canceled','refunded'],true)&&!in_array((string)($o['fulfillment']['status']??''),['shipped','delivered'],true))sf_commerce_release_order_inventory($id,'order_'.$target,(int)$me['id']);if($target==='canceled'&&!empty($o['quote']['physical'])){$o['fulfillment']['status']='canceled';$o['fulfillment']['updated_at']=$now;sf_admin_order_sync_pod($id,'canceled');}$o['timeline']=is_array($o['timeline']??null)?$o['timeline']:[];$o['timeline'][]=['type'=>'order_status','status'=>$target,'label'=>ucwords(str_replace('_',' ',$target)),'created_at'=>$now];sf_admin_order_write($o);
     $uid=(int)($o['user_id']??0);if($uid>0){$label='Order '.$id.' is now '.ucwords(str_replace('_',' ',$target)).'.';sf_notify_user($uid,'order',$label,'','?view=order&id='.rawurlencode($id));sf_log_user_activity($uid,'order_status',$label,'order',$id,['from'=>$previous,'to'=>$target]);}sf_log_admin_action((int)$me['id'],'order_status_updated','order',$id,['from'=>$previous,'to'=>$target]);sf_json_response(['ok'=>true,'order'=>sf_admin_order_public($o),'csrf'=>sf_admin_csrf()]);
 }
 if($action==='retry_pod'){
-    $id=sf_clean_text($b['id']??'',100);$orderMutationLock=sf_admin_order_mutation_lock($id);$o=sf_read_order($id);if(!$o)sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);if(empty($o['quote']['physical']))sf_json_response(['ok'=>false,'message'=>'This order has no physical handoff.'],422);if(($o['payment']['provider']??'')==='stripe'&&($o['payment']['status']??'')!=='paid')sf_json_response(['ok'=>false,'message'=>'Cannot create manufacturing files before Stripe payment is verified.'],409);$o['pod']=sf_build_pod_handoffs($id,(array)$o['quote'],(array)$o['customer']);$o['timeline']=is_array($o['timeline']??null)?$o['timeline']:[];$o['timeline'][]=['type'=>'pod_retry','status'=>'ready_for_provider','label'=>'POD handoff regenerated','created_at'=>gmdate('c')];sf_admin_order_write($o);sf_log_admin_action((int)$me['id'],'pod_handoff_retried','order',$id);sf_json_response(['ok'=>true,'order'=>sf_admin_order_public($o),'pod'=>$o['pod'],'csrf'=>sf_admin_csrf()]);
+    $id=sf_clean_text($b['id']??'',100);$orderMutationLock=sf_admin_order_mutation_lock($id);$o=sf_read_order($id);if(!$o||!sf_store_customer_order_visible($o))sf_json_response(['ok'=>false,'message'=>'Order not found.'],404);if(empty($o['quote']['physical']))sf_json_response(['ok'=>false,'message'=>'This order has no physical handoff.'],422);if(($o['payment']['provider']??'')==='stripe'&&($o['payment']['status']??'')!=='paid')sf_json_response(['ok'=>false,'message'=>'Cannot create manufacturing files before Stripe payment is verified.'],409);$o['pod']=sf_build_pod_handoffs($id,(array)$o['quote'],(array)$o['customer']);$o['timeline']=is_array($o['timeline']??null)?$o['timeline']:[];$o['timeline'][]=['type'=>'pod_retry','status'=>'ready_for_provider','label'=>'POD handoff regenerated','created_at'=>gmdate('c')];sf_admin_order_write($o);sf_log_admin_action((int)$me['id'],'pod_handoff_retried','order',$id);sf_json_response(['ok'=>true,'order'=>sf_admin_order_public($o),'pod'=>$o['pod'],'csrf'=>sf_admin_csrf()]);
 }
 sf_json_response(['ok'=>false,'message'=>'Unsupported order action.'],422);
