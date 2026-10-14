@@ -98,7 +98,7 @@ function sf_vinyl_production_approval(
         throw new RuntimeException('Approved artwork proof is missing or changed. Reconcile before advancing.');
     if($next==='production_complete'){
         $note=trim((string)($request['note']??''));
-        if(empty($request['qc_confirmed'])||mb_strlen($note)<10)
+        if(empty($request['qc_confirmed'])||strlen($note)<10)
             throw new RuntimeException('QC completion requires a confirmed inspection and a note of at least 10 characters.');
     }
     return ['proof_sha256'=>$approved];
