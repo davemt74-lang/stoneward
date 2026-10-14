@@ -74,12 +74,14 @@ function sf_admin_agent_operational_context(): array {
     $summary['commerce_attention']=$commerce['total_attention'];
     $summary['commerce_top_orders']=$commerce['attention_orders'];
     $summary['commerce_available']=$commerce['available'];
+    $summary['commerce_triage']=(array)($commerce['triage']??[]);
     return $summary;
 }
 function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
     if(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
     elseif(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m)){$type='prepare_commerce_followup';$view='commerce-ops';}
+    elseif(preg_match('/\b(draft|prepare|write)\b.*\b(reply|response)\b.*\border\b/',$m)){$type='draft_commerce_reply';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_journey';$view='automations';}
     elseif(preg_match('/\b(approval|approvals|proposals|action history|agent actions)\b/',$m)){$type='review_actions';$view='brain';}
     elseif(preg_match('/\b(orders?|commerce|stripe|refunds?|payments?|fulfill(?:ment)?|shipping|follow[ -]?ups?)\b/',$m)){$type='commerce_report';$view='commerce-ops';}
@@ -168,6 +170,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
       'prepare_commerce_followup'=>'I can prepare a customer-order follow-up for exact Admin approval. Use: Create follow-up for order SF-ORDER-ID: your note. The action only saves a note; it never refunds, charges, emails, or changes shipping.',
+      'draft_commerce_reply'=>'To draft an unsent customer-service response, type: Draft reply for order SF-ORDER-ID about shipping, refunds, payment, or digital access. A human must inspect and send any reply manually.',
       'commerce_report'=>(empty($context['commerce_available'])?'Commerce data is temporarily unavailable. Open Commerce Operations to inspect current orders.':'Commerce queue: '.(int)($context['commerce_attention']??0).' customer orders need attention, including '.(int)($context['commerce_summary']['payment_attention']??0).' payment exceptions, '.(int)($context['commerce_summary']['refund_attention']??0).' pending refunds and '.(int)($context['commerce_summary']['fulfillment_pending']??0).' awaiting fulfillment. Open Commerce Operations to review each order.'),
       'review_actions'=>'You have '.array_sum($missionState['counts']).' recent Agent missions, including '.(int)($missionState['counts']['review_required']??0).' requiring review and '.(int)($missionState['counts']['completed']??0).' completed. Open Agent actions for exact proposals, approved results, and interrupted work. Never automatically retry uncertain operations.',
       'crm_report'=>'Current CRM summary: '.$context['crm_contacts'].' contacts and '.$context['newsletter_opted_in'].' opted-in newsletter subscribers. Open CRM for eligible audience and campaign review.',
@@ -188,11 +191,31 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
             }else $text='Prepared the following follow-up for review: '.$draft['order_id'].' — '.$draft['note'].'. Inspect the exact proposal and approve it separately before saving.';
         }
     }
+    if($plan['type']==='draft_commerce_reply'){
+        $request=sf_agent_commerce_reply_request($message);
+        if($request===null){
+            $text='Use: Draft reply for order SF-ORDER-ID about shipping, refund, payment, or digital access. No response was created or sent.';
+        }else{
+            $target=sf_read_order($request['order_id']);
+            if(!$target||!sf_store_customer_order_visible($target)){
+                $text='Customer order not found. No reply was created or sent.';
+            }else{
+                $replyDraft=sf_agent_commerce_reply_draft($target,$request['topic']);
+                $text='Unsent customer-service draft for '.$replyDraft['order_id'].' ('.
+                    $replyDraft['topic']."):\n\n".$replyDraft['text'].
+                    "\n\nReview the exact order in Commerce Operations before sending anything. Nothing has been emailed or saved to the customer record.";
+            }
+        }
+    }
     if($plan['type']==='research'){
         $research=sf_admin_agent_research_reply($message,$context,$prior,$adminId);
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
+    if($plan['type']==='draft_commerce_reply' && !empty($replyDraft)){
+        $action['reply_draft']=$replyDraft;
+        $action['review_required']=true;
+    }
     if($plan['type']==='prepare_commerce_followup' && !empty($draft) && $contract['may_prepare_reviewed_proposal']){
         $action['draft']=$draft;
         $action['request_key']='commerce_'.bin2hex(random_bytes(16));
