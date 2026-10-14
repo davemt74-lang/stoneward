@@ -2,7 +2,7 @@
   'use strict';
   const ctx=window.STONEFELLOW_ADMIN_CONTEXT;
   if(!ctx)return;
-  let root=null,sidebar=null,draft=null,versions=[],saving=false,dirty=false,observer=null;
+  let root=null,sidebar=null,draft=null,review=null,versions=[],saving=false,dirty=false,observer=null;
   const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=v=>ctx.esc(String(v??''));
   const forms=()=>$$('[data-home-section]',sidebar||document.createElement('div'));
@@ -34,7 +34,21 @@
     const sel=$('#homepageVisualVersions',root);if(!sel)return;
     sel.innerHTML='<option value="">Version history…</option>'+versions.map(v=>'<option value="'+Number(v.id)+'">#'+Number(v.id)+' · '+esc(v.created_at)+'</option>').join('');
   }
-  function markDirty(){dirty=true;announce('Unsaved draft edits. Save draft before publishing.');}
+  function reviewStatus(){
+    const label=$('#homepageVisualReview',root),publishButton=$('#homepageVisualPublish',root);
+    const safeSections=Array.isArray(review?.changed_sections)?review.changed_sections:[];
+    const changed=Number(review?.changed_count||0);
+    const labelText=dirty?'Unsaved changes · Save draft to review':
+      review?.stale?'Live version changed · Review conflict':
+      !review?.can_publish?'No unpublished homepage changes':
+      changed+' section'+(changed===1?'':'s')+' changed: '+safeSections.map(r=>String(r.section_key||'')).slice(0,11).join(', ');
+    if(label){label.textContent=labelText;label.title=labelText;}
+    if(publishButton){
+      publishButton.disabled=dirty||!review?.can_publish||saving;
+      publishButton.setAttribute('aria-describedby','homepageVisualReview');
+    }
+  }
+  function markDirty(){dirty=true;reviewStatus();announce('Unsaved draft edits. Save draft before publishing.');}
   function hydrate(sections){
     const list=$('.homepage-section-list',sidebar);
     if(!list)return;
@@ -76,7 +90,7 @@
     try{
       const result=await ctx.api('homepage.php',{action:'save_design_draft',
         sections:collect(),expected_revision:draft.revision,base_hash:draft.base_hash});
-      draft=result.draft;dirty=false;window.SFHomepageWebEditor?.markClean?.();announce('Draft saved privately · revision '+draft.revision+'. Public homepage is unchanged.');
+      draft=result.draft;review=result.draft_review||null;dirty=false;window.SFHomepageWebEditor?.markClean?.();reviewStatus();announce('Draft saved privately · revision '+draft.revision+'. Public homepage is unchanged.');
       return true;
     }catch(e){announce(e.message||'Draft save failed');return false;}
     finally{saving=false;}
@@ -84,12 +98,13 @@
   async function publish(){
     if(dirty){announce('Save the draft before publishing.');return;}
     if(!draft?.revision){announce('Save a draft before publishing.');return;}
-    if(draft.base_hash!==draft.published_hash){announce('Live homepage changed. Reopen the designer and review conflicts.');return;}
-    if(!confirm('Publish this entire homepage design to the live site?'))return;
+    if(draft.base_hash!==draft.published_hash||review?.stale){announce('Live homepage changed. Reopen the designer and review conflicts.');return;}
+    if(!review?.can_publish){announce('No publishable changes. Save the draft and review section differences first.');reviewStatus();return;}
+    if(!confirm('Publish '+Number(review.changed_count)+' reviewed section change(s) to the LIVE homepage? This replaces the current homepage for all visitors.'))return;
     try{
       const result=await ctx.api('homepage.php',{action:'publish_design_draft',
         revision:draft.revision,published_hash:draft.published_hash,confirmed:true});
-      draft=result.draft;versions=result.versions||[];versionList();
+      draft=result.draft;review=result.draft_review||null;versions=result.versions||[];versionList();reviewStatus();
       announce('Homepage published atomically as version #'+result.version+'.');
     }catch(e){announce(e.message||'Publish failed; public homepage is unchanged.');}
   }
@@ -98,7 +113,7 @@
     try{
       const result=await ctx.api('homepage.php',{action:'reset_design_draft',confirmed:true,
         expected_revision:draft.revision,base_hash:draft.base_hash});
-      draft=result.draft;dirty=false;window.SFHomepageWebEditor?.markClean?.();
+      draft=result.draft;review=result.draft_review||null;dirty=false;window.SFHomepageWebEditor?.markClean?.();reviewStatus();
       hydrate(draft.sections);announce('Draft replaced with current published homepage. Nothing was published.');
     }catch(e){announce(e.message||'Could not reset draft.');}
   }
@@ -108,7 +123,7 @@
     try{
       const result=await ctx.api('homepage.php',{action:'restore_design_version',version:v,
         expected_revision:draft.revision,base_hash:draft.base_hash});
-      draft=result.draft;dirty=false;window.SFHomepageWebEditor?.markClean?.();hydrate(draft.sections);
+      draft=result.draft;review=result.draft_review||null;dirty=false;window.SFHomepageWebEditor?.markClean?.();hydrate(draft.sections);reviewStatus();
       announce('Version #'+v+' restored to your private draft. Review, then publish to go live.');
     }catch(e){announce(e.message||'Version restore failed.');}
   }
@@ -238,16 +253,16 @@
   function open(data){
     root=$('#homepageWebStage');sidebar=$('#homepageWebSidebar');
     if(!root||!sidebar)return;
-    draft=data.draft;versions=data.versions||[];
+    draft=data.draft;review=data.draft_review||null;versions=data.versions||[];
     // Rehydrate the draft after the existing homepage forms have mounted.
     hydrate(draft.sections||data.sections||[]);
     const actions=$('.homepage-web-toolbar-actions',root);
     const original=$('#homepageWebSave',root);
     if(original){original.textContent='Save draft';original.id='homepageVisualSave';original.onclick=()=>void saveDraft();}
-    actions.insertAdjacentHTML('beforeend','<button type="button" class="primary" id="homepageVisualPublish">Publish live</button><select id="homepageVisualVersions" aria-label="Homepage versions"></select><button type="button" class="secondary" id="homepageVisualRestore">Restore to draft</button><button type="button" class="secondary" id="homepageVisualReload">Reload live</button>');
+    actions.insertAdjacentHTML('beforeend','<span id="homepageVisualReview" role="status" class="homepage-release-review" aria-live="polite"></span><button type="button" class="primary" id="homepageVisualPublish">Publish live</button><select id="homepageVisualVersions" aria-label="Homepage versions"></select><button type="button" class="secondary" id="homepageVisualRestore">Restore to draft</button><button type="button" class="secondary" id="homepageVisualReload">Reload live</button>');
     $('#homepageVisualPublish',root).onclick=()=>void publish();
     $('#homepageVisualRestore',root).onclick=()=>void restore();
-    $('#homepageVisualReload',root).onclick=()=>void reloadLive();versionList();
+    $('#homepageVisualReload',root).onclick=()=>void reloadLive();versionList();reviewStatus();
     const preview=$('#homepageBuilderPreview',root);
     observer=new MutationObserver(()=>{if(observer){observer.disconnect();decorate();observer.observe(preview,{childList:true});}});
     observer.observe(preview,{childList:true});
