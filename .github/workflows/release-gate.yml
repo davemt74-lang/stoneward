@@ -221,6 +221,11 @@ jobs:
           php tests/section72e-exact-lookup.php
           php tests/section73-legacy-saved-drafts.php
           php tests/section74-storefront-runtime.php
+          php tests/section75a-stripe-store.php
+          php tests/section75b-stripe-signature.php
+          php tests/section75b-stripe-refunds.php
+          php tests/section75c-reconciliation.php
+          php tests/section75d-stock-replay.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

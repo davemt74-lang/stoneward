@@ -54,8 +54,31 @@ function sf_commerce_quote_item(array $raw): array {
     $price=$variant?(int)$variant['price_cents']:(int)$p['base_price_cents'];$inventoryMode=$variant?(string)$variant['inventory_mode']:(string)$p['inventory_mode'];$available=$variant?($variant['inventory_qty']??null):($inventoryMode==='finite'?(int)$p['inventory_qty']:null);if($inventoryMode==='finite'&&$qty>(int)$available)return ['ok'=>false,'error'=>$p['title'].' does not have enough stock for quantity '.$qty.'.'];$source=$inventoryMode==='finite'?($variant&&((string)($variant['inventory_mode']??'')==='finite')?'variant':'product'):'unlimited';
     return ['ok'=>true,'item'=>['type'=>'merch','product_id'=>(string)$p['id'],'variant_id'=>$variant?(int)$variant['id']:null,'sku'=>$variant?(string)$variant['sku']:(string)$p['id'],'label'=>(string)$p['title'],'variant_label'=>$variant?(string)$variant['title']:'','quantity'=>$qty,'unit_price_cents'=>$price,'price_cents'=>$price*$qty,'physical'=>!empty($p['physical']),'fulfillment_type'=>(string)$p['fulfillment_type'],'inventory_source'=>$source]];
 }
+/** Compare persistent stock reservations with an exact server-quoted cart on retry. */
+function sf_commerce_reservation_matches_quote(array $existing,array $items): bool {
+    if(count($existing)!==count($items))return false;
+    foreach($existing as $row){
+        $line=(int)($row['line_index']??-1);$item=$items[$line]??null;
+        if(!$item || (string)$row['product_id']!==(string)$item['product_id']
+            ||(int)($row['variant_id']??0)!==(int)($item['variant_id']??0)
+            ||(int)$row['quantity']!==(int)$item['quantity']
+            ||(int)$row['unit_price_cents']!==(int)$item['unit_price_cents']
+            ||(int)$row['subtotal_cents']!==(int)$item['price_cents']
+            ||(string)$row['inventory_source']!==(string)($item['inventory_source']??'unlimited')
+            ||(string)$row['inventory_status']!=='reserved')return false;
+    }
+    return true;
+}
 function sf_commerce_reserve_order(string $orderId,array $quote,?int $userId,string $email): array {
-    sf_commerce_ensure_schema();$items=[];foreach((array)($quote['items']??[]) as $i=>$item)if(($item['type']??'')==='merch')$items[$i]=$item;if(!$items)return ['reserved'=>0];$pdo=sf_db();$check=$pdo->prepare('SELECT COUNT(*) FROM store_order_items WHERE order_id=?');$check->execute([$orderId]);if((int)$check->fetchColumn()>0)return ['reserved'=>0,'idempotent'=>true];$now=gmdate('c');$reserved=0;
+    sf_commerce_ensure_schema();$items=[];foreach((array)($quote['items']??[]) as $i=>$item)if(($item['type']??'')==='merch')$items[$i]=$item;if(!$items)return ['reserved'=>0];$pdo=sf_db();$check=$pdo->prepare('SELECT line_index,product_id,variant_id,quantity,unit_price_cents,subtotal_cents,inventory_source,inventory_status FROM store_order_items WHERE order_id=? ORDER BY line_index');
+    $check->execute([$orderId]);$existing=$check->fetchAll();
+    if($existing){
+        // A retry must never reuse stock reserved for different items or already released.
+        if(!sf_commerce_reservation_matches_quote($existing,$items))
+            throw new RuntimeException('Existing stock reservation is not safe to reuse.');
+        return ['reserved'=>0,'idempotent'=>true];
+    }
+    $now=gmdate('c');$reserved=0;
     $pdo->beginTransaction();try{foreach($items as $line=>$item){$productId=(string)$item['product_id'];$variantId=!empty($item['variant_id'])?(int)$item['variant_id']:null;$qty=max(1,(int)$item['quantity']);$source=(string)($item['inventory_source']??'unlimited');$before=null;$after=null;
         if($source==='variant'&&$variantId){$u=$pdo->prepare("UPDATE store_variants SET inventory_qty=inventory_qty-?,updated_at=? WHERE id=? AND product_id=? AND inventory_qty>=? AND status='active'");$u->execute([$qty,$now,$variantId,$productId,$qty]);if(!$u->rowCount())throw new RuntimeException('Stock changed before checkout completed. Please review your cart.');$q=$pdo->prepare('SELECT inventory_qty FROM store_variants WHERE id=?');$q->execute([$variantId]);$after=(int)$q->fetchColumn();$before=$after+$qty;}
         elseif($source==='product'){$u=$pdo->prepare("UPDATE store_products SET inventory_qty=inventory_qty-?,updated_at=? WHERE id=? AND inventory_qty>=? AND status='active'");$u->execute([$qty,$now,$productId,$qty]);if(!$u->rowCount())throw new RuntimeException('Stock changed before checkout completed. Please review your cart.');$q=$pdo->prepare('SELECT inventory_qty FROM store_products WHERE id=?');$q->execute([$productId]);$after=(int)$q->fetchColumn();$before=$after+$qty;}

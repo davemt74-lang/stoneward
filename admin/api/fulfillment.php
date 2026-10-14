@@ -12,7 +12,9 @@ if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed']
 $b=sf_request_json();$action=(string)($b['action']??'');
 try{
   if($action==='save_shipment'){
-    $id=sf_clean_text($b['order_id']??'',100);$shipment=sf_fulfillment_save_shipment($id,(array)($b['shipment']??[]),(int)$me['id']);
+    $id=sf_clean_text($b['order_id']??'',100);$paymentOrder=sf_read_order($id);
+    if($paymentOrder&&($paymentOrder['payment']['provider']??'')==='stripe'&&($paymentOrder['payment']['status']??'')!=='paid')throw new RuntimeException('Stripe payment must be confirmed before creating a shipment.');
+    $shipment=sf_fulfillment_save_shipment($id,(array)($b['shipment']??[]),(int)$me['id']);
     sf_log_admin_action((int)$me['id'],'shipment_saved','order',$id,['shipment_id'=>(int)$shipment['id'],'status'=>$shipment['status'],'carrier'=>$shipment['carrier'],'tracking_number'=>$shipment['tracking_number']]);
     if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_fulfillment','shipment_update',['route'=>'fulfillment_care','action'=>'save_shipment','context_profile'=>'commerce','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','request'=>'Update shipment for '.$id,'response'=>'Shipment '.$shipment['id'].' saved as '.$shipment['status'].'.']);
     sf_json_response(['ok'=>true,'shipment'=>$shipment,'snapshot'=>sf_fulfillment_order_snapshot($id),'csrf'=>sf_admin_csrf()]);
@@ -22,7 +24,11 @@ try{
   }
   if($action==='confirm_refund'){
     if(empty($b['confirmed']))sf_json_response(['ok'=>false,'message'=>'Refund confirmation requires explicit Admin confirmation.'],422);
-    $refund=sf_fulfillment_confirm_refund((int)($b['refund_id']??0),(int)$me['id'],(string)($b['provider_reference']??''),!empty($b['restock']));
+    $refundId=(int)($b['refund_id']??0);
+    $q=sf_db()->prepare('SELECT order_id FROM order_refunds WHERE id=? LIMIT 1');$q->execute([$refundId]);
+    $orderId=(string)($q->fetchColumn()?:'');$paymentOrder=$orderId!==''?sf_read_order($orderId):null;
+    if($paymentOrder&&($paymentOrder['payment']['provider']??'')==='stripe')throw new RuntimeException('Stripe refunds cannot be confirmed manually. Payment provider confirmation is required.');
+    $refund=sf_fulfillment_confirm_refund($refundId,(int)$me['id'],(string)($b['provider_reference']??''),!empty($b['restock']));
     sf_log_admin_action((int)$me['id'],'refund_confirmed','order',(string)$refund['order_id'],['refund_id'=>(int)$refund['id'],'amount_cents'=>(int)$refund['amount_cents'],'restock_status'=>$refund['restock_status']]);
     if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_fulfillment','refund_confirm',['route'=>'fulfillment_care','action'=>'confirm_refund','context_profile'=>'commerce','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','request'=>'Confirm refund '.$refund['id'],'response'=>'Refund confirmed for '.sf_money((int)$refund['amount_cents']).'.']);
     sf_json_response(['ok'=>true,'refund'=>$refund,'snapshot'=>sf_fulfillment_order_snapshot((string)$refund['order_id']),'csrf'=>sf_admin_csrf()]);
