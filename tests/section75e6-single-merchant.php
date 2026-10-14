@@ -100,6 +100,13 @@ e6(str_contains($api,'sf_admin_require_auth($write)')&&str_contains($api,'sf_req
  'All state-changing setup endpoints require authenticated Admin CSRF enforcement');
 e6(str_contains($api,"'save_test_key'")&&str_contains($api,"'create_test_webhook'"),
  'Credential verification and signed webhook actions are wired to Admin');
+$billing=(string)file_get_contents($root.'/api/billing.php');
+e6(str_contains($billing,"if($settings['provider']==='test')return")
+    &&!str_contains($billing,"if($settings['mode']==='test'||$settings['provider']==='test')"),
+    'Stripe selected as billing provider cannot silently grant simulated paid subscriptions');
+e6(str_contains($billing,"billing.stripe_direct_account_id")
+    &&str_contains($billing,"billing.stripe_sandbox_certified"),
+    'Legacy billing configuration cannot bypass a direct merchant sandbox acceptance gate');
 e6(str_contains($api,"'sandbox_certified'")&&str_contains($api,"'can_enable_test'"),
  'Test payment activation remains gated by certification');
 e6(str_contains($ui,'stripeDirectKeyForm')&&str_contains($ui,'keyForm.reset()'),

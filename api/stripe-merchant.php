@@ -82,8 +82,9 @@ function sf_merchant_refresh_test_account():array {
 }
 function sf_merchant_webhook_url():string {
     $base=rtrim((string)sf_public_base_url(),'/');
-    if(!preg_match('~^https://[^/?#]+(?:/[A-Za-z0-9._~!$&()*+,;=:@%-]+)*$~D',$base)
-       ||!filter_var($base,FILTER_VALIDATE_URL)
+    if(!filter_var($base,FILTER_VALIDATE_URL)
+       ||strtolower((string)parse_url($base,PHP_URL_SCHEME))!=='https'
+       ||parse_url($base,PHP_URL_QUERY)!==null||parse_url($base,PHP_URL_FRAGMENT)!==null
        ||parse_url($base,PHP_URL_USER)!==null||parse_url($base,PHP_URL_PASS)!==null)
         throw new RuntimeException('Configure a public HTTPS Base URL without a query, fragment or credentials before setting up webhooks.');
     return $base.'/api/billing-webhook.php';
