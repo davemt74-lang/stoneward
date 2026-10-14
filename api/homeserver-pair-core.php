@@ -13,7 +13,8 @@ function sf_hs_pair_schema():void {
           scope TEXT NOT NULL, label TEXT NOT NULL, member_binding TEXT NOT NULL,
           created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
           approved_user_id INTEGER NOT NULL DEFAULT 0,
-          state TEXT NOT NULL DEFAULT 'pending', authorized_at INTEGER NOT NULL DEFAULT 0
+          state TEXT NOT NULL DEFAULT 'pending', authorized_at INTEGER NOT NULL DEFAULT 0,
+          initiator_hash TEXT NOT NULL DEFAULT ''
         )");
         $db->exec('CREATE INDEX IF NOT EXISTS idx_hs_pair_exp ON homeserver_pair_requests(expires_at,state)');
     }else{
@@ -24,6 +25,7 @@ function sf_hs_pair_schema():void {
           created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL,
           approved_user_id BIGINT NOT NULL DEFAULT 0,
           state VARCHAR(20) NOT NULL DEFAULT 'pending',authorized_at BIGINT NOT NULL DEFAULT 0,
+          initiator_hash CHAR(64) NOT NULL,
           INDEX idx_hs_pair_exp (expires_at,state)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
@@ -43,9 +45,15 @@ function sf_hs_pair_start(string $scope,string $verifier,string $label,string $m
        ->execute([$now-86400]);
     $count=(int)$db->query("SELECT COUNT(*) FROM homeserver_pair_requests WHERE state='pending' AND expires_at>".($now))->fetchColumn();
     if($count>=100)throw new RuntimeException('Too many pending HomeServer requests.');
+    // Rate limit anonymous start requests by the trusted socket IP, never
+    // X-Forwarded-For. Retain only an irreversible digest in the table.
+    $initiator=hash('sha256',$originIp!==''?$originIp:'unavailable');
+    $guard=$db->prepare('SELECT COUNT(*) FROM homeserver_pair_requests WHERE initiator_hash=? AND created_at>?');
+    $guard->execute([$initiator,$now-600]);
+    if((int)$guard->fetchColumn()>=8)throw new RuntimeException('Too many requests from this device.');
     $id=bin2hex(random_bytes(24));$expiry=$now+600;
-    $q=$db->prepare('INSERT INTO homeserver_pair_requests(request_id,verifier_hash,scope,label,member_binding,created_at,expires_at) VALUES(?,?,?,?,?,?,?)');
-    $q->execute([$id,hash('sha256',$verifier),$scope,$label,$memberBinding,$now,$expiry]);
+    $q=$db->prepare('INSERT INTO homeserver_pair_requests(request_id,verifier_hash,scope,label,member_binding,created_at,expires_at,initiator_hash) VALUES(?,?,?,?,?,?,?,?)');
+    $q->execute([$id,hash('sha256',$verifier),$scope,$label,$memberBinding,$now,$expiry,$initiator]);
     return ['contract'=>'stonefellow.homeserver-pair.v1','request_id'=>$id,
         'authorization_path'=>'/homeserver-connect.php?request_id='.$id,
         'expires_at'=>gmdate('c',$expiry),'scope'=>$scope,'status'=>'pending'];
