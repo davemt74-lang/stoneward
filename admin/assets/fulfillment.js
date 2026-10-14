@@ -41,6 +41,20 @@
       const proofNeedsReview=!proofReady||(index>0&&!proofMatches);
       const kunakiItems=Array.isArray(proof.items)?proof.items:[];
       const kunakiBindings=r.kunaki_products||{};
+      const publishJobs=Array.isArray(data.publishing_jobs)?data.publishing_jobs:[];
+      const safeJobs=publishJobs.map(job=>'<li>'+esc(job.job_id||'')+' · '+esc(job.state||'')+
+        (job.review_reason?' · '+esc(job.review_reason):'')+'</li>').join('');
+      const publishingPanel='<h3>Stonefellow → HomeServer publishing queue</h3>'+
+        '<p>Requires the purchased vinyl order AND paid catalog track licenses. Cloud queues a non-submitting job; the separate HomeServer job handles browser execution after its own review.</p>'+
+        '<p>HomeServer publishing and media transfers are not enabled in this section.</p>'+
+        (safeJobs?'<ol>'+safeJobs+'</ol>':'<p>No queued publishing jobs yet.</p>')+
+        (kunakiItems.length?kunakiItems.map(item=>{
+          const id=Number(item.item_index);
+          const hasJob=publishJobs.some(j=>Number(j.item_index)===id);
+          return '<div class="actions"><button type="button" class="secondary" data-kunaki-queue="'+id+'" '+
+            (!proofMatches||hasJob?'disabled':'')+'>Queue verified vinyl item '+(id+1)+' for HomeServer</button></div>';
+        }).join(''):'');
+
       const kunakiPanel='<h3>Kunaki vinyl publishing &amp; fulfillment</h3>'+
         '<p>Kunaki provides XML and HTTP fulfillment for already-published product IDs. New custom vinyl titles must first be published in Kunaki. No external orders, payments or uploads are sent from here.</p>'+
         '<p><a href="https://kunaki.com/product-vinyl.html" target="_blank" rel="noopener noreferrer">Open Kunaki vinyl publisher ↗</a></p>'+
@@ -63,8 +77,23 @@
         (next?'<form id="vinylAdvanceForm" class="form-grid"><label class="field">Next milestone<input readonly value="'+esc(label(next))+'"></label><label class="field">Production note<input name="note" maxlength="500" placeholder="'+(next==='production_complete'?'Required quality-control inspection details':'Optional internal note')+'" '+(next==='production_complete'?'required minlength="10"':'')+'></label>'+
         (next==='production_complete'?'<label class="field">Confirm manual quality inspection <input type="checkbox" name="qc_confirmed" required></label>':'')+
         '<div class="actions span3"><button class="primary" type="submit" '+(proofNeedsReview?'disabled':'')+'>Confirm '+esc(label(next))+'</button></div></form>':'<p>Production stages complete. Arrange shipment through Fulfillment.</p>')+
-        kunakiPanel+
+        kunakiPanel+publishingPanel+
         '<h3>Production history</h3>'+(events.length?'<ol>'+events.map(e=>'<li><strong>'+esc(label(e.to))+'</strong> · '+esc(dt(e.at))+' · '+esc(e.note||'No note')+'</li>').join('')+'</ol>':'<div class="empty">No production transitions yet.</div>');
+      box.querySelectorAll('[data-kunaki-queue]').forEach(button=>{
+        button.onclick=async()=>{
+          const index=Number(button.dataset.kunakiQueue);
+          if(!proofMatches)return;
+          if(!confirm('Queue vinyl item '+(index+1)+' for the HomeServer worker? Stonefellow will recheck paid catalog licenses. This DOES NOT upload media or publish or buy from Kunaki.'))return;
+          button.disabled=true;
+          try{
+            const response=await api('vinyl-production.php',{action:'queue_kunaki_publishing',
+              order_id:orderId,item_index:index,revision:Number(r.revision),
+              proof_sha256:proof.fingerprint,confirmed:true});
+            say('Publishing job staged: '+(response.job?.job_id||'')+'. Vendor actions remain disabled.');
+            await loadVinylProduction(orderId);
+          }catch(err){alert(err.message);button.disabled=false;}
+        };
+      });
       box.querySelectorAll('[data-kunaki-bind]').forEach(form=>{
         form.onsubmit=async event=>{
           event.preventDefault();
