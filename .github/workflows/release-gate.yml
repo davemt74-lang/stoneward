@@ -46,6 +46,7 @@ jobs:
       - name: Admin JavaScript syntax
         run: |
           node --check admin/assets/admin.js
+          node --check admin/assets/stripe-connect.js
           node --check admin/assets/turntable-modules.js
           node --check assets/js/turntable-parts.js
           node --check admin/assets/sidebar-accordion.js
@@ -221,6 +222,18 @@ jobs:
           php tests/section72e-exact-lookup.php
           php tests/section73-legacy-saved-drafts.php
           php tests/section74-storefront-runtime.php
+          php tests/section75a-stripe-store.php
+          php tests/section75b-stripe-signature.php
+          php tests/section75b-stripe-refunds.php
+          php tests/section75c-reconciliation.php
+          php tests/section75d-stock-replay.php
+          php tests/section75e-provider-mode.php
+          php tests/section75e2-provider-contract.php
+          php tests/section75e3-payment-ledger.php
+          php tests/section75e5-stripe-onboarding.php
+          php tests/section75e6-single-merchant.php
+          php tests/section75e7-sandbox-certification.php
+          php tests/section75e8-stripe-order-isolation.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
@@ -244,3 +257,36 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
+
+  mysql-certification:
+    name: MySQL checkout inventory certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: stonefellow_test
+          MYSQL_USER: stonefellow
+          MYSQL_PASSWORD: stonefellow
+          MYSQL_ROOT_PASSWORD: isolated-test-root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pisolated-test-root"
+          --health-interval=5s --health-timeout=5s --health-retries=15
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP MySQL driver
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql
+          coverage: none
+      - name: Real MySQL commerce and simultaneous final-unit checkout
+        env:
+          SF_E2_DB_USER: stonefellow
+          SF_E2_DB_PASS: stonefellow
+        run: |
+          SF_E4_EPHEMERAL=yes php tests/section75e4-mysql-legacy-upgrade.php
+          php tests/section75e2-mysql-commerce.php

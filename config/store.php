@@ -1,6 +1,6 @@
 <?php
 return [
-    'mode' => getenv('STONEFELLOW_STORE_MODE') ?: 'test', // test | production
+    'mode' => getenv('STONEFELLOW_STORE_MODE') ?: 'test', // test | stripe_test | production (stripe_test uses real Stripe test-mode API only)
     'currency' => 'USD',
     'shipping_flat_cents' => 800,
     'products' => [

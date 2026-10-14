@@ -6,6 +6,14 @@ try{
   $user=sf_current_user();$body=sf_request_json();$requestKey=sf_clean_text($body['request_id']??'',128);$cart=is_array($body['cart']??null)?$body['cart']:[];$campaignCode=sf_clean_text($body['campaign_code']??'',80);$quote=sf_quote($cart,$campaignCode,$user?(int)$user['id']:null);if(!$quote['ok'])sf_json_response($quote,422);
   $cust=sf_customer(is_array($body['customer']??null)?$body['customer']:[],$quote['physical']);if(!$cust['ok'])sf_json_response(['ok'=>false,'errors'=>$cust['errors']],422);
   $cfg=sf_store_config();$id=sf_order_id();$token=sf_token();$test=$cfg['mode']==='test';
+  if(!$test){
+    require_once __DIR__.'/store-payments.php';
+    if(!in_array((string)($body['payment_method']??'provider'),['provider','stripe'],true))
+      sf_json_response(['ok'=>false,'message'=>'Only Stripe Checkout is available for production orders.'],422);
+    try{$result=sf_store_stripe_create_order($user,$cust['customer'],$quote,$requestKey,$campaignCode);sf_json_response($result);}
+    catch(Throwable $e){$ref='PAY-'.strtoupper(bin2hex(random_bytes(5)));error_log('Stonefellow '.$ref.' Stripe Store '.get_class($e).' '.$e->getMessage());
+      sf_json_response(['ok'=>false,'error'=>'payment_setup_failed','message'=>'Payment could not be opened. Keep your cart and retry this checkout. Reference '.$ref,'error_ref'=>$ref],503);}
+  }
   $pay=sf_resolve_payment((string)($body['payment_method']??''),$cfg);
   if(!$pay['ok']){
     $messages=['cash_simulation_unavailable'=>'Cash simulation is only available in test mode.','test_payment_unavailable'=>'Test payment is only available in test mode.','payment_provider_not_configured'=>'Production checkout is disabled until a real payment adapter is configured.'];
@@ -22,9 +30,10 @@ try{
     try{$crm=sf_crm_upsert_contact((string)$cust['customer']['email'],(string)$cust['customer']['name'],'purchase',null,null,'customer');sf_crm_log_event((int)$crm['id'],null,'purchase','Created guest order '.$id,'order',$id,['total_cents'=>$quote['total_cents'],'physical'=>$quote['physical']]);}catch(Throwable $crmError){}
   }
   if($user){
-    sf_account_library_add_order((int)$user['id'],$order);
+    try{sf_account_library_add_order((int)$user['id'],$order);
     sf_log_user_activity((int)$user['id'],'purchase','Created order '.$id,'order',$id,['total_cents'=>$quote['total_cents'],'physical'=>$quote['physical']]);
     sf_notify_user((int)$user['id'],'order','Order '.$id.' received','Your Stonefellow order has been recorded.','?view=order&id='.rawurlencode($id));
+    }catch(Throwable $noncritical){error_log('Stonefellow order side-effect '.$id.' '.get_class($noncritical));}
   }
   try{$items=array_map(fn($x)=>(string)($x['label']??$x['type']??'Item'),(array)$quote['items']);$bodyText="Stonefellow order {$id}\n\n".implode("\n",array_map(fn($x)=>'- '.$x,$items))."\n\nTotal: ".sf_money((int)$quote['total_cents']).' '.(string)$quote['currency']."\nStatus: ".$orderStatus."\n\nThank you for supporting Stonefellow.";sf_transactional_email($user?(int)$user['id']:0,(string)$cust['customer']['email'],'Stonefellow order '.$id,$bodyText,'order_confirmation');}catch(Throwable $mailError){}
   sf_json_response(['ok'=>true,'order_id'=>$id,'status'=>$order['status'],'payment_method'=>$method,'payment_provider'=>$paymentProvider,'confirmation_token'=>$token,'mode'=>$cfg['mode'],'total_cents'=>$quote['total_cents'],'currency'=>$quote['currency'],'pod'=>$order['pod']]);

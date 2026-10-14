@@ -31,12 +31,14 @@ function sf_billing_ensure_schema(): void {
 function sf_billing_log(?int $userId,string $action,string $provider='',string $reference='',array $details=[]): void {
     sf_billing_ensure_schema();$q=sf_db()->prepare('INSERT INTO billing_audit_log(user_id,action,provider,reference_id,details_json,created_at) VALUES(?,?,?,?,?,?)');$q->execute([$userId,$action,$provider,$reference,json_encode($details,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}',gmdate('c')]);
 }
+require_once __DIR__.'/stripe-connect.php';
+require_once __DIR__.'/stripe-certification.php';
 function sf_billing_settings(): array {
     sf_billing_ensure_schema();$mode=sf_ai_meta_get('billing.mode',(string)(sf_store_config()['mode']??'test'));if(!in_array($mode,['test','production'],true))$mode='test';$provider=sf_ai_meta_get('billing.provider','test');if(!in_array($provider,['test','stripe'],true))$provider='test';
     return [
         'mode'=>$mode,'provider'=>$provider,
         'stripe_enabled'=>sf_ai_meta_get('billing.stripe_enabled','0')==='1',
-        'stripe_key_configured'=>sf_ai_meta_get('billing.stripe_secret_payload','')!=='',
+        'stripe_key_configured'=>sf_ai_meta_get('billing.stripe_secret_payload','')!==''||sf_connect_active(),
         'stripe_key_hint'=>sf_ai_meta_get('billing.stripe_key_hint',''),
         'stripe_webhook_configured'=>sf_ai_meta_get('billing.stripe_webhook_payload','')!=='',
         'stripe_webhook_hint'=>sf_ai_meta_get('billing.stripe_webhook_hint',''),
@@ -47,13 +49,26 @@ function sf_billing_settings_save(array $data): array {
     $enabled=!empty($data['stripe_enabled']);$secretPayload=sf_ai_meta_get('billing.stripe_secret_payload','');$secretHint=sf_ai_meta_get('billing.stripe_key_hint','');$webhookPayload=sf_ai_meta_get('billing.stripe_webhook_payload','');$webhookHint=sf_ai_meta_get('billing.stripe_webhook_hint','');
     $secret=trim((string)($data['stripe_secret_key']??''));if($secret!==''){$secretPayload=sf_ai_encrypt($secret);$secretHint=sf_ai_hint($secret);}if(!empty($data['clear_stripe_secret'])){$secretPayload='';$secretHint='';$enabled=false;}
     $webhook=trim((string)($data['stripe_webhook_secret']??''));if($webhook!==''){$webhookPayload=sf_ai_encrypt($webhook);$webhookHint=sf_ai_hint($webhook);}if(!empty($data['clear_webhook_secret'])){$webhookPayload='';$webhookHint='';}
-    if($enabled&&($secretPayload===''||$webhookPayload===''))throw new InvalidArgumentException('Stripe requires both the secret API key and webhook signing secret before it can be enabled.');
+    if($enabled&&(($secretPayload===''&&!sf_connect_active())||$webhookPayload===''))throw new InvalidArgumentException('Stripe requires both the secret API key and webhook signing secret before it can be enabled.');
+    if($enabled&&sf_ai_meta_get('billing.stripe_direct_account_id','')!==''&&!sf_cert_certified())throw new InvalidArgumentException('Direct merchant cannot be activated before independently verified Stripe sandbox payment and refund acceptance.');
+    if($enabled&&sf_ai_meta_get('billing.stripe_direct_account_id','')!==''&&($mode!=='test'||(sf_store_config()['mode']??'')!=='stripe_test'))throw new InvalidArgumentException('A verified direct Stripe test merchant cannot be enabled in live or simulated Store mode.');
     sf_ai_meta_set('billing.mode',$mode);sf_ai_meta_set('billing.provider',$provider);sf_ai_meta_set('billing.stripe_enabled',$enabled?'1':'0');sf_ai_meta_set('billing.stripe_secret_payload',$secretPayload);sf_ai_meta_set('billing.stripe_key_hint',$secretHint);sf_ai_meta_set('billing.stripe_webhook_payload',$webhookPayload);sf_ai_meta_set('billing.stripe_webhook_hint',$webhookHint);return sf_billing_settings();
 }
 function sf_billing_secret(string $key): string {$payload=sf_ai_meta_get($key,'');return $payload===''?'':sf_ai_decrypt($payload);}
-function sf_stripe_secret(): string { return sf_billing_secret('billing.stripe_secret_payload'); }
+function sf_stripe_secret(): string {
+    if(sf_connect_active())return (string)sf_connect_platform()['secret'];
+    return sf_billing_secret('billing.stripe_secret_payload');
+}
 function sf_stripe_webhook_secret(): string { return sf_billing_secret('billing.stripe_webhook_payload'); }
-function sf_stripe_configured(): bool {$s=sf_billing_settings();return $s['provider']==='stripe'&&$s['stripe_enabled']&&$s['stripe_key_configured']&&$s['stripe_webhook_configured'];}
+// billing.stripe_sandbox_certified alone is never sufficient: the certificate
+// must still match the current account, webhook, key and recent transaction receipts.
+function sf_stripe_configured(): bool {
+    if(sf_ai_meta_get('billing.stripe_direct_account_id','')!==''){
+        if(!sf_cert_certified()||(sf_store_config()['mode']??'')!=='stripe_test')return false;
+    }
+    $s=sf_billing_settings();
+    return $s['provider']==='stripe'&&$s['stripe_enabled']&&$s['stripe_key_configured']&&$s['stripe_webhook_configured'];
+}
 function sf_http_form_request(string $method,string $url,array $headers=[],array $fields=[]): array {
     $body=http_build_query($fields,'','&',PHP_QUERY_RFC3986);$method=strtoupper($method);
     if(function_exists('curl_init')){
@@ -61,13 +76,24 @@ function sf_http_form_request(string $method,string $url,array $headers=[],array
     }else{$header=implode("\r\n",array_merge(['Accept: application/json','Content-Type: application/x-www-form-urlencoded','User-Agent: Stonefellow/1.1'],$headers));$ctx=stream_context_create(['http'=>['method'=>$method,'header'=>$header,'content'=>$method==='POST'?$body:'','timeout'=>45,'ignore_errors'=>true]]);$raw=@file_get_contents($url,false,$ctx);if($raw===false)throw new RuntimeException('Billing provider connection failed.');$status=200;foreach($http_response_header??[] as $line)if(preg_match('#^HTTP/\S+\s+(\d+)#',$line,$m))$status=(int)$m[1];}
     $json=json_decode((string)$raw,true);if(!is_array($json))throw new RuntimeException('Billing provider returned an invalid response.');if($status<200||$status>=300)throw new RuntimeException((string)($json['error']['message']??$json['message']??('Billing HTTP '.$status)));return $json;
 }
-function sf_stripe_request(string $method,string $path,array $fields=[]): array {$key=sf_stripe_secret();if($key==='')throw new RuntimeException('Stripe is not configured.');return sf_http_form_request($method,'https://api.stripe.com/v1/'.ltrim($path,'/'),['Authorization: Bearer '.$key],$fields);}
+function sf_stripe_request(string $method,string $path,array $fields=[],string $idempotencyKey=''): array {
+    $key=sf_stripe_secret();if($key==='')throw new RuntimeException('Stripe is not configured.');
+    $headers=['Authorization: Bearer '.$key];
+    if(sf_connect_active())$headers[]='Stripe-Account: '.sf_connect_id();
+    if($idempotencyKey!==''){
+        if(!preg_match('/^[A-Za-z0-9._:-]{8,180}$/',$idempotencyKey))throw new InvalidArgumentException('Invalid Stripe idempotency key.');
+        $headers[]='Idempotency-Key: '.$idempotencyKey;
+    }
+    return sf_http_form_request($method,'https://api.stripe.com/v1/'.ltrim($path,'/'),$headers,$fields);
+}
 function sf_billing_subscription_row(int $userId): ?array {sf_billing_ensure_schema();$q=sf_db()->prepare('SELECT s.*,p.name package_name,p.slug package_slug,p.monthly_price_cents,p.monthly_tokens,p.provider_price_id FROM user_subscriptions s LEFT JOIN subscription_packages p ON p.id=s.package_id WHERE s.user_id=? LIMIT 1');$q->execute([$userId]);$r=$q->fetch();return $r?:null;}
 function sf_billing_invoices(int $userId,int $limit=30): array {sf_billing_ensure_schema();$q=sf_db()->prepare('SELECT provider_invoice_id,amount_paid_cents,currency,status,hosted_invoice_url,invoice_pdf,period_start,period_end,created_at,paid_at FROM billing_invoices WHERE user_id=? ORDER BY id DESC LIMIT '.max(1,min(100,$limit)));$q->execute([$userId]);return $q->fetchAll();}
 function sf_billing_checkout(array $user,int $packageId): array {
     sf_billing_ensure_schema();$p=sf_package($packageId);if(!$p||empty($p['is_active'])||empty($p['is_public']))throw new InvalidArgumentException('Package is unavailable.');if((int)$p['monthly_price_cents']<=0)return ['local'=>true,'entitlement'=>sf_activate_package((int)$user['id'],$packageId,'free_package')];
     $lifecycle=sf_customer_lifecycle_state((int)$user['id']);if(empty($lifecycle['email_verified']))throw new RuntimeException('Verify your email before starting a paid subscription.');$settings=sf_billing_settings();
-    if($settings['mode']==='test'||$settings['provider']==='test')return ['local'=>true,'entitlement'=>sf_activate_package((int)$user['id'],$packageId,'billing_test'),'simulated'=>true];
+    // Only the explicitly simulated provider may grant a local paid entitlement.
+    // Selecting Stripe in Admin must never turn test billing into free subscriptions.
+    if($settings['provider']==='test')return ['local'=>true,'entitlement'=>sf_activate_package((int)$user['id'],$packageId,'billing_test'),'simulated'=>true];
     if(!sf_stripe_configured())throw new RuntimeException('Production subscription billing is not configured.');$price=trim((string)($p['provider_price_id']??''));if($price==='')throw new RuntimeException('This package does not have a Stripe Price ID configured.');
     $existing=sf_billing_subscription_row((int)$user['id']);if($existing&&!empty($existing['provider_subscription_id'])&&in_array((string)$existing['status'],['active','trialing','past_due'],true))return sf_billing_portal($user);
     $base=sf_public_base_url();if($base==='')throw new RuntimeException('Configure the public Base URL in Admin before enabling production billing.');$fields=['mode'=>'subscription','success_url'=>$base.'/?view=account&billing=success','cancel_url'=>$base.'/?view=plans&billing=canceled','line_items[0][price]'=>$price,'line_items[0][quantity]'=>'1','client_reference_id'=>(string)$user['id'],'customer_email'=>(string)$user['email'],'metadata[stonefellow_user_id]'=>(string)$user['id'],'metadata[stonefellow_package_id]'=>(string)$packageId,'subscription_data[metadata][stonefellow_user_id]'=>(string)$user['id'],'subscription_data[metadata][stonefellow_package_id]'=>(string)$packageId,'allow_promotion_codes'=>'true'];$session=sf_stripe_request('POST','checkout/sessions',$fields);if(empty($session['url']))throw new RuntimeException('Stripe did not return a checkout URL.');sf_billing_log((int)$user['id'],'checkout_created','stripe',(string)($session['id']??''),['package_id'=>$packageId]);return ['checkout_url'=>(string)$session['url'],'provider'=>'stripe'];
@@ -127,7 +153,18 @@ function sf_billing_process_stripe_event(array $event,string $payloadHash=''): v
         $i=$pdo->prepare('INSERT INTO billing_webhook_events(event_id,provider,event_type,status,error_text,payload_sha256,created_at,processed_at) VALUES(?,?,?,? ,?,?,?,NULL)');$i->execute([$eventId,'stripe',$type,'processing','',$payloadHash,$now]);
     }
     try{$obj=(array)($event['data']['object']??[]);
-        if($type==='checkout.session.completed'){
+        if(in_array($type,['checkout.session.completed','checkout.session.async_payment_succeeded',
+            'checkout.session.async_payment_failed','checkout.session.expired'],true)
+            && (string)($obj['metadata']['stonefellow_kind']??'')==='store_order'){
+            require_once __DIR__.'/store-payments.php';
+            sf_store_stripe_webhook_event($obj,$type);
+        }
+        elseif(in_array($type,['refund.created','refund.updated','refund.failed'],true)
+            && (string)($obj['metadata']['stonefellow_kind']??'')==='store_refund'){
+            require_once __DIR__.'/store-refunds.php';
+            sf_store_refund_webhook_event($obj,$type,(bool)($event['livemode']??false));
+        }
+        elseif($type==='checkout.session.completed' && ($obj['mode']??'')!=='payment'){
             [$uid,$pkg]=sf_billing_event_identity($obj);if($uid<=0)$uid=(int)($obj['client_reference_id']??0);$customer=(string)($obj['customer']??'');$subId=(string)($obj['subscription']??'');$status=((string)($obj['payment_status']??''))==='paid'?'active':'pending_payment';if($uid>0){sf_billing_bind_stripe_subscription($uid,$pkg,$customer,$subId,$status,$now);sf_billing_log($uid,'checkout_completed','stripe',(string)($obj['id']??''),['package_id'=>$pkg]);}
         }
         elseif($type==='customer.subscription.created'){
