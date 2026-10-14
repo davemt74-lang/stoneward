@@ -105,6 +105,11 @@ $owned=sf_homeserver_owned_tracks(11,[
 ]);
 chk86(count($owned)===1&&$owned[0]['id']==='alpha'
  &&!isset($owned[0]['audio']),'Fan library excludes other-account songs and private audio paths');
+for($n=0;$n<8;$n++)sf_hs_pair_start('fan.library.read',bin2hex(random_bytes(32)),
+    'Another device','M'.str_repeat('b',32),100070,'203.0.113.18');
+chk86(stops86(fn()=>sf_hs_pair_start('fan.library.read',bin2hex(random_bytes(32)),
+    'Unlimited device','M'.str_repeat('b',32),100072,'203.0.113.18')),
+ 'Public device pairing has per-IP request limits before login');
 $endpoint=file_get_contents(dirname(__DIR__).'/api/homeserver-pair.php');
 $view=file_get_contents(dirname(__DIR__).'/homeserver-connect.php');
 $link=file_get_contents(dirname(__DIR__).'/api/homeserver-link.php');
