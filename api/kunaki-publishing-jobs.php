@@ -95,10 +95,22 @@ function sf_kunaki_publishing_contract(array $order,int $itemIndex,array $record
         'media_download_granted'=>false
     ];
 }
+/** Never expose lease token, customer source-order IDs or provider internals in Admin responses. */
+function sf_kunaki_job_public(array $job):array {
+    $allowed=['job_id','order_id','item_index','edition','state','created_at','updated_at',
+        'worker_id','review_reason','proof_sha256','browser_upload_enabled',
+        'kunaki_submission_enabled','media_download_granted'];
+    return array_intersect_key($job,array_fill_keys($allowed,true));
+}
+function sf_kunaki_job_for_order_public(string $orderId):array {
+    return array_map('sf_kunaki_job_public',sf_kunaki_job_for_order($orderId));
+}
 function sf_kunaki_queue_path():string {
     $dir=(defined('SF_ROOT')?SF_ROOT:dirname(__DIR__)).'/storage/kunaki';
     if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir))
         throw new RuntimeException('Cannot create secure Kunaki queue.');
+    $deny=$dir.'/.htaccess';
+    if(!is_file($deny))@file_put_contents($deny,"Require all denied\\nDeny from all\\n",LOCK_EX);
     return $dir.'/publishing-jobs.json';
 }
 /** One locked JSON document on shared PHP hosting; retries return same job. */
@@ -146,10 +158,11 @@ function sf_kunaki_job_claim(string $workerId):?array {
         throw new InvalidArgumentException('Invalid worker ID.');
     return sf_kunaki_queue_operation(static function(array &$jobs)use($workerId):array {
         $now=time();
+        $changed=false;
         foreach($jobs as &$job){
             if(($job['state']??'')==='leased'&&(int)($job['lease_expires']??0)<$now){
                 $job['state']='needs_review';$job['review_reason']='worker_lease_expired';
-                $job['updated_at']=gmdate('c');
+                $job['updated_at']=gmdate('c');$changed=true;
             }
         }unset($job);
         foreach($jobs as &$job){
@@ -160,7 +173,7 @@ function sf_kunaki_job_claim(string $workerId):?array {
             $claimed=$job;unset($job);
             return [$claimed,true];
         }unset($job);
-        return [null,true];
+        return [null,$changed];
     });
 }
 function sf_kunaki_job_report(string $jobId,string $workerId,string $leaseToken,
