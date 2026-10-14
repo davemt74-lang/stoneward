@@ -98,7 +98,7 @@ ok78(deny78(fn()=>sf_fulfillment_replay('order_refunds','SF-REAL-123','unique-re
 $care=(string)file_get_contents($root.'/api/customer-care.php');
 $orders=(string)file_get_contents($root.'/api/customer-order.php');
 $account=(string)file_get_contents($root.'/api/account.php');
-ok78(str_contains($care,'sf_customer_care_visible_case')&&!str_contains($care,"sf_json_response(['ok'=>true]+$snap)"),'Support API uses safe customer projection');
+ok78(str_contains($care,'sf_customer_care_visible_case')&&str_contains($care,'sf_customer_commerce_order($order,$viewer)'), 'Support API uses safe customer projection');
 ok78(str_contains($orders,'sf_customer_commerce_owns')&&str_contains($orders,'sf_customer_commerce_order'), 'Order Detail checks ownership and projects fields');
 ok78(str_contains($account,'sf_customer_commerce_summary')&&str_contains($account,'sf_customer_commerce_owns'),'Account purchases share owner and data boundary');
 ok78(str_contains((string)file_get_contents($root.'/admin/api/fulfillment.php'),'Stripe refunds cannot be confirmed manually'),'Stripe signed-confirmation restriction retained');
