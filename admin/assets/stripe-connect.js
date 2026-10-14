@@ -10,7 +10,36 @@ function step(good,number,title,description){
  return '<div class="stripe-wizard-step"><span class="stripe-wizard-number '+(good?'done':'')+'">'+(good?'✓':number)+'</span>'+
  '<div><strong>'+esc(title)+'</strong><p>'+esc(description)+'</p></div></div>';
 }
-function content(s){
+function certificationPanel(cert,s){
+ const cases=cert.cases||{},run=!!cert.run_id,enabled=run&&!!cert.binding_valid;
+ const names={paid:'Completed payment',declined:'Declined card',expired:'Expired or abandoned checkout',refund:'Confirmed refund'};
+ const instructions={
+   paid:'Pay the $1 test order with a Stripe test card. Find its checkout.session.completed event ID in the Stripe test Events view.',
+   declined:'Start a separate $1 test checkout and use a declined Stripe test card. Enter the payment_intent.payment_failed event ID.',
+   expired:'Use another test Checkout Session that Stripe confirms expired. Closing the browser alone does NOT count as expiry.',
+   refund:'After verifying a successful $1 payment, request its test refund below; enter the refund.updated event ID after Stripe delivers it.'
+ };
+ const cards=Object.keys(names).map(kind=>{
+   const c=cases[kind]||{},ok=!!c.verified;
+   return '<form class="stripe-cert-case" data-stripe-cert="'+kind+'"><div class="panel-title"><div><h3>'+(ok?'✓ ':'○ ')+esc(names[kind])+'</h3><p>'+esc(instructions[kind])+'</p></div><span class="stripe-pill '+(ok?'connected':'pending')+'">'+(ok?'Verified by Stripe':'Pending')+'</span></div>'+
+    '<div class="form-grid"><label class="field">Stonefellow test order ID<input name="order_id" required placeholder="SF-CERT-…" autocomplete="off" value="'+esc(c.order_id||'')+'"></label>'+
+    '<label class="field">Stripe signed webhook event ID<input name="event_id" required placeholder="evt_…" autocomplete="off" value="'+esc(c.event_id||'')+'"></label>'+
+    '<div class="actions"><button class="secondary" type="submit" '+(!enabled?'disabled':'')+'>Verify '+esc(kind)+' with Stripe</button></div></div></form>';
+ }).join('');
+ return '<section class="panel" id="stripeCertificationPanel"><div class="panel-title"><div><h2>Stripe sandbox acceptance</h2><p>Four real Stripe receipts are required. Stonefellow compares Stripe server responses, signed webhook events, and the saved Store order.</p></div><strong class="stripe-pill '+(cert.complete?'connected':'pending')+'">'+(cert.complete?'Certified':'Not certified')+'</strong></div>'+
+ '<div class="notice"><strong>Sandbox only</strong> · Checkout sessions are $1.00 in Stripe TEST mode. No real money is charged. The test orders cannot grant customer entitlements, trigger merchandise fulfillment, or record fan purchases. Production payments stay disabled.</div>'+
+ '<div class="actions"><button type="button" id="stripeCertBegin" class="primary" '+(!(s.provider==='direct'&&s.webhook_ready&&s.store_mode==='stripe_test')?'disabled':'')+'>'+(run?'Restart verification':'Start verification')+'</button>'+
+ '<button type="button" id="stripeCertCreate" class="secondary" '+(!enabled?'disabled':'')+'>Create $1 test Checkout ↗</button>'+
+ '<button type="button" id="stripeCertRefund" class="secondary" '+(!enabled?'disabled':'')+'>Request $1 test refund</button>'+
+ '<button type="button" id="stripeCertHealth" class="secondary">Webhook diagnostics</button></div>'+
+ '<p class="status-line" id="stripeCertMessage" role="status">Run: '+esc(cert.run_id||'Not started')+'. '+(enabled?'Use the buttons to create test orders; enter event IDs after Stripe delivers each webhook.':'Verify a merchant and webhook before starting.')+'</p>'+
+ '<div class="stripe-cert-cases">'+cards+'</div>'+
+ '<div class="actions"><button type="button" class="primary" id="stripeCertFinalize" '+(!(enabled&&Object.keys(names).every(k=>cases[k]?.verified))?'disabled':'')+'>Recheck all evidence &amp; certify</button>'+
+ '<a class="secondary" href="https://dashboard.stripe.com/test/events" target="_blank" rel="noopener noreferrer">View Stripe test events ↗</a></div>'+
+ '<div id="stripeCertHealthOutput" class="status-line" role="status"></div></section>';
+}
+
+function content(s,cert){
  const direct=s.provider==='direct', linked=!!s.connected, connect=s.provider==='connect', test=s.store_mode==='stripe_test';
  const canWebhook=direct&&!!s.webhook_url&&!s.webhook_ready;
  const steps=step(linked,1,'Create and verify your Stripe account',linked?'Verified merchant '+s.account_id:'Sign up in the official Stripe Dashboard; no Stripe account is required to prepare this wizard.')
@@ -41,7 +70,7 @@ function content(s){
  '<p>If Stonefellow is later used as a platform serving other merchants, you can register a Stripe Connect application and use its official hosted authorization flow. Not required for a single artist.</p>'+
  (s.platform_ready&&!direct?'<button class="secondary" type="button" id="stripeConnect">Authorize with Stripe Connect ↗</button>':
  '<div class="notice">A Stripe Connect platform client ID and platform secret must first be configured on your own server. This does not link ChatGPT to Stripe.</div>')+
- '<p id="stripeConnectStatus" role="status" class="status-line"></p></details>';
+ '<p id="stripeConnectStatus" role="status" class="status-line"></p></details>'+certificationPanel(cert||{},s);
 }
 async function action(kind,body,element,message){
  if(element)element.disabled=true;
@@ -52,7 +81,67 @@ async function render(){
  ctx.canvas.innerHTML='<div class="canvas-head"><h1>Payments &amp; Stripe</h1></div><section class="panel">Checking merchant configuration…</section>';
  try{
   const res=await ctx.api('stripe-connect.php');const s=res.stripe||{};
-  ctx.canvas.innerHTML=content(s);
+  ctx.canvas.innerHTML=content(s,res.certification||{});
+  const certMsg=()=>ui('stripeCertMessage');
+  const begin=ui('stripeCertBegin');
+  if(begin)begin.onclick=async()=>{
+    if(!window.confirm('Start a fresh Stripe test certification run? Existing run evidence will be replaced and any previous test activation disabled.'))return;
+    await action('cert_begin',{},begin,certMsg());
+  };
+  const create=ui('stripeCertCreate');
+  if(create)create.onclick=async()=>{
+    const tab=window.open('about:blank','stonefellow-stripe-test','width=860,height=780,scrollbars=yes');
+    create.disabled=true;
+    try{
+      const result=await ctx.api('stripe-connect.php',{action:'cert_checkout'});
+      if(!result.checkout?.checkout_url?.startsWith('https://checkout.stripe.com/'))
+        throw new Error('Stripe returned an invalid test Checkout URL.');
+      if(tab&&!tab.closed)tab.location.replace(result.checkout.checkout_url);
+      else window.location.assign(result.checkout.checkout_url);
+      if(certMsg())certMsg().textContent='Test order '+result.checkout.order_id+' created. Complete the checkout using a Stripe TEST card, then verify its event.';
+    }catch(error){if(tab&&!tab.closed)tab.close();if(certMsg())certMsg().textContent=String(error.message||error);}
+    finally{create.disabled=false;}
+  };
+  const refund=ui('stripeCertRefund');
+  if(refund)refund.onclick=async()=>{
+    const orderId=String(ui('stripeCertificationPanel')?.querySelector('[data-stripe-cert="paid"] input[name="order_id"]')?.value||'').trim();
+    if(!orderId){if(certMsg())certMsg().textContent='Verify the successful $1 test order before requesting a refund.';return;}
+    if(!window.confirm('Request a real Stripe TEST-mode $1.00 refund for '+orderId+'? This is a provider operation with no live-money transfer.'))return;
+    refund.disabled=true;
+    try{
+      const result=await ctx.api('stripe-connect.php',{action:'cert_refund',order_id:orderId});
+      if(certMsg())certMsg().textContent='Stripe test refund '+(result.refund?.refund_id||'')+' requested. Wait for the signed refund.updated event.';
+    }catch(e){if(certMsg())certMsg().textContent=String(e.message||e);}
+    finally{refund.disabled=false;}
+  };
+  ctx.canvas.querySelectorAll('[data-stripe-cert]').forEach(form=>{
+    form.onsubmit=async(event)=>{
+      event.preventDefault();
+      const button=form.querySelector('button[type="submit"]');
+      const values=new FormData(form);
+      await action('cert_verify',{case:form.dataset.stripeCert,order_id:String(values.get('order_id')||'').trim(),
+        event_id:String(values.get('event_id')||'').trim()},button,certMsg());
+    };
+  });
+  const finalize=ui('stripeCertFinalize');
+  if(finalize)finalize.onclick=async()=>{
+    if(!window.confirm('Independently revalidate all four Stripe events, order states and merchant account before enabling test certification?'))return;
+    await action('cert_finalize',{},finalize,certMsg());
+  };
+  const health=ui('stripeCertHealth');
+  if(health)health.onclick=async()=>{
+    health.disabled=true;
+    try{
+      const result=await ctx.api('stripe-connect.php',{action:'cert_health'});
+      const c=result.health?.counts||{};
+      const recent=(result.health?.recent||[]).map(x=>'<li>'+esc(x.created_at)+' · '+esc(x.type)+' · '+esc(x.status)+'</li>').join('');
+      ui('stripeCertHealthOutput').innerHTML='<p>Last seven days, at most 100 events: <strong>'+
+        Number(c.processed||0)+' processed · '+Number(c.failed||0)+' failed · '+Number(c.processing||0)+' processing</strong></p>'+
+        (recent?'<ul>'+recent+'</ul>':'<p>No recent webhook events recorded.</p>');
+    }catch(e){ui('stripeCertHealthOutput').textContent=String(e.message||e);}
+    finally{health.disabled=false;}
+  };
+
   const keyForm=ui('stripeDirectKeyForm');
   if(keyForm)keyForm.onsubmit=async(e)=>{
    e.preventDefault();

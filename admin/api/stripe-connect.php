@@ -3,11 +3,30 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/stripe-connect.php';
 require_once SF_ROOT.'/api/stripe-merchant.php';
+require_once SF_ROOT.'/api/stripe-certification.php';
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';
 $admin=sf_admin_require_auth($write);
-if(!$write)sf_json_response(['ok'=>true,'stripe'=>sf_merchant_status(),'csrf'=>sf_admin_csrf()]);
+if(!$write)sf_json_response(['ok'=>true,'stripe'=>sf_merchant_status(),'certification'=>sf_cert_status(),'csrf'=>sf_admin_csrf()]);
 try{
  $body=sf_request_json();$action=(string)($body['action']??'');
+ if($action==='cert_health'){
+     sf_json_response(['ok'=>true,'health'=>sf_cert_webhook_health((int)$admin['id'])]);
+ }
+ if($action==='cert_begin'){
+     sf_json_response(['ok'=>true,'certification'=>sf_cert_start((int)$admin['id'])]);
+ }
+ if($action==='cert_checkout'){
+     sf_json_response(['ok'=>true,'checkout'=>sf_cert_new_test_checkout((int)$admin['id'])]);
+ }
+ if($action==='cert_refund'){
+     sf_json_response(['ok'=>true,'refund'=>sf_cert_refund_test_checkout((int)$admin['id'],(string)($body['order_id']??''))]);
+ }
+ if($action==='cert_verify'){
+     sf_json_response(['ok'=>true,'certification'=>sf_cert_verify_case((int)$admin['id'],(string)($body['case']??''),(string)($body['order_id']??''),(string)($body['event_id']??''))]);
+ }
+ if($action==='cert_finalize'){
+     sf_json_response(['ok'=>true,'certification'=>sf_cert_finalize((int)$admin['id'])]);
+ }
  if($action==='save_test_key'){
      $status=sf_merchant_save_test_key((string)($body['secret_test_key']??''));
      sf_json_response(['ok'=>true,'stripe'=>$status]);

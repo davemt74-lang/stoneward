@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/stripe-certification.php';
 /**
  * Stonefellow Section 75E6 — single merchant Stripe onboarding.
  * Stripe does not offer direct merchant OAuth without a registered platform.
@@ -90,7 +91,7 @@ function sf_merchant_webhook_url():string {
     return $base.'/api/billing-webhook.php';
 }
 function sf_merchant_webhook_events():array {
-    return ['checkout.session.completed','checkout.session.async_payment_succeeded',
+    return ['payment_intent.payment_failed','checkout.session.completed','checkout.session.async_payment_succeeded',
        'checkout.session.async_payment_failed','checkout.session.expired',
        'refund.created','refund.updated','refund.failed','invoice.payment_succeeded',
        'invoice.payment_failed','customer.subscription.created',
@@ -138,7 +139,7 @@ function sf_merchant_status():array {
         ?sf_ai_meta_get('billing.stripe_direct_charge_status','0')==='1'
         :(!empty($connect['charges_enabled']));
     $mode=$provider==='direct'?'test':(string)($connect['environment']??'test');
-    $certified=sf_ai_meta_get('billing.stripe_sandbox_certified','0')==='1';
+    $certified=sf_cert_certified();
     $storeMode=(string)(sf_store_config()['mode']??'test');
     return ['provider'=>$provider,'direct_ready'=>$direct,'account_id'=>$provider==='direct'?$id:(string)($connect['account_id']??''),
        'environment'=>$mode,'store_mode'=>$storeMode,'platform_ready'=>(bool)($connect['platform_ready']??false),

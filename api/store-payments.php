@@ -13,7 +13,9 @@ function sf_store_stripe_ready(): void {
     $mode=(string)(sf_store_config()['mode']??'test');
     if(!in_array($mode,['production','stripe_test'],true)
         || $settings['mode']!==($mode==='production'?'production':'test')
-        || !sf_stripe_configured())throw new RuntimeException('Store Stripe payments are not enabled in Admin.');
+        || (!sf_stripe_configured()
+            && !(function_exists('sf_cert_probe_context_valid')&&sf_cert_probe_context_valid())))
+        throw new RuntimeException('Store Stripe payments are not enabled in Admin.');
     $expected=$mode==='production'?'sk_live_':'sk_test_';
     if(!str_starts_with(sf_stripe_secret(),$expected))
         throw new RuntimeException('The Stripe secret key does not match the Store payment mode.');
@@ -183,6 +185,18 @@ function sf_store_stripe_webhook_event(array $session,string $eventType): void {
                 $order['fulfillment']['status']=!empty($order['quote']['physical'])?'pending':'not_required';
                 $order['timeline'][]=['type'=>'payment_confirmed','status'=>'paid','label'=>'Stripe verified payment','created_at'=>gmdate('c')];
                 sf_write_json($file,$order);
+            }
+            if(!empty($order['certification_probe'])){
+                // Certification Checkouts are TEST ONLY and never produce real
+                // customer Library, CRM, POD, coupon, or notification effects.
+                if(!str_starts_with($id,'SF-CERT-')
+                   ||(int)($order['user_id']??0)!==0
+                   ||!empty($order['payment']['livemode']))
+                    throw new RuntimeException('Certification order isolation failed.');
+                foreach(['library','crm','campaign','pod','notification'] as $task)
+                    $order['payment']['postpayment_done'][$task]=true;
+                sf_write_json($file,$order);
+                return;
             }
             // Each side effect is checkpointed in the order. If one fails, Stripe may
             // safely retry the signed event; order remains paid, without double grants.

@@ -80,7 +80,7 @@ function sf_connect_webhook_setup(string $account):bool {
        &&sf_ai_meta_get('billing.stripe_webhook_payload','')!=='')return true;
     $url=rtrim((string)sf_public_base_url(),'/').'/api/billing-webhook.php';
     if(!str_starts_with($url,'https://'))throw new RuntimeException('Stripe webhooks require HTTPS.');
-    $types=['checkout.session.completed','checkout.session.async_payment_succeeded',
+    $types=['payment_intent.payment_failed','checkout.session.completed','checkout.session.async_payment_succeeded',
        'checkout.session.expired','refund.created','refund.updated','refund.failed',
        'invoice.payment_succeeded','invoice.payment_failed',
        'customer.subscription.created','customer.subscription.updated',

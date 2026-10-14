@@ -232,6 +232,7 @@ jobs:
           php tests/section75e3-payment-ledger.php
           php tests/section75e5-stripe-onboarding.php
           php tests/section75e6-single-merchant.php
+          php tests/section75e7-sandbox-certification.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
