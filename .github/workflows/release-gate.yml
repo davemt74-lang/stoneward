@@ -244,6 +244,7 @@ jobs:
           php tests/section79-agent-commerce-triage.php
           php tests/section80-homepage-release-review.php
           php tests/section81-vinyl-proof.php
+          php tests/section82-marketing-consent.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
