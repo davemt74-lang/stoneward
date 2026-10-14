@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/vinyl-production-gates.php';
 require_once SF_ROOT.'/api/kunaki-bridge.php';
+require_once SF_ROOT.'/api/kunaki-publishing-jobs.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $admin=sf_admin_require_auth($method!=='GET');
 $body=$method==='POST'?sf_request_json():[];
@@ -32,10 +33,26 @@ try {
     $stages=['awaiting_artwork_review','artwork_approved','in_production','quality_check','production_complete'];
     if($method==='POST'){
       $action=(string)($body['action']??'');
-      if(!in_array($action,['advance','verify_existing_proof','link_kunaki_product'],true))
+      if(!in_array($action,['advance','verify_existing_proof','link_kunaki_product','queue_kunaki_publishing'],true))
           sf_json_response(['ok'=>false,'message'=>'Unsupported production action.'],422);
       $expected=(int)($body['revision']??-1);
       if($expected!==(int)$record['revision']) sf_json_response(['ok'=>false,'message'=>'Production state has changed. Refresh before editing.'],409);
+      if($action==='queue_kunaki_publishing'){
+        if(empty($body['confirmed']))
+          throw new RuntimeException('Owner approval required to stage a Kunaki publishing job.');
+        $itemIndex=(int)($body['item_index']??-1);
+        if(!hash_equals((string)($proof['fingerprint']??''),(string)($body['proof_sha256']??'')))
+          throw new RuntimeException('Artwork changed. Review purchased design again.');
+        $tracks=sf_kunaki_publishing_verified_tracks($order,$itemIndex);
+        $job=sf_kunaki_publishing_contract($order,$itemIndex,$record,$proof,$tracks);
+        $stored=sf_kunaki_job_enqueue($job);
+        sf_log_admin_action((int)$admin['id'],'kunaki_publish_job_queued','order',$id,
+          ['job_id'=>$stored['job_id'],'item_index'=>$itemIndex,'state'=>$stored['state']]);
+        sf_json_response(['ok'=>true,'job'=>sf_kunaki_job_public($stored),
+          'jobs'=>sf_kunaki_job_for_order_public($id),
+          'kunaki_browser_publish_enabled'=>false,'kunaki_order_submission_enabled'=>false,
+          'csrf'=>sf_admin_csrf()]);
+      }
       if($action==='link_kunaki_product'){
         $itemIndex=(int)($body['item_index']??-1);
         $productId=(string)($body['product_id']??'');
@@ -91,7 +108,8 @@ try {
         @chmod($path,0660);
         sf_log_admin_action((int)$admin['id'],'vinyl_legacy_proof_verified','order',$id,
           ['revision'=>$record['revision'],'proof_sha256'=>$record['proof_sha256']]);
-        sf_json_response(['ok'=>true,'record'=>$record,'proof'=>$proof,'stages'=>$stages,'csrf'=>sf_admin_csrf()]);
+        sf_json_response(['ok'=>true,'record'=>$record,'proof'=>$proof,'stages'=>$stages,
+      'publishing_jobs'=>sf_kunaki_job_for_order_public($id),'csrf'=>sf_admin_csrf()]);
       }
       $orderStatus=(string)($order['status']??'');$paymentStatus=(string)($order['payment']['status']??'');
       $isPaid=str_starts_with($orderStatus,'paid_')||in_array($orderStatus,['paid','completed','fulfilled'],true)||in_array($paymentStatus,['paid','test_paid','simulated_paid','succeeded'],true);
@@ -120,6 +138,7 @@ try {
       @chmod($path,0660);
       sf_log_admin_action((int)$admin['id'],'vinyl_production_stage','order',$id,['status'=>$next,'revision'=>$record['revision']]);
     } elseif($method!=='GET') sf_json_response(['ok'=>false,'message'=>'Method not allowed.'],405);
-    sf_json_response(['ok'=>true,'record'=>$record,'proof'=>$proof,'stages'=>$stages,'csrf'=>sf_admin_csrf()]);
+    sf_json_response(['ok'=>true,'record'=>$record,'proof'=>$proof,'stages'=>$stages,
+      'publishing_jobs'=>sf_kunaki_job_for_order_public($id),'csrf'=>sf_admin_csrf()]);
   }finally{flock($lock,LOCK_UN);fclose($lock);}
 }catch(Throwable $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}
