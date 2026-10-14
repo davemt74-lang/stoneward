@@ -79,12 +79,12 @@ function sf_homeserver_bearer(string $header,string $requiredScope,int $now=0):i
     $q->execute([hash('sha256',$m[1]),$now]);$row=$q->fetch();
     if(!$row||!hash_equals($requiredScope,(string)$row['scope']))
         throw new RuntimeException('HomeServer connection expired, revoked or unauthorized.');
-    if($requiredScope==='admin.presence.read'){
-        $q=sf_db()->prepare('SELECT role FROM users WHERE id=? LIMIT 1');
-        $q->execute([(int)$row['user_id']]);
-        if((string)$q->fetchColumn()!=='admin')
-            throw new RuntimeException('Stonefellow administrator role was revoked.');
-    }
+    $q=sf_db()->prepare('SELECT role,status FROM users WHERE id=? LIMIT 1');
+    $q->execute([(int)$row['user_id']]);$user=$q->fetch();
+    if(!is_array($user)||($user['status']??'')!=='active')
+        throw new RuntimeException('Stonefellow account is no longer active.');
+    if($requiredScope==='admin.presence.read'&&($user['role']??'')!=='admin')
+        throw new RuntimeException('Stonefellow administrator role was revoked.');
     return (int)$row['user_id'];
 }
 function sf_homeserver_owned_tracks(int $userId,array $library,array $orders,array $catalog):array {
