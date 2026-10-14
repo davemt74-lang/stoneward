@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/agent-commerce-bridge.php';
 /**
  * The Customer Agent Brain is strictly user-scoped. Every persistence and
  * retrieval operation takes a trusted, authenticated user ID, not client input.
@@ -78,5 +79,5 @@ function sf_agent_customer_brain_snapshot(int $userId): array {
     $q=sf_db()->prepare('SELECT id,title,created_at,updated_at FROM agent_conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 20');
     $q->execute([$userId]);$conversations=$q->fetchAll(PDO::FETCH_ASSOC);
     $q=sf_db()->prepare('SELECT id,conversation_id,phase,route,action,provider_status,created_at FROM agent_brain_decisions WHERE user_id=? ORDER BY id DESC LIMIT 40');
-    $q->execute([$userId]);return ['memories'=>sf_privacy_personalization_enabled($userId)?sf_agent_customer_memory_list($userId):[],'personalization_enabled'=>sf_privacy_personalization_enabled($userId),'conversations'=>$conversations,'decisions'=>$q->fetchAll(PDO::FETCH_ASSOC)];
+    $q->execute([$userId]);return ['commerce'=>sf_agent_commerce_customer_snapshot($userId),'memories'=>sf_privacy_personalization_enabled($userId)?sf_agent_customer_memory_list($userId):[],'personalization_enabled'=>sf_privacy_personalization_enabled($userId),'conversations'=>$conversations,'decisions'=>$q->fetchAll(PDO::FETCH_ASSOC)];
 }

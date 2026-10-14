@@ -48,6 +48,8 @@ jobs:
           node --check admin/assets/admin.js
           node --check admin/assets/stripe-connect.js
           node --check admin/assets/commerce-ops.js
+          node --check admin/assets/agent-canvas.js
+          node --check admin/assets/agent-commerce-review.js
           node --check admin/assets/turntable-modules.js
           node --check assets/js/turntable-parts.js
           node --check admin/assets/sidebar-accordion.js
@@ -236,6 +238,7 @@ jobs:
           php tests/section75e7-sandbox-certification.php
           php tests/section75e8-stripe-order-isolation.php
           php tests/section76-commerce-operations.php
+          php tests/section76b-dual-agent-commerce.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

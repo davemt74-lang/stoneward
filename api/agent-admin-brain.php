@@ -6,6 +6,7 @@ require_once __DIR__.'/agent-admin-intelligence.php';
 require_once __DIR__.'/agent-proactive-research.php';
 require_once __DIR__.'/agent-specialist-delegation.php';
 require_once __DIR__.'/agent-feedback-core.php';
+require_once __DIR__.'/agent-commerce-bridge.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -68,16 +69,22 @@ function sf_admin_agent_operational_context(): array {
         $summary['journey_counts']=(array)($journey['counts']??[]);
         $summary['journey_rates']=(array)($journey['rates']??[]);
     }
+    $commerce=sf_agent_commerce_admin_snapshot();
+    $summary['commerce_summary']=$commerce['summary'];
+    $summary['commerce_attention']=$commerce['total_attention'];
+    $summary['commerce_top_orders']=$commerce['attention_orders'];
     return $summary;
 }
 function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
     if(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
+    elseif(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m)){$type='prepare_commerce_followup';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_journey';$view='automations';}
     elseif(preg_match('/\b(approval|pending|proposals|action history|agent actions)\b/',$m)){$type='review_actions';$view='brain';}
+    elseif(preg_match('/\b(orders?|commerce|stripe|refunds?|payments?|fulfill(?:ment)?|shipping|follow[ -]?ups?)\b/',$m)){$type='commerce_report';$view='commerce-ops';}
     elseif(preg_match('/\b(crm|fans|subscribers|audience)\b/',$m)){$type='crm_report';$view='crm';}
     elseif(preg_match('/\b(conversion|engagement|analytics|performance|journey)\b/',$m)){$type='journey_report';$view='automations';}
-    return ['type'=>$type,'view'=>$view,'requires_confirmation'=>in_array($type,['prepare_campaign','prepare_journey'],true),'execution'=>'proposal_or_navigation_only'];
+    return ['type'=>$type,'view'=>$view,'requires_confirmation'=>in_array($type,['prepare_campaign','prepare_journey','prepare_commerce_followup'],true),'execution'=>'proposal_or_navigation_only'];
 }
 /**
  * Reuse the existing provider clients for conversational explanation, never
@@ -140,6 +147,7 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
         'specialist_assignments'=>sf_agent_specialist_recent('admin',$adminId),
         'feedback_summary'=>sf_agent_feedback_summary('admin',$adminId),
         'recovery_summary'=>sf_agent_mission_recovery_summary('admin',$adminId),
+        'commerce'=>sf_agent_commerce_admin_snapshot(),
         'research_opportunities'=>sf_agent_proactive_admin_research(sf_admin_agent_operational_context())
     ];
 }
@@ -158,6 +166,8 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     $types=[
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
+      'prepare_commerce_followup'=>'I can prepare a customer-order follow-up for exact Admin approval. Use: Create follow-up for order SF-ORDER-ID: your note. The action only saves a note; it never refunds, charges, emails, or changes shipping.',
+      'commerce_report'=>'Commerce queue: '.(int)($context['commerce_attention']??0).' customer orders need attention, including '.(int)($context['commerce_summary']['payment_attention']??0).' payment exceptions, '.(int)($context['commerce_summary']['refund_attention']??0).' pending refunds and '.(int)($context['commerce_summary']['fulfillment_pending']??0).' awaiting fulfillment. Open Commerce Operations to review each order.',
       'review_actions'=>'You have '.array_sum($missionState['counts']).' recent Agent missions, including '.(int)($missionState['counts']['review_required']??0).' requiring review and '.(int)($missionState['counts']['completed']??0).' completed. Open Agent actions for exact proposals, approved results, and interrupted work. Never automatically retry uncertain operations.',
       'crm_report'=>'Current CRM summary: '.$context['crm_contacts'].' contacts and '.$context['newsletter_opted_in'].' opted-in newsletter subscribers. Open CRM for eligible audience and campaign review.',
       'journey_report'=>'The last 30 days include '.(int)($context['journey_counts']['journeys_started']??0).' journey runs, '.(int)($context['journey_counts']['journeys_completed']??0).' completed and '.(int)($context['journey_counts']['journeys_failed']??0).' failed. These independent counts are not a sequential customer funnel.',
@@ -166,11 +176,26 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     $text=$types[$plan['type']];
     $contract=sf_agent_orchestration_contract('admin',$plan['type']);
     if($plan['requires_confirmation']&&!$contract['may_prepare_reviewed_proposal'])throw new RuntimeException('The reviewed action is not registered.');
+    if($plan['type']==='prepare_commerce_followup'){
+        $draft=sf_agent_commerce_parse_followup($message);
+        if($draft===null)$text='To prepare a reviewed follow-up, type: Create follow-up for order SF-ORDER-ID: the exact note. No customer record has been changed.';
+        else {
+            $order=sf_read_order($draft['order_id']);
+            if(!$order||!sf_store_customer_order_visible($order)){
+                $text='That customer order was not found. No follow-up was prepared.';
+                $draft=null;
+            }else $text='Prepared the following follow-up for review: '.$draft['order_id'].' — '.$draft['note'].'. Inspect the exact proposal and approve it separately before saving.';
+        }
+    }
     if($plan['type']==='research'){
         $research=sf_admin_agent_research_reply($message,$context,$prior,$adminId);
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
+    if($plan['type']==='prepare_commerce_followup' && !empty($draft) && $contract['may_prepare_reviewed_proposal']){
+        $action['draft']=$draft;
+        $action['request_key']='commerce_'.bin2hex(random_bytes(16));
+    }
     sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
     return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'mission_plan'=>$missionPlan,'insights'=>$brief,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
 }
