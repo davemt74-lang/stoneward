@@ -48,7 +48,7 @@ function sf_vinyl_production_proof(array $order,string $storageRoot):array {
             &&($handoff['customer_player_preview']['visual_only']??null)===true;
         foreach($fields as $f)if(($handoff[$f]??null)!==$b[$f])$matches=false;
         if(!$matches){
-            $blockers[]='POD handoff does not match the purchased vinyl design for item '.($i+1).';
+            $blockers[]='POD handoff does not match the purchased vinyl design for item '.($i+1).'.';
             continue;
         }
         $fingerprints[]=['item_index'=>$i]+$b;
