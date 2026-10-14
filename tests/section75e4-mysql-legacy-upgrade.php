@@ -63,6 +63,27 @@ try{
  e4($blocked,'Historical migration drift stops upgrade safely');
  $pdo->prepare('UPDATE schema_migrations SET checksum=? WHERE migration_id=?')->execute([sf_migration_checksum($first),$first['id']]);
  e4(sf_migration_status()['drift']===0,'Registry restored after negative test');
+
+ // Replay this known synthetic fixture dump to prove a real MySQL restore.
+ // Only the CI fixture is parsed here; never use this splitter as a production importer.
+ e4clean();
+ $restoredStatements=preg_split('/;\s*\n/',preg_replace('/^--[^\n]*\n/m','',$sql));
+ $restoredCount=0;
+ foreach($restoredStatements as $sqlStatement){
+   if(trim($sqlStatement)==='')continue;
+   $pdo->exec($sqlStatement);$restoredCount++;
+ }
+ e4($restoredCount>=5,'Real MySQL restores the generated pre-upgrade SQL backup');
+ $recovered=$pdo->query('SELECT id,user_id,title,data_json,notes FROM user_saved_builds WHERE id=23')->fetch();
+ e4($recovered&&(int)$recovered['user_id']===7&&$recovered['data_json']===$json&&$recovered['notes']==='Original fan notes',
+    'Restored database contains exact original customer data');
+ e4(!in_array('name',sf_migration_columns('user_saved_builds'),true)
+    &&sf_migration_status()['pending']===1,'Backup restores legacy schema and original migration history');
+ $restoreRun=sf_migration_run_all(7,$backup['file']);
+ e4($restoreRun['ok']&&sf_migration_status()['current']
+    &&(int)$pdo->query('SELECT COUNT(*) FROM user_library')->fetchColumn()===2,
+    'Restored legacy database upgrades safely with customer library preserved');
+
 }finally{
  e4clean();foreach(glob(SF_ROOT.'/storage/backups/*')?:[] as $f)@unlink($f);
  @rmdir(SF_ROOT.'/storage/backups');@rmdir(SF_ROOT.'/storage');@rmdir(SF_ROOT);

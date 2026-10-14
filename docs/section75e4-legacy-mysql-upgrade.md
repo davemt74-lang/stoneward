@@ -16,6 +16,7 @@ Acceptance verifies:
 - Draft ID, owner, legacy title, JSON payload and notes, plus the original Library rows, remain intact.
 - New draft inserts can satisfy the old mandatory fields.
 - A second migration run applies nothing and leaves the original verified backup unchanged.
+- Restores the generated SQL backup into the disposable CI database, verifies original customer content/schema/history, and successfully reapplies the pending migration after restoration.
 - Deliberately tampered historical migration checksums block any subsequent upgrade.
 
 ## Certification limits
