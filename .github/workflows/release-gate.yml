@@ -249,6 +249,7 @@ jobs:
           php tests/section84a-kunaki-bridge.php
           php tests/section84b1-cloud-homeworker.php
           php tests/section84b3-print-licenses.php
+          php tests/section84b5-media-transfer.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
