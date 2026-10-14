@@ -20,6 +20,9 @@ The fixed pressing is `album_vinyl` and shares the Section 81 proof, fulfillment
 - An unsubmitted, canceled job can release its reservation only through a future governed cancellation flow. Uncertain external outcomes remain reserved to prevent double-use.
 - Purchased songs are **never deleted from the streaming/downloading Library** because a print right has been spent.
 
+## Customer license balance
+Authenticated customers may open a song or album and see remaining print licenses. The new read-only `api/vinyl-print-balance.php` endpoint returns granted, reserved/used and available credits by song only for the authenticated account. The full-album indicator is the minimum available credits across all songs in that album. Private payment orders, audio masters and worker leases are never returned. It has no impact on streaming or download rights.
+
 ## Operational caveats and certification boundaries
 No Kunaki products are published or manufacturing orders placed by this change. Actual owner-verified cancellations and vendor receipts require the later HomeServer and Kunaki stages, which are maintained separately. We do **not** grant rights against legacy records that cannot provide matching real paid-order evidence. Stripe live is not enabled merely because this source change merges.
 
