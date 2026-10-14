@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/vinyl-production-gates.php';
+require_once SF_ROOT.'/api/kunaki-bridge.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $admin=sf_admin_require_auth($method!=='GET');
 $body=$method==='POST'?sf_request_json():[];
@@ -31,10 +32,46 @@ try {
     $stages=['awaiting_artwork_review','artwork_approved','in_production','quality_check','production_complete'];
     if($method==='POST'){
       $action=(string)($body['action']??'');
-      if(!in_array($action,['advance','verify_existing_proof'],true))
+      if(!in_array($action,['advance','verify_existing_proof','link_kunaki_product'],true))
           sf_json_response(['ok'=>false,'message'=>'Unsupported production action.'],422);
       $expected=(int)($body['revision']??-1);
       if($expected!==(int)$record['revision']) sf_json_response(['ok'=>false,'message'=>'Production state has changed. Refresh before editing.'],409);
+      if($action==='link_kunaki_product'){
+        $itemIndex=(int)($body['item_index']??-1);
+        $productId=(string)($body['product_id']??'');
+        if(!hash_equals((string)($proof['fingerprint']??''),(string)($body['proof_sha256']??'')))
+          throw new RuntimeException('Artwork proof has changed; refresh the order.');
+        $mapping=sf_kunaki_mapping($order,$proof,$record,$itemIndex,$productId,!empty($body['confirmed']));
+        // A single published product must never represent different customer-specific
+        // vinyl designs. Prevent accidental reuse across orders or proof revisions.
+        foreach($records as $key=>$past){
+          if(!is_array($past))continue;
+          foreach((array)($past['kunaki_products']??[]) as $pastItem){
+            if(!is_array($pastItem)||($pastItem['product_id']??'')!==$mapping['product_id'])continue;
+            if(($pastItem['proof_sha256']??'')!==$mapping['proof_sha256'])
+              throw new RuntimeException('That Kunaki product ID is already bound to a different vinyl design.');
+          }
+        }
+        $existing=(array)($record['kunaki_products']??[]);
+        $same=$existing[(string)$itemIndex]??null;
+        if(is_array($same)&&($same['product_id']??'')!==$mapping['product_id'])
+          throw new RuntimeException('Existing Kunaki mapping cannot be replaced without a separate explicit remapping review.');
+        $mapping['linked_at']=gmdate('c');
+        $mapping['linked_by']=(int)$admin['id'];
+        $record['kunaki_products'][(string)$itemIndex]=$mapping;
+        $record['revision']++;
+        $record['updated_at']=gmdate('c');
+        $records[$id]=$record;
+        $encoded=json_encode($records,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+        $tmp=tempnam($dir,'vinyl_');
+        if(!$tmp||file_put_contents($tmp,$encoded,LOCK_EX)===false||!rename($tmp,$path))
+          throw new RuntimeException('Unable to save Kunaki product mapping.');
+        @chmod($path,0660);
+        sf_log_admin_action((int)$admin['id'],'kunaki_product_linked','order',$id,
+          ['revision'=>$record['revision'],'item_index'=>$itemIndex,'product_id'=>$mapping['product_id'],'proof_sha256'=>$mapping['proof_sha256']]);
+        sf_json_response(['ok'=>true,'record'=>$record,'proof'=>$proof,'stages'=>$stages,
+           'kunaki_mode'=>'product_mapping_only','provider_submissions_enabled'=>false,'csrf'=>sf_admin_csrf()]);
+      }
       if($action==='verify_existing_proof'){
         if((string)($record['status']??'')==='awaiting_artwork_review'
           ||!empty($record['proof_sha256']))
