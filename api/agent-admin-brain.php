@@ -80,7 +80,7 @@ function sf_admin_agent_plan(string $message): array {
     if(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
     elseif(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m)){$type='prepare_commerce_followup';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_journey';$view='automations';}
-    elseif(preg_match('/\b(approval|pending|proposals|action history|agent actions)\b/',$m)){$type='review_actions';$view='brain';}
+    elseif(preg_match('/\b(approval|approvals|proposals|action history|agent actions)\b/',$m)){$type='review_actions';$view='brain';}
     elseif(preg_match('/\b(orders?|commerce|stripe|refunds?|payments?|fulfill(?:ment)?|shipping|follow[ -]?ups?)\b/',$m)){$type='commerce_report';$view='commerce-ops';}
     elseif(preg_match('/\b(crm|fans|subscribers|audience)\b/',$m)){$type='crm_report';$view='crm';}
     elseif(preg_match('/\b(conversion|engagement|analytics|performance|journey)\b/',$m)){$type='journey_report';$view='automations';}
