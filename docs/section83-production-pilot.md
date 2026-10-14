@@ -35,3 +35,6 @@ Code/test acceptance: ten technical criteria, counted only when the exact PR-hea
 
 ## Deployment and recovery
 Use the existing GitHub Actions certified full deploy artifact for the exact merged revision, perform private-data-preserving backup before upgrade, validate restored user data on a clone, then rehearse in Stripe TEST mode. Do not enable any live transaction from this release.
+
+## Release-package provenance correction
+The Section 83 deployment certificate must identify the exact source commit used to build the ZIP. Historical top-level AUDIT-REPORT.md, TEST-RESULTS.txt, RELEASE-NOTES.md, UPGRADE-NOTES.md and the old v1.3.2 DEPLOY-MANIFEST.txt are intentionally omitted from current deployment ZIPs. The CI and local packaging scripts generate a fresh DEPLOY-MANIFEST.txt in the ZIP with the exact commit, UTC build time, source-only boundary and external pilot blockers. The existing code and version.php remain authoritative for app capabilities; this manifest does not assert that real provider rehearsal is complete. The SHA-256 checksums are created after ZIP assembly.
