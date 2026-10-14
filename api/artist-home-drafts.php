@@ -66,6 +66,45 @@ function sf_home_design_versions(): array {
     sf_home_design_schema();
     return sf_db()->query('SELECT id,created_at FROM artist_home_design_versions ORDER BY id DESC LIMIT 20')->fetchAll(PDO::FETCH_ASSOC);
 }
+/**
+ * Section 80: compare the saved, private draft with the exact live snapshot.
+ * This report carries section names/counts only, never Admin forms or secrets.
+ */
+function sf_home_design_review(array $draft,?array $live=null):array {
+    $live=$live??sf_home_design_snapshot();
+    $currentHash=sf_home_design_hash($live);
+    $base=(string)($draft['base_hash']??'');
+    $revision=(int)($draft['revision']??0);
+    $stale=$base===''||!hash_equals($base,$currentHash);
+    $before=[];$after=[];
+    foreach($live as $section)if(is_array($section)&&isset($section['section_key']))
+        $before[(string)$section['section_key']]=$section;
+    foreach((array)($draft['sections']??[]) as $section)if(is_array($section)&&isset($section['section_key']))
+        $after[(string)$section['section_key']]=$section;
+    $changes=[];
+    foreach(array_keys($before+$after) as $key){
+        $old=$before[$key]??[];$new=$after[$key]??[];
+        $fields=[];
+        foreach(['enabled','position','eyebrow','heading','body_text','config'] as $field)
+            if(($old[$field]??null)!==($new[$field]??null))$fields[]=$field;
+        if(!$fields)continue;
+        $oldBlocks=(array)($old['config']['blocks']??[]);
+        $newBlocks=(array)($new['config']['blocks']??[]);
+        $changes[]=[
+            'section_key'=>$key,'fields'=>$fields,
+            'blocks_before'=>count($oldBlocks),'blocks_after'=>count($newBlocks)
+        ];
+    }
+    usort($changes,static fn(array $a,array $b):int=>strcmp($a['section_key'],$b['section_key']));
+    return [
+        'changed_count'=>count($changes),'changed_sections'=>$changes,
+        'stale'=>$stale,'revision'=>$revision,
+        'can_publish'=>$revision>0&&!$stale&&count($changes)>0,
+        'requires_explicit_confirmation'=>true,
+        'published_hash'=>$currentHash,
+        'read_only'=>true
+    ];
+}
 function sf_home_design_save(array $sections,int $expectedRevision,string $baseHash): array {
     $clean=sf_home_design_clean($sections);
     $pdo=sf_db();sf_home_design_schema();
@@ -92,6 +131,8 @@ function sf_home_design_publish(int $revision,string $expectedHash): array {
         if(!hash_equals($row['base_hash'],$currentHash)||!hash_equals($expectedHash,$currentHash))
             throw new RuntimeException('Published homepage changed since this draft began. Reopen and review before publishing.');
         $sections=sf_home_design_clean(sf_artist_home_decode($row['snapshot_json'],[]));
+        $review=sf_home_design_review(['revision'=>$revision,'base_hash'=>(string)$row['base_hash'],'sections'=>$sections],sf_home_design_snapshot());
+        if(!$review['can_publish'])throw new RuntimeException('This draft has no new homepage changes to publish.');
         foreach($sections as $section)sf_artist_home_save_section($section); // all updates are one transaction
         $published=sf_home_design_snapshot();
         $q=$pdo->prepare('INSERT INTO artist_home_design_versions (snapshot_json,created_at) VALUES (?,?)');
