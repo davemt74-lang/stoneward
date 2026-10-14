@@ -241,6 +241,7 @@ jobs:
           php tests/section76b-dual-agent-commerce.php
           php tests/section77-commerce-readiness.php
           php tests/section78-customer-commerce.php
+          php tests/section79-agent-commerce-triage.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
