@@ -184,6 +184,13 @@ function sf_kunaki_job_for_order(string $id):array {
     });
 }
 /** Lease expiry is an unknown external outcome, never an automatic retry. */
+function sf_kunaki_jobs_for_owner(int $ownerId):array {
+    if($ownerId<1)return [];
+    return sf_kunaki_queue_operation(static function(array &$jobs)use($ownerId):array {
+        return [array_values(array_filter($jobs,
+            static fn($r):bool=>is_array($r)&&(int)($r['owner_id']??0)===$ownerId)),false];
+    });
+}
 function sf_kunaki_job_claim(string $workerId,?callable $licenseCheck=null):?array {
     if(!preg_match('/^HS-[a-zA-Z0-9_-]{5,64}$/D',$workerId))
         throw new InvalidArgumentException('Invalid worker ID.');
