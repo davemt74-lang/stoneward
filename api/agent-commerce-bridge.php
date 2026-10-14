@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/commerce-operations.php';
+require_once __DIR__.'/agent-commerce-triage.php';
 
 /**
  * Section 76B: one existing commerce source, two strictly isolated agent views.
@@ -23,7 +24,8 @@ function sf_agent_commerce_admin_snapshot():array {
     }
     if(!$available)return [
         'available'=>false,'summary'=>[],'total_attention'=>null,
-        'attention_orders'=>[],'source'=>'unavailable','reads_only'=>true
+        'attention_orders'=>[],'source'=>'unavailable','reads_only'=>true,
+        'triage'=>sf_agent_commerce_triage(['available'=>false])
     ];
     $snapshot=sf_commerce_ops_snapshot($orders);
     $safe=[];
@@ -42,7 +44,8 @@ function sf_agent_commerce_admin_snapshot():array {
         'total_attention'=>(int)($snapshot['total_attention']??0),
         'attention_orders'=>$safe,
         'source'=>'commerce_operations',
-        'reads_only'=>true
+        'reads_only'=>true,
+        'triage'=>sf_agent_commerce_triage(['available'=>true,'attention_orders'=>$safe])
     ];
 }
 
