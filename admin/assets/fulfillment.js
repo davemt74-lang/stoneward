@@ -39,6 +39,20 @@
       const proofReady=!!proof.ready,proofLocked=!!r.proof_sha256,proofMatches=proofLocked&&r.proof_sha256===proof.fingerprint;
       const legacyProof=index>0&&!proofLocked&&proofReady;
       const proofNeedsReview=!proofReady||(index>0&&!proofMatches);
+      const kunakiItems=Array.isArray(proof.items)?proof.items:[];
+      const kunakiBindings=r.kunaki_products||{};
+      const kunakiPanel='<h3>Kunaki vinyl publishing &amp; fulfillment</h3>'+
+        '<p>Kunaki provides XML and HTTP fulfillment for already-published product IDs. New custom vinyl titles must first be published in Kunaki. No external orders, payments or uploads are sent from here.</p>'+
+        '<p><a href="https://kunaki.com/product-vinyl.html" target="_blank" rel="noopener noreferrer">Open Kunaki vinyl publisher ↗</a></p>'+
+        (kunakiItems.length?kunakiItems.map(item=>{
+          const key=String(item.item_index);
+          const existing=kunakiBindings[key]||null;
+          return '<form class="form-grid" data-kunaki-bind="'+esc(key)+'"><label class="field">Vinyl item '+(Number(item.item_index)+1)+' · '+esc(item.title||'Custom vinyl')+
+            '<input name="product_id" maxlength="10" minlength="10" required autocomplete="off" pattern="[A-Za-z0-9]{10}" placeholder="Published 10-character ID" value="'+esc(existing?.product_id||'')+'" '+(existing?'readonly':'')+'></label>'+
+            '<div class="actions"><button type="submit" class="secondary" '+(!proofMatches||existing?'disabled':'')+'>'+(existing?'Bound to purchased design':'Link published Kunaki ID')+'</button></div></form>';
+        }).join(''):'<p>No eligible vinyl items.</p>')+
+        '<div class="notice">Product IDs are stored against the approved artwork fingerprint. Linking an ID does not verify Kunaki published it and does not submit a manufacturing order. XML/HTTP order submission remains disabled.</div>';
+
       box.innerHTML='<div class="panel-title"><div><h2>Custom vinyl production</h2><p>Artwork approval, pressing and quality control. Shipping is managed separately.</p></div>'+badge(r.status)+'</div>'+
         '<p>Stage '+(index+1)+' of '+stages.length+' · revision '+Number(r.revision||0)+'</p>'+
         '<div class="notice"><strong>Purchased artwork &amp; POD proof</strong><p>'+(proofReady?(proofMatches?'Approved design is locked to this production record.':'Internal handoff matches the order; staff proof approval is required.'):'Approval blocked until the purchased vinyl design matches the protected production handoff.')+'</p>'+
@@ -49,7 +63,26 @@
         (next?'<form id="vinylAdvanceForm" class="form-grid"><label class="field">Next milestone<input readonly value="'+esc(label(next))+'"></label><label class="field">Production note<input name="note" maxlength="500" placeholder="'+(next==='production_complete'?'Required quality-control inspection details':'Optional internal note')+'" '+(next==='production_complete'?'required minlength="10"':'')+'></label>'+
         (next==='production_complete'?'<label class="field">Confirm manual quality inspection <input type="checkbox" name="qc_confirmed" required></label>':'')+
         '<div class="actions span3"><button class="primary" type="submit" '+(proofNeedsReview?'disabled':'')+'>Confirm '+esc(label(next))+'</button></div></form>':'<p>Production stages complete. Arrange shipment through Fulfillment.</p>')+
+        kunakiPanel+
         '<h3>Production history</h3>'+(events.length?'<ol>'+events.map(e=>'<li><strong>'+esc(label(e.to))+'</strong> · '+esc(dt(e.at))+' · '+esc(e.note||'No note')+'</li>').join('')+'</ol>':'<div class="empty">No production transitions yet.</div>');
+      box.querySelectorAll('[data-kunaki-bind]').forEach(form=>{
+        form.onsubmit=async event=>{
+          event.preventDefault();
+          if(!proofMatches||!proof.fingerprint)return;
+          const itemIndex=Number(form.dataset.kunakiBind);
+          const productId=String(new FormData(form).get('product_id')||'').trim().toUpperCase();
+          if(!/^[A-Z0-9]{10}$/.test(productId)){alert('Enter the 10-character Kunaki product ID.');return;}
+          if(!confirm('Confirm '+productId+' is the published Kunaki product for THIS exact vinyl design? This only records a mapping and does NOT place an order.'))return;
+          const submit=form.querySelector('button[type="submit"]');submit.disabled=true;
+          try{
+            await api('vinyl-production.php',{action:'link_kunaki_product',order_id:orderId,
+              revision:Number(r.revision),confirmed:true,proof_sha256:proof.fingerprint,
+              item_index:itemIndex,product_id:productId});
+            say('Kunaki product ID linked to this approved vinyl design. No vendor order was placed.');
+            await loadVinylProduction(orderId);
+          }catch(e){alert(e.message);submit.disabled=false;}
+        };
+      });
       const legacy=$('#vinylProofLegacy',box);
       if(legacy)legacy.onclick=async()=>{
         if(!confirm('Verify that this existing production order matches its original internal POD proof? No vendor action is performed.'))return;
