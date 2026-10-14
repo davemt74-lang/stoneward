@@ -138,6 +138,25 @@ ok75(blocked75(fn()=>deliver75(event75('evt_e3_refund_wrong','refund.updated',$f
 $forged=$refund;$forged['livemode']=true;
 ok75(blocked75(fn()=>deliver75(event75('evt_e3_refund_live','refund.updated',$forged,true))),'Refund event in wrong Stripe environment rejected');
 ok75($GLOBALS['e3']['released']===1,'Refund does not silently restock sold merchandise');
+$probeId='SF-CERT-E3PROBE';$probeSession='cs_test_'.str_repeat('z',20);
+order75($probeId,$probeSession);
+$probe=sf_read_order($probeId);
+$probe['certification_probe']=true;$probe['certification_run_id']='fixture_e3_run';
+$probe['user_id']=null;$probe['quote']['physical']=false;$probe['quote']['total_cents']=100;
+sf_write_json(SF_ROOT.'/storage/orders/'.$probeId.'.json',$probe);
+$before=array_intersect_key($GLOBALS['e3'],array_flip(['library','crm','pod','notify','redeem']));
+$paidProbe=session75($probeId,$probeSession);$paidProbe['amount_total']=100;
+deliver75(event75('evt_e3_probe_paid','checkout.session.completed',$paidProbe));
+$probeResult=sf_read_order($probeId);
+ok75($probeResult['status']==='paid'&&$probeResult['payment']['status']==='paid',
+ 'Signed sandbox probe payment settles only the isolated test order');
+ok75(count(array_filter((array)($probeResult['payment']['postpayment_done']??[])))===5,
+ 'Probe records five completed non-fulfillment checkpoints');
+ok75(array_intersect_key($GLOBALS['e3'],$before)===$before,
+ 'Sandbox probe cannot write customer library, CRM purchase, POD, campaigns, or notifications');
+deliver75(event75('evt_e3_probe_duplicate','checkout.session.completed',$paidProbe));
+ok75(array_intersect_key($GLOBALS['e3'],$before)===$before,
+ 'Duplicate paid probe does not trigger any customer-facing side effects');
 $rows=(int)sf_db()->query("SELECT COUNT(*) FROM billing_webhook_events WHERE status='processed'")->fetchColumn();
 ok75($rows>=7,'Billing event ledger persists processed and duplicate events');
 foreach(glob($tmp.'/storage/orders/*')?:[] as $path)@unlink($path);
