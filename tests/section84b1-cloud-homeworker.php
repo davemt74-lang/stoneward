@@ -19,7 +19,7 @@ $tracks=[
  'song-two'=>['id'=>'song-two','title'=>'Second Song','duration'=>200,'podEligible'=>true,'audio'=>'masters/second.wav']
 ];
 $vinyl=[
- 'id'=>'SF-PURCHASE-84B','user_id'=>17,'status'=>'paid','payment'=>['status'=>'paid'],
+ 'id'=>'SF-PURCHASE-84B','user_id'=>17,'status'=>'paid','payment'=>['provider'=>'stripe','status'=>'paid','livemode'=>true,'payment_intent'=>'pi_real_fixture','postpayment_done'=>['library'=>true,'pod'=>true]],
  'quote'=>['items'=>[
   ['type'=>'custom_media','format'=>'vinyl','builder'=>[
    'title'=>'Custom Record','coverFront'=>'desert','coverBack'=>'analog',
@@ -27,9 +27,9 @@ $vinyl=[
   ]]
  ]]
 ];
-$source1=['id'=>'SF-SONG-ONE','user_id'=>17,'status'=>'paid','payment'=>['status'=>'paid'],
+$source1=['id'=>'SF-SONG-ONE','user_id'=>17,'status'=>'paid','payment'=>['provider'=>'stripe','status'=>'paid','livemode'=>true,'payment_intent'=>'pi_real_fixture','postpayment_done'=>['library'=>true,'pod'=>true]],
  'quote'=>['items'=>[['type'=>'track','track_id'=>'song-one','price_cents'=>120]]]];
-$source2=['id'=>'SF-SONG-TWO','user_id'=>17,'status'=>'paid','payment'=>['status'=>'paid'],
+$source2=['id'=>'SF-SONG-TWO','user_id'=>17,'status'=>'paid','payment'=>['provider'=>'stripe','status'=>'paid','livemode'=>true,'payment_intent'=>'pi_real_fixture','postpayment_done'=>['library'=>true,'pod'=>true]],
  'quote'=>['items'=>[['type'=>'track','track_id'=>'song-two','price_cents'=>120]]]];
 $library=[
  ['item_type'=>'track','item_key'=>'song-one','source_order_id'=>'SF-SONG-ONE'],
@@ -39,6 +39,23 @@ $paidSources=['SF-SONG-ONE'=>$source1,'SF-SONG-TWO'=>$source2];
 $approved=sf_kunaki_publishing_entitlements($vinyl,0,$library,$paidSources,$tracks);
 c84b(count($approved)===2&&$approved[0]['track_id']==='song-one',
  'Only two purchased Stonefellow catalog masters qualify');
+$test=$vinyl;$test['payment']['livemode']=false;
+c84b(blocked84b(fn()=>sf_kunaki_publishing_entitlements($test,0,$library,$paidSources,$tracks)),
+ 'Stripe TEST charges never authorize physical Kunaki publishing');
+$simulated=$vinyl;$simulated['payment']['provider']='cash_simulation';
+$simulated['payment']['status']='simulated_paid';
+c84b(blocked84b(fn()=>sf_kunaki_publishing_entitlements($simulated,0,$library,$paidSources,$tracks)),
+ 'Simulated cash payments never authorize physical publishing');
+$missingProof=$vinyl;$missingProof['payment']['postpayment_done']['pod']=false;
+c84b(blocked84b(fn()=>sf_kunaki_publishing_entitlements($missingProof,0,$library,$paidSources,$tracks)),
+ 'Incomplete postpayment POD checkpoint blocks vendor queue');
+$unsigned=$vinyl;$unsigned['payment']['payment_intent']='';
+c84b(blocked84b(fn()=>sf_kunaki_publishing_entitlements($unsigned,0,$library,$paidSources,$tracks)),
+ 'Missing Stripe PaymentIntent blocks vendor queue');
+$sourceTest=$source1;$sourceTest['payment']['livemode']=false;
+c84b(blocked84b(fn()=>sf_kunaki_publishing_entitlements($vinyl,0,$library,
+ ['SF-SONG-ONE'=>$sourceTest,'SF-SONG-TWO'=>$source2],$tracks)),
+ 'Sandbox-purchased catalog tracks cannot authorize live manufacturer');
 c84b(!str_contains(json_encode($approved,JSON_THROW_ON_ERROR),'masters/'),
  'Worker catalog manifest does not leak private master file paths');
 c84b(blocked84b(fn()=>sf_kunaki_publishing_entitlements($vinyl,0,[$library[0]],$paidSources,$tracks)),
