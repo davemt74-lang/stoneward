@@ -10,6 +10,7 @@ $GLOBALS['test_orders']=[];
 $GLOBALS['test_library']=[];
 function sf_read_order(string $id):?array{return $GLOBALS['test_orders'][$id]??null;}
 function sf_account_library(int $id):array{return $GLOBALS['test_library'][$id]??[];}
+function sf_track_map():array{return $GLOBALS['test_catalog']??[];}
 require_once $root.'/api/store-order-visibility.php';
 require_once $root.'/api/kunaki-publishing-jobs.php';
 require_once $root.'/api/vinyl-production-gates.php';
@@ -33,6 +34,7 @@ $catalog=[
  'song-b'=>['id'=>'song-b','title'=>'Song B','duration'=>184,'audio'=>'private/song-b.wav',
    'podEligible'=>true,'vinyl_license_packages'=>[['licenses'=>2,'price_cents'=>450]]]
 ];
+$GLOBALS['test_catalog']=$catalog;
 $release=['id'=>'my-album','state'=>'published','type'=>'album','title'=>'Locked Album',
  'track_ids'=>['song-a','song-b'],'purchasable'=>true,'public_visible'=>true,
  'vinyl_enabled'=>true,'vinyl_price_cents'=>4900,'vinyl_side_a_count'=>1,
