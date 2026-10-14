@@ -141,7 +141,7 @@ z83(str_contains($source,'sf_kunaki_job_enqueue_licensed($job)'),
  'Admin staging uses atomic license reservation, not unguarded queue insertion');
 z83(str_contains($worker,"'sf_vinyl_worker_job_allowed'"),
  'Worker claim uses latest rights/refunds and cannot silently proceed on revoked license');
-z83(str_contains($bootstrap,"$type==='vinyl_license_pack'")&&str_contains($bootstrap,"$type==='album_vinyl'"),
+z83(str_contains($bootstrap,"\$type==='vinyl_license_pack'")&&str_contains($bootstrap,"\$type==='album_vinyl'"),
  'Original checkout quotes digital packs and fixed physical album products');
 z83(str_contains($js,'storyPrintLicenseSelect')&&str_contains($js,'data-buy-album-licenses'),
  'Customer song and album screens expose additional license package purchase options');
