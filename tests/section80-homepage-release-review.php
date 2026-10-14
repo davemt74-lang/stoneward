@@ -45,7 +45,7 @@ ok80(str_contains($api,'sf_home_design_review(sf_home_design_state())')
     &&str_contains($api,"'draft_review'=>sf_home_design_review"),'Admin GET and mutation responses include read-only review metadata');
 ok80(str_contains($visual,'homepageVisualReview')&&str_contains($visual,'reviewStatus()'),'Visual designer displays change review in existing toolbar');
 ok80(str_contains($visual,'publishButton.disabled=dirty||!review?.can_publish||saving'),'Unsaved and no-change drafts cannot use Publish button');
-ok80(str_contains($visual,'review?.stale')&&str_contains($visual,'Publish '+Number(review.changed_count)'),'Stale drafts and explicit publish confirmation remain in editor');
+ok80(str_contains($visual,'review?.stale')&&str_contains($visual,"if(!confirm('Publish '+Number(review.changed_count)"),'Stale drafts and explicit publish confirmation remain in editor');
 ok80(str_contains($core,'This draft has no new homepage changes to publish.'),'Server itself blocks publication of no-op drafts');
 ok80(str_contains($api,"if(empty(\$b['confirmed']))"),'Server still requires explicit publish confirmation');
 ok80(!str_contains((string)file_get_contents($root.'/api/artist-home-core.php'),'artist_home_design_draft'),'Public homepage never reads private drafts');
