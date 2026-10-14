@@ -16,7 +16,7 @@ $api=(string)file_get_contents(dirname(__DIR__).'/admin/api/orders.php');
 check8(str_contains($api,'if(sf_store_customer_order_visible($o))$rows[]='),'Admin Orders excludes probes from list');
 check8(substr_count($api,'!sf_store_customer_order_visible($o)')>=3,'Admin detail and ordinary fulfillment/status actions exclude probes');
 check8(substr_count($api,'!sf_store_customer_order_visible($candidate)')===2,'Admin refund and reconciliation cannot target test probe orders');
-check8(str_contains($api,"sf_admin_require_auth($write)")&&str_contains($api,'sf_request_json()'),'Orders API retains Admin authentication and write CSRF');
+check8(str_contains($api,'sf_admin_require_auth($write)')&&str_contains($api,'sf_request_json()'),'Orders API retains Admin authentication and write CSRF');
 $gateway=(string)file_get_contents(dirname(__DIR__).'/api/store-payments.php');
 check8(str_contains($gateway,'certification_probe')&&str_contains($gateway,'postpayment_done'),'Test probe remains separated from real customer purchase entitlements');
 $billing=(string)file_get_contents(dirname(__DIR__).'/api/billing.php');
