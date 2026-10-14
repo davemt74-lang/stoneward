@@ -65,9 +65,9 @@ c82(str_contains($source,'sf_crm_contact_by_id((int)($c[\'id\']??0))')
 c82(str_contains($source,'skipped_opt_out_or_changed')&&str_contains($source,'$skipped++'),
   'Excluded contacts are counted separately from failed provider delivery');
 $automation=file_get_contents($root.'/api/automation-core.php');
-c82(str_contains($automation,"sf_crm_contact_by_id($contactId)")&&str_contains($automation,"empty($contact['unsubscribed_at'])"),
+c82(str_contains($automation,'sf_crm_contact_by_id($contactId)')&&str_contains($automation,"empty(\$contact['unsubscribed_at'])"),
   'Existing lifecycle email automation continues to read authoritative live consent');
-c82(str_contains($root.'/api/newsletter.php','newsletter.php')&&str_contains(file_get_contents($root.'/api/newsletter.php'),"action==='unsubscribe'"),
+c82(str_contains(file_get_contents($root.'/api/newsletter.php'),"action==='unsubscribe'"),
   'Public unsubscribe flow remains reachable');
 echo 'Section 82 consent and outreach gates: '.$pass.'/'.($pass+$fail).' passed'.PHP_EOL;
 exit($fail?1:0);
