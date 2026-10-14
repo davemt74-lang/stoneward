@@ -13,7 +13,7 @@ $action=(string)($data['operation']??'');
 try{
     if($action==='start'){
         $r=sf_hs_pair_start((string)($data['scope']??''),(string)($data['verifier']??''),
-            (string)($data['label']??''),(string)($data['member_binding']??''));
+            (string)($data['label']??''),(string)($data['member_binding']??''),0,(string)($_SERVER['REMOTE_ADDR']??''));
         sf_json_response(['ok'=>true]+$r);
     }
     if($action==='redeem'){
