@@ -250,6 +250,7 @@ jobs:
           php tests/section84b1-cloud-homeworker.php
           php tests/section84b3-print-licenses.php
           php tests/section84b5-media-transfer.php
+          php tests/section84b6-homeserver-user-consent.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
@@ -326,3 +327,4 @@ jobs:
         run: |
           SF_E4_EPHEMERAL=yes php tests/section75e4-mysql-legacy-upgrade.php
           php tests/section75e2-mysql-commerce.php
+          php tests/section84b6-mysql-device-pairing.php
