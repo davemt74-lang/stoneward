@@ -101,8 +101,9 @@ e6(str_contains($api,'sf_admin_require_auth($write)')&&str_contains($api,'sf_req
 e6(str_contains($api,"'save_test_key'")&&str_contains($api,"'create_test_webhook'"),
  'Credential verification and signed webhook actions are wired to Admin');
 $billing=(string)file_get_contents($root.'/api/billing.php');
-e6(str_contains($billing,"if($settings['provider']==='test')return")
-    &&!str_contains($billing,"if($settings['mode']==='test'||$settings['provider']==='test')"),
+$dollar=chr(36);
+e6(str_contains($billing,"if(".$dollar."settings['provider']==='test')return")
+    &&!str_contains($billing,"if(".$dollar."settings['mode']==='test'||".$dollar."settings['provider']==='test')"),
     'Stripe selected as billing provider cannot silently grant simulated paid subscriptions');
 e6(str_contains($billing,"billing.stripe_direct_account_id")
     &&str_contains($billing,"billing.stripe_sandbox_certified"),
