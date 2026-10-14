@@ -184,10 +184,10 @@ function sf_kunaki_job_for_order(string $id):array {
     });
 }
 /** Lease expiry is an unknown external outcome, never an automatic retry. */
-function sf_kunaki_job_claim(string $workerId):?array {
+function sf_kunaki_job_claim(string $workerId,?callable $licenseCheck=null):?array {
     if(!preg_match('/^HS-[a-zA-Z0-9_-]{5,64}$/D',$workerId))
         throw new InvalidArgumentException('Invalid worker ID.');
-    return sf_kunaki_queue_operation(static function(array &$jobs)use($workerId):array {
+    return sf_kunaki_queue_operation(static function(array &$jobs)use($workerId,$licenseCheck):array {
         $now=time();
         $changed=false;
         foreach($jobs as &$job){
@@ -198,6 +198,13 @@ function sf_kunaki_job_claim(string $workerId):?array {
         }unset($job);
         foreach($jobs as &$job){
             if(($job['state']??'')!=='queued')continue;
+            if($licenseCheck!==null&&!$licenseCheck($job,$jobs)){
+                $job['state']='needs_review';
+                $job['review_reason']='print_entitlement_or_order_changed';
+                $job['updated_at']=gmdate('c');
+                $changed=true;
+                continue;
+            }
             $job['state']='leased';$job['worker_id']=$workerId;
             $job['lease_token']=bin2hex(random_bytes(24));
             $job['lease_expires']=$now+600;$job['updated_at']=gmdate('c');
