@@ -9,6 +9,7 @@ if(array_key_exists('duration',$patch))$track['duration']=max(0,(int)$patch['dur
 if(array_key_exists('year',$patch))$track['year']=max(0,(int)$patch['year']);
 if(array_key_exists('price',$patch))$track['price']=max(0,(float)$patch['price']);
 if(array_key_exists('podEligible',$patch))$track['podEligible']=sf_admin_bool($patch['podEligible']);
+if(array_key_exists('vinyl_license_packages',$patch))$track['vinyl_license_packages']=sf_vinyl_license_packages($patch['vinyl_license_packages']);
 if(array_key_exists('mood',$patch))$track['mood']=sf_admin_array_strings($patch['mood']);
 if(array_key_exists('themes',$patch))$track['themes']=sf_admin_array_strings($patch['themes']);
 if(array_key_exists('energy',$patch))$track['energy']=max(1,min(5,(int)$patch['energy']));
