@@ -82,6 +82,11 @@ $next=sf_store_stripe_create_order(['id'=>7],$customer,$quote,'checkout_second_a
 $w=$webhook;$w['metadata']['stonefellow_order_id']=$nid;$w['payment_status']='unpaid';
 sf_store_stripe_webhook_event($w,'checkout.session.expired');sf_store_stripe_webhook_event($w,'checkout.session.expired');
 yes(sf_read_order($nid)['status']==='canceled'&&$GLOBALS['fake']['released'][$nid]===1,'Expired session releases stock once');
+$priorSessions=$GLOBALS['fake']['sessions'];
+try{sf_store_stripe_replay_order(sf_read_order($nid));$closedRefused=false;}
+catch(RuntimeException $e){$closedRefused=true;}
+yes($closedRefused&&$GLOBALS['fake']['sessions']===$priorSessions,'Closed Stripe order cannot replay its cached Checkout URL');
+
 $maybe='checkout_failed_request_abcdef456777';$GLOBALS['fake']['fail_session']=true;
 try{sf_store_stripe_create_order(['id'=>7],$customer,$quote,$maybe,'');$failed=false;}catch(RuntimeException $e){$failed=true;}
 $GLOBALS['fake']['fail_session']=false;

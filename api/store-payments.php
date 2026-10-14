@@ -62,10 +62,13 @@ function sf_store_stripe_checkout_start_locked(array $order): array {
     $id=(string)$order['id'];
     $stored=sf_read_order($id);
     if(!$stored || ($stored['payment']['provider']??'')!=='stripe')throw new RuntimeException('Stripe order could not be recovered.');
+    // A persisted Checkout URL is not authorization to resurrect a closed order.
+    // Check the authoritative local state BEFORE reusing an older Stripe URL.
+    if((string)($stored['status']??'')!=='payment_pending'
+        ||(string)($stored['payment']['status']??'')!=='pending')
+        throw new RuntimeException('This checkout order is no longer pending.');
     $current=(string)($stored['payment']['checkout_url']??'');
     if($current!=='' && preg_match('~^https://checkout\.stripe\.com/~',$current))return ['checkout_url'=>$current,'order_id'=>$id,'receipt_token'=>sf_store_receipt_token($id)];
-    if(in_array((string)($stored['status']??''),['canceled','paid','refunded'],true))
-        throw new RuntimeException('This checkout order is no longer pending.');
     if(strtotime((string)($stored['created_at']??''))<time()-20*3600)
         throw new RuntimeException('This payment attempt needs manual reconciliation before another Checkout Session.');
     // The ID is unique to the persisted order. Retries cannot generate a second Stripe Session.
