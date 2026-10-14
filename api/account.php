@@ -1,12 +1,13 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
+require_once __DIR__.'/customer-commerce-view.php';
 $u=sf_require_user();$uid=(int)$u['id'];$orders=[];
 foreach(glob(SF_ROOT.'/storage/orders/*.json')?:[] as $p){
     $o=json_decode((string)file_get_contents($p),true);if(!is_array($o))continue;
     $orderUserId=(int)($o['user_id']??0);$email=strtolower((string)($o['customer']['email']??''));
-    if($orderUserId===$uid||($orderUserId===0&&$email===strtolower((string)$u['email']))){
-        $orders[]=['id'=>$o['id']??basename($p,'.json'),'status'=>$o['status']??'','created_at'=>$o['created_at']??'','total_cents'=>$o['quote']['total_cents']??0,'currency'=>$o['quote']['currency']??'USD','items'=>array_map(fn($x)=>['type'=>$x['type']??'','label'=>$x['label']??''],(array)($o['quote']['items']??[])),'fulfillment'=>['status'=>(string)($o['fulfillment']['status']??(!empty($o['quote']['physical'])?'pending':'not_required')),'carrier'=>(string)($o['fulfillment']['carrier']??''),'tracking_number'=>(string)($o['fulfillment']['tracking_number']??''),'tracking_url'=>(string)($o['fulfillment']['tracking_url']??'')]];
+    if(sf_customer_commerce_owns($o,$u)){
+        $orders[]=sf_customer_commerce_summary($o,$u);
         // Backfill the account library from existing owned orders; this is idempotent.
         try{sf_account_library_add_order($uid,$o);}catch(Throwable $e){}
     }
