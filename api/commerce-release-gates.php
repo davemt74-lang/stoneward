@@ -96,7 +96,7 @@ function sf_commerce_release_https_webhook(string $url):bool {
     return is_array($parts)
         &&strtolower((string)($parts['scheme']??''))==='https'
         &&!empty($parts['host'])
-        &&!isset($parts['user'],$parts['pass'])
+        &&!isset($parts['user'])&&!isset($parts['pass'])
         &&!isset($parts['query'])&&!isset($parts['fragment'])
         &&(string)($parts['path']??'')!=='';
 }
