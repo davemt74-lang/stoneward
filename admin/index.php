@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.75-connect');
+define('SF_ADMIN_BUILD','1.3.75');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -144,7 +144,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/settings-tabs.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/sidebar-accordion.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
-  <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>&amp;e5=1"></script>
   <script src="assets/stripe-connect.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-actions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
