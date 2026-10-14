@@ -16,7 +16,7 @@ try {
   $quote=(array)($order['quote']??[]);
   $isVinyl=false;
   foreach((array)($quote['items']??[]) as $item){
-    if(is_array($item)&&($item['type']??'')==='custom_media'&&($item['format']??'vinyl')==='vinyl'){$isVinyl=true;break;}
+    if(is_array($item)&&in_array((string)($item['type']??''),['custom_media','album_vinyl'],true)&&($item['format']??'vinyl')==='vinyl'){$isVinyl=true;break;}
   }
   if(!$isVinyl) sf_json_response(['ok'=>false,'message'=>'No custom vinyl product on this order.'],404);
   $proof=sf_vinyl_production_proof($order,SF_ROOT.'/storage');
@@ -45,7 +45,7 @@ try {
           throw new RuntimeException('Artwork changed. Review purchased design again.');
         $tracks=sf_kunaki_publishing_verified_tracks($order,$itemIndex);
         $job=sf_kunaki_publishing_contract($order,$itemIndex,$record,$proof,$tracks);
-        $stored=sf_kunaki_job_enqueue($job);
+        $stored=sf_kunaki_job_enqueue_licensed($job);
         sf_log_admin_action((int)$admin['id'],'kunaki_publish_job_queued','order',$id,
           ['job_id'=>$stored['job_id'],'item_index'=>$itemIndex,'state'=>$stored['state']]);
         sf_json_response(['ok'=>true,'job'=>sf_kunaki_job_public($stored),
