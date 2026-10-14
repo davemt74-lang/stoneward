@@ -107,7 +107,7 @@ function sf_hs_pair_redeem(string $id,string $verifier,int $now=0):array {
             if($role!=='admin')throw new RuntimeException('Administrator permission has been revoked.');
         }
         $grant=sf_homeserver_link_issue($uid,(string)$r['scope'],$role,
-            (string)$r['label'],$now);
+            (string)$r['label'],$now,true);
         $q=$db->prepare('UPDATE homeserver_pair_requests SET state=? WHERE request_id=? AND state=?');
         $q->execute(['redeemed',$id,'approved']);
         if($q->rowCount()!==1)throw new RuntimeException('Duplicate HomeServer pairing redemption.');
