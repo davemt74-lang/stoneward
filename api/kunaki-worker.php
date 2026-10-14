@@ -9,6 +9,9 @@ if(($_SERVER['REQUEST_METHOD']??'')!=='POST')
 $raw=file_get_contents('php://input');
 if(!is_string($raw))sf_json_response(['ok'=>false,'error'=>'invalid_request'],400);
 $secret=(string)getenv('STONEFELLOW_KUNAKI_WORKER_SECRET');
+$expectedWorker=(string)getenv('STONEFELLOW_KUNAKI_WORKER_ID');
+if(!preg_match('/^HS-[a-zA-Z0-9_-]{5,64}$/D',$expectedWorker))
+    sf_json_response(['ok'=>false,'error'=>'worker_not_configured'],503);
 try{
     $worker=sf_kunaki_worker_verify([
         'timestamp'=>$_SERVER['HTTP_X_SF_WORKER_TIMESTAMP']??'',
@@ -16,6 +19,7 @@ try{
         'signature'=>$_SERVER['HTTP_X_SF_WORKER_SIGNATURE']??'',
         'worker'=>$_SERVER['HTTP_X_SF_WORKER_ID']??''
     ],$raw,$secret,time());
+    if(!hash_equals($expectedWorker,$worker))throw new RuntimeException('Wrong configured HomeServer identity.');
     sf_kunaki_worker_nonce_once((string)$_SERVER['HTTP_X_SF_WORKER_NONCE']);
 }catch(Throwable $e){sf_json_response(['ok'=>false,'error'=>'worker_not_authorized'],401);}
 $body=json_decode($raw,true);
