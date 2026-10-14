@@ -46,6 +46,7 @@ jobs:
       - name: Admin JavaScript syntax
         run: |
           node --check admin/assets/admin.js
+          node --check admin/assets/stripe-connect.js
           node --check admin/assets/turntable-modules.js
           node --check assets/js/turntable-parts.js
           node --check admin/assets/sidebar-accordion.js
@@ -229,6 +230,7 @@ jobs:
           php tests/section75e-provider-mode.php
           php tests/section75e2-provider-contract.php
           php tests/section75e3-payment-ledger.php
+          php tests/section75e5-stripe-onboarding.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

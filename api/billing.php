@@ -31,12 +31,13 @@ function sf_billing_ensure_schema(): void {
 function sf_billing_log(?int $userId,string $action,string $provider='',string $reference='',array $details=[]): void {
     sf_billing_ensure_schema();$q=sf_db()->prepare('INSERT INTO billing_audit_log(user_id,action,provider,reference_id,details_json,created_at) VALUES(?,?,?,?,?,?)');$q->execute([$userId,$action,$provider,$reference,json_encode($details,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}',gmdate('c')]);
 }
+require_once __DIR__.'/stripe-connect.php';
 function sf_billing_settings(): array {
     sf_billing_ensure_schema();$mode=sf_ai_meta_get('billing.mode',(string)(sf_store_config()['mode']??'test'));if(!in_array($mode,['test','production'],true))$mode='test';$provider=sf_ai_meta_get('billing.provider','test');if(!in_array($provider,['test','stripe'],true))$provider='test';
     return [
         'mode'=>$mode,'provider'=>$provider,
         'stripe_enabled'=>sf_ai_meta_get('billing.stripe_enabled','0')==='1',
-        'stripe_key_configured'=>sf_ai_meta_get('billing.stripe_secret_payload','')!=='',
+        'stripe_key_configured'=>sf_ai_meta_get('billing.stripe_secret_payload','')!==''||sf_connect_active(),
         'stripe_key_hint'=>sf_ai_meta_get('billing.stripe_key_hint',''),
         'stripe_webhook_configured'=>sf_ai_meta_get('billing.stripe_webhook_payload','')!=='',
         'stripe_webhook_hint'=>sf_ai_meta_get('billing.stripe_webhook_hint',''),
@@ -47,11 +48,14 @@ function sf_billing_settings_save(array $data): array {
     $enabled=!empty($data['stripe_enabled']);$secretPayload=sf_ai_meta_get('billing.stripe_secret_payload','');$secretHint=sf_ai_meta_get('billing.stripe_key_hint','');$webhookPayload=sf_ai_meta_get('billing.stripe_webhook_payload','');$webhookHint=sf_ai_meta_get('billing.stripe_webhook_hint','');
     $secret=trim((string)($data['stripe_secret_key']??''));if($secret!==''){$secretPayload=sf_ai_encrypt($secret);$secretHint=sf_ai_hint($secret);}if(!empty($data['clear_stripe_secret'])){$secretPayload='';$secretHint='';$enabled=false;}
     $webhook=trim((string)($data['stripe_webhook_secret']??''));if($webhook!==''){$webhookPayload=sf_ai_encrypt($webhook);$webhookHint=sf_ai_hint($webhook);}if(!empty($data['clear_webhook_secret'])){$webhookPayload='';$webhookHint='';}
-    if($enabled&&($secretPayload===''||$webhookPayload===''))throw new InvalidArgumentException('Stripe requires both the secret API key and webhook signing secret before it can be enabled.');
+    if($enabled&&(($secretPayload===''&&!sf_connect_active())||$webhookPayload===''))throw new InvalidArgumentException('Stripe requires both the secret API key and webhook signing secret before it can be enabled.');
     sf_ai_meta_set('billing.mode',$mode);sf_ai_meta_set('billing.provider',$provider);sf_ai_meta_set('billing.stripe_enabled',$enabled?'1':'0');sf_ai_meta_set('billing.stripe_secret_payload',$secretPayload);sf_ai_meta_set('billing.stripe_key_hint',$secretHint);sf_ai_meta_set('billing.stripe_webhook_payload',$webhookPayload);sf_ai_meta_set('billing.stripe_webhook_hint',$webhookHint);return sf_billing_settings();
 }
 function sf_billing_secret(string $key): string {$payload=sf_ai_meta_get($key,'');return $payload===''?'':sf_ai_decrypt($payload);}
-function sf_stripe_secret(): string { return sf_billing_secret('billing.stripe_secret_payload'); }
+function sf_stripe_secret(): string {
+    if(sf_connect_active())return (string)sf_connect_platform()['secret'];
+    return sf_billing_secret('billing.stripe_secret_payload');
+}
 function sf_stripe_webhook_secret(): string { return sf_billing_secret('billing.stripe_webhook_payload'); }
 function sf_stripe_configured(): bool {$s=sf_billing_settings();return $s['provider']==='stripe'&&$s['stripe_enabled']&&$s['stripe_key_configured']&&$s['stripe_webhook_configured'];}
 function sf_http_form_request(string $method,string $url,array $headers=[],array $fields=[]): array {
@@ -64,6 +68,7 @@ function sf_http_form_request(string $method,string $url,array $headers=[],array
 function sf_stripe_request(string $method,string $path,array $fields=[],string $idempotencyKey=''): array {
     $key=sf_stripe_secret();if($key==='')throw new RuntimeException('Stripe is not configured.');
     $headers=['Authorization: Bearer '.$key];
+    if(sf_connect_active())$headers[]='Stripe-Account: '.sf_connect_id();
     if($idempotencyKey!==''){
         if(!preg_match('/^[A-Za-z0-9._:-]{8,180}$/',$idempotencyKey))throw new InvalidArgumentException('Invalid Stripe idempotency key.');
         $headers[]='Idempotency-Key: '.$idempotencyKey;
