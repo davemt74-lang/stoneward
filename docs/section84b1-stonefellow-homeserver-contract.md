@@ -12,7 +12,9 @@
 
 ## Purchase and source eligibility
 
-The Cloud queues a publishing job only after Admin confirmation when: (1) a real customer purchased the custom vinyl physical line, (2) the same signed-in user previously purchased **every selected audio track** as a track line in real paid source order(s), (3) the personal library contains matching purchase grants, (4) the catalog marks every source master POD-eligible and records an audio asset, and (5) the order's protected artwork matches the Admin-approved fingerprint. A saved playlist, free catalog preview, refunded track purchase, or the purchase of the vinyl pressing fee alone is insufficient.
+The Cloud queues a publishing job only after Admin confirmation when: (1) a real customer purchased the custom vinyl physical line, (2) the same signed-in user previously purchased **every selected audio track** as a track line in real paid source order(s), (3) the personal library contains matching purchase grants, (4) the catalog marks every source master POD-eligible and records an audio asset, and (5) the order's protected artwork matches the Admin-approved fingerprint.
+
+**Real-payment restriction:** Both the vinyl order and each source-track purchase must be paid by a real LIVE Stripe checkout confirmed through the signed webhook. PaymentIntent, `postpayment_done.library` and the vinyl-specific `postpayment_done.pod` checkpoint must exist. Stripe TEST, simulated cash, reserved orders, missing signed-payment evidence, canceled/refunded status, and paid-fee-only records are denied. Until Stripe LIVE is configured, Admin can inspect the design but cannot queue a real Kunaki publishing job; CI uses wholly synthetic fixtures and never charges money. A saved playlist, free catalog preview, refunded track purchase, or the purchase of the vinyl pressing fee alone is insufficient.
 
 **Fixed albums:** Reusable album vinyl editions will need an independently certified album license/product mapping workflow. The current job contract is **custom editions only** and fails closed on missing individual track purchases. Do not silently grant the album right from a playlist/release view.
 

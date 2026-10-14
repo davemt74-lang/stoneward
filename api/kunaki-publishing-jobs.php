@@ -5,6 +5,20 @@ declare(strict_types=1);
  * customer addresses, private media bytes or Kunaki credentials.
  * No browser upload or Kunaki submission is authorized by this contract.
  */
+/** A future real manufacturer job must NEVER be derived from test, simulated cash,
+ * merely reserved, unsigned or partially refunded payment evidence.
+ */
+function sf_kunaki_live_purchase_confirmed(array $order,bool $physical=false):bool {
+    $payment=(array)($order['payment']??[]);
+    $done=(array)($payment['postpayment_done']??[]);
+    if(!sf_store_customer_order_visible($order)||($payment['provider']??'')!=='stripe'
+        ||($payment['status']??'')!=='paid'
+        ||($payment['livemode']??null)!==true
+        ||trim((string)($payment['payment_intent']??''))===''
+        ||!in_array((string)($order['status']??''),['paid','fulfilled','completed'],true)
+        ||empty($done['library'])||($physical&&empty($done['pod'])))return false;
+    return true;
+}
 function sf_kunaki_publishing_track_ids(array $order,int $itemIndex):array {
     if(!sf_store_customer_order_visible($order))throw new RuntimeException('Real customer order required.');
     $item=$order['quote']['items'][$itemIndex]??null;
@@ -29,7 +43,7 @@ function sf_kunaki_publishing_track_ids(array $order,int $itemIndex):array {
 function sf_kunaki_publishing_entitlements(array $vinylOrder,int $itemIndex,
     array $library,array $paidOrderMap,array $catalog):array {
     $uid=(int)($vinylOrder['user_id']??0);
-    if($uid<1||!sf_order_paid_for_library($vinylOrder))
+    if($uid<1||!sf_kunaki_live_purchase_confirmed($vinylOrder,true))
         throw new RuntimeException('Paid, signed-in customer required.');
     $ids=sf_kunaki_publishing_track_ids($vinylOrder,$itemIndex);
     $available=[];
@@ -38,7 +52,7 @@ function sf_kunaki_publishing_entitlements(array $vinylOrder,int $itemIndex,
         $track=(string)($entry['item_key']??'');$sourceId=(string)($entry['source_order_id']??'');
         $source=$paidOrderMap[$sourceId]??null;
         if(!$source||!sf_store_customer_order_visible($source)
-           ||(int)($source['user_id']??0)!==$uid||!sf_order_paid_for_library($source))
+           ||(int)($source['user_id']??0)!==$uid||!sf_kunaki_live_purchase_confirmed($source,false))
             continue;
         foreach((array)($source['quote']['items']??[]) as $line)
             if(is_array($line)&&($line['type']??'')==='track'
@@ -77,6 +91,8 @@ function sf_kunaki_publishing_contract(array $order,int $itemIndex,array $record
         ||!in_array((string)($record['status']??''),[
             'artwork_approved','in_production','quality_check','production_complete'],true))
         throw new RuntimeException('Exact purchased artwork must be approved before worker staging.');
+    if(!sf_kunaki_live_purchase_confirmed($order,true))
+        throw new RuntimeException('Only a genuinely paid live Stripe order can stage a real vendor workflow.');
     if(!$tracks)throw new RuntimeException('Missing verified purchases.');
     $item=$order['quote']['items'][$itemIndex]??null;
     if(!is_array($item))throw new RuntimeException('Order item missing.');
