@@ -254,7 +254,27 @@ jobs:
           mkdir -p dist/deploy
           git archive HEAD | tar -x -C dist/deploy
           rm -rf dist/deploy/.github dist/deploy/tests dist/deploy/storage
+          # These root documents are historical snapshots from older releases.
+          # Replace the misleading v1.3.2 manifest with the actual source commit.
+          rm -f dist/deploy/AUDIT-REPORT.md dist/deploy/RELEASE-NOTES.md \
+            dist/deploy/TEST-RESULTS.txt dist/deploy/UPGRADE-NOTES.md \
+            dist/deploy/DEPLOY-MANIFEST.txt
+          {
+            echo "Stonefellow — exact-source deployment"
+            echo "Source commit: $(git rev-parse HEAD)"
+            echo "Built at UTC: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Scope: Stonefellow PHP/JS application source at the commit above"
+            echo "Release checks: GitHub Actions PHP/JS regressions passed before archive creation"
+            echo "Private data: config/secrets, storage, customer records and host settings are not included"
+            echo "Schema: read current api/migrations.php and upgrade.php on the target host"
+            echo "Pilot readiness: Section 83 code included; external Stripe, mailer, browser, POD and backup rehearsals pending"
+            echo "Safety: source acceptance never authorizes Stripe live payments"
+          } > dist/deploy/DEPLOY-MANIFEST.txt
+          test -s dist/deploy/api/production-pilot.php
+          test -s dist/deploy/docs/section83-production-pilot.md
+          grep -Fx "Source commit: $(git rev-parse HEAD)" dist/deploy/DEPLOY-MANIFEST.txt
           (cd dist/deploy && zip -q -r ../stonefellow-section62c-full-deploy.zip .)
+          unzip -p dist/stonefellow-section62c-full-deploy.zip DEPLOY-MANIFEST.txt | grep -Fx "Source commit: $(git rev-parse HEAD)"
           (cd dist && sha256sum stonefellow-section62c-full-deploy.zip > SHA256SUMS.txt)
           (cd dist && sha256sum -c SHA256SUMS.txt)
           unzip -t dist/stonefellow-section62c-full-deploy.zip | tail -1
