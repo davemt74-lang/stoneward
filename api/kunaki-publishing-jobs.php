@@ -8,6 +8,7 @@ declare(strict_types=1);
 /** A future real manufacturer job must NEVER be derived from test, simulated cash,
  * merely reserved, unsigned or partially refunded payment evidence.
  */
+require_once __DIR__.'/vinyl-print-licenses.php';
 function sf_kunaki_live_purchase_confirmed(array $order,bool $physical=false):bool {
     $payment=(array)($order['payment']??[]);
     $done=(array)($payment['postpayment_done']??[]);
@@ -22,7 +23,7 @@ function sf_kunaki_live_purchase_confirmed(array $order,bool $physical=false):bo
 function sf_kunaki_publishing_track_ids(array $order,int $itemIndex):array {
     if(!sf_store_customer_order_visible($order))throw new RuntimeException('Real customer order required.');
     $item=$order['quote']['items'][$itemIndex]??null;
-    if(!is_array($item)||($item['type']??'')!=='custom_media'||($item['format']??'')!=='vinyl')
+    if(!is_array($item)||!in_array((string)($item['type']??''),['custom_media','album_vinyl'],true)||($item['format']??'')!=='vinyl')
         throw new RuntimeException('Purchased vinyl item not found.');
     $ids=[];
     foreach(['A','B'] as $side){
@@ -46,22 +47,32 @@ function sf_kunaki_publishing_entitlements(array $vinylOrder,int $itemIndex,
     if($uid<1||!sf_kunaki_live_purchase_confirmed($vinylOrder,true))
         throw new RuntimeException('Paid, signed-in customer required.');
     $ids=sf_kunaki_publishing_track_ids($vinylOrder,$itemIndex);
+    $grants=sf_vinyl_license_grants($uid,$library,$paidOrderMap);
     $available=[];
     foreach($library as $entry){
-        if(!is_array($entry)||($entry['item_type']??'')!=='track')continue;
-        $track=(string)($entry['item_key']??'');$sourceId=(string)($entry['source_order_id']??'');
+        if(!is_array($entry)||!in_array((string)($entry['item_type']??''),['track','release'],true))continue;
+        $type=(string)$entry['item_type'];
+        $key=(string)($entry['item_key']??'');
+        $sourceId=(string)($entry['source_order_id']??'');
         $source=$paidOrderMap[$sourceId]??null;
-        if(!$source||!sf_store_customer_order_visible($source)
-           ||(int)($source['user_id']??0)!==$uid||!sf_kunaki_live_purchase_confirmed($source,false))
-            continue;
-        foreach((array)($source['quote']['items']??[]) as $line)
-            if(is_array($line)&&($line['type']??'')==='track'
-                &&(string)($line['track_id']??'')===$track)
-                $available[$track]=$sourceId;
+        if(!is_array($source)||(int)($source['user_id']??0)!==$uid
+            ||!sf_kunaki_live_purchase_confirmed($source,false))continue;
+        foreach((array)($source['quote']['items']??[]) as $line){
+            if(!is_array($line))continue;
+            if($type==='track'&&($line['type']??'')==='track'
+               &&(string)($line['track_id']??'')===$key)
+                $available[$key]=$sourceId;
+            if($type==='release'&&($line['type']??'')==='release'
+               &&(string)($line['release_id']??'')===$key){
+                foreach((array)($line['track_ids']??[]) as $tid)
+                    $available[(string)$tid]=$sourceId;
+            }
+        }
     }
     $proof=[];
     foreach($ids as $track){
-        if(!isset($available[$track]))throw new RuntimeException('Purchase required for catalog track '.$track.'.');
+        if(!isset($available[$track])||(int)($grants[$track]??0)<1)
+            throw new RuntimeException('Music ownership and vinyl print license required for song '.$track.'.');
         $row=$catalog[$track]??null;
         if(!is_array($row)||empty($row['podEligible'])||empty($row['audio']))
             throw new RuntimeException('Catalog master is missing or not approved for vinyl.');
@@ -100,7 +111,11 @@ function sf_kunaki_publishing_contract(array $order,int $itemIndex,array $record
     return [
         'schema'=>'stonefellow.kunaki.publish-job.v1','job_id'=>'KJP-'.strtoupper(substr($identity,0,24)),
         'order_id'=>$id,'item_index'=>$itemIndex,'owner_id'=>(int)$order['user_id'],
-        'edition'=>'custom','proof_sha256'=>(string)$proof['fingerprint'],
+        'edition'=>($item['type']??'')==='album_vinyl'?'album':'custom',
+        'edition_id'=>(string)($item['edition_id']??''),
+        'edition_fingerprint'=>(string)($item['edition_fingerprint']??''),
+        'license_track_ids'=>array_values(array_map(static fn($r)=>(string)$r['track_id'],$tracks)),
+        'proof_sha256'=>(string)$proof['fingerprint'],
         'catalog_tracks'=>$tracks,
         'front_artwork_template'=>(string)($item['builder']['coverFront']??''),
         'back_artwork_template'=>(string)($item['builder']['coverBack']??''),
