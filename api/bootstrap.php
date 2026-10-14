@@ -75,9 +75,11 @@ function sf_validate_builder(array $b, string $format, int $userId=0): array {
       'customNote'=>sf_clean_text($b['customNote']??'',280),'playerModules'=>!empty($b['playerModules'])?sf_turntable_valid_selection((array)$b['playerModules'],$userId):sf_turntable_module_defaults(),'sides'=>$sides];
 }
 
+require_once __DIR__.'/vinyl-print-licenses.php';
 function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array {
     if(count($cart)>20) return ['ok'=>false,'errors'=>['Cart is too large.']];
     $cfg=sf_store_config(); $tracks=sf_track_map(); $errors=[]; $items=[]; $subtotal=0; $physical=false;
+    $releases=sf_vinyl_release_map_from_rows(sf_release_rows());
     $turntableInCart=[];
     foreach($cart as $i=>$raw){
         if(!is_array($raw)){ $errors[]="Invalid item at position $i."; continue; }
@@ -86,7 +88,40 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
             $id=(string)($raw['track_id'] ?? ''); $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
             $price=(int)round(((float)($t['price'] ?? 0))*100); if($price<0)$price=0;
-            $items[]=['type'=>'track','track_id'=>$id,'label'=>(string)$t['title'],'price_cents'=>$price]; $subtotal+=$price;
+            $items[]=['type'=>'track','track_id'=>$id,'label'=>(string)$t['title'],'price_cents'=>$price,
+                'vinyl_print_licenses_included'=>1]; $subtotal+=$price;
+        } elseif($type==='vinyl_license_pack'||$type==='album_vinyl_license_pack'){
+            try{$p=sf_vinyl_license_quote($raw,$tracks,$releases);
+                $items[]=$p;$subtotal+=(int)$p['price_cents'];}
+            catch(InvalidArgumentException $e){$errors[]=$e->getMessage();}
+        } elseif($type==='release'){
+            $rid=(string)($raw['release_id']??'');$r=$releases[$rid]??null;
+            if(!$r||($r['state']??'')!=='published'||empty($r['purchasable'])
+               ||empty($r['public_visible'])||($r['type']??'')!=='album'){
+                $errors[]='Album is not available for digital purchase.';continue;
+            }
+            $ids=array_values(array_map('strval',(array)($r['track_ids']??[])));
+            if(!$ids||count($ids)>40||count($ids)!==count(array_unique($ids))
+                ||count(array_filter($ids,fn($id)=>isset($tracks[$id])))!==count($ids)){
+                $errors[]='Album track list is invalid.';continue;
+            }
+            $price=(int)round(max(0,(float)($r['digital_price']??0))*100);
+            $items[]=['type'=>'release','release_id'=>$rid,'track_ids'=>$ids,
+                'label'=>(string)$r['title'].' · digital album','price_cents'=>$price,
+                'vinyl_print_licenses_included_per_song'=>1];$subtotal+=$price;
+        } elseif($type==='album_vinyl'){
+            $rid=(string)($raw['release_id']??'');$r=$releases[$rid]??null;
+            try{
+                if(!is_array($r))throw new InvalidArgumentException('Album vinyl is unavailable.');
+                $edition=sf_vinyl_locked_album($r,$tracks,(int)($cfg['limits']['vinyl']??0));
+                $price=(int)$r['vinyl_price_cents'];
+                $items[]=['type'=>'album_vinyl','format'=>'vinyl','release_id'=>$rid,
+                    'edition_id'=>$edition['edition_id'],'edition_fingerprint'=>$edition['edition_fingerprint'],
+                    'track_ids'=>$edition['track_ids'],'builder'=>$edition['builder'],
+                    'label'=>(string)$r['title'].' · locked album vinyl',
+                    'price_cents'=>$price,'physical'=>true,'quantity'=>1];
+                $subtotal+=$price;$physical=true;
+            }catch(InvalidArgumentException $e){$errors[]=$e->getMessage();}
         } elseif($type==='merch'){
             $merch=sf_commerce_quote_item($raw);if(!$merch['ok']){$errors[]=$merch['error'];continue;}$item=$merch['item'];$items[]=$item;$subtotal+=(int)$item['price_cents'];if(!empty($item['physical']))$physical=true;
         } elseif($type==='turntable_module'){
@@ -160,7 +195,7 @@ function sf_customer(array $raw, bool $physical): array {
 }
 
 function sf_build_pod_handoffs(string $orderId, array $quote, array $customer): array {
-    $out=[]; foreach($quote['items'] as $idx=>$item){ if($item['type']!=='custom_media')continue; $b=$item['builder']; $h=['schema'=>'stonefellow.pod-handoff.v1','provider'=>'file_handoff','order_id'=>$orderId,'item_index'=>$idx,'format'=>$item['format'],'title'=>$b['title'],'artwork_theme'=>$b['theme'],'artwork_front'=>$b['coverFront']??'stonefellow','artwork_back'=>$b['coverBack']??'stonefellow','dedication_note'=>$b['customNote']??'','sides'=>$b['sides'],'customer_player_preview'=>['visual_only'=>true,'components'=>$b['playerModules']??sf_turntable_module_defaults()],'recipient'=>$customer['shipping']??null,'status'=>'ready_for_provider','created_at'=>gmdate('c')]; $path=SF_ROOT.'/storage/pod/'.$orderId.'-'.$idx.'.json'; sf_write_json($path,$h); $out[]=['item_index'=>$idx,'status'=>'ready_for_provider','file'=>basename($path)]; }
+    $out=[]; foreach($quote['items'] as $idx=>$item){ if(!in_array((string)($item['type']??''),['custom_media','album_vinyl'],true))continue; $b=$item['builder']; $h=['schema'=>'stonefellow.pod-handoff.v1','provider'=>'file_handoff','order_id'=>$orderId,'item_index'=>$idx,'format'=>$item['format'],'edition_id'=>$item['edition_id']??null,'release_id'=>$item['release_id']??null,'title'=>$b['title'],'artwork_theme'=>$b['theme'],'artwork_front'=>$b['coverFront']??'stonefellow','artwork_back'=>$b['coverBack']??'stonefellow','dedication_note'=>$b['customNote']??'','sides'=>$b['sides'],'customer_player_preview'=>['visual_only'=>true,'components'=>$b['playerModules']??sf_turntable_module_defaults()],'recipient'=>$customer['shipping']??null,'status'=>'ready_for_provider','created_at'=>gmdate('c')]; $path=SF_ROOT.'/storage/pod/'.$orderId.'-'.$idx.'.json'; sf_write_json($path,$h); $out[]=['item_index'=>$idx,'status'=>'ready_for_provider','file'=>basename($path)]; }
     return $out;
 }
 

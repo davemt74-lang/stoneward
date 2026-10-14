@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/kunaki-publishing-jobs.php';
+require_once __DIR__.'/vinyl-print-licenses.php';
 require_once __DIR__.'/kunaki-worker-auth.php';
 header('Cache-Control: no-store');
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST')
@@ -27,7 +28,7 @@ if(!is_array($body))sf_json_response(['ok'=>false,'error'=>'invalid_json'],400);
 try{
     switch((string)($body['operation']??'')){
         case 'claim':
-            $job=sf_kunaki_job_claim($worker);
+            $job=sf_kunaki_job_claim($worker,'sf_vinyl_worker_job_allowed');
             sf_json_response(['ok'=>true,'job'=>$job,'next_poll_seconds'=>20]);
         case 'report':
             $job=sf_kunaki_job_report((string)($body['job_id']??''),$worker,

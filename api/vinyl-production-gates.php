@@ -11,7 +11,8 @@ function sf_vinyl_production_proof(array $order,string $storageRoot):array {
         throw new InvalidArgumentException('Valid customer order required.');
     $blockers=[];$review=[];$fingerprints=[];
     foreach((array)($order['quote']['items']??[]) as $i=>$item){
-        if(!is_array($item)||($item['type']??'')!=='custom_media'
+        if(!is_array($item)
+            ||!in_array((string)($item['type']??''),['custom_media','album_vinyl'],true)
             ||($item['format']??'')!=='vinyl')continue;
         $builder=(array)($item['builder']??[]);
         $b=[
@@ -54,6 +55,8 @@ function sf_vinyl_production_proof(array $order,string $storageRoot):array {
         $fingerprints[]=['item_index'=>$i]+$b;
         $review[]=['item_index'=>$i,'title'=>$b['title'],
             'front'=>$b['artwork_front'],'back'=>$b['artwork_back'],
+            'edition_id'=>(string)($item['edition_id']??''),
+            'edition_fingerprint'=>(string)($item['edition_fingerprint']??''),
             'side_a_tracks'=>count((array)($b['sides']['A']['tracks']??[])),
             'side_b_tracks'=>count((array)($b['sides']['B']['tracks']??[]))];
     }
