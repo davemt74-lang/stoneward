@@ -33,13 +33,13 @@ function sf_homeserver_link_schema():void {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 }
-function sf_homeserver_link_issue(int $userId,string $scope,string $role,string $label='',int $now=0):array {
+function sf_homeserver_link_issue(int $userId,string $scope,string $role,string $label='',int $now=0,bool $schemaReady=false):array {
     $now=$now?:time();
     if($userId<1||!in_array($scope,['fan.library.read','admin.presence.read'],true))
         throw new InvalidArgumentException('Invalid HomeServer connection.');
     if($scope==='admin.presence.read'&&$role!=='admin')
         throw new RuntimeException('Only Stonefellow administrators may authorize administrative presence.');
-    sf_homeserver_link_schema();
+    if(!$schemaReady)sf_homeserver_link_schema();
     $token='sfhs_'.bin2hex(random_bytes(32));$hash=hash('sha256',$token);
     $label=trim(substr(preg_replace('/[^\pL\pN ._-]+/u','',(string)$label)??'',0,100));
     $expires=$now+30*86400;
