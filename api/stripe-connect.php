@@ -90,8 +90,10 @@ function sf_connect_webhook_setup(string $account):bool {
     // A lost response might mean the provider already created the endpoint.
     // In that situation do not create an unknown duplicate signing secret.
     $known=sf_connect_provider_request('GET','webhook_endpoints',[],$account);
-    foreach((array)($known['data']??[]) as $endpoint){
-        if((string)($endpoint['url']??'')===$url)
+    if(!array_key_exists('data',$known)||!is_array($known['data'])||!empty($known['has_more']))
+        throw new RuntimeException('Stripe endpoint list is incomplete. Review existing webhooks before creating another.');
+    foreach($known['data'] as $endpoint){
+        if(is_array($endpoint)&&(string)($endpoint['url']??'')===$url)
             throw new RuntimeException('A Stripe webhook already exists for this URL; reconcile its signing secret in Stripe before continuing.');
     }
     $r=sf_connect_provider_request('POST','webhook_endpoints',$data,$account);
