@@ -49,7 +49,19 @@ function releasePanel(report){
  '<div class="stripe-wizard-steps">'+items+'</div><p class="status-line">Webhook status covers at most 100 recent events; it is not an exhaustive reconciliation. Refresh to reassess the current store.</p>'+
  '<div class="actions"><button type="button" id="stripeReleaseRefresh" class="secondary">Refresh release checks</button></div></section>';
 }
-function content(s,cert,release){
+function pilotPanel(pilot){
+ const gates=Array.isArray(pilot?.gates)?pilot.gates:[];
+ const manual=Array.isArray(pilot?.manual_verification_required)?pilot.manual_verification_required:[];
+ const items=gates.map(c=>'<li><strong>'+esc(c.label||c.id)+'</strong> · '+esc(c.status==='pass'?'Installed / verified within stated scope':'Blocked or unavailable')+'<p>'+esc(c.explanation||'')+'</p></li>').join('');
+ const checks=manual.map(c=>'<li>'+esc(c.label||c.id)+' <strong>— pending manual evidence</strong></li>').join('');
+ return '<section class="panel" id="stripePilotPanel"><div class="panel-title"><div><h2>Section 83 · End-to-end pilot readiness</h2><p>Read-only acceptance across checkout, customer orders, vinyl, Agent, fulfillment, marketing and upgrades.</p></div><strong class="stripe-pill pending">'+Number(pilot?.passed||0)+' / '+Number(pilot?.total||0)+' gates</strong></div>'+
+ '<div class="stripe-wizard-summary"><div><small>Technical components</small><strong>'+(pilot?.technical_components_present?'Present':'Incomplete')+'</strong></div><div><small>Sandbox rehearsal</small><strong>'+(pilot?.sandbox_rehearsal_ready?'Eligible by local evidence':'Blocked')+'</strong></div><div><small>Live release</small><strong>Not authorized</strong></div></div>'+
+ '<p>These results distinguish component presence from live transaction and operator acceptance. No action is executed from this panel.</p>'+
+ '<h3>Cross-system gates</h3><ol>'+items+'</ol><h3>Required pilot evidence</h3><ol>'+checks+'</ol>'+
+ '<div class="notice"><strong>Production Stripe remains disabled.</strong><p>'+esc(pilot?.summary||'External production acceptance has not been completed.')+'</p></div>'+
+ '<div class="actions"><button type="button" class="secondary" id="stripePilotRefresh">Refresh pilot checks</button></div></section>';
+}
+function content(s,cert,release,pilot){
  const direct=s.provider==='direct', linked=!!s.connected, connect=s.provider==='connect', test=s.store_mode==='stripe_test';
  const canWebhook=direct&&!!s.webhook_url&&!s.webhook_ready;
  const steps=step(linked,1,'Create and verify your Stripe account',linked?'Verified merchant '+s.account_id:'Sign up in the official Stripe Dashboard; no Stripe account is required to prepare this wizard.')
@@ -80,7 +92,7 @@ function content(s,cert,release){
  '<p>If Stonefellow is later used as a platform serving other merchants, you can register a Stripe Connect application and use its official hosted authorization flow. Not required for a single artist.</p>'+
  (s.platform_ready&&!direct?'<button class="secondary" type="button" id="stripeConnect">Authorize with Stripe Connect ↗</button>':
  '<div class="notice">A Stripe Connect platform client ID and platform secret must first be configured on your own server. This does not link ChatGPT to Stripe.</div>')+
- '<p id="stripeConnectStatus" role="status" class="status-line"></p></details>'+certificationPanel(cert||{},s)+releasePanel(release||{});
+ '<p id="stripeConnectStatus" role="status" class="status-line"></p></details>'+certificationPanel(cert||{},s)+releasePanel(release||{})+pilotPanel(pilot||{});
 }
 async function action(kind,body,element,message){
  if(element)element.disabled=true;
@@ -91,7 +103,8 @@ async function render(){
  ctx.canvas.innerHTML='<div class="canvas-head"><h1>Payments &amp; Stripe</h1></div><section class="panel">Checking merchant configuration…</section>';
  try{
   const res=await ctx.api('stripe-connect.php');const s=res.stripe||{};
-  ctx.canvas.innerHTML=content(s,res.certification||{},res.release||{});
+  ctx.canvas.innerHTML=content(s,res.certification||{},res.release||{},res.pilot||{});
+   const pilotRefresh=ui('stripePilotRefresh');if(pilotRefresh)pilotRefresh.onclick=()=>render();
    const releaseRefresh=ui('stripeReleaseRefresh');if(releaseRefresh)releaseRefresh.onclick=()=>render();
   const backOrders=ui('stripeBackOrders');
   if(backOrders)backOrders.onclick=()=>ctx.openView('orders');
