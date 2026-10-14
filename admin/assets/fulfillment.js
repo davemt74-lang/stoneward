@@ -35,18 +35,41 @@
     try{
       const data=await api('vinyl-production.php?order_id='+encodeURIComponent(orderId));
       const box=$('#vinylProductionPanel',canvas);if(!box)return;
-      const r=data.record||{},stages=data.stages||[],index=stages.indexOf(r.status),next=stages[index+1],events=r.events||[];
+      const r=data.record||{},stages=data.stages||[],index=stages.indexOf(r.status),next=stages[index+1],events=r.events||[],proof=data.proof||{};
+      const proofReady=!!proof.ready,proofLocked=!!r.proof_sha256,proofMatches=proofLocked&&r.proof_sha256===proof.fingerprint;
+      const legacyProof=index>0&&!proofLocked&&proofReady;
+      const proofNeedsReview=!proofReady||(index>0&&!proofMatches);
       box.innerHTML='<div class="panel-title"><div><h2>Custom vinyl production</h2><p>Artwork approval, pressing and quality control. Shipping is managed separately.</p></div>'+badge(r.status)+'</div>'+
         '<p>Stage '+(index+1)+' of '+stages.length+' · revision '+Number(r.revision||0)+'</p>'+
-        (next?'<form id="vinylAdvanceForm" class="form-grid"><label class="field">Next milestone<input readonly value="'+esc(label(next))+'"></label><label class="field">Production note<input name="note" maxlength="500" placeholder="Optional internal note"></label><div class="actions span3"><button class="primary" type="submit">Confirm '+esc(label(next))+'</button></div></form>':'<p>Production stages complete. Arrange shipment through Fulfillment.</p>')+
+        '<div class="notice"><strong>Purchased artwork &amp; POD proof</strong><p>'+(proofReady?(proofMatches?'Approved design is locked to this production record.':'Internal handoff matches the order; staff proof approval is required.'):'Approval blocked until the purchased vinyl design matches the protected production handoff.')+'</p>'+
+        '<p>Matched vinyl items: '+Number((proof.items||[]).length)+' · fingerprint: <code>'+esc(proof.fingerprint?String(proof.fingerprint).slice(0,16)+'…':'Not ready')+'</code></p>'+
+        (proof.blockers||[]).map(x=>'<p>'+esc(x)+'</p>').join('')+
+        '<small>This verifies the internal file handoff, not external manufacturer confirmation.</small></div>'+
+        (legacyProof?'<div class="actions"><button type="button" class="secondary" id="vinylProofLegacy">Verify legacy production proof</button></div>':'')+
+        (next?'<form id="vinylAdvanceForm" class="form-grid"><label class="field">Next milestone<input readonly value="'+esc(label(next))+'"></label><label class="field">Production note<input name="note" maxlength="500" placeholder="'+(next==='production_complete'?'Required quality-control inspection details':'Optional internal note')+'" '+(next==='production_complete'?'required minlength="10"':'')+'></label>'+
+        (next==='production_complete'?'<label class="field">Confirm manual quality inspection <input type="checkbox" name="qc_confirmed" required></label>':'')+
+        '<div class="actions span3"><button class="primary" type="submit" '+(proofNeedsReview?'disabled':'')+'>Confirm '+esc(label(next))+'</button></div></form>':'<p>Production stages complete. Arrange shipment through Fulfillment.</p>')+
         '<h3>Production history</h3>'+(events.length?'<ol>'+events.map(e=>'<li><strong>'+esc(label(e.to))+'</strong> · '+esc(dt(e.at))+' · '+esc(e.note||'No note')+'</li>').join('')+'</ol>':'<div class="empty">No production transitions yet.</div>');
+      const legacy=$('#vinylProofLegacy',box);
+      if(legacy)legacy.onclick=async()=>{
+        if(!confirm('Verify that this existing production order matches its original internal POD proof? No vendor action is performed.'))return;
+        legacy.disabled=true;
+        try{
+          await api('vinyl-production.php',{action:'verify_existing_proof',order_id:orderId,
+            revision:Number(r.revision),confirmed:true,proof_sha256:proof.fingerprint});
+          say('Existing artwork proof verified.');await loadVinylProduction(orderId);
+        }catch(e){alert(e.message);legacy.disabled=false;}
+      };
       const form=$('#vinylAdvanceForm',box);
       if(form)form.onsubmit=async event=>{
         event.preventDefault();
         if(!confirm('Advance this vinyl order to '+label(next)+'?'))return;
         const button=form.querySelector('button[type="submit"]');button.disabled=true;
         try{
-          const updated=await api('vinyl-production.php',{action:'advance',order_id:orderId,status:next,revision:Number(r.revision),confirmed:true,note:new FormData(form).get('note')||''});
+          const formData=new FormData(form);
+          const updated=await api('vinyl-production.php',{action:'advance',order_id:orderId,
+            status:next,revision:Number(r.revision),confirmed:true,proof_sha256:proof.fingerprint||'',
+            note:formData.get('note')||'',qc_confirmed:formData.get('qc_confirmed')==='on'});
           say('Vinyl production status saved.');await loadVinylProduction(orderId);
         }catch(e){alert(e.message);button.disabled=false;}
       };
