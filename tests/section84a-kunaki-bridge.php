@@ -59,7 +59,7 @@ $ui=file_get_contents($root.'/admin/assets/fulfillment.js');
 $bridge=file_get_contents($root.'/api/kunaki-bridge.php');
 k84(str_contains($api,'sf_admin_require_auth')&&str_contains($api,'link_kunaki_product')
     &&str_contains($api,'sf_kunaki_mapping'),'Only authenticated Admin can link proof-bound product ID');
-k84(str_contains($api,"flock($lock,LOCK_EX)")&&str_contains($api,'different vinyl design'),
+k84(str_contains($api,'flock($lock,LOCK_EX)')&&str_contains($api,'different vinyl design'),
     'Serialized production lock and cross-design Product ID collision guard');
 k84(str_contains($ui,'data-kunaki-bind')&&str_contains($ui,'proofMatches')
     &&str_contains($ui,'No vendor order was placed'),'Original Fulfillment canvas offers non-submitting mapping');
