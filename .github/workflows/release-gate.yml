@@ -228,6 +228,7 @@ jobs:
           php tests/section75d-stock-replay.php
           php tests/section75e-provider-mode.php
           php tests/section75e2-provider-contract.php
+          php tests/section75e3-payment-ledger.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

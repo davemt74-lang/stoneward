@@ -32,6 +32,7 @@ function sf_stripe_request(string $method,string $path,array $fields=[],string $
   if($method!=='POST'||$path!=='checkout/sessions'||!str_starts_with($key,'sf-store-SF-'))throw new RuntimeException('Missing safe idempotency');
   if(($fields['mode']??'')!=='payment'||($fields['payment_method_types[0]']??'')!=='card')throw new RuntimeException('Not hosted card Checkout');
   $GLOBALS['fake']['fields']=$fields;
+  if(!empty($GLOBALS['fake']['wrong_session_mode']))return ['id'=>'cs_live_'.str_repeat('a',20),'url'=>'https://checkout.stripe.com/c/pay/cs_live_'.str_repeat('a',20),'livemode'=>true];
   return ['id'=>'cs_test_'.str_repeat('a',20),'url'=>'https://checkout.stripe.com/c/pay/cs_test_'.str_repeat('a',20)];
 }
 require $root.'/api/store-payments.php';
@@ -101,6 +102,18 @@ $before=$GLOBALS['fake']['crm'];$GLOBALS['fake']['fail_library']=false;
 sf_store_stripe_webhook_event($dw,'checkout.session.completed');
 yes(!empty(sf_read_order($deferred['order_id'])['payment']['postpayment_done']['library']),'Later webhook retries incomplete library fulfillment');
 yes($GLOBALS['fake']['crm']===$before,'Already-completed CRM action is not duplicated on retry');
+$wrongKey='checkout_wrong_environment_123456';
+$GLOBALS['fake']['wrong_session_mode']=true;
+try{sf_store_stripe_create_order(['id'=>7],$customer,$quote,$wrongKey,'');$badAccepted=true;}
+catch(RuntimeException $e){$badAccepted=false;}
+$wrongId=sf_store_stripe_order_id_for_request($wrongKey);
+yes(!$badAccepted&&sf_read_order($wrongId)['payment']['checkout_session_id']===''
+  &&($GLOBALS['fake']['reserved'][$wrongId]??0)===1,
+  'Stripe session from wrong environment is refused before persistence without new stock hold');
+$GLOBALS['fake']['wrong_session_mode']=false;
+$goodRetry=sf_store_stripe_create_order(['id'=>7],$customer,$quote,$wrongKey,'');
+yes($goodRetry['order_id']===$wrongId&&($GLOBALS['fake']['reserved'][$wrongId]??0)===1,
+  'Correct environment retry recovers original order without re-reserving stock');
 $GLOBALS['fake']['mode']='production';$GLOBALS['fake']['billing_mode']='production';
 try{sf_store_stripe_ready();$blocked=false;}catch(RuntimeException $e){$blocked=true;}
 yes($blocked,'Live mode rejects Stripe test secret');

@@ -75,7 +75,11 @@ function sf_store_stripe_checkout_start_locked(array $order): array {
     // The ID is unique to the persisted order. Retries cannot generate a second Stripe Session.
     $session=sf_stripe_request('POST','checkout/sessions',sf_store_stripe_session_fields($stored),'sf-store-'.$id);
     $url=(string)($session['url']??'');$sid=(string)($session['id']??'');
-    if(!preg_match('~^https://checkout\.stripe\.com/~',$url)||!preg_match('/^cs_(?:live|test)_[A-Za-z0-9]+$/',$sid))
+    if(!preg_match('~^https://checkout\\.stripe\\.com/~',$url)||!preg_match('/^cs_(?:live|test)_[A-Za-z0-9]+$/',$sid)
+        ||!str_starts_with($sid,sf_store_order_expected_livemode($stored)?'cs_live_':'cs_test_')
+        ||(isset($session['livemode'])&&(bool)$session['livemode']!==sf_store_order_expected_livemode($stored))
+        ||(isset($session['amount_total'])&&(int)$session['amount_total']!==(int)$stored['quote']['total_cents'])
+        ||(isset($session['currency'])&&strtoupper((string)$session['currency'])!==strtoupper((string)$stored['quote']['currency'])))
         throw new RuntimeException('Stripe returned an invalid payment session.');
     $stored['payment']['checkout_session_id']=$sid;
     $stored['payment']['checkout_url']=$url;
@@ -166,6 +170,10 @@ function sf_store_stripe_webhook_event(array $session,string $eventType): void {
         $paid=in_array($eventType,['checkout.session.completed','checkout.session.async_payment_succeeded'],true)
             && ($session['payment_status']??'')==='paid';
         if($paid){
+            if(!preg_match('/^pi_[A-Za-z0-9]+$/D',(string)($session['payment_intent']??''))
+                ||(isset($session['status'])&&(string)$session['status']!=='complete')
+                ||(isset($session['client_reference_id'])&&(string)$session['client_reference_id']!==$id))
+                throw new RuntimeException('Stripe paid event is missing a matching completed PaymentIntent.');
             if(in_array((string)($order['status']??''),['refunded','partially_refunded'],true))return;
             if(($order['status']??'')==='canceled')throw new RuntimeException('Paid webhook arrived for a canceled order; manual reconciliation required.');
             if(($order['payment']['status']??'')!=='paid'){
