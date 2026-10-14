@@ -4,9 +4,12 @@ require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/stripe-connect.php';
 require_once SF_ROOT.'/api/stripe-merchant.php';
 require_once SF_ROOT.'/api/stripe-certification.php';
+require_once SF_ROOT.'/api/commerce-operations.php';
+require_once SF_ROOT.'/api/commerce-release-gates.php';
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';
 $admin=sf_admin_require_auth($write);
-if(!$write)sf_json_response(['ok'=>true,'stripe'=>sf_merchant_status(),'certification'=>sf_cert_status(),'csrf'=>sf_admin_csrf()]);
+if(!$write)sf_json_response(['ok'=>true,'stripe'=>sf_merchant_status(),'certification'=>sf_cert_status(),
+    'release'=>sf_commerce_release_snapshot((int)$admin['id']),'csrf'=>sf_admin_csrf()]);
 try{
  $body=sf_request_json();$action=(string)($body['action']??'');
  if($action==='cert_health'){

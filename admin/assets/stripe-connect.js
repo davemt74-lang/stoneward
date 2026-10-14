@@ -39,7 +39,17 @@ function certificationPanel(cert,s){
  '<div id="stripeCertHealthOutput" class="status-line" role="status"></div></section>';
 }
 
-function content(s,cert){
+function releasePanel(report){
+ const checks=Array.isArray(report?.checks)?report.checks:[];
+ const passed=Number(report?.passed||0),total=Number(report?.total||0);
+ const items=checks.map(c=>'<div class="stripe-wizard-step"><span class="stripe-wizard-number '+(c.state==='pass'?'done':'')+'">'+(c.state==='pass'?'✓':'!')+'</span><div><strong>'+esc(c.label||c.id)+'</strong><p>'+(c.state==='pass'?'Verified · ':'Blocked · ')+esc(c.detail||'')+'</p></div></div>').join('');
+ return '<section class="panel" id="stripeReleasePanel"><div class="panel-title"><div><h2>Commerce release readiness</h2><p>Read-only operational checks. No charge, refund, payout, fulfillment change, or Stripe account connection is triggered.</p></div><strong class="stripe-pill '+(passed===total&&total>0?'connected':'pending')+'">'+passed+' / '+total+' checks</strong></div>'+
+ '<div class="stripe-wizard-summary"><div><small>Test checkout</small><strong>'+(report?.test_activation_ready?'Ready by local evidence':'Blocked')+'</strong></div><div><small>Operations</small><strong>'+(report?.operations_clear?'Queue clear':'Needs review')+'</strong></div><div><small>Production charging</small><strong>Disabled</strong></div></div>'+
+ '<div class="notice"><strong>Live activation is not available.</strong><p>'+esc(report?.live_activation_reason||'A separate production acceptance is required.')+'</p></div>'+
+ '<div class="stripe-wizard-steps">'+items+'</div><p class="status-line">Webhook status covers at most 100 recent events; it is not an exhaustive reconciliation. Refresh to reassess the current store.</p>'+
+ '<div class="actions"><button type="button" id="stripeReleaseRefresh" class="secondary">Refresh release checks</button></div></section>';
+}
+function content(s,cert,release){
  const direct=s.provider==='direct', linked=!!s.connected, connect=s.provider==='connect', test=s.store_mode==='stripe_test';
  const canWebhook=direct&&!!s.webhook_url&&!s.webhook_ready;
  const steps=step(linked,1,'Create and verify your Stripe account',linked?'Verified merchant '+s.account_id:'Sign up in the official Stripe Dashboard; no Stripe account is required to prepare this wizard.')
@@ -70,7 +80,7 @@ function content(s,cert){
  '<p>If Stonefellow is later used as a platform serving other merchants, you can register a Stripe Connect application and use its official hosted authorization flow. Not required for a single artist.</p>'+
  (s.platform_ready&&!direct?'<button class="secondary" type="button" id="stripeConnect">Authorize with Stripe Connect ↗</button>':
  '<div class="notice">A Stripe Connect platform client ID and platform secret must first be configured on your own server. This does not link ChatGPT to Stripe.</div>')+
- '<p id="stripeConnectStatus" role="status" class="status-line"></p></details>'+certificationPanel(cert||{},s);
+ '<p id="stripeConnectStatus" role="status" class="status-line"></p></details>'+certificationPanel(cert||{},s)+releasePanel(release||{});
 }
 async function action(kind,body,element,message){
  if(element)element.disabled=true;
@@ -81,7 +91,8 @@ async function render(){
  ctx.canvas.innerHTML='<div class="canvas-head"><h1>Payments &amp; Stripe</h1></div><section class="panel">Checking merchant configuration…</section>';
  try{
   const res=await ctx.api('stripe-connect.php');const s=res.stripe||{};
-  ctx.canvas.innerHTML=content(s,res.certification||{});
+  ctx.canvas.innerHTML=content(s,res.certification||{},res.release||{});
+   const releaseRefresh=ui('stripeReleaseRefresh');if(releaseRefresh)releaseRefresh.onclick=()=>render();
   const backOrders=ui('stripeBackOrders');
   if(backOrders)backOrders.onclick=()=>ctx.openView('orders');
   const certMsg=()=>ui('stripeCertMessage');

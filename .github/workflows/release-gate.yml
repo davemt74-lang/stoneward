@@ -239,6 +239,7 @@ jobs:
           php tests/section75e8-stripe-order-isolation.php
           php tests/section76-commerce-operations.php
           php tests/section76b-dual-agent-commerce.php
+          php tests/section77-commerce-readiness.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
