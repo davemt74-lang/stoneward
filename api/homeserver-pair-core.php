@@ -87,7 +87,7 @@ function sf_hs_pair_redeem(string $id,string $verifier,int $now=0):array {
     $now=$now?:time();
     if(!preg_match('/^[a-f0-9]{48}$/D',$id)||!preg_match('/^[a-f0-9]{64}$/D',$verifier))
         throw new RuntimeException('Bad HomeServer pairing verifier.');
-    sf_hs_pair_schema();$db=sf_db();$db->beginTransaction();
+    sf_hs_pair_schema();sf_homeserver_link_schema();$db=sf_db();$db->beginTransaction();
     try{
         $sql="SELECT * FROM homeserver_pair_requests WHERE request_id=?".((string)(sf_db_config()['driver']??'')==='mysql'?' FOR UPDATE':'');
         $q=$db->prepare($sql);$q->execute([$id]);$r=$q->fetch();
