@@ -7,8 +7,25 @@ require_once __DIR__.'/commerce-operations.php';
  * Read-only snapshots: no Stripe network calls and no writes on Chat/Brain GET.
  */
 function sf_agent_commerce_admin_snapshot():array {
-    if(!function_exists('sf_admin_orders'))throw new RuntimeException('Admin commerce source unavailable.');
-    $snapshot=sf_commerce_ops_snapshot(sf_admin_orders());
+    $orders=[];
+    $available=false;
+    if(function_exists('sf_admin_orders')){
+        $orders=sf_admin_orders();
+        $available=true;
+    }elseif(function_exists('sf_fulfillment_recent_orders')&&function_exists('sf_read_order')){
+        foreach(sf_fulfillment_recent_orders(120) as $r){
+            $id=(string)($r['id']??'');
+            if(!preg_match('/^SF-[A-Z0-9-]+$/D',$id))continue;
+            $item=sf_read_order($id);
+            if($item&&sf_store_customer_order_visible($item))$orders[]=$item;
+        }
+        $available=true;
+    }
+    if(!$available)return [
+        'available'=>false,'summary'=>[],'total_attention'=>null,
+        'attention_orders'=>[],'source'=>'unavailable','reads_only'=>true
+    ];
+    $snapshot=sf_commerce_ops_snapshot($orders);
     $safe=[];
     foreach(array_slice((array)($snapshot['items']??[]),0,8) as $row){
         $safe[]=[
@@ -21,7 +38,7 @@ function sf_agent_commerce_admin_snapshot():array {
         ];
     }
     return [
-        'summary'=>(array)($snapshot['summary']??[]),
+        'available'=>true,'summary'=>(array)($snapshot['summary']??[]),
         'total_attention'=>(int)($snapshot['total_attention']??0),
         'attention_orders'=>$safe,
         'source'=>'commerce_operations',
