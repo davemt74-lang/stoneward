@@ -47,7 +47,7 @@ function content(s,cert){
  +step(!!s.webhook_ready,3,'Signed payment notifications','Stonefellow registers a webhook and stores the signing secret encrypted. It never trusts a browser success page as proof of payment.')
  +step(!!s.sandbox_certified,4,'Complete real sandbox acceptance','Successful and declined test purchases, signed notifications, and refunds must be verified against Stripe before activation.')
  +step(!!s.payments_enabled,5,'Enable test checkout','Test payments are a separate explicit action. Live payments are never enabled by this wizard.');
- return '<div class="canvas-head"><div><div class="eyebrow">ECOMMERCE · PAYMENTS</div><h1>Connect Stripe</h1><p>Set up direct merchant payments for the Stonefellow single-artist store. Optional Connect is available for registered platforms.</p></div><div class="actions"><a class="secondary" href="index.php?view=orders">Back to orders →</a></div></div>'+
+ return '<div class="canvas-head"><div><div class="eyebrow">ECOMMERCE · PAYMENTS</div><h1>Connect Stripe</h1><p>Set up direct merchant payments for the Stonefellow single-artist store. Optional Connect is available for registered platforms.</p></div><div class="actions"><button type="button" class="secondary" id="stripeBackOrders">Back to orders →</button></div></div>'+
  '<section class="panel sf-stripe-onboarding"><div class="panel-title"><div><h2>Stripe setup checklist</h2><p>Nothing goes live until payments and refunds have passed the required tests.</p></div><span class="stripe-pill '+(linked?'connected':'pending')+'">'+(linked?'Merchant verified':'Not connected')+'</span></div><div class="stripe-wizard-steps">'+steps+'</div>'+
  '<div class="notice"><strong>Recommended: direct Stripe account</strong><p>Stripe Connect authorization is for platforms. A standalone merchant cannot obtain a no-credentials authorization popup without registering a Stripe Connect application. Stripe hosts your account creation and customer checkout either way.</p></div></section>'+
  '<section class="panel"><div class="panel-title"><h2>1 · Create your Stripe account</h2><p>Official Stripe website</p></div><div class="actions"><a class="primary" target="_blank" rel="noopener noreferrer" href="'+stripeSignup+'">Create Stripe account ↗</a><a class="secondary" target="_blank" rel="noopener noreferrer" href="https://dashboard.stripe.com/">Open Stripe Dashboard ↗</a></div>'+
@@ -82,6 +82,8 @@ async function render(){
  try{
   const res=await ctx.api('stripe-connect.php');const s=res.stripe||{};
   ctx.canvas.innerHTML=content(s,res.certification||{});
+  const backOrders=ui('stripeBackOrders');
+  if(backOrders)backOrders.onclick=()=>ctx.openView('orders');
   const certMsg=()=>ui('stripeCertMessage');
   const begin=ui('stripeCertBegin');
   if(begin)begin.onclick=async()=>{

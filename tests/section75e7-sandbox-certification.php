@@ -120,6 +120,8 @@ $admin=file_get_contents($root.'/admin/api/stripe-connect.php');
 $ui=file_get_contents($root.'/admin/assets/stripe-connect.js');
 ok7(str_contains($gateway,"certification_probe")&&str_contains($gateway,"sf_cert_probe_context_valid"),
     'Certification orders are isolated from customer fulfillment and payment activation');
+ok7(str_contains($ui,'stripeBackOrders')&&str_contains($ui,"ctx.openView('orders')"),
+    'Certification wizard returns directly to existing Orders canvas');
 ok7(str_contains($admin,"'cert_verify'")&&str_contains($admin,"'cert_finalize'")&&str_contains($ui,'stripeCertCreate'),
     'Admin certification wizard is connected to server evidence verification and test checkout');
 ok7(str_contains(file_get_contents($root.'/api/stripe-merchant.php'),'payment_intent.payment_failed'),
