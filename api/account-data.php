@@ -322,13 +322,28 @@ function sf_account_library_add_order(int $userId,array $order): void {
         // Defense in depth: retain the module-specific check used by older integrations.
         if($type==='turntable_module'&&!in_array((string)($order['payment']['status']??''),['paid','simulated_paid','test_paid'],true) && (string)($order['payment']['status']??'')!=='succeeded')continue;
         // The paid-order gate above protects all other purchases as well.
-        $key=(string)($item['module_id']??$item['track_id']??$item['package_id']??'');
+        $key=(string)($item['module_id']??$item['track_id']??$item['release_id']??$item['package_id']??'');
         if($key==='') $key=$type==='custom_media'?$orderId.':'.(string)($item['format']??'custom'):$orderId.':'.substr(hash('sha256',json_encode($item)?:''),0,16);
         $label=sf_clean_text($item['label']??ucfirst(str_replace('_',' ',$type)),240);
         $meta=json_encode($item,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}';
         try{
             $q=$pdo->prepare('INSERT INTO user_library(user_id,item_type,item_key,label,source_order_id,metadata_json,acquired_at) VALUES(?,?,?,?,?,?,?)');
             $q->execute([$userId,$type,$key,$label,$orderId,$meta,$when]);
+            // A paid digital album unlocks streaming/downloading of its own
+            // tracks, without multiplying its single per-song print credit.
+            if($type==='release'){
+                $snap=(array)($item['track_ids']??[]);
+                foreach(array_unique(array_map('strval',$snap)) as $trackId){
+                    if(!preg_match('/^[a-zA-Z0-9_-]{1,100}$/D',$trackId))continue;
+                    $grant=$pdo->prepare('INSERT INTO user_library(user_id,item_type,item_key,label,source_order_id,metadata_json,acquired_at) VALUES(?,?,?,?,?,?,?)');
+                    try{
+                        $grant->execute([$userId,'track',$trackId,$trackId,$orderId,
+                            json_encode(['from_release'=>(string)($item['release_id']??''),'digital'=>true],JSON_THROW_ON_ERROR),$when]);
+                    }catch(PDOException $e){
+                        if(!in_array((string)$e->getCode(),['23000','19'],true))throw $e;
+                    }
+                }
+            }
         }catch(PDOException $e){
             // Duplicate order import/library write is idempotent.
             if((string)$e->getCode()!=='23000' && (string)$e->getCode()!=='19') throw $e;
