@@ -12,6 +12,9 @@ function sf_agent_tool_registry(): array {
         'favorite_track'=>['label'=>'Favorite a track','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/personalization.php','handler'=>'set_favorite','confirmation'=>true,'execution'=>'authenticated_api'],
         'create_playlist'=>['label'=>'Create a playlist','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/playlists.php','handler'=>'create','confirmation'=>true,'execution'=>'authenticated_api'],
         'queue_track'=>['label'=>'Change player queue','kind'=>'local_action','scope'=>'fan','owner'=>'assets/js/app.js','handler'=>'executeAgentAction','confirmation'=>false,'execution'=>'browser'],
+        'commerce_aggregate'=>['label'=>'Store payment, refund and fulfillment queue','kind'=>'read','scope'=>'admin','owner'=>'api/agent-commerce-bridge.php','handler'=>'sf_agent_commerce_admin_snapshot','confirmation'=>false,'execution'=>'server'],
+        'commerce_followup_add'=>['label'=>'Save exactly approved customer order follow-up','kind'=>'write','scope'=>'admin','owner'=>'api/commerce-operations.php','handler'=>'sf_commerce_ops_update','confirmation'=>true,'execution'=>'governed_admin_api'],
+        'customer_order_status'=>['label'=>'Read only signed-in customer order status','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/agent-commerce-bridge.php','handler'=>'sf_agent_commerce_customer_snapshot','confirmation'=>false,'execution'=>'server'],
         'crm_aggregate'=>['label'=>'CRM aggregate overview','kind'=>'read','scope'=>'admin','owner'=>'api/crm-core.php','handler'=>'sf_crm_admin_summary','confirmation'=>false,'execution'=>'server'],
         'campaign_aggregate'=>['label'=>'Campaign aggregate overview','kind'=>'read','scope'=>'admin','owner'=>'api/campaign-core.php','handler'=>'sf_campaign_admin_summary','confirmation'=>false,'execution'=>'server'],
         'campaign_graph_validate'=>['label'=>'Validate campaign node graph','kind'=>'read','scope'=>'admin','owner'=>'api/campaign-core.php','handler'=>'sf_campaign_graph_validate','confirmation'=>false,'execution'=>'server'],
@@ -49,6 +52,6 @@ function sf_agent_tool_allowed(string $toolId,string $role,bool $confirmed=false
  * Sending, publishing, purchasing and deletes remain in owner-controlled UI.
  */
 function sf_agent_tool_executable(string $toolId,string $role,bool $confirmed=false): bool {
-    if(!in_array($toolId,['campaign_draft_save','automation_draft_save'],true))return false;
+    if(!in_array($toolId,['campaign_draft_save','automation_draft_save','commerce_followup_add'],true))return false;
     return sf_agent_tool_allowed($toolId,$role,$confirmed);
 }

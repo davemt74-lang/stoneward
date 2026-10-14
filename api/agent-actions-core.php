@@ -71,6 +71,26 @@ function sf_agent_action_normalize_automation(array $input): array {
         'max_runs_per_contact'=>max(1,min(100,(int)($input['max_runs_per_contact']??3)))
     ];
 }
+function sf_agent_action_normalize_commerce_followup(array $input):array {
+    require_once __DIR__.'/agent-commerce-bridge.php';
+    $id=strtoupper(trim((string)($input['order_id']??'')));
+    $note=trim((string)($input['note']??''));
+    $priority=(string)($input['priority']??'normal');
+    $due=(string)($input['due_date']??'');
+    if(!preg_match('/^SF-[A-Z0-9-]+$/D',$id)||str_starts_with($id,'SF-CERT-'))
+        throw new InvalidArgumentException('A real customer order is required.');
+    $order=sf_read_order($id);
+    if(!$order||!sf_store_customer_order_visible($order))
+        throw new InvalidArgumentException('Customer order could not be verified.');
+    if($note===''||strlen($note)>600)
+        throw new InvalidArgumentException('Note must be 1–600 bytes.');
+    if(!in_array($priority,['normal','high'],true))
+        throw new InvalidArgumentException('Unsupported priority.');
+    if($due!==''&&(!preg_match('/^\d{4}-\d{2}-\d{2}$/D',$due)
+      ||date('Y-m-d',strtotime($due)?:0)!==$due))
+        throw new InvalidArgumentException('Invalid due date.');
+    return ['order_id'=>$id,'note'=>$note,'priority'=>$priority,'due_date'=>$due];
+}
 function sf_agent_action_hash(string $toolId,array $payload): string {
     return hash('sha256',$toolId.'|'.json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
 }
@@ -101,7 +121,7 @@ function sf_agent_action_recent(int $adminId,int $limit=25): array {
 function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,array $raw): array {
     if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
     if(!sf_agent_tool_executable($toolId,'admin',true))throw new InvalidArgumentException('Action is not available for governed preparation.');
-    $payload=$toolId==='automation_draft_save'?sf_agent_action_normalize_automation($raw):sf_agent_action_normalize_campaign($raw);$hash=sf_agent_action_hash($toolId,$payload);
+    $payload=match($toolId){'automation_draft_save'=>sf_agent_action_normalize_automation($raw),'commerce_followup_add'=>sf_agent_action_normalize_commerce_followup($raw),default=>sf_agent_action_normalize_campaign($raw)};$hash=sf_agent_action_hash($toolId,$payload);
     $payloadJson=json_encode($payload,JSON_THROW_ON_ERROR);
     if(strlen($payloadJson)>131072)throw new InvalidArgumentException('Campaign proposal exceeds the permitted size.');
     sf_agent_actions_ensure_schema();$db=sf_db();
@@ -205,6 +225,20 @@ function sf_agent_action_execute(int $adminId,string $id): array {
             $campaign=sf_agent_action_normalize_campaign((array)$p['payload']);
             $result=sf_campaign_save($campaign,$adminId);
             $public=['campaign_id'=>(int)$result['id'],'status'=>'draft','name'=>(string)$result['name']];
+        }elseif($p['tool_id']==='commerce_followup_add'){
+            require_once __DIR__.'/commerce-operations.php';
+            $draft=sf_agent_action_normalize_commerce_followup((array)$p['payload']);
+            // Stable idempotency key across crash after effect, before receipt.
+            $items=sf_commerce_ops_update($draft['order_id'],$adminId,'add_followup',[
+                'request_key'=>'agent_'.$p['id'],'note'=>$draft['note'],
+                'priority'=>$draft['priority'],'due_date'=>$draft['due_date']
+            ]);
+            $digest=hash('sha256',$draft['order_id'].'|'.'agent_'.$p['id']);
+            $match=null;
+            foreach($items as $item)if(($item['request_hash']??'')===$digest)$match=$item;
+            if(!$match)throw new RuntimeException('Follow-up result receipt missing.');
+            $public=['order_id'=>$draft['order_id'],'followup_id'=>(string)$match['id'],
+                'status'=>(string)$match['status']];
         }else throw new RuntimeException('This tool cannot be executed here.');
         $finish=$db->prepare("UPDATE agent_action_proposals SET status='completed',result_json=?,executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'");
         $finish->execute([json_encode($public,JSON_THROW_ON_ERROR),gmdate('c'),$id,$adminId]);
@@ -212,7 +246,7 @@ function sf_agent_action_execute(int $adminId,string $id): array {
     }catch(Throwable $e) {
         $db->prepare("UPDATE agent_action_proposals SET status='review_required',executed_at=? WHERE id=? AND admin_user_id=? AND status='executing'")
            ->execute([gmdate('c'),$id,$adminId]);
-        throw new RuntimeException('Action did not complete with confirmed results. Review the campaign list before retrying.');
+        throw new RuntimeException('Action did not complete with confirmed results. Review the destination Admin workspace before retrying.');
     }
     return sf_agent_action_get($adminId,$id);
 }

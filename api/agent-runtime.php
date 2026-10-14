@@ -113,6 +113,11 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
     if(in_array($profile,['commerce','crm','recommendation','catalog'],true)&&function_exists('sf_campaign_live_summaries')){$campaignLines=[];foreach(sf_campaign_live_summaries(10) as $campaign){$campaignLines[]='- slug='.$campaign['slug'].' | '.$campaign['name'].' | goal '.$campaign['goal'].' | '.$campaign['headline'].' | offers '.implode(', ',$campaign['offers']);}if($campaignLines)$sections[]="ACTIVE CAMPAIGNS\n".implode("\n",$campaignLines);}
     if($profile==='commerce'&&function_exists('sf_commerce_agent_context')){$merch=sf_commerce_agent_context();if($merch!=='')$sections[]=$merch;}
     if(function_exists('sf_ticket_agent_context')&&in_array($profile,['catalog','commerce','account'],true)){$tickets=sf_ticket_agent_context($userId>0?$userId:null);if($tickets!=='')$sections[]=$tickets;}
+    if($userId>0&&in_array($profile,['commerce','account','crm'],true)){
+        require_once __DIR__.'/agent-commerce-bridge.php';
+        $customerOrders=sf_agent_commerce_customer_context($userId);
+        if($customerOrders!=='')$sections[]=$customerOrders;
+    }
     if($userId>0&&function_exists('sf_fulfillment_agent_context')&&in_array($profile,['commerce','account','crm'],true)){$orders=sf_fulfillment_agent_context($userId);if($orders!=='')$sections[]=$orders;}
     if($profile==='commerce')$sections[]="COMMERCE POLICY\nThe agent may explain live merchandise availability, products, active campaigns, ticket/VIP offers, reservation eligibility, and the signed-in fan's own order/shipment/refund status, but it may not complete a purchase, reserve ticket capacity, check in guests, reserve inventory, ship an order, confirm/refuse a refund, restock a return, close a support case, or charge money. Checkout and reservations remain user-confirmed UI actions.";
     if($profile==='account')$sections[]="ACCOUNT POLICY\nThe agent may explain plans, membership benefits, VIP access, Active Tokens and account navigation, but must not expose other users or administrator-only data.";
