@@ -251,12 +251,38 @@ function sf_campaign_audience_contacts(array $campaign,int $limit=1000): array {
 function sf_campaign_marketing_unsubscribe_link(array $contact): string {
     $raw=bin2hex(random_bytes(24));$hash=hash('sha256',$raw);sf_db()->prepare('UPDATE fan_contacts SET unsubscribe_token_hash=?,updated_at=? WHERE id=?')->execute([$hash,gmdate('c'),(int)$contact['id']]);$base=sf_public_base_url();return ($base!==''?$base:'').'/?view=newsletter&unsubscribe='.rawurlencode($raw);
 }
+/** Fresh CRM consent at the actual delivery boundary, not initial segment selection. */
+function sf_campaign_send_recipient_allowed(array $candidate,?array $current): bool {
+    if(!$current||empty($current['marketing_opt_in'])
+        ||!empty($current['unsubscribed_at'])||empty($current['id']))return false;
+    if((int)($candidate['id']??0)!==(int)$current['id'])return false;
+    $old=strtolower(trim((string)($candidate['email']??'')));
+    $email=strtolower(trim((string)($current['email']??'')));
+    if($old===''||!filter_var($email,FILTER_VALIDATE_EMAIL)
+        ||!hash_equals($old,$email))return false;
+    return true;
+}
 function sf_campaign_send_email_node(array $campaign,string $nodeId,int $adminId,bool $confirmed=false): array {
     if(!$confirmed)throw new RuntimeException('Campaign email send requires explicit Admin confirmation.');if(($campaign['status']??'')!=='published')throw new RuntimeException('Publish the campaign before sending campaign email.');
     $node=sf_campaign_find_node($campaign,$nodeId);if(!$node||($node['type']??'')!=='email')throw new InvalidArgumentException('Email node not found.');$cfg=(array)($node['config']??[]);$subject=sf_clean_text($cfg['subject']??'',255);$body=sf_clean_text($cfg['body']??'',20000);if($subject===''||$body==='')throw new InvalidArgumentException('Email subject and body are required.');
-    $contacts=array_values(array_filter(sf_campaign_audience_contacts($campaign,2000),fn($c)=>!empty($c['marketing_opt_in'])));$now=gmdate('c');$q=sf_db()->prepare('INSERT INTO campaign_message_runs(campaign_id,node_id,admin_user_id,status,total_recipients,sent_count,failed_count,started_at,completed_at,details_json) VALUES(?,?,?,"running",?,0,0,?,NULL,?)');$q->execute([(int)$campaign['id'],$nodeId,$adminId?:null,count($contacts),$now,sf_campaign_json(['subject'=>$subject])]);$runId=(int)sf_db()->lastInsertId();$sent=0;$failed=0;
-    foreach($contacts as $c){try{$unsubscribe=sf_campaign_marketing_unsubscribe_link($c);$full=$body."\n\nUnsubscribe: ".$unsubscribe;$r=sf_transactional_email((int)($c['user_id']??0),(string)$c['email'],$subject,$full,'campaign_marketing');if(in_array((string)($r['status']??''),['sent','logged','queued'],true))$sent++;else$failed++;sf_campaign_log_event((int)$campaign['id'],'campaign_email_sent',null,(int)$c['id'],$nodeId,['run_id'=>$runId,'status'=>$r['status']??'']);}catch(Throwable $e){$failed++;}}
-    sf_db()->prepare('UPDATE campaign_message_runs SET status=?,sent_count=?,failed_count=?,completed_at=? WHERE id=?')->execute([$failed?'completed_with_errors':'completed',$sent,$failed,gmdate('c'),$runId]);sf_log_admin_action($adminId,'campaign_email_sent','campaign',(string)$campaign['id'],['node_id'=>$nodeId,'recipients'=>count($contacts),'sent'=>$sent,'failed'=>$failed]);return ['run_id'=>$runId,'total'=>count($contacts),'sent'=>$sent,'failed'=>$failed];
+    $contacts=array_values(array_filter(sf_campaign_audience_contacts($campaign,2000),fn($c)=>!empty($c['marketing_opt_in'])));$now=gmdate('c');$q=sf_db()->prepare('INSERT INTO campaign_message_runs(campaign_id,node_id,admin_user_id,status,total_recipients,sent_count,failed_count,started_at,completed_at,details_json) VALUES(?,?,?,"running",?,0,0,?,NULL,?)');$q->execute([(int)$campaign['id'],$nodeId,$adminId?:null,count($contacts),$now,sf_campaign_json(['subject'=>$subject])]);$runId=(int)sf_db()->lastInsertId();$sent=0;$failed=0;$skipped=0;
+    foreach($contacts as $c){
+        try{
+            $current=sf_crm_contact_by_id((int)($c['id']??0));
+            if(!sf_campaign_send_recipient_allowed($c,$current)){$skipped++;continue;}
+            $unsubscribe=sf_campaign_marketing_unsubscribe_link($current);
+            $full=$body."\n\nUnsubscribe: ".$unsubscribe;
+            $r=sf_transactional_email((int)($current['user_id']??0),(string)$current['email'],$subject,$full,'campaign_marketing');
+            if(in_array((string)($r['status']??''),['sent','logged','queued'],true))$sent++;else$failed++;
+            sf_campaign_log_event((int)$campaign['id'],'campaign_email_sent',null,(int)$current['id'],$nodeId,['run_id'=>$runId,'status'=>$r['status']??'']);
+        }catch(Throwable $e){$failed++;}
+    }
+    sf_db()->prepare('UPDATE campaign_message_runs SET status=?,sent_count=?,failed_count=?,completed_at=?,details_json=? WHERE id=?')
+        ->execute([$failed?'completed_with_errors':'completed',$sent,$failed,gmdate('c'),
+            sf_campaign_json(['subject'=>$subject,'skipped_opt_out_or_changed'=>$skipped]),$runId]);
+    sf_log_admin_action($adminId,'campaign_email_sent','campaign',(string)$campaign['id'],
+        ['node_id'=>$nodeId,'recipients'=>count($contacts),'sent'=>$sent,'failed'=>$failed,'skipped'=>$skipped]);
+    return ['run_id'=>$runId,'total'=>count($contacts),'sent'=>$sent,'failed'=>$failed,'skipped'=>$skipped];
 }
 function sf_campaign_set_session_attribution(array $campaign,array $participant): void {
     sf_user_session();$_SESSION['sf_campaign_attribution']=['campaign_id'=>(int)$campaign['id'],'participant_id'=>(int)($participant['id']??0),'contact_id'=>(int)($participant['contact_id']??0),'set_at'=>time(),'expires_at'=>time()+604800];

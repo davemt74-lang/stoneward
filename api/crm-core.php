@@ -45,14 +45,35 @@ function sf_crm_merge_contacts(int $keepId,int $dropId): void {
         $pdo->commit();
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 }
+/**
+ * Section 82: a merged CRM identity must not silently restore marketing consent.
+ * A newsletter signup is an explicit fresh opt-in; ordinary account/order merges
+ * with null consent preserve the most restrictive historical decision.
+ */
+function sf_crm_merge_consent(array $primary,array $secondary,?bool $explicit=null): array {
+    $unsubPrimary=(string)($primary['unsubscribed_at']??'');
+    $unsubSecondary=(string)($secondary['unsubscribed_at']??'');
+    $opted=(bool)($primary['marketing_opt_in']??false)||(bool)($secondary['marketing_opt_in']??false);
+    if($explicit===true)return ['opt_in'=>1,'opted_at'=>gmdate('c'),'unsubscribed_at'=>null];
+    if($explicit===false)return ['opt_in'=>0,'opted_at'=>null,'unsubscribed_at'=>gmdate('c')];
+    if($unsubPrimary!==''||$unsubSecondary!==''){
+        return ['opt_in'=>0,'opted_at'=>null,
+            'unsubscribed_at'=>$unsubPrimary!==''?$unsubPrimary:$unsubSecondary];
+    }
+    return ['opt_in'=>$opted?1:0,
+        'opted_at'=>$opted?(string)(($primary['marketing_opt_in_at']??null)?: (($secondary['marketing_opt_in_at']??null)?:gmdate('c'))):null,
+        'unsubscribed_at'=>null];
+}
 function sf_crm_upsert_contact(string $email,string $name='',string $source='account',?int $userId=null,?bool $marketingOptIn=null,string $status=''): array {
     sf_crm_ensure_schema();$email=sf_crm_email($email);if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('A valid email address is required.');
     $name=sf_clean_text($name,120);$source=sf_clean_text($source,60);$now=gmdate('c');$byUser=$userId?sf_crm_contact_by_user($userId):null;$byEmail=sf_crm_contact_by_email($email);
     if($byUser&&$byEmail&&(int)$byUser['id']!==(int)$byEmail['id']){
         $keep=(int)$byUser['id'];$drop=(int)$byEmail['id'];
-        $opt=(int)$byUser['marketing_opt_in']||(int)$byEmail['marketing_opt_in'];
+        $consent=sf_crm_merge_consent($byUser,$byEmail,$marketingOptIn);
         sf_crm_merge_contacts($keep,$drop);$byUser=sf_crm_contact_by_id($keep);
-        sf_db()->prepare('UPDATE fan_contacts SET marketing_opt_in=?,marketing_opt_in_at=COALESCE(marketing_opt_in_at,?),updated_at=? WHERE id=?')->execute([$opt,$opt?$now:null,$now,$keep]);
+        sf_db()->prepare('UPDATE fan_contacts SET marketing_opt_in=?,marketing_opt_in_at=?,unsubscribed_at=?,unsubscribe_token_hash=?,updated_at=? WHERE id=?')
+            ->execute([$consent['opt_in'],$consent['opted_at'],$consent['unsubscribed_at'],
+                $consent['opt_in']?($byUser['unsubscribe_token_hash']??null):null,$now,$keep]);
         $byEmail=null;
     }
     $row=$byUser?:$byEmail;
