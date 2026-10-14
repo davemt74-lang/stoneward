@@ -54,6 +54,6 @@ $ui=file_get_contents(dirname(__DIR__).'/admin/assets/stripe-connect.js');
 $connect=file_get_contents(dirname(__DIR__).'/api/stripe-connect.php');
 c77(str_contains($endpoint,'sf_admin_require_auth($write)')&&str_contains($endpoint,'sf_commerce_release_snapshot((int)$admin'), 'Readiness endpoint uses existing Admin authentication');
 c77(str_contains($ui,'stripeReleasePanel')&&str_contains($ui,'releasePanel(release||{})'), 'Readiness panel integrated in original Stripe canvas');
-c77(str_contains($connect,"!empty($known['has_more'])")&&str_contains($connect,'array_key_exists(\'data\',$known)'), 'Incomplete Connect webhook discovery must fail closed');
+c77(str_contains($connect,'!empty($known[\'has_more\'])')&&str_contains($connect,'array_key_exists(\'data\',$known)'), 'Incomplete Connect webhook discovery must fail closed');
 echo 'Section 77 commerce readiness: '.$passed.'/'.($passed+$failed).' checks'.PHP_EOL;
 exit($failed?1:0);
