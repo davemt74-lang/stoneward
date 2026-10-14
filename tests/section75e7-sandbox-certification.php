@@ -3,6 +3,7 @@ declare(strict_types=1);
 /** 75E7: Stripe certification acceptance, entirely mocked; no external API calls. */
 $root=dirname(__DIR__);
 $state=['mode'=>'stripe_test','account'=>'acct_StoneTest0123','webhook'=>'we_StoneTest0123','key'=>'enc_test_key','secret'=>'enc_whsec_test','cert'=>[]];
+$state['cert']['billing.stripe_direct_mode']='test';
 $GLOBALS['state']=$state;$GLOBALS['calls']=[];$GLOBALS['orders']=[];$GLOBALS['events']=[];$GLOBALS['sessions']=[];$GLOBALS['refunds']=[];
 $pdo=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
 $pdo->exec('CREATE TABLE billing_webhook_events (event_id TEXT PRIMARY KEY,provider TEXT,event_type TEXT,status TEXT,payload_sha256 TEXT,created_at TEXT)');
