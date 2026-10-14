@@ -61,7 +61,7 @@ function sf_crm_merge_consent(array $primary,array $secondary,?bool $explicit=nu
             'unsubscribed_at'=>$unsubPrimary!==''?$unsubPrimary:$unsubSecondary];
     }
     return ['opt_in'=>$opted?1:0,
-        'opted_at'=>$opted?(string)($primary['marketing_opt_in_at']?:($secondary['marketing_opt_in_at']?:gmdate('c'))):null,
+        'opted_at'=>$opted?(string)(($primary['marketing_opt_in_at']??null)?: (($secondary['marketing_opt_in_at']??null)?:gmdate('c'))):null,
         'unsubscribed_at'=>null];
 }
 function sf_crm_upsert_contact(string $email,string $name='',string $source='account',?int $userId=null,?bool $marketingOptIn=null,string $status=''): array {
