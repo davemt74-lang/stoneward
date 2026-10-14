@@ -37,11 +37,11 @@ try{
      sf_ai_meta_set('billing.mode','test');
      sf_ai_meta_set('billing.provider','stripe');
      sf_ai_meta_set('billing.stripe_enabled','1');
-     sf_json_response(['ok'=>true,'stripe'=>sf_connect_public_status()]);
+     sf_json_response(['ok'=>true,'stripe'=>sf_merchant_status()]);
  }
  if($action==='disable'){
      sf_ai_meta_set('billing.stripe_enabled','0');
-     sf_json_response(['ok'=>true,'stripe'=>sf_connect_public_status()]);
+     sf_json_response(['ok'=>true,'stripe'=>sf_merchant_status()]);
  }
  sf_json_response(['ok'=>false,'message'=>'Unsupported Stripe connection action.'],422);
 }catch(InvalidArgumentException|RuntimeException $e){

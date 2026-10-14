@@ -108,6 +108,8 @@ e6(str_contains($billing,"if(".$dollar."settings['provider']==='test')return")
 e6(str_contains($billing,"billing.stripe_direct_account_id")
     &&str_contains($billing,"billing.stripe_sandbox_certified"),
     'Legacy billing configuration cannot bypass a direct merchant sandbox acceptance gate');
+e6(substr_count($api,"sf_json_response(['ok'=>true,'stripe'=>sf_merchant_status()]);")>=2,
+ 'Payment enable and disable responses share the same direct-merchant status contract');
 e6(str_contains($api,"'sandbox_certified'")&&str_contains($api,"'can_enable_test'"),
  'Test payment activation remains gated by certification');
 e6(str_contains($ui,'stripeDirectKeyForm')&&str_contains($ui,'keyForm.reset()'),
