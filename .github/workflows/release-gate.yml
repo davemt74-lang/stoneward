@@ -282,4 +282,6 @@ jobs:
         env:
           SF_E2_DB_USER: stonefellow
           SF_E2_DB_PASS: stonefellow
-        run: php tests/section75e2-mysql-commerce.php
+        run: |
+          SF_E4_EPHEMERAL=yes php tests/section75e4-mysql-legacy-upgrade.php
+          php tests/section75e2-mysql-commerce.php
