@@ -49,6 +49,7 @@ function sf_billing_settings_save(array $data): array {
     $secret=trim((string)($data['stripe_secret_key']??''));if($secret!==''){$secretPayload=sf_ai_encrypt($secret);$secretHint=sf_ai_hint($secret);}if(!empty($data['clear_stripe_secret'])){$secretPayload='';$secretHint='';$enabled=false;}
     $webhook=trim((string)($data['stripe_webhook_secret']??''));if($webhook!==''){$webhookPayload=sf_ai_encrypt($webhook);$webhookHint=sf_ai_hint($webhook);}if(!empty($data['clear_webhook_secret'])){$webhookPayload='';$webhookHint='';}
     if($enabled&&(($secretPayload===''&&!sf_connect_active())||$webhookPayload===''))throw new InvalidArgumentException('Stripe requires both the secret API key and webhook signing secret before it can be enabled.');
+    if($enabled&&sf_ai_meta_get('billing.stripe_direct_account_id','')!==''&&sf_ai_meta_get('billing.stripe_sandbox_certified','0')!=='1')throw new InvalidArgumentException('Direct merchant cannot be activated before independently verified Stripe sandbox payment and refund acceptance.');
     sf_ai_meta_set('billing.mode',$mode);sf_ai_meta_set('billing.provider',$provider);sf_ai_meta_set('billing.stripe_enabled',$enabled?'1':'0');sf_ai_meta_set('billing.stripe_secret_payload',$secretPayload);sf_ai_meta_set('billing.stripe_key_hint',$secretHint);sf_ai_meta_set('billing.stripe_webhook_payload',$webhookPayload);sf_ai_meta_set('billing.stripe_webhook_hint',$webhookHint);return sf_billing_settings();
 }
 function sf_billing_secret(string $key): string {$payload=sf_ai_meta_get($key,'');return $payload===''?'':sf_ai_decrypt($payload);}
@@ -57,7 +58,12 @@ function sf_stripe_secret(): string {
     return sf_billing_secret('billing.stripe_secret_payload');
 }
 function sf_stripe_webhook_secret(): string { return sf_billing_secret('billing.stripe_webhook_payload'); }
-function sf_stripe_configured(): bool {$s=sf_billing_settings();return $s['provider']==='stripe'&&$s['stripe_enabled']&&$s['stripe_key_configured']&&$s['stripe_webhook_configured'];}
+function sf_stripe_configured(): bool {
+    if(sf_ai_meta_get('billing.stripe_direct_account_id','')!==''
+       &&sf_ai_meta_get('billing.stripe_sandbox_certified','0')!=='1')return false;
+    $s=sf_billing_settings();
+    return $s['provider']==='stripe'&&$s['stripe_enabled']&&$s['stripe_key_configured']&&$s['stripe_webhook_configured'];
+}
 function sf_http_form_request(string $method,string $url,array $headers=[],array $fields=[]): array {
     $body=http_build_query($fields,'','&',PHP_QUERY_RFC3986);$method=strtoupper($method);
     if(function_exists('curl_init')){
