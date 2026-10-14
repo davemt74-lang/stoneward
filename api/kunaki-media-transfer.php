@@ -7,6 +7,7 @@ declare(strict_types=1);
  */
 require_once __DIR__.'/kunaki-publishing-jobs.php';
 require_once __DIR__.'/vinyl-print-licenses.php';
+require_once __DIR__.'/vinyl-production-gates.php';
 const SF_KUNAKI_MEDIA_MAX_BYTES = 268435456; // 256 MiB/file
 const SF_KUNAKI_MEDIA_MAX_TOTAL = 1073741824; // 1 GiB/job
 function sf_kunaki_media_resolve(string $reference,string $role,?callable $lookup=null):array {
@@ -124,6 +125,12 @@ function sf_kunaki_media_lease_job(string $jobId,string $worker,string $lease):a
            ||!hash_equals((string)($job['lease_token']??''),$lease)
            ||!sf_vinyl_worker_job_allowed($job,$jobs))
             throw new RuntimeException('Media lease revoked, exhausted or no longer paid.');
+        $order=sf_read_order((string)$job['order_id']);
+        if(!is_array($order))throw new RuntimeException('Missing purchased artwork snapshot.');
+        $proof=sf_vinyl_production_proof($order,(defined('SF_ROOT')?SF_ROOT:dirname(__DIR__)).'/storage');
+        if(empty($proof['ready'])||!hash_equals((string)($job['proof_sha256']??''),
+                (string)($proof['fingerprint']??'')))
+            throw new RuntimeException('Protected vinyl design no longer matches its approval.');
         return [$job,false];
     });
 }
