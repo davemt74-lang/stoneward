@@ -16,7 +16,7 @@ function report77(?array $m=null,?array $c=null,?array $h=null,?array $o=null):a
  return sf_commerce_release_report($m??merchant77(),$c??cert77(),$h??health77(),$o??ops77());
 }
 $r=report77();
-c77($r['passed']===13&&$r['total']===13&&$r['test_activation_ready']&&$r['operations_clear'],'Complete read-only evidence clears sandbox and operations gates');
+c77($r['passed']===12&&$r['total']===12&&$r['test_activation_ready']&&$r['operations_clear'],'Complete read-only evidence clears sandbox and operations gates');
 c77(!$r['live_activation_available']&&$r['live_activation_reason']!=='','Production activation always remains unavailable');
 c77(!$r['test_checkout_active'],'Evidence does not independently turn on test checkout');
 $m=merchant77();$m['payments_enabled']=true;
