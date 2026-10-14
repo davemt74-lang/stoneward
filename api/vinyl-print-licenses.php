@@ -224,3 +224,34 @@ function sf_kunaki_job_enqueue_licensed(array $job):array {
         return [$job,true];
     });
 }
+
+/** Production worker never leases a job whose paid entitlement or licensed
+ * balance has changed since it was queued. This blocks refund-before-publish.
+ * No rights consumed automatically after publishing: an ambiguous job stays
+ * reserved pending an authorized reconciliation.
+ */
+function sf_vinyl_worker_job_allowed(array $job,array $jobs):bool {
+    try{
+        if(($job['license_reservation']??'')!=='one_per_track_this_pressing'
+            ||(int)($job['owner_id']??0)<1||empty($job['license_track_ids']))return false;
+        $order=sf_read_order((string)($job['order_id']??''));
+        if(!is_array($order)||!sf_kunaki_live_purchase_confirmed($order,true)
+            ||(int)$order['user_id']!==(int)$job['owner_id'])return false;
+        $verified=sf_kunaki_publishing_verified_tracks($order,(int)($job['item_index']??-1));
+        $ids=array_values(array_map(static fn($v)=>(string)$v['track_id'],$verified));
+        if($ids!==array_values((array)$job['license_track_ids']))return false;
+        $owner=(int)$job['owner_id'];
+        $library=sf_account_library($owner);$orders=[];
+        foreach($library as $entry){
+            $sourceId=(string)($entry['source_order_id']??'');
+            if($sourceId!==''&&!array_key_exists($sourceId,$orders))
+                $orders[$sourceId]=sf_read_order($sourceId);
+        }
+        $balances=sf_vinyl_license_balances($owner,$library,$orders,$jobs);
+        foreach($ids as $id){
+            $b=$balances[$id]??null;
+            if(!is_array($b)||$b['granted']<1||$b['granted']<$b['reserved_or_used'])return false;
+        }
+        return true;
+    }catch(Throwable $e){return false;}
+}
