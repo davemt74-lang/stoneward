@@ -86,6 +86,8 @@ function sf_kunaki_mapping(array $order,array $proof,array $record,
     return [
       'order_id'=>$orderId,'item_index'=>$itemIndex,
       'product_id'=>sf_kunaki_product_id($productId),
+      'edition_id'=>(string)($order['quote']['items'][$itemIndex]['edition_id']??''),
+      'edition_fingerprint'=>(string)($order['quote']['items'][$itemIndex]['edition_fingerprint']??''),
       'proof_sha256'=>$approved,
       'verification'=>'staff_confirmed_mapping',
       'provider_product_publication_verified'=>false,
