@@ -94,8 +94,10 @@ function sf_hs_pair_redeem(string $id,string $verifier,int $now=0):array {
         if(!$r||!hash_equals((string)$r['verifier_hash'],hash('sha256',$verifier)))
             throw new RuntimeException('Unknown HomeServer pairing verifier.');
         if((int)$r['expires_at']<=$now)throw new RuntimeException('HomeServer request expired.');
-        if($r['state']==='pending'||$r['state']==='denied')
+        if($r['state']==='pending'||$r['state']==='denied'){
+            $db->rollBack();
             return ['status'=>$r['state'],'request_id'=>$id];
+        }
         if($r['state']!=='approved'||(int)$r['approved_user_id']<1)
             throw new RuntimeException('Pairing request cannot be redeemed again.');
         $uid=(int)$r['approved_user_id'];$role='';
