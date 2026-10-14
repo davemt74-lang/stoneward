@@ -246,6 +246,7 @@ jobs:
           php tests/section81-vinyl-proof.php
           php tests/section82-marketing-consent.php
           php tests/section83-production-pilot.php
+          php tests/section84a-kunaki-bridge.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
