@@ -11,7 +11,7 @@ function sf_artist_home_admin_refs(): array {
   $tickets=[];foreach(sf_ticket_public_offers(null) as $offer)$tickets[]=['id'=>(string)$offer['id'],'title'=>(string)$offer['title'],'show_title'=>(string)$offer['show_title'],'date'=>(string)$offer['show_date'],'venue'=>(string)$offer['venue'],'price_cents'=>(int)$offer['price_cents']];
   return ['releases'=>$releases,'tracks'=>$tracks,'shows'=>$shows,'products'=>$products,'videos'=>$videos,'tickets'=>$tickets];
 }
-if($method==='GET')sf_json_response(['ok'=>true,'site'=>sf_site_settings(),'sections'=>sf_artist_home_sections(false),'draft'=>sf_home_design_state(),'versions'=>sf_home_design_versions(),'metrics'=>sf_artist_home_metrics(),'references'=>sf_artist_home_admin_refs(),'csrf'=>sf_admin_csrf()]);
+if($method==='GET')sf_json_response(['ok'=>true,'site'=>sf_site_settings(),'sections'=>sf_artist_home_sections(false),'draft'=>sf_home_design_state(),'draft_review'=>sf_home_design_review(sf_home_design_state()),'versions'=>sf_home_design_versions(),'metrics'=>sf_artist_home_metrics(),'references'=>sf_artist_home_admin_refs(),'csrf'=>sf_admin_csrf()]);
 if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $b=sf_request_json();$action=(string)($b['action']??'');
 try{
@@ -23,24 +23,24 @@ try{
   if($action==='save_design_draft'){
     $draft=sf_home_design_save((array)($b['sections']??[]),(int)($b['expected_revision']??-1),(string)($b['base_hash']??''));
     sf_log_admin_action((int)$me['id'],'artist_home_draft_saved','artist_home','draft',['revision'=>$draft['revision']]);
-    sf_json_response(['ok'=>true,'draft'=>$draft]);
+    sf_json_response(['ok'=>true,'draft'=>$draft,'draft_review'=>sf_home_design_review($draft)]);
   }
   if($action==='reset_design_draft'){
     if(empty($b['confirmed']))throw new InvalidArgumentException('Discarding the draft requires confirmation.');
     $draft=sf_home_design_reset_to_live((int)($b['expected_revision']??-1),(string)($b['base_hash']??''));
     sf_log_admin_action((int)$me['id'],'artist_home_draft_rebased','artist_home','draft',['revision'=>$draft['revision']]);
-    sf_json_response(['ok'=>true,'draft'=>$draft]);
+    sf_json_response(['ok'=>true,'draft'=>$draft,'draft_review'=>sf_home_design_review($draft)]);
   }
   if($action==='publish_design_draft'){
     if(empty($b['confirmed']))throw new InvalidArgumentException('Publishing requires explicit confirmation.');
     $published=sf_home_design_publish((int)($b['revision']??-1),(string)($b['published_hash']??''));
     sf_log_admin_action((int)$me['id'],'artist_home_design_published','artist_home','homepage',['version'=>$published['version']]);
-    sf_json_response(['ok'=>true]+$published+['versions'=>sf_home_design_versions()]);
+    sf_json_response(['ok'=>true]+$published+['draft_review'=>sf_home_design_review($published['draft']),'versions'=>sf_home_design_versions()]);
   }
   if($action==='restore_design_version'){
     $draft=sf_home_design_restore((int)($b['version']??0),(int)($b['expected_revision']??-1),(string)($b['base_hash']??''));
     sf_log_admin_action((int)$me['id'],'artist_home_version_staged','artist_home','draft',['version'=>(int)($b['version']??0)]);
-    sf_json_response(['ok'=>true,'draft'=>$draft]);
+    sf_json_response(['ok'=>true,'draft'=>$draft,'draft_review'=>sf_home_design_review($draft)]);
   }
   if($action==='save_section'){$section=sf_artist_home_save_section((array)($b['section']??[]));sf_log_admin_action((int)$me['id'],'artist_home_section_saved','artist_home',(string)$section['section_key'],['enabled'=>$section['enabled'],'position'=>$section['position']]);sf_agent_brain_log((int)$me['id'],'admin_homepage','artist_home_section',['route'=>'artist_homepage','action'=>'save_section','context_profile'=>'site','needs_llm'=>false,'requires_confirmation'=>false,'status'=>'completed','request'=>'Update artist homepage '.$section['section_key'],'response'=>'Homepage section saved.']);sf_json_response(['ok'=>true,'section'=>$section,'metrics'=>sf_artist_home_metrics()]);}
   if($action==='reorder_sections'){
