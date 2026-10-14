@@ -4,7 +4,7 @@ Status: Code review candidate. No Stripe account is connected and no live paymen
 
 ## What the Admin now provides
 
-A dedicated Commerce / Payments & Stripe Admin page, with:
+An Orders → Payments & Stripe action that opens a dedicated Admin payment canvas without adding a thirtieth sidebar item, with:
 - official Stripe-hosted signup link for an owner who has not created a Stripe account;
 - an official Connect OAuth authorization popup when an existing Stripe Connect platform is registered;
 - a same-origin verified callback and anti-CSRF OAuth state (bound to Admin user and a 10-minute validity window);

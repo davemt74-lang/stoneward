@@ -89,7 +89,6 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
           <summary class="admin-nav-summary"><span>Commerce &amp; VIP</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
           <div class="admin-nav-items">
             <button type="button" data-view="products"><span>14</span>Merch + Products</button>
-            <button type="button" data-view="payments"><span>30</span>Payments &amp; Stripe</button>
             <button type="button" data-view="orders"><span>16</span>Orders</button>
             <button type="button" data-view="fulfillment"><span>17</span>Fulfillment + Care</button>
             <button type="button" data-view="pod"><span>18</span>POD Handoffs</button>

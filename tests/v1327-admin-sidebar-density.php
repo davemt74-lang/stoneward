@@ -28,8 +28,7 @@ if ($css !== false) {
 
 if ($index !== false) {
     preg_match_all('/<button\s+type="button"\s+data-view="[^"]+"/', $index, $matches);
-    $check(count($matches[0]) === 30, 'admin sidebar should expose all 30 navigation buttons, including Payments & Stripe');
-    $check(str_contains($index, 'data-view="payments"'), 'Payments & Stripe must remain in the Commerce sidebar');
+    $check(count($matches[0]) === 29, 'admin sidebar should expose all 29 navigation buttons');
     $check(str_contains($index, 'data-view="settings"'), 'Settings must remain in the sidebar');
     $check(str_contains($index, 'data-view="operations"'), 'Operations must remain in the sidebar');
 }
