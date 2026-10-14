@@ -65,7 +65,12 @@ try {
           if(!is_array($past))continue;
           foreach((array)($past['kunaki_products']??[]) as $pastItem){
             if(!is_array($pastItem)||($pastItem['product_id']??'')!==$mapping['product_id'])continue;
-            if(($pastItem['proof_sha256']??'')!==$mapping['proof_sha256'])
+            if(($pastItem['proof_sha256']??'')!==$mapping['proof_sha256']
+              &&(
+                 empty($mapping['edition_fingerprint'])
+                 ||empty($pastItem['edition_fingerprint'])
+                 ||!hash_equals((string)$pastItem['edition_fingerprint'],(string)$mapping['edition_fingerprint'])
+              ))
               throw new RuntimeException('That Kunaki product ID is already bound to a different vinyl design.');
           }
         }
