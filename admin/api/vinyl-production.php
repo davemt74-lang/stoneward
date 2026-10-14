@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
+require_once SF_ROOT.'/api/vinyl-production-gates.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $admin=sf_admin_require_auth($method!=='GET');
 $body=$method==='POST'?sf_request_json():[];
@@ -16,6 +17,7 @@ try {
     if(is_array($item)&&($item['type']??'')==='custom_media'&&($item['format']??'vinyl')==='vinyl'){$isVinyl=true;break;}
   }
   if(!$isVinyl) sf_json_response(['ok'=>false,'message'=>'No custom vinyl product on this order.'],404);
+  $proof=sf_vinyl_production_proof($order,SF_ROOT.'/storage');
   $dir=SF_ROOT.'/storage/fulfillment';
   if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir)) throw new RuntimeException('Production storage unavailable.');
   $path=$dir.'/vinyl-production.json';
@@ -28,9 +30,32 @@ try {
     $record=$records[$id]??['order_id'=>$id,'status'=>'awaiting_artwork_review','revision'=>0,'events'=>[],'updated_at'=>null];
     $stages=['awaiting_artwork_review','artwork_approved','in_production','quality_check','production_complete'];
     if($method==='POST'){
-      if(($body['action']??'')!=='advance') sf_json_response(['ok'=>false,'message'=>'Unsupported production action.'],422);
+      $action=(string)($body['action']??'');
+      if(!in_array($action,['advance','verify_existing_proof'],true))
+          sf_json_response(['ok'=>false,'message'=>'Unsupported production action.'],422);
       $expected=(int)($body['revision']??-1);
       if($expected!==(int)$record['revision']) sf_json_response(['ok'=>false,'message'=>'Production state has changed. Refresh before editing.'],409);
+      if($action==='verify_existing_proof'){
+        if((string)($record['status']??'')==='awaiting_artwork_review'
+          ||!empty($record['proof_sha256']))
+            throw new RuntimeException('Only a previously advanced legacy order with no recorded proof can be verified here.');
+        $evidence=sf_vinyl_production_approval(
+          ['status'=>'awaiting_artwork_review'],$proof,$body,'artwork_approved');
+        $record['proof_sha256']=$evidence['proof_sha256'];
+        $record['proof_reviewed_at']=$evidence['proof_reviewed_at'];
+        $record['proof_reviewed_by']=(int)$admin['id'];
+        $record['updated_at']=gmdate('c');
+        $record['revision']++;
+        $records[$id]=$record;
+        $encoded=json_encode($records,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+        $tmp=tempnam($dir,'vinyl_');
+        if(!$tmp||file_put_contents($tmp,$encoded,LOCK_EX)===false||!rename($tmp,$path))
+          throw new RuntimeException('Unable to persist artwork proof verification.');
+        @chmod($path,0660);
+        sf_log_admin_action((int)$admin['id'],'vinyl_legacy_proof_verified','order',$id,
+          ['revision'=>$record['revision'],'proof_sha256'=>$record['proof_sha256']]);
+        sf_json_response(['ok'=>true,'record'=>$record,'proof'=>$proof,'stages'=>$stages,'csrf'=>sf_admin_csrf()]);
+      }
       $orderStatus=(string)($order['status']??'');$paymentStatus=(string)($order['payment']['status']??'');
       $isPaid=str_starts_with($orderStatus,'paid_')||in_array($orderStatus,['paid','completed','fulfilled'],true)||in_array($paymentStatus,['paid','test_paid','simulated_paid','succeeded'],true);
       if(!$isPaid || in_array($orderStatus,['refunded','partially_refunded','canceled','cancelled'],true)) sf_json_response(['ok'=>false,'message'=>'Only confirmed paid orders may advance production.'],422);
@@ -39,6 +64,13 @@ try {
       if($currentIndex===false||!isset($stages[$currentIndex+1])||$stages[$currentIndex+1]!==$next) sf_json_response(['ok'=>false,'message'=>'Choose the next production stage in sequence.'],422);
       if(empty($body['confirmed'])) sf_json_response(['ok'=>false,'message'=>'Explicit approval is required.'],422);
       $note=sf_clean_text($body['note']??'',500);
+      $evidence=sf_vinyl_production_approval($record,$proof,$body,$next);
+      if($next==='artwork_approved'){
+        $record['proof_sha256']=$evidence['proof_sha256'];
+        $record['proof_reviewed_at']=$evidence['proof_reviewed_at'];
+        $record['proof_reviewed_by']=(int)$admin['id'];
+      }
+      if($next==='production_complete')$record['qc_completed_at']=gmdate('c');
       $now=gmdate('c');
       $record['events'][]=['at'=>$now,'from'=>$record['status'],'to'=>$next,'admin_id'=>(int)$admin['id'],'note'=>$note];
       $record['status']=$next;
@@ -51,6 +83,6 @@ try {
       @chmod($path,0660);
       sf_log_admin_action((int)$admin['id'],'vinyl_production_stage','order',$id,['status'=>$next,'revision'=>$record['revision']]);
     } elseif($method!=='GET') sf_json_response(['ok'=>false,'message'=>'Method not allowed.'],405);
-    sf_json_response(['ok'=>true,'record'=>$record,'stages'=>$stages,'csrf'=>sf_admin_csrf()]);
+    sf_json_response(['ok'=>true,'record'=>$record,'proof'=>$proof,'stages'=>$stages,'csrf'=>sf_admin_csrf()]);
   }finally{flock($lock,LOCK_UN);fclose($lock);}
 }catch(Throwable $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}
