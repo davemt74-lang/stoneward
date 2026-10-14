@@ -226,6 +226,7 @@ jobs:
           php tests/section75b-stripe-refunds.php
           php tests/section75c-reconciliation.php
           php tests/section75d-stock-replay.php
+          php tests/section75e-provider-mode.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

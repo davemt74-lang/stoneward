@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/store-payment-mode.php';
 /** Section 75B — one-time Stripe refund requests and signed webhook reconciliation.
  * Provider API replies NEVER confirm refunded funds; Stripe signed webhooks do.
  * No automatic restocking or digital entitlement revocation; both require policy review.
@@ -100,7 +101,7 @@ function sf_store_refund_webhook_event(array $refund,string $eventType,bool $ver
             (string)($refund['payment_intent']??'')!==(string)($order['payment']['payment_intent']??'') ||
             (int)($refund['amount']??-1)!==(int)$record['amount_cents'] ||
             strtoupper((string)($refund['currency']??''))!==strtoupper((string)$order['quote']['currency']) ||
-            $verifiedLiveMode!==((sf_store_config()['mode']??'test')==='production'))
+            $verifiedLiveMode!==sf_store_order_expected_livemode($order))
             throw new RuntimeException('Signed Stripe refund does not match the authorized payment.');
         $status=(string)($refund['status']??'');
         if($eventType==='refund.failed')$status='failed';

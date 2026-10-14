@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/store-payment-mode.php';
 /** Section 75A: one-time Stripe Checkout. Uses the SAME credentials as subscriptions.
  * The only trusted payment confirmation comes from a signed Stripe webhook.
  */
@@ -130,7 +131,7 @@ function sf_store_stripe_create_order(?array $user,array $customer,array $quote,
     $order=['schema'=>'stonefellow.order.v1','id'=>$id,'user_id'=>$uid,'status'=>'payment_pending',
         'created_at'=>$now,'customer'=>$customer,'quote'=>$quote,'cart_fingerprint'=>hash('sha256',json_encode($quote,JSON_THROW_ON_ERROR)),
         'payment'=>['method'=>'stripe','provider'=>'stripe','status'=>'pending','amount_cents'=>(int)$quote['total_cents'],
-            'currency'=>(string)$quote['currency'],'checkout_session_id'=>'','checkout_url'=>''],
+            'currency'=>(string)$quote['currency'],'livemode'=>((sf_store_config()['mode']??'test')==='production'),'checkout_session_id'=>'','checkout_url'=>''],
         'fulfillment'=>['status'=>$quote['physical']?'awaiting_payment':'not_required','carrier'=>'','tracking_number'=>'','tracking_url'=>'','note'=>'','updated_at'=>$now],
         'timeline'=>[['type'=>'order_created','status'=>'payment_pending','label'=>'Awaiting verified Stripe payment','created_at'=>$now]],
         'pod'=>[],'campaign_code'=>$campaignCode,'confirmation_token_hash'=>hash('sha256',sf_token())];
@@ -157,7 +158,7 @@ function sf_store_stripe_webhook_event(array $session,string $eventType): void {
         if(!$order || ($order['payment']['provider']??'')!=='stripe')throw new RuntimeException('Stripe event order was not found.');
         if((string)($session['mode']??'')!=='payment' || (string)($session['id']??'')!==($order['payment']['checkout_session_id']??''))
             throw new RuntimeException('Stripe checkout session does not match the stored order.');
-        if((bool)($session['livemode']??false)!==((sf_store_config()['mode']??'test')==='production'))
+        if((bool)($session['livemode']??false)!==sf_store_order_expected_livemode($order))
             throw new RuntimeException('Stripe checkout mode does not match Store mode.');
         if((int)($session['amount_total']??-1)!==(int)$order['quote']['total_cents']
             || strtoupper((string)($session['currency']??''))!==strtoupper((string)$order['quote']['currency']))
