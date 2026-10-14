@@ -55,7 +55,7 @@ function sf_agent_commerce_reply_request(string $message):?array {
     $id=strtoupper((string)$m[1]);
     $s=strtolower($message);
     $topic='general';
-    if(preg_match('/\b(refund|return|cancellation)\b/',$s))$topic='refund';
+    if(preg_match('/\b(refunds?|returns?|cancellations?)\b/',$s))$topic='refund';
     elseif(preg_match('/\b(shipping|delivery|tracking|shipment)\b/',$s))$topic='shipping';
     elseif(preg_match('/\b(payment|declined|charged|billing)\b/',$s))$topic='payment';
     elseif(preg_match('/\b(download|digital|library|access)\b/',$s))$topic='digital';
