@@ -118,12 +118,12 @@ function sf_stem_project_update(string $id,array $payload):array {
 }
 function sf_stem_project_with_assets(array $project):array {
     foreach($project['tracks'] as &$t){
-        $ref=(string)($t['asset_uuid']??'');$t['audio_url']=null;$t['media_ready']=false;
+        $ref=(string)($t['asset_uuid']??'');$t['audio_url']=null;$t['media_ready']=false;$t['audio_size_bytes']=0;
         if($ref!==''){
             $asset=sf_media_asset($ref);
             if($asset&&($asset['category']??'')==='audio'){
                 $t['audio_url']='../api/media.php?id='.rawurlencode($ref);
-                $t['media_ready']=true;
+                $t['media_ready']=true;$t['audio_size_bytes']=(int)($asset['size_bytes']??0);
             }
         }
     }unset($t);
