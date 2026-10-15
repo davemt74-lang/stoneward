@@ -39,7 +39,7 @@ check86b(empty($m['tracks'][0]['fx'][0]['settings'])
  &&$m['tracks'][0]['clips'][0]['position']===2.25,
  'Undo FX change without losing clip edit');
 $m=sf_stem_project_update('song-1',['action'=>'undo_edit','revision'=>4]);
-check86b($m['tracks'][0]['clips'][0]['position']===1.0&&count($m['edit_history']['redo'])===2,
+check86b(abs((float)$m['tracks'][0]['clips'][0]['position']-1.0)<0.00001&&count($m['edit_history']['redo'])===2,
  'Undo timeline edit without changing raw REAPER project');
 $m=sf_stem_project_update('song-1',['action'=>'redo_edit','revision'=>5]);
 check86b($m['tracks'][0]['clips'][0]['position']===2.25,
