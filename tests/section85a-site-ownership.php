@@ -12,14 +12,14 @@ function denies85(callable $fn):bool{
 }
 $ref='api/media.php?id=M1234567890ABCDEF1234';
 $catalog=[
-  'purchased'=>['title'=>'A Purchased Song','audio'=>$ref,'duration'=>180,
+  'purchased'=>['title'=>'A Purchased Song','audio'=>'api/media.php?id=M99999999999999999999','private_master_audio'=>$ref,'audio_publishing_mode'=>'preview_master_split','duration'=>180,
     'podEligible'=>true,'vinyl_license_packages'=>[['licenses'=>1,'price_cents'=>250],
         ['licenses'=>5,'price_cents'=>1100]]],
   'preview'=>['title'=>'Preview Only','audio'=>'assets/audio/preview.mp3'],
   'other'=>['title'=>'Not Mine','audio'=>$ref],
   'vinyl'=>['title'=>'Vinyl License Only','audio'=>$ref],
   'unpaid'=>['title'=>'Unpaid Track','audio'=>$ref],
-  'album-track'=>['title'=>'Album Entitlement','audio'=>$ref],
+  'album-track'=>['title'=>'Album Entitlement','audio'=>$ref,'private_master_audio'=>$ref],
 ];
 $library=[
   ['item_type'=>'track','item_key'=>'purchased','source_order_id'=>'SF-ONE'],
