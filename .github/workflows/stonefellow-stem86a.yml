@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'api/stem-rpp-core.php'
+      - 'api/stem-zip-core.php'
+      - 'tests/section86a-stem-zip.php'
       - 'api/stem-studio-core.php'
       - 'api/media-core.php'
       - 'admin/api/stem-studio.php'
@@ -32,7 +34,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo_sqlite
+          extensions: pdo_sqlite, zip
           coverage: none
       - uses: actions/setup-node@v4
         with:
@@ -40,9 +42,11 @@ jobs:
       - name: REAPER parser, persistence, and UI binding tests
         run: |
           php -l api/stem-rpp-core.php
+          php -l api/stem-zip-core.php
           php -l api/stem-studio-core.php
           php -l admin/api/stem-studio.php
           node --check admin/assets/stem-studio.js
           node --check admin/assets/admin.js
           php tests/section86a-stem-studio.php
+          php tests/section86a-stem-zip.php
           php tests/section85b-media-publishing.php
