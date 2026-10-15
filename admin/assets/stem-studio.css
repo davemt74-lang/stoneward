@@ -154,3 +154,16 @@
 .sf-j-advisor summary{cursor:pointer;color:#efdab7}
 .sf-j-advisor li{margin:5px 0;word-break:break-word}
 @media(max-width:650px){.sf-j-advisor{padding:12px}.sf-j-buttons button{width:100%}}
+
+/* 86K measured source-level insights live alongside 86J on same private canvas. */
+.sf-k-intelligence{margin:16px 0 23px;padding:16px;background:#201d18;border:1px solid #896c4b;border-radius:9px;color:#eedfc6}
+.sf-k-intelligence h3{color:#f3d7a7;font-size:17px;margin:0 0 7px}
+.sf-k-intelligence p{color:#cfc0a7;font-size:12px;line-height:1.55;margin:6px 0 13px}
+.sf-k-intelligence .sf-j-buttons button{cursor:pointer;border:1px solid #ab8858;background:#674e32;color:white;border-radius:6px;padding:8px 12px;font-size:12px}
+.sf-k-intelligence .sf-j-buttons button:disabled{cursor:not-allowed;opacity:.48}
+.sf-k-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:10px;margin:12px 0}
+.sf-k-item{background:#2c251e;border:1px solid #675238;border-radius:7px;padding:11px;min-width:0}
+.sf-k-item strong{font-size:13px;color:#f8dbb0;overflow-wrap:anywhere}
+.sf-k-item p{font-size:12px;line-height:1.5}
+.sf-k-item small{font-size:11px;line-height:1.5;color:#cfbfa2;display:block}
+@media(max-width:630px){.sf-k-intelligence{padding:12px}.sf-k-intelligence .sf-j-buttons button{width:100%}}
