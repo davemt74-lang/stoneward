@@ -1,0 +1,43 @@
+name: Stonefellow REAPER Routing 86E
+on:
+  pull_request:
+    paths:
+      - 'api/stem-*.php'
+      - 'admin/assets/stem-studio*'
+      - 'tests/section86e-routing.php'
+      - '.github/workflows/stonefellow-stem86e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-*.php'
+      - 'admin/assets/stem-studio*'
+      - 'tests/section86e-routing.php'
+permissions:
+  contents: read
+jobs:
+  routing-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -e
+          php -l api/stem-routing-core.php
+          php -l api/stem-rpp-core.php
+          php -l api/stem-studio-core.php
+          php -l api/stem-plugin-operations.php
+          php tests/section86e-routing.php
+          php tests/section86d-native-state.php
+          php tests/section86c-reaper-plugin-rack.php
+          php tests/section86b-timeline-fx.php
+          php tests/section86a-stem-studio.php
+          node --check admin/assets/stem-studio.js
+          node --check admin/assets/stem-plugin-rack.js
+          node tests/section86c-plugin-rack.cjs

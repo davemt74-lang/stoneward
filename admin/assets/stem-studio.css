@@ -81,3 +81,12 @@
 .sf-plugin-native-values span{border-radius:2px;border:1px solid #504632;
   padding:4px 6px;font-family:ui-monospace,monospace;color:#d8c4a7}
 [data-studio-native-refresh]{margin:7px 0;font-size:12px}
+
+/* 86E auxiliary routing canvas */
+.sf-studio-routing{padding:14px;margin:15px 0;border:1px solid #70583b;background:#211b15}
+.sf-studio-routing h3{margin:0 0 7px;color:#f0d5ac}.sf-studio-routing p,.sf-studio-routing small{font-size:11px;color:#c2af94}
+.sf-route-add,.sf-route-buses,.sf-route-sends{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0;align-items:center}
+.sf-route-buses article,.sf-route-sends>div{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px;background:#31271c;border:1px solid #6c5338}
+.sf-route-buses article{flex:1 1 300px}.sf-route-buses article details{flex-basis:100%}
+.sf-studio-routing label{font-size:11px;color:#d8c1a1}.sf-studio-routing input,.sf-studio-routing select{background:#100e0c;color:#eee;border:1px solid #856643;padding:6px;max-width:180px}
+.sf-studio-routing button{background:#62452b;color:#fff;border:1px solid #9a744a;padding:7px 11px;cursor:pointer;border-radius:4px}

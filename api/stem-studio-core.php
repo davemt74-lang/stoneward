@@ -56,6 +56,13 @@ function sf_stem_project_import(string $id,string $content,string $name,int $adm
         foreach(['asset_uuid','role','name','volume','pan','mute','solo'] as $k)if(array_key_exists($k,$prior))$t[$k]=$prior[$k];
         $t['fx']=sf_stem_plugin_reimport_overrides((array)($t['fx']??[]),(array)($prior['fx']??[]));
     }unset($t);
+    if(is_array($old)&&isset($old['routing']['buses'])){
+        $parsed['routing']['buses']=(array)$old['routing']['buses'];
+        foreach((array)($old['routing']['sends']??[]) as $send){
+            if(($send['origin']??'')==='BROWSER')$parsed['routing']['sends'][]=$send;
+        }
+        sf_stem_route_validate($parsed);
+    }
     $parsed['project_name']=substr(pathinfo(sf_stem_safe_filename($name),PATHINFO_FILENAME),0,180);
     $parsed['imported_by']=$adminId;$parsed['imported_at']=gmdate('c');
     $parsed['source_sha256']=hash('sha256',$content);
@@ -111,6 +118,8 @@ function sf_stem_project_update(string $id,array $payload):array {
             $t['name']=$name;$t['role']=$role;$found=true;break;
         }unset($t);
         if(!$found)throw new InvalidArgumentException('Stem track not found.');
+    }elseif(str_starts_with($action,'route_')){
+        sf_stem_route_apply($old,$payload);
     }elseif($action==='save_mix'){
         $mix=(array)($payload['mix']??[]);
         $mixName=trim((string)($mix['name']??'Default'));
@@ -128,7 +137,11 @@ function sf_stem_project_update(string $id,array $payload):array {
                 'mute'=>!empty($override['mute']),'solo'=>!empty($override['solo'])];
         }
         $old['mixes']=array_slice((array)($old['mixes']??[]),-19,20,true);
-        $old['mixes'][$mixName]=['name'=>$mixName,'tracks'=>$values,'saved_at'=>gmdate('c')];
+        $old['mixes'][$mixName]=['name'=>$mixName,'tracks'=>$values,
+            'buses'=>array_map(static fn(array $b):array=>[
+                'id'=>$b['id'],'volume'=>$b['volume'],'pan'=>$b['pan'],
+                'mute'=>$b['mute'],'solo'=>$b['solo']],(array)($old['routing']['buses']??[])),
+            'saved_at'=>gmdate('c')];
     }elseif(in_array($action,[
         'plugin_add','plugin_settings','plugin_toggle','plugin_move',
         'plugin_remove','plugin_undo','plugin_redo'
