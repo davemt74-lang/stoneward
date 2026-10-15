@@ -1,0 +1,59 @@
+name: Stonefellow Mastering & Agent Brain 86G
+on:
+  pull_request:
+    paths:
+      - 'api/stem-mastering-core.php'
+      - 'api/stem-agent-bridge.php'
+      - 'api/stem-studio-core.php'
+      - 'api/agent-admin-brain.php'
+      - 'admin/api/stem-mastering.php'
+      - 'admin/assets/stem-mastering.js'
+      - 'admin/assets/stem-studio.*'
+      - 'admin/index.php'
+      - 'tests/section86g-*'
+      - '.github/workflows/stonefellow-stem86g.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-mastering-core.php'
+      - 'api/stem-agent-bridge.php'
+      - 'api/stem-studio-core.php'
+      - 'api/agent-admin-brain.php'
+      - 'admin/api/stem-mastering.php'
+      - 'admin/assets/stem-mastering.js'
+      - 'admin/assets/stem-studio.*'
+      - 'tests/section86g-*'
+permissions:
+  contents: read
+jobs:
+  mastering-brain-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sodium
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/stem-mastering-core.php
+          php -l api/stem-agent-bridge.php
+          php -l api/stem-studio-core.php
+          php -l api/agent-admin-brain.php
+          php -l admin/api/stem-mastering.php
+          node --check admin/assets/stem-mastering.js
+          node --check admin/assets/stem-studio.js
+          php tests/section86g-mastering.php
+          node tests/section86g-mastering.cjs
+          php tests/section86f-automation-agent.php
+          node tests/section86f-automation.cjs
+          php tests/section86e-routing.php
+          php tests/section86d-native-state.php
+          php tests/section86c-reaper-plugin-rack.php
+          php tests/section86b-timeline-fx.php
+          php tests/section86a-stem-studio.php
