@@ -122,7 +122,7 @@ function sf_stem_mastering_recommendations(array $summary):array {
     if(($summary['status']??'')!=='recent')$out[]='Measurements predate the current project revision. Re-render before acting.';
     if(($summary['clipped_samples']??0)>0)$out[]='Browser measurement shows clipped output samples; inspect master gain and limiter ceiling.';
     if(($summary['sample_peak_dbfs']??-120)>-1.0)$out[]='Sample peaks approach digital full scale; review headroom and check true peak in a mastering application.';
-    if(($summary['stereo_imbalance_db']??0)>3)$out[]='Left/right RMS differs by over 3 dB; review panning and the reference mix.';
+    if(($summary['stereo_imbalance_db']??0)>3)$out[]='Left/right channel RMS differs by over 3 dB; review panning and the reference mix.';
     if(($summary['low_band_pct']??null)!==null && ($summary['reference_low_band_pct']??null)!==null &&
         abs((float)$summary['low_band_pct']-(float)$summary['reference_low_band_pct'])>=10)
         $out[]='Approximate low-band balance differs materially from the selected reference; check source material and listen before EQ.';
