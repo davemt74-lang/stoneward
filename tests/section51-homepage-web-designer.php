@@ -53,6 +53,10 @@ $home=$read('admin/assets/homepage.js');
 $css=$read('admin/assets/homepage-web-editor.css');
 $shell=$read('admin/index.php');
 $app=$read('assets/js/app.js');
+$publicBuildText=$read('stonefellow-v120.php');
+$publicBuildParts=[];
+$siteVersion=preg_match("/define\\('SF_BUILD', '([0-9]+\\.[0-9]+\\.[0-9]+)'\\)/",$publicBuildText,$publicBuildParts)
+    ?$publicBuildParts[1]:'';
 $checks=[
  'Designer entered from original Settings Homepage panel'=>str_contains($home,'homepageOpenDesigner')&&str_contains($home,'SFHomepageWebEditor?.open?.()'),
  'Main Admin nav replaced only in designer mode'=>str_contains($css,'#sidebar > :not(#homepageWebSidebar)')&&str_contains($web,"shell.classList.add('homepage-web-design-mode')"),
@@ -66,7 +70,9 @@ $checks=[
  'Public render supports four block types and ticket CTA'=>str_contains($read('assets/js/artist-home-renderer.js'),"if(k==='custom_blocks')")&&str_contains($app,'data-home-ticket-offer')&&str_contains($app,'data-home-release')&&str_contains($app,'data-home-store'),
  'Block configuration and source references use original data'=>str_contains($builder,'getConfig')&&str_contains($read('admin/api/homepage.php'),"'tickets'=>\$tickets"),
  'New feature does not add another Admin sidebar item'=>substr_count($shell,'data-view="')===29,
- 'Release version advances all JS assets'=>str_contains($shell,"SF_ADMIN_BUILD','1.3.75'")&&str_contains($read('service-worker.js'),'stonefellow-static-v1.3.75'),
+ 'Release version advances all JS assets'=>$siteVersion!==''&&version_compare($siteVersion,'1.3.75','>=')
+    &&str_contains($shell,"SF_ADMIN_BUILD','".$siteVersion."'")
+    &&str_contains($read('service-worker.js'),'stonefellow-static-v'.$siteVersion),
  'Additive library schema target retained'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.48'"),
 ];
 $check=array_merge($check,$checks);
