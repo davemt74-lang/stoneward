@@ -1,0 +1,45 @@
+name: Stonefellow Mastering Readiness 86H
+on:
+  pull_request:
+    paths:
+      - 'api/stem-release-readiness.php'
+      - 'admin/api/stem-mastering.php'
+      - 'admin/assets/stem-mastering.js'
+      - 'tests/section86h-mastering-readiness.php'
+      - '.github/workflows/stonefellow-stem86h.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-release-readiness.php'
+      - 'admin/api/stem-mastering.php'
+      - 'admin/assets/stem-mastering.js'
+      - 'tests/section86h-mastering-readiness.php'
+permissions:
+  contents: read
+jobs:
+  mastering-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/stem-release-readiness.php
+          php -l admin/api/stem-mastering.php
+          node --check admin/assets/stem-mastering.js
+          php tests/section86h-mastering-readiness.php
+          php tests/section86g-mastering.php
+          node tests/section86g-mastering.cjs
+          php tests/section86f-automation-agent.php
+          php tests/section86e-routing.php
+          php tests/section86d-native-state.php
+          php tests/section86c-reaper-plugin-rack.php
+          php tests/section86b-timeline-fx.php
+          php tests/section86a-stem-studio.php
