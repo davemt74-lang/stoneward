@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/stem-agent-bridge.php';
+require_once __DIR__.'/stem-intelligence-core.php';
 
 /** 86J: bounded Admin-only evidence for the original Stem Studio/Agent Brain.
  * Never send raw RPP, audio, VST binary, private paths or fan information.
@@ -49,6 +50,7 @@ function sf_stem_production_inspect(string $songId):array {
         ];
     }
     $analysis=(array)($review['mastering']??[]);
+    $stemEvidence=sf_stem_intelligence_summary($songId,$project);
     $issues=[];$proposals=[];
     $add=static function(string $id,string $priority,string $evidence,string $advice,bool $editable=false)
         use(&$issues):void{
@@ -85,6 +87,25 @@ function sf_stem_production_inspect(string $songId):array {
             $add($band.'_reference','medium',
                 ucfirst($band).'-band energy difference '.round((float)$a-(float)$ref,1).' percentage points',
                 'A/B at matched perceived loudness; do not guess EQ from broad energy estimates.');
+    }
+    if(($stemEvidence['status']??'')==='recent'){
+        $pairs=(array)($stemEvidence['masking_candidates']??[]);
+        if($pairs){
+            $areas=array_values(array_unique(array_map(
+                static fn(array $pair):string=>(string)($pair['band']??'unknown'),$pairs)));
+            $add('stem_spectral_overlap','medium',
+                count($pairs).' track-pair frequency-band overlaps in sampled raw source audio ('.
+                implode(', ',array_slice($areas,0,5)).')',
+                'Listen to the tracks together in REAPER; overlapping FFT energy does not prove audible masking.');
+        }
+        $noisy=array_filter((array)($stemEvidence['stem_rows']??[]),
+            static fn(array $r):bool=>($r['metrics']['sample_peak_dbfs']??-120)>-1);
+        if($noisy)$add('stem_source_peaks','medium',
+            count($noisy).' decoded source stem(s) have sampled peaks above -1 dBFS',
+            'Inspect source clip headroom and master gain; source peaks are not processed mix peaks.');
+    }elseif(($stemEvidence['status']??'not_analyzed')==='stale_after_project_edit'){
+        $add('stem_evidence_stale','low','Source-stem FFT measurements are stale after a project change',
+            'Re-analyze the current linked stems before using source-level comparisons.');
     }
     $muted=count(array_filter($tracks,static fn(array $t):bool=>!empty($t['mute'])));
     if($muted)$add('muted_tracks','low',$muted.' muted track(s)',
@@ -123,13 +144,14 @@ function sf_stem_production_inspect(string $songId):array {
             'current_mix'=>substr((string)($project['current_mix']??''),0,100)
         ],
         'mastering'=>$analysis,
+        'stem_audio'=>$stemEvidence,
         'readiness'=>$review['mastering_review']??[],
         'catalog_publication'=>$review['catalog_publication']??[],
         'issues'=>array_slice($issues,0,24),'proposals'=>$proposals,
         'provenance'=>'private_project_manifest_and_browser_reported_measurements',
         'limitations'=>[
             'Browser loudness/peak evidence is not independently verified or native REAPER audio.',
-            'Track-level diagnoses are metadata-based; per-stem spectral measurements are not available.',
+            'Per-stem browser FFTs sample raw sources only; estimates are not complete tracks or native REAPER processing.',
             'No changes, publication or rights transfers occur without explicit owner actions.'
         ],
         'needs_owner_review'=>true
@@ -147,6 +169,7 @@ function sf_stem_production_brief(array $inspection):array {
         'fx_types'=>array_values(array_unique(array_map(static fn(array $fx):string=>$fx['type'],
             (array)($inspection['project']['master_fx']??[])))),
         'mastering'=>$inspection['mastering']??[],
+        'stem_audio'=>sf_stem_intelligence_agent_brief((array)($inspection['stem_audio']??['status'=>'not_analyzed'])),
         'readiness_status'=>$inspection['readiness']['status']??'not_reviewed',
         'catalog_state'=>$inspection['catalog_publication']['state']??'not_staged',
         'issues'=>array_map(static fn(array $i):array=>[
