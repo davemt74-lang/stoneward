@@ -59,8 +59,12 @@ function sf_validate_builder(array $b, string $format, int $userId=0): array {
             $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
             if(empty($t['podEligible'])){$errors[]="Track {$t['title']} is not eligible for custom media.";continue;}
+            if(($t['audio_publishing_mode']??'')==='preview_master_split'&&empty($t['private_master_audio'])){
+                $errors[]="Track {$t['title']} does not have a privately published production original.";
+                continue;
+            }
             $dur=(int)($t['duration'] ?? 0); $duration += $dur;
-            $rows[]=['id'=>$id,'title'=>(string)$t['title'],'duration'=>$dur,'audio_master'=>(string)($t['audio'] ?? '')];
+            $rows[]=['id'=>$id,'title'=>(string)$t['title'],'duration'=>$dur,'audio_master'=>(string)($t['private_master_audio']??(($t['audio_publishing_mode']??'')==='preview_master_split'?'':($t['audio']??'')))];
         }
         if($limit && $duration>$limit) $errors[]="Side $side exceeds the format time limit.";
         $sides[$side]=['duration'=>$duration,'tracks'=>$rows];

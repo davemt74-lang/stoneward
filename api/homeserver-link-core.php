@@ -108,7 +108,7 @@ function sf_homeserver_owned_tracks(int $userId,array $library,array $orders,arr
     $output=[];
     foreach($owned as $id=>$_){
         $t=$catalog[$id]??null;
-        if(!is_array($t)||empty($t['audio']))continue;
+        if(!is_array($t)||(empty($t['audio'])&&empty($t['private_master_audio'])))continue;
         $output[]=['id'=>$id,'title'=>substr((string)($t['title']??$id),0,180),
             'artist'=>'Stonefellow','duration_seconds'=>max(0,(int)($t['duration']??0)),
             'artwork'=>(string)($t['artwork']??''),'can_stream'=>true,'can_download'=>true];

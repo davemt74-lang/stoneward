@@ -49,14 +49,14 @@ function sf_vinyl_locked_album(array $release,array $tracks,int $sideLimit):arra
     $sides=['A'=>['duration'=>0,'tracks'=>[]],'B'=>['duration'=>0,'tracks'=>[]]];
     foreach($ids as $index=>$id){
         $t=$tracks[(string)$id]??null;
-        if(!is_array($t)||empty($t['podEligible'])||empty($t['audio']))
+        if(!is_array($t)||empty($t['podEligible']) || (empty($t['private_master_audio'])&&(($t['audio_publishing_mode']??'')==='preview_master_split'||empty($t['audio']))))
             throw new InvalidArgumentException('Album contains an unavailable vinyl master.');
         $dur=(int)($t['duration']??0);
         if($dur<=0)throw new InvalidArgumentException('Album track needs a duration.');
         $side=$index<$split?'A':'B';
         $sides[$side]['duration']+=$dur;
         $sides[$side]['tracks'][]=['id'=>(string)$id,'title'=>(string)($t['title']??$id),
-            'duration'=>$dur,'audio_master'=>(string)$t['audio']];
+            'duration'=>$dur,'audio_master'=>(string)($t['private_master_audio']??$t['audio'])];
     }
     foreach($sides as $side)
         if($sideLimit>0&&$side['duration']>$sideLimit)

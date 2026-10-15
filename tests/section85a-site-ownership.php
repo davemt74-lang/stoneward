@@ -12,14 +12,14 @@ function denies85(callable $fn):bool{
 }
 $ref='api/media.php?id=M1234567890ABCDEF1234';
 $catalog=[
-  'purchased'=>['title'=>'A Purchased Song','audio'=>$ref,'duration'=>180,
+  'purchased'=>['title'=>'A Purchased Song','audio'=>'api/media.php?id=M99999999999999999999','private_master_audio'=>$ref,'audio_publishing_mode'=>'preview_master_split','duration'=>180,
     'podEligible'=>true,'vinyl_license_packages'=>[['licenses'=>1,'price_cents'=>250],
         ['licenses'=>5,'price_cents'=>1100]]],
   'preview'=>['title'=>'Preview Only','audio'=>'assets/audio/preview.mp3'],
   'other'=>['title'=>'Not Mine','audio'=>$ref],
   'vinyl'=>['title'=>'Vinyl License Only','audio'=>$ref],
   'unpaid'=>['title'=>'Unpaid Track','audio'=>$ref],
-  'album-track'=>['title'=>'Album Entitlement','audio'=>$ref],
+  'album-track'=>['title'=>'Album Entitlement','audio'=>$ref,'private_master_audio'=>$ref],
 ];
 $library=[
   ['item_type'=>'track','item_key'=>'purchased','source_order_id'=>'SF-ONE'],
@@ -81,7 +81,7 @@ $site=file_get_contents(dirname(__DIR__).'/stonefellow-v120.php');
 $ui=file_get_contents(dirname(__DIR__).'/assets/js/library.js');
 $wallet=file_get_contents(dirname(__DIR__).'/assets/js/owned-music.js');
 $css=file_get_contents(dirname(__DIR__).'/assets/css/site.css');
-ok85(str_contains($site,'assets/js/owned-music.js') && str_contains($site,"'1.3.76'"),
+ok85(str_contains($site,'assets/js/owned-music.js') && str_contains($site,"'1.3.77'"),
     'Versioned storefront loads owned-wallet renderer before My Library');
 ok85(str_contains($ui,"owned:'Owned Music'")&&str_contains($ui,"fan-owned-music.php"),
     'My Library displays account-scoped purchased music separately from favorites');
@@ -141,9 +141,9 @@ echo "Section 85A purchased music and vinyl rights: $passes checks passed".PHP_E
 $adminBuild=(string)file_get_contents(dirname(__DIR__).'/admin/index.php');
 $serverHeaders=(string)file_get_contents(dirname(__DIR__).'/.htaccess');
 $serviceWorker=(string)file_get_contents(dirname(__DIR__).'/service-worker.js');
-ok85(str_contains($adminBuild,"define('SF_ADMIN_BUILD','1.3.76')")
-  &&str_contains($serverHeaders,'X-Stonefellow-Build "1.3.76"'),
+ok85(str_contains($adminBuild,"define('SF_ADMIN_BUILD','1.3.77')")
+  &&str_contains($serverHeaders,'X-Stonefellow-Build "1.3.77"'),
   'Website and Admin build markers stay in sync for deployed asset cache invalidation');
-ok85(str_contains($serviceWorker,"stonefellow-static-v1.3.76")
+ok85(str_contains($serviceWorker,"stonefellow-static-v1.3.77")
   &&str_contains($serviceWorker,'assets/js/owned-music.js'),
   'PWA serves the versioned purchased-music interface rather than a stale offline script');

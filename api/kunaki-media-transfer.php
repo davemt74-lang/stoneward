@@ -75,7 +75,11 @@ function sf_kunaki_media_job_assets(array $job,array $order,array $catalog,
         $id=(string)($line['id']??'');$catalogRow=$catalog[$id]??null;
         if(!is_array($catalogRow)||empty($catalogRow['podEligible'])
            ||(string)($catalogRow['audio']??'')==='')throw new RuntimeException('Required catalog master unavailable.');
-        $source=sf_kunaki_media_resolve((string)$catalogRow['audio'],'audio',$lookup);
+        $productionMaster=(string)($catalogRow['private_master_audio']??'');
+        if($productionMaster===''&&($catalogRow['audio_publishing_mode']??'')!=='preview_master_split')
+            $productionMaster=(string)$catalogRow['audio'];
+        if($productionMaster==='')throw new RuntimeException('Private production master not published.');
+        $source=sf_kunaki_media_resolve($productionMaster,'audio',$lookup);
         $sum+=$source['size_bytes'];
         $rows[]=['asset_key'=>'audio-'.$side.'-'.(count((array)$rows)+1),
             'side'=>$side,'position'=>(int)$n+1,'track_id'=>$id,

@@ -61,7 +61,7 @@ ok(str_contains($linksApi,'sf_media_public_links'),'public song media endpoint r
 ok(str_contains($adminShell,'data-view="media"')&&str_contains($adminShell,'assets/media.js'),'Media Library is a first-class Admin module');
 ok(str_contains($mediaJs,'Upload audio')&&str_contains($mediaJs,'Upload artwork')&&str_contains($mediaJs,'Upload photos')&&str_contains($mediaJs,'Upload video')&&str_contains($mediaJs,'Upload documents')&&str_contains($mediaJs,'Upload archive media'),'song Media workspace covers all requested media categories');
 ok(str_contains($mediaJs,'Choose from Library'),'song Media workspace can reuse existing assets');
-ok(str_contains($mediaJs,'Make primary audio')&&str_contains($mediaJs,'Make primary artwork'),'song Media workspace separates upload from explicit primary publish actions');
+ok(str_contains($mediaJs,'Publish public preview')&&str_contains($mediaJs,'Publish private original')&&str_contains($mediaJs,'Make primary artwork'),'song Media workspace separates upload from explicit primary publish actions');
 ok(str_contains($mediaJs,'data-link-public')&&str_contains($mediaJs,'data-link-download')&&str_contains($mediaJs,'data-link-featured'),'song media supports public, downloadable and featured controls');
 ok(str_contains($mediaJs,'ondragstart')&&str_contains($mediaJs,'reorderDrop'),'song media supports drag reordering');
 ok(str_contains($mediaJs,'Uploading ')&&str_contains($mediaJs,'xhr.upload.onprogress'),'uploader exposes real upload progress');
