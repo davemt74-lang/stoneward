@@ -27,3 +27,8 @@
 [data-studio-report]{font:12px/1.6 system-ui,sans-serif;color:#e1ceaf;overflow-wrap:anywhere;padding:0 4px;white-space:normal}
 .sf-studio-import [data-studio-bundle]{max-width:min(360px,82vw)}
 .sf-studio-import [data-studio-upload-progress]{font-size:12px;color:#dbbc87}
+
+/* Decoded PCM waveforms are only displayed after an explicit click. */
+.sf-studio-waveform{display:block;width:100%;height:100%;position:absolute;inset:0;z-index:0;opacity:.9;pointer-events:none}
+.sf-studio-clip span{position:relative;z-index:1;background:#17120aaa;border-radius:2px;width:max-content;max-width:100%}
+[data-stem-waveform]{margin-inline:4px}
