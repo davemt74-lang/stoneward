@@ -63,6 +63,7 @@ function sf_stem_project_import(string $id,string $content,string $name,int $adm
         }
         sf_stem_route_validate($parsed);
     }
+    sf_stem_automation_reimport($parsed,$old);
     $parsed['project_name']=substr(pathinfo(sf_stem_safe_filename($name),PATHINFO_FILENAME),0,180);
     $parsed['imported_by']=$adminId;$parsed['imported_at']=gmdate('c');
     $parsed['source_sha256']=hash('sha256',$content);
@@ -120,6 +121,10 @@ function sf_stem_project_update(string $id,array $payload):array {
         if(!$found)throw new InvalidArgumentException('Stem track not found.');
     }elseif(str_starts_with($action,'route_')){
         sf_stem_route_apply($old,$payload);
+    }elseif(str_starts_with($action,'automation_')){
+        sf_stem_automation_apply($old,$payload);
+    }elseif($action==='recall_mix'){
+        sf_stem_automation_recall_mix($old,(string)($payload['name']??''));
     }elseif($action==='save_mix'){
         $mix=(array)($payload['mix']??[]);
         $mixName=trim((string)($mix['name']??'Default'));
@@ -141,6 +146,8 @@ function sf_stem_project_update(string $id,array $payload):array {
             'buses'=>array_map(static fn(array $b):array=>[
                 'id'=>$b['id'],'volume'=>$b['volume'],'pan'=>$b['pan'],
                 'mute'=>$b['mute'],'solo'=>$b['solo']],(array)($old['routing']['buses']??[])),
+            'automation'=>array_values(array_filter((array)($old['automation']??[]),
+                static fn(array $lane):bool=>($lane['source']??'')==='BROWSER')),
             'saved_at'=>gmdate('c')];
     }elseif(in_array($action,[
         'plugin_add','plugin_settings','plugin_toggle','plugin_move',
