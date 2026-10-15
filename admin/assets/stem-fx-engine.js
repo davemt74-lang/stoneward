@@ -6,6 +6,12 @@
    * or alters the rendered public song.
    */
   const specs={
+    limiter:{threshold:[-36,0,-8],ceiling:[-12,0,-.1],attack:[0,.1,.01],release:[.01,2,.2]},
+    eq5:Object.fromEntries([60,180,900,3200,10000].flatMap((frequency,i)=>[
+      ['f'+(i+1),[20,20000,frequency]],
+      ['g'+(i+1),[-24,24,0]],
+      ['q'+(i+1),[.1,18,i>1?.9:.7]]
+    ])),
     eq:{frequency:[20,20000,900],gain:[-24,24,0],q:[.1,18,.9]},
     compressor:{threshold:[-60,0,-18],ratio:[1,20,2],attack:[0,1,.01],release:[.01,2,.25]},
     delay:{time:[.01,1.8,.25],feedback:[0,.75,.2],wet:[0,1,.2]},
@@ -51,8 +57,16 @@
       const dry=context.createGain(),wet=context.createGain();
       cursor.connect(input);input.connect(dry);dry.connect(merge);
       let processor,feedback=null;
+      let bands=null, ceilingGain=null;
       if(type==='eq'){
         processor=context.createBiquadFilter();processor.type='peaking';
+      }else if(type==='eq5'){
+        bands=Array.from({length:5},()=>context.createBiquadFilter());
+        for(const band of bands)band.type='peaking';
+        processor=bands[0];
+      }else if(type==='limiter'){
+        processor=context.createDynamicsCompressor();
+        ceilingGain=context.createGain();
       }else if(type==='compressor'){
         processor=context.createDynamicsCompressor();
       }else if(type==='delay'){
@@ -61,8 +75,15 @@
       }else if(type==='reverb'){
         processor=context.createConvolver();
       }
-      input.connect(processor);processor.connect(wet);wet.connect(merge);
-      stages.push({index:i,type,processor,dry,wet,feedback,impulseSeconds:0});
+      input.connect(processor);
+      if(bands){
+        for(let b=0;b<bands.length-1;b++)bands[b].connect(bands[b+1]);
+        bands[bands.length-1].connect(wet);
+      }else if(ceilingGain){
+        processor.connect(ceilingGain);ceilingGain.connect(wet);
+      }else processor.connect(wet);
+      wet.connect(merge);
+      stages.push({index:i,type,processor,dry,wet,feedback,bands,ceilingGain,impulseSeconds:0});
       cursor=merge;
     }
     cursor.connect(output);
@@ -75,7 +96,19 @@
         const wet=enabled?((stage.type==='delay'||stage.type==='reverb')?p.wet:1):0;
         controlledParam(stage.dry.gain,dry,context);
         controlledParam(stage.wet.gain,wet,context);
-        if(stage.type==='eq'){
+        if(stage.type==='eq5'){
+          for(let b=0;b<5;b++){
+            controlledParam(stage.bands[b].frequency,p['f'+(b+1)],context);
+            controlledParam(stage.bands[b].gain,p['g'+(b+1)],context);
+            controlledParam(stage.bands[b].Q,p['q'+(b+1)],context);
+          }
+        }else if(stage.type==='limiter'){
+          controlledParam(stage.processor.threshold,p.threshold,context);
+          controlledParam(stage.processor.ratio,20,context);
+          controlledParam(stage.processor.attack,p.attack,context);
+          controlledParam(stage.processor.release,p.release,context);
+          controlledParam(stage.ceilingGain.gain,Math.pow(10,p.ceiling/20),context);
+        }else if(stage.type==='eq'){
           controlledParam(stage.processor.frequency,p.frequency,context);
           controlledParam(stage.processor.gain,p.gain,context);
           controlledParam(stage.processor.Q,p.q,context);
