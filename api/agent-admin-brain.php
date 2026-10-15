@@ -217,6 +217,12 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
                   ($stemReview['status']==='not_imported'?'Project not imported.':
                   $stemReview['track_count'].' tracks, '.$stemReview['automation_lanes'].' automation lanes, '.
                   $stemReview['sends'].' sends, '.$stemReview['unmapped_effects'].' browser-unmapped effects.').
+                  "\nMastering analysis: ".
+                  (($stemReview['mastering']['status']??'')==='not_analyzed'?'No mix rendered and analyzed yet.':
+                  'Client-reported sample peak '.(string)($stemReview['mastering']['sample_peak_dbfs']??'unknown').
+                  ' dBFS; approximate integrated LUFS '.(string)($stemReview['mastering']['integrated_lufs']??'unavailable').
+                  '; clipped samples '.(string)($stemReview['mastering']['clipped_samples']??'unknown').
+                  '; status '.(string)($stemReview['mastering']['status']??'unknown').'.').
                   "\\nRecommendations: ".implode(' ',$stemReview['recommendations']).
                   ' Changes require explicit Admin approval; original REAPER media is never sent to the provider.';
             }catch(InvalidArgumentException){$text='That song ID is not in the private Stonefellow catalog. No file was opened.';}
