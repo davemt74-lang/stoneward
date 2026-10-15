@@ -164,6 +164,7 @@
      const root=this.overlay;
      window.SFStemPluginRack.bind(root,payload=>this.commitEdit(payload));
      window.SFStemAutomation.bind(root,this);
+     window.SFStemMastering.bind(root,this);
      const route=payload=>this.commitEdit(payload);
      el('[data-route-add-bus]',root)?.addEventListener('click',()=>route({action:'route_add_bus',name:el('[data-route-name]',root).value}));
      el('[data-route-add-send]',root)?.addEventListener('click',()=>route({action:'route_add_send',source_guid:el('[data-route-source]',root).value,target_guid:el('[data-route-target]',root).value}));
