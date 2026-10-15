@@ -174,6 +174,25 @@
     paramSchedule(master.gain,.82,lanes,'master','__master__','volume');
     scheduleFx(fxRacks,project.master_fx||[],lanes,'master','__master__');
   }
+  function effectTailSeconds(project){
+    const chains=[project.master_fx||[],...(project.tracks||[]).map(t=>t.fx||[]),
+      ...(project.routing?.buses||[]).map(b=>b.fx||[])];
+    let tail=0;
+    for(const chain of chains){
+      let seconds=0;
+      for(const fx of chain){
+        if(fx.enabled===false)continue;
+        if(fx.type==='reverb')seconds+=Math.max(0,Math.min(4,safe(fx.settings?.seconds,1.4)));
+        if(fx.type==='delay'){
+          const time=Math.max(.01,Math.min(1.8,safe(fx.settings?.time,.25)));
+          const feedback=Math.max(0,Math.min(.75,safe(fx.settings?.feedback,.2)));
+          seconds+=feedback>0?time*Math.log(.001)/Math.log(feedback):time;
+        }
+      }
+      tail=Math.max(tail,seconds);
+    }
+    return Math.min(12,Math.ceil(tail));
+  }
   async function renderOffline(studio,onProgress=()=>{}){
     const project=studio.project,duration=studio.duration;
     if(!project||!Number.isFinite(duration)||duration<0.1||duration>MAX_SECONDS)
@@ -181,7 +200,10 @@
     if(!window.OfflineAudioContext)throw Error('This browser does not support OfflineAudioContext.');
     const originals=(project.tracks||[]).filter(t=>t.source_file&&t.media_ready!==true);
     if(originals.length)throw Error('Link all '+originals.length+' referenced private stem(s) before rendering.');
-    const context=new OfflineAudioContext(2,Math.ceil(duration*RATE),RATE);
+    const tail=effectTailSeconds(project);
+    const renderSeconds=duration+tail;
+    if(renderSeconds>MAX_SECONDS)throw Error('Audio and effect tails exceed the 8 minute limit.');
+    const context=new OfflineAudioContext(2,Math.ceil(renderSeconds*RATE),RATE);
     const master=context.createGain(),processor=context.createGain();
     const masterFx=window.SFStemFX.build(context,master,project.master_fx||[],processor);
     processor.connect(context.destination);
@@ -244,7 +266,7 @@
       }
     }finally{await decoder.close().catch(()=>{});}
     if(!clipsMade)throw Error('No playable private stem clips were found.');
-    onProgress('Rendering '+clipsMade+' audio clips through the supported mixer graph…');
+    onProgress('Rendering '+clipsMade+' audio clips and up to '+tail+'s of supported effect tails…');
     return await context.startRendering();
   }
   const fmt=v=>Number.isFinite(v)?(Math.round(v*100)/100).toFixed(2):'—';
@@ -361,6 +383,7 @@
         const data=await window.STONEFELLOW_ADMIN_CONTEXT.uploadApi('stem-mastering.php',fd);
         studio.project=data.project;referenceName=data.project.mastering_reference?.name||file.name;
         b.src='api/stem-mastering.php?track_id='+encodeURIComponent(studio.id)+'&action=reference&t='+Date.now();
+        const heading=b.parentElement?.querySelector('b');if(heading)heading.textContent='B · '+referenceName;
         status('Private reference saved. The public music library has not changed.');
       }catch(err){status('Reference not saved: '+err.message)}
     };
@@ -400,5 +423,5 @@
     // Revoke any previous studio object URL when the owning Studio closes.
     studio._masteringDispose=()=>{a.pause();b.pause();if(blobURL)URL.revokeObjectURL(blobURL);};
   }
-  window.SFStemMastering={renderOffline,analyze,wav,ui,bind,fxInfo};
+  window.SFStemMastering={renderOffline,analyze,wav,ui,bind,fxInfo,effectTailSeconds};
 })();
