@@ -54,6 +54,7 @@ function sf_stem_project_import(string $id,string $content,string $name,int $adm
         $prior=$existing[$t['guid']]??null;
         if(!is_array($prior))continue;
         foreach(['asset_uuid','role','name','volume','pan','mute','solo'] as $k)if(array_key_exists($k,$prior))$t[$k]=$prior[$k];
+        $t['fx']=sf_stem_plugin_reimport_overrides((array)($t['fx']??[]),(array)($prior['fx']??[]));
     }unset($t);
     $parsed['project_name']=substr(pathinfo(sf_stem_safe_filename($name),PATHINFO_FILENAME),0,180);
     $parsed['imported_by']=$adminId;$parsed['imported_at']=gmdate('c');
@@ -65,6 +66,13 @@ function sf_stem_project_import(string $id,string $content,string $name,int $adm
     @chmod($tmp,0660);
     if(!rename($tmp,$source)){@unlink($tmp);throw new RuntimeException('Cannot commit REAPER project source.');}
 
+    if(is_array($old)){
+        $parsed['master_fx']=sf_stem_plugin_reimport_overrides(
+            (array)($parsed['master_fx']??[]),(array)($old['master_fx']??[]));
+    }
+    // Imported source changed; prior edit snapshots no longer apply safely.
+    $parsed['plugin_history']=['undo'=>[],'redo'=>[]];
+    $parsed['edit_history']=['undo'=>[],'redo'=>[]];
     $parsed['mixes']=(array)($old['mixes']??[]);
     return sf_stem_project_write($id,$parsed,$old===null?0:(int)$old['revision']);
 }

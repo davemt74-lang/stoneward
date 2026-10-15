@@ -1,7 +1,7 @@
 (() => {
   'use strict';
-  const types=['eq','compressor','limiter','delay','reverb'];
-  const display={eq:'EQ',compressor:'Compressor',limiter:'Master Limiter',
+  const types=['eq','eq5','compressor','limiter','delay','reverb'];
+  const display={eq:'EQ',eq5:'5-band EQ',compressor:'Compressor',limiter:'Master Limiter',
     delay:'Delay',reverb:'Reverb'};
   function render(scope,guid,list,escape){
     const esc=escape,fx=Array.isArray(list)?list:[];

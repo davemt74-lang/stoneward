@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /** Non-destructive browser plugin rack over byte-exact saved REAPER source. */
 function sf_stem_plugin_registry():array {
-    return ['eq'=>'EQ (5-band planning)',
+    return ['eq'=>'EQ', 'eq5'=>'5-band EQ',
         'compressor'=>'Compressor','delay'=>'Delay','reverb'=>'Reverb',
         'limiter'=>'Master Limiter'];
 }
@@ -105,4 +105,33 @@ function sf_stem_plugin_apply(array &$project,array $payload):void {
         $redo=[];
     }
     $project['plugin_history']=['undo'=>array_slice($undo,-20),'redo'=>array_slice($redo,-20)];
+}
+
+/** Reimport native RPP bytes, but retain safe user-made browser overrides by stable FX GUID. */
+function sf_stem_plugin_reimport_overrides(array $fresh,array $prior):array {
+    $oldByGuid=[];$extra=[];
+    foreach($prior as $fx){
+        if(!is_array($fx))continue;
+        if(($fx['format']??'')==='BROWSER'){
+            $extra[]=$fx;continue;
+        }
+        $key=(string)($fx['fx_guid']??'');
+        if($key!=='')$oldByGuid[$key]=$fx;
+    }
+    foreach($fresh as &$fx){
+        $key=(string)($fx['fx_guid']??'');
+        $old=$oldByGuid[$key]??null;
+        if(!is_array($old))continue;
+        if(($old['browser_settings_origin']??'')==='user-override'){
+            $fx['settings']=sf_stem_plugin_settings((string)$fx['type'],
+                [],(array)($old['settings']??[]));
+            $fx['enabled']=!empty($old['enabled']);
+            $fx['browser_settings_origin']='user-override';
+        }
+    }unset($fx);
+    foreach($extra as $plugin){
+        if(count($fresh)>=32)break;
+        $fresh[]=$plugin;
+    }
+    return $fresh;
 }

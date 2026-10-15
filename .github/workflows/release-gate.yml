@@ -284,6 +284,11 @@ jobs:
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php
+          php tests/section86c-reaper-plugin-rack.php
+          php -l api/stem-rpp-plugins.php
+          php -l api/stem-plugin-operations.php
+          node --check admin/assets/stem-plugin-rack.js
+          node tests/section86c-plugin-rack.cjs
           node --check admin/assets/stem-timeline.js
           node --check admin/assets/stem-fx-engine.js
           node tests/section86b-editor.cjs

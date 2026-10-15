@@ -52,3 +52,24 @@
  .sf-studio-clip-inspector label,.sf-studio-effect label{max-width:100%;width:100%;margin:4px 0}
  .sf-studio-clip-inspector input,.sf-studio-clip-inspector select,.sf-studio-effect input{max-width:100%;min-width:0}
 }
+
+/* 86C · REAPER-aligned modular per-track and master-bus plugin rack */
+.sf-studio-master-rack{margin:12px 0;padding:10px;background:#1b1915;border:1px solid #655038}
+.sf-studio-master-rack summary{cursor:pointer;color:#f2d7ab;font-weight:600}
+.sf-plugin-rack{display:grid;gap:10px;min-width:0;margin:10px 0;padding:10px;background:#1a1611;border:1px solid #614d36}
+.sf-plugin-rack-title{display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;color:#f0cfa2}
+.sf-plugin-rack-title small,.sf-plugin-provenance,.sf-plugin-js{font-size:11px;color:#c3b099}
+.sf-plugin{background:#292219;border:1px solid #70573c;padding:12px;display:grid;gap:10px;min-width:0}
+.sf-plugin-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sf-plugin-head strong{color:#f0d5ad;flex:1}
+.sf-plugin-head span{color:#cba973;font-size:11px}
+.sf-plugin-provenance{display:flex;gap:8px 18px;flex-wrap:wrap;overflow-wrap:anywhere}
+.sf-plugin-provenance code,.sf-plugin-js code{font-size:10px;overflow-wrap:anywhere}
+.sf-plugin-controls{display:flex;gap:9px;flex-wrap:wrap}
+.sf-plugin-controls label{display:grid;gap:4px;font-size:11px;color:#d2c0a4;min-width:95px;max-width:180px}
+.sf-plugin-controls input,.sf-plugin-toolbar select{background:#16130f;color:#f5e6cc;border:1px solid #826749;padding:7px;max-width:180px}
+.sf-plugin-actions,.sf-plugin-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sf-plugin-actions button,.sf-plugin-toolbar button{background:#4c3927;color:#f3dfbd;border:1px solid #8d6b42;border-radius:4px;padding:6px 10px;cursor:pointer}
+.sf-plugin-actions button:disabled{opacity:.35;cursor:not-allowed}
+.sf-plugin-js{max-width:100%;overflow-wrap:anywhere}
+@media(max-width:650px){.sf-plugin-rack{padding:7px}.sf-plugin-controls label{width:45%;min-width:0}.sf-plugin-controls input{width:100%}}
