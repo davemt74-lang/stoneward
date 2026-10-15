@@ -16,12 +16,18 @@ function sf_stem_mastering_report_validate(array $input):array {
         'crest_db'=>[0,120],
         'stereo_imbalance_db'=>[0,120],
         'clipped_samples'=>[0,96000*480*2],
+        'low_band_pct'=>[0,100], 'high_band_pct'=>[0,100],
+        'reference_low_band_pct'=>[0,100], 'reference_high_band_pct'=>[0,100],
+        'reference_integrated_lufs'=>[-120,24],
     ];
     $safe=[];
     foreach($allowed as $key=>[$lo,$hi]){
-        if(!array_key_exists($key,$metrics)){if($key==='integrated_lufs'){$safe[$key]=null;continue;}throw new InvalidArgumentException('Missing mix measurement: '.$key);}
+        if(!array_key_exists($key,$metrics)){
+            if($key==='integrated_lufs'||str_starts_with($key,'reference_')||in_array($key,['low_band_pct','high_band_pct'],true)){$safe[$key]=null;continue;}
+            throw new InvalidArgumentException('Missing mix measurement: '.$key);
+        }
         $v=$metrics[$key];
-        if($v===null&&$key==='integrated_lufs'){$safe[$key]=null;continue;}
+        if($v===null&&($key==='integrated_lufs'||str_starts_with($key,'reference_'))) {$safe[$key]=null;continue;}
         if(!is_numeric($v)||!is_finite((float)$v)||(float)$v<$lo||(float)$v>$hi)
             throw new InvalidArgumentException('Invalid mix measurement: '.$key);
         $safe[$key]=$key==='clipped_samples'?(int)$v:round((float)$v,3);
@@ -103,6 +109,10 @@ function sf_stem_mastering_agent_summary(array $project):array {
         'integrated_lufs'=>$m['integrated_lufs']??null,
         'crest_db'=>$m['crest_db']??null,
         'stereo_imbalance_db'=>$m['stereo_imbalance_db']??null,
+        'low_band_pct'=>$m['low_band_pct']??null,
+        'high_band_pct'=>$m['high_band_pct']??null,
+        'reference_low_band_pct'=>$m['reference_low_band_pct']??null,
+        'reference_high_band_pct'=>$m['reference_high_band_pct']??null,
         'clipped_samples'=>$m['clipped_samples']??null,
         'not_mastering_certified'=>true];
 }
@@ -113,6 +123,12 @@ function sf_stem_mastering_recommendations(array $summary):array {
     if(($summary['clipped_samples']??0)>0)$out[]='Browser measurement shows clipped output samples; inspect master gain and limiter ceiling.';
     if(($summary['sample_peak_dbfs']??-120)>-1.0)$out[]='Sample peaks approach digital full scale; review headroom and check true peak in a mastering application.';
     if(($summary['stereo_imbalance_db']??0)>3)$out[]='Left/right RMS differs by over 3 dB; review panning and the reference mix.';
+    if(($summary['low_band_pct']??null)!==null && ($summary['reference_low_band_pct']??null)!==null &&
+        abs((float)$summary['low_band_pct']-(float)$summary['reference_low_band_pct'])>=10)
+        $out[]='Approximate low-band balance differs materially from the selected reference; check source material and listen before EQ.';
+    if(($summary['high_band_pct']??null)!==null && ($summary['reference_high_band_pct']??null)!==null &&
+        abs((float)$summary['high_band_pct']-(float)$summary['reference_high_band_pct'])>=10)
+        $out[]='Approximate high-band balance differs from the reference; verify tonal balance by listening, not only this estimate.';
     if(($summary['integrated_lufs']??null)!==null)$out[]='Compare the measured integrated loudness against your intended release format; no universal LUFS target is assumed.';
     if(!$out)$out[]='No obvious clipping or channel-imbalance flags in the browser measurements; listen against the source REAPER mix.';
     $out[]='Measurements are browser-reported and not independently server-verified; any proposed changes require exact Admin approval.';
