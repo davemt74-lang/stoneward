@@ -83,6 +83,10 @@ async function run(){
     'Offline rendering schedules a decoded private stem with correct length');
   verify(graphEdges>=15&&scheduled>8&&decodeCalls===1,
     'Offline graph includes folder bus, post-fader send, mixer gates and automation');
+  verify(mastering.effectTailSeconds({...project,master_fx:[{type:'reverb',settings:{seconds:3},enabled:true}]})===3,
+    'Offline mixdown preserves bounded reverb tail frames');
+  verify(mastering.effectTailSeconds({...project,master_fx:[{type:'delay',settings:{time:1.2,feedback:.75},enabled:true}]})<=12,
+    'Long feedback tails remain within finite render bounds');
   const unsupported=mastering.fxInfo({...project,master_fx:[{type:'native_vst_unknown',enabled:true}]});
   verify(unsupported===1,'Unmapped native VST processing produces a visible fidelity warning');
   const html=mastering.ui({...project,track_id:'song-1',mastering_analyses:[]});
@@ -90,6 +94,6 @@ async function run(){
     html.includes('data-g-upload')&&html.includes('data-g-switch'),
     'Integrated mastering lab offers reference A/B and governed Agent review');
   verify(!html.includes('storage/stem-projects'),'Private storage paths are never rendered into browser');
-  console.log('86G browser mastering regression: 12 checks green');
+  console.log('86G browser mastering regression: 14 checks green');
 }
 run().catch(e=>{console.error(e);process.exitCode=1});
