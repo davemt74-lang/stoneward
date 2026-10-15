@@ -13,7 +13,7 @@ $checks=[
  'Agent Brain timeline now includes journey saves'=>str_contains($brain,'data-agent-journey-id'),
  'Completed journey opens existing Automation Builder'=>str_contains($brain,'SFAutomationsAdmin?.openAutomation?.(id)'),
  'Campaign history retained'=>str_contains($brain,'data-agent-campaign-id'),
- 'Interrupted journey requires manual review'=>str_contains($brain,'correct Campaign or Automation Builder'),
+ 'Interrupted journey requires manual review'=>str_contains($brain,'correct destination Admin editor')&&str_contains($brain,'possible partial saves first'),
  'Measured time windows retained'=>str_contains($ui,'[7,30,90]')
 ];
 $fail=0;foreach($checks as $name=>$ok){echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$ok)$fail++;}
