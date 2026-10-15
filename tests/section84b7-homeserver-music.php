@@ -10,7 +10,7 @@ function check87(bool $condition,string $message):void{
 function denies87(callable $fn):bool {
     try{$fn();return false;}catch(Throwable $e){return true;}
 }
-$owned=[['id'=>'song-one','can_stream'=>true],['id'=>'song-two','can_stream'=>false]];
+$owned=[['id'=>'song-one','can_stream'=>true,'can_download'=>true],['id'=>'song-two','can_stream'=>false]];
 $catalog=['song-one'=>['audio'=>'api/media.php?id=M12345678901234567890',
     'podEligible'=>true,'vinyl_license_packages'=>[['licenses'=>1,'price_cents'=>250]]],
     'song-two'=>['audio'=>'hidden.wav']];
