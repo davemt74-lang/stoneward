@@ -4,7 +4,7 @@ declare(strict_types=1);
  * 84B7: a read-only, account-scoped native playback contract.
  * Physical vinyl credits never create digital access.
  */
-function sf_hs_music_audio_reference(int $userId,string $trackId,array $owned,array $catalog):string {
+function sf_hs_music_audio_reference(int $userId,string $trackId,array $owned,array $catalog,bool $download=false):string {
     if($userId<1||!preg_match('/^[A-Za-z0-9._-]{1,100}$/D',$trackId))
         throw new RuntimeException('Invalid music request.');
     $permitted=false;
