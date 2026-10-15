@@ -20,6 +20,10 @@ check87(denies87(fn()=>sf_hs_music_audio_reference(10,'song-two',$owned,$catalog
     'Print rights do not grant digital stream rights');
 check87(denies87(fn()=>sf_hs_music_audio_reference(10,'../song-one',$owned,$catalog)),
     'No arbitrary media paths through song IDs');
+check87(denies87(fn()=>sf_hs_music_audio_reference(10,'song-two',$owned,$catalog,true)),
+    'Download permission is independent from streaming ownership');
+check87(sf_hs_music_audio_reference(10,'song-one',$owned,$catalog,true)==='api/media.php?id=M12345678901234567890',
+    'Purchased track may download only with can_download');
 check87(denies87(fn()=>sf_hs_music_audio_reference(11,'song-one',[],$catalog)),
     'No other-account access');
 check87(sf_hs_music_range('bytes=0-99',1000)['length']===100,

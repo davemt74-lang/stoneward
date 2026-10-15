@@ -21,8 +21,7 @@ try{
     // Use exactly the same vetted, private Media Library master resolver as 84B5.
     $media=sf_kunaki_media_resolve($ref,'audio');
     $size=(int)$media['size_bytes'];
-    $range=sf_hs_music_range(
-        !$download?(string)($_SERVER['HTTP_RANGE']??''):null,$size);
+    $range=sf_hs_music_range((string)($_SERVER['HTTP_RANGE']??''),$size);
 }catch(InvalidArgumentException $e){
     header('Content-Range: bytes */'.(int)($size??0));
     sf_json_response(['ok'=>false,'error'=>'invalid_range'],416);

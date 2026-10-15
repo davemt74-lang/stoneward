@@ -43,7 +43,7 @@ function sf_hs_music_rights(array $tracks,array $balances,array $catalog):array 
             foreach((array)($t['vinyl_license_packages']??[]) as $p){
                 if(!is_array($p))continue;
                 $count=(int)($p['licenses']??0);$price=(int)($p['price_cents']??0);
-                if(in_array($count,[1,2,3,5,10],true)&&$price>=50&&$price<=100000)
+                if(in_array($count,[1,2,3,5,10],true)&&$price>=50&&$price<=100000&&!array_key_exists($count,$packages))
                     $packages[$count]=['licenses'=>$count,'price_cents'=>$price];
             }
         ksort($packages,SORT_NUMERIC);
