@@ -108,3 +108,19 @@
 .sf-route-buses article{flex:1 1 300px}.sf-route-buses article details{flex-basis:100%}
 .sf-studio-routing label{font-size:11px;color:#d8c1a1}.sf-studio-routing input,.sf-studio-routing select{background:#100e0c;color:#eee;border:1px solid #856643;padding:6px;max-width:180px}
 .sf-studio-routing button{background:#62452b;color:#fff;border:1px solid #9a744a;padding:7px 11px;cursor:pointer;border-radius:4px}
+
+/* 86G private mastering lab, integrated into the current Stem Studio canvas */
+.sf-g-mastering{margin:18px 0;padding:18px;border:1px solid #876c48;background:#201a14;border-radius:10px}
+.sf-g-mastering h3{margin:0 0 10px;color:#f7deae}.sf-g-mastering p{color:#c5b8a3;font-size:13px;line-height:1.55}
+.sf-g-mastering .sf-g-warning{color:#f3b787;font-weight:600}
+.sf-g-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:14px 0}
+.sf-g-tools button,.sf-g-tools a,.sf-g-ab button{cursor:pointer;border-radius:6px;border:1px solid #94744c;background:#674a2e;color:#fff;padding:9px 13px;text-decoration:none;font-size:13px}
+.sf-g-tools button:disabled{opacity:.55;cursor:not-allowed}
+.sf-g-tools label{display:grid;gap:7px;font-size:12px;color:#e6d3af}.sf-g-tools input{max-width:280px;color:#e9dbca}
+.sf-g-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:14px 0}
+.sf-g-metrics>div{background:#30281e;border:1px solid #574831;border-radius:5px;padding:11px;display:grid;gap:6px}
+.sf-g-metrics small{font-size:11px;color:#d8c7b1}.sf-g-metrics strong{font-size:16px;color:#fae4bd}
+.sf-g-ab{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}.sf-g-ab>div{flex:1 1 230px;display:grid;gap:8px}
+.sf-g-ab b{font-size:12px;color:#f1d5ad}.sf-g-ab audio{width:100%;max-width:450px}
+.sf-g-ab button{align-self:center}.sf-g-note{font-size:11px!important}
+@media(max-width:620px){.sf-g-mastering{padding:12px}.sf-g-tools button,.sf-g-tools a{width:100%;text-align:center}.sf-g-ab>div{min-width:100%}}
