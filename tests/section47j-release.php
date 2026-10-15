@@ -47,7 +47,12 @@ $checks['Repeated migration never deletes existing mission history']=(int)$db->q
 $checks['Repeated migration never deletes feedback history']=(int)$db->query('SELECT COUNT(*) FROM agent_response_feedback')->fetchColumn()===1;
 $checks['User hashes also survive repeat migration']=$db->query('SELECT password_hash FROM users WHERE id=10')->fetchColumn()===$hash2;
 $checks['Migration checksum is stable']=count($matches)===1&&sf_migration_checksum($matches[0])===sf_migration_checksum($matches[0]);
-$build='1.3.75';$schema='1.3.48';
+$front=(string)$read('stonefellow-v120.php');
+$matchesBuild=[];
+$build=preg_match("/define\\('SF_BUILD', '([0-9]+\\.[0-9]+\\.[0-9]+)'\\)/",$front,$matchesBuild)
+    ?$matchesBuild[1]:'';
+$schema='1.3.48';
+$checks['Version increases without breaking section 47 baseline']=$build!==''&&version_compare($build,'1.3.75','>=');
 $checks['Public and Admin release version synchronized']=str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '".$build."')")
    &&str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$build."')");
 $checks['PWA and Apache headers synchronized']=str_contains($read('service-worker.js'),'stonefellow-static-v'.$build)
