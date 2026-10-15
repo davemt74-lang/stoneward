@@ -21,6 +21,8 @@ function sf_agent_skill_definitions(): array {
       'customer_policy'=>['label'=>'Apply JEV routing','contexts'=>['customer'],'tool'=>'jev_routing','intents'=>['jev_routing']],
       'customer_order_status'=>['label'=>'Read my own orders and fulfillment','contexts'=>['customer'],'tool'=>'customer_order_status','intents'=>['customer_order_status']],
       'admin_kunaki_publishing'=>['label'=>'Stage purchased vinyl for HomeServer review','contexts'=>['admin'],'tool'=>'kunaki_publishing_queue','intents'=>['kunaki_publishing_queue']],
+      'admin_stem_mix_review'=>['label'=>'Review private REAPER Stem Studio mix and suggest improvements','contexts'=>['admin'],'tool'=>'stem_mix_inspect','intents'=>['stem_mix_review']],
+      'admin_stem_automation'=>['label'=>'Prepare governed mix automation with exact approval','contexts'=>['admin'],'tool'=>'stem_automation_update','intents'=>['stem_automation_update']],
       'admin_commerce_insights'=>['label'=>'Review store commerce exceptions','contexts'=>['admin'],'tool'=>'commerce_aggregate','intents'=>['commerce_report']],
       'admin_commerce_followup'=>['label'=>'Prepare reviewed customer follow-up','contexts'=>['admin'],'tool'=>'commerce_followup_add','intents'=>['prepare_commerce_followup']],
       'admin_crm_insights'=>['label'=>'Review CRM aggregates','contexts'=>['admin'],'tool'=>'crm_aggregate','intents'=>['crm_report']],
