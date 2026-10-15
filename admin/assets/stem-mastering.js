@@ -203,7 +203,7 @@
     const tail=effectTailSeconds(project);
     const renderSeconds=duration+tail;
     if(renderSeconds>MAX_SECONDS)throw Error('Audio and effect tails exceed the 8 minute limit.');
-    const context=new OfflineAudioContext(2,Math.ceil(renderSeconds*RATE),RATE);
+    const context=new window.OfflineAudioContext(2,Math.ceil(renderSeconds*RATE),RATE);
     const master=context.createGain(),processor=context.createGain();
     const masterFx=window.SFStemFX.build(context,master,project.master_fx||[],processor);
     processor.connect(context.destination);
