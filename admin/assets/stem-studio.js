@@ -362,7 +362,7 @@
    async saveMix(){const name=el('[data-studio-mix-name]',this.overlay)?.value?.trim();if(!name)return this.say('Enter a mix name.');
      try{const j=await api('stem-studio.php',{action:'save_mix',track_id:this.id,revision:this.project.revision,mix:{name,tracks:clone(this.mixing),buses:clone(this.busMix)}});this.project=j.project;this.say('Saved mix '+name);this.render()}catch(e){this.say(e.message)}}
    recall(name){if(!this.project?.mixes?.[name])return;this.commitEdit({action:'recall_mix',name})}
-   close(){this.stop();void this.resetAudio();this.overlay?.remove();if(studio===this)studio=null}
+   close(){this._masteringDispose?.();this.stop();void this.resetAudio();this.overlay?.remove();if(studio===this)studio=null}
  }
  async function open(id){if(studio)studio.close();studio=new StemStudio(id);await studio.init();}
  window.SFStemStudio={section,bind,open};
