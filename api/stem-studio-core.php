@@ -141,11 +141,21 @@ function sf_stem_project_update(string $id,array $payload):array {
                 'pan'=>max(-1,min(1,(float)$pan)),
                 'mute'=>!empty($override['mute']),'solo'=>!empty($override['solo'])];
         }
+        $busRows=(array)($mix['buses']??[]);
+        foreach((array)($old['routing']['buses']??[]) as $bus){
+            $key=(string)$bus['id'];
+            $state=$busRows[$key]??null;
+            if(is_array($state)){
+                $busRows[$key]=['volume'=>sf_stem_automation_numeric($state['volume']??null,0,4),
+                    'pan'=>sf_stem_automation_numeric($state['pan']??null,-1,1),
+                    'mute'=>($state['mute']??false)===true,
+                    'solo'=>($state['solo']??false)===true];
+            }else $busRows[$key]=['volume'=>$bus['volume'],'pan'=>$bus['pan'],
+                 'mute'=>$bus['mute'],'solo'=>$bus['solo']];
+        }
         $old['mixes']=array_slice((array)($old['mixes']??[]),-19,20,true);
         $old['mixes'][$mixName]=['name'=>$mixName,'tracks'=>$values,
-            'buses'=>array_map(static fn(array $b):array=>[
-                'id'=>$b['id'],'volume'=>$b['volume'],'pan'=>$b['pan'],
-                'mute'=>$b['mute'],'solo'=>$b['solo']],(array)($old['routing']['buses']??[])),
+            'buses'=>array_map(static fn(array $b):array=>['id'=>$b['id']]+$busRows[(string)$b['id']],(array)($old['routing']['buses']??[])),
             'automation'=>array_values(array_filter((array)($old['automation']??[]),
                 static fn(array $lane):bool=>($lane['source']??'')==='BROWSER')),
             'saved_at'=>gmdate('c')];
