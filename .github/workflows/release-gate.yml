@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-      - 'feat/**'
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     branches:
       - main
 
@@ -13,7 +13,32 @@ permissions:
   contents: read
 
 jobs:
+  # Every draft gets lightweight changed-file syntax and workflow policy checks.
+  pr-smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check changed PHP/JS files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/ci_pr_smoke.py
+      - name: Verify CI release gating policy
+        run: python3 tests/ci_g1_release_policy.py
+
   release-gate:
+    # Full release suite runs once ready for review and on every main merge.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -296,6 +321,7 @@ jobs:
           retention-days: 30
 
   mysql-certification:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: MySQL checkout inventory certification
     runs-on: ubuntu-latest
     timeout-minutes: 10
