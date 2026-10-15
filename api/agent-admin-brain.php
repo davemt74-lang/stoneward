@@ -223,6 +223,9 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
                   ' dBFS; approximate integrated LUFS '.(string)($stemReview['mastering']['integrated_lufs']??'unavailable').
                   '; clipped samples '.(string)($stemReview['mastering']['clipped_samples']??'unknown').
                   '; status '.(string)($stemReview['mastering']['status']??'unknown').'.').
+                  "\\nRelease readiness: ".(string)($stemReview['mastering_review']['status']??'not_reviewed').
+                  '; private catalog master: '.(string)($stemReview['catalog_publication']['state']??'not_staged').
+                  '. Public previews and vinyl print rights are not altered by candidate staging.'.
                   "\\nRecommendations: ".implode(' ',$stemReview['recommendations']).
                   ' Changes require explicit Admin approval; original REAPER media is never sent to the provider.';
             }catch(InvalidArgumentException){$text='That song ID is not in the private Stonefellow catalog. No file was opened.';}
