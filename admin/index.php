@@ -158,6 +158,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/stem-fx-engine.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/stem-plugin-rack.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/stem-automation.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/stem-mastering.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/stem-studio.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/video.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/gallery.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
