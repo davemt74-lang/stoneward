@@ -49,7 +49,7 @@ function sf_stem_rpp_plugin_metadata(string $text):array {
         }
         if($scope==='')continue;
         if($current!==null&&$depth>0){
-            if(preg_match('/^(\\s*)>\\s*$/',$line)&&strlen($m[1])===$pluginIndent){
+            if(preg_match('/^(\\s*)>\\s*$/',$line,$m)&&strlen($m[1])===$pluginIndent){
                 $depth=0;
                 $current['native_state_sha256']=hash('sha256',implode("\n",$state));
                 $current['native_state_lines']=count($state);
