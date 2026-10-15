@@ -77,3 +77,21 @@ ok85(str_contains($endpoint,'sf_require_user()')
  &&!str_contains($endpoint,'sf_homeserver_bearer('),
     'Website download uses session identity and vetted masters rather than bridge tokens');
 echo "Section 85A purchased music and vinyl rights: $passes checks passed".PHP_EOL;
+
+$site=file_get_contents(dirname(__DIR__).'/stonefellow-v120.php');
+$ui=file_get_contents(dirname(__DIR__).'/assets/js/library.js');
+$wallet=file_get_contents(dirname(__DIR__).'/assets/js/owned-music.js');
+$css=file_get_contents(dirname(__DIR__).'/assets/css/site.css');
+ok85(str_contains($site,'assets/js/owned-music.js') && str_contains($site,"'1.3.76'"),
+    'Versioned storefront loads owned-wallet renderer before My Library');
+ok85(str_contains($ui,"owned:'Owned Music'")&&str_contains($ui,"fan-owned-music.php"),
+    'My Library displays account-scoped purchased music separately from favorites');
+ok85(str_contains($wallet,'api/fan-owned-download.php?id=')&&str_contains($wallet,'data-owned-licenses'),
+    'Digital download and additional vinyl-license actions use first-party website routes');
+ok85(str_contains($wallet,'reserved/used')&&str_contains($wallet,'never consume licenses'),
+    'Customer presentation distinguishes print-credit spending from owned digital playback');
+ok85(str_contains($css,'.library-owned-card')&&str_contains($css,'@media(max-width:740px)'),
+    'Owned-music controls have responsive mobile styles');
+ok85(str_contains(file_get_contents(dirname(__DIR__).'/.github/workflows/release-gate.yml'),
+    'php tests/section85a-site-ownership.php'),
+    'Final Stonefellow release gate explicitly runs 85A security and entitlement regressions');

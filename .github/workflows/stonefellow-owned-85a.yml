@@ -1,0 +1,45 @@
+name: Stonefellow Fan Music Wallet 85A
+on:
+  pull_request:
+    paths:
+      - 'api/fan-owned-*.php'
+      - 'api/homeserver-link-core.php'
+      - 'api/homeserver-music-core.php'
+      - 'assets/js/owned-music.js'
+      - 'assets/js/library.js'
+      - 'assets/css/site.css'
+      - 'stonefellow-v120.php'
+      - 'version.php'
+      - 'tests/section85a-site-ownership.php'
+      - '.github/workflows/stonefellow-owned-85a.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/fan-owned-*.php'
+      - 'assets/js/owned-music.js'
+      - 'assets/js/library.js'
+      - 'assets/css/site.css'
+      - 'stonefellow-v120.php'
+      - 'tests/section85a-site-ownership.php'
+permissions:
+  contents: read
+jobs:
+  wallet-rights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - run: |
+          php -l api/fan-owned-music-core.php
+          php -l api/fan-owned-music.php
+          php -l api/fan-owned-download.php
+          php -l tests/section85a-site-ownership.php
+          node --check assets/js/owned-music.js
+          node --check assets/js/library.js
+          node --check assets/js/app.js
+          php tests/section85a-site-ownership.php
