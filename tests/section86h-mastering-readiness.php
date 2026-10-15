@@ -39,8 +39,9 @@ ok86h(sf_stem_86h_review_status($p)['status']==='reviewed_pending_media_upload',
  'Readiness signature survives readiness-only revision');
 ok86h(sf_stem_86h_review_status($p)['can_publish']===false,
  'Reviewed candidate is not an existing catalog asset');
-$p=sf_stem_project_update('song-1',['action'=>'edit_track','revision'=>3,'guid'=>'{GUITAR}',
- 'name'=>'Guitar','role'=>'String']);
+$p=sf_stem_project_update('song-1',['action'=>'automation_set_lane','revision'=>3,
+ 'lane'=>['scope'=>'track','guid'=>'{GUITAR}','parameter'=>'volume',
+    'points'=>[['time'=>0,'value'=>0.7,'shape'=>'linear']]]]);
 ok86h(sf_stem_86h_review_status($p)['status']==='stale_after_mix_edit',
  'Any changed audio graph invalidates previous approval');
 ok86h(fails86h(fn()=>sf_stem_86h_save_review('song-1',[
