@@ -47,6 +47,15 @@ check86d($container['status']==='vst-container-verified-parameters-opaque'
     'Recognized ReaEQ VST container identity/version verified');
 check86d($container['native_parameters']===[]&&$container['confidence']==='container-only',
     'VST opaque binary is not misreported as effect knob values');
+$reaCompHeader=base64_encode('mcer'.hex2bin('ef5eedfe').pack('V',4).str_repeat(chr(0),24));
+$comp=sf_stem_inspect_reaplugs_state('reacomp.dll',[$reaCompHeader,$payload]);
+check86d($comp['status']==='vst-container-verified-parameters-opaque'
+  &&$comp['container']['plugin_fourcc']==='mcer'
+  &&$comp['container']['container_version']===4,
+  'Observed ReaComp ef5eedfe native header passes strict identity check');
+check86d(sf_stem_inspect_reaplugs_state('reacomp.dll',
+    [base64_encode('mcer'.hex2bin('ee5eedfe').pack('V',4).str_repeat(chr(0),24)),$payload])['confidence']==='none',
+    'ReaComp wrong marker is rejected rather than treated as verified');
 check86d(sf_stem_inspect_reaplugs_state('reacomp.dll',[$header,$payload])['confidence']==='none',
     'ReaComp cannot receive ReaEQ container identity');
 check86d(sf_stem_inspect_reaplugs_state('reaeq.dll',
