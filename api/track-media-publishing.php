@@ -26,6 +26,8 @@ function sf_track_media_publish_master(string $trackId,int $linkId):array {
     $q->execute([$id,$linkId]);
     if($q->fetchColumn())throw new RuntimeException('Original is publicly linked elsewhere; use a separate preview.');
     $ref='api/media.php?id='.(string)$link['uuid'];
+    if((string)($catalog[$idx]['audio']??'')===$ref)
+        throw new RuntimeException('The public preview and private original must be different media assets.');
     // Existing 84B5 resolver verifies private storage, SHA-256, media type and size.
     sf_kunaki_media_resolve($ref,'audio');
     $previous=(string)($catalog[$idx]['private_master_audio']??'');

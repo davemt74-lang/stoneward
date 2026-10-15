@@ -23,7 +23,7 @@ $pass=0;
 function ok85b(bool $yes,string $what):void{global $pass;if(!$yes)throw new RuntimeException('FAIL '.$what);$pass++;echo 'PASS '.$what.PHP_EOL;}
 function denies85b(callable $fn):bool{try{$fn();return false;}catch(Throwable){return true;}}
 function addAsset85b(string $uuid,string $name):int{
-    $file=SF_ROOT.'/storage/media/'.$name;$bytes='RIFF' .str_repeat('sample',36);
+    $file=SF_ROOT.'/storage/media/'.$name;$bytes='RIFF' .str_repeat('sample',36).$name;
     file_put_contents($file,$bytes);$hash=hash_file('sha256',$file);
     $q=sf_db()->prepare('INSERT INTO media_assets(uuid,category,mime_type,extension,original_name,stored_path,sha256,size_bytes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
     $q->execute([$uuid,'audio','audio/wav','wav',$name,'storage/media/'.$name,$hash,strlen($bytes),gmdate('c'),gmdate('c')]);
