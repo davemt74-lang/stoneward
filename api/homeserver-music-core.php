@@ -10,7 +10,7 @@ function sf_hs_music_audio_reference(int $userId,string $trackId,array $owned,ar
     $permitted=false;
     foreach($owned as $row){
         if(is_array($row)&&hash_equals((string)($row['id']??''),$trackId)
-           &&!empty($row['can_stream'])){$permitted=true;break;}
+           &&!empty($row[$download?'can_download':'can_stream'])){$permitted=true;break;}
     }
     if(!$permitted)throw new RuntimeException('Music entitlement unavailable.');
     $track=$catalog[$trackId]??null;
