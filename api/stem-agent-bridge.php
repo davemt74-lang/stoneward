@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/stem-studio-core.php';
 require_once __DIR__.'/stem-mastering-core.php';
+require_once __DIR__.'/stem-catalog-publishing.php';
 /**
  * Read-only Admin Brain bridge. Only a named song, validated against the site
  * catalog, can be inspected. Never supply RPP/VST binary, paths, stem URLs,
@@ -29,6 +30,8 @@ function sf_stem_agent_review(string $songId):array {
         if(($lane['source']??'')==='REAPER'&&empty($lane['enabled']))$unmapped++;
     }
     $mastering=sf_stem_mastering_agent_summary($project);
+    $releaseReview=sf_stem_86h_review_status($project);
+    $catalogPublication=sf_stem_86i_status($project);
     $suggestions=sf_stem_mastering_recommendations($mastering);
     if($missing>0)$suggestions[]=$missing.' tracks have missing source media. Link the private WAV/MP3 stems before assessing levels.';
     if((int)($routing['unsupported_receives']??0)>0)$suggestions[]='Some REAPER receives were not mapped; compare playback against the original REAPER session.';
@@ -48,6 +51,12 @@ function sf_stem_agent_review(string $songId):array {
       'saved_mix_count'=>count((array)($project['mixes']??[])),
       'current_mix'=>(string)($project['current_mix']??''),
       'mastering'=>$mastering,
+      'mastering_review'=>$releaseReview,
+      'catalog_publication'=>[
+          'state'=>$catalogPublication['state'],
+          'profile'=>$catalogPublication['profile'],
+          'audio_signature_matches'=>$catalogPublication['audio_signature_matches'],
+          'publish_scope'=>'private_master_only'],
       'reference_available'=>isset($project['mastering_reference']['tag']),
       'recommendations'=>array_values(array_slice(array_unique($suggestions),0,12)),
       'mutation_policy'=>'No autonomous edits: exact project revision and admin proposal approval required.'
