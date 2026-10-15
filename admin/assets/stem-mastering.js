@@ -44,6 +44,9 @@
     const l=buffer.getChannelData(0),r=mono?l:buffer.getChannelData(1);
     const n=l.length,win=19200,hop=4800;
     let peak=0,clips=0,lSum=0,rSum=0;
+    // Broad spectral bands are rough one-pole estimates, not FFT mastering EQ data.
+    const lp180=[0,0],lp3200=[0,0],band=[0,0,0];
+    const a180=1-Math.exp(-2*Math.PI*180/RATE),a3200=1-Math.exp(-2*Math.PI*3200/RATE);
     const filters=[0,1].map(()=>[
       {b:[1.53512485958697,-2.69169618940638,1.19839281085285],a:[-1.69065929318241,.73248077421585],z1:0,z2:0},
       {b:[1,-2,1],a:[-1.99004745483398,.99007225036621],z1:0,z2:0}
@@ -65,6 +68,12 @@
       peak=Math.max(peak,ap,bp);
       if(ap>=.999)clips++;if(!mono&&bp>=.999)clips++;
       lSum+=a*a;if(!mono)rSum+=b*b;
+      for(let ch=0;ch<(mono?1:2);ch++){
+        const v=ch===0?a:b;
+        lp180[ch]+=a180*(v-lp180[ch]);lp3200[ch]+=a3200*(v-lp3200[ch]);
+        const low=lp180[ch],mid=lp3200[ch]-low,high=v-lp3200[ch];
+        band[0]+=low*low;band[1]+=mid*mid;band[2]+=high*high;
+      }
       const ka=sample(a,0),kb=mono?0:sample(b,1);
       const energy=ka*ka+kb*kb,idx=i%win;
       sum+=energy-ring[idx];ring[idx]=energy;
@@ -83,6 +92,8 @@
       sample_peak_dbfs:db(peak),integrated_lufs:lufs,
       rms_dbfs:db(rms),crest_db:Math.max(0,db(peak)-db(rms)),
       stereo_imbalance_db:Math.abs(db(lRms)-db(rRms)),clipped_samples:clips,
+      low_band_pct:100*band[0]/Math.max(1e-18,band.reduce((x,y)=>x+y,0)),
+      high_band_pct:100*band[2]/Math.max(1e-18,band.reduce((x,y)=>x+y,0)),
     };
   }
   function paramSchedule(param,base,lanes,scope,guid,name,fxIndex=null,fxParam=''){
@@ -241,7 +252,8 @@
     return '<div class="sf-g-metrics">'+
       [['Sample peak',m.sample_peak_dbfs,'dBFS'],['Integrated loudness (approx)',m.integrated_lufs,'LUFS'],
        ['RMS',m.rms_dbfs,'dBFS'],['Crest factor',m.crest_db,'dB'],
-       ['Stereo imbalance',m.stereo_imbalance_db,'dB'],['Clipped output samples',m.clipped_samples,'']].
+       ['Stereo imbalance',m.stereo_imbalance_db,'dB'],['Clipped output samples',m.clipped_samples,''],
+       ['Low-frequency energy (approx)',m.low_band_pct,'%'],['High-frequency energy (approx)',m.high_band_pct,'%']].
       map(([name,value,unit])=>'<div><small>'+name+'</small><strong>'+fmt(value)+' '+unit+'</strong></div>').join('')+
       '</div>';
   }
@@ -362,9 +374,17 @@
         const decoded=await ctx.decodeAudioData(await response.arrayBuffer());
         if(decoded.duration>MAX_SECONDS)throw Error('Reference is longer than the 8 minute comparison limit.');
         refAnalysis=analyze(decoded);
+        if(last){
+          last.details.reference_name=referenceName;
+          last.metrics.reference_low_band_pct=refAnalysis.low_band_pct;
+          last.metrics.reference_high_band_pct=refAnalysis.high_band_pct;
+          last.metrics.reference_integrated_lufs=refAnalysis.integrated_lufs;
+        }
         q('[data-g-reference-results]').innerHTML='<h4>Reference: '+esc(referenceName)+'</h4>'+
           metricsHTML(refAnalysis)+(last?'<p>Relative loudness: '+fmt((last.metrics.integrated_lufs??0)-(refAnalysis.integrated_lufs??0))+
-          ' LU (current mix minus reference; approximate, not loudness-normalized).</p>':'');
+          ' LU (current mix minus reference; approximate, not loudness-normalized). Approximate low-band difference: '+
+          fmt(last.metrics.low_band_pct-refAnalysis.low_band_pct)+' percentage points; high-band difference: '+
+          fmt(last.metrics.high_band_pct-refAnalysis.high_band_pct)+' percentage points.</p>':'');
         status('Reference comparison complete. A/B listening does not normalize levels.');
       }catch(e){status('Reference analysis unavailable: '+e.message)}
       finally{await ctx.close().catch(()=>{})}
