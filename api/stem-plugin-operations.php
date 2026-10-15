@@ -12,6 +12,11 @@ function sf_stem_plugin_chain_reference(array &$project,string $scope,string $gu
             $project['master_fx']=[];
         return ['kind'=>'master','guid'=>'__master__'];
     }
+    if($scope==='bus'){
+        foreach((array)($project['routing']['buses']??[]) as $i=>$bus)
+            if(($bus['id']??'')===$guid)return ['kind'=>'bus','index'=>$i,'guid'=>$guid];
+        throw new InvalidArgumentException('Auxiliary bus not found.');
+    }
     if($scope!=='track')throw new InvalidArgumentException('Unsupported FX bus.');
     foreach($project['tracks'] as $i=>$track)
         if(hash_equals((string)($track['guid']??''),$guid))
@@ -38,6 +43,7 @@ function sf_stem_plugin_apply(array &$project,array $payload):void {
     $guid=(string)($payload['guid']??'');
     $target=sf_stem_plugin_chain_reference($project,$scope,$guid);
     if($scope==='master')$chain=&$project['master_fx'];
+    elseif($scope==='bus')$chain=&$project['routing']['buses'][$target['index']]['fx'];
     else $chain=&$project['tracks'][$target['index']]['fx'];
     $history=(array)($project['plugin_history']??[]);
     $undo=array_values((array)($history['undo']??[]));
