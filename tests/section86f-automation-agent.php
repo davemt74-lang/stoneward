@@ -79,4 +79,54 @@ ok86f(sf_agent_skill_for_intent('admin','stem_mix_review')!==null &&
  'Agent mix-review skill remains isolated from customer Brain');
 $p=sf_stem_project_import('song-1',$source,'fixture.rpp',1);
 ok86f(count($p['automation'])===4,'Reimport preserves independent browser overrides');
+
+// Verify the exact Admin Brain conversational router and governed action ledger,
+// not only static skill discoverability.
+require_once dirname(__DIR__).'/api/agent-admin-brain.php';
+require_once dirname(__DIR__).'/api/agent-actions-core.php';
+ok86f(sf_admin_agent_plan('Review the REAPER mix for song ID song-1')['type']==='stem_mix_review',
+    'Admin conversation routes REAPER mix questions into private review skill');
+ok86f(sf_agent_orchestration_contract('admin','stem_mix_review')['may_read_or_navigate']===true,
+    'Admin orchestration can discover read-only Stem Studio review');
+ok86f(sf_agent_orchestration_contract('admin','stem_automation_update')['may_prepare_reviewed_proposal']===true,
+    'Agent automation edits use governed proposal contract, not direct execution');
+function sf_db_config():array{return ['driver'=>'sqlite'];}
+function sf_db():PDO{
+    static $db=null;
+    if($db===null){$db=new PDO('sqlite::memory:');$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
+        $db->exec('PRAGMA foreign_keys=ON');
+        $db->exec('CREATE TABLE users (id INTEGER PRIMARY KEY)');
+        $db->exec('INSERT INTO users(id) VALUES (1),(2)');
+    }
+    return $db;
+}
+$reviewProposal=sf_agent_action_prepare(1,'stem86f_test_request_0123456789','stem_automation_update',[
+    'track_id'=>'song-1','revision'=>(int)$p['revision'],
+    'lane'=>['scope'=>'track','guid'=>'{DRUMS}','parameter'=>'volume',
+        'points'=>[['time'=>0,'value'=>.4,'shape'=>'linear']]]
+]);
+ok86f($reviewProposal['status']==='proposed','Agent preparation only creates reviewed proposal');
+$repeated=sf_agent_action_prepare(1,'stem86f_test_request_0123456789','stem_automation_update',[
+    'track_id'=>'song-1','revision'=>(int)$p['revision'],
+    'lane'=>['scope'=>'track','guid'=>'{DRUMS}','parameter'=>'volume',
+        'points'=>[['time'=>0,'value'=>.4,'shape'=>'linear']]]
+]);
+ok86f($repeated['id']===$reviewProposal['id'],'Repeated Agent request deduplicates exact payload');
+ok86f(rejected86f(fn()=>sf_agent_action_approve(1,$reviewProposal['id'],
+    $reviewProposal['payload_hash'],'OK')),'Agent needs typed exact APPROVE');
+ok86f(rejected86f(fn()=>sf_agent_action_execute(1,$reviewProposal['id'])),
+    'Agent automation may not execute before approval');
+$approved=sf_agent_action_approve(1,$reviewProposal['id'],$reviewProposal['payload_hash'],'APPROVE');
+ok86f($approved['status']==='approved','Exact-hash approval persisted separately');
+$completed=sf_agent_action_execute(1,$reviewProposal['id']);
+ok86f($completed['status']==='completed'&&$completed['result']['status']==='automation_saved',
+    'Approved automation is applied through real revision-checked Stem Studio');
+ok86f(sf_agent_action_execute(1,$reviewProposal['id'])['id']===$reviewProposal['id'],
+    'Completed action cannot execute twice');
+ok86f(sf_agent_action_get(2,$reviewProposal['id'])===null,'Other admin cannot inspect approved private edit');
+ok86f(rejected86f(fn()=>sf_agent_action_prepare(1,'stem86f_another_request_01234567',
+    'stem_automation_update',['track_id'=>'song-1','revision'=>(int)$p['revision'],
+        'lane'=>['scope'=>'track','guid'=>'{DRUMS}','parameter'=>'pan',
+            'points'=>[['time'=>0,'value'=>0]]]])),
+    'Agent proposed edit with stale project revision is rejected');
 echo "86F PHP: $n checks green\n";
