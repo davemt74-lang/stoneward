@@ -125,7 +125,7 @@
         if(type==='limiter'&&key==='ceiling'){
           // Ceiling stored as dB, applied as linear gain.
           const mapped=list.map(l=>({...l,points:l.points.map(p=>({...p,value:Math.pow(10,p.value/20)}))}));
-          paramSchedule(param,Math.pow(10/safe(1),1)*Math.pow(10,safe(fx.settings?.ceiling,-.1)/20),mapped,scope,guid,'fx',stage.index,key);
+          paramSchedule(param,Math.pow(10,safe(fx.settings?.ceiling,-.1)/20),mapped,scope,guid,'fx',stage.index,key);
           continue;
         }
         if(type==='reverb'&&key==='seconds'){
@@ -147,7 +147,7 @@
       const muteLanes=lanes.filter(l=>l.scope==='track'&&l.guid===t.guid&&l.parameter==='mute').map(l=>
         ({...l,points:l.points.map(p=>({...p,value:p.value>=.5?0:1}))}));
       paramSchedule(node.gate.gain,gate,muteLanes,'track',t.guid,'mute');
-      if(globalSolo&&!mix.solo)node.gate.gain.setValueAtTime(0,0);
+      if(globalSolo&&!mix.solo){node.gate.gain.cancelScheduledValues(0);node.gate.gain.setValueAtTime(0,0);}
       scheduleFx(node.fx,t.fx||[],lanes,'track',t.guid);
     }
     for(const bus of project.routing?.buses||[]){
@@ -256,7 +256,7 @@
       '<p data-g-progress role="status" aria-live="polite">Save your mix before analysis for reproducible revision history.</p>'+
       '<div data-g-live-analysis></div>'+
       '<div class="sf-g-ab"><div><b>A · current rendered mix</b><audio controls data-g-player-a></audio></div>'+
-      '<div><b>B · '+esc(reference?.name||'private reference (not uploaded)')+'</b><audio controls data-g-player-b'+(reference?' src="stem-mastering.php?track_id='+encodeURIComponent(project.track_id)+'&amp;action=reference"':'')+'></audio></div>'+
+      '<div><b>B · '+esc(reference?.name||'private reference (not uploaded)')+'</b><audio controls data-g-player-b'+(reference?' src="api/stem-mastering.php?track_id='+encodeURIComponent(project.track_id)+'&amp;action=reference"':'')+'></audio></div>'+
       '<button type="button" data-g-switch>Switch A/B at same position</button></div>'+
       '<div data-g-reference-results></div>'+
       (prev?'<details><summary>Last saved analysis · project revision '+prev.revision+'</summary>'+
@@ -315,7 +315,7 @@
       try{
         const data=await window.STONEFELLOW_ADMIN_CONTEXT.uploadApi('stem-mastering.php',fd);
         studio.project=data.project;referenceName=data.project.mastering_reference?.name||file.name;
-        b.src='stem-mastering.php?track_id='+encodeURIComponent(studio.id)+'&action=reference&t='+Date.now();
+        b.src='api/stem-mastering.php?track_id='+encodeURIComponent(studio.id)+'&action=reference&t='+Date.now();
         status('Private reference saved. The public music library has not changed.');
       }catch(err){status('Reference not saved: '+err.message)}
     };
