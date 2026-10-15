@@ -1,0 +1,54 @@
+name: Stonefellow Per-Stem Audio Intelligence 86K
+on:
+  pull_request:
+    paths:
+      - 'api/stem-intelligence-core.php'
+      - 'api/stem-production-advisor.php'
+      - 'admin/api/stem-intelligence.php'
+      - 'admin/assets/stem-intelligence.js'
+      - 'admin/assets/stem-studio.js'
+      - 'admin/index.php'
+      - 'tests/section86k-*'
+      - '.github/workflows/stonefellow-stem86k.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-intelligence-core.php'
+      - 'api/stem-production-advisor.php'
+      - 'admin/api/stem-intelligence.php'
+      - 'admin/assets/stem-intelligence.js'
+      - 'admin/assets/stem-studio.js'
+      - 'tests/section86k-*'
+permissions:
+  contents: read
+jobs:
+  private-stem-spectrum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sodium
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/stem-intelligence-core.php
+          php -l api/stem-production-advisor.php
+          php -l admin/api/stem-intelligence.php
+          node --check admin/assets/stem-intelligence.js
+          node --check admin/assets/stem-studio.js
+          php tests/section86k-stem-intelligence.php
+          node tests/section86k-stem-intelligence.cjs
+          php tests/section86j-production-agent.php
+          node tests/section86j-production-agent.cjs
+          php tests/section86i-stem-catalog.php
+          php tests/section86h-mastering-readiness.php
+          php tests/section86g-mastering.php
+          node tests/section86g-mastering.cjs
+          php tests/section86f-automation-agent.php
+          php tests/section85b-media-publishing.php
