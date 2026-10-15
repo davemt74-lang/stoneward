@@ -80,7 +80,8 @@ function sf_admin_agent_operational_context(): array {
 }
 function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
-    if(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
+    if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
+    elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
     elseif(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m)){$type='prepare_commerce_followup';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|prepare|write)\b.*\b(reply|response)\b.*\border\b/',$m)){$type='draft_commerce_reply';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_journey';$view='automations';}
