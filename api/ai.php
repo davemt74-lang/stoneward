@@ -134,16 +134,17 @@ function sf_ai_save_routing(array $data): array {
     $preferred=(string)($data['preferred_llm']??'openai');if(!in_array($preferred,['openai','anthropic'],true))throw new InvalidArgumentException('Choose OpenAI or Anthropic as the preferred LLM.');
     $voice=(string)($data['voice_provider']??'elevenlabs');if(!in_array($voice,['elevenlabs','none'],true))throw new InvalidArgumentException('Choose a supported voice provider.');
     $decision=(string)($data['decision_provider']??'none');if(!in_array($decision,['jev','none'],true))throw new InvalidArgumentException('Choose a supported decision provider.');
-    sf_ai_meta_set('ai.preferred_llm',$preferred);
-    sf_ai_meta_set('ai.fallback_enabled',!empty($data['fallback_enabled'])?'1':'0');
-    sf_ai_meta_set('ai.voice_provider',$voice);
-    sf_ai_meta_set('ai.decision_provider',$decision);
-    sf_ai_meta_set('ai.jev_response_eval',!empty($data['jev_response_eval'])?'1':'0');
+    // Validate all model choices before changing any persisted provider setting.
     $current=sf_ai_state()['routing'];
     $mode=(string)($data['claude_mode']??$current['claude_mode']);
     if(!in_array($mode,['auto','manual'],true))throw new InvalidArgumentException('Choose automatic or manual Claude model routing.');
     $fast=sf_claude_model_choice((string)($data['claude_fast_model']??$current['claude_fast_model']));
     $reasoning=sf_claude_model_choice((string)($data['claude_reasoning_model']??$current['claude_reasoning_model']));
+    sf_ai_meta_set('ai.preferred_llm',$preferred);
+    sf_ai_meta_set('ai.fallback_enabled',!empty($data['fallback_enabled'])?'1':'0');
+    sf_ai_meta_set('ai.voice_provider',$voice);
+    sf_ai_meta_set('ai.decision_provider',$decision);
+    sf_ai_meta_set('ai.jev_response_eval',!empty($data['jev_response_eval'])?'1':'0');
     sf_ai_meta_set('ai.claude_mode',$mode);
     sf_ai_meta_set('ai.claude_fast_model',$fast);
     sf_ai_meta_set('ai.claude_reasoning_model',$reasoning);
