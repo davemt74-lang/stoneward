@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/stem-mastering-core.php';
+require_once SF_ROOT.'/api/stem-release-readiness.php';
 $method=(string)($_SERVER['REQUEST_METHOD']??'GET');
 $admin=sf_admin_require_auth($method!=='GET');
 header('Cache-Control: private, no-store, max-age=0');
@@ -42,6 +43,11 @@ try{
             }finally{fclose($handle);}
             exit;
         }
+        if(($_GET['action']??'')==='readiness'){
+            $preset=(string)($_GET['profile']??'streaming');
+            sf_json_response(['ok'=>true,'report'=>sf_stem_86h_report($project,$preset),
+                'review'=>sf_stem_86h_review_status($project),'presets'=>sf_stem_86h_presets()]);
+        }
         sf_json_response(['ok'=>true,'mastering_reference'=>$project['mastering_reference']??null,
             'analyses'=>array_slice((array)($project['mastering_analyses']??[]),-12)]);
     }
@@ -56,6 +62,19 @@ try{
         sf_json_response(['ok'=>true,'project'=>sf_stem_project_with_assets($project)]);
     }
     $payload=sf_request_json();
+    if(($payload['action']??'')==='save_readiness'){
+        $id=(string)($payload['track_id']??'');
+        $project=sf_stem_86h_save_review($id,$payload,(int)$admin['id']);
+        sf_log_admin_action((int)$admin['id'],'stem_mastering_readiness_review','track',$id,
+            ['revision'=>$project['revision'],'profile'=>$project['mastering_readiness']['profile'],
+             'state'=>'reviewed_pending_media_upload']);
+        if(function_exists('sf_agent_brain_log'))
+            sf_agent_brain_log((int)$admin['id'],'stem_studio','mastering_readiness_review',[
+                'song_id'=>$id,'profile'=>$project['mastering_readiness']['profile'],
+                'status'=>'reviewed_pending_media_upload','public_published'=>false]);
+        sf_json_response(['ok'=>true,'project'=>sf_stem_project_with_assets($project),
+            'review'=>sf_stem_86h_review_status($project)]);
+    }
     if(($payload['action']??'')!=='save_analysis')throw new InvalidArgumentException('Unsupported mastering operation.');
     $id=(string)($payload['track_id']??'');
     $project=sf_stem_mastering_save_analysis($id,$payload);
