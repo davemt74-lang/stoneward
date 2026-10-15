@@ -68,10 +68,10 @@ function sf_stem_decode_loser_masterlimiter(string $module,array $lines):array {
  */
 function sf_stem_inspect_reaplugs_state(string $module,array $lines):array {
     $modules=[
-        'reaeq.dll'=>['qeer',2],
-        'reacomp.dll'=>['mcer',4],
-        'reaverb.dll'=>['bver',2],
-        'readelay.dll'=>['lder',2],
+        'reaeq.dll'=>['qeer',2,'ee5eedfe'],
+        'reacomp.dll'=>['mcer',4,'ef5eedfe'],
+        'reaverb.dll'=>['bver',2,'ee5eedfe'],
+        'readelay.dll'=>['lder',2,'ee5eedfe'],
     ];
     $name=strtolower(basename(str_replace('\\\\','/',$module)));
     if(!isset($modules[$name]))
@@ -90,7 +90,7 @@ function sf_stem_inspect_reaplugs_state(string $module,array $lines):array {
     $fourcc=substr($binary,0,4);
     $version=(int)unpack('V',substr($binary,8,4))[1];
     if($fourcc!==$modules[$name][0]||$version!==$modules[$name][1]
-       ||bin2hex(substr($binary,4,4))!=='ee5eedfe')
+       ||bin2hex(substr($binary,4,4))!==$modules[$name][2])
         return ['status'=>'unknown-vst-container-version','confidence'=>'none',
             'observed_fourcc'=>bin2hex($fourcc),'observed_version'=>$version];
     $total=0;$hashContext=hash_init('sha256');

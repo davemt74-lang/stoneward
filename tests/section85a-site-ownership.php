@@ -81,7 +81,7 @@ $site=file_get_contents(dirname(__DIR__).'/stonefellow-v120.php');
 $ui=file_get_contents(dirname(__DIR__).'/assets/js/library.js');
 $wallet=file_get_contents(dirname(__DIR__).'/assets/js/owned-music.js');
 $css=file_get_contents(dirname(__DIR__).'/assets/css/site.css');
-ok85(str_contains($site,'assets/js/owned-music.js') && str_contains($site,"'1.3.81'"),
+ok85(str_contains($site,'assets/js/owned-music.js') && str_contains($site,"'1.3.82'"),
     'Versioned storefront loads owned-wallet renderer before My Library');
 ok85(str_contains($ui,"owned:'Owned Music'")&&str_contains($ui,"fan-owned-music.php"),
     'My Library displays account-scoped purchased music separately from favorites');
@@ -141,9 +141,9 @@ echo "Section 85A purchased music and vinyl rights: $passes checks passed".PHP_E
 $adminBuild=(string)file_get_contents(dirname(__DIR__).'/admin/index.php');
 $serverHeaders=(string)file_get_contents(dirname(__DIR__).'/.htaccess');
 $serviceWorker=(string)file_get_contents(dirname(__DIR__).'/service-worker.js');
-ok85(str_contains($adminBuild,"define('SF_ADMIN_BUILD','1.3.81')")
-  &&str_contains($serverHeaders,'X-Stonefellow-Build "1.3.81"'),
+ok85(str_contains($adminBuild,"define('SF_ADMIN_BUILD','1.3.82')")
+  &&str_contains($serverHeaders,'X-Stonefellow-Build "1.3.82"'),
   'Website and Admin build markers stay in sync for deployed asset cache invalidation');
-ok85(str_contains($serviceWorker,"stonefellow-static-v1.3.81")
+ok85(str_contains($serviceWorker,"stonefellow-static-v1.3.82")
   &&str_contains($serviceWorker,'assets/js/owned-music.js'),
   'PWA serves the versioned purchased-music interface rather than a stale offline script');
