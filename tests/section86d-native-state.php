@@ -77,8 +77,9 @@ $m=sf_stem_project_update('song-1',[
 check86d($m['master_fx'][0]['browser_settings_origin']==='user-override',
     'Deliberate browser setting is separately identified');
 $m=sf_stem_project_update('song-1',['action'=>'native_decode_refresh','revision'=>2]);
-check86d($m['master_fx'][0]['settings']['threshold']===-5.0
-    &&$m['master_fx'][0]['settings']['ceiling']===-0.5,
+check86d(abs((float)$m['master_fx'][0]['settings']['threshold']+5.0)<0.000001
+    &&abs((float)$m['master_fx'][0]['settings']['ceiling']+0.5)<0.000001
+    &&$m['master_fx'][0]['browser_settings_origin']==='user-override',
     'Refresh preserves browser overrides instead of replacing them');
 check86d($m['master_fx'][0]['native_parameters']['threshold_db']===-8.3
     &&$m['native_decode_refresh']['counts']['exact_jsfx']===1,
