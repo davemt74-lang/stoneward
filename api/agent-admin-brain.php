@@ -105,7 +105,7 @@ function sf_admin_agent_research_reply(string $message,array $context,array $pri
     $system="You are Stonefellow's administrative research assistant. Use only the aggregate operational facts supplied. Never request or reveal any fan's private conversations or memories. Never claim to have edited CRM, sent messages, purchased, published, changed a journey or saved a campaign. The current tool contract allows no direct writes. State uncertainty if data is absent. Keep your answer under 220 words.\nAGGREGATE FACTS: ".json_encode($context,JSON_UNESCAPED_SLASHES);
     if($adminId>0){$quality=(string)(sf_agent_feedback_summary('admin',$adminId)['guidance']??'');
       if($quality!=='')$system.="\\nADMIN FEEDBACK (quality guidance only): ".$quality;}
-    foreach(array_slice(sf_ai_llm_candidates(),0,2) as $provider){
+    foreach(array_slice(sf_ai_llm_candidates('agent_brain'),0,2) as $provider){
         try{
             $result=$provider['provider']==='openai'
               ?sf_openai_call($provider,$system,$history,$message,450)

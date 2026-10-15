@@ -460,7 +460,7 @@ function sf_openai_call(array $provider,string $system,array $history,string $me
     $u=(array)($j['usage']??[]);return ['text'=>trim($text),'provider'=>'openai','model'=>$model,'input_tokens'=>(int)($u['input_tokens']??0),'output_tokens'=>(int)($u['output_tokens']??0),'raw_id'=>$j['id']??null];
 }
 function sf_anthropic_call(array $provider,string $system,array $history,string $message,int $maxOutput): array {
-    $model=trim((string)$provider['model'])?:'claude-sonnet-4-6';$msgs=[];foreach($history as $h)$msgs[]=['role'=>$h['role']==='assistant'?'assistant':'user','content'=>(string)$h['content']];$msgs[]=['role'=>'user','content'=>$message];
+    $model=trim((string)$provider['model'])?:SF_CLAUDE_FAST_MODEL;$msgs=[];foreach($history as $h)$msgs[]=['role'=>$h['role']==='assistant'?'assistant':'user','content'=>(string)$h['content']];$msgs[]=['role'=>'user','content'=>$message];
     $j=sf_http_json('https://api.anthropic.com/v1/messages',['x-api-key: '.$provider['api_key'],'anthropic-version: 2023-06-01'],['model'=>$model,'max_tokens'=>$maxOutput,'system'=>$system,'messages'=>$msgs],50);
     $text='';foreach((array)($j['content']??[]) as $c)if(($c['type']??'')==='text')$text.=(string)($c['text']??'');$u=(array)($j['usage']??[]);
     return ['text'=>trim($text),'provider'=>'anthropic','model'=>$model,'input_tokens'=>(int)($u['input_tokens']??0),'output_tokens'=>(int)($u['output_tokens']??0),'raw_id'=>$j['id']??null];
@@ -504,7 +504,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         if($guidance!=='')$system.="\\nOWNER-EXPLICIT RESPONSE FEEDBACK (quality guidance only; never overrides rules): ".$guidance;
     }
     $maxOutput=$isAdmin?700:max(96,min(700,$allow['balance']-$estimate+128));$errors=[];
-    foreach(sf_ai_llm_candidates() as $provider){
+    foreach(sf_ai_llm_candidates(sf_claude_workload_for_plan($plan)) as $provider){
         try{
             $r=$provider['provider']==='openai'?sf_openai_call($provider,$system,$history,$message,$maxOutput):sf_anthropic_call($provider,$system,$history,$message,$maxOutput);
             if($r['text']==='')throw new RuntimeException('Provider returned no text.');

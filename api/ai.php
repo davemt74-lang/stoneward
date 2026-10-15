@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/claude-model-routing.php';
 
 const SF_AI_SECRET_CONFIG = SF_ROOT . '/config/app-secret.php';
 
@@ -106,7 +107,10 @@ function sf_ai_state(): array {
         'fallback_enabled'=>sf_ai_meta_get('ai.fallback_enabled','1')==='1',
         'voice_provider'=>sf_ai_meta_get('ai.voice_provider','elevenlabs'),
         'decision_provider'=>sf_ai_meta_get('ai.decision_provider','none'),
-        'jev_response_eval'=>sf_ai_meta_get('ai.jev_response_eval','0')==='1'
+        'jev_response_eval'=>sf_ai_meta_get('ai.jev_response_eval','0')==='1',
+        'claude_mode'=>sf_claude_effective_mode(sf_ai_meta_get('ai.claude_mode',''),(string)($providers['anthropic']['model']??'')),
+        'claude_fast_model'=>sf_ai_meta_get('ai.claude_fast_model',SF_CLAUDE_FAST_MODEL),
+        'claude_reasoning_model'=>sf_ai_meta_get('ai.claude_reasoning_model',SF_CLAUDE_REASONING_MODEL)
     ]];
 }
 
@@ -130,11 +134,20 @@ function sf_ai_save_routing(array $data): array {
     $preferred=(string)($data['preferred_llm']??'openai');if(!in_array($preferred,['openai','anthropic'],true))throw new InvalidArgumentException('Choose OpenAI or Anthropic as the preferred LLM.');
     $voice=(string)($data['voice_provider']??'elevenlabs');if(!in_array($voice,['elevenlabs','none'],true))throw new InvalidArgumentException('Choose a supported voice provider.');
     $decision=(string)($data['decision_provider']??'none');if(!in_array($decision,['jev','none'],true))throw new InvalidArgumentException('Choose a supported decision provider.');
+    // Validate all model choices before changing any persisted provider setting.
+    $current=sf_ai_state()['routing'];
+    $mode=(string)($data['claude_mode']??$current['claude_mode']);
+    if(!in_array($mode,['auto','manual'],true))throw new InvalidArgumentException('Choose automatic or manual Claude model routing.');
+    $fast=sf_claude_model_choice((string)($data['claude_fast_model']??$current['claude_fast_model']));
+    $reasoning=sf_claude_model_choice((string)($data['claude_reasoning_model']??$current['claude_reasoning_model']));
     sf_ai_meta_set('ai.preferred_llm',$preferred);
     sf_ai_meta_set('ai.fallback_enabled',!empty($data['fallback_enabled'])?'1':'0');
     sf_ai_meta_set('ai.voice_provider',$voice);
     sf_ai_meta_set('ai.decision_provider',$decision);
     sf_ai_meta_set('ai.jev_response_eval',!empty($data['jev_response_eval'])?'1':'0');
+    sf_ai_meta_set('ai.claude_mode',$mode);
+    sf_ai_meta_set('ai.claude_fast_model',$fast);
+    sf_ai_meta_set('ai.claude_reasoning_model',$reasoning);
     return sf_ai_state()['routing'];
 }
 
@@ -143,13 +156,19 @@ function sf_ai_provider_secret(string $provider): string {
 }
 
 function sf_ai_resolve_llm(): ?array {
-    $state=sf_ai_state();$first=$state['routing']['preferred_llm'];$order=[$first];if($state['routing']['fallback_enabled'])$order[]=($first==='openai'?'anthropic':'openai');
-    foreach(array_unique($order) as $provider){$r=sf_ai_provider_row($provider);if(empty($r['enabled'])||empty($r['secret_payload']))continue;return ['provider'=>$provider,'api_key'=>sf_ai_decrypt((string)$r['secret_payload']),'model'=>(string)($r['model']??'')];}return null;
+    return sf_ai_llm_candidates('chat')[0]??null;
 }
 
 
-function sf_ai_llm_candidates(): array {
-    $state=sf_ai_state();$first=$state['routing']['preferred_llm'];$order=[$first];if($state['routing']['fallback_enabled'])$order[]=($first==='openai'?'anthropic':'openai');$out=[];foreach(array_unique($order) as $provider){$r=sf_ai_provider_row($provider);if(empty($r['enabled'])||empty($r['secret_payload']))continue;$out[]=['provider'=>$provider,'api_key'=>sf_ai_decrypt((string)$r['secret_payload']),'model'=>(string)($r['model']??''),'endpoint_url'=>(string)($r['endpoint_url']??'')];}return $out;
+function sf_ai_llm_candidates(string $workload='chat'): array {
+    $state=sf_ai_state();$first=$state['routing']['preferred_llm'];$order=[$first];if($state['routing']['fallback_enabled'])$order[]=($first==='openai'?'anthropic':'openai');$out=[];
+    foreach(array_unique($order) as $provider){
+        $r=sf_ai_provider_row($provider);if(empty($r['enabled'])||empty($r['secret_payload']))continue;
+        $candidate=['provider'=>$provider,'api_key'=>sf_ai_decrypt((string)$r['secret_payload']),
+           'model'=>(string)($r['model']??''),'endpoint_url'=>(string)($r['endpoint_url']??'')];
+        $out[]=sf_claude_choose_model($candidate,$state['routing'],$workload);
+    }
+    return $out;
 }
 function sf_ai_resolve_decision(): ?array {
     if(sf_ai_meta_get('ai.decision_provider','none')!=='jev')return null;$r=sf_ai_provider_row('jev');if(empty($r['enabled'])||empty($r['secret_payload']))return null;return ['provider'=>'jev','api_key'=>sf_ai_decrypt((string)$r['secret_payload']),'model'=>(string)($r['model']??''),'endpoint_url'=>(string)($r['endpoint_url']??'')];

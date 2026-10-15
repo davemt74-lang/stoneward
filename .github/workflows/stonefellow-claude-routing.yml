@@ -1,0 +1,47 @@
+name: Stonefellow Claude Haiku Sonnet Routing
+on:
+  pull_request:
+    paths:
+      - 'api/ai.php'
+      - 'api/claude-model-routing.php'
+      - 'api/agent-runtime.php'
+      - 'api/agent-admin-brain.php'
+      - 'admin/assets/admin.js'
+      - 'tests/section86h-claude-routing.php'
+      - '.github/workflows/stonefellow-claude-routing.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/ai.php'
+      - 'api/claude-model-routing.php'
+      - 'api/agent-runtime.php'
+      - 'api/agent-admin-brain.php'
+      - 'admin/assets/admin.js'
+      - 'tests/section86h-claude-routing.php'
+permissions:
+  contents: read
+jobs:
+  claude-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sodium
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/ai.php
+          php -l api/claude-model-routing.php
+          php -l api/agent-runtime.php
+          php -l api/agent-admin-brain.php
+          php -l admin/api/ai-providers.php
+          node --check admin/assets/admin.js
+          php tests/section86h-claude-routing.php
+          php tests/section43a-agent-runtime.php
+          php tests/section46c-admin-brain.php
