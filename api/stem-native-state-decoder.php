@@ -90,7 +90,7 @@ function sf_stem_inspect_reaplugs_state(string $module,array $lines):array {
     $fourcc=substr($binary,0,4);
     $version=(int)unpack('V',substr($binary,8,4))[1];
     if($fourcc!==$modules[$name][0]||$version!==$modules[$name][1]
-       ||substr($binary,4,4)!=="\\xee\\x5e\\xed\\xfe")
+       ||bin2hex(substr($binary,4,4))!=='ee5eedfe')
         return ['status'=>'unknown-vst-container-version','confidence'=>'none',
             'observed_fourcc'=>bin2hex($fourcc),'observed_version'=>$version];
     $total=0;$hashContext=hash_init('sha256');
