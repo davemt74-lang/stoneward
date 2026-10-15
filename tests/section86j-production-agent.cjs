@@ -3,10 +3,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const source=fs.readFileSync(path.join(__dirname,'../admin/assets/stem-production-advisor.js'),'utf8');
 const window={};
 vm.runInNewContext(source,{window,console});
-const module=window.SFStemProductionAdvisor;
-assert.equal(typeof module.render,'function');
-assert.equal(typeof module.bind,'function');
-const html=module.render({track_id:'song-1'});
+const advisor=window.SFStemProductionAdvisor;
+assert.equal(typeof advisor.render,'function');
+assert.equal(typeof advisor.bind,'function');
+const html=advisor.render({track_id:'song-1'});
 assert.ok(html.includes('data-j-inspect')&&html.includes('data-j-chat'),
  'Advisor adds inspect and Chat actions without a competing chat client');
 assert.ok(!html.includes('APPROVE')&&!html.includes('execute'),
