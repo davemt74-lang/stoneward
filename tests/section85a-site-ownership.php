@@ -76,7 +76,6 @@ ok85(str_contains($endpoint,'sf_require_user()')
  &&str_contains($endpoint,'sf_kunaki_media_resolve')
  &&!str_contains($endpoint,'sf_homeserver_bearer('),
     'Website download uses session identity and vetted masters rather than bridge tokens');
-echo "Section 85A purchased music and vinyl rights: $passes checks passed".PHP_EOL;
 
 $site=file_get_contents(dirname(__DIR__).'/stonefellow-v120.php');
 $ui=file_get_contents(dirname(__DIR__).'/assets/js/library.js');
@@ -102,5 +101,39 @@ ok85($noMasterById['purchased']['download_ready']===false,
     'Published reference without an available private file cannot create a false download button');
 $siteCore=file_get_contents(dirname(__DIR__).'/api/fan-owned-music-core.php');
 ok85(str_contains($siteCore,'sf_fan_owned_media_ready')&&str_contains($siteCore,'realpath(')
-    &&str_contains($siteCore,'!is_link($file)'),
+    &&str_contains($siteCore,'is_link($file)'),
     'Private media availability requires safe non-symlink master under local storage');
+
+$fixtureRoot=sys_get_temp_dir().'/sf85a-'.bin2hex(random_bytes(6));
+mkdir($fixtureRoot.'/storage/media',0700,true);
+$mediaPath=$fixtureRoot.'/storage/media/master.wav';
+file_put_contents($mediaPath,'RIFFTESTDATA');
+if(!defined('SF_ROOT'))define('SF_ROOT',$fixtureRoot);
+$asset=[
+    'uuid'=>'M1234567890ABCDEF1234',
+    'category'=>'audio','extension'=>'wav',
+    'stored_path'=>'storage/media/master.wav',
+];
+$lookup=static fn(string $id):?array=>$id==='M1234567890ABCDEF1234'?$asset:null;
+try{
+    ok85(sf_fan_owned_media_ready($ref,$lookup),
+        'Download available only when a real private audio asset exists under storage/media');
+    ok85(!sf_fan_owned_media_ready($ref,static fn()=>array_replace($asset,['category'=>'image'])),
+        'Image media cannot masquerade as an owned audio master');
+    ok85(!sf_fan_owned_media_ready($ref,static fn()=>array_replace($asset,['stored_path'=>'../master.wav'])),
+        'Traversal through catalog media metadata is rejected');
+    ok85(!sf_fan_owned_media_ready($ref,static fn()=>array_replace($asset,['stored_path'=>'storage/media/missing.wav'])),
+        'Missing original master hides download rather than advertising a broken file');
+    $decoy=$fixtureRoot.'/storage/media/symlink.wav';
+    if(function_exists('symlink')&&@symlink($mediaPath,$decoy)){
+        ok85(!sf_fan_owned_media_ready($ref,static fn()=>array_replace($asset,['stored_path'=>'storage/media/symlink.wav'])),
+            'Symbolic link cannot escape private-media publication checks');
+        @unlink($decoy);
+    }
+} finally {
+    @unlink($mediaPath);
+    @rmdir($fixtureRoot.'/storage/media');
+    @rmdir($fixtureRoot.'/storage');
+    @rmdir($fixtureRoot);
+}
+echo "Section 85A purchased music and vinyl rights: $passes checks passed".PHP_EOL;
