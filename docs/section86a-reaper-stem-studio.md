@@ -51,7 +51,7 @@ VST execution. Actual user music isn't checked into the repository.
   exact proprietary/native parameter blobs.
 - HTMLMediaElement multitrack playback uses drift detection and correction,
   not a guaranteed sample-accurate offline DAW render. Future sections should
-  implement buffered clip scheduling, quantized transport, better waveforms,
+  implement buffered clip scheduling, quantized transport, bulk waveform analysis,
   automation lanes, full effect controls and routing.
 - The RPP text only contains media file references; bundle the audio with the
   project in a ZIP or upload it separately. No user-supplied music is checked into GitHub.
@@ -65,3 +65,12 @@ projections, private original persistence, named saved mixes, editing, stale
 revisions, and integration with existing Catalog, Admin CSRF and Media Library.
 Before merging also require final full PHP/JS regression tests, real MySQL
 certification, merged-main verification and a ZIP with SHA-256.
+
+## Real waveform inspection
+
+In each song's existing Stem Studio lane, click **Load real waveform** to inspect
+actual decoded PCM peaks for that attached stem. Waveforms are requested only
+on demand (not automatically for all uploaded stems), rendered from audio
+amplitudes, and cached as tiny peak arrays. Browser decoding is limited to
+32 MiB per stem; larger files still stream and mix normally without a
+misleading synthetic waveform. Private media access still requires Admin login.
