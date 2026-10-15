@@ -1,0 +1,48 @@
+name: Stonefellow REAPER Stem Studio 86A
+on:
+  pull_request:
+    paths:
+      - 'api/stem-rpp-core.php'
+      - 'api/stem-studio-core.php'
+      - 'api/media-core.php'
+      - 'admin/api/stem-studio.php'
+      - 'admin/assets/stem-studio.js'
+      - 'admin/assets/stem-studio.css'
+      - 'admin/assets/admin.js'
+      - 'admin/index.php'
+      - 'tests/section86a-stem-studio.php'
+      - '.github/workflows/stonefellow-stem86a.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-rpp-core.php'
+      - 'api/stem-studio-core.php'
+      - 'api/media-core.php'
+      - 'admin/api/stem-studio.php'
+      - 'admin/assets/stem-studio.js'
+      - 'tests/section86a-stem-studio.php'
+permissions:
+  contents: read
+jobs:
+  stem-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: REAPER parser, persistence, and UI binding tests
+        run: |
+          php -l api/stem-rpp-core.php
+          php -l api/stem-studio-core.php
+          php -l admin/api/stem-studio.php
+          node --check admin/assets/stem-studio.js
+          node --check admin/assets/admin.js
+          php tests/section86a-stem-studio.php
+          php tests/section85b-media-publishing.php

@@ -117,12 +117,12 @@ function sf_media_links(string $entityType,string $entityId): array {
 function sf_media_protected_master_asset(int $assetId):bool {
     if($assetId<1)return false;
     sf_media_ensure_schema();
-    $q=sf_db()->prepare("SELECT 1 FROM media_links WHERE asset_id=? AND role='master_audio' LIMIT 1");
+    $q=sf_db()->prepare("SELECT 1 FROM media_links WHERE asset_id=? AND role IN ('master_audio','stem_audio') LIMIT 1");
     $q->execute([$assetId]);
     return (bool)$q->fetchColumn();
 }
 function sf_media_guard_link_exposure(int $assetId,string $role,bool $public,bool $download):void {
-    if($role==='master_audio'){
+    if($role==='master_audio'||$role==='stem_audio'){
         if($public||$download)throw new RuntimeException('Original masters cannot be publicly visible or downloadable.');
         $q=sf_db()->prepare('SELECT 1 FROM media_links WHERE asset_id=? AND (public_visible=1 OR download_allowed=1) LIMIT 1');
         $q->execute([$assetId]);
@@ -149,7 +149,7 @@ function sf_media_update_link(int $id,array $p): void {
     $role=(string)($p['role']??$existing['role']);
     $public=array_key_exists('public_visible',$p)?!empty($p['public_visible']):!empty($existing['public_visible']);
     $download=array_key_exists('download_allowed',$p)?!empty($p['download_allowed']):!empty($existing['download_allowed']);
-    if($existing['role']==='master_audio'&&$role!=='master_audio')
+    if(in_array($existing['role'],['master_audio','stem_audio'],true)&&$role!==$existing['role'])
         throw new RuntimeException('Change the published original using the master action, not a role toggle.');
     sf_media_guard_link_exposure($assetId,$role,$public,$download);
     $sets=[];$args=[];foreach(['featured','public_visible','download_allowed'] as $k)if(array_key_exists($k,$p)){$sets[]="$k=?";$args[]=!empty($p[$k])?1:0;}if(array_key_exists('role',$p)){$sets[]='role=?';$args[]=sf_clean_text($p['role'],60);}if(array_key_exists('sort_order',$p)){$sets[]='sort_order=?';$args[]=(int)$p['sort_order'];}if(!$sets)return;$sets[]='updated_at=?';$args[]=gmdate('c');$args[]=$id;sf_db()->prepare('UPDATE media_links SET '.implode(',',$sets).' WHERE id=?')->execute($args);}

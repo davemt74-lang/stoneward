@@ -84,6 +84,7 @@ jobs:
           node --check admin/assets/agent-actions.js
           node --check admin/assets/campaigns.js
           node --check admin/assets/media.js
+          node --check admin/assets/stem-studio.js
           node --check admin/assets/products.js
           node --check admin/assets/automations.js
           node --check admin/assets/membership.js
@@ -280,6 +281,7 @@ jobs:
           php tests/section84b6-homeserver-user-consent.php
           php tests/section85a-site-ownership.php
           php tests/section85b-media-publishing.php
+          php tests/section86a-stem-studio.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
