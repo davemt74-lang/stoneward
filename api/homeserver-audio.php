@@ -22,6 +22,7 @@ try{
     $media=sf_kunaki_media_resolve($ref,'audio');
     $size=(int)$media['size_bytes'];
     $range=sf_hs_music_range((string)($_SERVER['HTTP_RANGE']??''),$size);
+    $stream=sf_hs_music_open_range((string)$media['local_path'],$range);
 }catch(InvalidArgumentException $e){
     header('Content-Range: bytes */'.(int)($size??0));
     sf_json_response(['ok'=>false,'error'=>'invalid_range'],416);
@@ -38,9 +39,6 @@ if($range['partial'])
     header('Content-Range: bytes '.$range['start'].'-'.$range['end'].'/'.$size);
 if($download)
     header('Content-Disposition: attachment; filename="stonefellow-'.$trackId.'.'.$ext.'"');
-$stream=fopen($media['local_path'],'rb');
-if($stream===false){http_response_code(503);exit;}
-fseek($stream,$range['start']);
 $left=$range['length'];
 while($left>0&&!feof($stream)&&!connection_aborted()){
     $block=fread($stream,min(65536,$left));

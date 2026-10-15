@@ -43,3 +43,18 @@ check87($rows[0]['vinyl_print_rights']['packages'][0]['price_cents']===250,
 check87($rows[1]['vinyl_print_rights']['available']===0,
     'Unlicensed song never gets fictional available credits');
 echo '84B7 Cloud rights '.$passed.' checks passed'.PHP_EOL;
+
+$tmp87=tempnam(sys_get_temp_dir(),'sf87-');
+if($tmp87===false)throw new RuntimeException('Test fixture unavailable');
+try {
+    file_put_contents($tmp87,'abcdefgh');
+    $slice=sf_hs_music_range('bytes=3-5',8);
+    $handle=sf_hs_music_open_range($tmp87,$slice);
+    check87(fread($handle,$slice['length'])==='def',
+        'Private media stream starts at exactly the requested byte offset');
+    fclose($handle);
+    check87(denies87(fn()=>sf_hs_music_open_range($tmp87.'.missing',$slice)),
+        'Missing private files fail before HTTP headers are emitted');
+} finally {
+    @unlink($tmp87);
+}

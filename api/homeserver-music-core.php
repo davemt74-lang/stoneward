@@ -57,3 +57,14 @@ function sf_hs_music_rights(array $tracks,array $balances,array $catalog):array 
     unset($track);
     return $tracks;
 }
+
+/** Open a validated private media range before any headers reach the caller. */
+function sf_hs_music_open_range(string $path,array $range) {
+    $stream=@fopen($path,'rb');
+    if($stream===false)throw new RuntimeException('Music master unavailable.');
+    if(fseek($stream,(int)$range['start'],SEEK_SET)!==0){
+        fclose($stream);
+        throw new RuntimeException('Music range could not be opened.');
+    }
+    return $stream;
+}
