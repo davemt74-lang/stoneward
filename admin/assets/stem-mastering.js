@@ -298,6 +298,15 @@
       '<div data-g-reference-results></div>'+
       (prev?'<details><summary>Last saved analysis · project revision '+prev.revision+'</summary>'+
         '<p>Browser-reported evidence, not server-verified. Cached results may be stale after edits.</p>'+metricsHTML(prev.metrics||{})+'</details>':'')+
+      '<section class="sf-h-readiness" data-h-readiness><h4>86H · Mastering Presets & Release Readiness</h4>'+
+      '<p>Presets are conservative review criteria for the current 48 kHz / 16-bit WAV renderer, not encoding converters or native mastering certifications. Nothing is published automatically.</p>'+
+      '<label>Review destination <select data-h-profile><option value="streaming">Streaming candidate</option><option value="download">Owned download original</option><option value="vinyl">Vinyl pre-master (engineer sign-off required)</option><option value="archive">Archive comparison copy</option></select></label>'+
+      '<button type="button" data-h-check>Evaluate current mix</button>'+
+      '<div data-h-report role="status" aria-live="polite">'+
+      (project.mastering_readiness?.state?'<p>Existing review: '+esc(project.mastering_readiness.profile||'')+' · '+esc(project.mastering_readiness.state)+'</p>':'<p>No mastering review recorded yet.</p>')+'</div>'+
+      '<label>Type REVIEWED to confirm that you heard this mix and accept the warnings <input data-h-confirm autocomplete="off" placeholder="REVIEWED" maxlength="12"></label>'+
+      '<button type="button" data-h-save disabled>Record review · Keep private</button>'+
+      '<p class="sf-g-note">A review does not upload a master, replace catalog audio, grant vinyl rights or publish any public media. Import the WAV into the existing Media Library during the next release stage.</p></section>'+
       '<p class="sf-g-note">LUFS is a 48 kHz K-weighted, gated BS.1770-style estimate. Sample peak is not true peak; no streaming-platform loudness target or mastering certification is implied. Reference recordings remain private.</p></section>';
   }
   function bind(root,studio){
@@ -313,6 +322,51 @@
     const a=q('[data-g-player-a]'),b=q('[data-g-player-b]');
     a.addEventListener('play',()=>b.pause());b.addEventListener('play',()=>a.pause());
     const makeURL=blob=>{if(blobURL)URL.revokeObjectURL(blobURL);blobURL=URL.createObjectURL(blob);a.src=blobURL;};
+    const hq=selector=>area.querySelector(selector);
+    const renderReadiness=report=>{
+      const box=hq('[data-h-report]');
+      const lines=[
+        '<strong>'+esc(report.status==='ready_for_admin_review'?'Eligible for manual review':'Blocked')+'</strong>',
+        '<p>Sample-peak guideline: '+esc(report.profile_spec.sample_peak_ceiling_dbfs)+' dBFS. '+esc(report.profile_spec.notes)+'</p>',
+        ...report.blockers.map(x=>'<p class="sf-h-block"><b>Blocker:</b> '+esc(x)+'</p>'),
+        ...report.warnings.map(x=>'<p class="sf-h-warning"><b>Note:</b> '+esc(x)+'</p>')
+      ];
+      box.innerHTML=lines.join('');
+      hq('[data-h-save]').disabled=report.status!=='ready_for_admin_review';
+    };
+    hq('[data-h-check]').onclick=async()=>{
+      const profile=hq('[data-h-profile]').value,button=hq('[data-h-check]');
+      button.disabled=true;
+      try{
+        const res=await fetch('api/stem-mastering.php?track_id='+encodeURIComponent(studio.id)+
+          '&action=readiness&profile='+encodeURIComponent(profile),
+          {credentials:'same-origin',cache:'no-store'});
+        if(!res.ok)throw Error('Readiness request failed ('+res.status+').');
+        const data=await res.json();if(!data.ok)throw Error(data.message||'Readiness was not available');
+        renderReadiness(data.report);
+      }catch(err){
+        hq('[data-h-report]').textContent='Readiness unavailable: '+err.message;
+        hq('[data-h-save]').disabled=true;
+      }finally{button.disabled=false}
+    };
+    hq('[data-h-profile]').onchange=()=>{hq('[data-h-save]').disabled=true;};
+    hq('[data-h-save]').onclick=async()=>{
+      const button=hq('[data-h-save]');
+      button.disabled=true;
+      try{
+        const data=await window.STONEFELLOW_ADMIN_CONTEXT.api('stem-mastering.php',{
+          action:'save_readiness',track_id:studio.id,revision:studio.project.revision,
+          profile:hq('[data-h-profile]').value,confirmation:hq('[data-h-confirm]').value.trim()
+        });
+        studio.project=data.project;
+        hq('[data-h-report]').textContent='Review recorded · '+data.review.status+
+          '. The master remains private; import it using the existing Media Library workflow.';
+        const footer=studio.overlay?.querySelector('.sf-studio-footer > span');
+        if(footer)footer.textContent='Project revision '+data.project.revision;
+      }catch(err){
+        hq('[data-h-report]').textContent='Review was not saved: '+err.message;
+      }
+    };
     q('[data-g-render]').onclick=async()=>{
       const button=q('[data-g-render]');button.disabled=true;q('[data-g-save]').disabled=true;
       try{
