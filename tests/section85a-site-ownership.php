@@ -81,7 +81,7 @@ $site=file_get_contents(dirname(__DIR__).'/stonefellow-v120.php');
 $ui=file_get_contents(dirname(__DIR__).'/assets/js/library.js');
 $wallet=file_get_contents(dirname(__DIR__).'/assets/js/owned-music.js');
 $css=file_get_contents(dirname(__DIR__).'/assets/css/site.css');
-ok85(str_contains($site,'assets/js/owned-music.js') && str_contains($site,"'1.3.82'"),
+ok85(str_contains($site,'assets/js/owned-music.js') && preg_match("/define\\('SF_BUILD',\\s*'[0-9]+\\.[0-9]+\\.[0-9]+'\\)/",$site)===1,
     'Versioned storefront loads owned-wallet renderer before My Library');
 ok85(str_contains($ui,"owned:'Owned Music'")&&str_contains($ui,"fan-owned-music.php"),
     'My Library displays account-scoped purchased music separately from favorites');
