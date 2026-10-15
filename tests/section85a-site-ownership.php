@@ -137,3 +137,13 @@ try{
     @rmdir($fixtureRoot);
 }
 echo "Section 85A purchased music and vinyl rights: $passes checks passed".PHP_EOL;
+
+$adminBuild=(string)file_get_contents(dirname(__DIR__).'/admin/index.php');
+$serverHeaders=(string)file_get_contents(dirname(__DIR__).'/.htaccess');
+$serviceWorker=(string)file_get_contents(dirname(__DIR__).'/service-worker.js');
+ok85(str_contains($adminBuild,"define('SF_ADMIN_BUILD','1.3.76')")
+  &&str_contains($serverHeaders,'X-Stonefellow-Build "1.3.76"'),
+  'Website and Admin build markers stay in sync for deployed asset cache invalidation');
+ok85(str_contains($serviceWorker,"stonefellow-static-v1.3.76")
+  &&str_contains($serviceWorker,'assets/js/owned-music.js'),
+  'PWA serves the versioned purchased-music interface rather than a stale offline script');
