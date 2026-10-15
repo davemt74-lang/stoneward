@@ -307,6 +307,14 @@
       '<label>Type REVIEWED to confirm that you heard this mix and accept the warnings <input data-h-confirm autocomplete="off" placeholder="REVIEWED" maxlength="12"></label>'+
       '<button type="button" data-h-save disabled>Record review · Keep private</button>'+
       '<p class="sf-g-note">A review does not upload a master, replace catalog audio, grant vinyl rights or publish any public media. Import the WAV into the existing Media Library during the next release stage.</p></section>'+
+      '<section class="sf-i-publishing" data-i-publishing><h4>86I · Production → Private Catalog Master</h4>'+
+      '<p>Stage this exact reviewed 48 kHz WAV in Stonefellow’s existing private Media Library. Your streaming preview stays unchanged; publishing changes only the owned-download private original.</p>'+
+      '<p data-i-status role="status" aria-live="polite">'+esc(project.stem_publication?.state||'No WAV staged')+'</p>'+
+      '<button type="button" data-i-stage>Stage this rendered WAV privately</button>'+
+      '<label>Type PUBLISH PRIVATE MASTER to replace the private owned-download original. No public preview or vinyl license change. <input data-i-confirm maxlength="40" autocomplete="off" placeholder="PUBLISH PRIVATE MASTER"></label>'+
+      '<button type="button" data-i-publish>Publish private original with exact confirmation</button>'+
+      '<button type="button" data-i-reconcile>Check interrupted publication (manual reconciliation)</button>'+
+      '<p class="sf-g-note">Publishing uses your existing catalog permissions, purchase entitlements and Media Library. Vinyl pre-masters require engineer review. No automatic posting to your public music feed.</p></section>'+
       '<p class="sf-g-note">LUFS is a 48 kHz K-weighted, gated BS.1770-style estimate. Sample peak is not true peak; no streaming-platform loudness target or mastering certification is implied. Reference recordings remain private.</p></section>';
   }
   function bind(root,studio){
@@ -318,7 +326,7 @@
     if(unsupported)limits.push(unsupported+' enabled native/unsupported FX not processed');
     if(receives)limits.push(receives+' REAPER receive(s) unsupported');
     if(limits.length)q('[data-g-warning]').textContent='Fidelity warning: '+limits.join('; ')+'. Browser render is a working approximation.';
-    let last=null,blobURL=null,refAnalysis=null,referenceName=studio.project.mastering_reference?.name||'';
+    let last=null,renderBlob=null,blobURL=null,refAnalysis=null,referenceName=studio.project.mastering_reference?.name||'';
     const a=q('[data-g-player-a]'),b=q('[data-g-player-b]');
     a.addEventListener('play',()=>b.pause());b.addEventListener('play',()=>a.pause());
     const makeURL=blob=>{if(blobURL)URL.revokeObjectURL(blobURL);blobURL=URL.createObjectURL(blob);a.src=blobURL;};
@@ -367,6 +375,57 @@
         hq('[data-h-report]').textContent='Review was not saved: '+err.message;
       }
     };
+    const iStatus=message=>{const el=area.querySelector('[data-i-status]');if(el)el.textContent=message;};
+    area.querySelector('[data-i-stage]').onclick=async()=>{
+      if(!renderBlob||!last?.details?.render_sha256)return iStatus('Render and measure the WAV in this session first.');
+      if(studio.project.mastering_readiness?.state!=='reviewed_pending_media_upload')
+        return iStatus('Complete the 86H manual review first.');
+      const btn=area.querySelector('[data-i-stage]');btn.disabled=true;
+      try{
+        const fd=new FormData();
+        fd.append('track_id',studio.id);fd.append('revision',String(studio.project.revision));
+        fd.append('file',new File([renderBlob],filename(studio.project.project_name)+'-reviewed.wav',
+          {type:'audio/wav'}));
+        const result=await window.STONEFELLOW_ADMIN_CONTEXT.uploadApi('stem-publishing.php',fd);
+        studio.project=result.project;
+        const footer=studio.overlay?.querySelector('.sf-studio-footer > span');
+        if(footer)footer.textContent='Project revision '+result.project.revision;
+        iStatus('WAV staged privately as Media Library candidate #'+result.status.asset_id+
+          '. Public streaming and existing purchased media remain unchanged.');
+      }catch(err){iStatus('Private staging rejected: '+err.message);btn.disabled=false;}
+    };
+    area.querySelector('[data-i-publish]').onclick=async()=>{
+      const confirmation=area.querySelector('[data-i-confirm]').value.trim();
+      if(confirmation!=='PUBLISH PRIVATE MASTER')
+        return iStatus('Type the complete PUBLISH PRIVATE MASTER confirmation first.');
+      const btn=area.querySelector('[data-i-publish]');btn.disabled=true;
+      try{
+        const data=await window.STONEFELLOW_ADMIN_CONTEXT.api('stem-publishing.php',{
+          action:'publish_private_master',track_id:studio.id,
+          revision:studio.project.revision,confirmation
+        });
+        studio.project=data.project;
+        const footer=studio.overlay?.querySelector('.sf-studio-footer > span');
+        if(footer)footer.textContent='Project revision '+data.project.revision;
+        iStatus('Private purchased original published using the existing Media Library. Public preview, orders and vinyl print licenses were not changed.');
+      }catch(err){
+        iStatus('Publication is not confirmed: '+err.message+
+          '. Check Media Library status before attempting any action.');
+        btn.disabled=false;
+      }
+    };
+    area.querySelector('[data-i-reconcile]').onclick=async()=>{
+      const typed=prompt('If you have independently checked the current private catalog master, type RECONCILE MASTER.');
+      if(typed!=='RECONCILE MASTER')return;
+      try{
+        const data=await window.STONEFELLOW_ADMIN_CONTEXT.api('stem-publishing.php',{
+          action:'reconcile_private_master',track_id:studio.id,
+          revision:studio.project.revision,confirmation:typed
+        });
+        studio.project=data.project;
+        iStatus('Interrupted publication reconciled against existing catalog media. No duplicate publish was attempted.');
+      }catch(err){iStatus('Manual reconciliation not completed: '+err.message)}
+    };
     q('[data-g-render]').onclick=async()=>{
       const button=q('[data-g-render]');button.disabled=true;q('[data-g-save]').disabled=true;
       try{
@@ -376,7 +435,12 @@
         last={metrics:measurements,details:{
           unsupported_fx:unsupported,unsupported_routing:receives,
           unlinked_stems:0,reference_name:referenceName},revision};
-        const file=wav(buffer);makeURL(file);
+        const file=wav(buffer);
+        if(!crypto?.subtle?.digest)throw Error('HTTPS and secure browser crypto are required to bind a WAV to a reviewed render.');
+        const hashed=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+        const sha=Array.from(new Uint8Array(hashed),b=>b.toString(16).padStart(2,'0')).join('');
+        last.details.render_sha256=sha;
+        renderBlob=file;makeURL(file);
         const link=q('[data-g-download]');link.hidden=false;link.href=blobURL;
         link.download=filename(studio.project.project_name)+'-mix-r'+revision+'.wav';
         q('[data-g-live-analysis]').innerHTML=metricsHTML(measurements);
