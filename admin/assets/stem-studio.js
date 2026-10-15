@@ -88,6 +88,15 @@
      area.innerHTML='<div class="sf-studio-top"><div class="sf-studio-properties"><strong>'+esc(p.project_name)+'</strong><span>'+tracks.length+' tracks</span><span>'+esc(p.tempo_bpm)+' BPM</span><span>'+esc(p.time_signature)+'</span><span>'+esc(p.sample_rate||'Unknown')+' Hz</span></div><div class="sf-studio-transport"><button type="button" data-studio-play>▶ Play</button><button type="button" data-studio-stop>■ Stop</button><label><input type="checkbox" data-studio-loop> Loop</label><label><input type="checkbox" data-studio-snap checked> Snap to beat</label><button type="button" data-studio-undo title="Undo last clip/effect edit">↶ Undo</button><button type="button" data-studio-redo title="Redo last clip/effect edit">↷ Redo</button><input type="range" data-studio-seek min="0" max="'+max+'" step=".05" value="0"><output data-studio-time>0:00 / '+fmt(max)+'</output></div></div><div class="sf-studio-master"><h3>Master bus</h3><p>'+esc(p.master_fx.map(f=>f.name).join(' → ')||'No imported effects')+'</p><button type="button" class="secondary" data-studio-native-refresh>Verify native REAPER parameters</button><details class="sf-studio-master-rack"><summary>Master plugins · original REAPER order and settings</summary>'+window.SFStemPluginRack.render('master','__master__',p.master_fx||[],esc)+'</details></div><div class="sf-studio-tracks">'+tracks.map((t,i)=>this.trackHTML(t,i,max)).join('')+'</div><footer class="sf-studio-footer"><label>Save mix <input data-studio-mix-name maxlength="100" placeholder="Mix name" value="Studio mix"></label><button type="button" class="primary" data-studio-save>Save mix</button><label>Recall mix <select data-studio-recall><option value="">Choose saved mix</option>'+Object.keys(p.mixes||{}).map(k=>'<option value="'+esc(k)+'">'+esc(k)+'</option>').join('')+'</select></label><span>Project revision '+p.revision+'</span></footer>';
      this.bindControls();
    }
+   routingHTML(){const r=this.project.routing||{},b=r.buses||[],sends=r.sends||[];
+     const nodes=[...this.project.tracks.map(t=>({id:t.guid,name:t.name})),...b.map(x=>({id:x.id,name:x.name}))];
+     const opts=nodes.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
+     return '<section class="sf-studio-routing"><h3>Auxiliary routing &amp; group buses</h3><p>Browser interpretation of supported REAPER post-fader sends. Original project remains preserved.</p><small>'+n(r.unsupported_receives)+' unsupported native receives</small>'+
+       '<div class="sf-route-add"><input data-route-name placeholder="Bus name" maxlength="80"><button data-route-add-bus>Create bus</button></div>'+
+       '<div class="sf-route-buses">'+b.map(x=>'<article data-route-bus="'+esc(x.id)+'"><b>'+esc(x.name)+'</b><label>Gain <input data-bus-volume type="range" min="0" max="2" step=".01" value="'+n(this.busMix[x.id]?.volume,1)+'"></label><label>Pan <input data-bus-pan type="range" min="-1" max="1" step=".01" value="'+n(this.busMix[x.id]?.pan)+'"></label><label>Mute <input type="checkbox" data-bus-mute '+(this.busMix[x.id]?.mute?'checked':'')+'></label><button data-bus-save>Save</button><button data-bus-delete>Delete</button><details><summary>Bus FX</summary>'+window.SFStemPluginRack.render('bus',x.id,x.fx||[],esc)+'</details></article>').join('')+'</div>'+
+       '<div class="sf-route-add"><label>From <select data-route-source>'+opts+'</select></label><label>To <select data-route-target>'+opts+'</select></label><button data-route-add-send>Add send</button></div>'+
+       '<div class="sf-route-sends">'+sends.map(x=>'<div data-route-send="'+esc(x.id)+'"><b>'+esc(nodes.find(n=>n.id===x.source_guid)?.name||'?')+' → '+esc(nodes.find(n=>n.id===x.target_guid)?.name||'?')+'</b><small>'+esc(x.origin||'')+'</small><label>Level <input data-send-gain type="number" min="0" max="4" step=".05" value="'+n(x.gain,1)+'" '+(x.origin==='BROWSER'?'':'disabled')+'></label>'+(x.origin==='BROWSER'?'<button data-send-save>Save</button><button data-send-delete>Delete</button>':'')+'</div>').join('')+'</div></section>';
+   }
    trackHTML(t,i,total){
      const mix=this.mixing[t.guid]||{},files=(t.clips||[]),left=Math.max(0,Math.min(100,100*n(t.source_position)/total));
      const width=Math.max(0,Math.min(100-left,100*n(t.duration_seconds)/total));
@@ -145,7 +154,7 @@
      for(const entry of this.audio.values())for(const item of entry.clips||[]){
        item.media.pause();item.media.removeAttribute('src');item.media.load();
      }
-     this.audio.clear();
+     this.audio.clear();this.busNodes.clear();
      if(this.context){try{await this.context.close()}catch(_){}
        this.context=null;this.master=null;
      }
@@ -153,6 +162,20 @@
    bindControls(){
      const root=this.overlay;
      window.SFStemPluginRack.bind(root,payload=>this.commitEdit(payload));
+     const route=payload=>this.commitEdit(payload);
+     el('[data-route-add-bus]',root)?.addEventListener('click',()=>route({action:'route_add_bus',name:el('[data-route-name]',root).value}));
+     el('[data-route-add-send]',root)?.addEventListener('click',()=>route({action:'route_add_send',source_guid:el('[data-route-source]',root).value,target_guid:el('[data-route-target]',root).value}));
+     all('[data-route-bus]',root).forEach(row=>{const id=row.dataset.routeBus;
+       for(const [key,attr] of [['volume','[data-bus-volume]'],['pan','[data-bus-pan]']])el(attr,row).oninput=e=>{this.busMix[id][key]=n(e.target.value);this.applyMix()};
+       el('[data-bus-mute]',row).onchange=e=>{this.busMix[id].mute=e.target.checked;this.applyMix()};
+       el('[data-bus-save]',row).onclick=()=>route({action:'route_update_bus',id,...this.busMix[id]});
+       el('[data-bus-delete]',row).onclick=()=>route({action:'route_delete_bus',id});
+     });
+     all('[data-route-send]',root).forEach(row=>{const id=row.dataset.routeSend;
+       el('[data-send-save]',row)?.addEventListener('click',()=>route({action:'route_update_send',id,gain:n(el('[data-send-gain]',row).value)}));
+       el('[data-send-delete]',row)?.addEventListener('click',()=>route({action:'route_delete_send',id}));
+     });
+
      const nativeRefresh=el('[data-studio-native-refresh]',root);
      if(nativeRefresh)nativeRefresh.onclick=()=>{
        if(!confirm('Recheck the saved REAPER project for verified native settings? Your clips, original .rpp and deliberate browser parameter overrides are preserved.'))return;
@@ -237,33 +260,51 @@
      this.context=new (window.AudioContext||window.webkitAudioContext)();
      this.master=this.context.createGain();this.master.gain.value=.82;
      this.masterProcessor=this.context.createGain();
-     this.masterFX=window.SFStemFX.build(this.context,this.master,
-       this.project.master_fx||[],this.masterProcessor);
+     this.masterFX=window.SFStemFX.build(this.context,this.master,this.project.master_fx||[],this.masterProcessor);
      this.masterProcessor.connect(this.context.destination);
+     this.busNodes=new Map();
+     for(const b of this.project.routing?.buses||[]){
+       const input=this.context.createGain(),gain=this.context.createGain(),pan=this.context.createStereoPanner();
+       const fx=window.SFStemFX.build(this.context,input,b.fx||[],gain);
+       gain.connect(pan);pan.connect(this.master);
+       this.busNodes.set(b.id,{input,gain,pan,fx});
+     }
      for(const t of this.project.tracks){
        if(!t.media_ready||!t.audio_url)continue;
-       const selected=(t.clips||[]).filter(c=>
-         String(c.file||'').toLowerCase()===String(t.source_file||'').toLowerCase()&&n(c.length)>.01);
+       const selected=(t.clips||[]).filter(c=>String(c.file||'').toLowerCase()===String(t.source_file||'').toLowerCase()&&n(c.length)>.01);
        if(!selected.length)continue;
        const input=this.context.createGain(),gain=this.context.createGain(),pan=this.context.createStereoPanner();
        const fx=window.SFStemFX.build(this.context,input,t.fx||[],gain);
-       gain.connect(pan);pan.connect(this.master);
+       gain.connect(pan);
        const clips=[];
-       for(const clip of selected){
-         const media=new Audio(t.audio_url);media.preload='metadata';
-         this.context.createMediaElementSource(media).connect(input);
-         clips.push({media,clip});
-       }
-       this.audio.set(t.guid,{clips,gain,pan,track:t,fx});
+       for(const clip of selected){const media=new Audio(t.audio_url);media.preload='metadata';this.context.createMediaElementSource(media).connect(input);clips.push({media,clip});}
+       this.audio.set(t.guid,{clips,input,gain,pan,track:t,fx});
+     }
+     // Routing may reference unlinked audio tracks: do not invent silent processors.
+     for(const t of this.project.tracks){const entry=this.audio.get(t.guid);if(!entry)continue;
+       const parent=this.audio.get(t.folder_parent_guid)?.input||this.busNodes.get(t.folder_parent_guid)?.input;
+       if(t.main_send_enabled!==false)entry.pan.connect(parent||this.master);
+     }
+     for(const send of this.project.routing?.sends||[]){
+       if(send.enabled===false||send.mode!=='post-fader')continue;
+       const source=this.audio.get(send.source_guid)?.pan||this.busNodes.get(send.source_guid)?.pan;
+       const target=this.audio.get(send.target_guid)?.input||this.busNodes.get(send.target_guid)?.input;
+       if(source&&target){const gain=this.context.createGain();gain.gain.value=n(send.gain,0);source.connect(gain);gain.connect(target)}
      }
      this.applyMix();
    }
-   applyMix(){const solo=Object.values(this.mixing).some(x=>x.solo);for(const [guid,nodes] of this.audio){
-     const state=this.mixing[guid];if(!state)continue;
-     const active=!state.mute&&(!solo||state.solo);
-     nodes.gain.gain.setTargetAtTime(active?state.volume:0,this.context.currentTime,.008);
-     nodes.pan.pan.setTargetAtTime(state.pan,this.context.currentTime,.008);
-   }}
+   applyMix(){if(!this.context)return;
+     const solo=Object.values(this.mixing).some(x=>x.solo);
+     for(const [guid,nodes] of this.audio){const state=this.mixing[guid];if(!state)continue;
+       const active=!state.mute&&(!solo||state.solo);
+       nodes.gain.gain.setTargetAtTime(active?state.volume:0,this.context.currentTime,.008);
+       nodes.pan.pan.setTargetAtTime(state.pan,this.context.currentTime,.008);
+     }
+     for(const [id,nodes] of this.busNodes){const state=this.busMix[id];if(!state)continue;
+       nodes.gain.gain.setTargetAtTime(state.mute?0:state.volume,this.context.currentTime,.008);
+       nodes.pan.pan.setTargetAtTime(state.pan,this.context.currentTime,.008);
+     }
+   }
    currentTime(){return this.running&&this.context?Math.min(this.duration,this.anchor+(this.context.currentTime-this.anchorClock)):this.anchor}
    sync(){
      const time=this.currentTime();
