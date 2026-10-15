@@ -7,7 +7,7 @@ function render(c,owned,query=''){
   if(owned.status==='loading')return '<section data-library-owned-root class="library-owned-status" role="status">Checking your Stonefellow purchases and vinyl print rights…</section>';
   if(owned.status==='error')return `<section data-library-owned-root class="library-owned-status" role="alert">Purchased music is unavailable: ${esc(owned.error||'Please try again.')} <button type="button" class="text-control compact" data-owned-retry>Retry</button></section>`;
   const all=Array.isArray(owned.tracks)?owned.tracks:[];
-  const rows=all.filter(t=>!query||String(t.title||'').toLowerCase().includes(query.toLowerCase())).sort((a,b)=>String(a.title||'').localeCompare(String(b.title||''));
+  const rows=all.filter(t=>!query||String(t.title||'').toLowerCase().includes(query.toLowerCase())).sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));
   const totalPrint=all.reduce((n,t)=>n+Math.max(0,Number(t.vinyl_print_rights?.available||0)),0);
   const cards=rows.map(t=>{
     const id=String(t.id||''), rights=t.vinyl_print_rights||{};
