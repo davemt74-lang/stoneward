@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/stem-studio-core.php';
+require_once __DIR__.'/stem-mastering-core.php';
 /**
  * Read-only Admin Brain bridge. Only a named song, validated against the site
  * catalog, can be inspected. Never supply RPP/VST binary, paths, stem URLs,
@@ -27,7 +28,8 @@ function sf_stem_agent_review(string $songId):array {
         $automationByType[$key]=($automationByType[$key]??0)+1;
         if(($lane['source']??'')==='REAPER'&&empty($lane['enabled']))$unmapped++;
     }
-    $suggestions=[];
+    $mastering=sf_stem_mastering_agent_summary($project);
+    $suggestions=sf_stem_mastering_recommendations($mastering);
     if($missing>0)$suggestions[]=$missing.' tracks have missing source media. Link the private WAV/MP3 stems before assessing levels.';
     if((int)($routing['unsupported_receives']??0)>0)$suggestions[]='Some REAPER receives were not mapped; compare playback against the original REAPER session.';
     if($unsupportedFx>0)$suggestions[]=$unsupportedFx.' native effects have no supported browser processor. Do not claim matching native sound.';
@@ -45,7 +47,9 @@ function sf_stem_agent_review(string $songId):array {
       'import_limitations'=>(array)($project['automation_import']??[]),
       'saved_mix_count'=>count((array)($project['mixes']??[])),
       'current_mix'=>(string)($project['current_mix']??''),
-      'recommendations'=>$suggestions,
+      'mastering'=>$mastering,
+      'reference_available'=>isset($project['mastering_reference']['tag']),
+      'recommendations'=>array_values(array_slice(array_unique($suggestions),0,12)),
       'mutation_policy'=>'No autonomous edits: exact project revision and admin proposal approval required.'
     ];
 }
