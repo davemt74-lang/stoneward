@@ -1,0 +1,29 @@
+name: Stonefellow Native Music 84B7
+on:
+  pull_request:
+    paths:
+      - 'api/homeserver-audio.php'
+      - 'api/homeserver-music-core.php'
+      - 'api/homeserver-library.php'
+      - 'tests/section84b7-homeserver-music.php'
+      - '.github/workflows/stonefellow-native-84b7.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/homeserver-audio.php'
+      - 'api/homeserver-music-core.php'
+      - 'api/homeserver-library.php'
+      - 'tests/section84b7-homeserver-music.php'
+jobs:
+  music-rights:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - run: php -l api/homeserver-audio.php
+      - run: php -l api/homeserver-music-core.php
+      - run: php -l api/homeserver-library.php
+      - run: php tests/section84b7-homeserver-music.php
+      - run: php tests/section84b6-homeserver-user-consent.php
