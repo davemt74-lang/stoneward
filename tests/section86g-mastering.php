@@ -64,7 +64,8 @@ ok86g(sf_stem_mastering_reference_path('song-1',$p)===null,
 $endpoint=file_get_contents(dirname(__DIR__).'/admin/api/stem-mastering.php');
 ok86g(str_contains($endpoint,"sf_admin_require_auth(\$method!=='GET')")&&
  str_contains($endpoint,"header('Cache-Control: private, no-store")&&
- str_contains($endpoint,'sf_stem_mastering_reference_path'),
+ str_contains($endpoint,'sf_stem_mastering_reference_path')&&
+ str_contains($endpoint,"header('Accept-Ranges: bytes')")&&str_contains($endpoint,'fseek($handle,$start)'),
  'Private reference streaming authenticates and disables public caching');
 ok86g(str_contains($endpoint,"sf_log_admin_action("),'Mastering evidence changes are logged for Admin audit');
 $ui=file_get_contents(dirname(__DIR__).'/admin/assets/stem-studio.js');
