@@ -15,12 +15,12 @@ $auth=(string)($_SERVER['HTTP_AUTHORIZATION']??($_SERVER['REDIRECT_HTTP_AUTHORIZ
 try{
     $uid=sf_homeserver_bearer($auth,'fan.library.read');
     $trackId=(string)($_GET['id']??'');
+    $download=($_GET['download']??'')==='1';
     $owned=sf_homeserver_user_library($uid);
-    $ref=sf_hs_music_audio_reference($uid,$trackId,$owned,sf_track_map());
+    $ref=sf_hs_music_audio_reference($uid,$trackId,$owned,sf_track_map(),$download);
     // Use exactly the same vetted, private Media Library master resolver as 84B5.
     $media=sf_kunaki_media_resolve($ref,'audio');
     $size=(int)$media['size_bytes'];
-    $download=($_GET['download']??'')==='1';
     $range=sf_hs_music_range(
         !$download?(string)($_SERVER['HTTP_RANGE']??''):null,$size);
 }catch(InvalidArgumentException $e){
