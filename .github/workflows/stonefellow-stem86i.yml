@@ -1,0 +1,50 @@
+name: Stonefellow Stem-to-Catalog Publishing 86I
+on:
+  pull_request:
+    paths:
+      - 'api/stem-catalog-publishing.php'
+      - 'api/stem-mastering-core.php'
+      - 'api/stem-agent-bridge.php'
+      - 'admin/api/stem-publishing.php'
+      - 'admin/assets/stem-mastering.js'
+      - 'tests/section86i-stem-catalog.php'
+      - '.github/workflows/stonefellow-stem86i.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-catalog-publishing.php'
+      - 'api/stem-mastering-core.php'
+      - 'api/stem-agent-bridge.php'
+      - 'admin/api/stem-publishing.php'
+      - 'admin/assets/stem-mastering.js'
+      - 'tests/section86i-stem-catalog.php'
+permissions:
+  contents: read
+jobs:
+  private-catalog-publishing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sodium
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/stem-catalog-publishing.php
+          php -l api/stem-mastering-core.php
+          php -l api/stem-agent-bridge.php
+          php -l admin/api/stem-publishing.php
+          node --check admin/assets/stem-mastering.js
+          php tests/section86i-stem-catalog.php
+          php tests/section86h-mastering-readiness.php
+          php tests/section86g-mastering.php
+          node tests/section86g-mastering.cjs
+          php tests/section86f-automation-agent.php
+          php tests/section85b-media-publishing.php
+          php tests/section86e-routing.php
