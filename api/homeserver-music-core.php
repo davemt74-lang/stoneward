@@ -14,7 +14,15 @@ function sf_hs_music_audio_reference(int $userId,string $trackId,array $owned,ar
     }
     if(!$permitted)throw new RuntimeException('Music entitlement unavailable.');
     $track=$catalog[$trackId]??null;
-    if(!is_array($track)||!is_string($track['audio']??null)||$track['audio']==='')
+    if(!is_array($track))throw new RuntimeException('Music master unavailable.');
+    $original=(string)($track['private_master_audio']??'');
+    if($original!==''&&preg_match('/^api\\/media\\.php\\?id=M[A-F0-9]{20}$/D',$original))
+        return $original;
+    // Preserve previously issued 84B7 legacy streams only until a song is
+    // switched to explicit preview/private-master separation.
+    if(($track['audio_publishing_mode']??'')==='preview_master_split')
+        throw new RuntimeException('A private master has not been published.');
+    if(!is_string($track['audio']??null)||$track['audio']==='')
         throw new RuntimeException('Music master unavailable.');
     return $track['audio'];
 }

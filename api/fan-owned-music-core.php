@@ -44,7 +44,7 @@ function sf_fan_owned_project(int $uid,array $library,array $orders,
     foreach($rights as $t){
         $id=(string)$t['id'];
         $catalogRow=(array)($catalog[$id]??[]);
-        $reference=$catalogRow['audio']??null;
+        $reference=$catalogRow['private_master_audio']??null;
         $ready=sf_fan_owned_private_master($reference)
             &&($masterReady?$masterReady($reference):sf_fan_owned_media_ready($reference));
         $tracks[]=[
@@ -70,6 +70,10 @@ function sf_fan_owned_project(int $uid,array $library,array $orders,
 function sf_fan_owned_download_reference(int $uid,string $trackId,
                                          array $owned,array $catalog):string {
     $ref=sf_hs_music_audio_reference($uid,$trackId,$owned,$catalog,true);
+    // Only the explicitly published PRIVATE original qualifies for site
+    // download, even when a legacy public catalog audio URL exists.
+    if(($catalog[$trackId]['private_master_audio']??null)!==$ref)
+        throw new RuntimeException('Private original not published.');
     if(!sf_fan_owned_private_master($ref))
         throw new RuntimeException('The downloadable master has not been published.');
     return $ref;
