@@ -370,6 +370,10 @@
           action:'save_analysis',track_id:studio.id,revision:last.revision,analysis:last
         });
         studio.project=result.project;
+        // Evidence-only persistence advances the revision without changing audio.
+        last.revision=result.project.revision;
+        const footer=studio.overlay?.querySelector('.sf-studio-footer > span');
+        if(footer)footer.textContent='Project revision '+result.project.revision;
         status('Analysis saved to private Admin Agent Brain history. These measurements remain browser-reported.');
       }catch(e){status('Analysis not saved: '+e.message);q('[data-g-save]').disabled=false;}
     };
