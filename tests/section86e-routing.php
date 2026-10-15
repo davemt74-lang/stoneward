@@ -27,7 +27,7 @@ $m=sf_stem_project_update('song-1',['action'=>'route_add_send','revision'=>2,
  'source_guid'=>'{SNARE}','target_guid'=>$id,'gain'=>0.25]);
 ok86e(count($m['routing']['sends'])===2,'Browser post-fader send is stored');
 ok86e(fails86e(fn()=>sf_stem_project_update('song-1',['action'=>'route_add_send','revision'=>3,
- 'source_guid'=>$id,'target_guid'=>'{FOLDER}'])),'Cycle from bus into ancestor rejected');
+ 'source_guid'=>$id,'target_guid'=>'{SNARE}'])),'Cycle from bus into ancestor rejected');
 ok86e(fails86e(fn()=>sf_stem_project_update('song-1',['action'=>'route_delete_bus',
  'revision'=>3,'id'=>$id])),'Connected buses cannot be deleted');
 ok86e(fails86e(fn()=>sf_stem_project_update('song-1',['action'=>'route_update_send',
