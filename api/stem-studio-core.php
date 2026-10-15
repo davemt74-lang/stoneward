@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/stem-rpp-core.php';
+require_once __DIR__.'/stem-editor-core.php';
 /** Per-song private REAPER project + mix manifest, reusing existing media_assets. */
 function sf_stem_project_track(string $trackId):array {
     if(!preg_match('/^[A-Za-z0-9._-]{1,100}$/D',$trackId))throw new InvalidArgumentException('Invalid song ID.');
@@ -113,6 +114,8 @@ function sf_stem_project_update(string $id,array $payload):array {
         }
         $old['mixes']=array_slice((array)($old['mixes']??[]),-19,20,true);
         $old['mixes'][$mixName]=['name'=>$mixName,'tracks'=>$values,'saved_at'=>gmdate('c')];
+    }elseif(in_array($action,['edit_clip','edit_fx','undo_edit','redo_edit'],true)){
+        sf_stem_editor_apply($old,$payload);
     }else throw new InvalidArgumentException('Unsupported stem editor action.');
     return sf_stem_project_write($id,$old,$revision);
 }

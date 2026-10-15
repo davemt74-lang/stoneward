@@ -283,6 +283,10 @@ jobs:
           php tests/section85b-media-publishing.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
+          php tests/section86b-timeline-fx.php
+          node --check admin/assets/stem-timeline.js
+          node --check admin/assets/stem-fx-engine.js
+          node tests/section86b-editor.cjs
           node --check admin/assets/stem-waveform.js
           node tests/section86a-waveform.cjs
 
