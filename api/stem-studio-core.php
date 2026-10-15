@@ -81,6 +81,13 @@ function sf_stem_project_import(string $id,string $content,string $name,int $adm
     // Imported source changed; prior edit snapshots no longer apply safely.
     $parsed['plugin_history']=['undo'=>[],'redo'=>[]];
     $parsed['edit_history']=['undo'=>[],'redo'=>[]];
+    // Retain private reference and prior analyses across a REAPER reimport.
+    // Revision changes automatically mark old evidence stale.
+    if(is_array($old)){
+        if(isset($old['mastering_reference']))$parsed['mastering_reference']=$old['mastering_reference'];
+        if(isset($old['mastering_analyses']))$parsed['mastering_analyses']=array_slice(
+            (array)$old['mastering_analyses'],-12);
+    }
     $parsed['mixes']=(array)($old['mixes']??[]);
     return sf_stem_project_write($id,$parsed,$old===null?0:(int)$old['revision']);
 }
