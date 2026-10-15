@@ -101,7 +101,7 @@ ok85($noMasterById['purchased']['download_ready']===false,
     'Published reference without an available private file cannot create a false download button');
 $siteCore=file_get_contents(dirname(__DIR__).'/api/fan-owned-music-core.php');
 ok85(str_contains($siteCore,'sf_fan_owned_media_ready')&&str_contains($siteCore,'realpath(')
-    &&str_contains($siteCore,'is_link($file)'),
+    &&str_contains($siteCore,'is_link($candidate)'),
     'Private media availability requires safe non-symlink master under local storage');
 
 $fixtureRoot=sys_get_temp_dir().'/sf85a-'.bin2hex(random_bytes(6));
