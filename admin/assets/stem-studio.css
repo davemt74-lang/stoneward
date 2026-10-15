@@ -32,3 +32,23 @@
 .sf-studio-waveform{display:block;width:100%;height:100%;position:absolute;inset:0;z-index:0;opacity:.9;pointer-events:none}
 .sf-studio-clip span{position:relative;z-index:1;background:#17120aaa;border-radius:2px;width:max-content;max-width:100%}
 [data-stem-waveform]{margin-inline:4px}
+
+/* 86B clip timeline and non-destructive REAPER browser effects */
+.sf-studio-editable-clip{cursor:grab;text-align:left;padding:0;background:linear-gradient(180deg,#927346,#594029);touch-action:none;user-select:none}
+.sf-studio-editable-clip:active{cursor:grabbing}
+.sf-studio-editable-clip:focus-visible{outline:2px solid #f1d28e;outline-offset:1px}
+.sf-studio-unlinked{background:repeating-linear-gradient(45deg,#4e4032,#4e4032 8px,#342d27 8px,#342d27 16px);opacity:.8}
+.sf-studio-trim-handle{position:absolute;right:0;top:0;bottom:0;width:9px;border-left:2px solid #f2d09399;background:#d4ad7233;cursor:ew-resize}
+.sf-studio-clip-inspector,.sf-studio-effects{border:1px solid #65503d;padding:12px;margin:12px 0;background:#201a14}
+.sf-studio-clip-inspector h4,.sf-studio-effects h4{margin:0 0 8px;color:#efdab7;font-size:13px}
+.sf-studio-clip-inspector p,.sf-studio-effects>small{color:#baa891;font-size:11px;line-height:1.55}
+.sf-studio-clip-inspector label,.sf-studio-effect label{display:inline-flex;flex-direction:column;gap:5px;font-size:11px;max-width:200px}
+.sf-studio-clip-inspector select,.sf-studio-effect input{background:#11100d;color:#f0e3ce;border:1px solid #6c5237;padding:7px;max-width:180px}
+.sf-studio-effect{padding:11px;border-top:1px solid #5c4834;display:flex;align-items:center;flex-wrap:wrap;gap:9px}
+.sf-studio-effect b{font-size:12px;flex-basis:100%;color:#e4cfac}
+.sf-studio-effect>small{color:#c4b8a1}
+.sf-studio-transport [data-studio-undo]:disabled,.sf-studio-transport [data-studio-redo]:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:650px){
+ .sf-studio-clip-inspector label,.sf-studio-effect label{max-width:100%;width:100%;margin:4px 0}
+ .sf-studio-clip-inspector input,.sf-studio-clip-inspector select,.sf-studio-effect input{max-width:100%;min-width:0}
+}

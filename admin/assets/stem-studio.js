@@ -17,7 +17,7 @@
    }).catch(e=>{const status=el('[data-stem-project-status]');if(status)status.textContent=e.message});
  }
  class StemStudio {
-   constructor(id){this.id=id;this.project=null;this.overlay=null;this.audio=new Map();this.context=null;this.master=null;this.running=false;this.anchor=0;this.anchorClock=0;this.loop=false;this.raf=0;this.duration=0;this.mixing={};}
+   constructor(id){this.id=id;this.project=null;this.overlay=null;this.audio=new Map();this.context=null;this.master=null;this.running=false;this.anchor=0;this.anchorClock=0;this.loop=false;this.raf=0;this.duration=0;this.mixing={};this.selectedClips={};this.saving=false;}
    async init(){
      const overlay=document.createElement('div');overlay.className='sf-studio-overlay';overlay.innerHTML='<div class="sf-studio-shell"><header class="sf-studio-head"><div><span class="eyebrow">STONEFELLOW · STEM STUDIO</span><h2>Song multitrack editor</h2><p data-studio-message>Import a REAPER project to initialize your song.</p></div><button type="button" class="secondary" data-studio-close>Close</button></header><section class="sf-studio-import"><label class="sf-studio-file">Import project + stems ZIP <input type="file" accept=".zip,application/zip" data-studio-bundle></label><label class="sf-studio-file">Import REAPER project (.rpp) <input type="file" accept=".rpp,text/plain" data-studio-rpp></label><label class="sf-studio-file">Upload consolidated stems (WAV / MP3) <input type="file" accept=".wav,.mp3,audio/wav,audio/mpeg" multiple data-studio-audio></label><span data-studio-upload-progress role="status"></span></section><div data-studio-report role="status" aria-live="polite"></div><div data-studio-body></div></div>';
      document.body.appendChild(overlay);this.overlay=overlay;
@@ -29,7 +29,10 @@
    }
    say(m){const e=el('[data-studio-message]',this.overlay);if(e)e.textContent=m}
    async reload(){try{const j=await api('stem-studio.php?track_id='+encodeURIComponent(this.id));this.project=j.project;this.updateMix();this.render()}catch(e){this.say(e.message)}}
-   updateMix(){this.mixing={};for(const t of this.project?.tracks||[])this.mixing[t.guid]={volume:n(t.volume,1),pan:n(t.pan),mute:!!t.mute,solo:!!t.solo};this.duration=Math.max(1,...(this.project?.tracks||[]).flatMap(t=>(t.clips||[]).map(c=>n(c.position)+n(c.length))))}
+   updateMix(){this.mixing={};for(const t of this.project?.tracks||[])this.mixing[t.guid]={volume:n(t.volume,1),pan:n(t.pan),mute:!!t.mute,solo:!!t.solo};this.recalculateDuration()}
+   recalculateDuration(){
+     this.duration=Math.max(1,...(this.project?.tracks||[]).flatMap(t=>(t.clips||[]).map(c=>n(c.position)+n(c.length))));
+   }
    async importRpp(file){
      if(!/\.rpp$/i.test(file.name)||file.size>8388608)return this.say('Select a REAPER .rpp under 8 MB.');
      const fd=new FormData();fd.append('track_id',this.id);fd.append('file',file,file.name);
@@ -82,7 +85,7 @@
      if(!this.project){area.innerHTML='<div class="sf-studio-empty">Upload a single ZIP with your .rpp and WAV/MP3 stems, or import them separately. The REAPER project defines the lanes, plugins, timeline offsets and master bus.</div>';return}
      const p=this.project,tracks=p.tracks||[];
      const max=this.duration;
-     area.innerHTML='<div class="sf-studio-top"><div class="sf-studio-properties"><strong>'+esc(p.project_name)+'</strong><span>'+tracks.length+' tracks</span><span>'+esc(p.tempo_bpm)+' BPM</span><span>'+esc(p.time_signature)+'</span><span>'+esc(p.sample_rate||'Unknown')+' Hz</span></div><div class="sf-studio-transport"><button type="button" data-studio-play>▶ Play</button><button type="button" data-studio-stop>■ Stop</button><label><input type="checkbox" data-studio-loop> Loop</label><input type="range" data-studio-seek min="0" max="'+max+'" step=".05" value="0"><output data-studio-time>0:00 / '+fmt(max)+'</output></div></div><div class="sf-studio-master"><h3>Master bus</h3><p>'+esc(p.master_fx.map(f=>f.name).join(' → ')||'No imported effects')+'</p><small>REAPER plugin identities are retained. Native VST presets are not executed in a browser; supported processing uses approximate Web Audio nodes.</small></div><div class="sf-studio-tracks">'+tracks.map((t,i)=>this.trackHTML(t,i,max)).join('')+'</div><footer class="sf-studio-footer"><label>Save mix <input data-studio-mix-name maxlength="100" placeholder="Mix name" value="Studio mix"></label><button type="button" class="primary" data-studio-save>Save mix</button><label>Recall mix <select data-studio-recall><option value="">Choose saved mix</option>'+Object.keys(p.mixes||{}).map(k=>'<option value="'+esc(k)+'">'+esc(k)+'</option>').join('')+'</select></label><span>Project revision '+p.revision+'</span></footer>';
+     area.innerHTML='<div class="sf-studio-top"><div class="sf-studio-properties"><strong>'+esc(p.project_name)+'</strong><span>'+tracks.length+' tracks</span><span>'+esc(p.tempo_bpm)+' BPM</span><span>'+esc(p.time_signature)+'</span><span>'+esc(p.sample_rate||'Unknown')+' Hz</span></div><div class="sf-studio-transport"><button type="button" data-studio-play>▶ Play</button><button type="button" data-studio-stop>■ Stop</button><label><input type="checkbox" data-studio-loop> Loop</label><label><input type="checkbox" data-studio-snap checked> Snap to beat</label><button type="button" data-studio-undo title="Undo last clip/effect edit">↶ Undo</button><button type="button" data-studio-redo title="Redo last clip/effect edit">↷ Redo</button><input type="range" data-studio-seek min="0" max="'+max+'" step=".05" value="0"><output data-studio-time>0:00 / '+fmt(max)+'</output></div></div><div class="sf-studio-master"><h3>Master bus</h3><p>'+esc(p.master_fx.map(f=>f.name).join(' → ')||'No imported effects')+'</p><small>REAPER plugin identities are retained. Native VST presets are not executed in a browser; supported processing uses approximate Web Audio nodes.</small></div><div class="sf-studio-tracks">'+tracks.map((t,i)=>this.trackHTML(t,i,max)).join('')+'</div><footer class="sf-studio-footer"><label>Save mix <input data-studio-mix-name maxlength="100" placeholder="Mix name" value="Studio mix"></label><button type="button" class="primary" data-studio-save>Save mix</button><label>Recall mix <select data-studio-recall><option value="">Choose saved mix</option>'+Object.keys(p.mixes||{}).map(k=>'<option value="'+esc(k)+'">'+esc(k)+'</option>').join('')+'</select></label><span>Project revision '+p.revision+'</span></footer>';
      this.bindControls();
    }
    trackHTML(t,i,total){
@@ -90,7 +93,62 @@
      const width=Math.max(0,Math.min(100-left,100*n(t.duration_seconds)/total));
      const types=t.fx?.map(f=>f.type==='unsupported'?f.name:f.type.toUpperCase())||[];
      const assigned=t.asset_uuid?'Ready':'Missing audio';
-     return '<article class="sf-studio-track" data-guid="'+esc(t.guid)+'"><div class="sf-studio-track-meta"><b>'+(i+1)+'. '+esc(t.name)+'</b><span>'+esc(t.role||'Other')+' · '+assigned+'</span><span class="sf-studio-fx">'+esc(types.join(' → ')||'No track effects')+'</span></div><div class="sf-studio-mix-strip"><label>Gain<input type="range" data-stem-vol min="0" max="2" step=".01" value="'+n(mix.volume,1)+'"></label><label>Pan<input type="range" data-stem-pan min="-1" max="1" step=".01" value="'+n(mix.pan)+'"></label><label><input type="checkbox" data-stem-mute '+(mix.mute?'checked':'')+'>Mute</label><label><input type="checkbox" data-stem-solo '+(mix.solo?'checked':'')+'>Solo</label></div><div class="sf-studio-lane"><div class="sf-studio-clip" style="left:'+left+'%;width:'+width+'%" title="'+esc(t.source_file)+'"><canvas class="sf-studio-waveform" data-stem-waveform-canvas aria-label="Real decoded audio waveform"></canvas><span>'+esc(t.source_file||'Unlinked source')+'</span></div><div class="sf-studio-playhead" data-studio-head></div></div><details class="sf-studio-inspector"><summary>Track details · '+files.length+' clips · '+esc(t.fx?.length||0)+' plugins</summary><label>Name<input data-stem-name maxlength="180" value="'+esc(t.name)+'"></label><label>Role<input data-stem-role maxlength="80" value="'+esc(t.role||'Other')+'"></label><button type="button" class="secondary" data-stem-edit>Save track</button><button type="button" class="secondary" data-stem-waveform>Load real waveform</button><p>Expected file: '+esc(t.source_file||'none')+'</p><label>Attach an existing Media Library asset ID<input type="number" min="1" data-stem-asset-id placeholder="Asset ID"></label><button type="button" class="secondary" data-stem-assign>Attach asset</button><ul>'+files.slice(0,40).map(c=>'<li>'+fmt(c.position)+' · '+fmt(c.length)+' · '+esc(c.file)+'</li>').join('')+'</ul></details></article>';
+     return '<article class="sf-studio-track" data-guid="'+esc(t.guid)+'"><div class="sf-studio-track-meta"><b>'+(i+1)+'. '+esc(t.name)+'</b><span>'+esc(t.role||'Other')+' · '+assigned+'</span><span class="sf-studio-fx">'+esc(types.join(' → ')||'No track effects')+'</span></div><div class="sf-studio-mix-strip"><label>Gain<input type="range" data-stem-vol min="0" max="2" step=".01" value="'+n(mix.volume,1)+'"></label><label>Pan<input type="range" data-stem-pan min="-1" max="1" step=".01" value="'+n(mix.pan)+'"></label><label><input type="checkbox" data-stem-mute '+(mix.mute?'checked':'')+'>Mute</label><label><input type="checkbox" data-stem-solo '+(mix.solo?'checked':'')+'>Solo</label></div><div class="sf-studio-lane" data-studio-timeline>'+window.SFStemTimeline.render(t,total,esc)+'<div class="sf-studio-playhead" data-studio-head></div></div><details class="sf-studio-inspector"><summary>Track details · '+files.length+' clips · '+esc(t.fx?.length||0)+' plugins</summary><label>Name<input data-stem-name maxlength="180" value="'+esc(t.name)+'"></label><label>Role<input data-stem-role maxlength="80" value="'+esc(t.role||'Other')+'"></label><button type="button" class="secondary" data-stem-edit>Save track</button><button type="button" class="secondary" data-stem-waveform>Load real waveform</button><p>Attached REAPER source: '+esc(t.source_file||'none')+'</p><label>Attach existing Media Library asset ID<input type="number" min="1" data-stem-asset-id placeholder="Asset ID"></label><button type="button" class="secondary" data-stem-assign>Attach asset</button>'+this.clipInspector(t)+this.fxInspector(t)+'</details></article>';
+   }
+   clipInspector(t){
+     const files=t.clips||[];
+     if(!files.length)return '<p>No REAPER clips in this track.</p>';
+     const selected=Math.min(files.length-1,Math.max(0,this.selectedClips[t.guid]||0)),clip=files[selected];
+     return '<div class="sf-studio-clip-inspector"><h4>Timeline clips · non-destructive edit</h4><label>Clip <select data-stem-clip-select>'+
+       files.map((c,i)=>'<option value="'+i+'" '+(i===selected?'selected':'')+'>'+esc((i+1)+'. '+(c.file||'No source'))+'</option>').join('')+
+       '</select></label><label>Position (s)<input type="number" data-clip-position min="0" max="86400" step=".01" value="'+n(clip.position)+'"></label>'+
+       '<label>Length (s)<input type="number" data-clip-length min=".02" max="86400" step=".01" value="'+n(clip.length)+'"></label>'+
+       '<label>Source offset (s)<input type="number" data-clip-offset min="0" max="86400" step=".01" value="'+n(clip.offset)+'"></label>'+
+       '<button type="button" class="secondary" data-stem-clip-save>Save clip</button><p>Drag clip to move; drag its right edge to trim. Snap-to-beat is optional. Unlinked takes are visible but do not play.</p></div>';
+   }
+   fxInspector(t){
+     const effects=t.fx||[],specs=window.SFStemFX?.specs||{};
+     return '<div class="sf-studio-effects"><h4>REAPER effects · browser approximation</h4>'+
+       (effects.length?effects.map((fx,i)=>{
+         const spec=specs[fx.type];
+         const parameters=window.SFStemFX?.parameters(fx)||{};
+         return '<div class="sf-studio-effect" data-stem-fx-index="'+i+'"><b>'+esc(fx.name||fx.type||'Unknown plugin')+'</b>'+
+           (!spec?'<small>Plugin identity preserved; browser controls not supported.</small>':
+             '<label><input type="checkbox" data-fx-enabled '+(fx.enabled!==false?'checked':'')+'> Enabled</label>'+
+             Object.entries(spec).map(([name,range])=>'<label>'+esc(name)+
+               '<input type="number" data-fx-param="'+esc(name)+'" min="'+range[0]+'" max="'+range[1]+
+               '" step="any" value="'+n(parameters[name],range[2])+'"></label>').join('')+
+             '<button type="button" class="secondary" data-stem-fx-save>Save effect</button>')+
+           '</div>';
+       }).join(''):'<small>No REAPER effects on this track.</small>')+
+       '<small>These are editable Web Audio approximations. Native REAPER VST states are not executed or overwritten.</small></div>';
+   }
+   async commitEdit(payload){
+     if(this.saving)return;
+     this.saving=true;
+     try{
+       const result=await api('stem-studio.php',{
+         ...payload,track_id:this.id,revision:this.project.revision
+       });
+       this.pause();
+       this.project=result.project;
+       this.recalculateDuration();
+       await this.resetAudio();
+       this.render();
+       this.say('Stem project edit saved · revision '+this.project.revision);
+     }catch(e){
+       this.say('Edit not saved: '+e.message);
+       this.render();
+     }finally{this.saving=false}
+   }
+   async resetAudio(){
+     for(const entry of this.audio.values())for(const item of entry.clips||[]){
+       item.media.pause();item.media.removeAttribute('src');item.media.load();
+     }
+     this.audio.clear();
+     if(this.context){try{await this.context.close()}catch(_){}
+       this.context=null;this.master=null;
+     }
    }
    bindControls(){
      const root=this.overlay;
@@ -98,6 +156,31 @@
      el('[data-studio-stop]',root).onclick=()=>this.stop();
      el('[data-studio-loop]',root).onchange=e=>this.loop=e.target.checked;
      el('[data-studio-seek]',root).oninput=e=>this.seek(n(e.target.value));
+     el('[data-studio-undo]',root).disabled=!(this.project.edit_history?.undo?.length);
+     el('[data-studio-redo]',root).disabled=!(this.project.edit_history?.redo?.length);
+     el('[data-studio-undo]',root).onclick=()=>this.commitEdit({action:'undo_edit'});
+     el('[data-studio-redo]',root).onclick=()=>this.commitEdit({action:'redo_edit'});
+     // Preserve the existing on-demand real PCM waveform action for linked lanes.
+     all('[data-stem-clip-index]',root).forEach(clipElement=>{
+       const t=this.project.tracks.find(track=>track.guid===clipElement.dataset.stemClipGuid);
+       const clip=t?.clips[Number(clipElement.dataset.stemClipIndex)];
+       if(!t?.media_ready||!clip||String(clip.file||'').toLowerCase()!==String(t.source_file||'').toLowerCase())return;
+       const canvas=document.createElement('canvas');
+       canvas.className='sf-studio-waveform';
+       canvas.dataset.stemWaveformCanvas='';
+       canvas.setAttribute('aria-hidden','true');
+       clipElement.prepend(canvas);
+     });
+     window.SFStemTimeline.bind(root,this.project,{
+       duration:this.duration,locked:()=>this.saving,
+       snap:()=>!!el('[data-studio-snap]',root)?.checked,
+       onSelect:(guid,index)=>{
+         this.selectedClips[guid]=index;this.render();
+         const row=all('[data-guid]',root).find(e=>e.dataset.guid===guid);
+         row?.querySelector('.sf-studio-inspector')?.setAttribute('open','');
+       },
+       onEdit:(guid,index,clip)=>this.commitEdit({action:'edit_clip',guid,clip_index:index,...clip})
+     });
      el('[data-studio-save]',root).onclick=()=>this.saveMix();
      el('[data-studio-recall]',root).onchange=e=>this.recall(e.target.value);
      all('[data-guid]',root).forEach(row=>{
@@ -111,6 +194,24 @@
        el('[data-stem-edit]',row).onclick=async()=>{
          try{const j=await api('stem-studio.php',{action:'edit_track',track_id:this.id,revision:this.project.revision,guid,name:el('[data-stem-name]',row).value,role:el('[data-stem-role]',row).value});this.project=j.project;this.say('Track metadata saved');this.render()}catch(e){this.say(e.message)}
        };
+       el('[data-stem-clip-select]',row)?.addEventListener('change',e=>{
+         this.selectedClips[guid]=Number(e.target.value)||0;this.render();
+         const next=all('[data-guid]',root).find(element=>element.dataset.guid===guid);
+         next?.querySelector('.sf-studio-inspector')?.setAttribute('open','');
+       });
+       el('[data-stem-clip-save]',row)?.addEventListener('click',()=>this.commitEdit({
+         action:'edit_clip',guid,clip_index:this.selectedClips[guid]||0,
+         position:el('[data-clip-position]',row).value,
+         length:el('[data-clip-length]',row).value,
+         offset:el('[data-clip-offset]',row).value
+       }));
+       all('[data-stem-fx-save]',row).forEach(button=>button.onclick=()=>{
+         const fxRow=button.closest('[data-stem-fx-index]');
+         const settings={};
+         all('[data-fx-param]',fxRow).forEach(input=>settings[input.dataset.fxParam]=input.value);
+         this.commitEdit({action:'edit_fx',guid,fx_index:Number(fxRow.dataset.stemFxIndex),
+           enabled:!!el('[data-fx-enabled]',fxRow)?.checked,settings});
+       });
        el('[data-stem-waveform]',row).onclick=async()=>{
          const track=this.project.tracks.find(t=>t.guid===guid);
          const canvas=el('[data-stem-waveform-canvas]',row);
@@ -128,16 +229,23 @@
    async ensureAudio(){
      if(this.context)return;
      this.context=new (window.AudioContext||window.webkitAudioContext)();
-     this.master=this.context.createGain();this.master.gain.value=.82;this.master.connect(this.context.destination);
-     for(const t of this.project.tracks){if(!t.media_ready||!t.audio_url)continue;
-       const media=new Audio(t.audio_url);media.preload='metadata';
-       const source=this.context.createMediaElementSource(media);
-       const gain=this.context.createGain();const pan=this.context.createStereoPanner();
-       const eq=this.context.createBiquadFilter();eq.type='peaking';eq.frequency.value=900;eq.Q.value=.9;
-       const hasEQ=t.fx.some(x=>x.type==='eq');eq.gain.value=hasEQ?0:0;
-       const comp=this.context.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=t.fx.some(x=>x.type==='compressor')?2:1;
-       source.connect(eq);eq.connect(comp);comp.connect(gain);gain.connect(pan);pan.connect(this.master);
-       this.audio.set(t.guid,{media,gain,pan,track:t});
+     this.master=this.context.createGain();this.master.gain.value=.82;
+     this.master.connect(this.context.destination);
+     for(const t of this.project.tracks){
+       if(!t.media_ready||!t.audio_url)continue;
+       const selected=(t.clips||[]).filter(c=>
+         String(c.file||'').toLowerCase()===String(t.source_file||'').toLowerCase()&&n(c.length)>.01);
+       if(!selected.length)continue;
+       const input=this.context.createGain(),gain=this.context.createGain(),pan=this.context.createStereoPanner();
+       const fx=window.SFStemFX.build(this.context,input,t.fx||[],gain);
+       gain.connect(pan);pan.connect(this.master);
+       const clips=[];
+       for(const clip of selected){
+         const media=new Audio(t.audio_url);media.preload='metadata';
+         this.context.createMediaElementSource(media).connect(input);
+         clips.push({media,clip});
+       }
+       this.audio.set(t.guid,{clips,gain,pan,track:t,fx});
      }
      this.applyMix();
    }
@@ -148,13 +256,24 @@
      nodes.pan.pan.setTargetAtTime(state.pan,this.context.currentTime,.008);
    }}
    currentTime(){return this.running&&this.context?Math.min(this.duration,this.anchor+(this.context.currentTime-this.anchorClock)):this.anchor}
-   sync(){const time=this.currentTime();for(const {media,track} of this.audio.values()){
-     const offset=n(track.source_position),relative=time-offset;
-     if(relative<0||relative>=media.duration&&!Number.isNaN(media.duration)){media.pause();continue}
-     if(media.readyState<1)continue;
-     if(Math.abs(media.currentTime-relative)>.15){try{media.currentTime=Math.max(0,relative)}catch(_){}}
-     if(this.running&&media.paused)media.play().catch(()=>{});
-   }}
+   sync(){
+     const time=this.currentTime();
+     for(const nodes of this.audio.values())for(const {media,clip} of nodes.clips){
+       const elapsed=time-n(clip.position);
+       const offset=n(clip.offset);
+       const playable=elapsed>=0&&elapsed<n(clip.length);
+       if(!playable || (Number.isFinite(media.duration)&&offset+elapsed>=media.duration)){
+         if(!media.paused)media.pause();
+         continue;
+       }
+       if(media.readyState<1)continue;
+       const target=offset+elapsed;
+       if(Math.abs(media.currentTime-target)>.08){
+         try{media.currentTime=Math.max(0,target)}catch(_){}
+       }
+       if(this.running&&media.paused)media.play().catch(()=>{});
+     }
+   }
    async play(){if(!this.project)return;try{
      await this.ensureAudio();await this.context.resume();
      if(this.anchor>=this.duration)this.anchor=0;
@@ -162,8 +281,8 @@
      el('[data-studio-play]',this.overlay).textContent='Ⅱ Pause';this.tick();
    }catch(e){this.running=false;this.say('Audio could not start: '+e.message)}}
    pause(){this.anchor=this.currentTime();this.running=false;cancelAnimationFrame(this.raf);
-     for(const {media} of this.audio.values())media.pause();const b=el('[data-studio-play]',this.overlay);if(b)b.textContent='▶ Play';this.paintTime();}
-   stop(){this.pause();this.anchor=0;for(const {media} of this.audio.values())try{media.currentTime=0}catch(_){}this.paintTime();}
+     for(const entry of this.audio.values())for(const {media} of entry.clips)media.pause();const b=el('[data-studio-play]',this.overlay);if(b)b.textContent='▶ Play';this.paintTime();}
+   stop(){this.pause();this.anchor=0;for(const entry of this.audio.values())for(const {media} of entry.clips)try{media.currentTime=0}catch(_){}this.paintTime();}
    seek(t){const was=this.running;this.anchor=Math.max(0,Math.min(this.duration,t));if(this.context)this.anchorClock=this.context.currentTime;if(was)this.sync();this.paintTime()}
    tick(){if(!this.running)return;const t=this.currentTime();if(t>=this.duration){if(this.loop)this.seek(0);else {this.stop();return;}}
      this.sync();this.paintTime();this.raf=requestAnimationFrame(()=>this.tick());}
@@ -172,7 +291,7 @@
    async saveMix(){const name=el('[data-studio-mix-name]',this.overlay)?.value?.trim();if(!name)return this.say('Enter a mix name.');
      try{const j=await api('stem-studio.php',{action:'save_mix',track_id:this.id,revision:this.project.revision,mix:{name,tracks:clone(this.mixing)}});this.project=j.project;this.say('Saved mix '+name);this.render()}catch(e){this.say(e.message)}}
    recall(name){const m=this.project?.mixes?.[name];if(!m)return;this.mixing=clone(m.tracks);this.applyMix();this.say('Recalled '+name);this.render()}
-   close(){this.stop();for(const {media} of this.audio.values()){media.pause();media.removeAttribute('src');media.load()}this.audio.clear();this.context?.close();this.overlay?.remove();if(studio===this)studio=null}
+   close(){this.stop();void this.resetAudio();this.overlay?.remove();if(studio===this)studio=null}
  }
  async function open(id){if(studio)studio.close();studio=new StemStudio(id);await studio.init();}
  window.SFStemStudio={section,bind,open};
