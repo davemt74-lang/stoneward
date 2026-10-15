@@ -8,7 +8,7 @@
  const n=(x,d=0)=>Number.isFinite(Number(x))?Number(x):d;
  const fmt=s=>{const v=Math.max(0,Math.floor(s));return Math.floor(v/60)+':'+String(v%60).padStart(2,'0')};
  const clone=o=>JSON.parse(JSON.stringify(o));
- const section=track=>'<section class="form-section sf-stems-section"><h3>Stems &amp; REAPER Studio</h3><p class="hint">Import your original REAPER project, upload consolidated stems, and edit the song’s private multitrack mix. Public song media remains unchanged.</p><div class="actions"><button type="button" class="secondary" data-stem-open="'+esc(track.id)+'">Open Stem Studio</button></div><p class="status-line" data-stem-project-status>Project not loaded</p></section>';
+ const section=track=>'<section class="form-section sf-stems-section"><h3>Stems &amp; REAPER Studio</h3><p class="hint">Upload one ZIP with the REAPER .rpp and consolidated stems, then edit the song’s private multitrack mix. Public song media remains unchanged.</p><div class="actions"><button type="button" class="secondary" data-stem-open="'+esc(track.id)+'">Open Stem Studio</button></div><p class="status-line" data-stem-project-status>Project not loaded</p></section>';
  function bind(trackId){
    const b=el('[data-stem-open]');if(!b)return;
    b.onclick=()=>open(trackId);
@@ -19,9 +19,10 @@
  class StemStudio {
    constructor(id){this.id=id;this.project=null;this.overlay=null;this.audio=new Map();this.context=null;this.master=null;this.running=false;this.anchor=0;this.anchorClock=0;this.loop=false;this.raf=0;this.duration=0;this.mixing={};}
    async init(){
-     const overlay=document.createElement('div');overlay.className='sf-studio-overlay';overlay.innerHTML='<div class="sf-studio-shell"><header class="sf-studio-head"><div><span class="eyebrow">STONEFELLOW · STEM STUDIO</span><h2>Song multitrack editor</h2><p data-studio-message>Import a REAPER project to initialize your song.</p></div><button type="button" class="secondary" data-studio-close>Close</button></header><section class="sf-studio-import"><label class="sf-studio-file">Import REAPER project (.rpp) <input type="file" accept=".rpp,text/plain" data-studio-rpp></label><label class="sf-studio-file">Upload consolidated stems (WAV / MP3) <input type="file" accept=".wav,.mp3,audio/wav,audio/mpeg" multiple data-studio-audio></label><span data-studio-upload-progress></span></section><div data-studio-body></div></div>';
+     const overlay=document.createElement('div');overlay.className='sf-studio-overlay';overlay.innerHTML='<div class="sf-studio-shell"><header class="sf-studio-head"><div><span class="eyebrow">STONEFELLOW · STEM STUDIO</span><h2>Song multitrack editor</h2><p data-studio-message>Import a REAPER project to initialize your song.</p></div><button type="button" class="secondary" data-studio-close>Close</button></header><section class="sf-studio-import"><label class="sf-studio-file">Import project + stems ZIP <input type="file" accept=".zip,application/zip" data-studio-bundle></label><label class="sf-studio-file">Import REAPER project (.rpp) <input type="file" accept=".rpp,text/plain" data-studio-rpp></label><label class="sf-studio-file">Upload consolidated stems (WAV / MP3) <input type="file" accept=".wav,.mp3,audio/wav,audio/mpeg" multiple data-studio-audio></label><span data-studio-upload-progress role="status"></span></section><div data-studio-report role="status" aria-live="polite"></div><div data-studio-body></div></div>';
      document.body.appendChild(overlay);this.overlay=overlay;
      el('[data-studio-close]',overlay).onclick=()=>this.close();
+     el('[data-studio-bundle]',overlay).onchange=async e=>{const file=e.target.files?.[0];if(file)await this.importBundle(file);e.target.value='';};
      el('[data-studio-rpp]',overlay).onchange=async e=>{const file=e.target.files?.[0];if(file)await this.importRpp(file);e.target.value='';};
      el('[data-studio-audio]',overlay).onchange=async e=>{const files=[...(e.target.files||[])];if(files.length)await this.uploadStems(files);e.target.value='';};
      await this.reload();
@@ -34,6 +35,30 @@
      const fd=new FormData();fd.append('track_id',this.id);fd.append('file',file,file.name);
      this.stop();this.say('Parsing '+file.name+'…');
      try{const j=await uploadApi('stem-studio.php',fd);this.project=j.project;this.updateMix();this.render();this.say('Imported '+this.project.tracks.length+' REAPER tracks. Assign their audio files below.')}catch(e){this.say(e.message)}
+   }
+   async importBundle(file){
+     if(!/\\.zip$/i.test(file.name)||file.size>2147483648||file.size===0)
+       return this.say('Choose a REAPER project + stems ZIP up to 2 GiB.');
+     const progress=el('[data-studio-upload-progress]',this.overlay);
+     const report=el('[data-studio-report]',this.overlay);
+     const fd=new FormData();fd.append('track_id',this.id);fd.append('file',file,file.name);
+     this.stop();if(progress)progress.textContent='Uploading '+file.name+' and validating project and audio…';
+     this.say('Importing ZIP securely into the existing Media Library.');
+     try{
+       const j=await uploadApi('stem-studio.php',fd);
+       this.project=j.project;this.updateMix();this.render();
+       const info=j.import_report||{};
+       const missing=Array.isArray(info.missing_files)?info.missing_files:[];
+       const extra=Array.isArray(info.unmatched_audio_files)?info.unmatched_audio_files:[];
+       if(report){
+         report.textContent=(Number(info.matched_stems)||0)+' of '+(Number(info.stem_tracks)||0)+
+           ' REAPER lanes matched · '+(Number(info.uploaded_media_assets)||0)+' private audio assets imported'+
+           (missing.length?' · Missing: '+missing.join(', '):' · All referenced stems present')+
+           (extra.length?' · Extra ZIP audio not imported: '+extra.join(', '):'');
+       }
+       this.say('ZIP import complete. Public song media and purchased originals remain unchanged.');
+     }catch(e){this.say('ZIP import failed: '+e.message)}
+     finally{if(progress)progress.textContent=''}
    }
    async uploadStems(files){
      if(!this.project)return this.say('Import the REAPER project before attaching stems.');
@@ -54,7 +79,7 @@
    }
    render(){
      const area=el('[data-studio-body]',this.overlay);if(!area)return;
-     if(!this.project){area.innerHTML='<div class="sf-studio-empty">Your original .rpp project defines the stem lanes, plugin identities, timeline offsets, mix and master bus. Import it above, then upload the referenced WAV/MP3 files.</div>';return}
+     if(!this.project){area.innerHTML='<div class="sf-studio-empty">Upload a single ZIP with your .rpp and WAV/MP3 stems, or import them separately. The REAPER project defines the lanes, plugins, timeline offsets and master bus.</div>';return}
      const p=this.project,tracks=p.tracks||[];
      const max=this.duration;
      area.innerHTML='<div class="sf-studio-top"><div class="sf-studio-properties"><strong>'+esc(p.project_name)+'</strong><span>'+tracks.length+' tracks</span><span>'+esc(p.tempo_bpm)+' BPM</span><span>'+esc(p.time_signature)+'</span><span>'+esc(p.sample_rate||'Unknown')+' Hz</span></div><div class="sf-studio-transport"><button type="button" data-studio-play>▶ Play</button><button type="button" data-studio-stop>■ Stop</button><label><input type="checkbox" data-studio-loop> Loop</label><input type="range" data-studio-seek min="0" max="'+max+'" step=".05" value="0"><output data-studio-time>0:00 / '+fmt(max)+'</output></div></div><div class="sf-studio-master"><h3>Master bus</h3><p>'+esc(p.master_fx.map(f=>f.name).join(' → ')||'No imported effects')+'</p><small>REAPER plugin identities are retained. Native VST presets are not executed in a browser; supported processing uses approximate Web Audio nodes.</small></div><div class="sf-studio-tracks">'+tracks.map((t,i)=>this.trackHTML(t,i,max)).join('')+'</div><footer class="sf-studio-footer"><label>Save mix <input data-studio-mix-name maxlength="100" placeholder="Mix name" value="Studio mix"></label><button type="button" class="primary" data-studio-save>Save mix</button><label>Recall mix <select data-studio-recall><option value="">Choose saved mix</option>'+Object.keys(p.mixes||{}).map(k=>'<option value="'+esc(k)+'">'+esc(k)+'</option>').join('')+'</select></label><span>Project revision '+p.revision+'</span></footer>';
