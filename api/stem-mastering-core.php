@@ -113,6 +113,7 @@ function sf_stem_mastering_agent_summary(array $project):array {
         'high_band_pct'=>$m['high_band_pct']??null,
         'reference_low_band_pct'=>$m['reference_low_band_pct']??null,
         'reference_high_band_pct'=>$m['reference_high_band_pct']??null,
+        'reference_integrated_lufs'=>$m['reference_integrated_lufs']??null,
         'clipped_samples'=>$m['clipped_samples']??null,
         'not_mastering_certified'=>true];
 }
@@ -129,6 +130,9 @@ function sf_stem_mastering_recommendations(array $summary):array {
     if(($summary['high_band_pct']??null)!==null && ($summary['reference_high_band_pct']??null)!==null &&
         abs((float)$summary['high_band_pct']-(float)$summary['reference_high_band_pct'])>=10)
         $out[]='Approximate high-band balance differs from the reference; verify tonal balance by listening, not only this estimate.';
+    if(($summary['reference_integrated_lufs']??null)!==null&&($summary['integrated_lufs']??null)!==null &&
+        abs((float)$summary['integrated_lufs']-(float)$summary['reference_integrated_lufs'])>=3)
+        $out[]='Integrated loudness differs from the selected reference by 3 LU or more; compare both at matched playback loudness, without assuming a fixed target.';
     if(($summary['integrated_lufs']??null)!==null)$out[]='Compare the measured integrated loudness against your intended release format; no universal LUFS target is assumed.';
     if(!$out)$out[]='No obvious clipping or channel-imbalance flags in the browser measurements; listen against the source REAPER mix.';
     $out[]='Measurements are browser-reported and not independently server-verified; any proposed changes require exact Admin approval.';
