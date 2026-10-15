@@ -66,6 +66,8 @@ jobs:
           node --check assets/js/agent-brain.js
           node --check assets/js/agent-chat-canvas.js
           node --check assets/js/library.js
+          node --check assets/js/owned-music.js
+          node tests/section85a-owned-ui.cjs
           node --check assets/js/accessibility.js
 
       - name: Admin JavaScript syntax
@@ -276,6 +278,7 @@ jobs:
           php tests/section84b3-print-licenses.php
           php tests/section84b5-media-transfer.php
           php tests/section84b6-homeserver-user-consent.php
+          php tests/section85a-site-ownership.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

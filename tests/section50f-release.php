@@ -5,12 +5,13 @@ $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $admin=$read('admin/index.php');$public=$read('stonefellow-v120.php');$version=$read('version.php');
 $cache=$read('service-worker.js');$apache=$read('.htaccess');$mig=$read('api/migrations.php');
 $gate=$read('.github/workflows/release-gate.yml');
+$matched=[];$build=preg_match("/define\\('SF_BUILD', '([0-9]+\\.[0-9]+\\.[0-9]+)'\\)/",$public,$matched)?$matched[1]:'';
 $checks=[
- 'Section 50 release version is 1.3.75'=>str_contains($public,"define('SF_BUILD', '1.3.75')"),
- 'Admin build is the same version'=>str_contains($admin,"SF_ADMIN_BUILD','1.3.75'"),
- 'Public version endpoint matches release'=>str_contains($version,"'stonefellow'=>'1.3.75'"),
- 'PWA shell cache invalidated for UI assets'=>str_contains($cache,'stonefellow-static-v1.3.75'),
- 'Apache build header matches release'=>str_contains($apache,'X-Stonefellow-Build "1.3.75"'),
+ 'Section 50 release version matches supported baseline'=>$build!==''&&version_compare($build,'1.3.75','>='),
+ 'Admin build is the same version'=>$build!==''&&str_contains($admin,"SF_ADMIN_BUILD','".$build."'"),
+ 'Public version endpoint matches release'=>$build!==''&&str_contains($version,"'stonefellow'=>'".$build."'"),
+ 'PWA shell cache invalidated for UI assets'=>$build!==''&&str_contains($cache,'stonefellow-static-v'.$build),
+ 'Apache build header matches release'=>$build!==''&&str_contains($apache,'X-Stonefellow-Build "'.$build.'"'),
  'Database target correctly includes additive library repair'=>str_contains($version,"'database_schema_target'=>'1.3.48'")&&str_contains($mig,"SF_DB_SCHEMA_TARGET = '1.3.48'"),
  'Migration 037 remains additive and preserved'=>str_contains($mig,"'id'=>'2026-10-12-037'"),
  'No user or administrator password rewrite in new UI'=>!str_contains($read('admin/assets/unified-ui.js'),'password_hash')&&!str_contains($read('admin/assets/homepage.js'),'password_hash'),

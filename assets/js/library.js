@@ -1,8 +1,8 @@
 (() => {
 'use strict';
 
-const validTabs=new Set(['all','tracks','releases','playlists','purchases','builds','history','collections']);
-const tabLabel={all:'All',tracks:'Tracks',releases:'Releases',playlists:'Playlists',purchases:'Purchases',builds:'Builds',history:'History',collections:'Collections'};
+const validTabs=new Set(['all','owned','tracks','releases','playlists','purchases','builds','history','collections']);
+const tabLabel={all:'All',owned:'Owned Music',tracks:'Tracks',releases:'Releases',playlists:'Playlists',purchases:'Purchases',builds:'Builds',history:'History',collections:'Collections'};
 const kindLabel={track:'Track',release:'Release',playlist:'Playlist',purchase:'Purchase',build:'Saved build'};
 
 function when(v){return String(v||'').replace('T',' ').slice(0,16)}
@@ -71,10 +71,11 @@ function collectionDetail(c,lib,col){
 }
 function tabs(c,lib,tab){
   const s=lib.summary||{};
-  const counts={all:s.all||0,tracks:s.tracks||0,releases:s.releases||0,playlists:s.playlists||0,purchases:s.purchases||0,builds:s.builds||0,history:s.history||0,collections:s.collections||0};
+  const counts={all:s.all||0,owned:lib.owned_total||0,tracks:s.tracks||0,releases:s.releases||0,playlists:s.playlists||0,purchases:s.purchases||0,builds:s.builds||0,history:s.history||0,collections:s.collections||0};
   return `<div class="my-library-tabs" role="tablist">${Object.keys(tabLabel).map(k=>`<button type="button" class="${tab===k?'active':''}" data-library-tab="${k}"><span>${tabLabel[k]}</span><em>${Number(counts[k]||0)}</em></button>`).join('')}</div>`;
 }
-function renderGrid(c,lib,tab,query,sort){
+function renderGrid(c,lib,tab,query,sort,owned){
+  if(tab==='owned')return window.StonefellowOwnedMusic.render(c,owned,query);
   if(tab==='history')return `<div class="library-history-list">${historyRows(c,lib,query)}</div>`;
   const rows=sorted(lib[tab]||[],sort).filter(x=>!query||itemSearchText(x).includes(query.toLowerCase()));
   return rows.length?`<div class="my-library-list">${rows.map(x=>itemCard(c,lib,x)).join('')}</div>`:'<div class="library-empty">Nothing in this part of your library yet.</div>';
@@ -113,6 +114,15 @@ async function render(c,params={}){
   try{j=await c.api('library.php')}catch(e){if(e.payload?.error==='authentication_required'){c.navigate('login');return}canvas.innerHTML=`<article class="module"><div class="module-kicker">MY LIBRARY</div><h2>Library unavailable</h2><p class="player-note">${esc(e.message)}</p></article>`;return}
   if(j.csrf)c.state.auth.csrf=j.csrf;
   let lib=j.library||{},tab=validTabs.has(params.tab)?params.tab:'all',collectionId=Number(params.collection||0),query='',sort='recent';
+  let owned={status:'loading',tracks:[],error:''};
+  const loadOwned=()=>c.api('fan-owned-music.php').then(result=>{
+    owned={status:'ready',tracks:Array.isArray(result.tracks)?result.tracks:[],error:''};
+    lib.owned_total=Number(result.total||0);
+    if(canvas.querySelector('[data-library-owned-root]'))paint(lib);
+  }).catch(err=>{
+    owned={status:'error',tracks:[],error:err.message};
+    if(canvas.querySelector('[data-library-owned-root]'))paint(lib);
+  });
   const paint=(nextLib=lib)=>{
     lib=nextLib||lib;
     const collection=collectionId?(lib.collections||[]).find(x=>Number(x.id)===collectionId):null;
@@ -120,16 +130,17 @@ async function render(c,params={}){
       <div class="module-kicker">MY STONEFELLOW</div>
       <div class="my-library-head"><div><h2>My Library</h2><p class="player-note">Everything you’ve saved, bought, built, played, or organized — in one place.</p></div><div class="my-library-head-actions"><button class="text-control" type="button" data-view="music">Discover music</button><button class="text-control" type="button" data-library-create-collection>New collection</button></div></div>
       <div class="library-summary"><div><strong>${Number(lib.summary?.tracks||0)}</strong><span>Saved tracks</span></div><div><strong>${Number(lib.summary?.releases||0)}</strong><span>Saved releases</span></div><div><strong>${Number(lib.summary?.playlists||0)}</strong><span>Playlists</span></div><div><strong>${Number(lib.summary?.purchases||0)}</strong><span>Purchases</span></div><div><strong>${Number(lib.summary?.collections||0)}</strong><span>Collections</span></div></div>
-      ${collection?collectionDetail(c,lib,collection):`${tabs(c,lib,tab)}${(tab==='all'||tab==='history')?continueRail(c,lib):''}${tab==='collections'?collectionList(c,lib):`<div class="my-library-toolbar"><input id="librarySearch" type="search" placeholder="Search this library…" value="${esc(query)}"><select id="librarySort"><option value="recent" ${sort==='recent'?'selected':''}>Recently saved</option><option value="title" ${sort==='title'?'selected':''}>Title A–Z</option><option value="type" ${sort==='type'?'selected':''}>Type</option></select></div><div id="myLibraryContent">${renderGrid(c,lib,tab,query,sort)}</div>`}`}
+      ${collection?collectionDetail(c,lib,collection):`${tabs(c,lib,tab)}${(tab==='all'||tab==='history')?continueRail(c,lib):''}${tab==='collections'?collectionList(c,lib):`<div class="my-library-toolbar"><input id="librarySearch" type="search" placeholder="Search this library…" value="${esc(query)}"><select id="librarySort"><option value="recent" ${sort==='recent'?'selected':''}>Recently saved</option><option value="title" ${sort==='title'?'selected':''}>Title A–Z</option><option value="type" ${sort==='type'?'selected':''}>Type</option></select></div><div id="myLibraryContent">${renderGrid(c,lib,tab,query,sort,owned)}</div>`}`}
     </article>`;
     c.bind(canvas);
     bindCommon(c,lib,paint);
+    window.StonefellowOwnedMusic?.bind(c,()=>{owned={status:'loading',tracks:[]};paint(lib);void loadOwned()});
     $$('[data-library-tab]',canvas).forEach(b=>b.onclick=()=>c.navigate('library',{tab:b.dataset.libraryTab}));
     $$('[data-library-open-collection]',canvas).forEach(b=>b.onclick=()=>c.navigate('library',{tab:'collections',collection:b.dataset.libraryOpenCollection}));
     $$('[data-library-create-collection]',canvas).forEach(b=>b.onclick=()=>createCollectionPrompt(c,(next,col)=>{lib=next;c.navigate('library',{tab:'collections',collection:col?.id||''})}));
     const search=$('#librarySearch',canvas),sortEl=$('#librarySort',canvas),content=$('#myLibraryContent',canvas);
-    if(search&&content)search.oninput=()=>{query=search.value||'';content.innerHTML=renderGrid(c,lib,tab,query,sort);bindCommon(c,lib,paint)};
-    if(sortEl&&content)sortEl.onchange=()=>{sort=sortEl.value||'recent';content.innerHTML=renderGrid(c,lib,tab,query,sort);bindCommon(c,lib,paint)};
+    if(search&&content)search.oninput=()=>{query=search.value||'';content.innerHTML=renderGrid(c,lib,tab,query,sort,owned);bindCommon(c,lib,paint);window.StonefellowOwnedMusic?.bind(c,()=>{owned={status:'loading',tracks:[]};paint(lib);void loadOwned()})};
+    if(sortEl&&content)sortEl.onchange=()=>{sort=sortEl.value||'recent';content.innerHTML=renderGrid(c,lib,tab,query,sort,owned);bindCommon(c,lib,paint);window.StonefellowOwnedMusic?.bind(c,()=>{owned={status:'loading',tracks:[]};paint(lib);void loadOwned()})};
     if(collection){
       $$('[data-library-back-collections]',canvas).forEach(b=>b.onclick=()=>c.navigate('library',{tab:'collections'}));
       $$('[data-library-edit-collection]',canvas).forEach(b=>b.onclick=()=>editCollectionPrompt(c,collection,(next,col)=>{lib=next;collectionId=Number(col?.id||collectionId);paint(lib)}));
@@ -139,6 +150,7 @@ async function render(c,params={}){
     }
   };
   paint(lib);
+  if(tab==='owned')void loadOwned();
 }
 window.StonefellowLibrary={render};
 })();

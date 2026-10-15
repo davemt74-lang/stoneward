@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.75');
+define('SF_BUILD', '1.3.76');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -232,6 +232,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script>if(window.STONEFELLOW_CONFIG){window.STONEFELLOW_CONFIG.socials=window.STONEFELLOW_CONFIG.socials||{};for(const [k,v] of Object.entries(window.STONEFELLOW_SITE.socials||{})){if(v)window.STONEFELLOW_CONFIG.socials[k]=v;}}</script>
   <script src="assets/js/catalog.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/releases.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/owned-music.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/library.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-brain.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-chat-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
