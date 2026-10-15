@@ -7,6 +7,7 @@ require_once __DIR__.'/agent-proactive-research.php';
 require_once __DIR__.'/agent-specialist-delegation.php';
 require_once __DIR__.'/agent-feedback-core.php';
 require_once __DIR__.'/agent-commerce-bridge.php';
+require_once __DIR__.'/stem-agent-bridge.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -167,6 +168,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
         $missionPlan=sf_agent_mission_plan_save('admin',$adminId,$threadId,$message,$missionPlan);}
     $types=[
+      'stem_mix_review'=>'I can inspect private Stem Studio mix metadata for a named song ID, identify unlinked stems, unsupported effects and automation risks, and recommend improvements. Provide the exact song ID. I never modify private mixes without a reviewed proposal.',
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
       'prepare_commerce_followup'=>'I can prepare a customer-order follow-up for exact Admin approval. Use: Create follow-up for order SF-ORDER-ID: your note. The action only saves a note; it never refunds, charges, emails, or changes shipping.',
@@ -207,11 +209,24 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
             }
         }
     }
+    if($plan['type']==='stem_mix_review'){
+        if(preg_match('/\\bsong\\s+(?:id\\s+)?([A-Za-z0-9._-]{1,100})\\b/i',$message,$m)){
+            try{$stemReview=sf_stem_agent_review($m[1]);
+                $text='Private REAPER Stem Studio review for '.$stemReview['song_id'].': '.
+                  ($stemReview['status']==='not_imported'?'Project not imported.':
+                  $stemReview['track_count'].' tracks, '.$stemReview['automation_lanes'].' automation lanes, '.
+                  $stemReview['sends'].' sends, '.$stemReview['unmapped_effects'].' browser-unmapped effects.').
+                  "\\nRecommendations: ".implode(' ',$stemReview['recommendations']).
+                  ' Changes require explicit Admin approval; original REAPER media is never sent to the provider.';
+            }catch(InvalidArgumentException){$text='That song ID is not in the private Stonefellow catalog. No file was opened.';}
+        }
+    }
     if($plan['type']==='research'){
         $research=sf_admin_agent_research_reply($message,$context,$prior,$adminId);
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
+    if($plan['type']==='stem_mix_review'&&!empty($stemReview))$action['stem_review']=$stemReview;
     if($plan['type']==='draft_commerce_reply' && !empty($replyDraft)){
         $action['reply_draft']=$replyDraft;
         $action['review_required']=true;
