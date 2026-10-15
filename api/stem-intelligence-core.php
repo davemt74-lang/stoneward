@@ -1,6 +1,5 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__.'/stem-production-advisor.php';
 require_once __DIR__.'/stem-release-readiness.php';
 
 /**
