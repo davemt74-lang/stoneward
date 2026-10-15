@@ -270,9 +270,7 @@
        this.busNodes.set(b.id,{input,gain,pan,fx});
      }
      for(const t of this.project.tracks){
-       if(!t.media_ready||!t.audio_url)continue;
-       const selected=(t.clips||[]).filter(c=>String(c.file||'').toLowerCase()===String(t.source_file||'').toLowerCase()&&n(c.length)>.01);
-       if(!selected.length)continue;
+       const selected=(t.media_ready&&t.audio_url?(t.clips||[]):[]).filter(c=>String(c.file||'').toLowerCase()===String(t.source_file||'').toLowerCase()&&n(c.length)>.01);
        const input=this.context.createGain(),gain=this.context.createGain(),pan=this.context.createStereoPanner();
        const fx=window.SFStemFX.build(this.context,input,t.fx||[],gain);
        gain.connect(pan);
