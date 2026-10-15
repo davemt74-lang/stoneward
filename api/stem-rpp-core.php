@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/stem-rpp-plugins.php';
+require_once __DIR__.'/stem-routing-core.php';
 /** Safe, read-only REAPER RPP metadata importer (never executes plugin state). */
 function sf_stem_safe_filename(string $value):string {
     $name=basename(str_replace('\\','/',$value));
@@ -74,5 +75,6 @@ function sf_stem_rpp_parse(string $text):array {
     foreach($project['tracks'] as $t)if($t['source_file']!=='')$project['media_required'][$t['source_file']]=true;
     $project['media_required']=array_keys($project['media_required']);
     $project['track_count']=count($project['tracks']);
+    sf_stem_route_import($project,$text);
     return sf_stem_rpp_enrich_plugins($project,$text);
 }
