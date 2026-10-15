@@ -1,0 +1,34 @@
+.sf-stems-section .actions{margin-top:10px}
+.sf-studio-overlay{position:fixed;inset:0;z-index:30000;background:#100e0c;color:#eae4d9;overflow:auto;overscroll-behavior:contain}
+.sf-studio-shell{padding:24px clamp(14px,3vw,48px) 48px;max-width:1800px;margin:auto;min-height:100vh;box-sizing:border-box}
+.sf-studio-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.sf-studio-head h2{font-size:clamp(24px,3.4vw,46px);font-family:Georgia,serif;font-weight:400;margin:8px 0}
+.sf-studio-head p{color:#aaa297;margin:8px 0}.sf-studio-import{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:20px 0;padding:14px;background:#211e19;border:1px solid #373129}
+.sf-studio-file{display:flex;flex-direction:column;font-size:12px;gap:7px;color:#decda9}.sf-studio-file input{max-width:265px;color:#d7cbb5}
+.sf-studio-empty{min-height:160px;padding:32px;border:1px dashed #5f5240;color:#c8b998;line-height:1.7}
+.sf-studio-top{position:sticky;top:0;z-index:4;background:#100e0c;border-bottom:1px solid #3c3329;padding:8px 0 12px}
+.sf-studio-properties{display:flex;flex-wrap:wrap;gap:13px;align-items:center;color:#cfbaa0;margin:8px 0 12px}.sf-studio-properties strong{color:#fff;font-family:Georgia,serif;font-size:18px}
+.sf-studio-transport{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.sf-studio-transport button,.sf-studio-footer button,.sf-studio-inspector button{padding:8px 14px;border:1px solid #76654e;background:#32291d;color:#fff;cursor:pointer;border-radius:5px}
+.sf-studio-transport [data-studio-seek]{flex:1;min-width:120px;accent-color:#be965a}.sf-studio-transport output{min-width:98px;font-variant-numeric:tabular-nums}
+.sf-studio-master{padding:12px 16px;margin:16px 0;border:1px solid #5a4536;background:#241e19}.sf-studio-master h3{margin:0 0 6px;font-size:15px}.sf-studio-master p{margin:5px 0;color:#d2b07d}.sf-studio-master small{color:#a8a19a}
+.sf-studio-tracks{display:grid;gap:6px;margin:18px 0}.sf-studio-track{display:grid;grid-template-columns:minmax(140px,230px) minmax(175px,240px) 1fr;gap:8px;padding:12px;background:#211d19;border:1px solid #3b332a;align-items:center}
+.sf-studio-track-meta{min-width:0;display:grid;gap:5px}.sf-studio-track-meta b{font:400 15px Georgia,serif;overflow-wrap:anywhere}.sf-studio-track-meta span{font-size:11px;color:#aea394}.sf-studio-fx{color:#b99965!important}
+.sf-studio-mix-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sf-studio-mix-strip label{font-size:10px;display:flex;gap:5px;align-items:center;color:#d8cab2}.sf-studio-mix-strip input[type=range]{width:70px;accent-color:#bea06a}
+.sf-studio-lane{position:relative;min-height:54px;overflow:hidden;background:repeating-linear-gradient(to right,#221d19 0,#221d19 calc(10% - 1px),#483e32 calc(10% - 1px),#483e32 10%)}
+.sf-studio-clip{position:absolute;top:5px;bottom:5px;background:linear-gradient(180deg,#906e45,#5c4127);border:1px solid #bb995d;border-radius:3px;overflow:hidden;min-width:1px}.sf-studio-clip span{font-size:10px;color:#fff;padding:5px;white-space:nowrap;display:block;overflow:hidden;text-overflow:ellipsis}
+.sf-studio-playhead{position:absolute;top:0;bottom:0;width:2px;background:#f3df8b;left:0;pointer-events:none}
+.sf-studio-inspector{grid-column:1/-1;font-size:12px;color:#d2be99;border-top:1px solid #3e3329;padding-top:8px}.sf-studio-inspector summary{cursor:pointer}
+.sf-studio-inspector label{display:inline-flex;flex-direction:column;gap:6px;margin:10px}.sf-studio-inspector input{min-width:180px;background:#14120f;color:#ddd;border:1px solid #64503a;padding:8px}.sf-studio-inspector ul{max-height:100px;overflow:auto}
+.sf-studio-footer{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#242019;padding:20px;margin-top:18px;border-top:1px solid #5a4430}.sf-studio-footer label{display:flex;align-items:center;gap:9px;font-size:12px}.sf-studio-footer input,.sf-studio-footer select{background:#14120f;border:1px solid #544534;color:#e2d3bd;padding:8px}
+@media(max-width:1050px){.sf-studio-track{grid-template-columns:minmax(130px,190px) 1fr}.sf-studio-lane{grid-column:1/-1}}
+@media(max-width:600px){.sf-studio-shell{padding:12px}.sf-studio-track{display:flex;flex-direction:column;align-items:stretch}.sf-studio-lane{min-height:50px}.sf-studio-mix-strip{gap:10px}.sf-studio-head h2{font-size:25px}}
+
+/* Single ZIP project/stems importer — display missing/extra filename report safely */
+[data-studio-report]{font:12px/1.6 system-ui,sans-serif;color:#e1ceaf;overflow-wrap:anywhere;padding:0 4px;white-space:normal}
+.sf-studio-import [data-studio-bundle]{max-width:min(360px,82vw)}
+.sf-studio-import [data-studio-upload-progress]{font-size:12px;color:#dbbc87}
+
+/* Decoded PCM waveforms are only displayed after an explicit click. */
+.sf-studio-waveform{display:block;width:100%;height:100%;position:absolute;inset:0;z-index:0;opacity:.9;pointer-events:none}
+.sf-studio-clip span{position:relative;z-index:1;background:#17120aaa;border-radius:2px;width:max-content;max-width:100%}
+[data-stem-waveform]{margin-inline:4px}

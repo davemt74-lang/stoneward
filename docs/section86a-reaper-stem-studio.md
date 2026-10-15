@@ -1,0 +1,76 @@
+# Stonefellow Section 86A — Native Stem Studio and REAPER Import
+
+This module is a **new implementation in the current Stonefellow website**, with
+feature expectations recovered from the older Stonefellow editor. It does not
+import or embed legacy PHP code. All authentication, uploads, private media,
+song identities, versioning and audit controls reuse the existing website.
+
+## Upload one ZIP with project and stems
+
+Use **Admin → Catalog → Song → Stem Studio → Import project + stems ZIP**.
+The ZIP may contain nested folders but must have exactly one .rpp and uniquely
+named referenced WAV/MP3 stems. The importer securely streams the archive, matches
+REAPER consolidated source filenames case-insensitively, then links the stored
+audio to its REAPER lane through the existing Media Library. It reports missing
+files and extra audio separately; unmatched audio is not silently published.
+
+Limits: PHP ZipArchive extension required; compressed and expanded ZIP up to
+2 GiB, up to 512 entries, maximum 512 MiB per audio file, and .rpp under 8 MiB.
+The host's PHP `upload_max_filesize`, `post_max_size`, execution time and disk
+quota must accommodate the project. The code rejects traversal, ambiguous
+basenames, symbolic links and extreme expansion ratios. Files are never written
+into a public web folder. Browser FX remain approximations, not real REAPER
+VST execution. Actual user music isn't checked into the repository.
+
+## Existing Admin workflow
+
+1. Open **Admin → Catalog → Song**; under Media, use the new
+   **Stems & REAPER Studio** section and open the full-canvas editor.
+2. Upload one `.zip` with your project and stems, or the song's `.rpp` session (limit 8 MB). The importer reads track
+   names, GUIDs, tempo, meter, sample rate, clip offsets and lengths,
+   stem gain/pan, and recognized plugin identities. The original `.rpp`
+   is retained privately in `storage/stem-projects`.
+3. If you did not use a ZIP, upload the actual **consolidated MP3/WAV stems**. These go through the
+   **existing Media Library uploader** (validation, SHA-256, dedupe,
+   private storage); matching filenames automatically assign stems to the
+   corresponding REAPER lanes. Unmatched assets can be attached by media ID.
+4. Open the editor to listen to tracks using a shared Web Audio clock,
+   media playback drift correction, per-track gain/pan/mute/solo,
+   transport, seeking, loop, clip-offset presentation, track name/role edits,
+   and persistent named mix snapshots.
+5. Existing `api/media.php` restricts stems to authenticated Admin.
+   Stem media links may not be made public or silently re-roled. No
+   fan-facing download, vinyl production, Stripe, or publishing workflow is
+   changed by this module.
+
+## What is approximate or pending
+
+- REAPER plugins such as ReaEQ, ReaComp, ReaDelay and ReaVerb are **detected
+  and described**, with limited Web Audio EQ/compression approximations.
+  The browser does NOT execute native REAPER VST/JS binaries or restore their
+  exact proprietary/native parameter blobs.
+- HTMLMediaElement multitrack playback uses drift detection and correction,
+  not a guaranteed sample-accurate offline DAW render. Future sections should
+  implement buffered clip scheduling, quantized transport, bulk waveform analysis,
+  automation lanes, full effect controls and routing.
+- The RPP text only contains media file references; bundle the audio with the
+  project in a ZIP or upload it separately. No user-supplied music is checked into GitHub.
+- This module is Admin-only; a public remix store or fan-access control is
+  NOT part of Section 86A.
+
+## Acceptance gates
+
+The dedicated 86A CI checks importer structure and hard limits, safe file path
+projections, private original persistence, named saved mixes, editing, stale
+revisions, and integration with existing Catalog, Admin CSRF and Media Library.
+Before merging also require final full PHP/JS regression tests, real MySQL
+certification, merged-main verification and a ZIP with SHA-256.
+
+## Real waveform inspection
+
+In each song's existing Stem Studio lane, click **Load real waveform** to inspect
+actual decoded PCM peaks for that attached stem. Waveforms are requested only
+on demand (not automatically for all uploaded stems), rendered from audio
+amplitudes, and cached as tiny peak arrays. Browser decoding is limited to
+32 MiB per stem; larger files still stream and mix normally without a
+misleading synthetic waveform. Private media access still requires Admin login.
