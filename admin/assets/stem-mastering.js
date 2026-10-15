@@ -26,10 +26,10 @@
     u32(RATE);u32(RATE*4);u16(4);u16(16);four('data');u32(frames*4);
     const left=buffer.getChannelData(0),right=buffer.getChannelData(1);
     for(let i=0;i<frames;i++){
-      for(const v of [left[i],right[i]]){
-        const bounded=Math.max(-1,Math.min(1,Number.isFinite(v)?v:0));
-        view.setInt16(p,bounded<0?Math.round(bounded*32768):Math.round(bounded*32767),true);p+=2;
-      }
+      let v=Number.isFinite(left[i])?Math.max(-1,Math.min(1,left[i])):0;
+      view.setInt16(p,v<0?Math.round(v*32768):Math.round(v*32767),true);p+=2;
+      v=Number.isFinite(right[i])?Math.max(-1,Math.min(1,right[i])):0;
+      view.setInt16(p,v<0?Math.round(v*32768):Math.round(v*32767),true);p+=2;
     }
     return new Blob([out],{type:'audio/wav'});
   }
@@ -40,7 +40,8 @@
    */
   function analyze(buffer){
     if(buffer.numberOfChannels<1||buffer.sampleRate!==RATE)throw Error('Analysis requires a 48 kHz audio buffer.');
-    const l=buffer.getChannelData(0),r=buffer.getChannelData(Math.min(1,buffer.numberOfChannels-1));
+    const mono=buffer.numberOfChannels===1;
+    const l=buffer.getChannelData(0),r=mono?l:buffer.getChannelData(1);
     const n=l.length,win=19200,hop=4800;
     let peak=0,clips=0,lSum=0,rSum=0;
     const filters=[0,1].map(()=>[
@@ -62,9 +63,9 @@
       const a=Number.isFinite(l[i])?l[i]:0,b=Number.isFinite(r[i])?r[i]:0;
       const ap=Math.abs(a),bp=Math.abs(b);
       peak=Math.max(peak,ap,bp);
-      if(ap>=.999)clips++;if(bp>=.999)clips++;
-      lSum+=a*a;rSum+=b*b;
-      const ka=sample(a,0),kb=sample(b,1);
+      if(ap>=.999)clips++;if(!mono&&bp>=.999)clips++;
+      lSum+=a*a;if(!mono)rSum+=b*b;
+      const ka=sample(a,0),kb=mono?0:sample(b,1);
       const energy=ka*ka+kb*kb,idx=i%win;
       sum+=energy-ring[idx];ring[idx]=energy;
       if(i+1>=win && (i+1-win)%hop===0)blocks.push(Math.max(0,sum/win));
@@ -75,8 +76,8 @@
     const threshold=Math.max(-70,(preliminary??-120)-10);
     const gated=blocks.filter(x=>lum(x)>=threshold);
     const lufs=gated.length?lum(gated.reduce((a,b)=>a+b,0)/gated.length):null;
-    const rms=Math.sqrt((lSum+rSum)/Math.max(1,2*n)),lRms=Math.sqrt(lSum/Math.max(1,n)),
-      rRms=Math.sqrt(rSum/Math.max(1,n));
+    const rms=Math.sqrt((lSum+rSum)/Math.max(1,(mono?1:2)*n)),lRms=Math.sqrt(lSum/Math.max(1,n)),
+      rRms=mono?lRms:Math.sqrt(rSum/Math.max(1,n));
     return {
       duration_seconds:n/RATE,sample_rate:RATE,
       sample_peak_dbfs:db(peak),integrated_lufs:lufs,
