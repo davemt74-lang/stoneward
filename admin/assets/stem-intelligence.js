@@ -194,7 +194,7 @@
           'Possible '+p.band.replace('_',' ')+' overlap between '+p.left+' and '+p.right);
         status('Saved '+summary.analyzed_stems+' private stems. '+items.slice(0,3).join('; ')+
           '. Measurements are browser-origin evidence, not verified audio.');
-        q('[data-j-inspect]')?.click();
+        root.querySelector('[data-j-inspect]')?.click();
       }catch(e){status('Stem evidence was not saved: '+e.message);button.disabled=false}
     };
   }
