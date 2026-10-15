@@ -5,6 +5,11 @@ declare(strict_types=1);
  * point formats are imported. No native plugin bytes, mute polarity or
  * unsupported interpolation shapes are guessed.
  */
+function sf_stem_automation_numeric(mixed $value,float $lo,float $hi):float {
+    if(!is_numeric($value)||!is_finite((float)$value)||(float)$value<$lo||(float)$value>$hi)
+        throw new InvalidArgumentException('Invalid automation point value.');
+    return round((float)$value,4);
+}
 function sf_stem_automation_bounds(array $project,string $scope,string $guid,string $parameter,?int $fxIndex=null,string $fxParameter=''):array {
     if(!in_array($scope,['track','bus','master'],true))throw new InvalidArgumentException('Unknown automation scope.');
     $fx=[];
@@ -52,8 +57,8 @@ function sf_stem_automation_validate_lane(array $project,array $raw):array {
     $verified=[];$last=-1;
     foreach($points as $p){
         if(!is_array($p))throw new InvalidArgumentException('Invalid automation point.');
-        $time=sf_stem_numeric($p['time']??null,0,86400,'automation time');
-        $value=sf_stem_numeric($p['value']??null,$lo,$hi,'automation value');
+        $time=sf_stem_automation_numeric($p['time']??null,0,86400);
+        $value=sf_stem_automation_numeric($p['value']??null,$lo,$hi);
         $shape=(string)($p['shape']??($parameter==='mute'?'square':'linear'));
         if(!in_array($shape,['linear','square'],true)||($parameter==='mute'&&$shape!=='square'))
             throw new InvalidArgumentException('Unsupported automation interpolation.');
