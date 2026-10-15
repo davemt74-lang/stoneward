@@ -14,6 +14,8 @@ try {
     // Re-evaluate signed-in user's PAID digital entitlement on every request.
     $owned=sf_homeserver_user_library($uid);
     $reference=sf_fan_owned_download_reference($uid,$trackId,$owned,sf_track_map());
+    if(!sf_fan_owned_media_ready($reference))
+        throw new RuntimeException('Private original master is not safely available.');
     $media=sf_kunaki_media_resolve($reference,'audio');
     $length=(int)$media['size_bytes'];
     $stream=sf_hs_music_open_range((string)$media['local_path'],

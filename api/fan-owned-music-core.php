@@ -26,9 +26,12 @@ function sf_fan_owned_media_ready(mixed $reference,?callable $lookup=null):bool 
     if($raw===''||str_contains($raw,'..')||str_contains($raw,'\\'))return false;
     $root=defined('SF_ROOT')?SF_ROOT:dirname(__DIR__);
     $base=realpath($root.'/storage/media');
-    $file=realpath($root.'/'.ltrim($raw,'/'));
+    $candidate=$root.'/'.ltrim($raw,'/');
+    // Detect a symbolic link on the unresolved path, not just realpath(target).
+    if(is_link($candidate))return false;
+    $file=realpath($candidate);
     if(!$base||!$file||!str_starts_with($file,$base.DIRECTORY_SEPARATOR)
-       ||!is_file($file)||is_link($file))return false;
+       ||!is_file($file))return false;
     $bytes=filesize($file);
     return $bytes!==false&&$bytes>0&&$bytes<=268435456;
 }
