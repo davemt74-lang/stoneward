@@ -254,7 +254,9 @@
       '<label>Private reference WAV/MP3<input data-g-upload type="file" accept=".wav,.mp3,audio/wav,audio/mpeg"></label>'+
       '<button type="button" data-g-ref-analyze>Compare reference loudness</button></div>'+
       '<p data-g-progress role="status" aria-live="polite">Save your mix before analysis for reproducible revision history.</p>'+
-      '<div data-g-live-analysis></div>'+
+      '<div data-g-live-analysis></div><div class="sf-g-tools">'+
+      '<button type="button" data-g-agent>Ask Agent Brain about this mix</button>'+
+      '<button type="button" data-g-gain disabled>Prepare master gain correction for exact approval</button></div>'+
       '<div class="sf-g-ab"><div><b>A · current rendered mix</b><audio controls data-g-player-a></audio></div>'+
       '<div><b>B · '+esc(reference?.name||'private reference (not uploaded)')+'</b><audio controls data-g-player-b'+(reference?' src="api/stem-mastering.php?track_id='+encodeURIComponent(project.track_id)+'&amp;action=reference"':'')+'></audio></div>'+
       '<button type="button" data-g-switch>Switch A/B at same position</button></div>'+
@@ -290,9 +292,39 @@
         link.download=filename(studio.project.project_name)+'-mix-r'+revision+'.wav';
         q('[data-g-live-analysis]').innerHTML=metricsHTML(measurements);
         q('[data-g-save]').disabled=false;
+        q('[data-g-gain]').disabled=measurements.sample_peak_dbfs<=-1;
         status('48 kHz WAV rendered. Review the measurements, A/B listen and save the evidence to Agent Brain.');
       }catch(e){status('Render unavailable: '+e.message)}
       finally{button.disabled=false}
+    };
+    q('[data-g-agent]').onclick=async()=>{
+      status('Requesting private Admin Agent Brain review based on saved measurements…');
+      try{
+        const result=await window.STONEFELLOW_ADMIN_CONTEXT.api('agent-chat.php',{
+          message:'Review REAPER Stem Studio mastering evidence for song ID '+studio.id+
+            '. Discuss clipping, headroom, loudness uncertainty, and recommendations. No changes without my exact approval.'
+        });
+        status(result.text||'Agent Brain returned no analysis.');
+      }catch(e){status('Agent Brain unavailable: '+e.message)}
+    };
+    q('[data-g-gain]').onclick=()=>{
+      if(!last||last.revision!==studio.project.revision)
+        return status('Render a current mix before proposing a gain change.');
+      const meter=last.metrics.sample_peak_dbfs;
+      if(!Number.isFinite(meter)||meter<=-1)return status('No peak-headroom correction proposed.');
+      const factor=Math.pow(10,Math.max(-24,Math.min(0,-1.5-meter))/20);
+      const section=studio.overlay?.querySelector('.sf-studio-automation');
+      if(!section)return status('Automation editor is unavailable.');
+      const target=section.querySelector('[data-auto-target]');
+      const parameter=section.querySelector('[data-auto-parameter]');
+      const points=section.querySelector('[data-auto-points]');
+      const proposal=section.querySelector('[data-auto-propose]');
+      if(!target||!parameter||!points||!proposal)return status('Approval workbench is unavailable.');
+      target.value='master|__master__';parameter.value='volume';
+      points.value='0,'+(0.82*factor).toFixed(4)+',square';
+      section.scrollIntoView({behavior:'smooth',block:'start'});
+      status('A master gain proposal was prepared for exact review. No DSP values have been saved.');
+      proposal.click();
     };
     q('[data-g-save]').onclick=async()=>{
       if(!last)return;
