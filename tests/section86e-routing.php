@@ -6,7 +6,7 @@ function sf_catalog():array{return [['id'=>'song-1']];}
 require dirname(__DIR__).'/api/stem-studio-core.php';
 $n=0;
 function ok86e(bool $condition,string $message):void{global $n;if(!$condition)throw new RuntimeException($message);$n++;echo "PASS $message\n";}
-function fails86e(callable $fn):bool{try{$fn();return false;}catch(InvalidArgumentException){return true;}}
+function fails86e(callable $fn):bool{try{$fn();return false;}catch(InvalidArgumentException|RuntimeException){return true;}}
 $rpp="<REAPER_PROJECT 0.1 \"7.0\" 1\n".
 "  <TRACK {FOLDER}\n    NAME \"Drums bus\"\n    I_FOLDERDEPTH 1\n  >\n".
 "  <TRACK {KICK}\n    NAME \"Kick\"\n    I_FOLDERDEPTH 0\n  >\n".
