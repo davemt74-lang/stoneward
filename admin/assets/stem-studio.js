@@ -81,6 +81,7 @@
      out.textContent='';this.updateMix();this.render();
    }
    render(){
+     this._masteringDispose?.();this._masteringDispose=null;
      const area=el('[data-studio-body]',this.overlay);if(!area)return;
      if(!this.project){area.innerHTML='<div class="sf-studio-empty">Upload a single ZIP with your .rpp and WAV/MP3 stems, or import them separately. The REAPER project defines the lanes, plugins, timeline offsets and master bus.</div>';return}
      const p=this.project,tracks=p.tracks||[];
