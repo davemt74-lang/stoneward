@@ -279,6 +279,7 @@ jobs:
           php tests/section84b5-media-transfer.php
           php tests/section84b6-homeserver-user-consent.php
           php tests/section85a-site-ownership.php
+          php tests/section85b-media-publishing.php
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
