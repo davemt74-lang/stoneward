@@ -74,6 +74,24 @@
 .sf-plugin-js{max-width:100%;overflow-wrap:anywhere}
 @media(max-width:650px){.sf-plugin-rack{padding:7px}.sf-plugin-controls label{width:45%;min-width:0}.sf-plugin-controls input{width:100%}}
 
+/* 86F automation and exact Agent review */
+.sf-studio-automation{margin:14px 0;padding:16px;border:1px solid #725c43;background:#201b16}
+.sf-studio-automation h3{margin:0 0 8px;color:#f1dab6}
+.sf-studio-automation p{color:#c2af93;font-size:12px}
+.sf-auto-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.sf-auto-controls label{display:grid;gap:5px;font-size:11px;color:#e7ceab}
+.sf-auto-controls input,.sf-auto-controls select,.sf-auto-controls textarea{background:#15120e;color:#f0e3cf;border:1px solid #765a3c;padding:8px;max-width:220px}
+.sf-auto-controls textarea{min-width:220px}
+.sf-auto-controls button,.sf-auto-lanes button,.sf-auto-proposal button{background:#5d432c;border:1px solid #9d794c;color:#fff;padding:7px 11px;cursor:pointer}
+.sf-auto-lanes{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+.sf-auto-lanes article{display:grid;gap:6px;background:#30251b;border:1px solid #64513b;padding:11px;min-width:190px;max-width:420px}
+.sf-auto-lanes small,.sf-auto-preview{font-size:11px;color:#c4b29c}
+.sf-auto-preview{display:flex;flex-wrap:wrap;gap:6px}
+.sf-auto-proposal{background:#221d17;color:#eedfc7;border:1px solid #987b59;padding:24px;max-width:min(700px,94vw)}
+.sf-auto-proposal::backdrop{background:#000b}
+.sf-auto-proposal pre{max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.sf-studio-track meter,.sf-route-buses meter,.sf-studio-master meter{width:80px;height:9px}
+@media(max-width:650px){.sf-auto-controls label{width:100%}.sf-auto-controls input,.sf-auto-controls select,.sf-auto-controls textarea{max-width:100%;width:100%;min-width:0}}
 /* 86D verified-native provenance, never confuse original with browser knobs */
 .sf-plugin-native-values{display:flex;flex-wrap:wrap;gap:7px 11px;
   padding:9px;border:1px solid #77644b;background:#16150f;flex-basis:100%}

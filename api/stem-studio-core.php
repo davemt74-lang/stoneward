@@ -63,6 +63,7 @@ function sf_stem_project_import(string $id,string $content,string $name,int $adm
         }
         sf_stem_route_validate($parsed);
     }
+    sf_stem_automation_reimport($parsed,$old);
     $parsed['project_name']=substr(pathinfo(sf_stem_safe_filename($name),PATHINFO_FILENAME),0,180);
     $parsed['imported_by']=$adminId;$parsed['imported_at']=gmdate('c');
     $parsed['source_sha256']=hash('sha256',$content);
@@ -120,6 +121,10 @@ function sf_stem_project_update(string $id,array $payload):array {
         if(!$found)throw new InvalidArgumentException('Stem track not found.');
     }elseif(str_starts_with($action,'route_')){
         sf_stem_route_apply($old,$payload);
+    }elseif(str_starts_with($action,'automation_')){
+        sf_stem_automation_apply($old,$payload);
+    }elseif($action==='recall_mix'){
+        sf_stem_automation_recall_mix($old,(string)($payload['name']??''));
     }elseif($action==='save_mix'){
         $mix=(array)($payload['mix']??[]);
         $mixName=trim((string)($mix['name']??'Default'));
@@ -136,11 +141,23 @@ function sf_stem_project_update(string $id,array $payload):array {
                 'pan'=>max(-1,min(1,(float)$pan)),
                 'mute'=>!empty($override['mute']),'solo'=>!empty($override['solo'])];
         }
+        $busRows=(array)($mix['buses']??[]);
+        foreach((array)($old['routing']['buses']??[]) as $bus){
+            $key=(string)$bus['id'];
+            $state=$busRows[$key]??null;
+            if(is_array($state)){
+                $busRows[$key]=['volume'=>sf_stem_automation_numeric($state['volume']??null,0,4),
+                    'pan'=>sf_stem_automation_numeric($state['pan']??null,-1,1),
+                    'mute'=>($state['mute']??false)===true,
+                    'solo'=>($state['solo']??false)===true];
+            }else $busRows[$key]=['volume'=>$bus['volume'],'pan'=>$bus['pan'],
+                 'mute'=>$bus['mute'],'solo'=>$bus['solo']];
+        }
         $old['mixes']=array_slice((array)($old['mixes']??[]),-19,20,true);
         $old['mixes'][$mixName]=['name'=>$mixName,'tracks'=>$values,
-            'buses'=>array_map(static fn(array $b):array=>[
-                'id'=>$b['id'],'volume'=>$b['volume'],'pan'=>$b['pan'],
-                'mute'=>$b['mute'],'solo'=>$b['solo']],(array)($old['routing']['buses']??[])),
+            'buses'=>array_map(static fn(array $b):array=>['id'=>$b['id']]+$busRows[(string)$b['id']],(array)($old['routing']['buses']??[])),
+            'automation'=>array_values(array_filter((array)($old['automation']??[]),
+                static fn(array $lane):bool=>($lane['source']??'')==='BROWSER')),
             'saved_at'=>gmdate('c')];
     }elseif(in_array($action,[
         'plugin_add','plugin_settings','plugin_toggle','plugin_move',

@@ -13,6 +13,8 @@ function sf_agent_tool_registry(): array {
         'create_playlist'=>['label'=>'Create a playlist','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/playlists.php','handler'=>'create','confirmation'=>true,'execution'=>'authenticated_api'],
         'queue_track'=>['label'=>'Change player queue','kind'=>'local_action','scope'=>'fan','owner'=>'assets/js/app.js','handler'=>'executeAgentAction','confirmation'=>false,'execution'=>'browser'],
         'kunaki_publishing_queue'=>['label'=>'Stage purchased vinyl for HomeServer publishing review','kind'=>'write','scope'=>'admin','owner'=>'admin/api/vinyl-production.php','handler'=>'queue_kunaki_publishing','confirmation'=>true,'execution'=>'governed_admin_api'],
+        'stem_mix_inspect'=>['label'=>'Inspect private REAPER mix metrics (Admin only)','kind'=>'read','scope'=>'admin','owner'=>'api/stem-agent-bridge.php','handler'=>'sf_stem_agent_review','confirmation'=>false,'execution'=>'server'],
+        'stem_automation_update'=>['label'=>'Apply exactly approved private Stem Studio automation','kind'=>'write','scope'=>'admin','owner'=>'api/stem-agent-bridge.php','handler'=>'sf_stem_project_update','confirmation'=>true,'execution'=>'governed_admin_api'],
         'commerce_aggregate'=>['label'=>'Store payment, refund and fulfillment queue','kind'=>'read','scope'=>'admin','owner'=>'api/agent-commerce-bridge.php','handler'=>'sf_agent_commerce_admin_snapshot','confirmation'=>false,'execution'=>'server'],
         'commerce_followup_add'=>['label'=>'Save exactly approved customer order follow-up','kind'=>'write','scope'=>'admin','owner'=>'api/commerce-operations.php','handler'=>'sf_commerce_ops_update','confirmation'=>true,'execution'=>'governed_admin_api'],
         'customer_order_status'=>['label'=>'Read only signed-in customer order status','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/agent-commerce-bridge.php','handler'=>'sf_agent_commerce_customer_snapshot','confirmation'=>false,'execution'=>'server'],
@@ -53,6 +55,6 @@ function sf_agent_tool_allowed(string $toolId,string $role,bool $confirmed=false
  * Sending, publishing, purchasing and deletes remain in owner-controlled UI.
  */
 function sf_agent_tool_executable(string $toolId,string $role,bool $confirmed=false): bool {
-    if(!in_array($toolId,['campaign_draft_save','automation_draft_save','commerce_followup_add'],true))return false;
+    if(!in_array($toolId,['campaign_draft_save','automation_draft_save','commerce_followup_add','stem_automation_update'],true))return false;
     return sf_agent_tool_allowed($toolId,$role,$confirmed);
 }

@@ -42,6 +42,13 @@ try{
     $body=sf_request_json();$id=(string)($body['track_id']??'');
     $project=sf_stem_project_update($id,$body);
     sf_log_admin_action((int)$me['id'],'stem_project_update','track',$id,['action'=>(string)($body['action']??'')]);
+    // Admin Brain timeline gets metadata only: never disclose source RPP,
+    // plugin state, private stem paths, or fan content.
+    if(function_exists('sf_agent_brain_log'))
+        sf_agent_brain_log((int)$me['id'],'stem_studio','admin_mix_edit',[
+          'song_id'=>$id,'revision'=>(int)$project['revision'],
+          'operation'=>(string)($body['action']??''),
+          'requires_confirmation'=>true,'private_source_preserved'=>true]);
     sf_json_response(['ok'=>true,'project'=>sf_stem_project_with_assets($project)]);
 }catch(InvalidArgumentException $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);
 }catch(Throwable $e){error_log('Stem Studio: '.get_class($e).': '.$e->getMessage());sf_json_response(['ok'=>false,'message'=>'Stem project could not be completed.'],409);}

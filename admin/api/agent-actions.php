@@ -20,12 +20,12 @@ try{
         if(!sf_agent_tool_executable($tool,'admin',true))sf_json_response(['ok'=>false,'error'=>'tool_not_allowed'],403);
         $draft=is_array($b['draft']??null)?$b['draft']:[];
         $proposal=sf_agent_action_prepare($uid,(string)($b['request_key']??''),$tool,$draft);
-        sf_agent_brain_log($uid,$tool==='commerce_followup_add'?'agent_commerce':'agent_campaign','action_proposed',['route'=>$tool==='commerce_followup_add'?'commerce_followup':($tool==='automation_draft_save'?'journey_draft':'campaign_draft'),'action'=>$tool,'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'payload_hash'=>$proposal['payload_hash'],'requires_confirmation'=>true]);
+        sf_agent_brain_log($uid,$tool==='stem_automation_update'?'agent_stem':($tool==='commerce_followup_add'?'agent_commerce':'agent_campaign'),'action_proposed',['route'=>$tool==='stem_automation_update'?'stem_automation':($tool==='commerce_followup_add'?'commerce_followup':($tool==='automation_draft_save'?'journey_draft':'campaign_draft')),'action'=>$tool,'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'payload_hash'=>$proposal['payload_hash'],'requires_confirmation'=>true]);
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     if($action==='approve'){
         $proposal=sf_agent_action_approve($uid,(string)($b['proposal_id']??''),(string)($b['payload_hash']??''),(string)($b['typed_confirmation']??''));
-        sf_agent_brain_log($uid,$proposal['tool_id']==='commerce_followup_add'?'agent_commerce':'agent_campaign','action_approved',['route'=>$proposal['tool_id']==='commerce_followup_add'?'commerce_followup':($proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft'),'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
+        sf_agent_brain_log($uid,$proposal['tool_id']==='stem_automation_update'?'agent_stem':($proposal['tool_id']==='commerce_followup_add'?'agent_commerce':'agent_campaign'),'action_approved',['route'=>$proposal['tool_id']==='stem_automation_update'?'stem_automation':($proposal['tool_id']==='commerce_followup_add'?'commerce_followup':($proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft')),'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     if($action==='cancel'||$action==='reconcile'){
@@ -43,11 +43,17 @@ try{
         $proposal=sf_agent_action_execute($uid,$id);
         // Replaying a completed request must not duplicate the Admin event trail.
         if($previous['status']!=='completed'){
-            sf_agent_brain_log($uid,$proposal['tool_id']==='commerce_followup_add'?'agent_commerce':'agent_campaign','action_result',['route'=>$proposal['tool_id']==='commerce_followup_add'?'commerce_followup':($proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft'),'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'entity_id'=>$proposal['tool_id']==='automation_draft_save'?($proposal['result']['automation_id']??null):($proposal['result']['campaign_id']??null),'requires_confirmation'=>true]);
+            sf_agent_brain_log($uid,$proposal['tool_id']==='stem_automation_update'?'agent_stem':($proposal['tool_id']==='commerce_followup_add'?'agent_commerce':'agent_campaign'),'action_result',['route'=>$proposal['tool_id']==='stem_automation_update'?'stem_automation':($proposal['tool_id']==='commerce_followup_add'?'commerce_followup':($proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft')),'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'entity_id'=>$proposal['tool_id']==='automation_draft_save'?($proposal['result']['automation_id']??null):($proposal['result']['campaign_id']??null),'requires_confirmation'=>true]);
+            if($proposal['tool_id']==='stem_automation_update'){
+                sf_log_admin_action($uid,'agent_stem_automation_saved','track',
+                    (string)($proposal['result']['track_id']??''),
+                    ['proposal_id'=>$proposal['id'],'revision'=>$proposal['result']['revision']??null]);
+            }else{
             $isJourney=$proposal['tool_id']==='automation_draft_save';
             $isCommerce=$proposal['tool_id']==='commerce_followup_add';
             sf_log_admin_action($uid,$isCommerce?'agent_commerce_followup_saved':($isJourney?'agent_journey_draft_saved':'agent_campaign_draft_saved'),$isCommerce?'order':($isJourney?'automation':'campaign'),
                 (string)($isCommerce?($proposal['result']['order_id']??''):($isJourney?($proposal['result']['automation_id']??''):($proposal['result']['campaign_id']??''))),['proposal_id'=>$proposal['id']]);
+            }
         }
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }

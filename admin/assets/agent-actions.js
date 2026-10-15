@@ -141,20 +141,21 @@
     history.setAttribute('aria-label','Reviewed Agent campaign and lifecycle journey actions');
     history.className='agent-history-dialog';
     const rows=(data.proposals||[]).map(p=>{
-      const name=esc(p.payload?.name||'Reviewed draft');
+      const name=esc(p.payload?.name||(p.tool_id==='stem_automation_update'?'Stem automation · '+(p.payload?.track_id||'song'):'Reviewed draft'));
       const status=esc(p.status||'unknown');
       const when=esc(p.created_at||'');
-      const completed=Number(p.result?.campaign_id||0),completedJourney=Number(p.result?.automation_id||0);
+      const completed=Number(p.result?.campaign_id||0),completedJourney=Number(p.result?.automation_id||0),completedStem=String(p.result?.track_id||'');
       let action='Awaiting review';
       if(completed)action='<button type="button" data-agent-campaign-id="'+completed+'">Open campaign</button>';
       else if(completedJourney)action='<button type="button" data-agent-journey-id="'+completedJourney+'">Open journey</button>';
+      else if(completedStem)action='<button type="button" data-agent-stem-song="'+esc(completedStem)+'">Open Stem Studio</button>';
       else if(p.status==='proposed'||p.status==='approved')action='<button type="button" data-agent-cancel-id="'+esc(p.id)+'">Cancel pending</button>';
       else if(p.status==='review_required'||p.status==='executing')action='<button type="button" data-agent-reconcile-id="'+esc(p.id)+'">Mark reviewed (no retry)</button>';
       else if(p.status==='reviewed_no_retry')action='Manually reviewed; no automatic retry.';
       else if(p.status==='cancelled')action='Cancelled before execution.';
       return '<tr><td>'+name+'</td><td>'+status+'</td><td>'+when+'</td><td>'+action+'</td></tr>';
     }).join('');
-    history.innerHTML='<h2>Agent action timeline</h2><p>These are your reviewed Agent campaign and lifecycle journey proposals. Pending, interrupted, or uncertain operations never run automatically. Review the relevant Admin editor manually; do not retry automatically.</p><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Draft</th><th>Status</th><th>Created</th><th>Next step</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No Agent draft actions yet.</td></tr>')+'</tbody></table></div><button type="button" id="closeAgentHistory">Close</button>';
+    history.innerHTML='<h2>Agent action timeline</h2><p>These are your reviewed Admin Agent campaign, journey and private Stem Studio proposals. Pending, interrupted, or uncertain operations never run automatically. Review the relevant Admin editor manually; do not retry automatically.</p><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Draft</th><th>Status</th><th>Created</th><th>Next step</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No Agent draft actions yet.</td></tr>')+'</tbody></table></div><button type="button" id="closeAgentHistory">Close</button>';
     document.body.appendChild(history);
     history.querySelector('#closeAgentHistory').onclick=()=>history.close();
     history.addEventListener('close',()=>history.remove());
@@ -166,10 +167,13 @@
       history.close();openView('automations');
       window.SFAutomationsAdmin?.openAutomation?.(id);
     });
+    history.querySelectorAll('[data-agent-stem-song]').forEach(button=>button.onclick=()=>{
+      const id=button.dataset.agentStemSong;history.close();window.SFStemStudio?.open?.(id);
+    });
     async function recover(button,action,keyword){
       const id=action==='cancel'?button.dataset.agentCancelId:button.dataset.agentReconcileId;
       const explanation=action==='reconcile'
-        ?'Inspect the correct Campaign or Automation Builder for possible partial saves first. This does NOT undo anything. Type RECONCILED to mark this action reviewed without retrying.'
+        ?'Inspect the correct destination Admin editor (including Stem Studio for automation edits) for possible partial saves first. This does NOT undo anything. Type RECONCILED to mark this action reviewed without retrying.'
         :'Only pending, never-started work can be cancelled. Type CANCEL to confirm.';
       const typed=window.prompt(explanation,'');
       if(typed!==keyword)return;
