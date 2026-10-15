@@ -40,7 +40,7 @@ $orders=[
 ];
 $balances=['purchased'=>['granted'=>5,'reserved_or_used'=>3,'available'=>2],
            'vinyl'=>['granted'=>1,'reserved_or_used'=>0,'available'=>1]];
-$result=sf_fan_owned_project(4,$library,$orders,$catalog,$balances);
+$result=sf_fan_owned_project(4,$library,$orders,$catalog,$balances,static fn($ref):bool=>$ref==='api/media.php?id=M1234567890ABCDEF1234');
 $byId=array_column($result['tracks'],null,'id');
 ok85($result['total']===3,'Exactly paid own digital song and album lines are eligible');
 ok85(!isset($byId['other'],$byId['vinyl'],$byId['unpaid']),'Other account, vinyl-only, and unpaid cannot masquerade as music ownership');
@@ -95,3 +95,12 @@ ok85(str_contains($css,'.library-owned-card')&&str_contains($css,'@media(max-wid
 ok85(str_contains(file_get_contents(dirname(__DIR__).'/.github/workflows/release-gate.yml'),
     'php tests/section85a-site-ownership.php'),
     'Final Stonefellow release gate explicitly runs 85A security and entitlement regressions');
+
+$noMaster=sf_fan_owned_project(4,$library,$orders,$catalog,$balances,static fn($ref):bool=>false);
+$noMasterById=array_column($noMaster['tracks'],null,'id');
+ok85($noMasterById['purchased']['download_ready']===false,
+    'Published reference without an available private file cannot create a false download button');
+$siteCore=file_get_contents(dirname(__DIR__).'/api/fan-owned-music-core.php');
+ok85(str_contains($siteCore,'sf_fan_owned_media_ready')&&str_contains($siteCore,'realpath(')
+    &&str_contains($siteCore,'!is_link($file)'),
+    'Private media availability requires safe non-symlink master under local storage');

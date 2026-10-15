@@ -10,7 +10,7 @@ without building a second checkout or changing HomeServer.
 - My Library now has an **Owned Music** tab distinct from saved/favorite tracks.
 - The first-party `fan-owned-music.php` endpoint filters to this authenticated
   account's verified PAID track and album grants, returning sanitized titles,
-  playback eligibility, a master-publication indicator and vinyl credit balances.
+  playback eligibility, a real private-media asset presence indicator and vinyl credit balances.
 - The UI shows granted, reserved/used and available print licenses for each song.
   Additional print licenses open the existing track product and checkout pathway.
 - `fan-owned-download.php` validates the current Stonefellow session, rechecks
@@ -25,7 +25,7 @@ without building a second checkout or changing HomeServer.
 A catalog preview or a file absent from the Media Library is NOT a downloadable
 master. The demo catalog's `assets/audio/*.mp3` files are not deployed by
 this source repository. Administrators must publish valid private media
-masters using existing Media Library tooling before owned downloads work.
+masters using existing Media Library tooling before owned downloads work. The wallet checks asset category, private storage path and file presence without hashing on each page load; the download path performs full hash verification.
 The download endpoint fails closed when storage files or ownership are missing.
 Live HostGator cookie, storage, playback, download, and payment checks remain
 a separate deployment acceptance step.

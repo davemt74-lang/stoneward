@@ -11,6 +11,7 @@ on:
       - 'stonefellow-v120.php'
       - 'version.php'
       - 'tests/section85a-site-ownership.php'
+      - 'tests/section85a-owned-ui.cjs'
       - '.github/workflows/stonefellow-owned-85a.yml'
   push:
     branches: [main]
@@ -42,4 +43,5 @@ jobs:
           node --check assets/js/owned-music.js
           node --check assets/js/library.js
           node --check assets/js/app.js
+          node tests/section85a-owned-ui.cjs
           php tests/section85a-site-ownership.php

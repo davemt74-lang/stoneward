@@ -67,6 +67,7 @@ jobs:
           node --check assets/js/agent-chat-canvas.js
           node --check assets/js/library.js
           node --check assets/js/owned-music.js
+          node tests/section85a-owned-ui.cjs
           node --check assets/js/accessibility.js
 
       - name: Admin JavaScript syntax

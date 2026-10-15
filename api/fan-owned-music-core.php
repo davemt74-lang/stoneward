@@ -12,8 +12,28 @@ function sf_fan_owned_private_master(mixed $reference):bool {
     return is_string($reference)
         && preg_match('/^api\/media\.php\?id=M[A-F0-9]{20}$/D',$reference)===1;
 }
+
+/** Cheap presence check for the library UI; full SHA-256 validation on download. */
+function sf_fan_owned_media_ready(mixed $reference,?callable $lookup=null):bool {
+    if(!sf_fan_owned_private_master($reference))return false;
+    $id=substr($reference,strlen('api/media.php?id='));
+    $asset=$lookup?$lookup($id):(function_exists('sf_media_asset')?sf_media_asset($id):null);
+    if(!is_array($asset)||(string)($asset['uuid']??'')!==$id
+       ||(string)($asset['category']??'')!=='audio'
+       ||!in_array(strtolower((string)($asset['extension']??'')),['mp3','wav'],true))
+        return false;
+    $raw=(string)($asset['stored_path']??'');
+    if($raw===''||str_contains($raw,'..')||str_contains($raw,'\\'))return false;
+    $root=defined('SF_ROOT')?SF_ROOT:dirname(__DIR__);
+    $base=realpath($root.'/storage/media');
+    $file=realpath($root.'/'.ltrim($raw,'/'));
+    if(!$base||!$file||!str_starts_with($file,$base.DIRECTORY_SEPARATOR)
+       ||!is_file($file)||is_link($file))return false;
+    $bytes=filesize($file);
+    return $bytes!==false&&$bytes>0&&$bytes<=268435456;
+}
 function sf_fan_owned_project(int $uid,array $library,array $orders,
-                              array $catalog,array $balances):array {
+                              array $catalog,array $balances,?callable $masterReady=null):array {
     if($uid<1)throw new RuntimeException('Signed-in account required.');
     $owned=sf_homeserver_owned_tracks($uid,$library,$orders,$catalog);
     $rights=sf_hs_music_rights($owned,$balances,$catalog);
@@ -21,7 +41,9 @@ function sf_fan_owned_project(int $uid,array $library,array $orders,
     foreach($rights as $t){
         $id=(string)$t['id'];
         $catalogRow=(array)($catalog[$id]??[]);
-        $ready=sf_fan_owned_private_master($catalogRow['audio']??null);
+        $reference=$catalogRow['audio']??null;
+        $ready=sf_fan_owned_private_master($reference)
+            &&($masterReady?$masterReady($reference):sf_fan_owned_media_ready($reference));
         $tracks[]=[
             'id'=>$id,'title'=>(string)$t['title'],
             'artist'=>'Stonefellow',
