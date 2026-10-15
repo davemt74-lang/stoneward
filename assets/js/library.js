@@ -139,8 +139,8 @@ async function render(c,params={}){
     $$('[data-library-open-collection]',canvas).forEach(b=>b.onclick=()=>c.navigate('library',{tab:'collections',collection:b.dataset.libraryOpenCollection}));
     $$('[data-library-create-collection]',canvas).forEach(b=>b.onclick=()=>createCollectionPrompt(c,(next,col)=>{lib=next;c.navigate('library',{tab:'collections',collection:col?.id||''})}));
     const search=$('#librarySearch',canvas),sortEl=$('#librarySort',canvas),content=$('#myLibraryContent',canvas);
-    if(search&&content)search.oninput=()=>{query=search.value||'';content.innerHTML=renderGrid(c,lib,tab,query,sort,owned);bindCommon(c,lib,paint)};
-    if(sortEl&&content)sortEl.onchange=()=>{sort=sortEl.value||'recent';content.innerHTML=renderGrid(c,lib,tab,query,sort);bindCommon(c,lib,paint)};
+    if(search&&content)search.oninput=()=>{query=search.value||'';content.innerHTML=renderGrid(c,lib,tab,query,sort,owned);bindCommon(c,lib,paint);window.StonefellowOwnedMusic?.bind(c,()=>{owned={status:'loading',tracks:[]};paint(lib);void loadOwned()})};
+    if(sortEl&&content)sortEl.onchange=()=>{sort=sortEl.value||'recent';content.innerHTML=renderGrid(c,lib,tab,query,sort,owned);bindCommon(c,lib,paint);window.StonefellowOwnedMusic?.bind(c,()=>{owned={status:'loading',tracks:[]};paint(lib);void loadOwned()})};
     if(collection){
       $$('[data-library-back-collections]',canvas).forEach(b=>b.onclick=()=>c.navigate('library',{tab:'collections'}));
       $$('[data-library-edit-collection]',canvas).forEach(b=>b.onclick=()=>editCollectionPrompt(c,collection,(next,col)=>{lib=next;collectionId=Number(col?.id||collectionId);paint(lib)}));
