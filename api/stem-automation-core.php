@@ -197,3 +197,44 @@ function sf_stem_automation_reimport(array &$fresh,?array $old):void {
             (int)($fresh['automation_import']['orphaned_browser_lanes']??0)+1;}
     }
 }
+
+/** Atomic server-side mix recall; imported native envelopes are never replaced. */
+function sf_stem_automation_recall_mix(array &$project,string $name):void {
+    $mix=$project['mixes'][$name]??null;
+    if(!is_array($mix)||$name===''||strlen($name)>100)
+        throw new InvalidArgumentException('Saved mix does not exist.');
+    $values=(array)($mix['tracks']??[]);
+    foreach($project['tracks'] as &$track){
+        $id=(string)$track['guid'];$state=$values[$id]??null;
+        if(!is_array($state))throw new InvalidArgumentException('Mix no longer matches project tracks.');
+        $track['volume']=sf_stem_automation_numeric($state['volume']??null,0,4);
+        $track['pan']=sf_stem_automation_numeric($state['pan']??null,-1,1);
+        $track['mute']=($state['mute']??false)===true;
+        $track['solo']=($state['solo']??false)===true;
+    }unset($track);
+    $savedBuses=[];
+    foreach((array)($mix['buses']??[]) as $bus)$savedBuses[(string)($bus['id']??'')]=$bus;
+    foreach($project['routing']['buses']??[] as &$bus){
+        $id=(string)$bus['id'];$state=$savedBuses[$id]??null;
+        if(!is_array($state))throw new InvalidArgumentException('Mix no longer matches auxiliary buses.');
+        $bus['volume']=sf_stem_automation_numeric($state['volume']??null,0,4);
+        $bus['pan']=sf_stem_automation_numeric($state['pan']??null,-1,1);
+        $bus['mute']=($state['mute']??false)===true;
+        $bus['solo']=($state['solo']??false)===true;
+    }unset($bus);
+    $native=array_values(array_filter((array)($project['automation']??[]),
+        static fn(array $lane):bool=>($lane['source']??'')==='REAPER'));
+    $browser=[];$seen=[];
+    foreach((array)($mix['automation']??[]) as $lane){
+        if(!is_array($lane))throw new InvalidArgumentException('Mix automation is malformed.');
+        $clean=sf_stem_automation_validate_lane($project,$lane);
+        $clean['id']=$lane['id'];
+        $key=sf_stem_automation_lane_key($clean);
+        if(isset($seen[$key]))throw new InvalidArgumentException('Duplicate automation lane in saved mix.');
+        $seen[$key]=true;$browser[]=$clean;
+    }
+    if(count($native)+count($browser)>256)throw new InvalidArgumentException('Mix automation capacity exceeded.');
+    $project['automation']=array_merge($native,$browser);
+    $project['current_mix']=$name;
+    $project['mix_recalled_at']=gmdate('c');
+}
