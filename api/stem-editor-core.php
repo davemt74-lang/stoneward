@@ -16,6 +16,7 @@ function sf_stem_fx_defaults(string $type):array {
         'compressor'=>['threshold'=>-18.0,'ratio'=>2.0,'attack'=>0.01,'release'=>0.25],
         'delay'=>['time'=>0.25,'feedback'=>0.2,'wet'=>0.2],
         'reverb'=>['wet'=>0.2,'seconds'=>1.4],
+        'limiter'=>['threshold'=>-8.0,'ceiling'=>-0.1,'attack'=>0.01,'release'=>0.2],
         default=>[]
     };
 }
@@ -25,6 +26,7 @@ function sf_stem_fx_bounds(string $type):array {
         'compressor'=>['threshold'=>[-60,0],'ratio'=>[1,20],'attack'=>[0,1],'release'=>[0.01,2]],
         'delay'=>['time'=>[0.01,1.8],'feedback'=>[0,0.75],'wet'=>[0,1]],
         'reverb'=>['wet'=>[0,1],'seconds'=>[0.2,4]],
+        'limiter'=>['threshold'=>[-36,0],'ceiling'=>[-12,0],'attack'=>[0,0.1],'release'=>[0.01,2]],
         default=>[]
     };
 }
