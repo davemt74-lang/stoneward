@@ -1,0 +1,55 @@
+name: Stonefellow AI Production Assistant 86J
+on:
+  pull_request:
+    paths:
+      - 'api/stem-production-advisor.php'
+      - 'api/agent-admin-brain.php'
+      - 'api/agent-skill-registry.php'
+      - 'admin/api/stem-advisor.php'
+      - 'admin/assets/stem-production-advisor.js'
+      - 'admin/assets/stem-studio.js'
+      - 'admin/assets/stem-studio.css'
+      - 'tests/section86j-*'
+      - '.github/workflows/stonefellow-stem86j.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-production-advisor.php'
+      - 'api/agent-admin-brain.php'
+      - 'api/agent-skill-registry.php'
+      - 'admin/api/stem-advisor.php'
+      - 'admin/assets/stem-production-advisor.js'
+      - 'admin/assets/stem-studio.js'
+      - 'tests/section86j-*'
+permissions:
+  contents: read
+jobs:
+  production-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sodium
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/stem-production-advisor.php
+          php -l api/agent-admin-brain.php
+          php -l api/agent-skill-registry.php
+          php -l admin/api/stem-advisor.php
+          node --check admin/assets/stem-production-advisor.js
+          node --check admin/assets/stem-studio.js
+          node tests/section86j-production-agent.cjs
+          php tests/section86j-production-agent.php
+          php tests/section86i-stem-catalog.php
+          php tests/section86h-mastering-readiness.php
+          php tests/section86g-mastering.php
+          node tests/section86g-mastering.cjs
+          php tests/section86f-automation-agent.php
+          php tests/section85b-media-publishing.php
