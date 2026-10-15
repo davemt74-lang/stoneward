@@ -15,10 +15,31 @@ try{
             $path=sf_stem_mastering_reference_path($id,$project);
             if(!$path)throw new InvalidArgumentException('No private reference recording stored.');
             $kind=strtolower(pathinfo($path,PATHINFO_EXTENSION));
+            $size=(int)filesize($path);$start=0;$end=$size-1;
             header('Content-Type: '.($kind==='wav'?'audio/wav':'audio/mpeg'));
             header('Content-Disposition: inline; filename="stem-reference.'.$kind.'"');
-            header('Content-Length: '.filesize($path));
-            readfile($path);
+            header('Accept-Ranges: bytes');
+            $range=(string)($_SERVER['HTTP_RANGE']??'');
+            if($range!==''){
+                if(!preg_match('/^bytes=(\\d+)-(\\d*)$/D',$range,$matches))
+                    sf_json_response(['ok'=>false,'message'=>'Invalid reference range.'],416);
+                $start=(int)$matches[1];$end=$matches[2]===''?$end:(int)$matches[2];
+                if($start>=$size||$end<$start||$end>=$size)
+                    sf_json_response(['ok'=>false,'message'=>'Reference range not satisfiable.'],416);
+                http_response_code(206);
+                header("Content-Range: bytes $start-$end/$size");
+            }
+            header('Content-Length: '.($end-$start+1));
+            $handle=fopen($path,'rb');if(!$handle)throw new RuntimeException('Private reference unavailable.');
+            try{
+                if(fseek($handle,$start)!==0)throw new RuntimeException('Cannot seek private reference.');
+                $remaining=$end-$start+1;
+                while($remaining>0&&!feof($handle)){
+                    $chunk=fread($handle,min($remaining,65536));
+                    if($chunk===false||$chunk==='')break;
+                    echo $chunk;$remaining-=strlen($chunk);
+                }
+            }finally{fclose($handle);}
             exit;
         }
         sf_json_response(['ok'=>true,'mastering_reference'=>$project['mastering_reference']??null,
