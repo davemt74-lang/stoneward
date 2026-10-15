@@ -11,10 +11,14 @@
       const specs=window.SFStemFX?.specs?.[plugin.type]||{};
       const source=plugin.format==='BROWSER'?'Stonefellow':
         (plugin.format||'REAPER');
-      const native=plugin.format!=='BROWSER';
+      const importedNative=plugin.format!=='BROWSER';
       const origin=plugin.parameter_provenance||'unknown';
       const original=plugin.source_enabled===null?'n/a':
         (plugin.source_enabled===false?'Bypassed in REAPER':'Enabled in REAPER');
+      const native=plugin.native_decode||{};
+      const confidence=native.confidence||'none';
+      const decoded=plugin.native_parameters||native.native_parameters||null;
+      const verified=confidence==='exact-native-slider-values';
       return '<article class="sf-plugin" data-plugin-index="'+index+'"><div class="sf-plugin-head">'+
         '<strong>'+(index+1)+'. '+esc(plugin.name||plugin.type||'Plugin')+'</strong>'+
         '<span>'+esc(source)+'</span>'+
@@ -26,6 +30,17 @@
          (plugin.module?'<span>Module: '+esc(plugin.module)+'</span>':'')+
          (Number.isInteger(plugin.slot)?'<span>Original slot: '+(plugin.slot+1)+'</span>':'')+
          '<span>'+esc(original)+'</span><span>Parameter source: '+esc(origin)+'</span>'+
+         '<span>Native decode: '+esc(native.status||'Not inspected')+'</span>'+
+         (native.schema_id?'<span>Decoder: '+esc(native.schema_id)+'</span>':'')+
+         (native.container?'<span>Verified VST container: '+esc(native.container.plugin_fourcc)+' / v'+
+            esc(native.container.container_version)+' · parameters opaque</span>':'')+
+         (decoded?'<div class="sf-plugin-native-values"><strong>'+
+            (verified?'Verified source slider values':'Unverified source values')+'</strong>'+
+            Object.entries(decoded).map(([key,value])=>'<span>'+esc(key)+': '+
+               esc(value)+' '+esc(native.parameter_units?.[key]||'')+'</span>').join('')+
+            '</div>':'')+
+         (native.browser_unmapped_parameters?'<small>Browser model does not reproduce: '+
+            esc(Object.keys(native.browser_unmapped_parameters).join(', '))+'</small>':'')+
          (plugin.native_state_sha256?'<span>Native state SHA-256: <code>'+esc(plugin.native_state_sha256)+'</code></span>':'')+
         '</div>'+
         (plugin.js_slider_tokens?.length?'<details class="sf-plugin-js"><summary>Exact imported JSFX slider tokens</summary><code>'+
@@ -40,7 +55,7 @@
         '<button type="button" data-plugin-action="plugin_toggle">Toggle bypass</button>'+
         '<button type="button" data-plugin-action="plugin_move" data-direction="-1" '+(index===0?'disabled':'')+'>↑</button>'+
         '<button type="button" data-plugin-action="plugin_move" data-direction="1" '+(index===fx.length-1?'disabled':'')+'>↓</button>'+
-        (!native?'<button type="button" data-plugin-action="plugin_remove">Remove</button>':'')+
+        (!importedNative?'<button type="button" data-plugin-action="plugin_remove">Remove</button>':'')+
         '</div></article>';
     }).join('');
     return '<section class="sf-plugin-rack" data-plugin-scope="'+esc(scope)+'" data-plugin-guid="'+esc(guid)+'">'+

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/stem-native-state-decoder.php';
 /**
  * 86C: lossless REAPER FX identification and provenance, not lossless native DSP.
  * Original .rpp text including opaque VST chunks remains stored unmodified.
@@ -54,6 +55,7 @@ function sf_stem_rpp_plugin_metadata(string $text):array {
                 $current['native_state_sha256']=hash('sha256',implode("\n",$state));
                 $current['native_state_lines']=count($state);
                 $current['native_state_bytes']=strlen(implode("\n",$state));
+                sf_stem_native_enrich_fx($current,$state);
                 if($current['format']==='JS'&&isset($state[0])){
                     $tokens=preg_split('/\\s+/',trim($state[0]))?:[];
                     $current['js_slider_tokens']=array_slice($tokens,0,128);

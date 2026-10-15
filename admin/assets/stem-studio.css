@@ -73,3 +73,11 @@
 .sf-plugin-actions button:disabled{opacity:.35;cursor:not-allowed}
 .sf-plugin-js{max-width:100%;overflow-wrap:anywhere}
 @media(max-width:650px){.sf-plugin-rack{padding:7px}.sf-plugin-controls label{width:45%;min-width:0}.sf-plugin-controls input{width:100%}}
+
+/* 86D verified-native provenance, never confuse original with browser knobs */
+.sf-plugin-native-values{display:flex;flex-wrap:wrap;gap:7px 11px;
+  padding:9px;border:1px solid #77644b;background:#16150f;flex-basis:100%}
+.sf-plugin-native-values strong{flex-basis:100%;color:#f1d3a0}
+.sf-plugin-native-values span{border-radius:2px;border:1px solid #504632;
+  padding:4px 6px;font-family:ui-monospace,monospace;color:#d8c4a7}
+[data-studio-native-refresh]{margin:7px 0;font-size:12px}

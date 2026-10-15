@@ -95,6 +95,12 @@ function sf_stem_project_update(string $id,array $payload):array {
             $t['asset_uuid']=(string)$asset['uuid'];$found=true;break;
         }unset($t);
         if(!$found)throw new InvalidArgumentException('Stem track not found.');
+    }elseif($action==='native_decode_refresh'){
+        $source=sf_stem_project_dir().'/'.hash('sha256',$id).'.rpp';
+        $raw=is_file($source)?file_get_contents($source):false;
+        if(!is_string($raw)||strlen($raw)>8388608)
+            throw new RuntimeException('Original private REAPER source not available.');
+        sf_stem_native_refresh($old,$raw);
     }elseif($action==='edit_track'){
         $guid=(string)($payload['guid']??'');$found=false;
         foreach($old['tracks'] as &$t)if(hash_equals((string)$t['guid'],$guid)){

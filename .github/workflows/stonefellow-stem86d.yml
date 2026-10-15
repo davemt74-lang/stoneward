@@ -1,0 +1,45 @@
+name: Stonefellow Verified REAPER State 86D
+on:
+  pull_request:
+    paths:
+      - 'api/stem-native-state-decoder.php'
+      - 'api/stem-rpp-plugins.php'
+      - 'api/stem-studio-core.php'
+      - 'admin/assets/stem-plugin-rack.js'
+      - 'admin/assets/stem-studio.js'
+      - 'tests/section86d-native-state.php'
+      - '.github/workflows/stonefellow-stem86d.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-native-state-decoder.php'
+      - 'api/stem-rpp-plugins.php'
+      - 'api/stem-studio-core.php'
+      - 'tests/section86d-native-state.php'
+permissions:
+  contents: read
+jobs:
+  native-state-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -e
+          php -l api/stem-native-state-decoder.php
+          php -l api/stem-rpp-plugins.php
+          php -l api/stem-studio-core.php
+          php tests/section86d-native-state.php
+          node --check admin/assets/stem-plugin-rack.js
+          node --check admin/assets/stem-studio.js
+          php tests/section86c-reaper-plugin-rack.php
+          node tests/section86c-plugin-rack.cjs
+          php tests/section86b-timeline-fx.php
+          php tests/section86a-stem-studio.php
