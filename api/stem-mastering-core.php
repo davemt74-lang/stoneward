@@ -42,6 +42,8 @@ function sf_stem_mastering_report_validate(array $input):array {
             'unsupported_routing'=>max(0,min(256,(int)($meta['unsupported_routing']??0))),
             'unlinked_stems'=>max(0,min(256,(int)($meta['unlinked_stems']??0))),
             'reference_name'=>substr(preg_replace('/[\x00-\x1F\x7F]/','',(string)($meta['reference_name']??''))?:'',0,120),
+            'render_sha256'=>isset($meta['render_sha256'])&&is_string($meta['render_sha256'])&&
+                preg_match('/^[a-f0-9]{64}$/D',$meta['render_sha256'])?$meta['render_sha256']:null,
         ],
         'measurement_provenance'=>'browser_measured_not_server_verified',
         'method'=>'48000 Hz stereo PCM; 400ms K-weighted gated LUFS (EBU R128/BS1770 approximation); sample peak, RMS and crest',

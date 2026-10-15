@@ -124,3 +124,14 @@
 .sf-g-ab b{font-size:12px;color:#f1d5ad}.sf-g-ab audio{width:100%;max-width:450px}
 .sf-g-ab button{align-self:center}.sf-g-note{font-size:11px!important}
 @media(max-width:620px){.sf-g-mastering{padding:12px}.sf-g-tools button,.sf-g-tools a{width:100%;text-align:center}.sf-g-ab>div{min-width:100%}}
+
+/* 86H & 86I one-canvas mastering review and existing-catalog publication */
+.sf-h-readiness,.sf-i-publishing{margin:16px 0;padding:14px;background:#292319;border:1px solid #766044;border-radius:7px}
+.sf-h-readiness h4,.sf-i-publishing h4{color:#f3d6ac;margin:0 0 8px;font-size:15px}
+.sf-h-readiness p,.sf-i-publishing p{color:#cfc0a7;line-height:1.55;font-size:12px}
+.sf-h-readiness label,.sf-i-publishing label{display:grid;gap:7px;max-width:580px;font-size:12px;color:#f3ddba;margin-bottom:9px}
+.sf-h-readiness input,.sf-h-readiness select,.sf-i-publishing input{padding:9px;border:1px solid #94754c;background:#1b1812;color:#f2e8d6;width:100%;max-width:440px}
+.sf-h-readiness button,.sf-i-publishing button{background:#665033;color:#fff;border:1px solid #b2905f;padding:8px 12px;border-radius:6px;margin:3px 8px 6px 0;cursor:pointer}
+.sf-h-readiness button:disabled,.sf-i-publishing button:disabled{opacity:.45;cursor:not-allowed}
+.sf-h-block{color:#ffb3a7!important;font-weight:600}
+.sf-h-warning{color:#eed3a6!important}
