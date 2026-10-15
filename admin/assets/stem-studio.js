@@ -17,7 +17,7 @@
    }).catch(e=>{const status=el('[data-stem-project-status]');if(status)status.textContent=e.message});
  }
  class StemStudio {
-   constructor(id){this.id=id;this.project=null;this.overlay=null;this.audio=new Map();this.context=null;this.master=null;this.masterFX=null;this.masterProcessor=null;this.running=false;this.anchor=0;this.anchorClock=0;this.loop=false;this.raf=0;this.duration=0;this.mixing={};this.selectedClips={};this.saving=false;}
+   constructor(id){this.id=id;this.project=null;this.overlay=null;this.audio=new Map();this.context=null;this.master=null;this.masterFX=null;this.masterProcessor=null;this.running=false;this.anchor=0;this.anchorClock=0;this.loop=false;this.raf=0;this.duration=0;this.mixing={};this.busMix={};this.busNodes=new Map();this.meters=new Map();this.selectedClips={};this.saving=false;}
    async init(){
      const overlay=document.createElement('div');overlay.className='sf-studio-overlay';overlay.innerHTML='<div class="sf-studio-shell"><header class="sf-studio-head"><div><span class="eyebrow">STONEFELLOW · STEM STUDIO</span><h2>Song multitrack editor</h2><p data-studio-message>Import a REAPER project to initialize your song.</p></div><button type="button" class="secondary" data-studio-close>Close</button></header><section class="sf-studio-import"><label class="sf-studio-file">Import project + stems ZIP <input type="file" accept=".zip,application/zip" data-studio-bundle></label><label class="sf-studio-file">Import REAPER project (.rpp) <input type="file" accept=".rpp,text/plain" data-studio-rpp></label><label class="sf-studio-file">Upload consolidated stems (WAV / MP3) <input type="file" accept=".wav,.mp3,audio/wav,audio/mpeg" multiple data-studio-audio></label><span data-studio-upload-progress role="status"></span></section><div data-studio-report role="status" aria-live="polite"></div><div data-studio-body></div></div>';
      document.body.appendChild(overlay);this.overlay=overlay;
@@ -29,7 +29,7 @@
    }
    say(m){const e=el('[data-studio-message]',this.overlay);if(e)e.textContent=m}
    async reload(){try{const j=await api('stem-studio.php?track_id='+encodeURIComponent(this.id));this.project=j.project;this.updateMix();this.render()}catch(e){this.say(e.message)}}
-   updateMix(){this.mixing={};for(const t of this.project?.tracks||[])this.mixing[t.guid]={volume:n(t.volume,1),pan:n(t.pan),mute:!!t.mute,solo:!!t.solo};this.recalculateDuration()}
+   updateMix(){this.mixing={};for(const t of this.project?.tracks||[])this.mixing[t.guid]={volume:n(t.volume,1),pan:n(t.pan),mute:!!t.mute,solo:!!t.solo};this.busMix={};for(const b of this.project?.routing?.buses||[])this.busMix[b.id]={volume:n(b.volume,1),pan:n(b.pan),mute:!!b.mute,solo:!!b.solo};this.recalculateDuration()}
    recalculateDuration(){
      this.duration=Math.max(1,...(this.project?.tracks||[]).flatMap(t=>(t.clips||[]).map(c=>n(c.position)+n(c.length))));
    }
@@ -299,7 +299,7 @@
      all('[data-studio-head]',this.overlay).forEach(x=>x.style.left=Math.min(100,100*t/this.duration)+'%');}
    async saveMix(){const name=el('[data-studio-mix-name]',this.overlay)?.value?.trim();if(!name)return this.say('Enter a mix name.');
      try{const j=await api('stem-studio.php',{action:'save_mix',track_id:this.id,revision:this.project.revision,mix:{name,tracks:clone(this.mixing)}});this.project=j.project;this.say('Saved mix '+name);this.render()}catch(e){this.say(e.message)}}
-   recall(name){const m=this.project?.mixes?.[name];if(!m)return;this.mixing=clone(m.tracks);this.applyMix();this.say('Recalled '+name);this.render()}
+   recall(name){const m=this.project?.mixes?.[name];if(!m)return;this.mixing=clone(m.tracks);if(Array.isArray(m.buses))for(const b of m.buses)if(this.busMix[b.id])this.busMix[b.id]={volume:b.volume,pan:b.pan,mute:b.mute,solo:b.solo};this.applyMix();this.say('Recalled '+name);this.render()}
    close(){this.stop();void this.resetAudio();this.overlay?.remove();if(studio===this)studio=null}
  }
  async function open(id){if(studio)studio.close();studio=new StemStudio(id);await studio.init();}
