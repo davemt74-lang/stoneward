@@ -135,3 +135,22 @@
 .sf-h-readiness button:disabled,.sf-i-publishing button:disabled{opacity:.45;cursor:not-allowed}
 .sf-h-block{color:#ffb3a7!important;font-weight:600}
 .sf-h-warning{color:#eed3a6!important}
+
+/* 86J production advisor stays on the existing private Stem Studio canvas */
+.sf-j-advisor{margin:16px 0 22px;padding:16px;background:#211e19;border:1px solid #836b4a;border-radius:9px;color:#e9ddc9}
+.sf-j-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.sf-j-advisor h3{color:#f1d5a7;margin:0 0 7px;font-size:17px}
+.sf-j-advisor h4{color:#ecd0a0;margin:14px 0 9px}
+.sf-j-advisor p{line-height:1.5;font-size:12px;margin:5px 0 9px;color:#cfc0a6}
+.sf-j-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.sf-j-buttons button,.sf-j-proposal button{cursor:pointer;border:1px solid #a88a5a;background:#695238;color:#fff;padding:8px 12px;border-radius:6px;font-size:12px}
+.sf-j-buttons button:disabled{opacity:.5}
+.sf-j-issue{margin:7px 0;padding:10px;border:1px solid #584634;background:#2c251e;border-radius:5px}
+.sf-j-issue strong{font-size:12px;color:#f4d8b5}
+.sf-j-issue p{margin:5px 0}
+.sf-j-proposal{margin:14px 0;padding:12px;border:1px solid #947347;background:#34291e;border-radius:6px}
+.sf-j-proposal strong{color:#f9dba8}
+.sf-j-advisor details{margin:12px 0;font-size:12px}
+.sf-j-advisor summary{cursor:pointer;color:#efdab7}
+.sf-j-advisor li{margin:5px 0;word-break:break-word}
+@media(max-width:650px){.sf-j-advisor{padding:12px}.sf-j-buttons button{width:100%}}
