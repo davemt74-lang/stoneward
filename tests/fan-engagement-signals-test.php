@@ -21,5 +21,6 @@ check87($s['tracks']['a']['listen']===1 && $s['tracks']['a']['paid_purchase']===
 $b=sf_engagement_normalize_events($events,['a'],7,false);
 check87(count($b)===2,'consent gates listening');
 check87(sf_engagement_normalize_events($events,['a'],null,true)===[],'guest isolation');
-check87(sf_engagement_normalize_events($events,['a'],8,true)===[],'cross-fan isolation');
+$other=sf_engagement_normalize_events($events,['a'],8,true);
+check87(count($other)===1 && $other[0]['type']==='paid_purchase' && $other[0]['track_id']==='a','cross-fan isolation');
 echo "87C1 signal normalization: PASS\n";
