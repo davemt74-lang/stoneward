@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/stem-agent-bridge.php';
 require_once __DIR__.'/stem-intelligence-core.php';
+require_once __DIR__.'/stem-alignment-core.php';
 
 /** 86J: bounded Admin-only evidence for the original Stem Studio/Agent Brain.
  * Never send raw RPP, audio, VST binary, private paths or fan information.
@@ -51,6 +52,7 @@ function sf_stem_production_inspect(string $songId):array {
     }
     $analysis=(array)($review['mastering']??[]);
     $stemEvidence=sf_stem_intelligence_summary($songId,$project);
+    $timeEvidence=sf_stem_alignment_summary($songId,$project);
     $issues=[];$proposals=[];
     $add=static function(string $id,string $priority,string $evidence,string $advice,bool $editable=false)
         use(&$issues):void{
@@ -107,6 +109,20 @@ function sf_stem_production_inspect(string $songId):array {
         $add('stem_evidence_stale','low','Source-stem FFT measurements are stale after a project change',
             'Re-analyze the current linked stems before using source-level comparisons.');
     }
+    if($timeEvidence['status']==='recent'&&count($timeEvidence['top_findings']??[])>0){
+        $timed=(array)$timeEvidence['top_findings'];
+        $bands=array_values(array_unique(array_column($timed,'band')));
+        $times=array_values(array_unique(array_column($timed,'time')));
+        sort($times,SORT_NUMERIC);
+        $add('time_aligned_competition','medium',
+            count($timed).' simultaneous raw-source spectral events at sampled project times '.
+            implode(', ',array_map(static fn(float $n):string=>round($n,1).'s',array_slice($times,0,5))).
+            ' in '.implode(', ',array_slice($bands,0,5)),
+            'Use the 86L timeline to jump to a specific passage and listen to the tracks together, then refine the region. Overlap is not proof of audible masking.');
+    }elseif($timeEvidence['status']==='stale_after_project_edit'){
+        $add('timeline_evidence_stale','low','Earlier time-aligned measurements predate the saved project',
+            'Re-analyze source clips at the current project revision before relying on their times.');
+    }
     $muted=count(array_filter($tracks,static fn(array $t):bool=>!empty($t['mute'])));
     if($muted)$add('muted_tracks','low',$muted.' muted track(s)',
         'Check that these were intentionally excluded.');
@@ -145,6 +161,7 @@ function sf_stem_production_inspect(string $songId):array {
         ],
         'mastering'=>$analysis,
         'stem_audio'=>$stemEvidence,
+        'time_alignment'=>$timeEvidence,
         'readiness'=>$review['mastering_review']??[],
         'catalog_publication'=>$review['catalog_publication']??[],
         'issues'=>array_slice($issues,0,24),'proposals'=>$proposals,
@@ -170,6 +187,9 @@ function sf_stem_production_brief(array $inspection):array {
             (array)($inspection['project']['master_fx']??[])))),
         'mastering'=>$inspection['mastering']??[],
         'stem_audio'=>sf_stem_intelligence_agent_brief((array)($inspection['stem_audio']??['status'=>'not_analyzed'])),
+        'time_alignment'=>sf_stem_alignment_agent_brief(
+            (array)($inspection['time_alignment']??['status'=>'not_analyzed']),
+            ['tracks'=>(array)($inspection['project']['tracks']??[])]),
         'readiness_status'=>$inspection['readiness']['status']??'not_reviewed',
         'catalog_state'=>$inspection['catalog_publication']['state']??'not_staged',
         'issues'=>array_map(static fn(array $i):array=>[
