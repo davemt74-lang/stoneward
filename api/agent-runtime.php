@@ -4,6 +4,7 @@ require_once __DIR__.'/agent-feedback-core.php';
 require_once __DIR__.'/agent-customer-brain.php';
 require_once __DIR__.'/agent-customer-context.php';
 require_once __DIR__.'/fan-discovery-paths.php';
+require_once __DIR__.'/fan-commerce-advisor.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -112,6 +113,18 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
         $sections[]="APPROVED KNOWLEDGE\n".implode("\n",$kb);
     }
     if(in_array($profile,['commerce','crm','recommendation','catalog'],true)&&function_exists('sf_campaign_live_summaries')){$campaignLines=[];foreach(sf_campaign_live_summaries(10) as $campaign){$campaignLines[]='- slug='.$campaign['slug'].' | '.$campaign['name'].' | goal '.$campaign['goal'].' | '.$campaign['headline'].' | offers '.implode(', ',$campaign['offers']);}if($campaignLines)$sections[]="ACTIVE CAMPAIGNS\n".implode("\n",$campaignLines);}
+    if($profile==='commerce'){
+        $mentioned=sf_agent_find_track($query,'');
+        if($mentioned){
+            try{
+                $facts=sf_fan_commerce_agent_brief(sf_fan_commerce_decision(
+                    $userId>0?$userId:null,(string)$mentioned['id'],
+                    (bool)preg_match('/\\b(?:vinyl|record|pressing)\\b/i',$query)));
+                $sections[]="FAN COMMERCE DECISION (READ ONLY, USER-BOUND)\n".
+                    json_encode($facts,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+            }catch(InvalidArgumentException){}
+        }
+    }
     if($profile==='commerce'&&function_exists('sf_commerce_agent_context')){$merch=sf_commerce_agent_context();if($merch!=='')$sections[]=$merch;}
     if(function_exists('sf_ticket_agent_context')&&in_array($profile,['catalog','commerce','account'],true)){$tickets=sf_ticket_agent_context($userId>0?$userId:null);if($tickets!=='')$sections[]=$tickets;}
     if($userId>0&&in_array($profile,['commerce','account','crm'],true)){
@@ -370,7 +383,32 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
                 }else{$text='I could not find a vinyl production update associated with your account. You can check My Account for order details.';}
             }
             break;
-        case 'purchase_request':$action=['type'=>'open_view','view'=>'cart'];$text='I can take you to the cart. You’ll confirm the purchase yourself at checkout.';$profile='commerce';$confirm=true;break;
+        case 'purchase_request':
+            // Existing Agent action is navigation ONLY. Verified paid music
+            // belongs in My Library; never prompt the owner to buy it again.
+            $profile='commerce';$confirm=true;
+            $action=['type'=>'open_view','view'=>'cart'];
+            $text='I can open the cart. You will review current prices and confirm any purchase at checkout.';
+            if($track){
+                try{
+                    $vinyl=(bool)preg_match('/\\b(?:vinyl|record|pressing)\\b/i',$message);
+                    $decision=sf_fan_commerce_decision($userId,$track['id'],$vinyl);
+                    if($decision['next_view']==='open_library'){
+                        $action=['type'=>'open_library','tab'=>'purchases'];
+                        $text='You already own “'.$decision['title'].'” in your verified Stonefellow purchase library. I can open My Library.';
+                    }elseif($decision['next_view']==='open_builder'){
+                        $action=['type'=>'open_view','view'=>'builder'];
+                        $text='“'.$decision['title'].'” is eligible for custom vinyl review. The Builder checks print licenses, exact pricing, and availability before any order.';
+                    }else{
+                        $action=['type'=>'open_view','view'=>'track','id'=>$decision['track_id']];
+                        $text=$decision['reason'].' I can open the song. Any digital price comes from the cart quote and checkout.';
+                    }
+                }catch(InvalidArgumentException){
+                    // Keep the canonical cart fallback without disclosing any
+                    // unpublished or unknown catalog material.
+                }
+            }
+            break;
         case 'notifications_open':$action=['type'=>'open_notifications'];$count=(int)($client['notification_unread']??0);$text=$count>0?'You have '.$count.' unread notification'.($count===1?'':'s').'. I’ll open them.':'You’re caught up. I’ll open your activity drawer.';$profile='account';break;
         case 'notification_preferences':$action=['type'=>'open_view','view'=>'account'];$text='Your notification preferences are in My account. You can control in-app and email reminders there.';$profile='account';break;
         case 'library_open':

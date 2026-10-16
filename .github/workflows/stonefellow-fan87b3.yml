@@ -1,0 +1,45 @@
+name: Stonefellow Agent Commerce Journey 87B3
+on:
+  pull_request:
+    paths:
+      - 'api/fan-commerce-advisor.php'
+      - 'api/agent-runtime.php'
+      - 'assets/js/fan-discovery.js'
+      - 'tests/section87b3-*'
+      - '.github/workflows/stonefellow-fan87b3.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/fan-commerce-advisor.php'
+      - 'api/agent-runtime.php'
+      - 'assets/js/fan-discovery.js'
+      - 'tests/section87b3-*'
+permissions:
+  contents: read
+jobs:
+  owner-bound-agent-commerce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/fan-commerce-advisor.php
+          php -l api/agent-runtime.php
+          node --check assets/js/fan-discovery.js
+          php tests/section87b3-agent-commerce.php
+          php tests/section87b2-saved-journey.php
+          node tests/section87b2-conversion.cjs
+          php tests/section87b1-purchase-journey.php
+          php tests/section87a3-agent-journeys.php
+          php tests/section76b-dual-agent-commerce.php
+          php tests/section84b3-print-licenses.php
+          php tests/section78-customer-commerce.php
