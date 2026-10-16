@@ -21,3 +21,39 @@ function sf_fan_discovery_public(array $catalog):array {
  }
  return $rows;
 }
+
+/** Pure ranker: existing personalization signals, never opaque LLM claims. */
+function sf_fan_discovery_rank(array $catalog,string $path,?array $profile=null,int $limit=8):array {
+ $paths=sf_fan_discovery_paths();
+ if(!isset($paths[$path]))throw new InvalidArgumentException('Unknown discovery path.');
+ $rules=$paths[$path];$personal=!empty($profile['personalized']);$limit=max(1,min(12,$limit));
+ $base=[];
+ if($personal&&function_exists('sf_personalization_rank_catalog'))
+  foreach(sf_personalization_rank_catalog($catalog,$profile,30) as $i=>$r)
+   $base[(string)$r['track_id']]=max(0,10-$i);
+ $rows=[];
+ foreach(sf_fan_discovery_public($catalog) as $index=>$t){
+  $id=(string)$t['id'];
+  if($personal&&($profile['feedback'][$id]['sentiment']??'')==='dislike')continue;
+  $moods=array_map('strtolower',(array)($t['mood']??[]));
+  $themes=array_map('strtolower',(array)($t['themes']??[]));
+  $mh=array_values(array_intersect($moods,$rules['moods']));
+  $th=array_values(array_intersect($themes,$rules['themes']));
+  $score=count($mh)*12+count($th)*8;
+  if($rules['energy']!==null)$score+=max(0,6-abs((int)($t['energy']??3)-$rules['energy'])*3);
+  if($personal){
+   $score+=$base[$id]??0;
+   $seen=max(0,(int)($profile['seen_counts'][$id]??0));
+   if($path==='deep_cuts')$score+=max(0,32-$seen*9);
+   elseif($path==='start_here')$score+=max(0,10-$seen*2);
+  }elseif($path==='deep_cuts')$score+=max(0,6-$index);
+  $reason=$mh?'Fits the '.$mh[0].' mood.':($th?'Explores '.$th[0].'.':
+   ($path==='deep_cuts'&&$personal?'A less familiar Stonefellow song.':'Explore the Stonefellow catalog.'));
+  $rows[]=['score'=>$score,'index'=>$index,'item'=>[
+   'track_id'=>$id,'title'=>(string)($t['title']??$id),
+   'release'=>(string)($t['release']??''),'artwork'=>(string)($t['artwork']??''),
+   'duration'=>max(0,(int)($t['duration']??0)),'reason'=>$reason]];
+ }
+ usort($rows,static fn(array $a,array $b):int=>($b['score']<=>$a['score'])?:($a['index']<=>$b['index']));
+ return array_map(static fn(array $r):array=>$r['item'],array_slice($rows,0,$limit));
+}
