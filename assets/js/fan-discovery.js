@@ -24,6 +24,7 @@
    (t.digital?.action==='open_library'?'<button type="button" data-fan-library="'+esc(t.track_id)+'">Already owned · My Library</button>':'')+
    (t.digital?.action==='add_to_cart'?'<button type="button" data-fan-cart="'+esc(t.track_id)+'">Review digital purchase</button>':'')+
    (t.vinyl?.eligible?'<button type="button" data-fan-vinyl="'+esc(t.track_id)+'">Explore custom vinyl</button>':'')+
+   (authenticated&&t.digital?'<button type="button" data-fan-buy-help="'+esc(t.track_id)+'">Ask Agent about owning this</button>':'')+
    '</div></article>').join(''):'<p>No released songs match this path yet.</p>')+'</div>'+
    (data.commercial_terms?'<p class="fan-guided-terms">'+esc(data.commercial_terms)+'</p>':'')+
    '<p class="fan-guided-privacy">'+esc(data.privacy||'')+'</p>'+
@@ -77,6 +78,11 @@
    });
    element.querySelectorAll('[data-fan-library]').forEach(b=>b.onclick=()=>host.library(b.dataset.fanLibrary));
    element.querySelectorAll('[data-fan-vinyl]').forEach(b=>b.onclick=()=>host.vinyl(b.dataset.fanVinyl));
+   element.querySelectorAll('[data-fan-buy-help]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.fanBuyHelp;
+    const song=(data.items||[]).find(t=>t.track_id===id);
+    if(song)host.ask('Can I buy the Stonefellow song "'+song.title+'", or is it already in my purchased library? Explain without charging me.');
+   });
    const start=element.querySelector('[data-fan-start]');
    if(start)start.onclick=async()=>{
     if(!data.items?.length)return;
