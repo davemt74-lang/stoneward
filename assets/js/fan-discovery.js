@@ -23,6 +23,13 @@
    '<p class="fan-guided-privacy">'+esc(data.privacy||'')+'</p>'+
    '<p class="fan-guided-status" data-fan-status role="status" aria-live="polite"></p></section>';
  }
+ async function playPath(items,host){
+  const ids=(items||[]).map(x=>x.track_id).filter(Boolean);
+  if(!ids.length)return {started:null,queued:0};
+  host.play(ids[0]);let queued=0;
+  if(host.authenticated)for(const id of ids.slice(1)){await host.queue(id);queued++;}
+  return {started:ids[0],queued};
+ }
  async function mount(element,host){
   if(!element)return;
   let active='start_here',request=0,stopped=false;
@@ -51,13 +58,11 @@
    });
    const start=element.querySelector('[data-fan-start]');
    if(start)start.onclick=async()=>{
-    const ids=(data.items||[]).map(x=>x.track_id);
-    if(!ids.length)return;
+    if(!data.items?.length)return;
     start.disabled=true;
     try{
-     host.play(ids[0]);
-     if(host.authenticated)for(const id of ids.slice(1))await host.queue(id);
-     notify(host.authenticated?'The rest of this path was added to Up Next.':'Playing the first Stonefellow song.');
+     const outcome=await playPath(data.items,host);
+     notify(host.authenticated?outcome.queued+' following songs added to Up Next.':'Playing the first Stonefellow song.');
     }catch(e){notify('Could not queue every track: '+e.message);}
     finally{start.disabled=false;}
    };
@@ -65,5 +70,5 @@
   await refresh(active);
   return ()=>{stopped=true;request++;};
  }
- window.STONEFELLOW_FAN_DISCOVERY={view,mount};
+ window.STONEFELLOW_FAN_DISCOVERY={view,mount,playPath};
 })();
