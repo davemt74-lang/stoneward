@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-feedback-core.php';
 require_once __DIR__.'/agent-customer-brain.php';
 require_once __DIR__.'/agent-customer-context.php';
+require_once __DIR__.'/fan-discovery-paths.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -151,6 +152,16 @@ function sf_agent_track_score(array $t,string $message): int {
 }
 function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $userId=null): ?array {
     $catalog=sf_agent_public_catalog();$exclude=$excludeId?[$excludeId]:[];
+    $path=sf_fan_discovery_path_from_message($message);
+    if($path!==null){
+        $state=sf_fan_discovery_state($userId&&$userId>0?$userId:null,$path,12);
+        $byId=[];foreach($catalog as $t)$byId[(string)$t['id']]=$t;
+        foreach((array)$state['items'] as $row){
+            $id=(string)($row['track_id']??'');
+            if($id!==''&&!in_array($id,$exclude,true)&&isset($byId[$id]))return $byId[$id];
+        }
+        return null;
+    }
     $preferenceTerms=$userId!==null?sf_agent_customer_preference_terms($userId):[];
     if($userId&&function_exists('sf_personalization_recommendation_profile')){
         $profile=sf_personalization_recommendation_profile($userId);$ranked=sf_personalization_rank_catalog($catalog,$profile,20,$exclude);
