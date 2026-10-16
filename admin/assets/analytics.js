@@ -10,9 +10,8 @@ const trend=(c,rows)=>{
 };
 
 const verifiedConversionPanel=(c,v)=>{
-  const sales=v.verified_orders||{},notes=Array.isArray(v.suggestions)?v.suggestions:[],
-        observed=Array.isArray(v.observed_intent)?v.observed_intent:[];
-  const cents=n=>'(c,j)=>{
+  const sales=v.verified_orders||{},observed=Array.isArray(v.observed_intent)?v.observed_intent:[],suggestions=Array.isArray(v.suggestions)?v.suggestions:[];
+  const usd=n=>'(c,j)=>{
   const measures=Array.isArray(j.measures)?j.measures:[];
   const suggestions=Array.isArray(j.opportunities)?j.opportunities:[];
   const songs=Array.isArray(j.top_public_songs)?j.top_public_songs:[];
@@ -188,22 +187,12 @@ async function render(c,userId=0){
 }
 window.StonefellowAdminAnalytics={render};
 })();
-+(Number(n||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  return `<section class="panel verified-conversion-panel"><div class="panel-title"><div>
-      <h2>Verified sales & observed purchase interest</h2>
-      <p>Stripe-confirmed live orders are separate from cart/checkout review events.</p></div></div>
-      <div class="stats">
-       <div class="stat"><strong>${Number(sales.live_paid||0)}</strong><span>Live verified paid orders</span></div>
-       <div class="stat"><strong>${cents(sales.net_cents)}</strong><span>Recorded net (after refunds)</span></div>
-       <div class="stat"><strong>${Number(sales.test_or_simulated||0)}</strong><span>Test or simulated</span></div>
-       <div class="stat"><strong>${Number(sales.pending_or_unverified||0)}</strong><span>Pending or unverified</span></div>
-      </div>
-      <h3>Signed-in cart / checkout observations</h3>
-      ${observed.length?'<div class="source-list">'+observed.map(i=>`<div><span>${c.esc(i.stage==='cart_review'?'Cart reviewed':'Checkout reviewed')} · ${c.esc(i.kind||'other')}</span><strong>${i.accounts===null?'Insufficient sample':Number(i.accounts)+' accounts'}</strong></div>`).join('')+'</div>':'<div class="empty">No eligible observed cart or checkout signals yet.</div>'}
-      <h3>Suggested reviews</h3>
-      ${notes.map(i=>`<p>${c.esc(i.suggestion||'')}</p>`).join('')}
-      <p><small>${c.esc(v.limits||'No confirmed attribution rate is available.')}</small></p>
-    </section>`;
++(Number(n||0)/100).toFixed(2);
+  const metrics=[['Verified live orders',Number(sales.live_paid||0)],['Recorded net',usd(sales.net_cents)],['Test or simulated',Number(sales.test_or_simulated||0)],['Pending or unverified',Number(sales.pending_or_unverified||0)]];
+  const stats='<div class="stats">'+metrics.map(m=>'<div class="stat"><strong>'+c.esc(String(m[1]))+'</strong><span>'+c.esc(m[0])+'</span></div>').join('')+'</div>';
+  const interest=observed.length?'<div class="source-list">'+observed.map(i=>'<div><span>'+c.esc(String(i.stage||''))+' · '+c.esc(String(i.kind||''))+'</span><strong>'+(i.accounts===null?'Insufficient sample':Number(i.accounts)+' accounts')+'</strong></div>').join('')+'</div>':'<div class="empty">No consented cart reviews recorded yet.</div>';
+  const advice=suggestions.map(i=>'<p>'+c.esc(String(i.suggestion||''))+'</p>').join('');
+  return '<section class="panel verified-conversion-panel"><div class="panel-title"><div><h2>Verified sales and purchase interest</h2><p>Confirmed Stripe orders and separately observed review events.</p></div></div>'+stats+'<h3>Cart and checkout review</h3>'+interest+'<h3>Suggested reviews</h3>'+advice+'<p><small>'+c.esc(String(v.limits||''))+'</small></p></section>';
 };
 
 const journeyPanel=(c,j)=>{
