@@ -12,7 +12,7 @@
     offer_exclusive:['Exclusive','Private content'],redirect:['Redirect','Open a destination'],
     conversion:['Conversion','Mark success'],exit:['Exit','End journey']
   };
-  const state={summary:{},items:[],segments:[],editor:null};
+  const state={summary:{},items:[],segments:[],editor:null,guidance:{}};
 
   function defaultGraph(){
     return {nodes:[
@@ -39,15 +39,21 @@
   function badge(v){return '<span class="badge '+(v==='published'?'good':'')+'">'+esc(String(v||'draft').toUpperCase())+'</span>'}
   async function loadList(){
     const j=await api('campaigns.php');
-    state.summary=j.summary||{};state.items=j.campaigns||[];state.segments=j.segments||[];
+    state.summary=j.summary||{};state.items=j.campaigns||[];state.segments=j.segments||[];state.guidance=j.fan_conversion_guidance||{};
     return j;
   }
   async function renderCampaigns(){
     try{await loadList()}catch(e){canvas.innerHTML=head('CAMPAIGNS','Unavailable',e.message);return}
     const s=state.summary,rows=state.items;
+    const g=state.guidance,ideas=Array.isArray(g.ideas)?g.ideas:[];
+    const adviceHtml='<section class="panel"><div class="panel-title"><div><h2>Consent-aware fan conversion ideas</h2><p>Suggested reviews based on recorded engagement; nothing is sent automatically.</p></div></div>'+
+      '<p>Currently eligible opted-in newsletter contacts: <strong>'+Number(g.eligible_opted_in_contacts||0).toLocaleString()+'</strong>. Subscribers who unsubscribe are excluded at sending time.</p>'+
+      (ideas.length?'<div class="source-list">'+ideas.map(function(i){return '<div><span><strong>'+esc(i.title||'')+'</strong><small>'+esc(i.reason||'')+'</small></span><em>'+esc(i.next_step||'')+'</em></div>'}).join('')+'</div>':'<div class="empty">No campaign ideas yet.</div>')+
+      '<p><small>For email ideas, use the existing Agent draft action. All campaign messages still require the normal approval and live consent checks.</small></p></section>';
+
     canvas.innerHTML=head('FAN ACQUISITION + PROMOTION','Campaigns','Build newsletter acquisition, free downloads, discounts, VIP offers, exclusives and governed fan journeys.','<button class="primary" id="newCampaign" type="button">New campaign</button><button class="secondary" id="agentCampaignDraft" type="button">Agent draft</button><button class="secondary" id="agentCampaignHistory" type="button">Agent actions</button>')+
       '<div class="stats"><div class="stat"><strong>'+Number(s.campaigns||0)+'</strong><span>Campaigns</span></div><div class="stat"><strong>'+Number(s.active||0)+'</strong><span>Published</span></div><div class="stat"><strong>'+Number(s.participants||0)+'</strong><span>Participants</span></div><div class="stat"><strong>'+Number(s.redemptions||0)+'</strong><span>Redemptions</span></div></div><section class="campaign-starters"><button data-campaign-template="newsletter"><strong>Newsletter Signup</strong><span>Grow opted-in CRM audience</span></button><button data-campaign-template="download"><strong>Free Song</strong><span>Email capture + download</span></button><button data-campaign-template="discount"><strong>Merch Discount</strong><span>Claimable store code</span></button><button data-campaign-template="vip"><strong>VIP Tickets</strong><span>Show access or presale</span></button></section>'+
-      '<section class="panel"><div class="panel-title"><div><h2>Campaign library</h2><p>Draft, schedule, publish, pause and analyze direct-to-fan campaigns.</p></div></div>'+
+      adviceHtml+'<section class="panel"><div class="panel-title"><div><h2>Campaign library</h2><p>Draft, schedule, publish, pause and analyze direct-to-fan campaigns.</p></div></div>'+
       (rows.length?'<table class="data-table"><thead><tr><th>Campaign</th><th>Goal</th><th>Status</th><th>Window</th><th>Version</th><th></th></tr></thead><tbody>'+rows.map(function(c){return '<tr><td><strong>'+esc(c.name)+'</strong><div class="file-list">/campaign/'+esc(c.slug)+'</div></td><td>'+esc(c.goal)+'</td><td>'+badge(c.status)+'</td><td>'+esc((c.starts_at||'anytime').replace('T',' ').slice(0,16))+' → '+esc((c.ends_at||'open').replace('T',' ').slice(0,16))+'</td><td>v'+Number(c.version||1)+'</td><td><button class="secondary" type="button" data-campaign-open="'+c.id+'">Open</button></td></tr>'}).join('')+'</tbody></table>':'<div class="empty">No campaigns yet. Create the first one.</div>')+'</section>';
     $('#newCampaign').onclick=function(){openEditor(0)};$('#agentCampaignDraft').onclick=function(){window.SFAgentCampaigns?.open?.('newsletter')};$('#agentCampaignHistory').onclick=function(){window.SFAgentCampaigns?.showHistory?.().catch(e=>say(e.message))};$$('[data-campaign-template]',canvas).forEach(function(b){b.onclick=function(){state.editor={campaign:templateDraft(b.dataset.campaignTemplate),analytics:{},participants:[],events:[],runs:[],tab:'builder',selected:null,connectFrom:null,simulation:[]};renderEditor()}});$$('[data-campaign-open]',canvas).forEach(function(b){b.onclick=function(){openEditor(Number(b.dataset.campaignOpen))}});
   }

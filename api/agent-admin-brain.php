@@ -6,6 +6,7 @@ require_once __DIR__.'/agent-admin-intelligence.php';
 require_once __DIR__.'/fan-discovery-paths.php';
 require_once __DIR__.'/fan-journey-diagnostics.php';
 require_once __DIR__.'/fan-journey-agent-bridge.php';
+require_once __DIR__.'/fan-conversion-campaign-strategy.php';
 require_once __DIR__.'/agent-proactive-research.php';
 require_once __DIR__.'/agent-specialist-delegation.php';
 require_once __DIR__.'/agent-feedback-core.php';
@@ -81,6 +82,11 @@ function sf_admin_agent_operational_context(): array {
                 sf_engagement_analytics(30,null),
                 sf_fan_discovery_public(sf_catalog()),30);
             $summary['fan_journey_signals']=sf_fan_journey_agent_brief($diagnostics);
+            if(function_exists('sf_crm_ensure_schema')){
+                $campaignStrategy=sf_fan_conversion_campaign_strategy($diagnostics,
+                    sf_fan_conversion_eligible_newsletter_count());
+                $summary['fan_campaign_guidance']=sf_fan_conversion_agent_brief($campaignStrategy);
+            }
         }catch(Throwable $e){
             $summary['fan_journey_signals']=['source'=>'unavailable','metrics'=>[],
                 'opportunity_codes'=>[],'transactions_or_changes_executed'=>false];
@@ -198,6 +204,9 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
     ];
     $text=$types[$plan['type']];
+    if(in_array($plan['type'],['prepare_campaign','crm_report'],true)
+       &&isset($context['fan_campaign_guidance']))
+        $text.=' '.sf_fan_conversion_agent_copy((array)$context['fan_campaign_guidance']);
     $contract=sf_agent_orchestration_contract('admin',$plan['type']);
     if($plan['requires_confirmation']&&!$contract['may_prepare_reviewed_proposal'])throw new RuntimeException('The reviewed action is not registered.');
     if($plan['type']==='prepare_commerce_followup'){
