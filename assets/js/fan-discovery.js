@@ -20,7 +20,12 @@
    '<button type="button" data-fan-open="'+esc(t.track_id)+'">Details</button>'+
    (authenticated?'<button type="button" data-fan-queue="'+esc(t.track_id)+'">Up Next</button>':'')+
    (data.allow_feedback?'<button type="button" data-fan-dislike="'+esc(t.track_id)+'">Not for me</button>':'')+
+   (t.save_available?'<button type="button" data-fan-save="'+esc(t.track_id)+'" data-fan-saved="'+(t.saved?'1':'0')+'">'+(t.saved?'Saved for later':'Save song')+'</button>':'')+
+   (t.digital?.action==='open_library'?'<button type="button" data-fan-library="'+esc(t.track_id)+'">Already owned · My Library</button>':'')+
+   (t.digital?.action==='add_to_cart'?'<button type="button" data-fan-cart="'+esc(t.track_id)+'">Review digital purchase</button>':'')+
+   (t.vinyl?.eligible?'<button type="button" data-fan-vinyl="'+esc(t.track_id)+'">Explore custom vinyl</button>':'')+
    '</div></article>').join(''):'<p>No released songs match this path yet.</p>')+'</div>'+
+   (data.commercial_terms?'<p class="fan-guided-terms">'+esc(data.commercial_terms)+'</p>':'')+
    '<p class="fan-guided-privacy">'+esc(data.privacy||'')+'</p>'+
    '<p class="fan-guided-status" data-fan-status role="status" aria-live="polite"></p></section>';
  }
@@ -38,12 +43,12 @@
   async function refresh(path){
    const revision=++request;active=path;
    try{
-    const r=await fetch((host.apiBase||'api')+'/fan-discovery.php?path='+encodeURIComponent(path),
+    const r=await fetch((host.apiBase||'api')+'/'+(host.endpoint||'fan-discovery.php')+'?path='+encodeURIComponent(path),
       {credentials:'same-origin',cache:'no-store'});
     const j=await r.json();
     if(!r.ok||j.ok===false)throw Error(j.message||'Discovery unavailable');
     if(stopped||revision!==request||!element.isConnected)return;
-    const data=j.discovery;element.innerHTML=view(data,!!host.authenticated);
+    const data=j.journey||j.discovery;element.innerHTML=view(data,!!host.authenticated);
     bind(data);
    }catch(e){if(!stopped&&revision===request)element.textContent='Discovery unavailable: '+e.message;}
   }
@@ -59,6 +64,19 @@
     try{await host.feedback(b.dataset.fanDislike,'dislike',active);await refresh(active);}
     catch(e){b.disabled=false;notify(e.message);}
    });
+   element.querySelectorAll('[data-fan-save]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    try{
+      await host.save(b.dataset.fanSave,b.dataset.fanSaved!=='1');
+      notify('Song preference saved. A favorite is not a purchase.');
+      await refresh(active);
+    }catch(e){b.disabled=false;notify('Could not change saved song: '+e.message);}
+   });
+   element.querySelectorAll('[data-fan-cart]').forEach(b=>b.onclick=()=>{
+    try{host.cart(b.dataset.fanCart);}catch(e){notify('Cart unavailable: '+e.message);}
+   });
+   element.querySelectorAll('[data-fan-library]').forEach(b=>b.onclick=()=>host.library(b.dataset.fanLibrary));
+   element.querySelectorAll('[data-fan-vinyl]').forEach(b=>b.onclick=()=>host.vinyl(b.dataset.fanVinyl));
    const start=element.querySelector('[data-fan-start]');
    if(start)start.onclick=async()=>{
     if(!data.items?.length)return;
