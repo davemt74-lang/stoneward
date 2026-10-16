@@ -287,6 +287,7 @@ jobs:
           php tests/section87c3-agent-insights.php
           php tests/section87c4-consent-campaign.php
           php tests/section87c5-release-identity.php
+          php tests/section87d1-verified-conversions.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php
