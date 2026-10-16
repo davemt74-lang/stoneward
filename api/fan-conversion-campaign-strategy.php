@@ -78,3 +78,35 @@ function sf_fan_conversion_campaign_strategy(array $diagnostics,int $eligible):a
         'any_send_executed'=>false,'campaign_created'=>false,
     ];
 }
+
+/** Narrow allowlist is safe to pass to the existing Admin Agent LLM. */
+function sf_fan_conversion_agent_brief(array $strategy):array {
+    $eligible=$strategy['eligible_opted_in_contacts']??null;
+    if(!is_int($eligible)||$eligible<0||$eligible>1000000000)$eligible=0;
+    $allowed=['collect_evidence','public_music_feature','newsletter_music_review',
+        'save_action','cart_guidance','vinyl_handoff','newsletter_vinyl_review',
+        'playback_quality','baseline'];
+    $codes=[];
+    foreach((array)($strategy['ideas']??[]) as $idea){
+        if(!is_array($idea))continue;
+        $code=(string)($idea['code']??'');
+        if(in_array($code,$allowed,true)&&!in_array($code,$codes,true))$codes[]=$code;
+        if(count($codes)>=8)break;
+    }
+    return ['eligible_current_opted_in_contacts'=>$eligible,'idea_codes'=>$codes,
+        'outreach_requires_live_consent'=>true,'admin_review_required'=>true,
+        'marketing_send_executed'=>false,'campaign_saved'=>false];
+}
+function sf_fan_conversion_agent_copy(array $brief):string {
+    $opted=max(0,(int)($brief['eligible_current_opted_in_contacts']??0));
+    $codes=(array)($brief['idea_codes']??[]);
+    $copy='Current CRM snapshot identifies '.$opted.' opted-in, non-unsubscribed newsletter contacts.';
+    if(in_array('newsletter_music_review',$codes,true))
+        $copy.=' Consider an unsent public-music newsletter draft in the existing Campaign Builder.';
+    elseif(in_array('newsletter_vinyl_review',$codes,true))
+        $copy.=' Consider an unsent newsletter draft about published vinyl options.';
+    elseif(in_array('collect_evidence',$codes,true))
+        $copy.=' Engagement is not yet strong enough to justify a targeted campaign.';
+    else $copy.=' Review the on-site improvements and current campaign templates first.';
+    return $copy.' Review the exact audience, copy and opt-out controls. A send requires live consent rechecking; nothing was created or sent.';
+}
