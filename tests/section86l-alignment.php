@@ -45,10 +45,17 @@ yes86l($first['format']==='stonefellow.stem-alignment.v1'&&
 yes86l(sf_stem_project_read('song-1')['revision']===2,'Evidence sidecar does not change mix revision or master approval');
 $summary=sf_stem_alignment_summary('song-1',sf_stem_project_read('song-1'));
 yes86l($summary['status']==='recent'&&count($summary['top_findings'])===4,'Four simultaneous strong bass-band events found at exact project times');
+yes86l(count($summary['top_passages'])===1&&$summary['top_passages'][0]['sample_count']===4&&
+ $summary['top_passages'][0]['start_seconds']===1.0&&
+ $summary['top_passages'][0]['end_seconds']===3.0,
+ 'Consecutive strong aligned FFT events merge into a specific 1–3s listening passage');
 yes86l($summary['top_findings'][0]['band']==='bass'&&
     in_array($summary['top_findings'][0]['time'],[1.,1.5,2.,2.5],true),'Events contain precise passage time and band');
 $brief=sf_stem_alignment_agent_brief($summary,$p);
 $j=json_encode($brief);
+yes86l($brief['passages'][0]['stem_numbers']===[1,2]&&
+ $brief['passages'][0]['samples']===4,
+ 'Admin Agent Brain receives redacted passage windows rather than only isolated events');
 yes86l($brief['events'][0]['stem_roles']===['drums','bass']&&
  !str_contains($j,'{KICK}')&&!str_contains($j,'{BASS}')&&!str_contains($j,'private-')&&
  !str_contains($j,'kick.wav')&&!str_contains($j,'Bass.wav'),
