@@ -281,6 +281,8 @@ jobs:
           php tests/section84b6-homeserver-user-consent.php
           php tests/section85a-site-ownership.php
           php tests/section85b-media-publishing.php
+          php tests/fan-engagement-signals-test.php
+          php tests/section87c1-engagement-sources.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php
