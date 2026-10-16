@@ -48,6 +48,9 @@ $client=file_get_contents(dirname(__DIR__).'/assets/js/fan-discovery.js');
 $app=file_get_contents(dirname(__DIR__).'/assets/js/app.js');
 ok87(str_contains($brain,'sf_fan_discovery_path_from_message($message)')&&
  str_contains($brain,'sf_fan_discovery_state($userId'),'Existing Agent recommendation route shares discovery rules');
+ok87(str_contains($brain,"if(sf_fan_discovery_path_from_message(\$message)!==null") &&
+ strpos($brain,'return \'listening_session_start\';')!==false,
+ 'Explicit guided session intent is recognized before ambiguous named-song playback');
 ok87(str_contains($sessions,'sf_fan_discovery_session_plan($userId,$message)')&&
  str_contains($sessions,'sf_agent_playlist_track_ids('),'Existing session retains generic fallback');
 ok87(str_contains($client,'data-fan-agent')&&str_contains($app,'form.requestSubmit()'),
