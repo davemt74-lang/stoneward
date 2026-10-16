@@ -31,4 +31,4 @@ jobs:
           php tests/section87a1-discovery.php
           php tests/section84b3-print-licenses.php
           php tests/section78-customer-commerce.php
-          php tests/section85a-fan-library.php
+          php tests/section85a-site-ownership.php
