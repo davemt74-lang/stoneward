@@ -1,5 +1,8 @@
 <?php
 declare(strict_types=1);require __DIR__.'/bootstrap.php';
+require_once dirname(__DIR__,2).'/api/fan-discovery-paths.php';
+require_once dirname(__DIR__,2).'/api/fan-journey-diagnostics.php';
+require_once dirname(__DIR__,2).'/api/fan-conversion-campaign-strategy.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';$me=sf_admin_require_auth($method!=='GET');sf_campaign_ensure_schema();
 
 if($method==='GET'){
@@ -14,7 +17,12 @@ if($method==='GET'){
         $q=sf_db()->prepare('SELECT * FROM campaign_message_runs WHERE campaign_id=? ORDER BY id DESC LIMIT 100');$q->execute([$id]);$runs=$q->fetchAll();
         sf_json_response(['ok'=>true,'campaign'=>$campaign,'analytics'=>sf_campaign_analytics($id),'participants'=>$participants,'events'=>$events,'message_runs'=>$runs,'segments'=>$segments,'summary'=>$summary]);
     }
-    sf_json_response(['ok'=>true,'campaigns'=>sf_campaign_list(300),'segments'=>$segments,'summary'=>$summary]);
+    $journey=sf_fan_journey_diagnostics(sf_engagement_analytics(30,null),
+        sf_fan_discovery_public(sf_catalog()),30);
+    $guidance=sf_fan_conversion_campaign_strategy($journey,
+        sf_fan_conversion_eligible_newsletter_count());
+    sf_json_response(['ok'=>true,'campaigns'=>sf_campaign_list(300),
+        'segments'=>$segments,'summary'=>$summary,'fan_conversion_guidance'=>$guidance]);
 }
 if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $b=sf_request_json();$action=(string)($b['action']??'save');
