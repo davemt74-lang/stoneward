@@ -69,7 +69,7 @@ function sf_fan_discovery_state(?int $userId,string $path='start_here',int $limi
   ?sf_personalization_recommendation_profile($userId):null;
  $tabs=[];foreach($paths as $key=>$spec)$tabs[]=['id'=>$key,'title'=>$spec['title']];
  return [
-  'path'=>$path,'paths'=>$tabs,'personalized'=>$allowed&&!empty($profile['personalized']),
+  'path'=>$path,'paths'=>$tabs,'allow_feedback'=>$allowed,'personalized'=>$allowed&&!empty($profile['personalized']),
   'summary'=>$allowed&&!empty($profile['personalized'])
    ?'Guided by your saved songs and listening preferences.'
    :'Explore the Stonefellow catalog without personal listening history.',

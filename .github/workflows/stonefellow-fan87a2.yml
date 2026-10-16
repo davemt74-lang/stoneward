@@ -1,0 +1,38 @@
+name: Stonefellow Guided Fan Canvas 87A2
+on:
+  pull_request:
+    paths:
+      - 'api/fan-discovery*'
+      - 'assets/js/fan-discovery.js'
+      - 'assets/js/app.js'
+      - 'tests/section87a2-*'
+      - '.github/workflows/stonefellow-fan87a2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/fan-discovery*'
+      - 'assets/js/fan-discovery.js'
+      - 'assets/js/app.js'
+      - 'tests/section87a2-*'
+permissions:
+  contents: read
+jobs:
+  fan-canvas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/fan-discovery-feedback.php
+          node --check assets/js/fan-discovery.js
+          node --check assets/js/app.js
+          node tests/section87a2-fan-discovery.cjs
+          php tests/section87a1-discovery.php
