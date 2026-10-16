@@ -25,6 +25,6 @@ $api=file_get_contents(dirname(__DIR__).'/admin/api/analytics.php');
 $js=file_get_contents(dirname(__DIR__).'/admin/assets/analytics.js');
 $brain=file_get_contents(dirname(__DIR__).'/api/agent-admin-brain.php');
 $ok(str_contains($api,'sf_admin_require_auth(false)')&&str_contains($api,"'verified_conversion_intelligence'"),'admin authorization');
-$ok(str_contains($js,'verifiedConversionPanel(c,verified)')&&str_contains($js,'c.esc(i.suggestion'),'native safely-escaped dashboard');
+$ok(str_contains($js,'verifiedConversionPanel(c,verified)')&&str_contains($js,'c.esc(String(i.suggestion'),'native safely-escaped dashboard');
 $ok(str_contains($brain,'sf_87d_admin_agent_projection($conversion)')&&str_contains($brain,'sf_87d_admin_agent_message('),'existing Admin Agent integrated');
 echo "87D3 diagnostics and Agent regression green\n";
