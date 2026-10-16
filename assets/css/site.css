@@ -467,3 +467,26 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
   .library-owned-card{grid-template-columns:58px minmax(0,1fr)}
   .library-owned-card .my-library-card-actions{grid-column:2;justify-content:flex-start;max-width:none}
 }
+
+/* 87A2 guided discovery fits the existing Music canvas and persistent player. */
+.fan-guided-discovery{margin:22px 0;padding:20px;border:1px solid var(--line,#4c473e);border-radius:13px;background:rgba(152,126,89,.07)}
+.fan-guided-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.fan-guided-head small{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+.fan-guided-head h3{font-size:21px;line-height:1.25;margin:7px 0}
+.fan-guided-head p,.fan-guided-summary,.fan-guided-privacy{font-size:12px;opacity:.8;line-height:1.5;margin:7px 0}
+.fan-guided-head>button{padding:10px 16px;border-radius:7px;background:#936b45;color:#fff;border:1px solid #ae8960;cursor:pointer}
+.fan-guided-tabs{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0 9px}
+.fan-guided-tabs button{padding:8px 12px;border:1px solid #77664e;border-radius:25px;background:transparent;color:inherit;font-size:12px;cursor:pointer}
+.fan-guided-tabs button[aria-pressed=true]{background:#8d6845;color:#fff;border-color:#b48e60;font-weight:650}
+.fan-guided-tracks{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:10px;margin:15px 0}
+.fan-guided-track{display:grid;grid-template-columns:21px minmax(0,1fr);gap:7px 10px;padding:14px;border-radius:9px;border:1px solid #77654d66;background:rgba(120,103,80,.08)}
+.fan-guided-number{font-size:12px;opacity:.65}
+.fan-guided-track strong{display:block;font-size:14px}
+.fan-guided-track small{font-size:11px;opacity:.7}
+.fan-guided-track p{font-size:12px;line-height:1.45;opacity:.85;margin:7px 0 0}
+.fan-guided-actions{grid-column:2;display:flex;gap:6px;flex-wrap:wrap}
+.fan-guided-actions button{font-size:11px;border-radius:5px;border:1px solid #746247;background:transparent;color:inherit;padding:6px 10px;cursor:pointer}
+.fan-guided-actions button:first-child{background:#674a2f;color:white}
+.fan-guided-actions button:disabled,.fan-guided-head button:disabled{opacity:.45;cursor:not-allowed}
+.fan-guided-status{min-height:16px;font-size:12px}
+@media(max-width:670px){.fan-guided-discovery{padding:13px}.fan-guided-head>button{width:100%}.fan-guided-tracks{grid-template-columns:1fr}.fan-guided-tabs{gap:5px}}
