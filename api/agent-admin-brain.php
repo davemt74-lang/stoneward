@@ -7,6 +7,9 @@ require_once __DIR__.'/fan-discovery-paths.php';
 require_once __DIR__.'/fan-journey-diagnostics.php';
 require_once __DIR__.'/fan-journey-agent-bridge.php';
 require_once __DIR__.'/fan-conversion-campaign-strategy.php';
+require_once __DIR__.'/fan-conversion-verified.php';
+require_once __DIR__.'/fan-conversion-intent-core.php';
+require_once __DIR__.'/fan-conversion-diagnostics.php';
 require_once __DIR__.'/agent-proactive-research.php';
 require_once __DIR__.'/agent-specialist-delegation.php';
 require_once __DIR__.'/agent-feedback-core.php';
@@ -91,6 +94,17 @@ function sf_admin_agent_operational_context(): array {
             $summary['fan_journey_signals']=['source'=>'unavailable','metrics'=>[],
                 'opportunity_codes'=>[],'transactions_or_changes_executed'=>false];
         }
+    }
+    // Aggregate only; independent server-verified payments and opted-in interest.
+    if(function_exists('sf_db') && function_exists('sf_privacy_ensure_schema')){
+      try{
+        $conversion=sf_87d_admin_conversion_diagnostics(
+            sf_87d_verified_conversion_from_disk(30),sf_87d_intent_aggregate(30));
+        $summary['verified_fan_conversion']=sf_87d_admin_agent_projection($conversion);
+      }catch(Throwable $e){
+        $summary['verified_fan_conversion']=['source'=>'unavailable','codes'=>[],
+            'attribution_verified'=>false,'actions_executed'=>false];
+      }
     }
     $commerce=sf_agent_commerce_admin_snapshot();
     $summary['commerce_summary']=$commerce['summary'];
@@ -200,7 +214,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'commerce_report'=>(empty($context['commerce_available'])?'Commerce data is temporarily unavailable. Open Commerce Operations to inspect current orders.':'Commerce queue: '.(int)($context['commerce_attention']??0).' customer orders need attention, including '.(int)($context['commerce_summary']['payment_attention']??0).' payment exceptions, '.(int)($context['commerce_summary']['refund_attention']??0).' pending refunds and '.(int)($context['commerce_summary']['fulfillment_pending']??0).' awaiting fulfillment. Open Commerce Operations to review each order.'),
       'review_actions'=>'You have '.array_sum($missionState['counts']).' recent Agent missions, including '.(int)($missionState['counts']['review_required']??0).' requiring review and '.(int)($missionState['counts']['completed']??0).' completed. Open Agent actions for exact proposals, approved results, and interrupted work. Never automatically retry uncertain operations.',
       'crm_report'=>'Current CRM summary: '.$context['crm_contacts'].' contacts and '.$context['newsletter_opted_in'].' opted-in newsletter subscribers. Open CRM for eligible audience and campaign review.',
-      'journey_report'=>sf_fan_journey_agent_message((array)($context['fan_journey_signals']??[])).' Existing lifecycle automation runs in 30 days: '.(int)($context['journey_counts']['journeys_started']??0).' started, '.(int)($context['journey_counts']['journeys_failed']??0).' failed.',
+      'journey_report'=>sf_fan_journey_agent_message((array)($context['fan_journey_signals']??[])).' '.sf_87d_admin_agent_message((array)($context['verified_fan_conversion']??[])).' Existing lifecycle automation runs in 30 days: '.(int)($context['journey_counts']['journeys_started']??0).' started, '.(int)($context['journey_counts']['journeys_failed']??0).' failed.',
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
     ];
     $text=$types[$plan['type']];
