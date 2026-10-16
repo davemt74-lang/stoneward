@@ -57,3 +57,23 @@ function sf_fan_discovery_rank(array $catalog,string $path,?array $profile=null,
  usort($rows,static fn(array $a,array $b):int=>($b['score']<=>$a['score'])?:($a['index']<=>$b['index']));
  return array_map(static fn(array $r):array=>$r['item'],array_slice($rows,0,$limit));
 }
+
+/** Resolve a fan only from the authenticated session, never a URL user_id. */
+function sf_fan_discovery_state(?int $userId,string $path='start_here',int $limit=8):array {
+ $paths=sf_fan_discovery_paths();
+ if(!isset($paths[$path]))throw new InvalidArgumentException('Unknown discovery path.');
+ $allowed=$userId!==null&&$userId>0
+  &&function_exists('sf_privacy_personalization_enabled')
+  &&sf_privacy_personalization_enabled($userId);
+ $profile=$allowed&&function_exists('sf_personalization_recommendation_profile')
+  ?sf_personalization_recommendation_profile($userId):null;
+ $tabs=[];foreach($paths as $key=>$spec)$tabs[]=['id'=>$key,'title'=>$spec['title']];
+ return [
+  'path'=>$path,'paths'=>$tabs,'personalized'=>$allowed&&!empty($profile['personalized']),
+  'summary'=>$allowed&&!empty($profile['personalized'])
+   ?'Guided by your saved songs and listening preferences.'
+   :'Explore the Stonefellow catalog without personal listening history.',
+  'items'=>sf_fan_discovery_rank(sf_catalog(),$path,$profile,$limit),
+  'privacy'=>'Listening history is not used without the existing permission.',
+ ];
+}
