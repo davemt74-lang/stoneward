@@ -191,6 +191,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(pause|stop music|stop song)\b/',$q))return 'player_pause';
     if(preg_match('/\b(next song|next track|skip)\b/',$q))return 'player_next';
     if(preg_match('/\b(previous song|previous track|go back a song)\b/',$q))return 'player_previous';
+    if(sf_fan_discovery_path_from_message($message)!==null&&preg_match('/\\b(?:session|guided listen|playlist)\\b/',$q))return 'listening_session_start';
     if(preg_match('/\b(play|listen to)\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'player_play_named';
     if(preg_match('/guided (album|release)|listen through .*album|walk me through .*release/',$q))return 'listening_session_guided_release';
     if(preg_match('/play (?:the )?(?:album|release)|listen to (?:the )?(?:album|release)/',$q))return 'listening_session_release';
