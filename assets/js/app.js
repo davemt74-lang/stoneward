@@ -618,6 +618,7 @@
    apiBase:cfg.apiBase||'api',authenticated:st.auth.authenticated,
    play:id=>{const t=trackById(id);if(t)play(t,0,'guided_discovery')},
    open:id=>navigate('track',{id}),
+   ask:text=>{if(input&&form){input.value=text;form.requestSubmit()}},
    queue:async id=>{if(!trackById(id))throw Error('Song no longer available');const r=await secureJsonPost('queue.php',{action:'add',track_id:id,placement:'end'});applyQueue(r.queue);return r},
    feedback:async(id,sentiment,path)=>{
      const result=await secureJsonPost('fan-discovery-feedback.php',{track_id:id,sentiment,path});
