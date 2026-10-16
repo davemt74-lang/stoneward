@@ -5,8 +5,9 @@ declare(strict_types=1);
  * Inputs must originate from trusted Stonefellow server-side readers.
  * Neither browser-supplied identities nor marketing consent are trusted here.
  */
-function sf_engagement_normalize_events(array $events, array $publicTrackIds, ?int $ownerId, bool $listeningConsent): array {
+function sf_engagement_normalize_events(array $events, array $publicTrackIds, ?int $ownerId, bool $listeningConsent, ?bool $personalizationConsent=null): array {
     if ($ownerId === null || $ownerId < 1) return [];
+    $personalizationConsent = $personalizationConsent ?? $listeningConsent;
     $public = array_fill_keys(array_map('strval', $publicTrackIds), true);
     $types = ['listen'=>true,'save'=>true,'cart'=>true,'paid_purchase'=>true,'vinyl_interest'=>true];
     $seen = []; $out = [];
@@ -15,14 +16,15 @@ function sf_engagement_normalize_events(array $events, array $publicTrackIds, ?i
         $type = (string)($e['type'] ?? '');
         $track = (string)($e['track_id'] ?? '');
         if (!isset($types[$type], $public[$track])) continue;
-        if (($type === 'listen' || $type === 'save') && !$listeningConsent) continue;
+        if ($type === 'listen' && !$listeningConsent) continue;
+        if ($type === 'save' && !$personalizationConsent) continue;
         if ($type === 'paid_purchase' && ($e['payment_verified'] ?? false) !== true) continue;
         $id = (string)($e['event_id'] ?? '');
         if ($id === '' || strlen($id) > 128 || isset($seen[$type.'|'.$id])) continue;
         $at = (string)($e['occurred_at'] ?? '');
         try { $date = new DateTimeImmutable($at); }
         catch (Exception $ex) { continue; }
-        if ($at === '' || $date->getTimestamp() > time() + 300) continue;
+        if (!preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:[+\\-]\\d{2}:\\d{2}|Z)$/D', $at) || $date->getTimestamp() > time() + 300) continue;
         $seen[$type.'|'.$id] = true;
         $out[] = ['type'=>$type, 'track_id'=>$track, 'occurred_at'=>$date->format(DateTimeInterface::ATOM)];
     }
