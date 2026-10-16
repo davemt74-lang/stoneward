@@ -82,9 +82,11 @@ function sf_admin_agent_operational_context(): array {
                 sf_engagement_analytics(30,null),
                 sf_fan_discovery_public(sf_catalog()),30);
             $summary['fan_journey_signals']=sf_fan_journey_agent_brief($diagnostics);
-            $campaignStrategy=sf_fan_conversion_campaign_strategy($diagnostics,
-                sf_fan_conversion_eligible_newsletter_count());
-            $summary['fan_campaign_guidance']=sf_fan_conversion_agent_brief($campaignStrategy);
+            if(function_exists('sf_crm_ensure_schema')){
+                $campaignStrategy=sf_fan_conversion_campaign_strategy($diagnostics,
+                    sf_fan_conversion_eligible_newsletter_count());
+                $summary['fan_campaign_guidance']=sf_fan_conversion_agent_brief($campaignStrategy);
+            }
         }catch(Throwable $e){
             $summary['fan_journey_signals']=['source'=>'unavailable','metrics'=>[],
                 'opportunity_codes'=>[],'transactions_or_changes_executed'=>false];
