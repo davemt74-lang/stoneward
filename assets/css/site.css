@@ -490,3 +490,12 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .fan-guided-actions button:disabled,.fan-guided-head button:disabled{opacity:.45;cursor:not-allowed}
 .fan-guided-status{min-height:16px;font-size:12px}
 @media(max-width:670px){.fan-guided-discovery{padding:13px}.fan-guided-head>button{width:100%}.fan-guided-tracks{grid-template-columns:1fr}.fan-guided-tabs{gap:5px}}
+
+/* 87B2: Save, own, purchase and vinyl remain visually distinct actions. */
+.fan-guided-terms{margin:12px 0 6px;padding:10px 12px;border-left:2px solid #ac8a60;
+ background:rgba(155,120,73,.08);font-size:12px;line-height:1.5}
+.fan-guided-actions [data-fan-cart]{background:#946b40;border-color:#ad8756;color:#fff}
+.fan-guided-actions [data-fan-library]{border-color:#85a38a;background:rgba(88,129,93,.16)}
+.fan-guided-actions [data-fan-save]{background:rgba(153,128,87,.15)}
+.fan-guided-actions [data-fan-vinyl]{border-color:#9176a1;background:rgba(112,85,141,.12)}
+.fan-guided-actions button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
