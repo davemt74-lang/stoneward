@@ -171,21 +171,63 @@ function sf_stem_alignment_findings(array $scan,int $limit=24):array {
         ?:($a['time']<=>$b['time']));
     return array_slice($events,0,$limit);
 }
+/**
+ * Reconstruct sustained passages from adjacent SHARED project-time samples.
+ * One isolated transient remains a marker, not a sustained masking claim.
+ */
+function sf_stem_alignment_passages(array $scan):array {
+    $findings=sf_stem_alignment_findings($scan,300);
+    if(!$findings)return [];
+    usort($findings,static fn(array $a,array $b):int=>$a['time']<=>$b['time']);
+    $step=(float)($scan['step_seconds']??1);
+    $groups=[];
+    foreach($findings as $point){
+        $a=(string)$point['track_a'];$b=(string)$point['track_b'];
+        $key=$a.'|'.$b.'|'.$point['band'];
+        $existing=$groups[$key]??[];
+        $last=count($existing)?array_key_last($existing):null;
+        if($last!==null&&$point['time']-$existing[$last]['end_seconds']<=$step*1.02){
+            $existing[$last]['end_seconds']=$point['time'];
+            $existing[$last]['sample_count']++;
+            $existing[$last]['peak_priority']=max($existing[$last]['peak_priority'],$point['priority']);
+        }else{
+            $existing[]=['start_seconds'=>$point['time'],'end_seconds'=>$point['time'],
+                'track_a'=>$a,'track_b'=>$b,'band'=>$point['band'],
+                'sample_count'=>1,'peak_priority'=>$point['priority']];
+        }
+        $groups[$key]=$existing;
+    }
+    $passages=[];
+    foreach($groups as $list)foreach($list as $p)if($p['sample_count']>=2){
+        $p['end_seconds']=round($p['end_seconds']+$step,3);
+        $p['candidate_only']=true;
+        $p['duration_seconds']=round($p['end_seconds']-$p['start_seconds'],3);
+        $passages[]=$p;
+    }
+    usort($passages,static fn(array $a,array $b):int=>
+        $b['peak_priority']<=>$a['peak_priority']?:$b['sample_count']<=>$a['sample_count']);
+    return array_slice($passages,0,20);
+}
 function sf_stem_alignment_summary(string $song,array $project):array {
     $record=sf_stem_alignment_read($song,$project);
-    $scans=[];$all=[];
+    $scans=[];$all=[];$passages=[];
     foreach((array)($record['scans']??[]) as $scan){
         $findings=sf_stem_alignment_findings($scan);
+        $grouped=sf_stem_alignment_passages($scan);
         $scans[]=['status'=>$scan['status'],'mode'=>$scan['mode'],
             'start_seconds'=>$scan['start_seconds'],'end_seconds'=>$scan['end_seconds'],
             'step_seconds'=>$scan['step_seconds'],
             'sampled_stem_count'=>count($scan['tracks']),'created_at'=>$scan['created_at'],
-            'findings'=>$findings];
-        if($scan['status']==='recent')array_push($all,...$findings);
+            'findings'=>$findings,'passages'=>$grouped];
+        if($scan['status']==='recent'){
+            array_push($all,...$findings);
+            array_push($passages,...$grouped);
+        }
     }
     usort($all,static fn(array $a,array $b):int=>$b['priority']<=>$a['priority']);
+    usort($passages,static fn(array $a,array $b):int=>$b['peak_priority']<=>$a['peak_priority']);
     return ['status'=>$record['status'],'scans'=>$scans,
-        'top_findings'=>array_slice($all,0,20),
+        'top_findings'=>array_slice($all,0,20),'top_passages'=>array_slice($passages,0,15),
         'provenance'=>'browser_raw_source_pre_fx_sparse_fft',
         'not_proof_of_masking'=>true,
         'not_native_reaper_dsp'=>true];
@@ -212,7 +254,15 @@ function sf_stem_alignment_agent_brief(array $summary,array $project):array {
             'levels_dbfs'=>$r['levels_dbfs'],'priority'=>$r['priority'],
             'claim'=>'potential overlap in simultaneously sampled raw sources, not confirmed masking'];
     }
-    return ['status'=>'recent','events'=>$events,
+    $ranges=[];
+    foreach(array_slice((array)($summary['top_passages']??[]),0,8) as $p){
+        if(!isset($index[$p['track_a']],$index[$p['track_b']]))continue;
+        $ranges[]=['start_seconds'=>$p['start_seconds'],'end_seconds'=>$p['end_seconds'],
+            'stem_numbers'=>[$index[$p['track_a']],$index[$p['track_b']]],
+            'band'=>$p['band'],'samples'=>$p['sample_count'],
+            'qualification'=>'repeated sparse samples are NOT confirmation of audible masking'];
+    }
+    return ['status'=>'recent','events'=>$events,'passages'=>$ranges,
         'scan_modes'=>array_values(array_unique(array_column($summary['scans'],'mode'))),
         'measurement_limit'=>'sparse browser FFT snapshots of decoded linked clips; no native FX, no verified listening, no raw audio'];
 }
