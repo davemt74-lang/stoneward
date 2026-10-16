@@ -9,6 +9,19 @@ const trend=(c,rows)=>{
   return `<div class="analytics-trend">${rows.map(d=>`<div class="analytics-day"><div class="analytics-bars"><i class="start" style="height:${Math.max(3,Math.round(Number(d.listens||0)/max*100))}%"></i><i class="complete" style="height:${Math.max(3,Math.round(Number(d.completes||0)/max*100))}%"></i><i class="skip" style="height:${Math.max(3,Math.round(Number(d.skips||0)/max*100))}%"></i></div><span>${c.esc(String(d.day||'').slice(5))}</span><small>${Number(d.listens||0)} / ${Number(d.completes||0)} / ${Number(d.skips||0)}</small></div>`).join('')}</div>`;
 };
 
+const journeyPanel=(c,j)=>{
+  const measures=Array.isArray(j.measures)?j.measures:[];
+  const suggestions=Array.isArray(j.opportunities)?j.opportunities:[];
+  const songs=Array.isArray(j.top_public_songs)?j.top_public_songs:[];
+  return \`<section class="panel fan-journey-diagnostics"><div class="panel-title"><div><h2>Fan journey insights</h2><p>Observed listening, saving and purchase activity — suggestions for improving Stonefellow</p></div></div>
+    <div class="stats">\${measures.map(m=>\`<div class="stat"><strong>\${Number(m.count||0).toLocaleString()}</strong><span>\${c.esc(m.label||'Activity')}</span></div>\`).join('')}</div>
+    <h3>Experience opportunities</h3>
+    \${suggestions.length?\`<div class="source-list">\${suggestions.map(s=>\`<div><span><strong>\${c.esc(s.title||'')}</strong><small>\${c.esc(s.evidence||'')}</small></span><em>\${c.esc(s.suggestion||'')}</em></div>\`).join('')}</div>\`:'<div class="empty">No suggestions available yet.</div>'}
+    \${songs.length?\`<h3>Public songs with sufficient activity</h3><div class="source-list">\${songs.map(s=>\`<div><span>\${c.esc(s.title||'')}</span><strong>\${Number(s.starts||0)} starts</strong><em>\${Number(s.repeat_starts||0)} repeat starts</em></div>\`).join('')}</div>\`:''}
+    <p><small>\${c.esc(j.data_quality?.note||'Independent activity counts; not a verified end-to-end checkout funnel.')}</small></p>
+  </section>\`;
+};
+
 const notificationPanel=(c,n)=>{
   const types=n.types||[],users=n.users||[];
   return `<section class="panel notification-analytics-panel"><div class="panel-title"><div><h2>Notification re-engagement</h2><p>Delivery, engagement, and 24-hour post-click conversion</p></div></div>
@@ -149,10 +162,11 @@ async function render(c,userId=0){
   try{
     const days=Number($('#analyticsDays')?.value||30),j=await api('analytics.php?days='+days+(userId?'&user_id='+userId:''));
     app.analytics=j;
-    const a=j.overall||{},growth=j.growth||{},tracks=a.tracks||[],users=j.users||[],daily=a.daily||[],sel=j.selected,cv=a.conversion||{},sources=a.sources||[],notifications=j.notification_analytics||{},search=j.search_analytics||{},siteSearch=j.site_search_analytics||{},library=j.library_analytics||{};
+    const a=j.overall||{},growth=j.growth||{},tracks=a.tracks||[],users=j.users||[],daily=a.daily||[],sel=j.selected,cv=a.conversion||{},sources=a.sources||[],notifications=j.notification_analytics||{},search=j.search_analytics||{},siteSearch=j.site_search_analytics||{},library=j.library_analytics||{},journey=j.fan_journey_insights||{};
     canvas.innerHTML=head('BUSINESS + FAN INTELLIGENCE','Performance Intelligence','Recorded revenue, fan growth, campaign attribution, merch, membership, tickets, lifecycle automation, customer care, and listening quality.',`<select id="analyticsDays" class="table-input"><option value="7" ${days===7?'selected':''}>7 days</option><option value="30" ${days===30?'selected':''}>30 days</option><option value="90" ${days===90?'selected':''}>90 days</option><option value="365" ${days===365?'selected':''}>1 year</option></select>`)+
     `<div class="stats analytics-primary-stats"><div class="stat"><strong>${Number(a.starts||0).toLocaleString()}</strong><span>Listens started</span></div><div class="stat"><strong>${Number(a.completion_rate||0)}%</strong><span>Completion rate</span></div><div class="stat"><strong>${Number(a.skip_rate||0)}%</strong><span>Skip rate</span></div><div class="stat"><strong>${Number(a.repeat_rate||0)}%</strong><span>Repeat rate</span></div></div>
     <section class="panel"><div class="panel-title"><h2>Listener conversion</h2><p>Actions after first listen inside this ${days}-day window</p></div><div class="conversion-grid">${funnel(c,'Favorite',cv.favorite_users,cv.favorite_rate)}${funnel(c,'Playlist',cv.playlist_users,cv.playlist_rate)}${funnel(c,'Saved build',cv.build_users,cv.build_rate)}${funnel(c,'Purchase',cv.purchase_users,cv.purchase_rate)}${funnel(c,'Custom media',cv.custom_media_users,cv.custom_media_rate)}</div><div class="analytics-commerce-strip"><div><span>Paid orders</span><strong>${Number(a.paid_orders||0)}</strong></div><div><span>Revenue</span><strong>${money(a.revenue_cents||0)}</strong></div><div><span>Favorites added</span><strong>${Number(a.favorites_added||0)}</strong></div><div><span>Playlists created</span><strong>${Number(a.playlists_created||0)}</strong></div><div><span>Builds created</span><strong>${Number(a.builds_created||0)}</strong></div></div></section>
+    ${journeyPanel(c,journey)}
     ${notificationPanel(c,notifications)}
     ${searchPanel(c,search)}
     ${siteSearchPanel(c,siteSearch)}
