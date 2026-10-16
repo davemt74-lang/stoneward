@@ -1,0 +1,34 @@
+name: Stonefellow Fan Discovery 87A1
+on:
+  pull_request:
+    paths:
+      - 'api/fan-discovery-paths.php'
+      - 'api/fan-discovery.php'
+      - 'tests/section87a1-discovery.php'
+      - '.github/workflows/stonefellow-fan87a1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/fan-discovery-paths.php'
+      - 'api/fan-discovery.php'
+      - 'tests/section87a1-discovery.php'
+permissions:
+  contents: read
+jobs:
+  public-safe-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - run: |
+          set -eu
+          php -l api/fan-discovery-paths.php
+          php -l api/fan-discovery.php
+          php tests/section87a1-discovery.php
+          php tests/v133-section4-personalized-recommendations.php
+          php tests/v138-section9-personalized-home.php
+          php tests/v1311-section12-search-discovery.php
