@@ -45,7 +45,10 @@ function sf_fan_engagement_owner_signals(int $ownerId,int $days=30): array {
     }
     // Library rows are verified by the existing paid-order entitlement reader.
     // Album rights are expanded by the same canonical metadata as 87B.
-    foreach(array_slice(sf_library_purchase_rows($ownerId),0,1001) as $p) {
+    $purchaseRows=sf_library_purchase_rows($ownerId);
+    if(count($purchaseRows)>1000)$truncated=true;
+    $purchaseCount=0;
+    foreach(array_slice($purchaseRows,0,1000) as $p) {
         $meta=(array)($p['metadata']??[]);
         $ids=[];
         if(($p['item_type']??'')==='track')$ids=[(string)($p['track_id']??$meta['track_id']??'')];
@@ -53,6 +56,8 @@ function sf_fan_engagement_owner_signals(int $ownerId,int $days=30): array {
         $when=(string)($p['saved_at']??'');
         if($when===''||strcmp($when,$since)<0)continue;
         foreach(array_slice(array_unique($ids),0,50) as $trackId) {
+            if($purchaseCount>=1500){$truncated=true;break 2;}
+            $purchaseCount++;
             if($trackId==='')continue;
             $events[]=[
                 'event_id'=>'purchase:'.(string)($p['id']??'').':'.$trackId,
@@ -61,7 +66,6 @@ function sf_fan_engagement_owner_signals(int $ownerId,int $days=30): array {
             ];
         }
     }
-    if(count(sf_library_purchase_rows($ownerId))>1000)$truncated=true;
     $normalized=sf_engagement_normalize_events($events,$publicIds,$ownerId,$listening,$personal);
     return [
         'summary'=>sf_engagement_summary($normalized),
