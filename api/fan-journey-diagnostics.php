@@ -54,7 +54,7 @@ function sf_fan_journey_diagnostics(array $analytics,array $publicSongs,int $day
                 'Check playback reliability, preview quality and song-page expectations.','exploratory');
         if($saves<=max(1,(int)floor($starts*.02)))
             $add('save_discovery','Make song saving easy to discover',
-                $saves.' saved-song events versus '.$starts.' listening starts.',
+                $saves.' favorite events versus '.$starts.' listening starts.',
                 'Check that the Save action is visible from the player and track page.','exploratory');
         if($paid===0&&$starts>=30)
             $add('purchase_path','Review song purchase navigation',
@@ -62,11 +62,11 @@ function sf_fan_journey_diagnostics(array $analytics,array $publicSongs,int $day
                 'Inspect track-to-cart navigation and checkout clarity; do not assume a failed conversion.','exploratory');
         if($builds>=5&&$custom===0)
             $add('vinyl_path','Review vinyl Builder handoff',
-                $builds.' saved builds and zero paid custom-media orders.',
+                $builds.' saved builds and zero recorded paid custom-media orders.',
                 'Check Builder review, licensing explanation and checkout handoff.','exploratory');
         if(!$opportunities)
             $add('baseline','No strong warning in this window',
-                $starts.' starts, '.$saves.' song saves and '.$paid.' paid orders.',
+                $starts.' starts, '.$saves.' favorites and '.$paid.' paid orders.',
                 'Continue monitoring before making site changes.','observational');
     }
     return [
@@ -74,10 +74,10 @@ function sf_fan_journey_diagnostics(array $analytics,array $publicSongs,int $day
         'measures'=>[
             ['label'=>'Listening starts','count'=>$starts,'unit'=>'events'],
             ['label'=>'Repeat starts','count'=>$repeat,'unit'=>'events'],
-            ['label'=>'Song saves','count'=>$saves,'unit'=>'events'],
-            ['label'=>'Paid orders','count'=>$paid,'unit'=>'orders'],
-            ['label'=>'Saved vinyl builds','count'=>$builds,'unit'=>'builds'],
-            ['label'=>'Custom media orders','count'=>$custom,'unit'=>'orders'],
+            ['label'=>'Favorites added','count'=>$saves,'unit'=>'events'],
+            ['label'=>'Recorded paid-status orders','count'=>$paid,'unit'=>'orders'],
+            ['label'=>'Saved builds','count'=>$builds,'unit'=>'builds'],
+            ['label'=>'Recorded custom-media orders','count'=>$custom,'unit'=>'orders'],
         ],
         'top_public_songs'=>$tracks,
         'opportunities'=>array_slice($opportunities,0,6),
