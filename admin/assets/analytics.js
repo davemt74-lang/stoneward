@@ -13,13 +13,13 @@ const journeyPanel=(c,j)=>{
   const measures=Array.isArray(j.measures)?j.measures:[];
   const suggestions=Array.isArray(j.opportunities)?j.opportunities:[];
   const songs=Array.isArray(j.top_public_songs)?j.top_public_songs:[];
-  return \`<section class="panel fan-journey-diagnostics"><div class="panel-title"><div><h2>Fan journey insights</h2><p>Observed listening, saving and purchase activity — suggestions for improving Stonefellow</p></div></div>
-    <div class="stats">\${measures.map(m=>\`<div class="stat"><strong>\${Number(m.count||0).toLocaleString()}</strong><span>\${c.esc(m.label||'Activity')}</span></div>\`).join('')}</div>
+  return `<section class="panel fan-journey-diagnostics"><div class="panel-title"><div><h2>Fan journey insights</h2><p>Observed listening, saving and purchase activity — suggestions for improving Stonefellow</p></div></div>
+    <div class="stats">${measures.map(m=>`<div class="stat"><strong>${Number(m.count||0).toLocaleString()}</strong><span>${c.esc(m.label||'Activity')}</span></div>`).join('')}</div>
     <h3>Experience opportunities</h3>
-    \${suggestions.length?\`<div class="source-list">\${suggestions.map(s=>\`<div><span><strong>\${c.esc(s.title||'')}</strong><small>\${c.esc(s.evidence||'')}</small></span><em>\${c.esc(s.suggestion||'')}</em></div>\`).join('')}</div>\`:'<div class="empty">No suggestions available yet.</div>'}
-    \${songs.length?\`<h3>Public songs with sufficient activity</h3><div class="source-list">\${songs.map(s=>\`<div><span>\${c.esc(s.title||'')}</span><strong>\${Number(s.starts||0)} starts</strong><em>\${Number(s.repeat_starts||0)} repeat starts</em></div>\`).join('')}</div>\`:''}
-    <p><small>\${c.esc(j.data_quality?.note||'Independent activity counts; not a verified end-to-end checkout funnel.')}</small></p>
-  </section>\`;
+    ${suggestions.length?`<div class="source-list">${suggestions.map(s=>`<div><span><strong>${c.esc(s.title||'')}</strong><small>${c.esc(s.evidence||'')}</small></span><em>${c.esc(s.suggestion||'')}</em></div>`).join('')}</div>`:'<div class="empty">No suggestions available yet.</div>'}
+    ${songs.length?`<h3>Public songs with sufficient activity</h3><div class="source-list">${songs.map(s=>`<div><span>${c.esc(s.title||'')}</span><strong>${Number(s.starts||0)} starts</strong><em>${Number(s.repeat_starts||0)} repeat starts</em></div>`).join('')}</div>`:''}
+    <p><small>${c.esc(j.data_quality?.note||'Independent activity counts; not a verified end-to-end checkout funnel.')}</small></p>
+  </section>`;
 };
 
 const notificationPanel=(c,n)=>{
