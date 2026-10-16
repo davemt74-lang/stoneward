@@ -34,7 +34,7 @@ function sf_fan_discovery_rank(array $catalog,string $path,?array $profile=null,
  $rows=[];
  foreach(sf_fan_discovery_public($catalog) as $index=>$t){
   $id=(string)$t['id'];
-  if($personal&&($profile['feedback'][$id]['sentiment']??'')==='dislike')continue;
+  if($profile!==null&&($profile['feedback'][$id]['sentiment']??'')==='dislike')continue;
   $moods=array_map('strtolower',(array)($t['mood']??[]));
   $themes=array_map('strtolower',(array)($t['themes']??[]));
   $mh=array_values(array_intersect($moods,$rules['moods']));
