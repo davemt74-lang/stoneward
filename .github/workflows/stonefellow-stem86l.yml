@@ -1,0 +1,54 @@
+name: Stonefellow Time-Aligned Mix Intelligence 86L
+on:
+  pull_request:
+    paths:
+      - 'api/stem-alignment-core.php'
+      - 'api/stem-production-advisor.php'
+      - 'admin/api/stem-alignment.php'
+      - 'admin/assets/stem-alignment.js'
+      - 'admin/assets/stem-studio.js'
+      - 'tests/section86l-*'
+      - '.github/workflows/stonefellow-stem86l.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/stem-alignment-core.php'
+      - 'api/stem-production-advisor.php'
+      - 'admin/api/stem-alignment.php'
+      - 'admin/assets/stem-alignment.js'
+      - 'admin/assets/stem-studio.js'
+      - 'tests/section86l-*'
+permissions:
+  contents: read
+jobs:
+  audio-timeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sodium
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/stem-alignment-core.php
+          php -l api/stem-production-advisor.php
+          php -l admin/api/stem-alignment.php
+          node --check admin/assets/stem-alignment.js
+          node --check admin/assets/stem-studio.js
+          php tests/section86l-alignment.php
+          node tests/section86l-alignment.cjs
+          php tests/section86k-stem-intelligence.php
+          node tests/section86k-stem-intelligence.cjs
+          php tests/section86j-production-agent.php
+          node tests/section86j-production-agent.cjs
+          php tests/section86i-stem-catalog.php
+          php tests/section86h-mastering-readiness.php
+          php tests/section86g-mastering.php
+          php tests/section86f-automation-agent.php
+          php tests/section85b-media-publishing.php
