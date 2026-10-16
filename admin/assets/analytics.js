@@ -9,6 +9,16 @@ const trend=(c,rows)=>{
   return `<div class="analytics-trend">${rows.map(d=>`<div class="analytics-day"><div class="analytics-bars"><i class="start" style="height:${Math.max(3,Math.round(Number(d.listens||0)/max*100))}%"></i><i class="complete" style="height:${Math.max(3,Math.round(Number(d.completes||0)/max*100))}%"></i><i class="skip" style="height:${Math.max(3,Math.round(Number(d.skips||0)/max*100))}%"></i></div><span>${c.esc(String(d.day||'').slice(5))}</span><small>${Number(d.listens||0)} / ${Number(d.completes||0)} / ${Number(d.skips||0)}</small></div>`).join('')}</div>`;
 };
 
+const verifiedConversionPanel=(c,v)=>{
+  const sales=v.verified_orders||{},observed=Array.isArray(v.observed_intent)?v.observed_intent:[],suggestions=Array.isArray(v.suggestions)?v.suggestions:[];
+  const usd=n=>'$'+(Number(n||0)/100).toFixed(2);
+  const metrics=[['Verified live orders',Number(sales.live_paid||0)],['Recorded net',usd(sales.net_cents)],['Test or simulated',Number(sales.test_or_simulated||0)],['Pending or unverified',Number(sales.pending_or_unverified||0)]];
+  const stats='<div class="stats">'+metrics.map(m=>'<div class="stat"><strong>'+c.esc(String(m[1]))+'</strong><span>'+c.esc(m[0])+'</span></div>').join('')+'</div>';
+  const interest=observed.length?'<div class="source-list">'+observed.map(i=>'<div><span>'+c.esc(String(i.stage||''))+' · '+c.esc(String(i.kind||''))+'</span><strong>'+(i.accounts===null?'Insufficient sample':Number(i.accounts)+' accounts')+'</strong></div>').join('')+'</div>':'<div class="empty">No consented cart reviews recorded yet.</div>';
+  const advice=suggestions.map(i=>'<p>'+c.esc(String(i.suggestion||''))+'</p>').join('');
+  return '<section class="panel verified-conversion-panel"><div class="panel-title"><div><h2>Verified sales and purchase interest</h2><p>Confirmed Stripe orders and separately observed review events.</p></div></div>'+stats+'<h3>Cart and checkout review</h3>'+interest+'<h3>Suggested reviews</h3>'+advice+'<p><small>'+c.esc(String(v.limits||''))+'</small></p></section>';
+};
+
 const journeyPanel=(c,j)=>{
   const measures=Array.isArray(j.measures)?j.measures:[];
   const suggestions=Array.isArray(j.opportunities)?j.opportunities:[];
@@ -162,10 +172,11 @@ async function render(c,userId=0){
   try{
     const days=Number($('#analyticsDays')?.value||30),j=await api('analytics.php?days='+days+(userId?'&user_id='+userId:''));
     app.analytics=j;
-    const a=j.overall||{},growth=j.growth||{},tracks=a.tracks||[],users=j.users||[],daily=a.daily||[],sel=j.selected,cv=a.conversion||{},sources=a.sources||[],notifications=j.notification_analytics||{},search=j.search_analytics||{},siteSearch=j.site_search_analytics||{},library=j.library_analytics||{},journey=j.fan_journey_insights||{};
+    const a=j.overall||{},growth=j.growth||{},tracks=a.tracks||[],users=j.users||[],daily=a.daily||[],sel=j.selected,cv=a.conversion||{},sources=a.sources||[],notifications=j.notification_analytics||{},search=j.search_analytics||{},siteSearch=j.site_search_analytics||{},library=j.library_analytics||{},journey=j.fan_journey_insights||{},verified=j.verified_conversion_intelligence||{};
     canvas.innerHTML=head('BUSINESS + FAN INTELLIGENCE','Performance Intelligence','Recorded revenue, fan growth, campaign attribution, merch, membership, tickets, lifecycle automation, customer care, and listening quality.',`<select id="analyticsDays" class="table-input"><option value="7" ${days===7?'selected':''}>7 days</option><option value="30" ${days===30?'selected':''}>30 days</option><option value="90" ${days===90?'selected':''}>90 days</option><option value="365" ${days===365?'selected':''}>1 year</option></select>`)+
     `<div class="stats analytics-primary-stats"><div class="stat"><strong>${Number(a.starts||0).toLocaleString()}</strong><span>Listens started</span></div><div class="stat"><strong>${Number(a.completion_rate||0)}%</strong><span>Completion rate</span></div><div class="stat"><strong>${Number(a.skip_rate||0)}%</strong><span>Skip rate</span></div><div class="stat"><strong>${Number(a.repeat_rate||0)}%</strong><span>Repeat rate</span></div></div>
     <section class="panel"><div class="panel-title"><h2>Listener conversion</h2><p>Actions after first listen inside this ${days}-day window</p></div><div class="conversion-grid">${funnel(c,'Favorite',cv.favorite_users,cv.favorite_rate)}${funnel(c,'Playlist',cv.playlist_users,cv.playlist_rate)}${funnel(c,'Saved build',cv.build_users,cv.build_rate)}${funnel(c,'Purchase',cv.purchase_users,cv.purchase_rate)}${funnel(c,'Custom media',cv.custom_media_users,cv.custom_media_rate)}</div><div class="analytics-commerce-strip"><div><span>Paid orders</span><strong>${Number(a.paid_orders||0)}</strong></div><div><span>Revenue</span><strong>${money(a.revenue_cents||0)}</strong></div><div><span>Favorites added</span><strong>${Number(a.favorites_added||0)}</strong></div><div><span>Playlists created</span><strong>${Number(a.playlists_created||0)}</strong></div><div><span>Builds created</span><strong>${Number(a.builds_created||0)}</strong></div></div></section>
+    ${verifiedConversionPanel(c,verified)}
     ${journeyPanel(c,journey)}
     ${notificationPanel(c,notifications)}
     ${searchPanel(c,search)}
