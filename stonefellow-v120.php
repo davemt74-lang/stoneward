@@ -238,6 +238,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/agent-chat-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/artist-home-renderer.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/turntable-parts.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/fan-discovery.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/build-integrity.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/accessibility.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
