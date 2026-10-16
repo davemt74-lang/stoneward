@@ -65,7 +65,8 @@ ok39(str_contains($shell,"\$publicInitialViews[]='search'"),'server pretty-route
 ok39(str_contains($shell,'href="search" data-view="search"'),'public navigation exposes Search');
 ok39(substr_count($adminShell,'data-view="')===29,'public Search adds no Admin sidebar item');
 ok39(str_contains($ht,'^search/?$')&&str_contains($ht,'view=search'),'Apache serves canonical /search');
-ok39(preg_match('/X-Stonefellow-Build "1\.3\.(?:3[8-9]|[4-9][0-9])"/',$ht)===1,'server build header remains Section 39 compatible or newer');
+$buildHeaderMatches=[];preg_match('/X-Stonefellow-Build "([0-9.]+)"/',$ht,$buildHeaderMatches);
+ok39(isset($buildHeaderMatches[1])&&version_compare($buildHeaderMatches[1],'1.3.39','>='),'server build header remains Section 39 compatible or newer');
 ok39(str_contains($seo,"if(\$view==='search')")&&str_contains($seo,"'noindex,follow,noarchive'"),'Search has dedicated noindex/follow SEO policy');
 ok39(str_contains($seo,"sf_seo_base_url().'/search'"),'Search canonical strips query/filter duplicates');
 ok39(!str_contains($seo,"\$add(\$base.'/search'"),'Search page is intentionally absent from the public sitemap');
