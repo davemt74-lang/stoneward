@@ -3,6 +3,9 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-orchestration.php';
 require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-admin-intelligence.php';
+require_once __DIR__.'/fan-discovery-paths.php';
+require_once __DIR__.'/fan-journey-diagnostics.php';
+require_once __DIR__.'/fan-journey-agent-bridge.php';
 require_once __DIR__.'/agent-proactive-research.php';
 require_once __DIR__.'/agent-specialist-delegation.php';
 require_once __DIR__.'/agent-feedback-core.php';
@@ -71,6 +74,18 @@ function sf_admin_agent_operational_context(): array {
         $summary['journey_counts']=(array)($journey['counts']??[]);
         $summary['journey_rates']=(array)($journey['rates']??[]);
     }
+    // Current admin aggregates only. Customer identities never enter Agent facts.
+    if(function_exists('sf_engagement_analytics')){
+        try{
+            $diagnostics=sf_fan_journey_diagnostics(
+                sf_engagement_analytics(30,null),
+                sf_fan_discovery_public(sf_catalog()),30);
+            $summary['fan_journey_signals']=sf_fan_journey_agent_brief($diagnostics);
+        }catch(Throwable $e){
+            $summary['fan_journey_signals']=['source'=>'unavailable','metrics'=>[],
+                'opportunity_codes'=>[],'transactions_or_changes_executed'=>false];
+        }
+    }
     $commerce=sf_agent_commerce_admin_snapshot();
     $summary['commerce_summary']=$commerce['summary'];
     $summary['commerce_attention']=$commerce['total_attention'];
@@ -88,8 +103,9 @@ function sf_admin_agent_plan(string $message): array {
     elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_journey';$view='automations';}
     elseif(preg_match('/\b(approval|approvals|proposals|action history|agent actions)\b/',$m)){$type='review_actions';$view='brain';}
     elseif(preg_match('/\b(orders?|commerce|stripe|refunds?|payments?|fulfill(?:ment)?|shipping|follow[ -]?ups?)\b/',$m)){$type='commerce_report';$view='commerce-ops';}
+    elseif(preg_match('/\b(?:fan engagement|fan journeys?|listening trends?|song discovery|repeat listening|music conversion|song conversion|listening performance)\b/',$m)){$type='journey_report';$view='analytics';}
     elseif(preg_match('/\b(crm|fans|subscribers|audience)\b/',$m)){$type='crm_report';$view='crm';}
-    elseif(preg_match('/\b(conversion|engagement|analytics|performance|journey)\b/',$m)){$type='journey_report';$view='automations';}
+    elseif(preg_match('/\b(conversion|engagement|analytics|performance|journey)\b/',$m)){$type='journey_report';$view='analytics';}
     return ['type'=>$type,'view'=>$view,'requires_confirmation'=>in_array($type,['prepare_campaign','prepare_journey','prepare_commerce_followup'],true),'execution'=>'proposal_or_navigation_only'];
 }
 /**
@@ -178,7 +194,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'commerce_report'=>(empty($context['commerce_available'])?'Commerce data is temporarily unavailable. Open Commerce Operations to inspect current orders.':'Commerce queue: '.(int)($context['commerce_attention']??0).' customer orders need attention, including '.(int)($context['commerce_summary']['payment_attention']??0).' payment exceptions, '.(int)($context['commerce_summary']['refund_attention']??0).' pending refunds and '.(int)($context['commerce_summary']['fulfillment_pending']??0).' awaiting fulfillment. Open Commerce Operations to review each order.'),
       'review_actions'=>'You have '.array_sum($missionState['counts']).' recent Agent missions, including '.(int)($missionState['counts']['review_required']??0).' requiring review and '.(int)($missionState['counts']['completed']??0).' completed. Open Agent actions for exact proposals, approved results, and interrupted work. Never automatically retry uncertain operations.',
       'crm_report'=>'Current CRM summary: '.$context['crm_contacts'].' contacts and '.$context['newsletter_opted_in'].' opted-in newsletter subscribers. Open CRM for eligible audience and campaign review.',
-      'journey_report'=>'The last 30 days include '.(int)($context['journey_counts']['journeys_started']??0).' journey runs, '.(int)($context['journey_counts']['journeys_completed']??0).' completed and '.(int)($context['journey_counts']['journeys_failed']??0).' failed. These independent counts are not a sequential customer funnel.',
+      'journey_report'=>sf_fan_journey_agent_message((array)($context['fan_journey_signals']??[])).' Existing lifecycle automation runs in 30 days: '.(int)($context['journey_counts']['journeys_started']??0).' started, '.(int)($context['journey_counts']['journeys_failed']??0).' failed.',
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
     ];
     $text=$types[$plan['type']];
