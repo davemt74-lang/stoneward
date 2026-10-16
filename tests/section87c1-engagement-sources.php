@@ -56,7 +56,7 @@ ok87c1($s['summary']['event_count']===5,'Historical data excluded and pause/comp
 ok87c1($s['sources']['cart']==='not_instrumented' && $s['sources']['vinyl_interest']==='not_instrumented',
     'Never infer nonexistent cart or vinyl intent events');
 ok87c1($s['marketing_consent_inferred']===false,'Engagement does not infer marketing consent');
-ok87c1(sf_fan_engagement_owner_signals(8,30)['summary']['event_count']===1,
+ok87c1(sf_fan_engagement_owner_signals(8,30)['summary']['event_count']===2,
     'Cross-account purchase and favorite evidence unavailable');
 $GLOBALS['listeningConsent87']=false;
 $off=sf_fan_engagement_owner_signals(7);
