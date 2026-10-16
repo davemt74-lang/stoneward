@@ -1,0 +1,45 @@
+name: Stonefellow Fan Conversion Canvas 87B2
+on:
+  pull_request:
+    paths:
+      - 'api/fan-purchase-journey-core.php'
+      - 'assets/js/fan-discovery.js'
+      - 'assets/js/app.js'
+      - 'assets/css/site.css'
+      - 'tests/section87b2-*'
+      - '.github/workflows/stonefellow-fan87b2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/fan-purchase-journey-core.php'
+      - 'assets/js/fan-discovery.js'
+      - 'assets/js/app.js'
+      - 'tests/section87b2-*'
+permissions:
+  contents: read
+jobs:
+  conversion-journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - run: |
+          set -eu
+          node --check assets/js/fan-discovery.js
+          node --check assets/js/app.js
+          php -l api/fan-purchase-journey-core.php
+          php tests/section87b2-saved-journey.php
+          node tests/section87b2-conversion.cjs
+          php tests/section87b1-purchase-journey.php
+          node tests/section87a2-fan-discovery.cjs
+          php tests/section87a1-discovery.php
+          php tests/section84b3-print-licenses.php
+          php tests/section78-customer-commerce.php
