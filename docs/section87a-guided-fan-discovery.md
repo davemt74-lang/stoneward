@@ -15,3 +15,11 @@ The whole path starts one song and queues the remainder in order. Queue status i
 
 ## Acceptance
 87A1 and 87A2 each require focused unit/behavior checks, legacy search/recommendation/privacy regressions, MySQL/full website CI, exact-revision PR green merge and merged-main verification. No HomeServer modifications.
+
+## 87A3 — Customer Agent Brain listening paths
+
+Explicit user phrases such as “play an After Dark listening session” are now resolved through the same published discovery ranking used by the Music page. The current Customer Agent's play-one-song route and the existing saved Agent Listening Sessions both accept this path selection. They do not create a parallel model, queue, profile, or private listening table.
+
+The Music panel's **Guide me with Agent Brain** control hands the requested path to the existing chat composer. The existing Agent listening session still owns playback progression, positive/negative feedback, playlist saves, privacy boundaries and audit events. Explicit dislikes remain excluded when personalization is enabled; account Privacy Settings still govern any use of listening history. The Agent never enrolls fans in the newsletter or authorizes campaign sends because they requested a playlist.
+
+Tests: pure path recognition, exactly aligned fan/Agent ranking, unpublished exclusion, dislike suppression, privacy opt-out, session-plan compatibility, historical Agent session regression and full release/MySQL certification.

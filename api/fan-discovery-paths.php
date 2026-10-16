@@ -77,3 +77,26 @@ function sf_fan_discovery_state(?int $userId,string $path='start_here',int $limi
   'privacy'=>'Listening history is not used without the existing permission.',
  ];
 }
+
+/** Explicit human language selector. Never infer a private preference from chat. */
+function sf_fan_discovery_path_from_message(string $message):?string {
+ $m=strtolower($message);
+ if(preg_match('/\\bafter[ -]dark\\b/i',$m))return 'after_dark';
+ if(preg_match('/\\bopen[ -]road\\b/i',$m))return 'open_road';
+ if(preg_match('/\\bslow[ -]down\\b/i',$m))return 'slow_down';
+ if(preg_match('/\\bdeep[ -]cuts?\\b/i',$m))return 'deep_cuts';
+ if(preg_match('/\\bstart[ -]here\\b/i',$m))return 'start_here';
+ return null;
+}
+/** Feed the CANONICAL Agent listening session instead of a parallel queue. */
+function sf_fan_discovery_session_plan(int $userId,string $message):?array {
+ $path=sf_fan_discovery_path_from_message($message);
+ if($path===null)return null;
+ $state=sf_fan_discovery_state($userId,$path,8);
+ $ids=array_values(array_unique(array_map('strval',array_column($state['items'],'track_id'))));
+ if(!$ids)return null;
+ $spec=sf_fan_discovery_paths()[$path];
+ return ['mode'=>'mix','title'=>$spec['title'].' · Stonefellow Session',
+   'prompt'=>sf_clean_text($message,500),'release_id'=>'',
+   'track_ids'=>$ids,'discovery_path'=>$path];
+}

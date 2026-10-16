@@ -47,6 +47,11 @@ function sf_agent_session_plan(int $userId,string $message,string $mode='mix',?s
         if(!$ids)throw new RuntimeException('That release has no playable catalog tracks.');
         return ['mode'=>$mode,'title'=>($mode==='guided_release'?'Guided: ':'').(string)($release['title']??'Stonefellow Release'),'prompt'=>$message,'release_id'=>(string)($release['id']??''),'track_ids'=>$ids];
     }
+    // 87A3: explicit discovery path requests use the same consent-aware
+    // published ranking as the Music page, with existing session permissions.
+    $discovery=$mode==='mix'&&function_exists('sf_fan_discovery_session_plan')
+        ?sf_fan_discovery_session_plan($userId,$message):null;
+    if($discovery!==null)return $discovery;
     $ids=sf_agent_playlist_track_ids($message,$activeTrackId,8,$userId);if(!$ids)throw new RuntimeException('No playable tracks are available for a listening session.');
     $label='Agent Listening Session';$q=strtolower($message);
     foreach(['quiet','mellow','dark','driving','warm','acoustic','reflective','late night','desert'] as $mood)if(str_contains($q,$mood)){$label=ucwords($mood).' Session';break;}

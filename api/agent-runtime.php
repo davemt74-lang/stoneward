@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-feedback-core.php';
 require_once __DIR__.'/agent-customer-brain.php';
 require_once __DIR__.'/agent-customer-context.php';
+require_once __DIR__.'/fan-discovery-paths.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -151,6 +152,16 @@ function sf_agent_track_score(array $t,string $message): int {
 }
 function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $userId=null): ?array {
     $catalog=sf_agent_public_catalog();$exclude=$excludeId?[$excludeId]:[];
+    $path=sf_fan_discovery_path_from_message($message);
+    if($path!==null){
+        $state=sf_fan_discovery_state($userId&&$userId>0?$userId:null,$path,12);
+        $byId=[];foreach($catalog as $t)$byId[(string)$t['id']]=$t;
+        foreach((array)$state['items'] as $row){
+            $id=(string)($row['track_id']??'');
+            if($id!==''&&!in_array($id,$exclude,true)&&isset($byId[$id]))return $byId[$id];
+        }
+        return null;
+    }
     $preferenceTerms=$userId!==null?sf_agent_customer_preference_terms($userId):[];
     if($userId&&function_exists('sf_personalization_recommendation_profile')){
         $profile=sf_personalization_recommendation_profile($userId);$ranked=sf_personalization_rank_catalog($catalog,$profile,20,$exclude);
@@ -180,6 +191,7 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(pause|stop music|stop song)\b/',$q))return 'player_pause';
     if(preg_match('/\b(next song|next track|skip)\b/',$q))return 'player_next';
     if(preg_match('/\b(previous song|previous track|go back a song)\b/',$q))return 'player_previous';
+    if(sf_fan_discovery_path_from_message($message)!==null&&preg_match('/\\b(?:session|guided listen|playlist)\\b/',$q))return 'listening_session_start';
     if(preg_match('/\b(play|listen to)\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'player_play_named';
     if(preg_match('/guided (album|release)|listen through .*album|walk me through .*release/',$q))return 'listening_session_guided_release';
     if(preg_match('/play (?:the )?(?:album|release)|listen to (?:the )?(?:album|release)/',$q))return 'listening_session_release';

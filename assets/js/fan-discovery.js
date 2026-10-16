@@ -7,7 +7,8 @@
    '<div class="fan-guided-head"><div><small>GUIDED LISTENING</small><h3>Find your Stonefellow sound</h3>'+
    '<p>Choose a direction. Every suggestion comes from the released catalog.</p></div>'+
    '<button type="button" data-fan-start '+(!items.length?'disabled':'')+'>'+
-   (authenticated?'Play this path':'Play the first song')+'</button></div>'+
+   (authenticated?'Play this path':'Play the first song')+'</button>'+
+   (authenticated?'<button type="button" data-fan-agent>Guide me with Agent Brain</button>':'')+'</div>'+
    '<div class="fan-guided-tabs" role="group" aria-label="Listening moods">'+
    paths.map(p=>'<button type="button" data-fan-path="'+esc(p.id)+'" aria-pressed="'+(p.id===data.path?'true':'false')+'">'+esc(p.title)+'</button>').join('')+
    '</div><p class="fan-guided-summary">'+esc(data.summary||'')+'</p>'+
@@ -48,6 +49,8 @@
   }
   function bind(data){
    element.querySelectorAll('[data-fan-path]').forEach(b=>b.onclick=()=>refresh(b.dataset.fanPath));
+   const agent=element.querySelector('[data-fan-agent]');
+   if(agent)agent.onclick=()=>host.ask('Play me a '+data.paths.find(p=>p.id===active)?.title+' listening session');
    element.querySelectorAll('[data-fan-play]').forEach(b=>b.onclick=()=>host.play(b.dataset.fanPlay));
    element.querySelectorAll('[data-fan-open]').forEach(b=>b.onclick=()=>host.open(b.dataset.fanOpen));
    element.querySelectorAll('[data-fan-queue]').forEach(b=>b.onclick=()=>host.queue(b.dataset.fanQueue));
