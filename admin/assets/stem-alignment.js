@@ -128,6 +128,27 @@ function bind(root,studio){
       ' s interval · '+latest.sampled_stem_count+' stems · '+latest.findings.length+
       ' highest-confidence potential overlaps.';
     map.append(subtitle);
+    if((latest.passages||[]).length){
+      const title=document.createElement('h4');
+      title.textContent='Repeated energy overlap · time ranges to listen to';list.append(title);
+      for(const passage of latest.passages.slice(0,12)){
+        const row=document.createElement('article');row.className='sf-l-passage';
+        const label=document.createElement('strong');
+        label.textContent=passage.start_seconds.toFixed(1)+'–'+passage.end_seconds.toFixed(1)+
+          's · '+passage.band.replace('_',' ')+' · '+passage.track_a+' / '+passage.track_b;
+        const detail=document.createElement('p');
+        detail.textContent=passage.sample_count+' consecutive synchronized samples. Potential frequency competition only.';
+        const play=document.createElement('button');
+        play.type='button';play.textContent='Listen to passage';
+        play.onclick=()=>jump(passage.start_seconds);
+        const focus=document.createElement('button');
+        focus.type='button';focus.textContent='Refine these 12 seconds';
+        focus.onclick=()=>scan('focus',(passage.start_seconds+passage.end_seconds)/2);
+        row.append(label,detail,play,focus);list.append(row);
+      }
+    }
+    const markerHeading=document.createElement('h4');
+    markerHeading.textContent='Individual time markers';list.append(markerHeading);
     if(!(latest.findings||[]).length){
       const no=document.createElement('p');
       no.textContent='No simultaneous, sufficiently strong band-energy events in sampled moments. This does not prove the mix is clear everywhere.';
