@@ -1,0 +1,45 @@
+name: Stonefellow Agent Listening Paths 87A3
+on:
+  pull_request:
+    paths:
+      - 'api/fan-discovery-paths.php'
+      - 'api/agent-runtime.php'
+      - 'api/listening-sessions-core.php'
+      - 'assets/js/fan-discovery.js'
+      - 'assets/js/app.js'
+      - 'tests/section87a3-*'
+      - '.github/workflows/stonefellow-fan87a3.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/fan-discovery-paths.php'
+      - 'api/agent-runtime.php'
+      - 'api/listening-sessions-core.php'
+      - 'assets/js/fan-discovery.js'
+      - 'tests/section87a3-*'
+permissions:
+  contents: read
+jobs:
+  agent-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          set -eu
+          php -l api/fan-discovery-paths.php
+          php -l api/agent-runtime.php
+          php -l api/listening-sessions-core.php
+          php tests/section87a3-agent-journeys.php
+          php tests/section87a1-discovery.php
+          node tests/section87a2-fan-discovery.cjs
+          php tests/v135-section6-agent-listening-sessions.php
+          php tests/v133-section4-personalized-recommendations.php
