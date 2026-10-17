@@ -125,7 +125,8 @@ function sf_team_assign_roles(int $targetId,array $requested,int $adminId):array
             $db->prepare($sql)->execute([$targetId,$role,$adminId,$now]);$changed=true;
         }
         if($changed)sf_team_audit($adminId,'team.roles_updated','user',(string)$targetId,
-          'Changed team role assignments',['user_id'=>$targetId]);
+          'Updated team roles for account '.$targetId.': '.implode(', ',array_keys($prior)).' → '.implode(', ',array_keys($new)),
+          ['user_id'=>$targetId]);
         $db->commit();
     }catch(Throwable $e){$db->rollBack();throw $e;}
     return sf_team_roles($targetId);
