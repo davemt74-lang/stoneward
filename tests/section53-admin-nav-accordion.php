@@ -10,7 +10,7 @@ $groups=[
  'audience'=>['crm','customer','campaigns','automations'],
  'commerce'=>['products','orders','fulfillment','pod','membership','ticketing','packages'],
  'agent'=>['brain','knowledge','ai'],
- 'administration'=>['users','operations','settings']
+ 'administration'=>['users','team','operations','settings']
 ];
 preg_match_all('/<details class="admin-nav-category" data-nav-category="([^"]+)"( open)?>\s*<summary[^>]*>(.*?)<\/summary>\s*<div class="admin-nav-items">(.*?)<\/div>\s*<\/details>/s',$html,$parts,PREG_SET_ORDER);
 $check=[];
