@@ -67,7 +67,7 @@ ok40(str_contains($version,"'pwa_install'=>'dynamic-manifest-install-prompt-stan
 ok40(str_contains($version,"'accessibility_keyboard'=>'skip-link-dialog-focus-trap-escape-focus-return-aria-current'"),'version endpoint advertises keyboard accessibility support');
 ok40(!str_contains($mig,"'app_version'=>'1.3.39'"),'Section 40 itself still introduced no unnecessary database migration');
 ok40(preg_match("/define\\('SF_ADMIN_BUILD','([^']+)'\\)/",$admin,$am40)&&version_compare($am40[1],'1.3.39','>='),'Admin asset build remains Section 40 compatible or newer');
-ok40(substr_count($admin,'data-view="')===29,'Section 40 adds no Admin sidebar item');
+ok40(substr_count($admin,'data-view="')>=30&&str_contains($admin,'data-view="team"'),'Section 40 remains compatible with the additional Team Workspace page');
 ok40(str_contains($wf,'node --check assets/js/accessibility.js')&&str_contains($wf,'php tests/v1339-section40-accessibility-pwa.php'),'release gate certifies accessibility runtime and Section 40');
 ok40(!str_contains($releaseNotes,'NaN# Stonefellow'),'release notes contain no NaN/corruption artifact');
 

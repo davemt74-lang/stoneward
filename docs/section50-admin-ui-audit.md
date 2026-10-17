@@ -1,7 +1,7 @@
 # Section 50 — Admin UI and Workflow Certification
 
 **Source baseline:** v1.3.49, `main` at `2c7507d6bd2b516e2eaed4be41dc66506e780b4c`.
-**Scope:** 29 Admin navigation views, authenticated Admin shell, shared page headers and form overlays.
+**Scope:** 30 Admin navigation views (29 historical baseline plus Team Workspace), authenticated Admin shell, shared page headers and form overlays.
 **Audience:** Single-artist Stonefellow operators.
 
 ## 50A — Page-by-page static UI audit
@@ -39,6 +39,7 @@ The audit classifies each view by the existing owner of its markup and primary a
 | 27 | Operating Calendar | New launch plan, milestone | Header actions and plan editor overlay |
 | 28 | Operations | Health, backups and diagnostics | Preserve existing destructive-operation guards |
 | 29 | Settings | Ten-tab workspace, + New Story | Retain Settings tabs and specialized Story modal |
+| 30 | Team Workspace | Assign multiple staff roles; inspect named, timestamped operational activity | New, separate role-scoped team module; does not alter Admin ownership or permissions |
 
 ## 50B — Header actions and editor lifecycle
 
