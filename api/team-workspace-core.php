@@ -7,6 +7,9 @@ declare(strict_types=1);
  */
 function sf_team_role_catalog():array {
     return [
+      // Audience contributor roles never grant the internal Team Workspace.
+      'fan'=>['label'=>'Fan','permissions'=>['capture.view','capture.submit']],
+      'customer'=>['label'=>'Customer','permissions'=>['capture.view','capture.submit']],
       'band_member'=>['label'=>'Band Member','permissions'=>['team.enter','team.profile.edit_own','media.read','knowledge.read']],
       'manager'=>['label'=>'Manager','permissions'=>['team.enter','team.profile.edit_own','team.timeline.read','team.roster.read','media.read','media.upload','knowledge.read','tour.read']],
       'website_manager'=>['label'=>'Website Manager','permissions'=>['team.enter','team.profile.edit_own','team.timeline.read','team.roster.read','media.read','media.upload','knowledge.read','content.draft']],
@@ -136,7 +139,7 @@ function sf_team_roster(int $viewerId):array {
     sf_team_ensure_schema();
     $rows=sf_db()->query("SELECT DISTINCT u.id,u.display_name,u.status
       FROM users u JOIN team_role_assignments r ON r.user_id=u.id
-      WHERE r.revoked_at IS NULL AND u.status='active' ORDER BY u.display_name LIMIT 300")->fetchAll(PDO::FETCH_ASSOC);
+      WHERE r.revoked_at IS NULL AND r.role_key NOT IN ('fan','customer') AND u.status='active' ORDER BY u.display_name LIMIT 300")->fetchAll(PDO::FETCH_ASSOC);
     foreach($rows as &$row)$row['team_roles']=sf_team_roles((int)$row['id']);
     unset($row);return $rows;
 }
