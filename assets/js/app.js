@@ -576,13 +576,13 @@
         bind(detail);
       }
     }
-    $('[data-world-key]',canvas).forEach(button=>button.onclick=()=>{
+    canvas.querySelectorAll('[data-world-key]').forEach(button=>button.onclick=()=>{
       const key=button.dataset.worldKey;if(!byId.has(key))return;
       graph.selected=key;paintArtistWorld();setUrl('world',{id:key});
       const panel=$('#artistWorldDetail',canvas);
       if(panel&&window.innerWidth<800)panel.scrollIntoView({behavior:'smooth',block:'start'});
     });
-    $('[data-world-filter]',canvas).forEach(button=>{
+    canvas.querySelectorAll('[data-world-filter]').forEach(button=>{
       const active=button.dataset.worldFilter===graph.filter;
       button.setAttribute('aria-pressed',String(active));
     });
@@ -612,7 +612,7 @@
       '<aside id="artistWorldDetail" class="artist-world-detail" aria-label="Selected experience"></aside></div>'+
       '<div class="artist-world-footnote">Every connection comes from published Stonefellow content. Private drafts, purchases, and listening profiles are not exposed.</div></article>';
     bind(canvas);
-    $('[data-world-filter]',canvas).forEach(button=>button.onclick=()=>{artistWorldState.filter=button.dataset.worldFilter;paintArtistWorld()});
+    canvas.querySelectorAll('[data-world-filter]').forEach(button=>button.onclick=()=>{artistWorldState.filter=button.dataset.worldFilter;paintArtistWorld()});
     $('#artistWorldSearch',canvas).oninput=e=>{artistWorldState.query=e.target.value.slice(0,100);paintArtistWorld()};
     paintArtistWorld();
   }
