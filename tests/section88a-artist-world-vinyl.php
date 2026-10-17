@@ -25,9 +25,7 @@ function sf_gallery_public_list():array {
  ['id'=>1,'slug'=>'live','title'=>'Behind the Album','summary'=>'Published story',
  'cover'=>$photo('M'.str_repeat('A',20),true,true,2400),
  'photos'=>[$photo('M'.str_repeat('B',20),true,false,2400),$photo('M'.str_repeat('A',20),true,true,900)],
- 'entities'=>[['type'=>'release','id'=>'album1']]],
- ['id'=>2,'slug'=>'private','title'=>'Private Studio','summary'=>'Unpublished',
- 'cover'=>$photo('M'.str_repeat('B',20),true,true,2400),'photos'=>[],'entities'=>[]]
+ 'entities'=>[['type'=>'release','id'=>'album1']]]
  ];
 }
 require dirname(__DIR__).'/api/artist-world-vinyl.php';
