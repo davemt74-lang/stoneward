@@ -143,3 +143,13 @@
 .team-admin-timeline-item small{font-size:.7rem;opacity:.7}
 #teamAdminUser{width:100%;max-width:500px}
 @media(max-width:600px){.team-admin-role-grid{grid-template-columns:1fr}}
+
+/* Director panel inside Team Workspace */
+.director-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:1rem 0}
+.director-form label{display:grid;gap:.25rem;min-width:0}
+.director-form label:has(textarea),.director-form button{grid-column:1/-1}
+.director-form input,.director-form select,.director-form textarea{width:100%;padding:.55rem;border:1px solid rgba(160,160,160,.3);border-radius:7px;background:transparent;color:inherit}
+.director-row{display:flex;align-items:start;justify-content:space-between;gap:1rem;padding:1rem 0;border-bottom:1px solid rgba(150,150,150,.2)}
+.director-row>div:first-child{display:grid;gap:.2rem}.director-row small{font-size:.74rem;opacity:.7}
+.director-row p{white-space:pre-wrap}.director-actions{display:flex;flex-wrap:wrap;gap:.4rem}
+@media(max-width:650px){.director-form{grid-template-columns:1fr}.director-row{flex-direction:column}}
