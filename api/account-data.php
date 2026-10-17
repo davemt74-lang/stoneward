@@ -187,6 +187,13 @@ function sf_account_normalize_build(array $raw,int $userId=0): array {
             error_log('Stonefellow draft module validation deferred. SQLSTATE '.(string)$e->getCode());
         }
     }
+    require_once __DIR__.'/artist-world-vinyl.php';
+    foreach(['coverFront','coverBack'] as $coverKey){
+      $reference=sf_clean_text($raw[$coverKey]??'stonefellow',70);
+      if(!in_array($reference,['stonefellow','desert','midnight','analog'],true)
+         &&!sf_world_vinyl_approved_reference($reference))
+         throw new InvalidArgumentException('Chosen gallery artwork is no longer approved for vinyl. Choose another image.');
+    }
     return ['version'=>4,'format'=>$format,'title'=>$title,'theme'=>$theme,'A'=>$sides['A'],'B'=>$sides['B'],
       'playerModules'=>$modules,'pendingPlayerModules'=>$pending,
       'coverFront'=>sf_clean_text($raw['coverFront']??'stonefellow',70),'coverBack'=>sf_clean_text($raw['coverBack']??'stonefellow',70),
