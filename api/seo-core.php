@@ -72,6 +72,15 @@ function sf_seo_resolve(?string $view=null,string $id='',string $slug=''): array
     if($view===''||$view==='home'){
       $m['title']='Stonefellow — Official Artist Site';$m['description']=sf_seo_excerpt((string)($site['seo_description']??''),180)?:'Stonefellow music, releases, shows, stories, merch and direct fan experiences.';$m['canonical']=sf_seo_base_url().'/';$m['json_ld']=[sf_seo_artist_schema()];$m['server_title']='Stonefellow';$m['server_body']=$m['description'];return $m;
     }
+    if($view==='world'){
+      $m['title']='Artist World — Stonefellow';
+      $m['description']='Explore connections among Stonefellow songs, albums, music stories, photography, films and live shows.';
+      $m['canonical']=sf_seo_base_url().'/world';
+      $m['json_ld']=[sf_seo_artist_schema()];
+      $m['server_title']='Stonefellow Artist World';
+      $m['server_body']=$m['description'];
+      return $m;
+    }
     if($view==='search'){
       $m['title']='Search Stonefellow';$m['description']='Search public Stonefellow songs, releases, shows, stories, videos, photos, merch and current offers.';$m['canonical']=sf_seo_base_url().'/search';$m['robots']='noindex,follow,noarchive';$m['json_ld']=[];$m['server_title']='Search Stonefellow';$m['server_body']=$m['description'];return $m;
     }
@@ -137,7 +146,7 @@ function sf_seo_server_html(array $m): string {
 
 function sf_seo_sitemap_entries(): array {
     $out=[];$add=function(string $url,string $lastmod='',string $priority='0.7')use(&$out){if(!sf_seo_web_url($url))return;$out[$url]=['loc'=>$url,'lastmod'=>$lastmod,'priority'=>$priority];};
-    $base=sf_seo_base_url();foreach([''=>'1.0','music'=>'0.8','releases'=>'0.9','shows'=>'0.8','videos'=>'0.8','photos'=>'0.7','store'=>'0.8','about'=>'0.6','contact'=>'0.6','archive'=>'0.7'] as $path=>$priority)$add($base.'/'.($path!==''?$path:''),'',$priority);
+    $base=sf_seo_base_url();foreach([''=>'1.0','world'=>'0.9','music'=>'0.8','releases'=>'0.9','shows'=>'0.8','videos'=>'0.8','photos'=>'0.7','store'=>'0.8','about'=>'0.6','contact'=>'0.6','archive'=>'0.7'] as $path=>$priority)$add($base.'/'.($path!==''?$path:''),'',$priority);
     foreach(sf_seo_release_rows() as $r){if(($r['state']??'published')!=='published'||($r['public_visible']??true)===false||empty($r['id']))continue;$id=(string)$r['id'];$add($base.'/release/'.rawurlencode($id),(string)($r['updated_at']??$r['release_date']??''),'0.9');foreach((array)($r['track_ids']??[]) as $tid){if(sf_seo_public_track((string)$tid))$add($base.'/track/'.rawurlencode((string)$tid),(string)($r['updated_at']??$r['release_date']??''),'0.8');}}
     foreach(sf_catalog() as $t){$tid=(string)($t['id']??'');if($tid!==''&&sf_seo_public_track($tid))$add($base.'/track/'.rawurlencode($tid),(string)($t['updated_at']??$t['metadata']['release_date']??''),'0.8');}
     if(function_exists('sf_live_public_shows'))foreach(sf_live_public_shows() as $s)if(!empty($s['id']))$add($base.'/show/'.rawurlencode((string)$s['id']),(string)($s['updated_at']??$s['date']??''),'0.7');
