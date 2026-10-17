@@ -80,6 +80,7 @@
         if(!timeline.has_more)next.hidden=true;
       }catch(e){c.say?.(e.message);}finally{next.disabled=false;}
     };
+    await window.SFDirectorCaptureAdmin?.render?.(c.canvas);
   }
   window.SFTeamAdmin={render};
 })();
