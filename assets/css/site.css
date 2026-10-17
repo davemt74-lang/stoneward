@@ -499,3 +499,16 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .fan-guided-actions [data-fan-save]{background:rgba(153,128,87,.15)}
 .fan-guided-actions [data-fan-vinyl]{border-color:#9176a1;background:rgba(112,85,141,.12)}
 .fan-guided-actions button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+
+/* Team Workspace · role-based, minimal staff experience */
+.team-workspace{max-width:1050px;margin:0 auto}
+.team-workspace .panel{margin:1rem 0;padding:1.15rem;border:1px solid rgba(158,158,158,.23);border-radius:16px}
+.team-role-tags{display:flex;flex-wrap:wrap;gap:.5rem}
+.team-role-tag{padding:.35rem .75rem;border-radius:2rem;border:1px solid rgba(158,158,158,.4);font-size:.83rem}
+.team-roster-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.5rem;padding:.75rem 0;border-bottom:1px solid rgba(158,158,158,.18)}
+.team-roster-row small{opacity:.73}
+.team-timeline{display:grid;gap:.7rem;margin:1rem 0}
+.team-timeline-event{display:grid;gap:.25rem;padding:.75rem 1rem;border-left:2px solid var(--accent,#bd9d69);background:rgba(120,120,120,.06);border-radius:0 8px 8px 0}
+.team-timeline-event time,.team-timeline-event small{font-size:.73rem;opacity:.7;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.team-workspace input[type=file]{display:block;max-width:100%;margin:.8rem 0}
+@media(max-width:660px){.team-roster-row{flex-direction:column}.team-workspace .panel{padding:.8rem}}

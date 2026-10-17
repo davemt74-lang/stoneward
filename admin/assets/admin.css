@@ -131,3 +131,15 @@
 @media(max-height:760px){#adminNav .admin-nav-summary{min-height:34px;padding-top:6px;padding-bottom:6px}#adminNav .admin-nav-items{padding-bottom:5px}}
 @media(max-width:760px){#adminNav .admin-nav-summary{min-height:44px}#adminNav .admin-nav-items button{min-height:38px;font-size:.72rem}}
 @media(prefers-reduced-motion:reduce){#adminNav .admin-nav-chevron{transition:none}}
+
+/* Team Workspace · multi-role editor and chronology */
+.team-admin-role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.6rem;margin:1rem 0}
+.team-role-choice{display:flex;align-items:flex-start;gap:.55rem;padding:.75rem;border:1px solid rgba(160,160,160,.24);border-radius:10px;cursor:pointer;min-width:0}
+.team-role-choice input{margin:.2rem 0 0;flex-shrink:0}
+.team-role-choice span{display:grid;gap:.3rem;min-width:0}
+.team-role-choice small{font-size:.7rem;opacity:.64;line-height:1.45;overflow-wrap:anywhere}
+.team-admin-timeline{display:grid;gap:.5rem;margin:1rem 0}
+.team-admin-timeline-item{padding:.7rem .9rem;border-left:2px solid var(--accent,#b99a6b);background:rgba(128,128,128,.05);border-radius:0 9px 9px 0}
+.team-admin-timeline-item small{font-size:.7rem;opacity:.7}
+#teamAdminUser{width:100%;max-width:500px}
+@media(max-width:600px){.team-admin-role-grid{grid-template-columns:1fr}}
