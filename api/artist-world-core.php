@@ -47,7 +47,7 @@ function sf_world_graph_assemble(array $sources):array {
             if(!is_array($row))continue;
             $node=sf_world_node($type,$row);
             if(!$node)continue;$nodes[$node['key']]=$node;
-            if($type==='release')$releaseTitles[mb_strtolower($node['title'])]=$node['id'];
+            if($type==='release')$releaseTitles[strtolower($node['title'])]=$node['id'];
         }
     }
     $connect=function(string $a,string $b,string $kind)use(&$edges,&$edgeSeen,$nodes):void {
@@ -59,8 +59,8 @@ function sf_world_graph_assemble(array $sources):array {
         if(!is_array($row))continue;$key='track:'.(string)($row['id']??'');
         if(!isset($nodes[$key]))continue;
         $release=(string)($row['release_id']??'');
-        if($release===''&&isset($releaseTitles[mb_strtolower((string)($row['release']??''))]))
-            $release=$releaseTitles[mb_strtolower((string)($row['release']??''))];
+        if($release===''&&isset($releaseTitles[strtolower((string)($row['release']??''))]))
+            $release=$releaseTitles[strtolower((string)($row['release']??''))];
         if($release!=='')$connect('release:'.$release,$key,'contains');
     }
     foreach(['story','video','photo'] as $type){
@@ -72,7 +72,7 @@ function sf_world_graph_assemble(array $sources):array {
               :(array)($row['entities']??[]);
             foreach(array_slice($refs,0,15) as $ref){
                 if(!is_array($ref))continue;$t=(string)($ref['type']??'');$id=(string)($ref['id']??'');
-                if(!in_array($t,['track','release','show'],true))continue;
+                if(!in_array($t,['track','release','show','story'],true))continue;
                 $connect($from,$t.':'.$id,'about');
             }
         }
