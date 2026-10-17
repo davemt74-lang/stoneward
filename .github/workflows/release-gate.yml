@@ -291,6 +291,7 @@ jobs:
           php tests/section87d2-consented-intent.php
           php tests/section87d3-admin-conversion.php
           php tests/section87d4-release-identity.php
+          php tests/section88a-artist-world-vinyl.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php

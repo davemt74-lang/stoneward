@@ -70,10 +70,11 @@ function sf_validate_builder(array $b, string $format, int $userId=0): array {
         $sides[$side]=['duration'=>$duration,'tracks'=>$rows];
     }
     if(count($seen)===0) $errors[]='Add at least one track before ordering.';
+    require_once __DIR__.'/artist-world-vinyl.php';
     $allowedCovers=['stonefellow','desert','midnight','analog'];
     $front=sf_clean_text($b['coverFront']??'stonefellow',70);$back=sf_clean_text($b['coverBack']??'stonefellow',70);
-    if(!in_array($front,$allowedCovers,true))$errors[]='Unknown front cover template.';
-    if(!in_array($back,$allowedCovers,true))$errors[]='Unknown back cover template.';
+    if(!in_array($front,$allowedCovers,true)&&!sf_world_vinyl_approved_reference($front))$errors[]='Front artwork is not in an approved published Vinyl Studio photo collection.';
+    if(!in_array($back,$allowedCovers,true)&&!sf_world_vinyl_approved_reference($back))$errors[]='Back artwork is not in an approved published Vinyl Studio photo collection.';
     return ['ok'=>!$errors,'errors'=>$errors,'format'=>$format,'title'=>sf_clean_text($b['title'] ?? 'My Stonefellow Record',60),
       'theme'=>sf_clean_text($b['theme'] ?? 'desert',30),'coverFront'=>$front,'coverBack'=>$back,
       'customNote'=>sf_clean_text($b['customNote']??'',280),'playerModules'=>!empty($b['playerModules'])?sf_turntable_valid_selection((array)$b['playerModules'],$userId):sf_turntable_module_defaults(),'sides'=>$sides];
