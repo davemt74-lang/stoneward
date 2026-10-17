@@ -62,6 +62,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/turntable-builder.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/artist-world.css?v=<?=rawurlencode(SF_BUILD)?>">
   <style id="stonefellowTheme"><?=sf_theme_css($activeTheme)?></style>
 </head>
 <body class="<?=sf_h(trim(sf_theme_body_classes($activeTheme).' '.(($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':'')))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
@@ -92,6 +93,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
         <button class="menu-close" id="menuClose" type="button" aria-label="Close menu">×</button>
         <nav>
           <a href="./" data-view="home"><?=!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent'?></a>
+          <a href="world" data-view="world">Artist World</a>
           <a href="music" data-view="music">Music</a>
           <a href="search" data-view="search">Search</a>
           <a href="releases" data-view="releases">Releases</a>

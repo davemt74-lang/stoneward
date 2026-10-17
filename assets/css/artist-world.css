@@ -1,0 +1,39 @@
+
+/* 88B2 · Artist World connection canvas; one artist, one published catalog. */
+.artist-world{max-width:1440px;margin:0 auto}
+.artist-world-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;margin:1.5rem 0 2rem}
+.artist-world-intro h1{font-size:clamp(2.1rem,4vw,4rem);line-height:1.05;letter-spacing:-.04em;max-width:780px;margin:.25rem 0 1rem}
+.artist-world-intro p{max-width:65ch;opacity:.8;line-height:1.6}
+.artist-world-controls{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;margin:1.5rem 0}
+.artist-world-filters{display:flex;flex-wrap:wrap;gap:.45rem}
+.artist-world-filters button{border:1px solid rgba(153,153,153,.32);background:transparent;color:inherit;border-radius:24px;padding:.48rem .75rem;cursor:pointer;font:inherit;font-size:.83rem}
+.artist-world-filters button[aria-pressed="true"]{background:var(--accent,#bd9d69);color:#151515;border-color:transparent}
+.artist-world-filters span{font-variant-numeric:tabular-nums;opacity:.7;margin-left:.3rem}
+.artist-world-search{font-size:.75rem;display:flex;flex-direction:column;gap:.25rem;min-width:min(100%,220px)}
+.artist-world-search input{border:1px solid rgba(153,153,153,.4);color:inherit;background:transparent;border-radius:12px;padding:.65rem}
+.artist-world-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(290px,1fr);gap:1.5rem;align-items:start}
+.artist-world-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:1rem;min-height:90px}
+.artist-world-card{display:flex;flex-direction:column;background:rgba(120,120,120,.055);border:1px solid rgba(145,145,145,.23);border-radius:16px;padding:.5rem;overflow:hidden;color:inherit;text-align:left;cursor:pointer;min-width:0;transition:transform .14s,border-color .14s}
+.artist-world-card:hover,.artist-world-card:focus-visible,.artist-world-card.selected{border-color:var(--accent,#bd9d69);transform:translateY(-2px)}
+.artist-world-card-art{display:grid;place-items:center;aspect-ratio:1.1;border-radius:11px;overflow:hidden;background:linear-gradient(145deg,rgba(174,122,59,.16),rgba(72,70,92,.32))}
+.artist-world-card-art img{width:100%;height:100%;object-fit:cover}
+.artist-world-fallback{font-size:4rem;opacity:.35;font-weight:200}
+.artist-world-card-body{display:flex;flex-direction:column;gap:.3rem;padding:.75rem .3rem;min-height:80px}
+.artist-world-card-body small,.artist-world-link small{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;opacity:.63}
+.artist-world-card-body strong{font-size:1rem;line-height:1.3}
+.artist-world-card-body>span{font-size:.78rem;line-height:1.5;opacity:.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.artist-world-detail{border:1px solid rgba(155,155,155,.25);border-radius:20px;padding:1.25rem;background:rgba(110,110,110,.05);position:sticky;top:1.5rem}
+.artist-world-detail-art{width:100%;aspect-ratio:1.9;overflow:hidden;background:linear-gradient(125deg,rgba(180,126,55,.2),rgba(55,66,89,.4));border-radius:12px;display:grid;place-items:center;margin-bottom:1rem}
+.artist-world-detail-art img{width:100%;height:100%;object-fit:cover}
+.artist-world-detail h2{font-size:clamp(1.6rem,2.5vw,2.2rem);line-height:1.15;margin:.4rem 0}
+.artist-world-detail>p{line-height:1.6;opacity:.83}
+.artist-world-detail h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.09em;margin:1.4rem 0 .6rem}
+.artist-world-detail-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}
+.artist-world-related{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:.5rem}
+.artist-world-link{display:flex;flex-direction:column;gap:.3rem;padding:.7rem;border:1px solid rgba(140,140,140,.3);background:transparent;color:inherit;border-radius:10px;text-align:left;cursor:pointer}
+.artist-world-link:hover,.artist-world-link:focus-visible{border-color:var(--accent,#bd9d69)}
+.artist-world-link strong{font-size:.85rem}
+.artist-world-empty{padding:1.5rem;border:1px dashed rgba(150,150,150,.3);border-radius:14px;line-height:1.6}
+.artist-world-footnote{font-size:.78rem;opacity:.67;margin-top:2rem}
+@media(max-width:850px){.artist-world-layout{grid-template-columns:1fr}.artist-world-detail{position:static}.artist-world-intro{align-items:flex-start;flex-direction:column}}
+@media(max-width:480px){.artist-world-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.artist-world-card-body{padding:.6rem .2rem}.artist-world-controls{flex-direction:column}}

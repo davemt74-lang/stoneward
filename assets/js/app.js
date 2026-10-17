@@ -312,6 +312,7 @@
   function publicRouteUrl(view,params={}){
     const id=encodeURIComponent(String(params.id||'')),slug=encodeURIComponent(String(params.slug||'')),base=document.baseURI,finish=u=>{if(window.STONEFELLOW_THEME_PREVIEW)u.searchParams.set('theme_preview','1');return u};
     if(!view||view==='home')return finish(new URL('./',base));
+    if(view==='world'&&id){const u=finish(new URL('world',base));u.searchParams.set('id',String(params.id).slice(0,180));return u;}
     if(view==='track'&&id)return finish(new URL('track/'+id,base));
     if(view==='release'&&id)return finish(new URL('release/'+id,base));
     if(view==='show'&&id)return finish(new URL('show/'+id,base));
@@ -321,7 +322,7 @@
     if(view==='video'&&slug)return finish(new URL('video/'+slug,base));
     if(view==='photo'&&slug)return finish(new URL('photos/'+slug,base));
     if(view==='press'&&slug){const u=new URL('press/'+slug,base);if(params.token)u.hash='token='+encodeURIComponent(String(params.token));return finish(u)}
-    if(view==='contact'){const u=finish(new URL('contact',base));if(['booking','press','licensing','collaboration','general'].includes(String(params.type||'')))u.searchParams.set('type',String(params.type));return u}if(view==='search'){const u=finish(new URL('search',base));if(params.q)u.searchParams.set('q',String(params.q).slice(0,300));if(params.type&&params.type!=='all'&&['track','release','show','story','video','photo','product','campaign'].includes(String(params.type)))u.searchParams.set('type',String(params.type));return u}if(['music','releases','shows','store','about','archive','videos'].includes(view))return finish(new URL(view,base));if(view==='photos')return finish(new URL('photos',base));
+    if(view==='contact'){const u=finish(new URL('contact',base));if(['booking','press','licensing','collaboration','general'].includes(String(params.type||'')))u.searchParams.set('type',String(params.type));return u}if(view==='search'){const u=finish(new URL('search',base));if(params.q)u.searchParams.set('q',String(params.q).slice(0,300));if(params.type&&params.type!=='all'&&['track','release','show','story','video','photo','product','campaign'].includes(String(params.type)))u.searchParams.set('type',String(params.type));return u}if(['world','music','releases','shows','store','about','archive','videos'].includes(view))return finish(new URL(view,base));if(view==='photos')return finish(new URL('photos',base));
     const u=new URL('./',base);u.searchParams.set('view',view);Object.entries(params).forEach(([k,v])=>{if(k!=='token'&&v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});return finish(u);
   }
   async function syncSeo(view,params={}){
@@ -533,7 +534,90 @@
   const albumVinyl=$('[data-buy-album-vinyl]',canvas);if(albumVinyl)albumVinyl.onclick=()=>addAlbumVinylToCart(r);
   const albumLicenses=$('[data-buy-album-licenses]',canvas);if(albumLicenses)albumLicenses.onclick=()=>addVinylLicensePack('album_vinyl_license_pack',r.id,Number($('[data-album-license-select]',canvas)?.value||0));void updatePrintLicenseBalance(tracks.map(t=>t.id),'#releaseVinylBalance');if(push)setUrl('release',{id:r.id})}
 
-  async function navigate(view='home',params={},push=true){closeMenu();hide();document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
+
+  // 88B2 Artist World: published nodes only, navigation stays inside the existing SPA.
+  const artistWorldState={nodes:[],edges:[],selected:'',filter:'all',query:'',partial:[]};
+  const artistWorldKinds={track:'Songs',release:'Albums',story:'Stories',video:'Videos',photo:'Photo Collections',show:'Live Shows'};
+  function artistWorldPhoto(node){
+    return node.image?'<img src="'+esc(node.image)+'" alt="" loading="lazy">':'<span class="artist-world-fallback" aria-hidden="true">'+esc(node.type.slice(0,1).toUpperCase())+'</span>';
+  }
+  function artistWorldCard(node){
+    return '<button type="button" class="artist-world-card'+(node.key===artistWorldState.selected?' selected':'')+'" data-world-key="'+esc(node.key)+'" aria-pressed="'+(node.key===artistWorldState.selected?'true':'false')+'">'+
+      '<span class="artist-world-card-art">'+artistWorldPhoto(node)+'</span>'+
+      '<span class="artist-world-card-body"><small>'+esc(artistWorldKinds[node.type]||node.type)+'</small><strong>'+esc(node.title)+'</strong>'+
+      (node.summary?'<span>'+esc(node.summary)+'</span>':'')+'</span></button>';
+  }
+  function paintArtistWorld(){
+    const graph=artistWorldState,byId=new Map(graph.nodes.map(n=>[n.key,n]));
+    const filter=graph.filter,q=graph.query.trim().toLowerCase();
+    const visible=graph.nodes.filter(n=>(filter==='all'||n.type===filter)&&(!q||(n.title+' '+n.summary).toLowerCase().includes(q)));
+    const grid=$('#artistWorldGrid',canvas);
+    if(grid)grid.innerHTML=visible.length?visible.slice(0,160).map(artistWorldCard).join(''):'<div class="artist-world-empty">No published items match. Try another collection or search.</div>';
+    const chosen=byId.get(graph.selected)||graph.nodes[0]||null;
+    const detail=$('#artistWorldDetail',canvas);
+    if(detail){
+      if(!chosen)detail.innerHTML='<div class="artist-world-empty">Published music and stories will appear as the artist releases them.</div>';
+      else {
+        const connections=[];
+        for(const e of graph.edges){
+          const other=e.from===chosen.key?byId.get(e.to):e.to===chosen.key?byId.get(e.from):null;
+          if(other&&other.key!==chosen.key&&!connections.some(x=>x.key===other.key))connections.push(other);
+          if(connections.length>=18)break;
+        }
+        detail.innerHTML='<div class="artist-world-detail-art">'+artistWorldPhoto(chosen)+'</div>'+
+          '<div class="module-kicker">'+esc(artistWorldKinds[chosen.type]||chosen.type)+'</div>'+
+          '<h2>'+esc(chosen.title)+'</h2>'+
+          (chosen.summary?'<p>'+esc(chosen.summary)+'</p>':'<p>Explore this part of the Stonefellow story.</p>')+
+          '<div class="artist-world-detail-actions"><button class="buy-primary" type="button" id="artistWorldOpen">Open '+esc(chosen.type==='track'?'song':chosen.type==='release'?'album':'experience')+'</button><button class="text-control" type="button" data-view="builder">Design vinyl</button></div>'+
+          '<h3>Connected in this world</h3>'+
+          (connections.length?'<div class="artist-world-related">'+connections.map(x=>'<button class="artist-world-link" type="button" data-world-key="'+esc(x.key)+'"><small>'+esc(artistWorldKinds[x.type]||x.type)+'</small><strong>'+esc(x.title)+'</strong></button>').join('')+'</div>':
+            '<p class="player-note">This is a starting point. More connections appear as related stories and media are published.</p>');
+        $('#artistWorldOpen',detail).onclick=()=>navigate(chosen.view,chosen.params);
+        bind(detail);
+      }
+    }
+    $('[data-world-key]',canvas).forEach(button=>button.onclick=()=>{
+      const key=button.dataset.worldKey;if(!byId.has(key))return;
+      graph.selected=key;paintArtistWorld();setUrl('world',{id:key});
+      const panel=$('#artistWorldDetail',canvas);
+      if(panel&&window.innerWidth<800)panel.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+    $('[data-world-filter]',canvas).forEach(button=>{
+      const active=button.dataset.worldFilter===graph.filter;
+      button.setAttribute('aria-pressed',String(active));
+    });
+  }
+  async function renderArtistWorld(params={}){
+    starters.hidden=true;
+    canvas.innerHTML='<article class="module artist-world"><div class="module-kicker">STONEFELLOW · ARTIST WORLD</div><h1>Every song has a world around it.</h1><p>Travel between Stonefellow music, stories, photography, films and live moments without interrupting playback.</p><div class="artist-world-empty">Opening Artist World…</div></article>';
+    try{
+      const j=await api('artist-world.php'),w=j.world||{};
+      artistWorldState.nodes=Array.isArray(w.nodes)?w.nodes:[];
+      artistWorldState.edges=Array.isArray(w.edges)?w.edges:[];
+      artistWorldState.partial=Array.isArray(w.unavailable_sources)?w.unavailable_sources:[];
+    }catch(e){
+      canvas.innerHTML='<article class="module artist-world"><div class="module-kicker">ARTIST WORLD</div><h1>The world is temporarily unavailable.</h1><p>'+esc(e.message)+'</p><button type="button" class="text-control" data-view="music">Explore songs instead</button></article>';
+      bind(canvas);return;
+    }
+    const types=['all','release','track','story','video','photo','show'];
+    const counts={};for(const n of artistWorldState.nodes)counts[n.type]=(counts[n.type]||0)+1;
+    artistWorldState.selected=artistWorldState.nodes.some(n=>n.key===String(params.id||''))?String(params.id):artistWorldState.nodes[0]?.key||'';
+    artistWorldState.filter='all';artistWorldState.query='';
+    canvas.innerHTML='<article class="module artist-world" aria-label="Artist World exploration"><div class="module-kicker">STONEFELLOW · ARTIST WORLD</div>'+
+      '<div class="artist-world-intro"><div><h1>Explore the world behind the music.</h1><p>Songs, albums, stories, films, photographs and live moments are all connected. Choose any doorway and see what surrounds it.</p></div><button type="button" class="text-control" data-view="builder">Make your own vinyl</button></div>'+
+      (artistWorldState.partial.length?'<p class="player-note" role="status">Some published collections are temporarily unavailable: '+esc(artistWorldState.partial.join(', '))+'.</p>':'')+
+      '<div class="artist-world-controls"><div class="artist-world-filters" role="group" aria-label="Explore content types">'+types.map(t=>'<button type="button" data-world-filter="'+t+'" aria-pressed="'+(t==='all'?'true':'false')+'">'+(t==='all'?'All':artistWorldKinds[t])+' <span>'+ (t==='all'?artistWorldState.nodes.length:(counts[t]||0))+'</span></button>').join('')+'</div>'+
+      '<label class="artist-world-search">Search this world<input id="artistWorldSearch" type="search" autocomplete="off" placeholder="Song, story, album…" maxlength="100" aria-label="Search published Artist World content"></label></div>'+
+      '<div class="artist-world-layout"><section class="artist-world-grid" id="artistWorldGrid" aria-label="Published experiences"></section>'+
+      '<aside id="artistWorldDetail" class="artist-world-detail" aria-label="Selected experience"></aside></div>'+
+      '<div class="artist-world-footnote">Every connection comes from published Stonefellow content. Private drafts, purchases, and listening profiles are not exposed.</div></article>';
+    bind(canvas);
+    $('[data-world-filter]',canvas).forEach(button=>button.onclick=()=>{artistWorldState.filter=button.dataset.worldFilter;paintArtistWorld()});
+    $('#artistWorldSearch',canvas).oninput=e=>{artistWorldState.query=e.target.value.slice(0,100);paintArtistWorld()};
+    paintArtistWorld();
+  }
+
+  async function navigate(view='home',params={},push=true){closeMenu();hide();document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
   function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}navigate(view,params,false)}
 
   function updateFooterPlayer(){window.StonefellowTurntable?.sync?.(st.track,st.playing,st.builder);if(!st.track){footerPlayer.hidden=true;return}footerPlayer.hidden=false;playerTitle.textContent=st.track.title;playerRelease.textContent=st.track.release||'Stonefellow';playerToggle.textContent=st.playing?'Ⅱ':'▶';playerToggle.setAttribute('aria-label',st.playing?'Pause':'Play');const art=st.track.artwork||'';playerArtwork.innerHTML=art?`<img src="${esc(art)}" alt="">`:'<span>SF</span>';document.body.classList.add('has-player')}
@@ -1019,7 +1103,7 @@
   async function publicKnowledgeAnswer(q){try{const r=await fetch((cfg.apiBase||'api')+'/knowledge-search.php?q='+encodeURIComponent(q),{cache:'no-store'}),j=await r.json();if(j.ok&&j.hits?.length){const h=j.hits[0];say('From the Stonefellow knowledge base: '+(h.snippet||h.name));return true}}catch(_){}return false}
   function releaseAnswer(q){const n=norm(q);const r=releases.find(x=>n.includes(norm(x.title)))||releases.find(x=>(x.state||'published')==='published'&&x.agent_discoverable!==false);if(!r)return false;openRelease(r.id,true);say('Here is “'+r.title+'.”');return true}
   async function command(raw){const text=String(raw||'').trim(),q=norm(text);if(!text)return;hide();input.value='';closeMenu();const named=findTitle(q);await loadAuth();if(st.auth.authenticated){await liveAgent(text);return}
-    if(q.includes('community')){if(fanCommunityEnabled){navigate('community')}else{say('The fan community is not open yet. CRM and the Stonefellow newsletter are still active.',()=>navigate('newsletter'))}return}if(q.includes('newsletter')||q.includes('mailing list')){navigate('newsletter');return}if(q.includes('merch')||q.includes('shop')||q.includes('store')){navigate('store');return}if(q.includes('ticket')||q.includes('rsvp')||q.includes('vip')||q.includes('presale')){navigate('tickets');return}if(q.includes('tour')||q.includes('show dates')||q.includes('shows')){navigate('shows');return}
+    if(q.includes('artist world')||q.includes('explore the world')||q.includes('connected stories')){navigate('world');return}if(q.includes('community')){if(fanCommunityEnabled){navigate('community')}else{say('The fan community is not open yet. CRM and the Stonefellow newsletter are still active.',()=>navigate('newsletter'))}return}if(q.includes('newsletter')||q.includes('mailing list')){navigate('newsletter');return}if(q.includes('merch')||q.includes('shop')||q.includes('store')){navigate('store');return}if(q.includes('ticket')||q.includes('rsvp')||q.includes('vip')||q.includes('presale')){navigate('tickets');return}if(q.includes('tour')||q.includes('show dates')||q.includes('shows')){navigate('shows');return}
     if(q.includes('album')||q.includes('release')||q.includes('ep')||q.includes('single')){if(releaseAnswer(q))return}
     if(q.includes('knowledge')||q.includes('notes')||q.includes('document')||q.includes('photo')||q.includes('image')){if(await publicKnowledgeAnswer(text))return}
     if(q.includes('login')||q.includes('sign in')){say('Here is the login.',()=>navigate('login'));return}
