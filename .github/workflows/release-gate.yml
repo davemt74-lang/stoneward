@@ -298,6 +298,7 @@ jobs:
           php tests/section88b3-release-identity.php
           php tests/section88c1-living-album.php
           php tests/section88c2-team-workspace.php
+          php tests/section88c2a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php
