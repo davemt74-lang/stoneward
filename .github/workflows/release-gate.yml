@@ -300,6 +300,7 @@ jobs:
           php tests/section88c2-team-workspace.php
           php tests/section88c2a-release-identity.php
           php tests/section88c3a-band-member-profiles.php
+          php tests/section88d1-story-capture.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php
