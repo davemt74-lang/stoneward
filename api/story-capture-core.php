@@ -95,7 +95,7 @@ function sf_capture_create_request(int $adminId,array $input):int {
     sf_capture_clean($input['world_context']??'',180),
     sf_capture_clean($input['creative_suggestion']??'',2500),$origin,$state,$now,$now]);
   $id=(int)sf_db()->lastInsertId();
-  sf_team_audit($adminId,'capture.request_created','shot_request',(string)$id,'Created '+$kind+' capture request');
+  sf_team_audit($adminId,'capture.request_created','shot_request',(string)$id,'Created '.$kind.' capture request');
   return $id;
 }
 function sf_capture_publish_request(int $adminId,int $requestId,bool $open):void {
