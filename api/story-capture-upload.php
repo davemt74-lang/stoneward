@@ -15,6 +15,15 @@ if(($_POST['rights_attested']??'')!=='1')
 $kind=(string)($_POST['submission_type']??'');
 $title=sf_capture_clean($_POST['title']??'',180);
 if(!sf_capture_kind($kind)||$title==='')sf_json_response(['ok'=>false,'error'=>'invalid_capture'],422);
+// Reject exhausted quotas before Media Library ingestion; a rejected upload
+// must not leave an unreferenced large private media file behind.
+sf_capture_schema();
+$dailyLimit=sf_team_can($uid,'media.upload')?15:5;
+$q=sf_db()->prepare('SELECT COUNT(*) FROM story_capture_submissions WHERE contributor_id=? AND created_at>=?');
+$q->execute([$uid,gmdate('c',time()-86400)]);
+if((int)$q->fetchColumn()>=$dailyLimit)
+ sf_json_response(['ok'=>false,'error'=>'capture_quota_reached',
+   'message'=>'Daily media capture quota reached.'],429);
 $requestId=(int)($_POST['request_id']??0);
 if($requestId>0&&!in_array($requestId,array_map('intval',array_column(sf_capture_requests($uid),'id')),true))
  sf_json_response(['ok'=>false,'error'=>'shot_request_unavailable'],403);
