@@ -666,7 +666,81 @@
     };
   }
 
-  async function navigate(view='home',params={},push=true){closeMenu();hide();document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='team'){await renderTeamWorkspace()}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
+
+  async function renderCreativeCapture(){
+    await loadAuth(true);
+    if(!st.auth.authenticated){renderLogin();return;}
+    starters.hidden=true;
+    canvas.innerHTML='<section class="module"><h1>Creative Capture</h1><p>Loading capture requests…</p></section>';
+    let data;try{data=await api('story-capture.php');}catch(e){
+      canvas.innerHTML='<section class="module"><h1>Creative Capture</h1><p role="alert">'+esc(e.message||'Unavailable')+'</p></section>';return;}
+    const requests=Array.isArray(data.requests)?data.requests:[],
+      my=Array.isArray(data.submissions)?data.submissions:[];
+    canvas.innerHTML='<article class="module capture-studio"><div class="module-kicker">ARTIST WORLD · CREATIVE STUDIO</div>'+
+      '<h1>Capture the world around the music.</h1>'+
+      '<p>Respond to a Director request or contribute your own background scene, photograph, ambient sound, dialogue or story idea. All submissions remain private until reviewed.</p>'+
+      '<div class="capture-layout"><section><h2>Director requests</h2>'+
+      (requests.map(r=>'<div class="capture-request"><small>'+esc(r.shot_type||'')+' · '+esc(r.target_role||'')+'</small>'+
+        '<h3>'+esc(r.title||'')+'</h3><p>'+esc(r.brief||'')+'</p>'+
+        (r.creative_suggestion?'<p><strong>Creative direction:</strong> '+esc(r.creative_suggestion)+'</p>':'')+
+        '<button type="button" data-capture-request="'+Number(r.id)+'">Capture this shot</button></div>').join('')||'<p>No open requests yet. Background contributions are welcome.</p>')+
+      '</section><section class="capture-submit"><h2>Contribute a capture</h2><form id="creativeCaptureForm">'+
+      '<label>Request<select name="request_id" id="creativeCaptureRequest"><option value="0">General / background material</option>'+
+      requests.map(r=>'<option value="'+Number(r.id)+'">'+esc(r.title||'')+'</option>').join('')+'</select></label>'+
+      '<label>Type<select name="submission_type">'+
+      [['photo','Photograph'],['video','Video'],['audio','Audio'],['ambient','Ambient sound'],['dialogue','Dialogue'],['story_idea','Story idea'],['screenshot','Suggested screenshot/frame']].map(a=>'<option value="'+a[0]+'">'+a[1]+'</option>').join('')+'</select></label>'+
+      '<label>Title<input name="title" required maxlength="180"></label>'+
+      '<label>Description<textarea name="description" maxlength="3000" rows="3"></textarea></label>'+
+      '<label>Suggested dialogue<textarea name="dialogue_text" maxlength="5000" rows="2"></textarea></label>'+
+      '<label>Upload existing photo, video or audio<input name="file" type="file" accept="image/*,video/*,audio/*"></label>'+
+      '<label>Capture from camera<input id="creativeCamera" type="file" accept="image/*,video/*" capture="environment"></label>'+
+      '<label>Captured at<input name="captured_at" type="datetime-local"></label>'+
+      '<label>People and likeness release<select name="people_release_status"><option value="unconfirmed">Not yet cleared</option><option value="requires_review">May require releases</option><option value="not_applicable">No recognizable people</option></select></label>'+
+      '<label class="capture-agreement"><input name="rights_attested" type="checkbox" required> I have the right to submit this material for private editorial review. Publication and use of likenesses require separate approval.</label>'+
+      '<button class="buy-primary" type="submit">Submit for review</button><p role="status" id="creativeCaptureStatus"></p></form></section></div>'+
+      '<section class="capture-history"><h2>My contributions</h2>'+
+      (my.map(r=>'<div><time>'+esc(r.created_at||'')+'</time><strong>'+esc(r.title||'')+'</strong><small>'+esc(r.review_status||'')+'</small></div>').join('')||'<p>Nothing submitted yet.</p>')+'</section>'+
+      '<p class="player-note">AI suggestions and original uploads are evidence for an editorial review—not automatic permission to generate or publish a finished video.</p></article>';
+    canvas.querySelectorAll('[data-capture-request]').forEach(b=>b.onclick=()=>{
+      $('#creativeCaptureRequest',canvas).value=b.dataset.captureRequest;
+      $('#creativeCaptureForm',canvas).scrollIntoView({behavior:'smooth',block:'center'});
+    });
+    const formCapture=$('#creativeCaptureForm',canvas),camera=$('#creativeCamera',canvas);
+    camera.onchange=()=>{if(camera.files?.length)formCapture.querySelector('[name="file"]').value='';};
+    formCapture.onsubmit=async e=>{
+      e.preventDefault();
+      const note=$('#creativeCaptureStatus',canvas),button=formCapture.querySelector('[type="submit"]');
+      button.disabled=true;note.textContent='Submitting privately…';
+      try{
+        const form=new FormData(formCapture);
+        if(camera.files?.length)form.set('file',camera.files[0]);
+        const time=String(form.get('captured_at')||'');
+        form.set('captured_at',time?new Date(time).toISOString():'');
+        let response;
+        const file=form.get('file');
+        if(file instanceof File&&file.size){
+          if(file.size>250*1024*1024)throw new Error('Maximum upload is 250 MB.');
+          form.set('rights_attested',form.has('rights_attested')?'1':'0');
+          const http=await fetch((cfg.apiBase||'api')+'/story-capture-upload.php',
+            {method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':st.auth.csrf||''},body:form});
+          response=await http.json();
+          if(!http.ok||!response.ok)throw new Error(response.message||response.error||'Upload rejected.');
+        }else{
+          response=await api('story-capture.php',{
+            request_id:Number(form.get('request_id')||0),submission_type:String(form.get('submission_type')),
+            title:String(form.get('title')||''),description:String(form.get('description')||''),
+            dialogue_text:String(form.get('dialogue_text')||''),captured_at:String(form.get('captured_at')||''),
+            people_release_status:String(form.get('people_release_status')),
+            rights_attested:form.has('rights_attested')});
+        }
+        note.textContent='Submitted for review. Nothing has been published.';
+        formCapture.reset();camera.value='';
+      }catch(err){note.textContent=err.message||'Submission failed.';}
+      finally{button.disabled=false;}
+    };
+  }
+
+  async function navigate(view='home',params={},push=true){closeMenu();hide();document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='capture'){await renderCreativeCapture()}else if(view==='team'){await renderTeamWorkspace()}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
   function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}navigate(view,params,false)}
 
   function updateFooterPlayer(){window.StonefellowTurntable?.sync?.(st.track,st.playing,st.builder);if(!st.track){footerPlayer.hidden=true;return}footerPlayer.hidden=false;playerTitle.textContent=st.track.title;playerRelease.textContent=st.track.release||'Stonefellow';playerToggle.textContent=st.playing?'Ⅱ':'▶';playerToggle.setAttribute('aria-label',st.playing?'Pause':'Play');const art=st.track.artwork||'';playerArtwork.innerHTML=art?`<img src="${esc(art)}" alt="">`:'<span>SF</span>';document.body.classList.add('has-player')}

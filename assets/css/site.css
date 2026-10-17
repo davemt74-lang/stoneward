@@ -512,3 +512,16 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .team-timeline-event time,.team-timeline-event small{font-size:.73rem;opacity:.7;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .team-workspace input[type=file]{display:block;max-width:100%;margin:.8rem 0}
 @media(max-width:660px){.team-roster-row{flex-direction:column}.team-workspace .panel{padding:.8rem}}
+
+/* Artist World capture — mobile-first contributor requests and private submission */
+.capture-studio{max-width:1200px;margin:0 auto}.capture-studio>h1{font-size:clamp(2rem,4vw,3.6rem)}
+.capture-studio>p{max-width:72ch;line-height:1.6}
+.capture-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,430px);gap:1.3rem;margin:1.3rem 0}
+.capture-request,.capture-submit{border:1px solid rgba(150,150,150,.28);border-radius:14px;padding:1rem;margin:.7rem 0}
+.capture-request h3{margin:.4rem 0}.capture-request small{opacity:.7;text-transform:uppercase;font-size:.72rem}
+.capture-submit form,.capture-submit label{display:grid;gap:.5rem}.capture-submit form{gap:.85rem}
+.capture-submit input:not([type=checkbox]),.capture-submit textarea,.capture-submit select{background:transparent;color:inherit;border:1px solid rgba(150,150,150,.4);padding:.55rem;width:100%;max-width:100%;border-radius:7px}
+.capture-submit .capture-agreement{display:flex;align-items:flex-start;gap:.5rem;font-size:.82rem}
+.capture-history>div{display:flex;flex-wrap:wrap;gap:.7rem;justify-content:space-between;padding:.7rem;border-bottom:1px solid rgba(150,150,150,.2)}
+.capture-history time,.capture-history small{opacity:.65;font-size:.74rem}
+@media(max-width:780px){.capture-layout{grid-template-columns:1fr}.capture-submit{order:-1}}
