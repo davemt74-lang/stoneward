@@ -26,7 +26,7 @@ RewriteRule ^video/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=video&slug=$1 [
 RewriteRule ^photos/([A-Za-z0-9_-]+)/?$ stonefellow-v120.php?view=photo&slug=$1 [QSA,L]
 RewriteRule ^photos/?$ stonefellow-v120.php?view=photos [QSA,L]
 RewriteRule ^search/?$ stonefellow-v120.php?view=search [QSA,L]
-RewriteRule ^(music|releases|shows|videos|store|about|contact|archive)/?$ stonefellow-v120.php?view=$1 [QSA,L]
+RewriteRule ^(world|music|releases|shows|videos|store|about|contact|archive)/?$ stonefellow-v120.php?view=$1 [QSA,L]
 
 # Never serve a stale legacy static shell.
 RewriteRule ^index\.html$ ./ [R=302,L]
