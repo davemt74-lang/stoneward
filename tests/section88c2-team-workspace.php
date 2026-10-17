@@ -57,4 +57,28 @@ $assign=file_get_contents(dirname(__DIR__).'/admin/api/team-workspace.php');
 gateTeam(str_contains($endpoint,"sf_team_require('team.enter')"),'Shared session protected Team Workspace');
 gateTeam(str_contains($upload,"sf_team_require('media.upload',true)")&&str_contains($upload,'sf_team_audit('),'Team upload requires permission and CSRF and logs actor');
 gateTeam(str_contains($assign,"sf_admin_require_auth(")&&str_contains($assign,"confirmed"),'Only Admin assigns roles with confirmation');
+
+$adminPage=file_get_contents(dirname(__DIR__).'/admin/index.php');
+$adminJs=file_get_contents(dirname(__DIR__).'/admin/assets/admin.js');
+$adminModule=file_get_contents(dirname(__DIR__).'/admin/assets/team-workspace.js');
+$sitePage=file_get_contents(dirname(__DIR__).'/stonefellow-v120.php');
+$siteJs=file_get_contents(dirname(__DIR__).'/assets/js/app.js');
+$legacyUpload=file_get_contents(dirname(__DIR__).'/admin/api/upload.php');
+$catalog=file_get_contents(dirname(__DIR__).'/admin/api/catalog.php');
+gateTeam(str_contains($adminPage,'data-view="team"')
+ &&str_contains($adminPage,'team-workspace.js?v=')
+ &&str_contains($adminJs,'window.SFTeamAdmin?.render'), 'Admin has Team Workspace navigation');
+gateTeam(str_contains($adminModule,'[data-team-role]:checked')
+ &&str_contains($adminModule,"action:'assign_roles'")
+ &&str_contains($adminModule,'teamAdminTimeline'), 'Admin can assign multiple roles and inspect timeline');
+gateTeam(str_contains($sitePage,'sf_team_can((int)$currentUser['."'".'id'."'".'],'."'".'team.enter'."'".')')
+ &&str_contains($siteJs,"view==='team'")&&str_contains($siteJs,'renderTeamWorkspace()'),
+ 'Existing site login opens role-gated team workspace');
+gateTeam(str_contains($siteJs,'team-media-upload.php')
+ &&str_contains($siteJs,"'X-CSRF-Token':st.auth.csrf"),'Team upload is connected to authenticated browser UI');
+gateTeam(str_contains($legacyUpload,"'song_source_uploaded'")
+ &&str_contains($legacyUpload,"(int)$"."me['id']"),'Original song upload pipeline logs the uploading admin');
+gateTeam(str_contains($catalog,"'song_metadata_updated'")
+ &&str_contains($catalog,"(int)$"."me['id']"),'Existing catalog edits log the responsible admin');
+
 echo "TEAM: $n acceptance checks green\n";
