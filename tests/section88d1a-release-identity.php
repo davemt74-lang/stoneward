@@ -14,6 +14,7 @@ $checks=[
 'Capture camera and user forms are present'=>str_contains($app,'creativeCaptureForm')&&str_contains($app,'capture="environment"'),
 'Capture role types do not grant Team access'=>str_contains($read('api/team-workspace-core.php'),"'customer'=>['label'=>'Customer','permissions'=>['capture.view','capture.submit']]"),
 'Shot requests and approvals are Admin-gated'=>str_contains($read('admin/api/story-capture.php'),'sf_admin_require_auth')&&str_contains($read('api/story-capture-core.php'),"'ai_suggestion'"),
+'Pre-ingest quota limits audience upload abuse'=>str_contains($read('api/story-capture-upload.php'),'dailyLimit')&&str_contains($read('api/story-capture-upload.php'),'sf_capture_schema()'),
 'Contributor media uses private review process'=>str_contains($read('api/story-capture-upload.php'),'sf_media_ingest_upload(')&&str_contains($read('api/story-capture-core.php'),"'pending_review'"),
 'Director panel stays in existing Admin Team Workspace'=>str_contains($admin,'director-capture.js?v=')&&str_contains($read('admin/assets/team-workspace.js'),'SFDirectorCaptureAdmin'),
 'Full acceptance includes captured-data privacy suite'=>str_contains($read('.github/workflows/release-gate.yml'),'php tests/section88d1-story-capture.php')
