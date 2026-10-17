@@ -120,6 +120,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           </div>
           <a href="?view=library" data-view="library" id="menuLibrary">My Library</a>
           <a href="?view=account" data-view="account" id="menuAccount">My account</a>
+<?php require_once __DIR__.'/api/team-workspace-core.php'; if(sf_team_can((int)$currentUser['id'],'team.enter')): ?>
+          <a href="?view=team" data-view="team" id="menuTeamWorkspace">Team Workspace</a>
+<?php endif; ?>
           <a href="?view=agent-brain" data-view="agent-brain" id="menuAgentBrain">My Agent Brain</a>
           <a href="?view=agent-chat" data-view="agent-chat" id="menuAgentChat">My Agent Chat</a>
           <a href="#" id="menuQueueLink">Up Next</a>

@@ -111,6 +111,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
           <summary class="admin-nav-summary"><span>Administration</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
           <div class="admin-nav-items">
             <button type="button" data-view="users"><span>19</span>Users + Tokens</button>
+            <button type="button" data-view="team"><span>19A</span>Team Workspace + Timeline</button>
             <button type="button" data-view="operations"><span>28</span>Operations</button>
             <button type="button" data-view="settings"><span>29</span>Settings</button>
           </div>
@@ -144,6 +145,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 
   <input id="folderInput" type="file" webkitdirectory directory multiple accept=".mp3,.wav,.wave,audio/mpeg,audio/wav" hidden>
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/team-workspace.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/settings-tabs.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/sidebar-accordion.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>&amp;e5=1"></script>

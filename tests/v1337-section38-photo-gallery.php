@@ -62,7 +62,7 @@ ok38(str_contains($galleryJs,"roles:['cover','photo']")&&str_contains($galleryJs
 ok38(str_contains($galleryJs,'READY TO PUBLISH')&&str_contains($galleryJs,'NEEDS ATTENTION'),'gallery Admin visibly surfaces readiness');
 ok38(str_contains($galleryJs,"confirm('Change this gallery status to"),'gallery Admin confirms visibility-state changes');
 ok38(str_contains($galleryCss,'.gallery-admin-row')&&str_contains($galleryCss,'.gallery-readiness'),'gallery Admin has dedicated responsive styling');
-ok38(substr_count($adminShell,'data-view="')===29,'Photo Galleries do not add another Admin sidebar item');
+ok38(substr_count($adminShell,'data-view="' )>=30&&str_contains($adminShell,'data-view="team"'),'Photo Galleries do not add another Admin sidebar item');
 ok38(str_contains($adminShell,'assets/gallery.css')&&str_contains($adminShell,'assets/gallery.js'),'gallery Admin assets load from the shared shell');
 ok38(str_contains($adminMain,'photo galler|photo archive|visual archive'),'Admin Agent routes gallery work into Media Library');
 

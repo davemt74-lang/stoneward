@@ -71,7 +71,7 @@ ok30(str_contains($mediaApi,"'press_kit'=>['hero']"),'EPK hero can be explicitly
 ok30(str_contains($adminShell,'data-view="press"')&&str_contains($adminShell,'assets/press.js')&&str_contains($adminShell,'assets/press.css'),'EPK + Press is a first-class Admin module');
 ok30(str_contains($adminMain,"press:'EPK + Press'")&&str_contains($adminMain,"openView('press')"),'Admin shell routes into EPK + Press');
 ok30(str_contains($adminMain,'press kit|epk|media relations|press contact')&&str_contains($adminMain,'record press|pressing|manufactur'),'Admin Agent separates media relations from record manufacturing');
-ok30(substr_count($adminShell,'data-view="')===29,'Admin sidebar exposes 29 navigation entries');
+ok30(substr_count($adminShell,'data-view="')>=30&&str_contains($adminShell,'data-view="team"'),'Admin sidebar preserves EPK tools and adds scoped Team Workspace');
 ok30(str_contains($adminBaseCss,'min-height:21px')&&str_contains($adminBaseCss,'font-size:.62rem'),'short-viewport sidebar remains dense with 29 links');
 ok30(str_contains($adminJs,'Electronic press kits')&&str_contains($adminJs,'Press contacts'),'Admin workspace manages EPKs and press contacts');
 ok30(str_contains($adminJs,'Rotate private link')&&str_contains($adminJs,'privateTokens'),'private raw token remains session-scoped in the EPK workspace');

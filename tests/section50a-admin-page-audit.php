@@ -5,12 +5,12 @@ $read=static fn(string $path):string=>(string)file_get_contents($root.'/'.$path)
 $shell=$read('admin/index.php');$ui=$read('admin/assets/unified-ui.js');
 $css=$read('admin/assets/unified-ui.css');$doc=$read('docs/section50-admin-ui-audit.md');
 preg_match_all('/<button type="button" data-view="([^"]+)"/',$shell,$matches);
-$nav=$matches[1];$expected=['dashboard','analytics','calendar','catalog','media','uploads','templates','releases','shows','distribution','press','rights','crm','customer','campaigns','automations','products','orders','fulfillment','pod','membership','ticketing','packages','brain','knowledge','ai','users','operations','settings'];
+$nav=$matches[1];$expected=['dashboard','analytics','calendar','catalog','media','uploads','templates','releases','shows','distribution','press','rights','crm','customer','campaigns','automations','products','orders','fulfillment','pod','membership','ticketing','packages','brain','knowledge','ai','users','team','operations','settings'];
 $checks=[
- 'All 29 Admin navigation pages accounted for'=>count($nav)===29 && $nav===$expected,
- 'Sidebar has no duplicate navigation routes'=>count(array_unique($nav))===29,
+ 'All 30 Admin navigation pages accounted for'=>count($nav)===30 && $nav===$expected,
+ 'Sidebar has no duplicate navigation routes'=>count(array_unique($nav))===30,
  'All seven category accordions are accessible'=>substr_count($shell,'data-nav-category=')===7&&substr_count($shell,'admin-nav-summary')===7,
- 'Audit matrix documents all 29 source-level views'=>preg_match_all('/^\| (?:0[1-9]|[12][0-9]) \|/m',$doc)===29,
+ 'Audit matrix documents all 30 source-level views'=>preg_match_all('/^\| (?:0[1-9]|[12][0-9]|30) \|/m',$doc)===30,
  'No new creation action invented for analytics-only views'=>!str_contains($ui,"analytics:['new"),
  'Settings and Agent Brain keep specialized presentation'=>str_contains($ui,"['settings','agent-chat','brain'].includes(getView())"),
  'Unified header created when legacy page lacks one'=>str_contains($ui,'admin-unified-generated-header'),

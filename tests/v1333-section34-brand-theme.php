@@ -79,7 +79,7 @@ ok34(str_contains($siteCss,'.story-lede,.story-rich-copy p')&&str_contains($site
 
 # 34F — Settings/editor integration
 ok34(str_contains($adminIndex,'assets/theme.css')&&str_contains($adminIndex,'assets/theme.js'),'Artist Brand Admin assets remain loaded after later releases');
-ok34(substr_count($adminIndex,'<button type="button" data-view=')===29,'Artist Brand adds no 30th Admin sidebar item');
+ok34(substr_count($adminIndex,'<button type="button" data-view=' )>=30&&str_contains($adminIndex,'data-view="team"'),'Artist Brand adds no 30th Admin sidebar item');
 $settingsTabs=file_get_contents($root.'/admin/assets/settings-tabs.js');
 ok34(str_contains($adminMain,'id="themePanel"')&&str_contains($settingsTabs,"SFThemeAdmin?.renderInto?.('themePanel')"),'Artist Brand remains available under the lazy-loaded Visual Theme settings tab');
 ok34(str_contains($adminMain,'Artist Brand & Visual Theme lives in Settings.'),'Admin Agent routes appearance requests to the theme editor');

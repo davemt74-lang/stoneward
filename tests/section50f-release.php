@@ -22,7 +22,7 @@ $checks=[
  'Existing Admin v1.3.49 tests retained'=>str_contains($gate,'php tests/admin-unified-ui.php')&&str_contains($gate,'php tests/settings-tabs-story-modal.php'),
  'Certified ZIP tied to passing main SHA'=>str_contains($read('.github/workflows/certified-deploy.yml'),"github.event.workflow_run.head_sha"),
  'Certified packaging verifies archive and checksum'=>str_contains($read('scripts/release-zip.sh'),'unzip -tqq')&&str_contains($read('scripts/release-zip.sh'),'sha256sum stonefellow-deploy.zip'),
- 'Release audit documents all 29 pages and live browser caveat'=>str_contains($read('docs/section50-admin-ui-audit.md'),'29 Admin')&&str_contains($read('docs/section50-admin-ui-audit.md'),'Known limit'),
+ 'Release audit documents all 29 pages and live browser caveat'=>str_contains($read('docs/section50-admin-ui-audit.md'),'29 historical baseline')&&str_contains($read('docs/section50-admin-ui-audit.md'),'Known limit'),
 ];
 $errors=0;foreach($checks as $name=>$pass){echo ($pass?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$pass)$errors++;}
 echo '50F: '.(count($checks)-$errors).'/'.count($checks).' checks passed'.PHP_EOL;

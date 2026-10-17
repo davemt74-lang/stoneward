@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1); require __DIR__.'/bootstrap.php'; sf_admin_require_auth(true);
+declare(strict_types=1); require __DIR__.'/bootstrap.php'; $me=sf_admin_require_auth(true);
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST') sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 if(!isset($_FILES['file'])||!is_array($_FILES['file']))sf_json_response(['ok'=>false,'message'=>'No audio file was received.'],422);
 $f=$_FILES['file'];if(($f['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK){$code=(int)($f['error']??-1);sf_json_response(['ok'=>false,'message'=>'Upload failed with PHP upload code '.$code.'. Check upload_max_filesize and post_max_size.'],422);}
@@ -17,4 +17,6 @@ else{
 }
 $uploadId='UP-'.strtoupper(bin2hex(random_bytes(6)));$record=['schema'=>'stonefellow.upload.v1','id'=>$uploadId,'batch_id'=>$batch,'track_key'=>$trackKey,'original_name'=>$name,'relative_path'=>sf_clean_text($_POST['relative_path']??$name,500),'extension'=>$ext,'size'=>$size,'sha256'=>$hash,'stored_path'=>$stored,'duplicate'=>$duplicate,'created_at'=>gmdate('c')];
 $dir=SF_ROOT.'/storage/imports/'.$batch.'/uploads';if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir))throw new RuntimeException('Cannot create import storage.');sf_write_json($dir.'/'.$uploadId.'.json',$record);
+sf_log_admin_action((int)$me['id'],'song_source_uploaded','import_upload',$uploadId,
+ ['name'=>$name,'track_key'=>$trackKey,'batch_id'=>$batch,'duplicate'=>$duplicate,'size'=>$size]);
 sf_json_response(['ok'=>true,'upload'=>array_diff_key($record,['stored_path'=>true])]);

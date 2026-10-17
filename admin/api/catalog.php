@@ -2,7 +2,7 @@
 declare(strict_types=1); require __DIR__.'/bootstrap.php';
 if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'){sf_admin_require_auth(false);sf_json_response(['ok'=>true,'catalog'=>sf_catalog()]);}
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST') sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
-sf_admin_require_auth(true);$body=sf_request_json();$id=(string)($body['id']??'');$catalog=sf_catalog();$idx=null;foreach($catalog as $i=>$t)if((string)($t['id']??'')===$id){$idx=$i;break;}if($idx===null)sf_json_response(['ok'=>false,'message'=>'Track not found.'],404);
+$me=sf_admin_require_auth(true);$body=sf_request_json();$id=(string)($body['id']??'');$catalog=sf_catalog();$idx=null;foreach($catalog as $i=>$t)if((string)($t['id']??'')===$id){$idx=$i;break;}if($idx===null)sf_json_response(['ok'=>false,'message'=>'Track not found.'],404);
 $track=$catalog[$idx];$patch=is_array($body['track']??null)?$body['track']:[];
 foreach(['title','release','lyrics','story','artwork'] as $k)if(array_key_exists($k,$patch))$track[$k]=sf_clean_text($patch[$k],$k==='lyrics'||$k==='story'?10000:240);
 if(array_key_exists('duration',$patch))$track['duration']=max(0,(int)$patch['duration']);
@@ -30,4 +30,4 @@ if(array_key_exists('archive',$patch)&&is_array($patch['archive'])){
   if(array_key_exists('media',$incoming)){$rows=[];foreach((array)$incoming['media'] as $mrow){if(!is_array($mrow))continue;$url=sf_clean_text($mrow['url']??'',500);if($url==='')continue;$rows[]=['type'=>sf_clean_text($mrow['type']??'link',40),'title'=>sf_clean_text($mrow['title']??'Archive item',180),'url'=>$url,'caption'=>sf_clean_text($mrow['caption']??'',500),'date'=>sf_clean_text($mrow['date']??'',20)];if(count($rows)>=80)break;}$a['media']=$rows;}
   $track['archive']=$a;
 }
-$catalog[$idx]=$track;sf_admin_write_catalog($catalog);sf_json_response(['ok'=>true,'track'=>$track]);
+$catalog[$idx]=$track;sf_admin_write_catalog($catalog);sf_log_admin_action((int)$me['id'],'song_metadata_updated','track',$id,['changed_fields'=>array_keys($patch)]);sf_json_response(['ok'=>true,'track'=>$track]);
