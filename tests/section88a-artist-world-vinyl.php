@@ -39,11 +39,11 @@ gate88(sf_world_vinyl_public_collections()===[],'No implicit vinyl reproduction 
 sf_world_vinyl_set_enabled(1,true,11);
 $c=sf_world_vinyl_public_collections();
 gate88(count($c)===1&&$c[0]['title']==='Behind the Album','Approved published photo collection');
-gate88(count($c[0]['photos'])===1,'Only download-enabled sufficiently large originals');
+gate88(count($c[0]['photos'])===2,'Only public sufficiently large original images');
 gate88($c[0]['photos'][0]['reference']===$ref,'Canonical local Media Library original');
 gate88(sf_world_vinyl_approved_reference($ref),'Approved original available');
 gate88(!sf_world_vinyl_approved_reference('https://external.example/photo.jpg'),'External image never accepted');
-gate88(!sf_world_vinyl_approved_reference('api/media.php?id=M'.str_repeat('B',20)),'No unapproved image');
+gate88(sf_world_vinyl_approved_reference('api/media.php?id=M'.str_repeat('B',20)),'Gallery reproduction approval independent from downloading');
 gate88(!sf_world_vinyl_approved_reference($ref.'&variant=thumb'),'No user-controlled variants');
 sf_world_vinyl_set_enabled(2,true,11);
 gate88(count(sf_world_vinyl_public_collections())===1,'Unpublished galleries excluded');
