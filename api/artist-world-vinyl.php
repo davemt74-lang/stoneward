@@ -24,7 +24,7 @@ function sf_world_vinyl_set_enabled(int $galleryId,bool $enabled,int $adminId):v
 function sf_world_vinyl_gallery_photos(array $gallery):array {
  $out=[];
  foreach((array)($gallery['photos']??[]) as $m){
-  if(!is_array($m)||empty($m['public_visible'])||empty($m['download_allowed']))continue;
+  if(!is_array($m)||empty($m['public_visible']))continue;
   $uuid=(string)($m['uuid']??'');
   if(!preg_match('/^M[A-F0-9]{20}$/D',$uuid))continue;
   if((int)($m['width']??0)<1600||(int)($m['height']??0)<1600)continue;
