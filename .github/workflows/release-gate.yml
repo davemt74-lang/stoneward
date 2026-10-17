@@ -296,6 +296,7 @@ jobs:
           php tests/section88b1-world-graph.php
           php tests/section88b2-world-canvas.php
           php tests/section88b3-release-identity.php
+          php tests/section88c1-living-album.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php
