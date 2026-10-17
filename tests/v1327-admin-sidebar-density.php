@@ -28,8 +28,9 @@ if ($css !== false) {
 
 if ($index !== false) {
     preg_match_all('/<button\s+type="button"\s+data-view="[^"]+"/', $index, $matches);
-    $check(count($matches[0]) === 29, 'admin sidebar should expose all 29 navigation buttons');
+    $check(count($matches[0]) >= 30, 'admin sidebar must retain the original 29 links plus Team Workspace');
     $check(str_contains($index, 'data-view="settings"'), 'Settings must remain in the sidebar');
+    $check(str_contains($index, 'data-view="team"'), 'Team Workspace must be directly accessible in Admin navigation');
     $check(str_contains($index, 'data-view="operations"'), 'Operations must remain in the sidebar');
 }
 
