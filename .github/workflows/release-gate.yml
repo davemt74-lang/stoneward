@@ -293,6 +293,7 @@ jobs:
           php tests/section87d4-release-identity.php
           php tests/section88a-artist-world-vinyl.php
           php tests/section88a1-release-identity.php
+          php tests/section88b1-world-graph.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
           php tests/section86b-timeline-fx.php
