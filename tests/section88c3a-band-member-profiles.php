@@ -34,8 +34,11 @@ $public=sf_band_profile_publish(2,1,true);
 assertBand($public['stage_name']==='Stage Name'&&$public['biography']==='Unpublished Biography','Only Admin approves biography');
 assertBand($public['likeness']['asset_id']===44,'Public likeness must belong to currently published photo gallery');
 assertBand($public['gallery']['slug']==='member-images','Gallery reused from existing Media Library');
-sf_band_profile_update(2,2,['biography_draft'=>'Updated pending notes']);
-assertBand(sf_band_profile_public(2)['biography']==='Unpublished Biography','Members cannot overwrite public copy without approval');
+sf_band_profile_update(2,2,['biography_draft'=>'Updated pending notes','stage_name'=>'Private next name','instruments'=>['Drums']]);
+$stillPublic=sf_band_profile_public(2);
+assertBand($stillPublic['biography']==='Unpublished Biography','Members cannot overwrite public copy without approval');
+assertBand($stillPublic['stage_name']==='Stage Name'&&$stillPublic['instruments']===['Guitar','Vocals'],
+ 'Draft stage names and instruments do not leak into published public profile');
 $k=sf_band_knowledge_save(2,2,'Recording setup','Amp configuration');
 assertBand(count(sf_band_knowledge(2,true))===0,'Member knowledge drafts remain private');
 sf_band_knowledge_approve($k,1);
