@@ -55,7 +55,7 @@ ok31(str_contains($adminApi,'explicit confirmation')&&str_contains($adminApi,'sf
 ok31(str_contains($adminApi,'releases')&&str_contains($adminApi,'tracks')&&str_contains($adminApi,'shows')&&str_contains($adminApi,'products'),'homepage editor receives authoritative selection references');
 
 ok31(str_contains($adminShell,'assets/homepage.css')&&str_contains($adminShell,'assets/homepage.js'),'homepage plugin Admin assets load');
-ok31(substr_count($adminShell,'data-view="')===29,'homepage plugin does not add another Admin sidebar item');
+ok31(substr_count($adminShell,'data-view="')>=30&&str_contains($adminShell,'data-view="team"'),'Homepage stays modular while Team Workspace is a separate explicitly navigable Admin tool');
 ok31(str_contains($adminMain,'Enable the single-artist Homepage plugin'),'Settings includes explicit homepage on/off control');
 ok31(str_contains($adminMain,'artistHomepagePanel')&&str_contains($adminMain,'SFArtistHomeAdmin'),'Settings embeds the homepage editor');
 ok31(str_contains($adminMain,'homepage|home page|landing page|splash page|artist homepage'),'Admin Agent routes homepage requests into Settings');
