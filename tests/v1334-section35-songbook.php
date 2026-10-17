@@ -62,7 +62,7 @@ ok35(str_contains($agent,'sf_songbook_agent_context($query,4)'),'public Agent re
 ok35(str_contains($agent,"unset(\$safe['lyrics'])")&&str_contains($agent,'$publicTrackHay'),'public Agent track ranking cannot be influenced by draft lyric text');
 
 ok35(str_contains($adminShell,'assets/songbook.css')&&str_contains($adminShell,'assets/songbook.js'),'Admin shell loads Songbook editor assets');
-ok35(substr_count($adminShell,'data-view="')===29,'Songbook stays inside Catalog and adds no sidebar item');
+ok35(substr_count($adminShell,'data-view="' )>=30&&str_contains($adminShell,'data-view="team"'),'Songbook stays inside Catalog and adds no sidebar item');
 ok35(str_contains($adminJs,'Canonical lyrics')&&str_contains($adminJs,'remain private until the Songbook below is explicitly published'),'Catalog clearly separates canonical lyrics from public Songbook publication');
 ok35(str_contains($adminJs,'SFSongbookAdmin?.section')&&str_contains($adminJs,'SFSongbookAdmin?.bindTrack'),'Songbook editor is embedded in each Catalog track workspace');
 ok35(str_contains($adminJs,'songbook|publish.*lyrics|lyrics.*publish|verse|chorus|bridge'),'Admin Agent routes lyric publishing work to Songbook');

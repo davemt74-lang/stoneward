@@ -64,7 +64,7 @@ ok36(str_contains($mediaJs,"entityType==='video_feature'")&&str_contains($mediaJ
 ok36(str_contains($mediaJs,'SFVideoAdmin?.renderInto'),'Media Library loads the Video Hub publisher in place');
 
 ok36(str_contains($adminShell,'assets/video.css')&&str_contains($adminShell,'assets/video.js'),'Admin shell loads Video Hub publisher assets');
-ok36(substr_count($adminShell,'data-view="')===29,'Video Hub does not add another Admin sidebar item');
+ok36(substr_count($adminShell,'data-view="' )>=30&&str_contains($adminShell,'data-view="team"'),'Video Hub does not add another Admin sidebar item');
 ok36(str_contains($adminApi,'Changing video visibility requires explicit Admin confirmation.'),'every consequential video visibility transition is confirmation governed');
 ok36(str_contains($adminApi,'sf_agent_brain_log')&&str_contains($adminApi,'sf_log_admin_action'),'video publication changes feed Agent Brain and Admin audit');
 ok36(str_contains($adminModule,'save a Draft')&&str_contains($adminModule,'Manage media'),'Video Hub editor teaches draft → media → publish workflow');

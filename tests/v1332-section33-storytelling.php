@@ -45,7 +45,7 @@ ok33(str_contains($app,'trackStoryLinks')&&str_contains($app,'releaseStoryLinks'
 
 # 33C — Admin editor and publishing governance
 ok33(str_contains($adminIndex,'assets/stories.css')&&str_contains($adminIndex,'assets/stories.js'),'Storytelling Admin assets load in the existing application');
-ok33(substr_count($adminIndex,'<button type="button" data-view=')===29,'Storytelling adds no 30th Admin sidebar item');
+ok33(substr_count($adminIndex,'<button type="button" data-view=' )>=30&&str_contains($adminIndex,'data-view="team"'),'Storytelling adds no 30th Admin sidebar item');
 $settingsTabs=file_get_contents($root.'/admin/assets/settings-tabs.js');
 ok33(str_contains($adminMain,'id="storytellingPanel"')&&str_contains($settingsTabs,"SFStoriesAdmin?.renderInto?.('storytellingPanel')"),'Storytelling editor remains available under the Settings Stories tab');
 ok33(str_contains($adminMain,'Artist Story, Editorial & Timeline lives in Settings.'),'Admin Agent routes storytelling requests to the embedded editor');

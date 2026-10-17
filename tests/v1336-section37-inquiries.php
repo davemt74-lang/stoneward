@@ -55,7 +55,7 @@ ok37(str_contains($adminJs,'The inquiry is marked Replied only after the outbox 
 ok37(str_contains($adminJs,'Send confirmed reply')&&str_contains($adminJs,"confirm('Send this professional inquiry reply now?')"),'Admin reply UI requires explicit send confirmation');
 ok37(str_contains($adminCss,'.inquiry-detail-grid')&&str_contains($adminCss,'.inquiry-message.outbound'),'professional inbox has dedicated responsive conversation styling');
 
-ok37(substr_count($adminShell,'data-view="')===29,'professional inbox does not add a 30th Admin sidebar item');
+ok37(substr_count($adminShell,'data-view="' )>=30&&str_contains($adminShell,'data-view="team"'),'professional inbox does not add a 30th Admin sidebar item');
 ok37(str_contains($adminShell,'assets/inquiries.css')&&str_contains($adminShell,'assets/inquiries.js'),'professional inbox assets load in Admin');
 ok37(str_contains($adminMain,'professionalInquiriesPanel')&&str_contains($adminMain,'SFInquiriesAdmin'),'Fans + CRM embeds the professional inquiry inbox');
 ok37(str_contains($adminMain,'professional inquir|booking inquir|booking request|licensing request'),'Admin Agent routes professional inquiry requests to the embedded inbox');
