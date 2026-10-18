@@ -95,17 +95,23 @@ function sf_story_graph_add_link(int $editorId,int $entityId,int $submissionId,s
  $q=$db->prepare('SELECT review_status FROM story_graph_entities WHERE id=?');
  $q->execute([$entityId]);$state=$q->fetchColumn();
  if($state===false||$state==='rejected')throw new InvalidArgumentException('Entity is not available for links.');
- $q=$db->prepare('SELECT id FROM story_capture_submissions WHERE id=?');
- $q->execute([$submissionId]);if(!$q->fetchColumn())throw new InvalidArgumentException('Submission not found.');
+ $q=$db->prepare('SELECT review_status FROM story_capture_submissions WHERE id=?');
+ $q->execute([$submissionId]);
+ if($q->fetchColumn()!=='approved_for_edit')
+   throw new InvalidArgumentException('Graph provenance requires an editorially approved submission.');
  if($sourceType==='submission'){
   if($sourceId!==$submissionId)throw new InvalidArgumentException('Submission reference mismatch.');
  }else{
   if($sourceType==='scene')sf_scene_schema();
   else sf_transcript_schema();
   $table=$sourceType==='scene'?'story_scene_annotations':'story_transcripts';
-  $q=$db->prepare("SELECT submission_id FROM $table WHERE id=?");
+  $q=$db->prepare("SELECT submission_id,review_status FROM $table WHERE id=?");
   $q->execute([$sourceId]);
-  if((int)$q->fetchColumn()!==$submissionId)throw new InvalidArgumentException('Evidence provenance mismatch.');
+  $evidence=$q->fetch(PDO::FETCH_ASSOC);
+  if(!$evidence||(int)$evidence['submission_id']!==$submissionId)
+    throw new InvalidArgumentException('Evidence provenance mismatch.');
+  if((string)$evidence['review_status']!=='verified')
+    throw new InvalidArgumentException('Graph provenance requires verified source evidence.');
  }
  $q=$db->prepare('INSERT INTO story_graph_links
   (entity_id,submission_id,source_type,source_id,relation_type,created_by,created_at)

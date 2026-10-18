@@ -314,6 +314,7 @@ jobs:
           php -l api/story-capture-upload.php
           php -l api/media-core.php
           php tests/section88d2h2-intake-integrity.php
+          php -l api/story-graph-core.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
