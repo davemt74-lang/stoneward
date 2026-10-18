@@ -16,6 +16,7 @@ require_once __DIR__.'/agent-feedback-core.php';
 require_once __DIR__.'/agent-commerce-bridge.php';
 require_once __DIR__.'/stem-agent-bridge.php';
 require_once __DIR__.'/stem-production-advisor.php';
+require_once __DIR__.'/story-production-search-core.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -117,6 +118,7 @@ function sf_admin_agent_operational_context(): array {
 function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
+    elseif(preg_match('/\\b(?:artist world|production evidence|creative capture|scene evidence|story graph|shot footage)\\b/',$m)){$type='production_evidence_search';$view='brain';}
     elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
     elseif(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m)){$type='prepare_commerce_followup';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|prepare|write)\b.*\b(reply|response)\b.*\border\b/',$m)){$type='draft_commerce_reply';$view='commerce-ops';}
@@ -206,6 +208,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
         $missionPlan=sf_agent_mission_plan_save('admin',$adminId,$threadId,$message,$missionPlan);}
     $types=[
+      'production_evidence_search'=>'No matching reviewed Artist World production evidence was found.',
       'stem_mix_review'=>'I can inspect real private Stem Studio track, bus, send, FX, automation and mastering metadata, compare bounded reference evidence, recommend specific adjustments and prepare exact reviewed changes. Provide a song ID. Native VST audio is not independently recreated and no mix is changed automatically.',
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
@@ -218,6 +221,13 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
     ];
     $text=$types[$plan['type']];
+    if($plan['type']==='production_evidence_search'){
+      $needle=$message;
+      if(str_contains($needle,':'))$needle=trim(substr($needle,strpos($needle,':')+1));
+      else $needle=trim(preg_replace('/^(?:please\\s+)?(?:find|search|show|look for)\\s+(?:artist world|production evidence|creative capture|scene evidence|story graph|shot footage)\\s*/i','',$needle)??$needle);
+      try{$text=sf_production_search_admin_brief($adminId,$needle);}
+      catch(Throwable $e){$text='Private production evidence search is temporarily unavailable. No media was exposed or published.';}
+    }
     if(in_array($plan['type'],['prepare_campaign','crm_report'],true)
        &&isset($context['fan_campaign_guidance']))
         $text.=' '.sf_fan_conversion_agent_copy((array)$context['fan_campaign_guidance']);
