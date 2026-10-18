@@ -15,7 +15,8 @@ $checks=[
  'Shared UI loaded on all authenticated Admin pages'=>str_contains($index,'assets/unified-ui.js') && str_contains($index,'assets/unified-ui.css'),
  'Shared UI loads after the Admin runtime'=>strpos($index,'assets/admin.js')<strpos($index,'assets/unified-ui.js'),
  'Shared UI loads after all specialist modules'=>strpos($index,'assets/theme.js')<strpos($index,'assets/unified-ui.js'),
- 'All 29 legacy views plus Team Workspace remain'=>substr_count($index,'<button type="button" data-view=')===30&&str_contains($index,'data-view="team"'),
+ 'All legacy Admin views plus Team Workspace remain'=>substr_count($index,'<button type="button" data-view=')>=30&&str_contains($index,'data-view="team"')
+   &&str_contains($index,'data-view="production-review"'),
  'Unified UI binds one existing canonical Admin context'=>str_contains($ui,'window.STONEFELLOW_ADMIN_CONTEXT')
      && str_contains($main,'window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,reloadCore}'),
  'No alternate network or save endpoints introduced'=>!preg_match('/\bfetch\s*\(|\bXMLHttpRequest\b|\bapi\s*\(/',$ui),
