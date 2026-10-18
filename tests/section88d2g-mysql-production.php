@@ -33,7 +33,7 @@ require dirname(__DIR__).'/api/story-production-review-core.php';
 require dirname(__DIR__).'/api/story-assembly-core.php';
 require dirname(__DIR__).'/api/story-composer-core.php';
 require dirname(__DIR__).'/api/storyboard-preview-core.php';
-require dirname(__DIR__).'/api/story-media-evidence-core.php';
+require_once dirname(__DIR__).'/api/story-media-evidence-core.php';
 require dirname(__DIR__).'/api/story-render-source-core.php';
 sf_capture_schema();sf_evidence_schema();sf_transcript_schema();
 sf_scene_schema();sf_story_graph_schema();sf_director_schema();sf_capture_rights_schema();sf_inference_schema();sf_inference_results_schema();sf_production_import_schema();sf_assembly_schema();sf_composer_schema();sf_storyboard_schema();sf_render_source_schema();
