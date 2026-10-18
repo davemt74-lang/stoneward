@@ -49,7 +49,7 @@ $dialogueSub=sf_capture_submit(2,['title'=>'Band conversation','submission_type'
  'description'=>'Story dialogue','rights_attested'=>true,'people_release_status'=>'requires_review'],5);
 sf_capture_review(1,$dialogueSub,'approved_for_edit');
 $trans=sf_transcript_create(1,$dialogueSub,['origin'=>'human','language'=>'en',
- 'segments'=>[['start_ms'=>100,'end_ms'=>3600,'text'=>'We are beginning the show.','speaker_label'=>'Band']]]]);
+ 'segments'=>[['start_ms'=>100,'end_ms'=>3600,'text'=>'We are beginning the show.','speaker_label'=>'Band']]]);
 sf_transcript_review(1,$trans,'verified');
 $stillSub=sf_capture_submit(2,['title'=>'Venue detail','submission_type'=>'photo',
  'description'=>'Stage object','rights_attested'=>true,'people_release_status'=>'not_applicable'],6);
