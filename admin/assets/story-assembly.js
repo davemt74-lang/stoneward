@@ -2,7 +2,8 @@
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
- let chosen=0,view=null,all=[],candidates=[],proposals=[],composerEnabled=false,busy=false,dirty=false;
+ let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,composerEnabled=false,busy=false,dirty=false;
+ let previewMs=0,previewTimer=null;
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
  function ctx(){return window.STONEFELLOW_ADMIN_CONTEXT;}
@@ -14,6 +15,7 @@
  function warnFor(item){const src=sourceFor(item);return !src?'Source no longer verified / available':
   src.publication_clearance!=='cleared'?(src.kind==='track'?'Confirm synchronization and master-use music licenses':'Publication clearance: '+src.publication_clearance):'';}
  function draw(){
+  if(previewTimer){clearInterval(previewTimer);previewTimer=null;}
   const host=panel(),c=ctx();if(!host||!c)return;
   const project=view,items=project?.items||[],total=items.reduce((sum,x)=>sum+ms(x.duration_ms),0);
   const plan=project?.director||{gaps:[],notes:[]};
@@ -57,6 +59,46 @@
     (plan.notes||[]).map(n=>'<p class="hint">• '+esc(n)+'</p>').join('')+
     '<p class="hint">Publication clearance gaps: '+Number(plan.publication_rights_pending||0)+
       '. Music licensing is separately required. Final video render remains disabled.</p></div>':'<p class="hint">Create an assembly to start your private editorial timeline.</p>')+
+    (project&&storyboard?'<section class="assembly-storyboard" aria-label="Private production storyboard">'+
+       '<div class="assembly-board-head"><div><h3>Storyboard · timed production preview</h3>'+
+       '<p class="hint">Private metadata-only timing simulation. Scene cards are descriptions, not thumbnails or streaming footage.</p></div>'+
+       '<span>'+humanTime(storyboard.total_ms)+' · revision '+Number(storyboard.revision)+'</span></div>'+
+       '<div class="assembly-board-reel">'+
+       (storyboard.cards||[]).map((card,i)=>'<article class="assembly-board-card'+(card.source_verified?'':' unverified')+'" data-board-index="'+i+'">'+
+        '<div class="assembly-board-art" aria-hidden="true">'+
+        (card.kind==='scene'?'🎬':card.kind==='track'?'♫':'🎙')+'</div>'+
+        '<div class="assembly-board-details"><strong>'+esc(card.label)+'</strong>'+
+        '<small>'+esc(card.kind.toUpperCase())+' · '+humanTime(card.start_ms)+'–'+humanTime(card.end_ms)+
+        ' · '+esc(card.transition)+'</small>'+
+        (card.transition_note?'<span class="hint">'+esc(card.transition_note)+'</span>':'')+
+        (card.notes?'<span>'+esc(card.notes)+'</span>':'')+
+        '<span class="hint">'+(card.kind==='track'?'Sync: '+esc(card.sync_clearance)+' · Master: '+esc(card.master_clearance):
+            'Publishing: '+esc(card.publication_clearance)+' · Source file: '+(card.asset_present?'present':'unavailable'))+'</span>'+
+        '</div></article>').join('')+'</div>'+
+       '<div class="assembly-preview-controls"><button id="assemblyPreviewPlay" type="button">Play timing</button>'+
+       '<button id="assemblyPreviewReset" type="button" class="secondary">Reset</button>'+
+       '<label>Virtual playhead<input id="assemblyPreviewRange" type="range" min="0" max="'+Math.max(1,Number(storyboard.total_ms))+
+       '" step="100" value="'+Math.min(previewMs,Number(storyboard.total_ms))+'"></label>'+
+       '<output id="assemblyPreviewClock">'+humanTime(previewMs)+' / '+humanTime(storyboard.total_ms)+'</output></div>'+
+       '<div class="assembly-readiness"><h3>Production readiness</h3>'+
+       '<p><strong>'+((storyboard.blockers||[]).length?'Blocked — '+storyboard.blockers.length+' action(s) required':
+          'Evidence/rights preflight clear; render worker still unavailable')+'</strong></p>'+
+       '<p class="hint">This preflight checks verified metadata, publication and music permissions, and local source-file presence/size. It is NOT a hash-verified render certification. Rendering and publication are disabled.</p>'+
+       (storyboard.blockers||[]).map(b=>'<p class="assembly-blocker">⚠ '+esc(b.message)+'</p>').join('')+
+       '<details><summary>Production follow-up checks</summary>'+
+       (storyboard.warnings||[]).map(w=>'<p class="hint">• '+esc(w.message)+'</p>').join('')+
+       '<p class="hint">A future render worker must rehash source files, verify music masters and enforce release rights at execution time.</p></details>'+
+       '<div class="assembly-license"><h4>Human music-license review</h4>'+
+       '<p class="hint">Record synchronization and master-use permissions separately for each Stonefellow track on this saved revision. A new revision invalidates previous decisions.</p>'+
+       '<label>Track<select id="assemblyLicenseTrack">'+
+       (storyboard.cards||[]).filter(card=>card.kind==='track').map(card=>'<option value="'+esc(card.source_id)+'">'+esc(card.label)+'</option>').join('')+
+       '</select></label><label>License purpose<select id="assemblyLicenseType"><option value="sync">Synchronization</option>'+
+       '<option value="master">Master recording</option></select></label>'+
+       '<label>Decision<select id="assemblyLicenseDecision"><option value="restricted">Restricted/revoked</option>'+
+       '<option value="cleared">Cleared after review</option></select></label>'+
+       '<label>Review evidence<textarea id="assemblyLicenseBasis" rows="2" minlength="25" maxlength="1000" placeholder="Record independently checked agreement or restriction reference."></textarea></label>'+
+       '<button type="button" id="assemblyLicenseSave" '+(!(storyboard.cards||[]).some(x=>x.kind==='track')?'disabled':'')+'>Record scoped license decision</button>'+
+       '</div></div></section>':'')+
     (project?'<div class="assembly-composer"><h3>AI Writer / Director · Story Proposals</h3>'+
        '<p class="hint">Supervised proposal from short editorial metadata only (title, premise, source IDs and verified summaries). No raw media or transcript text leaves the server. A configured paid provider may incur cost; rights clearance is required for all captured sources.</p>'+
        '<div class="actions"><button type="button" class="secondary" id="composerToggle">'+(composerEnabled?'Disable story composer':'Enable story composer')+'</button>'+
@@ -133,6 +175,53 @@
    }catch(e){note('Save failed: '+(e.message||'unknown error')+'. Refresh to reconcile if another editor updated the timeline.',true);}
    finally{busy=false;}
   };
+  const range=host.querySelector('#assemblyPreviewRange');
+  const playback=host.querySelector('#assemblyPreviewPlay');
+  function refreshPlayhead(){
+    if(!storyboard||!range)return;
+    previewMs=Math.max(0,Math.min(Number(storyboard.total_ms),previewMs));
+    range.value=String(previewMs);
+    const clock=host.querySelector('#assemblyPreviewClock');
+    if(clock)clock.textContent=humanTime(previewMs)+' / '+humanTime(storyboard.total_ms);
+    host.querySelectorAll('[data-board-index]').forEach(node=>{
+      const card=storyboard.cards[Number(node.dataset.boardIndex)];
+      node.classList.toggle('playing',Boolean(card&&previewMs>=card.start_ms&&previewMs<card.end_ms));
+    });
+    if(previewMs>=storyboard.total_ms&&previewTimer){clearInterval(previewTimer);previewTimer=null;if(playback)playback.textContent='Play timing';}
+  }
+  if(range){
+    range.oninput=()=>{previewMs=Number(range.value);refreshPlayhead();};
+    playback.onclick=()=>{
+      if(previewTimer){clearInterval(previewTimer);previewTimer=null;playback.textContent='Play timing';return;}
+      if(previewMs>=storyboard.total_ms)previewMs=0;
+      let lastTick=Date.now();
+      previewTimer=setInterval(()=>{
+        const now=Date.now();previewMs+=Math.max(0,Math.min(1000,now-lastTick));lastTick=now;
+        refreshPlayhead();
+      },100);
+      playback.textContent='Pause timing';refreshPlayhead();
+    };
+    host.querySelector('#assemblyPreviewReset').onclick=()=>{
+      if(previewTimer){clearInterval(previewTimer);previewTimer=null;}previewMs=0;
+      playback.textContent='Play timing';refreshPlayhead();
+    };
+    refreshPlayhead();
+  }
+  const license=host.querySelector('#assemblyLicenseSave');
+  if(license)license.onclick=async()=>{
+    const trackId=host.querySelector('#assemblyLicenseTrack')?.value||'';
+    const purpose=host.querySelector('#assemblyLicenseType')?.value||'';
+    const decision=host.querySelector('#assemblyLicenseDecision')?.value||'';
+    const basis=host.querySelector('#assemblyLicenseBasis')?.value.trim()||'';
+    if(basis.length<25){note('Document independently reviewed license evidence or restriction (25+ characters).',true);return;}
+    if(!trackId||dirty||busy){note('Save the timeline and choose an existing music cue first.',true);return;}
+    if(!window.confirm('Record '+decision+' for '+purpose+' license at assembly revision '+view.revision+'?'))return;
+    busy=true;try{
+      await c.api('story-assembly.php',{action:'review_music_rights',assembly_id:Number(view.id),
+        revision:Number(view.revision),track_id:trackId,license_type:purpose,decision,basis});
+      await load();note('Scoped music-license decision recorded for this exact revision.');
+    }catch(e){note(e.message,true);}finally{busy=false;}
+  };
   host.querySelector('#composerToggle').onclick=async ()=>{
    if(busy)return;
    if(!window.confirm(composerEnabled?'Disable AI composition?':
@@ -179,11 +268,13 @@
   });
  }
  async function load(){
+  if(previewTimer){clearInterval(previewTimer);previewTimer=null;}
   const host=panel();if(!host)return;
   try{
    const c=ctx(),r=await c.api('story-assembly.php'+(chosen?'?assembly_id='+encodeURIComponent(chosen):''));
    all=Array.isArray(r.assemblies)?r.assemblies:[];candidates=Array.isArray(r.candidates)?r.candidates:[];
    composerEnabled=Boolean(r.composer_enabled);proposals=Array.isArray(r.composer_proposals)?r.composer_proposals:[];
+   storyboard=r.storyboard||null;previewMs=0;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
    draw();

@@ -11,6 +11,7 @@ require_once SF_ROOT.'/api/story-assembly-core.php';
 require_once SF_ROOT.'/api/ai.php';
 require_once SF_ROOT.'/api/story-inference-worker-core.php';
 require_once SF_ROOT.'/api/story-composer-core.php';
+require_once SF_ROOT.'/api/storyboard-preview-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $me=sf_admin_require_auth($method!=='GET');
 $id=(int)$me['id'];
@@ -23,12 +24,20 @@ try{
     'assembly'=>$assemblyId>0?sf_assembly_read($id,$assemblyId):null,
     'composer_enabled'=>sf_composer_enabled(),
     'composer_proposals'=>$assemblyId>0?sf_composer_list($id,$assemblyId):[],
+    'storyboard'=>$assemblyId>0?sf_storyboard_preview($id,$assemblyId):null,
     'candidates'=>sf_assembly_candidates($id),'publication_enabled'=>false,
     'video_rendering_enabled'=>false,'ai_provider_invocation'=>false]);
  }
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();
  $action=(string)($p['action']??'');
+ if($action==='review_music_rights'){
+  sf_storyboard_license_review($id,(int)($p['assembly_id']??0),
+    (string)($p['track_id']??''),(string)($p['license_type']??''),
+    (string)($p['decision']??''),(string)($p['basis']??''),
+    (int)($p['revision']??0));
+  sf_json_response(['ok'=>true,'message'=>'Private scoped music-license review recorded.']);
+ }
  if($action==='configure_composer'){
   if(!is_bool($p['enabled']??null))sf_json_response(['ok'=>false,'error'=>'invalid_enabled'],422);
   sf_composer_configure($id,$p['enabled']);

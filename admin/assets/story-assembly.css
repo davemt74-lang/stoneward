@@ -15,3 +15,23 @@
 .assembly-gap{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid rgba(180,172,155,.15)}
 #assemblyStatus{min-height:1.5em}
 @media(max-width:760px){.assembly-inputs{grid-template-columns:1fr}.assembly-gap{align-items:stretch;flex-direction:column}}
+
+/* 88D3F — private storyboard: cards are illustrative metadata, not media previews. */
+.assembly-storyboard{border-top:1px solid rgba(170,160,145,.25);margin-top:24px;padding-top:20px}
+.assembly-board-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.assembly-board-reel{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:12px 2px 18px}
+.assembly-board-card{width:190px;flex:none;scroll-snap-align:start;border:1px solid rgba(170,160,145,.34);border-radius:12px;overflow:hidden;background:rgba(128,128,128,.05);transition:border-color .18s,box-shadow .18s}
+.assembly-board-card.playing{border-color:var(--accent,#d8a76c);box-shadow:0 0 0 2px rgba(205,150,78,.35)}
+.assembly-board-card.unverified{border-style:dashed}
+.assembly-board-art{height:100px;display:grid;place-items:center;font-size:40px;background:linear-gradient(135deg,rgba(139,122,111,.2),rgba(91,82,92,.12))}
+.assembly-board-details{padding:12px;display:grid;gap:6px;overflow-wrap:anywhere}
+.assembly-board-details small,.assembly-board-details .hint{font-size:.8rem}
+.assembly-preview-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}
+.assembly-preview-controls label{flex:1;min-width:150px}
+.assembly-preview-controls input[type="range"]{width:100%;display:block}
+.assembly-readiness{border-top:1px solid rgba(170,160,145,.25);margin:18px 0;padding-top:16px}
+.assembly-blocker{border-left:3px solid #ad7556;padding:8px 12px;background:rgba(170,112,73,.06);margin:8px 0}
+.assembly-license{display:grid;gap:12px;margin-top:20px}
+.assembly-license label{display:grid;gap:6px}
+.assembly-license select,.assembly-license textarea{max-width:100%;width:100%;box-sizing:border-box}
+@media(max-width:680px){.assembly-board-card{width:162px}.assembly-board-art{height:84px}}
