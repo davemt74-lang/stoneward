@@ -116,6 +116,8 @@ sf_assembly_replace(1,$id,5,array_map(fn($v)=>[
  'in_ms'=>(int)$v['in_ms'],'out_ms'=>(int)$v['out_ms'],
  'duration_ms'=>(int)$v['duration_ms'],'notes'=>$v['notes']
 ],$timeline['items']));
+sf_capture_rights_review(1,$dialogueSub,'external_ai','cleared',
+ 'Editor independently reviewed a new authorized use of creative synopsis metadata.');
 reject88e(fn()=>sf_composer_queue(1,$id,6),'Daily three-proposal budget enforced');
 sf_composer_configure(1,false);
 verify88e(!sf_composer_enabled(),'Global composer switch can be disabled');
