@@ -56,7 +56,7 @@ catch(RuntimeException $e){check88b(str_contains($e->getMessage(),'enabled'),'Pr
 check88b(sf_inference_jobs(1)[0]['status']==='queued','Disabled execution does not consume a lease');
 sf_inference_execution_configure(1,true);
 $called=0;
-$mock=function(string $url,array $headers,array $body,bool $multi)use(&$called):array{
+$mock=function(string $url,array $headers,array $body,bool $multi=false)use(&$called):array{
  $called++;
  if($url!=='https://api.openai.com/v1/responses'||$multi||!str_contains(json_encode($body),'input_image'))
   throw new RuntimeException('Provider request shape wrong.');
@@ -101,7 +101,7 @@ check88b(sf_inference_result_admin(1,$revoked['job_id'])===null,'Revoked result 
 check88b(sf_inference_jobs(1)[0]['status']==='interrupted','Uncertain operation requires human recovery');
 $providerMode='anthropic';
 $still=prepare88b(11,'image','image/png',$png,'photo');$anthropicJob=sf_inference_enqueue(1,$still,'scene');
-$anthropicMock=function(string $url,array $headers,array $body,bool $multi):array{
+$anthropicMock=function(string $url,array $headers,array $body,bool $multi=false):array{
  if($url!=='https://api.anthropic.com/v1/messages'||!isset($body['messages'][0]['content'][0]['source']['data']))
   throw new RuntimeException('Anthropic media request malformed.');
  return ['content'=>[['type'=>'text','text'=>'A bright stage.']]];
