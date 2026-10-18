@@ -36,11 +36,12 @@ require dirname(__DIR__).'/api/storyboard-preview-core.php';
 require_once dirname(__DIR__).'/api/story-media-evidence-core.php';
 require dirname(__DIR__).'/api/story-render-source-core.php';
 require dirname(__DIR__).'/api/story-render-worker-core.php';
+require dirname(__DIR__).'/api/story-render-review-core.php';
 sf_capture_schema();sf_evidence_schema();sf_transcript_schema();
-sf_scene_schema();sf_story_graph_schema();sf_director_schema();sf_capture_rights_schema();sf_inference_schema();sf_inference_results_schema();sf_production_import_schema();sf_assembly_schema();sf_composer_schema();sf_storyboard_schema();sf_render_source_schema();sf_render_jobs_schema();
+sf_scene_schema();sf_story_graph_schema();sf_director_schema();sf_capture_rights_schema();sf_inference_schema();sf_inference_results_schema();sf_production_import_schema();sf_assembly_schema();sf_composer_schema();sf_storyboard_schema();sf_render_source_schema();sf_render_jobs_schema();sf_render_review_schema();
 $required=['story_capture_requests','story_capture_submissions','story_media_evidence',
  'story_transcripts','story_transcript_segments','story_scene_annotations',
- 'story_graph_entities','story_graph_links','story_director_drafts','story_capture_rights_reviews','story_inference_jobs','story_inference_results','story_inference_imports','story_assemblies','story_assembly_items','story_composer_proposals','story_track_license_reviews','story_render_track_masters','story_render_jobs'];
+ 'story_graph_entities','story_graph_links','story_director_drafts','story_capture_rights_reviews','story_inference_jobs','story_inference_results','story_inference_imports','story_assemblies','story_assembly_items','story_composer_proposals','story_track_license_reviews','story_render_track_masters','story_render_jobs','story_render_reviews'];
 foreach($required as $table){
  $q=$db->query('SHOW TABLES LIKE '.$db->quote($table));
  if(!$q->fetchColumn())throw new RuntimeException('Missing production table: '.$table);
