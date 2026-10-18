@@ -6,6 +6,11 @@ declare(strict_types=1);
  * transmitted to an external model by this component.
  */
 function sf_production_search(int $viewerId,string $query,int $limit=20):array{
+ if(!function_exists('sf_team_can'))require_once __DIR__.'/team-workspace-core.php';
+ if(!function_exists('sf_capture_schema'))require_once __DIR__.'/story-capture-core.php';
+ if(!function_exists('sf_transcript_schema'))require_once __DIR__.'/story-transcript-core.php';
+ if(!function_exists('sf_scene_schema'))require_once __DIR__.'/story-scene-core.php';
+ if(!function_exists('sf_story_graph_schema'))require_once __DIR__.'/story-graph-core.php';
  if($viewerId<1||!sf_team_can($viewerId,'team.assign_roles'))
   throw new RuntimeException('Production search requires editor authority.');
  $needle=sf_capture_clean($query,100);
