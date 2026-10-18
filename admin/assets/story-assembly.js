@@ -2,7 +2,7 @@
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
- let chosen=0,view=null,all=[],candidates=[],busy=false,dirty=false;
+ let chosen=0,view=null,all=[],candidates=[],proposals=[],composerEnabled=false,busy=false,dirty=false;
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
  function ctx(){return window.STONEFELLOW_ADMIN_CONTEXT;}
@@ -57,6 +57,24 @@
     (plan.notes||[]).map(n=>'<p class="hint">• '+esc(n)+'</p>').join('')+
     '<p class="hint">Publication clearance gaps: '+Number(plan.publication_rights_pending||0)+
       '. Music licensing is separately required. Final video render remains disabled.</p></div>':'<p class="hint">Create an assembly to start your private editorial timeline.</p>')+
+    (project?'<div class="assembly-composer"><h3>AI Writer / Director · Story Proposals</h3>'+
+       '<p class="hint">Supervised proposal from short editorial metadata only (title, premise, source IDs and verified summaries). No raw media or transcript text leaves the server. A configured paid provider may incur cost; rights clearance is required for all captured sources.</p>'+
+       '<div class="actions"><button type="button" class="secondary" id="composerToggle">'+(composerEnabled?'Disable story composer':'Enable story composer')+'</button>'+
+       '<button type="button" class="primary" id="composerRequest" '+(!composerEnabled||dirty||items.length<2?'disabled':'')+'>Request AI composition</button></div>'+
+       '<p class="hint">The server CLI must separately process queued proposals. No model call starts from this page. An editor then reviews and explicitly applies any reordering.</p>'+
+       (proposals.length?proposals.map(p=>{
+          const q=p.suggestion||{},order=(q.order||[]).map(v=>Number(v)+1).join(' → ');
+          return '<article class="assembly-proposal"><strong>Proposal #'+Number(p.id)+' · revision '+Number(p.revision)+' · '+esc(p.status)+'</strong>'+
+           (p.provider?'<p class="hint">Provider: '+esc(p.provider)+' / '+esc(p.model)+'</p>':'')+
+           (q.logline?'<p>'+esc(q.logline)+'</p><p class="hint">Proposed positions: '+esc(order)+'</p>'+
+           '<ol>'+((q.beats||[]).map(b=>'<li>'+esc(b.reason)+' · '+esc(b.transition)+'</li>').join(''))+'</ol>'+
+           ((q.missing_shots||[]).length?'<p class="hint">Missing shots: '+esc(q.missing_shots.join('; '))+'</p>':''):'')+
+           (p.status==='pending_review'?'<button type="button" data-composer-review="approved" data-proposal-id="'+Number(p.id)+'">Approve proposal</button>'+
+             '<button type="button" class="secondary" data-composer-review="rejected" data-proposal-id="'+Number(p.id)+'">Reject</button>':'')+
+           (p.status==='approved'?'<button type="button" class="primary" data-composer-apply="'+Number(p.id)+'" '+(Number(p.revision)!==Number(project.revision)||dirty?'disabled':'')+'>Apply approved ordering</button>':'')+
+          '</article>';
+        }).join(''):'<p class="hint">No AI composition proposals for this assembly.</p>')+
+       '</div>':'')+
     '<p id="assemblyStatus" role="status" aria-live="polite"></p></section>';
   bind(host);
  }
@@ -115,6 +133,38 @@
    }catch(e){note('Save failed: '+(e.message||'unknown error')+'. Refresh to reconcile if another editor updated the timeline.',true);}
    finally{busy=false;}
   };
+  host.querySelector('#composerToggle').onclick=async ()=>{
+   if(busy)return;
+   if(!window.confirm(composerEnabled?'Disable AI composition?':
+    'Enable paid, metadata-only AI composition? Approved editorial source summaries and premise may be sent to your configured provider. This does not execute a worker or publish anything.'))return;
+   busy=true;try{await c.api('story-assembly.php',{action:'configure_composer',enabled:!composerEnabled});
+     await load();note('Composer permission updated.');}catch(e){note(e.message,true);}finally{busy=false;}
+  };
+  host.querySelector('#composerRequest').onclick=async ()=>{
+   if(busy||dirty||!composerEnabled)return;
+   if(!window.confirm('Queue a paid composition proposal for this exact private timeline revision? Each source must be cleared for external AI.'))return;
+   busy=true;try{const r=await c.api('story-assembly.php',{action:'compose',
+      assembly_id:Number(view.id),revision:Number(view.revision)});
+     await load();note('Proposal #'+r.proposal.id+' '+(r.proposal.existing?'already exists':'queued')+
+       '. Run the supervised server-side CLI to request a model suggestion.');}
+   catch(e){note(e.message,true);}finally{busy=false;}
+  };
+  host.querySelectorAll('[data-composer-review]').forEach(b=>b.onclick=async ()=>{
+   if(busy)return;const choice=b.dataset.composerReview;
+   if(!window.confirm('Record editorial '+choice+' decision? This alone will not change the timeline.'))return;
+   busy=true;try{await c.api('story-assembly.php',{action:'review_composer',
+       proposal_id:Number(b.dataset.proposalId),decision:choice});
+     await load();note('Proposal review recorded; timeline unchanged.');}
+   catch(e){note(e.message,true);}finally{busy=false;}
+  });
+  host.querySelectorAll('[data-composer-apply]').forEach(b=>b.onclick=async ()=>{
+   if(busy||dirty)return;
+   if(!window.confirm('Apply ONLY the existing verified source ordering? No clips, times, or music rights will be changed or published.'))return;
+   busy=true;try{await c.api('story-assembly.php',{action:'apply_composer',
+      proposal_id:Number(b.dataset.composerApply)});
+     await load();note('Approved ordering applied to a new private timeline revision.');}
+   catch(e){note(e.message,true);}finally{busy=false;}
+  });
   host.querySelectorAll('[data-assembly-shot]').forEach(b=>b.onclick=async ()=>{
    const code=b.dataset.assemblyShot,g=(view.director?.gaps||[]).find(x=>x.code===code);
    if(!g||!window.confirm('Create an UNPUBLISHED suggested shot request for '+view.title+'?'))return;
@@ -133,6 +183,7 @@
   try{
    const c=ctx(),r=await c.api('story-assembly.php'+(chosen?'?assembly_id='+encodeURIComponent(chosen):''));
    all=Array.isArray(r.assemblies)?r.assemblies:[];candidates=Array.isArray(r.candidates)?r.candidates:[];
+   composerEnabled=Boolean(r.composer_enabled);proposals=Array.isArray(r.composer_proposals)?r.composer_proposals:[];
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
    draw();

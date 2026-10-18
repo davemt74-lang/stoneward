@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.117',
+  'stonefellow'=>'1.3.118',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.54',
+  'database_schema_target'=>'1.3.55',
   'homepage_web_designer'=>'visual-inline-editing-private-drafts-atomic-publishing-version-history',
   'customer_agent_brain'=>'per-account-explicit-memory-private-conversation-consent-and-deletion',
   'admin_agent_brain'=>'separate-operational-chat-proposals-and-mission-ledger',
@@ -54,6 +54,7 @@ echo json_encode([
   'artist_world_inference_execution'=>'admin-opt-in-supervised-openai-audio-openai-anthropic-still-vision-private-review-only',
   'artist_world_production_review'=>'editorial-ai-drafts-canonical-private-import-timecoded-ffmpeg-optional',
   'artist_world_assembly'=>'private-verified-evidence-story-timeline-catalog-music-deterministic-director-gaps',
+  'artist_world_composer'=>'supervised-metadata-only-llm-story-proposals-explicit-human-approval-revisioned-apply',
 
   'song_media'=>'audio-artwork-photo-video-document-archive-uploader',
   'audio_metadata'=>'ffprobe-wav-riff-mp3-frame-id3-fallback',
