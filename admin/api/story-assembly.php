@@ -12,6 +12,8 @@ require_once SF_ROOT.'/api/ai.php';
 require_once SF_ROOT.'/api/story-inference-worker-core.php';
 require_once SF_ROOT.'/api/story-composer-core.php';
 require_once SF_ROOT.'/api/storyboard-preview-core.php';
+require_once SF_ROOT.'/api/story-media-evidence-core.php';
+require_once SF_ROOT.'/api/story-render-source-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $me=sf_admin_require_auth($method!=='GET');
 $id=(int)$me['id'];
@@ -25,12 +27,18 @@ try{
     'composer_enabled'=>sf_composer_enabled(),
     'composer_proposals'=>$assemblyId>0?sf_composer_list($id,$assemblyId):[],
     'storyboard'=>$assemblyId>0?sf_storyboard_preview($id,$assemblyId):null,
+    'render_certification'=>$assemblyId>0?sf_render_source_admin_status($id,$assemblyId,(int)(sf_assembly_read($id,$assemblyId)['revision']??0)):null,
     'candidates'=>sf_assembly_candidates($id),'publication_enabled'=>false,
     'video_rendering_enabled'=>false,'ai_provider_invocation'=>false]);
  }
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();
  $action=(string)($p['action']??'');
+ if($action==='bind_render_master'){
+  sf_render_master_bind($id,(int)($p['assembly_id']??0),(int)($p['revision']??0),
+    (string)($p['track_id']??''),(int)($p['asset_id']??0));
+  sf_json_response(['ok'=>true,'message'=>'Private SHA-256 music master bound to current editorial revision.']);
+ }
  if($action==='review_music_rights'){
   sf_storyboard_license_review($id,(int)($p['assembly_id']??0),
     (string)($p['track_id']??''),(string)($p['license_type']??''),
