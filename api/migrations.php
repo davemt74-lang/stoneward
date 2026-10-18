@@ -370,7 +370,7 @@ function sf_migration_definitions(): array {
                 require_once SF_ROOT.'/api/story-capture-rights-core.php';
                 sf_capture_rights_schema();
             },
-
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
