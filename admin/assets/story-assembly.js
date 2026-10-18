@@ -129,8 +129,15 @@
       '<div class="actions"><button type="button" class="secondary" id="renderToggle">'+(renderEnabled?'Disable private renderer':'Enable private renderer')+'</button>'+
       '<button type="button" class="primary" id="renderQueue" '+(!renderEnabled||!renderCert?.eligible||dirty?'disabled':'')+'>Queue private render</button></div>'+
       '<p class="hint">Execute one approved job on the server: php scripts/artist-world-private-render.php --editor-id=EDITOR_ID. Outputs remain outside the web root, awaiting a separate video review phase.</p>'+
-      (renderJobs.length?renderJobs.map(j=>'<p class="hint">Render #'+Number(j.id)+' · rev '+Number(j.revision)+' · '+esc(j.status)+
-        ' · '+Number(j.output_bytes||0)+' bytes</p>').join(''):'<p class="hint">No private render jobs for this assembly.</p>')+
+      (renderJobs.length?renderJobs.map(j=>'<article class="assembly-render-job"><p class="hint"><strong>Private render #'+Number(j.id)+'</strong> · revision '+Number(j.revision)+' · '+esc(j.status)+
+        ' · '+Number(j.output_bytes||0)+' bytes</p>'+
+        (['private_review','approved_private'].includes(j.status)&&Number(j.revision)===Number(project.revision)?
+         '<video controls preload="metadata" controlsList="nodownload noplaybackrate" disablepictureinpicture playsinline class="assembly-video-private" src="api/story-render-review.php?action=stream&amp;job_id='+Number(j.id)+'" aria-label="Private reviewed video #'+Number(j.id)+'"></video>'+
+         '<p class="hint">Authenticated private reviewer playback. No public or unguarded video URL.</p>':'')+
+        (j.status==='private_review'?'<label>Human editorial review basis<textarea rows="2" minlength="25" maxlength="1000" data-render-basis="'+Number(j.id)+'" placeholder="Record what you checked in the video and any restrictions."></textarea></label>'+
+         '<div class="actions"><button type="button" data-render-review="approved_private" data-render-id="'+Number(j.id)+'">Approve private draft</button>'+
+         '<button type="button" class="secondary" data-render-review="rejected" data-render-id="'+Number(j.id)+'">Reject private draft</button></div>':'')+
+        '</article>').join(''):'<p class="hint">No private render jobs for this assembly.</p>')+
       '</section>':'')+
     '<p id="assemblyStatus" role="status" aria-live="polite"></p></section>';
   bind(host);
@@ -257,6 +264,17 @@
       await load();note('Private render execution policy updated.');
     }catch(e){note(e.message,true);}finally{busy=false;}
   };
+  host.querySelectorAll('[data-render-review]').forEach(button=>button.onclick=async()=>{
+    if(busy||dirty)return;
+    const jobId=Number(button.dataset.renderId),decision=button.dataset.renderReview;
+    const basis=host.querySelector('[data-render-basis="'+jobId+'"]')?.value.trim()||'';
+    if(basis.length<25){note('Record an independent video review basis (at least 25 characters).',true);return;}
+    if(!window.confirm('Record '+decision+' for this private video? This never publishes or releases the MP4.'))return;
+    busy=true;try{
+      const answer=await c.api('story-render-review.php',{action:'review',job_id:jobId,decision,basis});
+      await load();note(answer.changed?'Private video review recorded. Publication remains disabled.':'Video was already reviewed.');
+    }catch(e){note(e.message||'Review unavailable.',true);}finally{busy=false;}
+  });
   const renderQueue=host.querySelector('#renderQueue');
   if(renderQueue)renderQueue.onclick=async()=>{
     if(busy||dirty||!renderCert?.eligible)return;
