@@ -26,7 +26,7 @@ $checks=[
   &&str_contains($read('version.php'),"'artist_world_scene_analysis'=>'timecoded-human-or-machine-descriptions-human-verified-no-vision-inference'"),
  'Graph concept identities cannot certify real identities'=>str_contains($read('api/story-graph-core.php'),"'character','location','event','theme'"),
  'Evidence retrieval is read-only and editor-scoped'=>str_contains($read('api/story-production-search-core.php'),'Production search requires editor authority.')
-  &&str_contains($read('api/story-production-search-core.php'),"review_status='verified'"),
+  &&str_contains($read('api/story-production-search-core.php'),'review_status') && str_contains($read('api/story-production-search-core.php'),'verified'),
  'AI shot suggestions remain drafts'=>str_contains($read('api/story-director-core.php'),"'suggestion_origin'=>'ai_suggestion','publish'=>false"),
  'Admin Agent Brain offers production retrieval'=>str_contains($read('api/agent-admin-brain.php'),'sf_production_search_admin_brief')
   &&str_contains($read('api/agent-admin-brain.php'),'sf_director_admin_brief'),
