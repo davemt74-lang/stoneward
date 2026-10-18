@@ -40,7 +40,7 @@ function noG3(callable $f,string $label):void{
 $name='assembly-7-rev-3-job-11-0123456789abcdef.mp4';$data=str_repeat('private video bytes',100);
 file_put_contents($private.'/'.$name,$data);
 $sha=hash_file('sha256',$private.'/'.$name);$size=strlen($data);
-$db->prepare("INSERT INTO story_render_jobs VALUES(11,7,3,'private_review',?,?,?,?,?,?)")
+$db->prepare("INSERT INTO story_render_jobs VALUES(11,7,3,'private_review',?,?,?,?,?)")
  ->execute([$name,$sha,$size,gmdate('c'),gmdate('c')]);
 noG3(fn()=>sf_render_review_file(2,11),'Contributor denied private MP4 access');
 $stream=sf_render_review_file(1,11);
@@ -80,7 +80,7 @@ yesG3(!sf_render_review_decide(1,11,'approved_private',
 yesG3(sf_render_review_admin(1,7)[0]['decision']==='approved_private'
  &&!isset(sf_render_review_admin(1,7)[0]['output_name']),
  'Admin review list omits private storage path and fingerprint');
-$db->prepare("INSERT INTO story_render_jobs VALUES(12,7,3,'private_review',?,?,?,?,?,?)")
+$db->prepare("INSERT INTO story_render_jobs VALUES(12,7,3,'private_review',?,?,?,?,?)")
  ->execute(['assembly-7-rev-3-job-12-0123456789abcdef.mp4',$sha,$size,gmdate('c'),gmdate('c')]);
 $rightsOkay=false;
 yesG3(sf_render_review_decide(1,12,'rejected',
