@@ -96,11 +96,13 @@ function sf_evidence_record(int $submissionId,int $assetId,array $observed):void
 function sf_evidence_for_submission(int $viewerId,int $submissionId):?array {
   if($viewerId<1||$submissionId<1)return null;
   sf_capture_schema();sf_evidence_schema();
-  $q=sf_db()->prepare('SELECT e.* FROM story_media_evidence e
+  $admin=sf_team_can($viewerId,'team.assign_roles');
+  $sql='SELECT e.* FROM story_media_evidence e
     JOIN story_capture_submissions s ON s.id=e.submission_id
-    WHERE e.submission_id=? AND (s.contributor_id=? OR ?=1)');
-  $admin=sf_team_can($viewerId,'team.assign_roles')?1:0;
-  $q->execute([$submissionId,$viewerId,$admin]);
+    WHERE e.submission_id=?';
+  if(!$admin)$sql.=' AND s.contributor_id=?';
+  $q=sf_db()->prepare($sql);
+  $q->execute($admin?[$submissionId]:[$submissionId,$viewerId]);
   $result=$q->fetch(PDO::FETCH_ASSOC);
   return $result?:null;
 }
