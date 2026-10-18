@@ -21,7 +21,7 @@ function sf_media_ensure_schema():void{
 $db->exec('CREATE TABLE IF NOT EXISTS users(id BIGINT UNSIGNED NOT NULL PRIMARY KEY)
  ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
 require dirname(__DIR__).'/api/story-capture-core.php';
-require dirname(__DIR__).'/api/story-media-evidence-core.php';
+require_once dirname(__DIR__).'/api/story-media-evidence-core.php';
 require dirname(__DIR__).'/api/story-transcript-core.php';
 require dirname(__DIR__).'/api/story-scene-core.php';
 require dirname(__DIR__).'/api/story-graph-core.php';
