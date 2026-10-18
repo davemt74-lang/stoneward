@@ -156,14 +156,15 @@ function sf_inference_run_once(int $editorId,?callable $transport=null):array {
  $q->execute([gmdate('c',time()-86400)]);
  if((int)$q->fetchColumn()>=6)throw new RuntimeException('Daily inference attempt budget exhausted.');
  $claim=sf_inference_claim($editorId);if(!$claim)return ['status'=>'empty'];
- $id=(int)$claim['job_id'];$token=$claim['lease_token'];
+ $id=(int)$claim['job_id'];$token=$claim['lease_token'];$stage='source_preflight';
  try{
   $media=sf_inference_media_path($id,$token);
-  $provider=sf_inference_provider($claim['task_type']);
+  $stage='provider_selection';$provider=sf_inference_provider($claim['task_type']);
   if(!sf_inference_lease_valid($id,$token)||!sf_inference_enabled())
    throw new RuntimeException('Processing authorization changed.');
-  $draft=sf_inference_dispatch($media,$provider,$transport);
-  sf_inference_media_path($id,$token);
+  $stage='provider_request';$draft=sf_inference_dispatch($media,$provider,$transport);
+  $stage='post_request_validation';sf_inference_media_path($id,$token);
+  $stage='draft_persistence';
   if(!sf_inference_enabled()||!sf_inference_finish($id,$token,$provider,$draft))
    return ['status'=>'interrupted','job_id'=>$id];
   return ['status'=>'pending_review','job_id'=>$id];
@@ -173,7 +174,7 @@ function sf_inference_run_once(int $editorId,?callable $transport=null):array {
    error_code='provider_or_source_error',lease_token_sha256=NULL,lease_expires_at=NULL,updated_at=?
    WHERE id=? AND status='leased' AND lease_token_sha256=?");
   $q->execute([gmdate('c'),$id,hash('sha256',$token)]);
-  return ['status'=>'interrupted','job_id'=>$id,'error'=>'provider_or_source_error'];
+  return ['status'=>'interrupted','job_id'=>$id,'error'=>'provider_or_source_error','failure_stage'=>$stage];
  }
 }
 function sf_inference_result_admin(int $editorId,int $id):?array {
