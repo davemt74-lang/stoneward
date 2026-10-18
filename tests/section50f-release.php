@@ -12,7 +12,8 @@ $checks=[
  'Public version endpoint matches release'=>$build!==''&&str_contains($version,"'stonefellow'=>'".$build."'"),
  'PWA shell cache invalidated for UI assets'=>$build!==''&&str_contains($cache,'stonefellow-static-v'.$build),
  'Apache build header matches release'=>$build!==''&&str_contains($apache,'X-Stonefellow-Build "'.$build.'"'),
- 'Database target correctly includes additive library repair'=>(preg_match("/'database_schema_target'=>'([0-9.]+)'/",$version,$schemaMatch)&&version_compare($schemaMatch[1],'1.3.48','>='))&&str_contains($mig,"SF_DB_SCHEMA_TARGET = '1.3.49'"),
+ 'Database target correctly includes additive library repair'=>(preg_match("/'database_schema_target'=>'([0-9.]+)'/",$version,$schemaMatch)&&version_compare($schemaMatch[1],'1.3.48','>='))&&(preg_match("/SF_DB_SCHEMA_TARGET = '([0-9.]+)'/",$mig,$migrationMatch)
+     &&version_compare($migrationMatch[1],'1.3.49','>=')),
  'Migration 037 remains additive and preserved'=>str_contains($mig,"'id'=>'2026-10-12-037'"),
  'No user or administrator password rewrite in new UI'=>!str_contains($read('admin/assets/unified-ui.js'),'password_hash')&&!str_contains($read('admin/assets/homepage.js'),'password_hash'),
  'Full 50A-F phase coverage required in release gate'=>array_reduce(['a','b','c','d','e','f'],fn($ok,$p)=>$ok&&str_contains($gate,'php tests/section50'.$p.'-'),true),

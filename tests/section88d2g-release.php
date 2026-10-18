@@ -4,7 +4,7 @@ $root=dirname(__DIR__);$read=static fn(string $path):string=>(string)file_get_co
 preg_match("/define\\('SF_BUILD',\\s*'([0-9.]+)'\\)/",$read('stonefellow-v120.php'),$match);
 $v=$match[1]??'';
 $checks=[
- 'Release advanced to 1.3.112'=>$v==='1.3.112',
+ 'Release at least 1.3.112'=>version_compare($v,'1.3.112','>='),
  'Admin build synchronized'=>str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$v."')"),
  'Version API synchronized'=>str_contains($read('version.php'),"'stonefellow'=>'".$v."'"),
  'PWA cache isolated'=>str_contains($read('service-worker.js'),"stonefellow-static-v".$v)
@@ -12,7 +12,7 @@ $checks=[
  'Apache build header aligned'=>str_contains($read('.htaccess'),'X-Stonefellow-Build "'.$v.'"'),
  'Public JS cache aligned'=>str_contains($read('assets/js/app.js'),"window.STONEFELLOW_APP_BUILD='".$v."'"),
  'Builder CSS aligned'=>str_contains($read('assets/css/turntable-builder.css'),$v),
- 'Schema version advanced'=>str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.49'")&&str_contains($read('version.php'),"'database_schema_target'=>'1.3.49'"),
+ 'Schema version advanced'=>str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.50'")&&str_contains($read('version.php'),"'database_schema_target'=>'1.3.50'"),
  'Migration installs all production schemas'=>str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-040'")
   &&str_contains($read('api/migrations.php'),'sf_evidence_schema()')
   &&str_contains($read('api/migrations.php'),'sf_director_schema()'),

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 /**
- * MySQL 8 schema certification for Artist World v1.3.112.
+ * MySQL 8 schema certification for Artist World v1.3.113.
  * Executes on the isolated CI MySQL service after its commerce tests.
  */
 if(!extension_loaded('pdo_mysql'))throw new RuntimeException('Real MySQL driver required.');
@@ -26,11 +26,12 @@ require dirname(__DIR__).'/api/story-transcript-core.php';
 require dirname(__DIR__).'/api/story-scene-core.php';
 require dirname(__DIR__).'/api/story-graph-core.php';
 require dirname(__DIR__).'/api/story-director-core.php';
+require dirname(__DIR__).'/api/story-capture-rights-core.php';
 sf_capture_schema();sf_evidence_schema();sf_transcript_schema();
-sf_scene_schema();sf_story_graph_schema();sf_director_schema();
+sf_scene_schema();sf_story_graph_schema();sf_director_schema();sf_capture_rights_schema();
 $required=['story_capture_requests','story_capture_submissions','story_media_evidence',
  'story_transcripts','story_transcript_segments','story_scene_annotations',
- 'story_graph_entities','story_graph_links','story_director_drafts'];
+ 'story_graph_entities','story_graph_links','story_director_drafts','story_capture_rights_reviews'];
 foreach($required as $table){
  $q=$db->query('SHOW TABLES LIKE '.$db->quote($table));
  if(!$q->fetchColumn())throw new RuntimeException('Missing production table: '.$table);
@@ -43,4 +44,8 @@ $q=$db->query("SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='story_graph_links' AND REFERENCED_TABLE_NAME IS NOT NULL");
 if((int)$q->fetchColumn()<3)throw new RuntimeException('Story graph provenance foreign keys missing.');
 echo 'PASS MySQL 8 story graph referential constraints'.PHP_EOL;
+$q=$db->query("SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
+ WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='story_capture_rights_reviews' AND REFERENCED_TABLE_NAME IS NOT NULL");
+if((int)$q->fetchColumn()<2)throw new RuntimeException('Human rights evidence foreign keys missing.');
+echo 'PASS MySQL 8 scoped rights referential constraints'.PHP_EOL;
 echo '88D2G: MySQL production schema certification green'.PHP_EOL;
