@@ -29,7 +29,7 @@ function rejects(callable $action,string $what):void{
 $submission=sf_capture_submit(2,['title'=>'Video','submission_type'=>'video','description'=>'Concert','rights_attested'=>true],4);
 $other=sf_capture_submit(3,['title'=>'Other','submission_type'=>'video','description'=>'Stage','rights_attested'=>true],4);
 $scene=sf_scene_create(2,$submission,['start_ms'=>0,'end_ms'=>1200,'description'=>'Stage entrance']);
-$transcript=sf_transcript_create(2,$submission,['segments'=>[['start_ms'=>0,'end_ms'=>900,'text'=>'Welcome']]],'language'=>'en']);
+$transcript=sf_transcript_create(2,$submission,['segments'=>[['start_ms'=>0,'end_ms'=>900,'text'=>'Welcome']],'language'=>'en']);
 $entity=sf_story_graph_create_entity(1,['entity_type'=>'character','label'=>'Narrator','description'=>'Fictional story role','origin'=>'machine_draft']);
 ok($entity>0,'Editor creates private proposed character');
 ok(sf_story_graph_read_entity(1,$entity)['review_status']==='draft','Machine concept is not verified');
