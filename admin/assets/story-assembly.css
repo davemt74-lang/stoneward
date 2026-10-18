@@ -1,0 +1,17 @@
+/* 88D3D — private verified-source editorial assembly */
+#storyAssemblyHost{margin-top:22px;min-width:0}
+#storyAssemblyHost .panel{overflow-wrap:anywhere}
+#storyAssemblyHost .assembly-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:22px 0 12px}
+.assembly-timeline{display:grid;gap:10px;border-left:2px solid var(--border,#5c574f);padding:8px 0 8px 16px}
+.assembly-item{padding:14px;border:1px solid rgba(175,166,151,.28);border-radius:12px;min-width:0}
+.assembly-item-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.assembly-actions{display:flex;gap:6px;align-items:center}
+.assembly-actions button{min-width:34px}
+.assembly-inputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.assembly-inputs label,#storyAssemblyHost .field{display:block}
+.assembly-inputs input,#storyAssemblyHost input,#storyAssemblyHost select,#storyAssemblyHost textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.assembly-warning,#assemblyStatus.error{color:#e99585}
+.assembly-director{border-top:1px solid rgba(180,172,155,.3);margin-top:20px;padding-top:15px}
+.assembly-gap{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid rgba(180,172,155,.15)}
+#assemblyStatus{min-height:1.5em}
+@media(max-width:760px){.assembly-inputs{grid-template-columns:1fr}.assembly-gap{align-items:stretch;flex-direction:column}}
