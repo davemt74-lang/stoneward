@@ -308,6 +308,8 @@ jobs:
           php tests/section88d2e-production-search.php
           php tests/section88d2f-director.php
           php tests/section88d2g-release.php
+          php -l api/agent-admin-brain.php
+          php tests/section88d2h1-admin-provider-privacy.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
