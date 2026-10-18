@@ -86,8 +86,10 @@
         (current.job_status==='queued'?'<button type="button" class="secondary" id="productionCancel">Cancel job</button>':''))+
        '</section>')+
       '<p class="hint">For detailed contributor permissions and original media review, open Team Workspace. A machine result does not establish authorship, likeness rights or publishing clearance.</p>'+
-      '<p role="status" aria-live="polite" id="productionNotice" class="production-notice"></p>';
+      '<p role="status" aria-live="polite" id="productionNotice" class="production-notice"></p>'+
+      '<div id="storyAssemblyHost" aria-label="AI Director Story Assembly"></div>';
     bind(c,current,captures);
+    window.SFStoryAssembly?.render?.();
   }
   function bind(c,current,captures){
     const host=c.canvas;
