@@ -318,6 +318,9 @@ jobs:
           php -l api/story-capture-rights-core.php
           php -l admin/api/story-capture.php
           php tests/section88d2h4-rights-clearance.php
+          php -l api/migrations.php
+          php -l version.php
+          php tests/section88d2h5-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
