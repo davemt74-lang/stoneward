@@ -58,6 +58,11 @@ $still=sf_scene_create(1,$stillSub,['origin'=>'human','start_ms'=>0,'end_ms'=>0,
  'description'=>'Verified venue detail photograph','tags'=>[]]);
 sf_scene_review(1,$still,'verified');
 reject88d(fn()=>sf_assembly_create(2,'Unauthorized story'),'Non-editor may not create story');
+$failAudit=true;
+reject88d(fn()=>sf_assembly_create(1,'Unlogged assembly'),'Failed creation audit blocks insertion');
+$failAudit=false;
+assert88d((int)$db->query('SELECT COUNT(*) FROM story_assemblies')->fetchColumn()===0,
+ 'Failed creation audit leaves no untracked assembly');
 $id=sf_assembly_create(1,'Opening night film','A private music and venue story');
 assert88d($id>0,'Private story assembly created');
 reject88d(fn()=>sf_assembly_list(2),'Contributor cannot list private assemblies');
@@ -116,10 +121,12 @@ reject88d(fn()=>sf_assembly_replace(1,$id,2,[$stillItem]),
  'Revoked editorial verification blocks a new revision');
 assert88d(sf_assembly_read(1,$id)['revision']==2,
  'Invalid source revision leaves current project intact');
+assert88d(sf_assembly_read(1,$id)['director']['invalid_source_items']===1,
+ 'Director rescans source verification and removes revoked evidence from coverage');
 sf_capture_rights_review(1,$sceneSub,'publication','cleared',
  'Independent source release documentation checked for publication permissions.');
-assert88d(sf_assembly_read(1,$id)['director']['publication_rights_pending']===2,
- 'Publication readiness recalculates when a contributor source is cleared');
+assert88d(sf_assembly_read(1,$id)['director']['publication_rights_pending']===1,
+ 'Publication readiness recalculates clearance without counting invalid evidence');
 $modified=sf_assembly_replace(1,$id,2,[$musicItem,$transItem]);
 assert88d($modified['revision']===3&&$modified['item_count']===2,
  'Editor can reorder and remove verified clips with next revision');
