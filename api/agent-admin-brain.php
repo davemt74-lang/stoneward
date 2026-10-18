@@ -136,21 +136,41 @@ function sf_admin_agent_plan(string $message): array {
  * Reuse the existing provider clients for conversational explanation, never
  * for selecting permissions, approving actions, or writing to the platform.
  */
+/**
+ * Explicit allowlist for facts that can cross the external-provider boundary.
+ * Never forward full Agent context: it contains private order references,
+ * production evidence and data intended exclusively for Admin tools.
+ */
+function sf_admin_agent_external_facts(array $context):array {
+    $safe=[];
+    foreach(['crm_contacts','newsletter_opted_in','campaigns_total','campaigns_active','commerce_attention'] as $key){
+        $safe[$key]=max(0,(int)($context[$key]??0));
+    }
+    $safe['commerce_available']=(bool)($context['commerce_available']??false);
+    $counts=(array)($context['journey_counts']??[]);
+    $safe['journey_counts']=[];
+    foreach(['journeys_started','journeys_completed','journeys_failed'] as $key){
+        $safe['journey_counts'][$key]=max(0,(int)($counts[$key]??0));
+    }
+    return $safe;
+}
+/**
+ * No saved Admin conversation history is shared with external providers.
+ * Prior messages can contain private Artist World evidence, track stems,
+ * order notes or drafts even when the current question is general research.
+ * Context is deliberately stateless across external calls until an explicit,
+ * auditable per-message data classification and consent contract exists.
+ */
 function sf_admin_agent_research_reply(string $message,array $context,array $prior,int $adminId=0): ?string {
     if(!function_exists('sf_ai_llm_candidates'))return null;
-    $history=[];
-    foreach(array_slice($prior,-8) as $row){
-        if(!in_array((string)($row['role']??''),['user','assistant'],true))continue;
-        $history[]=['role'=>(string)$row['role'],'content'=>substr((string)$row['content'],0,1800)];
-    }
-    $system="You are Stonefellow's administrative research assistant. Use only the aggregate operational facts supplied. Never request or reveal any fan's private conversations or memories. Never claim to have edited CRM, sent messages, purchased, published, changed a journey or saved a campaign. The current tool contract allows no direct writes. State uncertainty if data is absent. Keep your answer under 220 words.\nAGGREGATE FACTS: ".json_encode($context,JSON_UNESCAPED_SLASHES);
-    if($adminId>0){$quality=(string)(sf_agent_feedback_summary('admin',$adminId)['guidance']??'');
-      if($quality!=='')$system.="\\nADMIN FEEDBACK (quality guidance only): ".$quality;}
+    $facts=sf_admin_agent_external_facts($context);
+    $system="You are Stonefellow's administrative research assistant. Use only the aggregate operational facts supplied. Never request or reveal any fan's private conversations or memories. Never claim to have edited CRM, sent messages, purchased, published, changed a journey or saved a campaign. The current tool contract allows no direct writes. State uncertainty if data is absent. Keep your answer under 220 words.\\nAGGREGATE FACTS: ".json_encode($facts,JSON_UNESCAPED_SLASHES);
+    // $prior and private Admin feedback are intentionally not exported.
     foreach(array_slice(sf_ai_llm_candidates('agent_brain'),0,2) as $provider){
         try{
             $result=$provider['provider']==='openai'
-              ?sf_openai_call($provider,$system,$history,$message,450)
-              :sf_anthropic_call($provider,$system,$history,$message,450);
+              ?sf_openai_call($provider,$system,[],$message,450)
+              :sf_anthropic_call($provider,$system,[],$message,450);
             $answer=trim((string)($result['text']??''));
             if($answer!=='')return substr($answer,0,2200);
         }catch(Throwable $e){/* Never surface provider keys or internal paths. */}
