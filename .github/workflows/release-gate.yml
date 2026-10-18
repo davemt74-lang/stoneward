@@ -326,6 +326,11 @@ jobs:
           php -l api/migrations.php
           php tests/section88d3a-inference-queue.php
           php tests/section88d3a-release.php
+          php -l api/story-inference-worker-core.php
+          php -l admin/api/story-inference.php
+          php -l scripts/artist-world-inference-worker.php
+          php tests/section88d3b-provider-execution.php
+          php tests/section88d3b-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
