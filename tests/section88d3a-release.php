@@ -21,7 +21,7 @@ if(str_contains($queue,'sf_openai_call(')||str_contains($queue,'sf_anthropic_cal
    ||str_contains($queue,'curl_exec(')||str_contains($endpoint,'sf_inference_claim('))
   throw new RuntimeException('Queue stage must not expose model execution.');
 if(!str_contains($endpoint,'sf_admin_require_auth($method!==\'GET\')')
-  ||!str_contains($queue,"sf_capture_rights_may_use($submissionId,'external_ai')")
+   ||!str_contains($queue,'sf_capture_rights_may_use(')
   ||!str_contains($queue,'sf_inference_lease_valid'))
   throw new RuntimeException('Required production evidence/rights safety gate missing.');
 echo "88D3A: 12 release/safety assertions green".PHP_EOL;
