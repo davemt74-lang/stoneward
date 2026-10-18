@@ -1,0 +1,44 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/bootstrap.php';
+require_once SF_ROOT.'/api/media-core.php';
+require_once SF_ROOT.'/api/team-workspace-core.php';
+require_once SF_ROOT.'/api/story-capture-core.php';
+require_once SF_ROOT.'/api/story-capture-rights-core.php';
+require_once SF_ROOT.'/api/story-transcript-core.php';
+require_once SF_ROOT.'/api/story-scene-core.php';
+require_once SF_ROOT.'/api/story-assembly-core.php';
+$method=$_SERVER['REQUEST_METHOD']??'GET';
+$me=sf_admin_require_auth($method!=='GET');
+$id=(int)$me['id'];
+if(!sf_team_can($id,'team.assign_roles'))
+ sf_json_response(['ok'=>false,'error'=>'forbidden'],403);
+try{
+ if($method==='GET'){
+  $assemblyId=(int)($_GET['assembly_id']??0);
+  sf_json_response(['ok'=>true,'assemblies'=>sf_assembly_list($id),
+    'assembly'=>$assemblyId>0?sf_assembly_read($id,$assemblyId):null,
+    'candidates'=>sf_assembly_candidates($id),'publication_enabled'=>false,
+    'video_rendering_enabled'=>false,'ai_provider_invocation'=>false]);
+ }
+ if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
+ $p=sf_request_json();
+ $action=(string)($p['action']??'');
+ if($action==='create'){
+  sf_json_response(['ok'=>true,'assembly_id'=>sf_assembly_create($id,
+   (string)($p['title']??''),(string)($p['brief']??''))]);
+ }
+ if($action==='replace'){
+  if(!is_array($p['items']??null))sf_json_response(['ok'=>false,'error'=>'invalid_items'],422);
+  sf_json_response(['ok'=>true,'result'=>sf_assembly_replace($id,
+   (int)($p['assembly_id']??0),(int)($p['revision']??0),$p['items'])]);
+ }
+ sf_json_response(['ok'=>false,'error'=>'unsupported_action'],422);
+}catch(InvalidArgumentException $e){
+ sf_json_response(['ok'=>false,'error'=>'invalid_assembly','message'=>$e->getMessage()],422);
+}catch(RuntimeException $e){
+ sf_json_response(['ok'=>false,'error'=>'assembly_conflict_or_forbidden','message'=>$e->getMessage()],409);
+}catch(Throwable $e){
+ error_log('[Stonefellow assembly] '.get_class($e));
+ sf_json_response(['ok'=>false,'error'=>'assembly_unavailable'],503);
+}
