@@ -1,0 +1,47 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/bootstrap.php';
+require_once SF_ROOT.'/api/media-core.php';
+require_once SF_ROOT.'/api/team-workspace-core.php';
+require_once SF_ROOT.'/api/story-capture-core.php';
+require_once SF_ROOT.'/api/story-media-evidence-core.php';
+require_once SF_ROOT.'/api/story-capture-rights-core.php';
+require_once SF_ROOT.'/api/story-inference-queue-core.php';
+$method=$_SERVER['REQUEST_METHOD']??'GET';
+$admin=sf_admin_require_auth($method!=='GET');
+$id=(int)$admin['id'];
+if(!sf_team_can($id,'team.assign_roles'))
+  sf_json_response(['ok'=>false,'error'=>'forbidden'],403);
+try{
+  if($method==='GET'){
+    sf_json_response(['ok'=>true,'jobs'=>sf_inference_jobs($id),
+      'provider_execution_enabled'=>false,'auto_retries'=>false,
+      'requires_independent_external_ai_clearance'=>true]);
+  }
+  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
+  $input=sf_request_json();
+  $action=(string)($input['action']??'');
+  if($action==='enqueue'){
+    $job=sf_inference_enqueue($id,(int)($input['submission_id']??0),
+      (string)($input['task_type']??''));
+    sf_json_response(['ok'=>true,'job'=>$job,'provider_execution_enabled'=>false]);
+  }
+  if($action==='cancel'){
+    sf_json_response(['ok'=>true,'changed'=>sf_inference_cancel($id,(int)($input['job_id']??0))]);
+  }
+  if($action==='recover'){
+    sf_json_response(['ok'=>true,'interrupted_jobs'=>sf_inference_recover($id),
+      'auto_retries'=>false]);
+  }
+  if($action==='retry'){
+    sf_json_response(['ok'=>true,'queued'=>sf_inference_retry($id,(int)($input['job_id']??0))]);
+  }
+  sf_json_response(['ok'=>false,'error'=>'unknown_action'],422);
+}catch(InvalidArgumentException $e){
+  sf_json_response(['ok'=>false,'error'=>'invalid_inference_request','message'=>$e->getMessage()],422);
+}catch(RuntimeException $e){
+  sf_json_response(['ok'=>false,'error'=>'inference_not_authorized','message'=>$e->getMessage()],403);
+}catch(Throwable $e){
+  error_log('[Stonefellow inference queue] '.get_class($e));
+  sf_json_response(['ok'=>false,'error'=>'inference_queue_unavailable'],503);
+}

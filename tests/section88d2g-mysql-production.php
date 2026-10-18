@@ -27,11 +27,12 @@ require dirname(__DIR__).'/api/story-scene-core.php';
 require dirname(__DIR__).'/api/story-graph-core.php';
 require dirname(__DIR__).'/api/story-director-core.php';
 require dirname(__DIR__).'/api/story-capture-rights-core.php';
+require dirname(__DIR__).'/api/story-inference-queue-core.php';
 sf_capture_schema();sf_evidence_schema();sf_transcript_schema();
-sf_scene_schema();sf_story_graph_schema();sf_director_schema();sf_capture_rights_schema();
+sf_scene_schema();sf_story_graph_schema();sf_director_schema();sf_capture_rights_schema();sf_inference_schema();
 $required=['story_capture_requests','story_capture_submissions','story_media_evidence',
  'story_transcripts','story_transcript_segments','story_scene_annotations',
- 'story_graph_entities','story_graph_links','story_director_drafts','story_capture_rights_reviews'];
+ 'story_graph_entities','story_graph_links','story_director_drafts','story_capture_rights_reviews','story_inference_jobs'];
 foreach($required as $table){
  $q=$db->query('SHOW TABLES LIKE '.$db->quote($table));
  if(!$q->fetchColumn())throw new RuntimeException('Missing production table: '.$table);
@@ -48,4 +49,7 @@ $q=$db->query("SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='story_capture_rights_reviews' AND REFERENCED_TABLE_NAME IS NOT NULL");
 if((int)$q->fetchColumn()<2)throw new RuntimeException('Human rights evidence foreign keys missing.');
 echo 'PASS MySQL 8 scoped rights referential constraints'.PHP_EOL;
-echo '88D2G: MySQL production schema certification green'.PHP_EOL;
+$q=$db->query("SHOW INDEX FROM story_inference_jobs WHERE Key_name='uq_inference_submission_task' AND Non_unique=0");
+if((int)$q->rowCount()<2)throw new RuntimeException('Inference source/task deduplication key missing.');
+echo 'PASS MySQL 8 inference duplicate prevention'.PHP_EOL;
+echo '88D3A: MySQL production schemas certified'.PHP_EOL;

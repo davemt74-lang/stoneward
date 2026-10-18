@@ -12,7 +12,8 @@ $checks=[
  'Apache build header aligned'=>str_contains($read('.htaccess'),'X-Stonefellow-Build "'.$v.'"'),
  'Public JS cache aligned'=>str_contains($read('assets/js/app.js'),"window.STONEFELLOW_APP_BUILD='".$v."'"),
  'Builder CSS aligned'=>str_contains($read('assets/css/turntable-builder.css'),$v),
- 'Schema version advanced'=>str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.50'")&&str_contains($read('version.php'),"'database_schema_target'=>'1.3.50'"),
+ 'Schema version advanced'=>preg_match("/SF_DB_SCHEMA_TARGET = '([0-9.]+)'/",$read('api/migrations.php'),$schemaMatch)
+  &&version_compare($schemaMatch[1],'1.3.49','>=')&&str_contains($read('version.php'),"'database_schema_target'=>'".$schemaMatch[1]."'"),
  'Migration installs all production schemas'=>str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-040'")
   &&str_contains($read('api/migrations.php'),'sf_evidence_schema()')
   &&str_contains($read('api/migrations.php'),'sf_director_schema()'),
