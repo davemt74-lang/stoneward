@@ -108,6 +108,13 @@ jobs:
           node --check admin/assets/gallery.js
           node --check admin/assets/inquiries.js
 
+      - name: Install FFmpeg for actual private render certification
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          /usr/bin/ffmpeg -version | head -n 1
+
       - name: v1.3 regression suites
         run: |
           set -euo pipefail
@@ -362,6 +369,12 @@ jobs:
           php -l api/migrations.php
           php tests/section88d3g1-render-certification.php
           php tests/section88d3g1-release.php
+          php -l api/story-render-worker-core.php
+          php -l scripts/artist-world-private-render.php
+          php -l admin/api/story-assembly.php
+          node --check admin/assets/story-assembly.js
+          php tests/section88d3g2-ffmpeg-render.php
+          php tests/section88d3g2-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php

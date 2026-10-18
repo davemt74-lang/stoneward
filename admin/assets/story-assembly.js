@@ -2,7 +2,7 @@
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
- let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,composerEnabled=false,busy=false,dirty=false;
+ let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],composerEnabled=false,busy=false,dirty=false;
  let previewMs=0,previewTimer=null;
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -117,6 +117,21 @@
           '</article>';
         }).join(''):'<p class="hint">No AI composition proposals for this assembly.</p>')+
        '</div>':'')+
+    (project&&storyboard?'<section class="assembly-render"><h3>Private 720p render · supervised pilot</h3>'+
+      '<p class="hint">Real MP4 generation runs only via a server CLI operator. No public link, preview player, download or publication endpoint is active. Initial pilot uses hard cuts and accepts 1–12 clips, up to 60 seconds.</p>'+
+      '<p><strong>SHA-256 source certification: '+(renderCert?.eligible?'Eligible':'Blocked')+'</strong></p>'+
+      '<p class="hint">'+esc(renderCert?.eligible?'Source bytes, independent rights and song-master bindings are verified.':'Current rights, original capture evidence, supported media or revision-bound music masters need verification.')+'</p>'+
+      '<div class="assembly-master-picker"><label>Stonefellow track<select id="renderTrack">'+
+        (storyboard.cards||[]).filter(x=>x.kind==='track').map(x=>'<option value="'+esc(x.source_id)+'">'+esc(x.label)+'</option>').join('')+'</select></label>'+
+      '<label>Verified Media Library audio master<select id="renderMaster">'+
+        audioMasters.map(x=>'<option value="'+Number(x.id)+'">#'+Number(x.id)+' · '+esc(x.title||x.original_name||'Audio')+' · '+humanTime(Number(x.duration_seconds||0)*1000)+'</option>').join('')+'</select></label>'+
+      '<button type="button" class="secondary" id="renderBindMaster" '+(dirty||!audioMasters.length?'disabled':'')+'>Bind private song master to current revision</button></div>'+
+      '<div class="actions"><button type="button" class="secondary" id="renderToggle">'+(renderEnabled?'Disable private renderer':'Enable private renderer')+'</button>'+
+      '<button type="button" class="primary" id="renderQueue" '+(!renderEnabled||!renderCert?.eligible||dirty?'disabled':'')+'>Queue private render</button></div>'+
+      '<p class="hint">Execute one approved job on the server: php scripts/artist-world-private-render.php --editor-id=EDITOR_ID. Outputs remain outside the web root, awaiting a separate video review phase.</p>'+
+      (renderJobs.length?renderJobs.map(j=>'<p class="hint">Render #'+Number(j.id)+' · rev '+Number(j.revision)+' · '+esc(j.status)+
+        ' · '+Number(j.output_bytes||0)+' bytes</p>').join(''):'<p class="hint">No private render jobs for this assembly.</p>')+
+      '</section>':'')+
     '<p id="assemblyStatus" role="status" aria-live="polite"></p></section>';
   bind(host);
  }
@@ -222,6 +237,35 @@
       await load();note('Scoped music-license decision recorded for this exact revision.');
     }catch(e){note(e.message,true);}finally{busy=false;}
   };
+  const bindMaster=host.querySelector('#renderBindMaster');
+  if(bindMaster)bindMaster.onclick=async()=>{
+    if(busy||dirty)return;
+    const trackId=host.querySelector('#renderTrack')?.value||'';
+    const assetId=Number(host.querySelector('#renderMaster')?.value)||0;
+    if(!trackId||!assetId){note('Choose an existing Stonefellow song and an audio master.',true);return;}
+    if(!window.confirm('Bind this private Media Library audio master to the saved story revision? Only verified source bytes will be accepted.'))return;
+    busy=true;try{await c.api('story-assembly.php',{action:'bind_render_master',
+      assembly_id:Number(view.id),revision:Number(view.revision),track_id:trackId,asset_id:assetId});
+      await load();note('Private track master bound and source certificate refreshed.');
+    }catch(e){note(e.message,true);}finally{busy=false;}
+  };
+  const renderToggle=host.querySelector('#renderToggle');
+  if(renderToggle)renderToggle.onclick=async()=>{
+    if(busy||!window.confirm(renderEnabled?'Disable supervised private render execution?':
+      'Enable paid compute/private FFmpeg execution? Rendering still requires an operator-run CLI and a separately approved output review.'))return;
+    busy=true;try{await c.api('story-assembly.php',{action:'configure_render',enabled:!renderEnabled});
+      await load();note('Private render execution policy updated.');
+    }catch(e){note(e.message,true);}finally{busy=false;}
+  };
+  const renderQueue=host.querySelector('#renderQueue');
+  if(renderQueue)renderQueue.onclick=async()=>{
+    if(busy||dirty||!renderCert?.eligible)return;
+    if(!window.confirm('Queue private 720p cut-only render for this exact certified revision? Publication stays disabled.'))return;
+    busy=true;try{const r=await c.api('story-assembly.php',{action:'enqueue_render',
+       assembly_id:Number(view.id),revision:Number(view.revision)});
+      await load();note('Private render job #'+r.job.job_id+' '+(r.job.existing?'already exists':'queued')+'.');
+    }catch(e){note(e.message,true);}finally{busy=false;}
+  };
   host.querySelector('#composerToggle').onclick=async ()=>{
    if(busy)return;
    if(!window.confirm(composerEnabled?'Disable AI composition?':
@@ -274,7 +318,9 @@
    const c=ctx(),r=await c.api('story-assembly.php'+(chosen?'?assembly_id='+encodeURIComponent(chosen):''));
    all=Array.isArray(r.assemblies)?r.assemblies:[];candidates=Array.isArray(r.candidates)?r.candidates:[];
    composerEnabled=Boolean(r.composer_enabled);proposals=Array.isArray(r.composer_proposals)?r.composer_proposals:[];
-   storyboard=r.storyboard||null;previewMs=0;
+   storyboard=r.storyboard||null;renderCert=r.render_certification||null;
+   renderEnabled=Boolean(r.render_enabled);renderJobs=Array.isArray(r.render_jobs)?r.render_jobs:[];
+   audioMasters=Array.isArray(r.render_audio_candidates)?r.render_audio_candidates:[];previewMs=0;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
    draw();

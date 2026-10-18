@@ -35,3 +35,12 @@
 .assembly-license label{display:grid;gap:6px}
 .assembly-license select,.assembly-license textarea{max-width:100%;width:100%;box-sizing:border-box}
 @media(max-width:680px){.assembly-board-card{width:162px}.assembly-board-art{height:84px}}
+
+/* 88D3G2: supervised private video render operations */
+.assembly-render{padding:18px 0;margin-top:24px;border-top:1px solid rgba(175,161,146,.25)}
+.assembly-render .assembly-master-picker{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+.assembly-render .assembly-master-picker label{display:grid;gap:6px;min-width:0}
+.assembly-render .assembly-master-picker select{min-width:0;width:100%;max-width:100%}
+.assembly-render .assembly-master-picker button{grid-column:1/-1;justify-self:start}
+.assembly-render .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+@media(max-width:700px){.assembly-render .assembly-master-picker{grid-template-columns:1fr}}
