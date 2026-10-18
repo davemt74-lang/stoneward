@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.111',
+  'stonefellow'=>'1.3.112',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.48',
+  'database_schema_target'=>'1.3.49',
   'homepage_web_designer'=>'visual-inline-editing-private-drafts-atomic-publishing-version-history',
   'customer_agent_brain'=>'per-account-explicit-memory-private-conversation-consent-and-deletion',
   'admin_agent_brain'=>'separate-operational-chat-proposals-and-mission-ledger',
@@ -41,6 +41,14 @@ echo json_encode([
   'campaigns'=>'visual-node-builder-audience-offers-messaging-attribution',
   'campaign_offers'=>'newsletter-free-download-discount-vip-exclusive',
   'media_library'=>'central-assets-upload-analyze-attach-reorder-controlled-delivery',
+  'artist_world_capture'=>'contributors-roles-private-shot-requests-human-review',
+  'artist_world_media_evidence'=>'private-fingerprints-media-types-image-dimensions',
+  'artist_world_transcripts'=>'timecoded-human-or-machine-drafts-human-verified-no-speech-model',
+  'artist_world_scene_analysis'=>'timecoded-human-or-machine-descriptions-human-verified-no-vision-inference',
+  'artist_world_story_graph'=>'editorial-characters-locations-events-provenance',
+  'artist_world_agent_brain'=>'private-approved-evidence-search-read-only',
+  'artist_world_director'=>'coverage-gaps-role-targeted-private-draft-shot-requests',
+
   'song_media'=>'audio-artwork-photo-video-document-archive-uploader',
   'audio_metadata'=>'ffprobe-wav-riff-mp3-frame-id3-fallback',
   'universal_media'=>'release-show-campaign-store-site-media-publishing',

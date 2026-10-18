@@ -73,7 +73,7 @@ $checks=[
  'Release version advances all JS assets'=>$siteVersion!==''&&version_compare($siteVersion,'1.3.75','>=')
     &&str_contains($shell,"SF_ADMIN_BUILD','".$siteVersion."'")
     &&str_contains($read('service-worker.js'),'stonefellow-static-v'.$siteVersion),
- 'Additive library schema target retained'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.48'"),
+ 'Additive library schema target retained'=>(preg_match("/'database_schema_target'=>'([0-9.]+)'/",$read('version.php'),$schemaMatch)&&version_compare($schemaMatch[1],'1.3.48','>=')),
 ];
 $check=array_merge($check,$checks);
 $failed=0;foreach($check as $name=>$ok){echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;if(!$ok)$failed++;}

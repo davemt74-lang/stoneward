@@ -8,7 +8,7 @@ $migrations=(string)file_get_contents($root.'/api/migrations.php');
 $checks=[
  'Saved draft has isolated auto-repair'=>str_contains($core,'function sf_account_draft_ensure_schema()'),
  'Upgrade migration 039 present'=>str_contains($migrations,"'id'=>'2026-10-13-039'"),
- 'Schema target advances additively'=>str_contains($migrations,"const SF_DB_SCHEMA_TARGET = '1.3.48';"),
+ 'Schema target advances additively'=>(preg_match("/const SF_DB_SCHEMA_TARGET = '([0-9.]+)';/",$migrations,$schemaMatch) && version_compare($schemaMatch[1],'1.3.48','>=')),
  'Default player modules skip entitlement DB'=>str_contains($core,'if($onlyDefaults){$modules=$defaults;}'),
  'Public errors no longer advise repeated upgrades'=>str_contains($api,'error_ref')&&!str_contains($api,'Draft storage needs a database upgrade'),
  'Paid features still require verified ownership'=>str_contains($core,'pendingPlayerModules')&&str_contains($core,'$modules=$defaults;'),
