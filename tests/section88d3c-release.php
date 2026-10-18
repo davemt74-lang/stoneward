@@ -5,12 +5,12 @@ $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $files=['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'];
 foreach($files as $f)
- if(!str_contains($read($f),'1.3.121'))throw new RuntimeException('Release identity not updated: '.$f);
-if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.58'")
+ if(!str_contains($read($f),'1.3.122'))throw new RuntimeException('Release identity not updated: '.$f);
+if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.59'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-044'")
  ||!str_contains($read('api/migrations.php'),"'story_inference_imports'"))
  throw new RuntimeException('Migration 044 or integrity report missing.');
-if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.58'")
+if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.59'")
  ||!str_contains($read('version.php'),'editorial-ai-drafts-canonical-private-import-timecoded-ffmpeg-optional'))
  throw new RuntimeException('Public version contract missing private review feature.');
 $admin=$read('admin/index.php');$nav=$read('admin/assets/admin.js');
