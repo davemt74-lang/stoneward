@@ -303,6 +303,7 @@ jobs:
           php tests/section88d1-story-capture.php
           php tests/section88d2a-media-evidence.php
           php tests/section88d2b-transcript.php
+          php tests/section88d2c-scenes.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
