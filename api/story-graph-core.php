@@ -100,6 +100,8 @@ function sf_story_graph_add_link(int $editorId,int $entityId,int $submissionId,s
  if($sourceType==='submission'){
   if($sourceId!==$submissionId)throw new InvalidArgumentException('Submission reference mismatch.');
  }else{
+  if($sourceType==='scene')sf_scene_schema();
+  else sf_transcript_schema();
   $table=$sourceType==='scene'?'story_scene_annotations':'story_transcripts';
   $q=$db->prepare("SELECT submission_id FROM $table WHERE id=?");
   $q->execute([$sourceId]);
