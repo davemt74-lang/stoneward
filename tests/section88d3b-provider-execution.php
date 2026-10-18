@@ -63,7 +63,7 @@ $mock=function(string $url,array $headers,array $body,bool $multi)use(&$called):
  return ['output'=>[['content'=>[['type'=>'output_text','text'=>'A guitar beside a studio microphone.']]]]];
 };
 $done=sf_inference_run_once(1,$mock);
-check88b($done['status']==='pending_review'&&$called===1,'Real OpenAI visual request constructed through test transport');
+check88b($done['status']==='pending_review'&&$called===1,'Real OpenAI visual request constructed through test transport; status='.($done['status']??'missing').'; calls='.$called.'; error='.($done['error']??'none'));
 $result=sf_inference_result_admin(1,$job['job_id']);
 check88b($result['draft']['description']==='A guitar beside a studio microphone.','Provider response stored as private machine draft');
 check88b($result['status']==='pending_review','No implicit editorial verification');
