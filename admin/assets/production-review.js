@@ -57,7 +57,12 @@
         captures.map(x=>'<option value="'+num(x.id)+'">'+esc('#'+x.id+' '+x.title+' · '+x.review_status+' · AI rights '+x.external_ai_clearance)+'</option>').join('')+'</select></label>'+
       '<label class="field">Analysis<select id="productionTask"><option value="transcript">Speech transcription</option><option value="scene">Scene / still image</option></select></label></div>'+
       '<button type="button" class="primary" id="productionQueue">Queue for supervised processing</button>'+
-      '<p id="productionCaptureHint" class="hint">Editing approval and separate external-AI permission are both required.</p></section></div>'+
+      '<p id="productionCaptureHint" class="hint">Editing approval and separate external-AI permission are both required.</p>'+
+      '<details><summary>Independent rights review</summary><p class="hint">Clearance must be based on verified documentation, not contributor self-attestation. Publication and external AI are separate permissions.</p>'+
+      '<label class="field">Purpose<select id="productionRightsPurpose"><option value="external_ai">External AI use</option><option value="publication">Publication</option></select></label>'+
+      '<label class="field">Decision<select id="productionRightsDecision"><option value="restricted">Restricted / revoked</option><option value="cleared">Independently cleared</option></select></label>'+
+      '<label class="field">Evidence or restriction basis<textarea id="productionRightsBasis" minlength="25" maxlength="1000" rows="3" placeholder="Record what supporting release or restriction was independently checked."></textarea></label>'+
+      '<button type="button" class="secondary" id="productionRightsSave">Record audited rights decision</button></details></section></div>'+
       '<section class="panel"><h2>Inference jobs</h2>'+
       '<div class="production-list">'+(jobs.length?jobs.map(j=>'<button type="button" class="production-job'+(num(j.job_id)===focusedJob?' active':'')+
         '" data-production-job="'+num(j.job_id)+'"><span><strong>#'+num(j.job_id)+' · '+esc(j.capture_title||'Capture')+'</strong>'+
@@ -104,6 +109,20 @@
     capture.onchange=()=>{const x=captures.find(i=>num(i.id)===num(capture.value));hint.textContent=x?
       'Editorial '+x.review_status+' · external AI '+x.external_ai_clearance+
       (canQueue(x)?' · eligible for source verification':' · review in Team Workspace before queuing'):'Select a private capture.';};
+    $('#productionRightsSave',host).onclick=()=>{
+      const id=num(capture.value),found=captures.find(x=>num(x.id)===id);
+      if(!found){notice('Select the source capture for the independent rights decision.',true);return;}
+      const purpose=$('#productionRightsPurpose',host).value,decision=$('#productionRightsDecision',host).value;
+      const basis=$('#productionRightsBasis',host).value.trim();
+      if(basis.length<25){notice('Write a substantive evidence or restriction basis (25+ characters).',true);return;}
+      if(decision==='cleared'&&found.review_status!=='approved_for_edit'){
+        notice('Capture must first be approved by an editor.',true);return;
+      }
+      if(!window.confirm('Record '+decision+' for '+purpose+' on capture #'+id+'? This changes governing permissions.'))return;
+      if(busy)return;busy=true;
+      void c.api('story-capture.php',{action:'review_rights',submission_id:id,purpose,decision,basis})
+        .then(()=>load(true)).catch(e=>notice(e.message||'Rights review failed.',true)).finally(()=>{busy=false;});
+    };
     $('#productionQueue',host).onclick=()=>{
       const id=num(capture.value),found=captures.find(x=>num(x.id)===id);
       if(!found||!canQueue(found)){notice('Choose an approved capture with independent external-AI clearance.',true);return;}
