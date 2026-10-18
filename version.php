@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.114',
+  'stonefellow'=>'1.3.115',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.51',
+  'database_schema_target'=>'1.3.52',
   'homepage_web_designer'=>'visual-inline-editing-private-drafts-atomic-publishing-version-history',
   'customer_agent_brain'=>'per-account-explicit-memory-private-conversation-consent-and-deletion',
   'admin_agent_brain'=>'separate-operational-chat-proposals-and-mission-ledger',
@@ -50,7 +50,8 @@ echo json_encode([
   'artist_world_director'=>'coverage-gaps-role-targeted-private-draft-shot-requests',
   'artist_world_integrity'=>'private-agent-provider-boundary-atomic-evidence-verified-story-links',
   'artist_world_rights'=>'human-purpose-scoped-external-ai-and-publication-clearance-revocable',
-  'artist_world_inference_queue'=>'private-rights-gated-durable-lease-human-retry-no-provider-execution',
+  'artist_world_inference_queue'=>'private-rights-gated-durable-lease-human-retry',
+  'artist_world_inference_execution'=>'admin-opt-in-supervised-openai-audio-openai-anthropic-still-vision-private-review-only',
 
   'song_media'=>'audio-artwork-photo-video-document-archive-uploader',
   'audio_metadata'=>'ffprobe-wav-riff-mp3-frame-id3-fallback',
