@@ -3,14 +3,17 @@ declare(strict_types=1);
 $root=dirname(__DIR__);
 $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $checks=[
- 'Version API 1.3.113'=>str_contains($read('version.php'),"'stonefellow'=>'1.3.113'"),
- 'Public runtime 1.3.113'=>str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '1.3.113')"),
- 'Admin build synchronized'=>str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','1.3.113')"),
- 'PWA cache bumped'=>str_contains($read('service-worker.js'),'1.3.113'),
- 'Application and builder assets bumped'=>str_contains($read('assets/js/app.js'),'1.3.113')
-   &&str_contains($read('assets/css/turntable-builder.css'),'1.3.113'),
- 'Schema 1.3.50'=>str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.50'")
-   &&str_contains($read('version.php'),"'database_schema_target'=>'1.3.50'"),
+ 'Version API baseline'=>preg_match("/'stonefellow'=>'([0-9.]+)'/",$read('version.php'),$apiVersion)
+   &&version_compare($apiVersion[1],'1.3.113','>='),
+ 'Public runtime baseline'=>preg_match("/define\\('SF_BUILD', '([0-9.]+)'\\)/",$read('stonefellow-v120.php'),$releaseBuild)
+   &&version_compare($releaseBuild[1],'1.3.113','>='),
+ 'Admin build synchronized'=>str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$releaseBuild[1]."')"),
+ 'PWA cache bumped'=>str_contains($read('service-worker.js'),$releaseBuild[1]),
+ 'Application and builder assets bumped'=>str_contains($read('assets/js/app.js'),$releaseBuild[1])
+   &&str_contains($read('assets/css/turntable-builder.css'),$releaseBuild[1]),
+ 'Schema additive baseline'=>preg_match("/SF_DB_SCHEMA_TARGET = '([0-9.]+)'/",$read('api/migrations.php'),$schema)
+   &&version_compare($schema[1],'1.3.50','>=')
+   &&str_contains($read('version.php'),"'database_schema_target'=>'".$schema[1]."'"),
  'Additive migration 041'=>str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-041'")
    &&str_contains($read('api/migrations.php'),'sf_capture_rights_schema()'),
  'Integrity report includes scoped rights'=>str_contains($read('api/migrations.php'),"'story_capture_rights_reviews'"),
