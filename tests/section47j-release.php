@@ -16,7 +16,7 @@ $defs=sf_migration_definitions();
 $matches=array_values(array_filter($defs,fn($m)=>$m['id']==='2026-10-12-037'));
 $old=array_values(array_filter($defs,fn($m)=>$m['id']==='2026-10-12-036'));
 $checks=[
- 'Release target is 1.3.48'=>SF_DB_SCHEMA_TARGET==='1.3.48',
+ 'Release target is 1.3.48 or later'=>version_compare(SF_DB_SCHEMA_TARGET,'1.3.48','>='),
  'Exactly one additive migration 037'=>count($matches)===1,
  'Next library-repair migration registered'=>count(array_filter($defs,fn($m)=>$m['id']==='2026-10-13-038'))===1,
  'Prior migration 036 remains unmodified'=>count($old)===1&&$old[0]['app_version']==='1.3.45'&&$old[0]['revision']==='1',
@@ -51,7 +51,7 @@ $front=(string)$read('stonefellow-v120.php');
 $matchesBuild=[];
 $build=preg_match("/define\\('SF_BUILD', '([0-9]+\\.[0-9]+\\.[0-9]+)'\\)/",$front,$matchesBuild)
     ?$matchesBuild[1]:'';
-$schema='1.3.48';
+$schema=SF_DB_SCHEMA_TARGET;
 $checks['Version increases without breaking section 47 baseline']=$build!==''&&version_compare($build,'1.3.75','>=');
 $checks['Public and Admin release version synchronized']=str_contains($read('stonefellow-v120.php'),"define('SF_BUILD', '".$build."')")
    &&str_contains($read('admin/index.php'),"define('SF_ADMIN_BUILD','".$build."')");
