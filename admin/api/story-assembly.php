@@ -31,6 +31,7 @@ try{
     'render_certification'=>$assemblyId>0?sf_render_source_admin_status($id,$assemblyId,(int)(sf_assembly_read($id,$assemblyId)['revision']??0)):null,
     'render_enabled'=>sf_render_enabled(),
     'render_jobs'=>$assemblyId>0?sf_render_jobs($id,$assemblyId):[],
+    'render_audio_candidates'=>$assemblyId>0?sf_render_audio_candidates($id):[],
     'candidates'=>sf_assembly_candidates($id),'publication_enabled'=>false,
     'video_rendering_enabled'=>false,'ai_provider_invocation'=>false]);
  }
