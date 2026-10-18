@@ -66,7 +66,7 @@ $checks=[
  'Tables remain scrollable without widening whole page'=>str_contains($css,'.admin-canvas .table-scroll{max-width:100%;overflow-x:auto'),
  'Admin API and form permission semantics untouched'=>!str_contains($ui,'executeAction')&&!str_contains($ui,'csrf'),
  'Story Settings keeps independent modal workflow'=>str_contains($index,'assets/settings-tabs.js')&&str_contains($index,'assets/stories.js'),
- 'Unchanged password controls with additive customer library migration'=>str_contains($read('version.php'),"'database_schema_target'=>'1.3.48'")
+ 'Unchanged password controls with additive customer library migration'=>(preg_match("/'database_schema_target'=>'([0-9.]+)'/",$read('version.php'),$schemaMatch) && version_compare($schemaMatch[1],'1.3.48','>='))
      && !str_contains($ui,'password_reset'),
  'Frontend/Admin and PWA versions remain synchronized'=>preg_match("/SF_ADMIN_BUILD','([0-9.]+)'/",$index,$sync)
     &&version_compare($sync[1]??'0','1.3.50','>=')
