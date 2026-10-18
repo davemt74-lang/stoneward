@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/team-workspace-core.php';
 require_once SF_ROOT.'/api/story-capture-core.php';
+require_once SF_ROOT.'/api/story-capture-rights-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';$me=sf_admin_require_auth($method!=='GET');$id=(int)$me['id'];
 if($method==='GET')sf_json_response(['ok'=>true,'requests'=>sf_capture_requests($id),
  'review_queue'=>sf_capture_review_queue($id),'role_types'=>sf_capture_role_types()]);
@@ -21,6 +22,12 @@ try{
  if($action==='review_submission'){
    sf_capture_review($id,(int)($b['submission_id']??0),(string)($b['decision']??''));
    sf_json_response(['ok'=>true]);
+ }
+ if($action==='review_rights'){
+   sf_capture_rights_review($id,(int)($b['submission_id']??0),
+     (string)($b['purpose']??''),(string)($b['decision']??''),(string)($b['basis']??''));
+   sf_json_response(['ok'=>true,'status'=>sf_capture_rights_status(
+     (int)($b['submission_id']??0),(string)($b['purpose']??''))]);
  }
  sf_json_response(['ok'=>false,'error'=>'invalid_action'],422);
 }catch(InvalidArgumentException $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}
