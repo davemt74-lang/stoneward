@@ -375,6 +375,11 @@ jobs:
           node --check admin/assets/story-assembly.js
           php tests/section88d3g2-ffmpeg-render.php
           php tests/section88d3g2-release.php
+          php -l api/story-render-review-core.php
+          php -l admin/api/story-render-review.php
+          node --check admin/assets/story-assembly.js
+          php tests/section88d3g3-private-review.php
+          php tests/section88d3g3-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
