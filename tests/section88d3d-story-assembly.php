@@ -126,7 +126,7 @@ assert88d($modified['revision']===3&&$modified['item_count']===2,
 assert88d(sf_assembly_read(1,$id)['items'][0]['kind']==='track',
  'Explicit editor ordering is persisted');
 $api=(string)file_get_contents(dirname(__DIR__).'/admin/api/story-assembly.php');
-assert88d(str_contains($api,"sf_admin_require_auth($method!=='GET')")
+assert88d(str_contains($api,"sf_admin_require_auth(".chr(36)."method!=='GET')")
  &&!str_contains($api,'sf_inference_run_once('),
  'Assembly API requires Admin write authorization and does not invoke models');
 echo "88D3D: $n functional assertions passed".PHP_EOL;
