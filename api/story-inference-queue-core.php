@@ -95,6 +95,8 @@ function sf_inference_enqueue(int $editorId,int $submissionId,string $taskType):
     WHERE created_by=? AND status IN ('queued','leased')");
   $quota->execute([$editorId]);
   if((int)$quota->fetchColumn()>=12)throw new RuntimeException('Too many active inference jobs; review queue before submitting more.');
+  // Audit schema must be installed before DML transaction (MySQL DDL commits).
+  if(function_exists('sf_team_ensure_schema'))sf_team_ensure_schema();
   $now=gmdate('c');
   // UNIQUE(submission_id,task_type) remains the concurrency authority.
   try{
