@@ -38,13 +38,21 @@ function sf_director_catalog():array{
 function sf_director_coverage(int $editorId):array{
  if($editorId<1||!sf_team_can($editorId,'team.assign_roles'))
   throw new RuntimeException('Production editor required.');
- sf_director_schema();$db=sf_db();
+ sf_director_schema();
+ if(!function_exists('sf_capture_rights_schema'))require_once __DIR__.'/story-capture-rights-core.php';
+ sf_capture_rights_schema();$db=sf_db();
  $rows=$db->query("SELECT submission_type,COUNT(*) AS total FROM story_capture_submissions
   WHERE review_status='approved_for_edit' GROUP BY submission_type")->fetchAll(PDO::FETCH_ASSOC);
  $counts=[];foreach($rows as $r)$counts[(string)$r['submission_type']]=(int)$r['total'];
  $pending=(int)$db->query("SELECT COUNT(*) FROM story_capture_submissions WHERE review_status='pending_review'")->fetchColumn();
- $clearance=(int)$db->query("SELECT COUNT(*) FROM story_capture_submissions
-  WHERE review_status='approved_for_edit' AND people_release_status<>'not_applicable'")->fetchColumn();
+ // All contributor statements, including 'not_applicable', require a
+ // separate human rights decision before external AI or publication.
+ $clearance=(int)$db->query("SELECT COUNT(*) FROM story_capture_submissions s
+  LEFT JOIN story_capture_rights_reviews r ON r.submission_id=s.id AND r.purpose='external_ai'
+  WHERE s.review_status='approved_for_edit' AND COALESCE(r.status,'unreviewed')<>'cleared'")->fetchColumn();
+ $aiReady=(int)$db->query("SELECT COUNT(*) FROM story_capture_submissions s
+  JOIN story_capture_rights_reviews r ON r.submission_id=s.id AND r.purpose='external_ai'
+  WHERE s.review_status='approved_for_edit' AND r.status='cleared'")->fetchColumn();
  $gaps=[];
  foreach(sf_director_catalog() as $code=>$spec){
   $count=$counts[$spec['kind']]??0;
@@ -57,7 +65,8 @@ function sf_director_coverage(int $editorId):array{
    'reason'=>'Insufficient reviewed '.$spec['kind'].' coverage for a basic editorial assembly'];
  }
  return ['gaps'=>$gaps,'approved_counts'=>$counts,'pending_review'=>$pending,
-  'needs_likeness_or_release_review'=>$clearance,'basis'=>'approved submissions only',
+  'needs_likeness_or_release_review'=>$clearance,'external_ai_rights_cleared'=>$aiReady,
+  'basis'=>'editorially approved submissions; independent AI rights clearance is separate',
   'executed_changes'=>false,'auto_publish'=>false];
 }
 function sf_director_create_draft(int $editorId,string $code):int{
