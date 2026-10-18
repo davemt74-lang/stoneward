@@ -86,7 +86,7 @@ $anthropicMock=function(string $url,array $headers,array $body)use(&$invalidResp
  return ['content'=>[['type'=>'text','text'=>json_encode([
   'order'=>[1,1],'logline'=>'Invented repeated evidence',
   'beats'=>[['reason'=>'Duplicate source','transition'=>'cut'],['reason'=>'Duplicate source','transition'=>'cut']]
- ])]]]];
+ ])]]];
 };
 $res=sf_composer_run_once(1,$anthropicMock);
 verify88e($res['status']==='interrupted'&&$invalidResponses===1,
