@@ -7,6 +7,8 @@ require_once SF_ROOT.'/api/story-capture-core.php';
 require_once SF_ROOT.'/api/story-media-evidence-core.php';
 require_once SF_ROOT.'/api/story-capture-rights-core.php';
 require_once SF_ROOT.'/api/story-inference-queue-core.php';
+require_once SF_ROOT.'/api/ai.php';
+require_once SF_ROOT.'/api/story-inference-worker-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $admin=sf_admin_require_auth($method!=='GET');
 $id=(int)$admin['id'];
@@ -14,13 +16,24 @@ if(!sf_team_can($id,'team.assign_roles'))
   sf_json_response(['ok'=>false,'error'=>'forbidden'],403);
 try{
   if($method==='GET'){
+    $resultId=(int)($_GET['job_id']??0);
     sf_json_response(['ok'=>true,'jobs'=>sf_inference_jobs($id),
-      'provider_execution_enabled'=>false,'auto_retries'=>false,
+      'result'=>$resultId>0?sf_inference_result_admin($id,$resultId):null,
+      'provider_execution_enabled'=>sf_inference_enabled(),'auto_retries'=>false,
       'requires_independent_external_ai_clearance'=>true]);
   }
   if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
   $input=sf_request_json();
   $action=(string)($input['action']??'');
+  if($action==='configure_execution'){
+    if(!is_bool($input['enabled']??null))sf_json_response(['ok'=>false,'error'=>'invalid_enabled'],422);
+    sf_inference_execution_configure($id,$input['enabled']);
+    sf_json_response(['ok'=>true,'provider_execution_enabled'=>sf_inference_enabled()]);
+  }
+  if($action==='review_result'){
+    $changed=sf_inference_review($id,(int)($input['job_id']??0),(string)($input['decision']??''));
+    sf_json_response(['ok'=>true,'changed'=>$changed]);
+  }
   if($action==='enqueue'){
     $job=sf_inference_enqueue($id,(int)($input['submission_id']??0),
       (string)($input['task_type']??''));
