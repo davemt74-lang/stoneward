@@ -155,12 +155,17 @@ function sf_assembly_create(int $editor,string $title,string $brief=''):int{
  sf_assembly_editor($editor);sf_assembly_schema();
  $title=sf_capture_clean($title,180);$brief=sf_capture_clean($brief,1500);
  if(strlen($title)<3)throw new InvalidArgumentException('Title must contain at least 3 characters.');
- $now=gmdate('c');$q=sf_db()->prepare("INSERT INTO story_assemblies
-  (title,brief,revision,status,created_by,created_at,updated_at)
-  VALUES(?,?,1,'draft',?,?,?)");
- $q->execute([$title,$brief,$editor,$now,$now]);$id=(int)sf_db()->lastInsertId();
- sf_team_audit($editor,'capture.assembly_created','story_assembly',(string)$id,'Private editorial assembly created');
- return $id;
+ if(function_exists('sf_team_ensure_schema'))sf_team_ensure_schema();
+ $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested assembly creation unsupported.');
+ $db->beginTransaction();
+ try{
+  $now=gmdate('c');$q=$db->prepare("INSERT INTO story_assemblies
+    (title,brief,revision,status,created_by,created_at,updated_at)
+    VALUES(?,?,1,'draft',?,?,?)");
+  $q->execute([$title,$brief,$editor,$now,$now]);$id=(int)$db->lastInsertId();
+  sf_team_audit($editor,'capture.assembly_created','story_assembly',(string)$id,'Private editorial assembly created');
+  $db->commit();return $id;
+ }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
 function sf_assembly_list(int $editor):array{
  sf_assembly_editor($editor);sf_assembly_schema();
@@ -182,9 +187,16 @@ function sf_assembly_read(int $editor,int $assemblyId):?array{
 /** Rules-based Director editorial guidance, with no LLM, media transfer or mutation. */
 function sf_assembly_director_plan(int $editor,array $items):array{
  sf_assembly_editor($editor);
- $visual=0;$dialogue=0;$music=0;$unreleased=0;
+ $visual=0;$dialogue=0;$music=0;$unreleased=0;$invalid=0;
  foreach($items as $row){
   $k=$row['kind']??'';
+  try{
+   sf_assembly_validate_item([
+    'kind'=>$k,'source_id'=>(string)($row['source_id']??''),
+    'in_ms'=>(int)($row['in_ms']??0),'out_ms'=>(int)($row['out_ms']??0),
+    'duration_ms'=>(int)($row['duration_ms']??0),'notes'=>''
+   ]);
+  }catch(Throwable $e){$invalid++;continue;}
   if($k==='scene')$visual++;
   if($k==='transcript')$dialogue++;
   if($k==='track')$music++;
@@ -198,12 +210,14 @@ function sf_assembly_director_plan(int $editor,array $items):array{
  if($music<1)$gaps[]=['code'=>'music_bed','target_role'=>'band_member','shot_type'=>'audio',
     'brief'=>'Select a cleared Stonefellow track for the story music bed.','missing'=>1];
  $tips=[];
+ if($invalid)$tips[]=$invalid.' timeline source(s) are no longer independently verified or available; review the sequence.';
  if($items&&($items[0]['kind']??'')!=='scene')$tips[]='Consider starting with a verified establishing scene.';
  if($items&&($items[count($items)-1]['kind']??'')!=='scene')$tips[]='Consider ending with a verified visual scene.';
  if($unreleased)$tips[]='Some source captures lack independent publication clearance; private assembly is not a distribution license.';
  if($music)$tips[]='Track references are editorial only; confirm synchronization and master-use rights before publication.';
  return ['gaps'=>$gaps,'notes'=>$tips,'verified_visuals'=>$visual,'verified_dialogue'=>$dialogue,
    'music_references'=>$music,'publication_rights_pending'=>$unreleased,
+   'invalid_source_items'=>$invalid,
    'recommendation_origin'=>'deterministic_rules','automatic_changes'=>false,'ready_to_render'=>false];
 }
 /** All-or-nothing optimistic revision update with a unique ordered sequence. */
@@ -222,6 +236,9 @@ function sf_assembly_replace(int $editor,int $assemblyId,int $revision,array $it
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested assembly transaction unsupported.');
  $db->beginTransaction();
  try{
+  // Repeat source verification inside the transaction. Sources may have been
+  // reviewed or revoked between the client's preview and this save.
+  foreach($prepared as $v)sf_assembly_validate_item($v);
   $q=$db->prepare("UPDATE story_assemblies SET revision=revision+1,updated_at=?
    WHERE id=? AND revision=? AND status='draft'");
   $q->execute([gmdate('c'),$assemblyId,$revision]);
