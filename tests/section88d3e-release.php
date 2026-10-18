@@ -21,7 +21,7 @@ if(!str_contains($cli,"if(PHP_SAPI!=='cli')")
  ||!str_contains($worker,'sf_capture_rights_may_use(')
  ||!str_contains($worker,'sf_composer_validate_suggestion(')
  ||!str_contains($worker,'sf_assembly_replace(')
- ||!str_contains($worker,'CURLOPT_FOLLOWLOCATION')===false)
+ ||!str_contains($read('api/story-inference-worker-core.php'),'CURLOPT_FOLLOWLOCATION=>false'))
  throw new RuntimeException('Composer rights/controlled provider contract missing.');
 if(str_contains($api,'sf_composer_run_once(')
  ||!str_contains($api,'sf_admin_require_auth($method!==\'GET\')')
