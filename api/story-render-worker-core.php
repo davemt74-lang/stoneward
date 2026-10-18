@@ -110,6 +110,13 @@ function sf_render_enqueue(int $editor,int $assemblyId,int $revision):array{
   throw $e;
  }
 }
+function sf_render_audio_candidates(int $editor):array{
+ sf_assembly_editor($editor);
+ sf_render_jobs_schema();
+ return sf_db()->query("SELECT id,title,original_name,duration_seconds,size_bytes
+  FROM media_assets WHERE category='audio' AND size_bytes>0
+  ORDER BY id DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+}
 function sf_render_jobs(int $editor,int $assemblyId):array{
  sf_assembly_editor($editor);sf_render_jobs_schema();
  $q=sf_db()->prepare('SELECT id,revision,status,created_at,updated_at,output_bytes,error_code
