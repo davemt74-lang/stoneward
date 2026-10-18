@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.115');
+define('SF_ADMIN_BUILD','1.3.116');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -22,6 +22,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/campaigns.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/agent-actions.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/agent-canvas.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/production-review.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/media.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/stem-studio.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/video.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
@@ -103,6 +104,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
           <summary class="admin-nav-summary"><span>Agent &amp; Knowledge</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
           <div class="admin-nav-items">
             <button type="button" data-view="brain"><span>24</span>Agent Brain</button>
+            <button type="button" data-view="production-review"><span>24A</span>AI Production Review</button>
             <button type="button" data-view="knowledge"><span>15</span>Knowledge Base</button>
             <button type="button" data-view="ai"><span>23</span>AI Providers</button>
           </div>
@@ -147,6 +149,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/team-workspace.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/director-capture.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/production-review.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/settings-tabs.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/sidebar-accordion.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>&amp;e5=1"></script>

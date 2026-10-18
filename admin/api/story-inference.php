@@ -9,6 +9,9 @@ require_once SF_ROOT.'/api/story-capture-rights-core.php';
 require_once SF_ROOT.'/api/story-inference-queue-core.php';
 require_once SF_ROOT.'/api/ai.php';
 require_once SF_ROOT.'/api/story-inference-worker-core.php';
+require_once SF_ROOT.'/api/story-transcript-core.php';
+require_once SF_ROOT.'/api/story-scene-core.php';
+require_once SF_ROOT.'/api/story-production-review-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $admin=sf_admin_require_auth($method!=='GET');
 $id=(int)$admin['id'];
@@ -18,6 +21,8 @@ try{
   if($method==='GET'){
     $resultId=(int)($_GET['job_id']??0);
     sf_json_response(['ok'=>true,'jobs'=>sf_inference_jobs($id),
+      'review_items'=>sf_production_review_items($id),
+      'captures'=>sf_capture_review_queue($id),
       'result'=>$resultId>0?sf_inference_result_admin($id,$resultId):null,
       'provider_execution_enabled'=>sf_inference_enabled(),'auto_retries'=>false,
       'requires_independent_external_ai_clearance'=>true]);
@@ -29,6 +34,11 @@ try{
     if(!is_bool($input['enabled']??null))sf_json_response(['ok'=>false,'error'=>'invalid_enabled'],422);
     sf_inference_execution_configure($id,$input['enabled']);
     sf_json_response(['ok'=>true,'provider_execution_enabled'=>sf_inference_enabled()]);
+  }
+  if($action==='import_reviewed'){
+    $import=sf_production_import($id,(int)($input['job_id']??0),(array)($input['changes']??[]));
+    sf_json_response(['ok'=>true,'import'=>$import,
+      'message'=>'Private editorial draft imported; it is NOT published or independently verified.']);
   }
   if($action==='review_result'){
     $changed=sf_inference_review($id,(int)($input['job_id']??0),(string)($input['decision']??''));

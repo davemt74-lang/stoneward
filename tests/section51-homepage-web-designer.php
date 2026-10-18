@@ -69,7 +69,7 @@ $checks=[
  'Responsive preview supports all three devices'=>str_contains($css,'data-device=desktop')&&str_contains($css,'data-device=tablet')&&str_contains($css,'data-device=phone'),
  'Public render supports four block types and ticket CTA'=>str_contains($read('assets/js/artist-home-renderer.js'),"if(k==='custom_blocks')")&&str_contains($app,'data-home-ticket-offer')&&str_contains($app,'data-home-release')&&str_contains($app,'data-home-store'),
  'Block configuration and source references use original data'=>str_contains($builder,'getConfig')&&str_contains($read('admin/api/homepage.php'),"'tickets'=>\$tickets"),
- 'New feature does not add another Admin sidebar item'=>substr_count($shell,'data-view="')===30&&str_contains($shell,'data-view="team"'),
+ 'Homepage designer does not add duplicate navigation routes'=>substr_count($shell,'data-view="')===31&&str_contains($shell,'data-view="team"')&&str_contains($shell,'data-view="production-review"'),
  'Release version advances all JS assets'=>$siteVersion!==''&&version_compare($siteVersion,'1.3.75','>=')
     &&str_contains($shell,"SF_ADMIN_BUILD','".$siteVersion."'")
     &&str_contains($read('service-worker.js'),'stonefellow-static-v'.$siteVersion),

@@ -1,0 +1,18 @@
+/* Artist World 88D3C: native private AI Production Review Studio */
+.production-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0 0 20px}
+.production-grid>.panel{min-width:0}
+.production-grid button{margin:6px 8px 6px 0}
+.production-grid .field{display:block;margin:12px 0}
+.production-grid details{border-top:1px solid rgba(160,150,140,.25);padding-top:12px;margin-top:12px}
+.production-grid summary{cursor:pointer;font-weight:600}
+.production-list{display:grid;gap:4px;max-height:420px;overflow:auto}
+.production-job{width:100%;display:flex;gap:16px;justify-content:space-between;align-items:center;text-align:left;border:1px solid rgba(170,160,145,.22);border-radius:9px;padding:12px 14px;background:transparent;color:inherit;cursor:pointer}
+.production-job:hover,.production-job:focus-visible,.production-job.active{border-color:currentColor}
+.production-job strong,.production-job small{display:block;overflow-wrap:anywhere}
+.production-job small{opacity:.75;margin-top:4px}
+#productionReviewPanel .field{display:block;max-width:100%;margin:12px 0}
+#productionReviewPanel textarea,#productionReviewPanel input,.production-grid input,.production-grid textarea,.production-grid select{display:block;max-width:100%;width:100%;box-sizing:border-box}
+#productionReviewActions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.production-notice{min-height:1.5em}
+.production-notice.error{color:#e98080}
+@media(max-width:850px){.production-grid{grid-template-columns:1fr}.production-grid .form-grid{grid-template-columns:1fr}}
