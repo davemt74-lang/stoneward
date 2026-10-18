@@ -103,6 +103,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
           <summary class="admin-nav-summary"><span>Agent &amp; Knowledge</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
           <div class="admin-nav-items">
             <button type="button" data-view="brain"><span>24</span>Agent Brain</button>
+            <button type="button" data-view="production-review"><span>24A</span>AI Production Review</button>
             <button type="button" data-view="knowledge"><span>15</span>Knowledge Base</button>
             <button type="button" data-view="ai"><span>23</span>AI Providers</button>
           </div>
@@ -147,6 +148,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/analytics.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/team-workspace.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/director-capture.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/production-review.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/settings-tabs.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/sidebar-accordion.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>&amp;e5=1"></script>
