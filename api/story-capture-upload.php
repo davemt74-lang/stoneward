@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/team-workspace-core.php';
 require_once __DIR__.'/story-capture-core.php';
+require_once __DIR__.'/story-media-evidence-core.php';
 if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $me=sf_require_user(false,true);$uid=(int)$me['id'];
 if(empty($_FILES['file'])||!is_array($_FILES['file']))
@@ -29,6 +30,7 @@ if($requestId>0&&!in_array($requestId,array_map('intval',array_column(sf_capture
  sf_json_response(['ok'=>false,'error'=>'shot_request_unavailable'],403);
 // Intake is private. No automatic publication, role grants or media links.
 try{
+ $observed=sf_evidence_observe_upload($file);
  $asset=sf_media_ingest_upload($file,$uid);
  if(!$asset||empty($asset['id'])||sf_media_protected_master_asset((int)$asset['id']))
    throw new InvalidArgumentException('The uploaded item cannot be used for capture.');
@@ -39,6 +41,10 @@ try{
    'request_id'=>$requestId,'rights_attested'=>true,
    'people_release_status'=>(string)($_POST['people_release_status']??'unconfirmed')];
  $id=sf_capture_submit($uid,$draft,(int)$asset['id']);
+ // Technical indexing is best-effort: never misrepresent capture acceptance as AI analysis.
+ try{sf_evidence_record($id,(int)$asset['id'],$observed);}catch(Throwable $indexError){
+   error_log('[Stonefellow evidence index] '.get_class($indexError));
+ }
  sf_json_response(['ok'=>true,'submission_id'=>$id,'review_status'=>'pending_review',
    'message'=>'Captured privately and submitted for editorial review.']);
 }catch(InvalidArgumentException $e){
