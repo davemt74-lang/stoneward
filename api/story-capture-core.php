@@ -168,7 +168,18 @@ function sf_capture_my_submissions(int $viewerId):array {
 function sf_capture_review_queue(int $adminId):array {
   if(!sf_team_can($adminId,'team.assign_roles'))throw new RuntimeException('Administrator required.');
   sf_capture_schema();
-  return sf_db()->query('SELECT id,contributor_id,request_id,asset_id,submission_type,title,description,dialogue_text,captured_at,role_snapshot,people_release_status,review_status,created_at FROM story_capture_submissions ORDER BY id DESC LIMIT 150')->fetchAll(PDO::FETCH_ASSOC);
+  require_once __DIR__.'/story-capture-rights-core.php';
+  sf_capture_rights_schema();
+  // Contributor release fields are self-reported, not independent clearance.
+  return sf_db()->query("SELECT s.id,s.contributor_id,s.request_id,s.asset_id,s.submission_type,
+    s.title,s.description,s.dialogue_text,s.captured_at,s.role_snapshot,
+    s.people_release_status,s.review_status,s.created_at,
+    COALESCE(ai.status,'unreviewed') AS external_ai_clearance,
+    COALESCE(pub.status,'unreviewed') AS publication_clearance
+    FROM story_capture_submissions s
+    LEFT JOIN story_capture_rights_reviews ai ON ai.submission_id=s.id AND ai.purpose='external_ai'
+    LEFT JOIN story_capture_rights_reviews pub ON pub.submission_id=s.id AND pub.purpose='publication'
+    ORDER BY s.id DESC LIMIT 150")->fetchAll(PDO::FETCH_ASSOC);
 }
 function sf_capture_review(int $adminId,int $submissionId,string $decision):void {
   if(!sf_team_can($adminId,'team.assign_roles'))throw new RuntimeException('Administrator required.');
