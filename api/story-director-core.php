@@ -91,3 +91,17 @@ function sf_director_create_draft(int $editorId,string $code):int{
   throw $e;
  }
 }
+
+function sf_director_admin_brief(int $editorId):string{
+ $coverage=sf_director_coverage($editorId);
+ $lines=[];
+ foreach($coverage['gaps'] as $gap){
+  $lines[]=$gap['code'].': '.$gap['approved_assets'].'/'.$gap['recommended_minimum'].
+   ' reviewed assets; '.($gap['draft_request_id']?'draft #'.$gap['draft_request_id']:'draft not yet created');
+ }
+ return 'Artist World Director coverage review (read-only). '.
+  $coverage['pending_review'].' contribution(s) pending editorial review; '.
+  $coverage['needs_likeness_or_release_review'].' accepted contribution(s) still require likeness/release assessment. '.
+  ($lines?implode("\n",$lines):'Minimum starting shot coverage is present.').
+  ' Suggested requests require an explicit editor action and remain unpublished drafts.';
+}
