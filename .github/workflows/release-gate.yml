@@ -307,6 +307,7 @@ jobs:
           php tests/section88d2d-story-graph.php
           php tests/section88d2e-production-search.php
           php tests/section88d2f-director.php
+          php tests/section88d2g-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
@@ -401,3 +402,4 @@ jobs:
           SF_E4_EPHEMERAL=yes php tests/section75e4-mysql-legacy-upgrade.php
           php tests/section75e2-mysql-commerce.php
           php tests/section84b6-mysql-device-pairing.php
+          php tests/section88d2g-mysql-production.php
