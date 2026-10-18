@@ -306,6 +306,7 @@ jobs:
           php tests/section88d2c-scenes.php
           php tests/section88d2d-story-graph.php
           php tests/section88d2e-production-search.php
+          php tests/section88d2f-director.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
