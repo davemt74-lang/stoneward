@@ -88,7 +88,7 @@ good(sf_inference_recover(1)===1,'Final expired attempt marked interrupted');
 good(sf_inference_retry(1,$claimed['job_id'])===false,'Three-attempt cap prevents further retries');
 good(sf_inference_claim(1)===null,'No hidden retry after budget exhaustion');
 $scene=sf_inference_enqueue(1,$submission,'scene');
-good($scene['task_type']??true,'Independent visual analysis task can enqueue');
+good($scene['existing']===false,'Independent visual analysis task can enqueue');
 good($scene['status']==='queued'&&$scene['job_id']!==$first['job_id'],'Separate task types have separate durable jobs');
 $q=$db->prepare('UPDATE media_assets SET sha256=? WHERE id=?');
 $q->execute([str_repeat('a',64),4]);
