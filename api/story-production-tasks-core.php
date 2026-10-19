@@ -116,12 +116,17 @@ function sf_production_task_assign(int $editor,int $task,int $assignee):void{
  $u=sf_db()->prepare('SELECT id,status FROM users WHERE id=?');$u->execute([$assignee]);
  if(($u->fetch(PDO::FETCH_ASSOC)['status']??'')!=='active')
   throw new RuntimeException('Assignee is not active.');
- $q=sf_db()->prepare("UPDATE story_production_tasks SET assigned_to=?,status='assigned',
- updated_at=? WHERE id=? AND status IN ('proposed','assigned')");
- $q->execute([$assignee,gmdate('c'),$task]);
- if($q->rowCount()<1)throw new RuntimeException('Task changed; reload.');
- sf_team_audit($editor,'production.task_assigned','story_production_task',(string)$task,
-  'Production task assigned to active role-eligible contributor');
+ $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested assignment unsupported.');
+ $db->beginTransaction();
+ try{
+  $q=$db->prepare("UPDATE story_production_tasks SET assigned_to=?,status='assigned',
+   updated_at=? WHERE id=? AND status IN ('proposed','assigned')");
+  $q->execute([$assignee,gmdate('c'),$task]);
+  if($q->rowCount()<1)throw new RuntimeException('Task changed; reload.');
+  sf_team_audit($editor,'production.task_assigned','story_production_task',(string)$task,
+   'Production task assigned to active role-eligible contributor');
+  $db->commit();
+ }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
 /** Submit an existing contributor-owned capture; never silently approve the media. */
 function sf_production_task_submit(int $actor,int $task,int $evidence,string $note):void{
@@ -142,12 +147,17 @@ function sf_production_task_submit(int $actor,int $task,int $evidence,string $no
   if($evidence!==(int)$row['source_id'])
    throw new RuntimeException('Editorial evidence must reference original proposal.');
  }else throw new RuntimeException('Unknown task type.');
- $q=sf_db()->prepare("UPDATE story_production_tasks SET status='submitted',evidence_id=?,
- contributor_note=?,updated_at=? WHERE id=? AND status='assigned' AND assigned_to=?");
- $q->execute([$evidence,$note,gmdate('c'),$task,$actor]);
- if($q->rowCount()!==1)throw new RuntimeException('Task was modified; reload.');
- sf_team_audit($actor,'production.task_evidence_submitted','story_production_task',(string)$task,
-  'Linked contributor evidence submitted for independent human review');
+ $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested submission unsupported.');
+ $db->beginTransaction();
+ try{
+  $q=$db->prepare("UPDATE story_production_tasks SET status='submitted',evidence_id=?,
+   contributor_note=?,updated_at=? WHERE id=? AND status='assigned' AND assigned_to=?");
+  $q->execute([$evidence,$note,gmdate('c'),$task,$actor]);
+  if($q->rowCount()!==1)throw new RuntimeException('Task was modified; reload.');
+  sf_team_audit($actor,'production.task_evidence_submitted','story_production_task',(string)$task,
+   'Linked contributor evidence submitted for independent human review');
+  $db->commit();
+ }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
 function sf_production_task_review(int $editor,int $task,string $decision,string $basis):void{
  sf_production_task_editor($editor);$row=sf_production_task_read($editor,$task);
