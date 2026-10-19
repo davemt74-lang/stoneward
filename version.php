@@ -69,6 +69,7 @@ echo json_encode([
   'artist_world_crew_tasks'=>'director-gap-task-assignment-evidence-human-completion-approval',
   'artist_world_task_lifecycle'=>'source-linked-progress-recovery-history-private-activity',
   'artist_world_production_scheduling'=>'human-deadlines-private-crew-availability-readonly-agent-conflict-alerts',
+  'artist_world_production_scheduling'=>'human-deadlines-private-crew-availability-readonly-agent-conflict-alerts',
   'artist_world_private_qc'=>'hash-verified-revision-gated-video-review-cue-sheet-millisecond-seek',
 
   'song_media'=>'audio-artwork-photo-video-document-archive-uploader',
