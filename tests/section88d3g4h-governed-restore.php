@@ -17,11 +17,12 @@ function denyH(callable $task,string $label):void{
 sf_assembly_restore_schema();
 $old=sf_assembly_read(1,$id);
 okayH((int)$old['revision']===3,'Existing versioned private assembly is the test fixture.');
+sf_assembly_history_archive(1,$id,1,[]); // Actual empty first revision in fixture.
 sf_assembly_history_archive(1,$id,2,[$sceneItem,$transItem,$musicItem,$stillItem]);
 sf_assembly_history_archive(1,$id,3,$old['items']);
 $next=sf_assembly_replace(1,$id,3,[$sceneItem,$transItem,$musicItem]);
 okayH($next['revision']===4,'Current production edit creates version four with verified sources.');
-okayH(count(sf_assembly_history_list(1,$id))===3,'History ledger contains only actual and newly saved versions.');
+okayH(count(sf_assembly_history_list(1,$id))===4,'History ledger contains only actual and newly saved versions.');
 denyH(fn()=>sf_assembly_restore_request(2,$id,4,3,str_repeat('Invalid contributor request.',2)),
  'Contributor cannot queue restoration review.');
 denyH(fn()=>sf_assembly_restore_request(1,$id,4,4,str_repeat('Cannot restore present revision.',2)),
@@ -90,7 +91,7 @@ okayH(sf_assembly_restore_review(1,$pending['id'],'rejected',
  'Revoked sources still allow explicit rejection and an auditable decision.');
 $stillVerified=$db->prepare("UPDATE story_transcripts SET review_status='verified' WHERE id=?");
 $stillVerified->execute([$trans]);
-$stale=sf_assembly_restore_request(1,$id,5,4,
+$stale=sf_assembly_restore_request(1,$id,5,1,
  'Another approved source-preserving version should be considered.');
 $more=sf_assembly_replace(1,$id,5,[$musicItem,$transItem]);
 okayH($more['revision']==6,'Independent editorial edit advances the optimistic revision.');
