@@ -156,6 +156,7 @@ function sf_assembly_create(int $editor,string $title,string $brief=''):int{
  $title=sf_capture_clean($title,180);$brief=sf_capture_clean($brief,1500);
  if(strlen($title)<3)throw new InvalidArgumentException('Title must contain at least 3 characters.');
  if(function_exists('sf_team_ensure_schema'))sf_team_ensure_schema();
+ if(function_exists('sf_assembly_history_schema'))sf_assembly_history_schema();
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested assembly creation unsupported.');
  $db->beginTransaction();
  try{
@@ -163,6 +164,7 @@ function sf_assembly_create(int $editor,string $title,string $brief=''):int{
     (title,brief,revision,status,created_by,created_at,updated_at)
     VALUES(?,?,1,'draft',?,?,?)");
   $q->execute([$title,$brief,$editor,$now,$now]);$id=(int)$db->lastInsertId();
+  if(function_exists('sf_assembly_history_archive'))sf_assembly_history_archive($editor,$id,1,[]);
   sf_team_audit($editor,'capture.assembly_created','story_assembly',(string)$id,'Private editorial assembly created');
   $db->commit();return $id;
  }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
@@ -233,12 +235,19 @@ function sf_assembly_replace(int $editor,int $assemblyId,int $revision,array $it
   $prepared[]=$v+['ordinal'=>$i];
  }
  if(function_exists('sf_team_ensure_schema'))sf_team_ensure_schema();
+ if(function_exists('sf_assembly_history_schema'))sf_assembly_history_schema();
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested assembly transaction unsupported.');
  $db->beginTransaction();
  try{
   // Repeat source verification inside the transaction. Sources may have been
   // reviewed or revoked between the client's preview and this save.
   foreach($prepared as $v)sf_assembly_validate_item($v);
+  if(function_exists('sf_assembly_history_archive')){
+   $oldQ=$db->prepare('SELECT kind,source_id,in_ms,out_ms,duration_ms,notes
+      FROM story_assembly_items WHERE assembly_id=? ORDER BY ordinal');
+   $oldQ->execute([$assemblyId]);
+   sf_assembly_history_archive($editor,$assemblyId,$revision,$oldQ->fetchAll(PDO::FETCH_ASSOC));
+  }
   $q=$db->prepare("UPDATE story_assemblies SET revision=revision+1,updated_at=?
    WHERE id=? AND revision=? AND status='draft'");
   $q->execute([gmdate('c'),$assemblyId,$revision]);
@@ -249,6 +258,7 @@ function sf_assembly_replace(int $editor,int $assemblyId,int $revision,array $it
    VALUES(?,?,?,?,?,?,?,?,?,?)');
   foreach($prepared as $v)$q->execute([$assemblyId,$v['ordinal'],$v['kind'],$v['source_id'],
     $v['source_submission_id'],$v['in_ms'],$v['out_ms'],$v['duration_ms'],$v['notes'],gmdate('c')]);
+  if(function_exists('sf_assembly_history_archive'))sf_assembly_history_archive($editor,$assemblyId,$revision+1,$prepared);
   sf_team_audit($editor,'capture.assembly_revised','story_assembly',(string)$assemblyId,
     'Revised private editorial timeline from revision '.$revision.' to '.($revision+1));
   $db->commit();return ['assembly_id'=>$assemblyId,'revision'=>$revision+1,'item_count'=>count($prepared),'duration_ms'=>$sum];
