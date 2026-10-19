@@ -1,10 +1,13 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
+require_once SF_ROOT.'/api/media-core.php';
 require_once SF_ROOT.'/api/team-workspace-core.php';
 require_once SF_ROOT.'/api/story-capture-core.php';
 require_once SF_ROOT.'/api/story-capture-rights-core.php';
 require_once SF_ROOT.'/api/story-director-core.php';
+require_once SF_ROOT.'/api/story-transcript-core.php';
+require_once SF_ROOT.'/api/story-scene-core.php';
 require_once SF_ROOT.'/api/story-assembly-core.php';
 require_once SF_ROOT.'/api/story-composer-core.php';
 require_once SF_ROOT.'/api/story-production-tasks-core.php';
