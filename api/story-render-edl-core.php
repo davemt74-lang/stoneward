@@ -87,6 +87,7 @@ function sf_render_edl_preview(int $editor,int $assembly,int $revision):array{
  $saved=sf_assembly_read($editor,$assembly);
  if(!$saved||(int)$saved['revision']!==$revision||$saved['status']!=='draft')
   throw new RuntimeException('Current saved private editorial revision required.');
+ if(count($saved['items'])===0)return [];
  $plan=['revision'=>$revision,'items'=>$saved['items'],
   'total_ms'=>array_sum(array_map(static fn($v)=>(int)$v['duration_ms'],$saved['items']))];
  return sf_render_edl_build($plan,
