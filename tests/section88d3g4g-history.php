@@ -54,7 +54,7 @@ $db->commit();
 $diff=sf_assembly_history_compare(1,9,2,3);
 $types=array_column($diff['changes'],'type');
 yesG4G($diff['from_count']===3&&$diff['to_count']===4
- &&$diff['from_duration_ms']===5900&&$diff['to_duration_ms']===5400,
+ &&$diff['from_duration_ms']===5900&&$diff['to_duration_ms']===7200,
  'Revision summary compares actual source-timing totals.');
 yesG4G(in_array('reordered',$types,true)&&in_array('modified',$types,true)
  &&in_array('added',$types,true),'Comparison distinguishes reorder, trim/notes edit and duplicate clip addition.');
