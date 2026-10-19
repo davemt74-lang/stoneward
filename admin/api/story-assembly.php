@@ -8,6 +8,7 @@ require_once SF_ROOT.'/api/story-capture-rights-core.php';
 require_once SF_ROOT.'/api/story-transcript-core.php';
 require_once SF_ROOT.'/api/story-scene-core.php';
 require_once SF_ROOT.'/api/story-assembly-core.php';
+require_once SF_ROOT.'/api/story-assembly-history-core.php';
 require_once SF_ROOT.'/api/ai.php';
 require_once SF_ROOT.'/api/story-inference-worker-core.php';
 require_once SF_ROOT.'/api/story-composer-core.php';
@@ -27,8 +28,14 @@ if(!sf_team_can($id,'team.assign_roles'))
 try{
  if($method==='GET'){
   $assemblyId=(int)($_GET['assembly_id']??0);
+  if(($_GET['action']??'')==='compare_revisions'){
+   $assembly=(int)($_GET['assembly_id']??0);
+   sf_json_response(['ok'=>true,'comparison'=>sf_assembly_history_compare($id,$assembly,
+     (int)($_GET['from_revision']??0),(int)($_GET['to_revision']??0))]);
+  }
   sf_json_response(['ok'=>true,'assemblies'=>sf_assembly_list($id),
     'assembly'=>$assemblyId>0?sf_assembly_read($id,$assemblyId):null,
+    'revision_history'=>$assemblyId>0?sf_assembly_history_list($id,$assemblyId):[],
     'composer_enabled'=>sf_composer_enabled(),
     'composer_proposals'=>$assemblyId>0?sf_composer_list($id,$assemblyId):[],
     'storyboard'=>$assemblyId>0?sf_storyboard_preview($id,$assemblyId):null,
