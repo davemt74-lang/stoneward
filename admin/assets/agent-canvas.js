@@ -46,7 +46,8 @@
     if(type==='brain'){showBrain();return;}
     if(type==='campaigns'){c.openView('campaigns');setTimeout(()=>window.SFAgentCampaigns?.open?.('newsletter'),0);return;}
     if(type==='journey'){c.openView('automations');setTimeout(()=>window.SFAutomationsAdmin?.openAutomation?.(0),0);return;}
-    if(['crm','automations','analytics','commerce-ops','production-review'].includes(type))c.openView(type);
+    if(type==='production-review'){c.openView('production-review');return;}
+    if(['crm','automations','analytics','commerce-ops'].includes(type))c.openView(type);
   }
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
