@@ -3,9 +3,9 @@ declare(strict_types=1);
 $root=dirname(__DIR__);$read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js','.htaccess',
  'assets/js/app.js','assets/css/turntable-builder.css'] as $file)
- if(!str_contains($read($file),'1.3.133'))throw new RuntimeException('G4J stale release identity: '.$file);
-if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.66'")
- ||!str_contains($read('api/migrations.php'),"const SF_DB_SCHEMA_TARGET = '1.3.66'")
+ if(!str_contains($read($file),'1.3.134'))throw new RuntimeException('G4J stale release identity: '.$file);
+if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.67'")
+ ||!str_contains($read('api/migrations.php'),"const SF_DB_SCHEMA_TARGET = '1.3.67'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-19-056'")
  ||!str_contains($read('api/migrations.php'),'sf_production_tasks_schema();')
  ||!str_contains($read('version.php'),"'artist_world_crew_tasks'=>'director-gap-task-assignment-evidence-human-completion-approval'"))

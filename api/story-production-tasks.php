@@ -5,14 +5,22 @@ require_once __DIR__.'/team-workspace-core.php';
 require_once __DIR__.'/story-capture-core.php';
 require_once __DIR__.'/story-production-tasks-core.php';
 require_once __DIR__.'/story-production-task-lifecycle-core.php';
+require_once __DIR__.'/story-production-scheduling-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $user=sf_require_user(false,$method!=='GET');
 $id=(int)$user['id'];header('Cache-Control: no-store, private');
 try{
  if($method==='GET')sf_json_response(['ok'=>true,'tasks'=>sf_production_task_list($id),
-  'task_updates'=>sf_production_task_notifications($id)]);
+  'task_updates'=>sf_production_task_notifications($id),
+  'schedule_board'=>sf_production_schedule_board($id),
+  'my_availability'=>sf_production_availability_list($id,$id)]);
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();
+ if(($p['action']??'')==='availability'){
+  sf_production_availability_set($id,(string)($p['start_date']??''),
+   (string)($p['end_date']??''),(string)($p['status']??''),(string)($p['note']??''));
+  sf_json_response(['ok'=>true,'automatic_assignment'=>false]);
+ }
  if(($p['action']??'')==='progress'){
   sf_production_task_progress($id,(int)($p['task_id']??0),(string)($p['note']??''));
   sf_json_response(['ok'=>true,'status'=>'in_progress','publication_allowed'=>false]);

@@ -7,7 +7,7 @@
     let data;
     try{data=await ctx.api('story-capture.php');}
     catch(e){host.insertAdjacentHTML('beforeend','<section class="panel"><h2>Creative Director</h2><p role="alert">'+esc(e.message||'Capture unavailable')+'</p></section>');return;}
-    let taskData={tasks:[],coverage:{gaps:[]},composer_queue:[],roster:[],task_updates:[]};
+    let taskData={tasks:[],coverage:{gaps:[]},composer_queue:[],roster:[],task_updates:[],schedule_board:{tasks:[],counts:{}}};
     try{taskData=await ctx.api('story-production-tasks.php');}
     catch(e){/* Preserve existing shot review when optional task ledger is unavailable. */}
     const types=[['photo','Photo'],['video','Video'],['audio','Audio'],['ambient','Ambient sound'],['dialogue','Dialogue'],['story_idea','Story beat'],['screenshot','Suggested screenshot']];
@@ -37,9 +37,14 @@
       '</div><div class="director-list">'+
       ((taskData.tasks||[]).map(t=>{
         const eligible=(taskData.roster||[]).filter(u=>t.target_role==='all'||(u.team_roles||[]).includes(t.target_role));
+        const calendar=(taskData.schedule_board?.tasks||[]).find(x=>Number(x.task_id)===Number(t.id))||{};
         return '<div class="director-row"><div><small>Task #'+Number(t.id)+' · '+esc(t.kind)+
           ' · '+esc(t.status)+' · '+esc(t.target_role)+'</small><strong>'+esc(t.title)+'</strong>'+
           '<p>'+esc(t.brief)+'</p>'+
+          (calendar.due_at?'<p class="hint">Due <strong>'+esc(calendar.due_at)+'</strong> · '+esc(calendar.priority)+
+           ' priority · crew '+esc(calendar.availability||'unknown')+
+           (calendar.flags?.length?' · '+esc(calendar.flags.join(', ')):'')+'</p>':'')+
+
           (t.kind==='shot'?'<p class="hint">Linked shot request #'+Number(t.source_id)+
             ' must be explicitly opened by a human before capture submission.</p>':'')+
           (t.evidence_id?'<p class="hint">Private evidence #'+Number(t.evidence_id)+
@@ -47,6 +52,11 @@
           (t.reviewed_by?'<p class="hint">Human reviewer #'+Number(t.reviewed_by)+
             ': '+esc(t.review_basis||'')+'</p>':'')+
           '</div>'+
+          (!['approved','rejected'].includes(t.status)?'<div class="director-task-controls">'+
+           '<label>Target completion (local)<input type="datetime-local" data-task-due="'+Number(t.id)+'"></label>'+
+           '<label>Priority<select data-task-priority="'+Number(t.id)+'"><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select></label>'+
+           '<textarea rows="2" maxlength="750" data-task-schedule-reason="'+Number(t.id)+'" placeholder="Document scheduling purpose (20+ characters)"></textarea>'+
+           '<button type="button" data-task-schedule="'+Number(t.id)+'">Set deadline</button></div>':'')+
           (['proposed','assigned'].includes(t.status)?'<div class="director-task-controls"><select data-task-assignee="'+Number(t.id)+'">'+
             '<option value="">Choose eligible team member</option>'+
             eligible.map(u=>'<option value="'+Number(u.id)+'" '+(Number(t.assigned_to)===Number(u.id)?'selected':'')+'>'+
@@ -66,7 +76,10 @@
             '<button type="button" data-task-review="'+Number(t.id)+'" data-decision="rejected">Reject</button></div>':'')+
           '</div>';
       }).join('')||'<p>No production tasks assigned yet. Use a Director coverage recommendation to propose one.</p>')+
-      '</div><details><summary>Evidence-linked task activity · '+Number((taskData.task_updates||[]).length)+' recent updates</summary>'+
+      '</div><p class="hint">Scheduling signals: '+Number(taskData.schedule_board?.counts?.overdue||0)+' overdue · '+
+       Number(taskData.schedule_board?.counts?.due_soon||0)+' due soon · '+
+       Number(taskData.schedule_board?.counts?.availability_conflict||0)+' crew availability conflicts. Review only, no automatic reassignment.</p>'+
+       '<details><summary>Evidence-linked task activity · '+Number((taskData.task_updates||[]).length)+' recent updates</summary>'+
       '<ol class="director-task-activity">'+(taskData.task_updates||[]).map(e=>
         '<li><time>'+esc(e.created_at)+'</time> · Task #'+Number(e.task_id)+
         ' · '+esc(e.event_type)+' → '+esc(e.status_to)+'</li>').join('')+'</ol></details>'+
@@ -114,6 +127,19 @@
       if(window.confirm('Record '+b.dataset.decision+' for this completed task? This is not publication clearance.'))
         void taskPost({action:'review',task_id:Number(b.dataset.taskReview),
           decision:b.dataset.decision,basis});
+    });
+    section.querySelectorAll('[data-task-schedule]').forEach(button=>button.onclick=()=>{
+      const id=Number(button.dataset.taskSchedule),
+        value=section.querySelector('[data-task-due="'+id+'"]')?.value||'',
+        reason=section.querySelector('[data-task-schedule-reason="'+id+'"]')?.value.trim()||'',
+        priority=section.querySelector('[data-task-priority="'+id+'"]')?.value||'normal';
+      const date=new Date(value);
+      if(!value||!Number.isFinite(date.getTime())||reason.length<20){
+        if(taskStatus)taskStatus.textContent='Select a deadline and explain it (20+ characters).';return;
+      }
+      if(window.confirm('Save this private task deadline? The AI Director will only recommend actions.'))
+        void taskPost({action:'schedule',task_id:id,priority,
+          due_at:date.toISOString().replace('.000Z','Z'),reason});
     });
     section.querySelectorAll('[data-task-reopen]').forEach(button=>button.onclick=()=>{
       const id=Number(button.dataset.taskReopen);

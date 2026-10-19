@@ -12,6 +12,7 @@ require_once SF_ROOT.'/api/story-assembly-core.php';
 require_once SF_ROOT.'/api/story-composer-core.php';
 require_once SF_ROOT.'/api/story-production-tasks-core.php';
 require_once SF_ROOT.'/api/story-production-task-lifecycle-core.php';
+require_once SF_ROOT.'/api/story-production-scheduling-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $user=sf_admin_require_auth($method!=='GET');$editor=(int)$user['id'];
 if(!sf_team_can($editor,'team.assign_roles'))
@@ -20,12 +21,18 @@ try{
  if($method==='GET'){sf_composer_schema();sf_json_response(['ok'=>true,'tasks'=>sf_production_task_list($editor),
    'coverage'=>sf_director_coverage($editor),'roster'=>sf_team_roster($editor),
    'task_updates'=>sf_production_task_notifications($editor),
+   'schedule_board'=>sf_production_schedule_board($editor),
    'composer_queue'=>sf_db()->query("SELECT id,assembly_id,revision,status
      FROM story_composer_proposals WHERE status='pending_review' ORDER BY id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC)]);}
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();$action=(string)($p['action']??'');
  if($action==='propose_gap')sf_json_response(['ok'=>true,'task'=>sf_production_task_propose_gap($editor,(string)($p['code']??''))]);
  if($action==='propose_editorial')sf_json_response(['ok'=>true,'task'=>sf_production_task_propose_editorial($editor,(int)($p['proposal_id']??0))]);
+ if($action==='schedule'){
+   sf_production_schedule_set($editor,(int)($p['task_id']??0),(string)($p['due_at']??''),
+     (string)($p['priority']??''),(string)($p['reason']??''));
+   sf_json_response(['ok'=>true,'auto_reassigned'=>false]);
+ }
  if($action==='assign'){sf_production_task_assign($editor,(int)($p['task_id']??0),(int)($p['assignee_id']??0));sf_json_response(['ok'=>true]);}
  if($action==='reopen'){sf_production_task_reopen($editor,(int)($p['task_id']??0),
   (int)($p['assignee_id']??0),(string)($p['basis']??''));sf_json_response(['ok'=>true]);}
