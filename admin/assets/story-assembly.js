@@ -2,7 +2,7 @@
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
- let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],composerEnabled=false,busy=false,dirty=false;
+ let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,composerEnabled=false,busy=false,dirty=false;
  let previewMs=0,previewTimer=null;
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -126,6 +126,19 @@
       '<label>Verified Media Library audio master<select id="renderMaster">'+
         audioMasters.map(x=>'<option value="'+Number(x.id)+'">#'+Number(x.id)+' · '+esc(x.title||x.original_name||'Audio')+' · '+humanTime(Number(x.duration_seconds||0)*1000)+'</option>').join('')+'</select></label>'+
       '<button type="button" class="secondary" id="renderBindMaster" '+(dirty||!audioMasters.length?'disabled':'')+'>Bind private song master to current revision</button></div>'+
+      '<fieldset class="assembly-mix-preset"><legend>Licensed music bed · dialogue ducking</legend>'+
+       '<p class="hint">Optional private MP4 mix. The selected song must already be in the timeline with both cleared use licenses and a verified audio master. Presets lock when a render is queued for this revision.</p>'+
+       '<label>Soundtrack<select id="mixTrack">'+
+        (storyboard.cards||[]).filter(x=>x.kind==='track').map(card=>'<option value="'+esc(card.source_id)+'" '+(renderMix?.track_id===card.source_id?'selected':'')+'>'+esc(card.label)+'</option>').join('')+'</select></label>'+
+       '<label>Background music level<select id="mixGain">'+
+        [10,15,20,25,30].map(n=>'<option value="'+n+'" '+((renderMix?.gain_pct??20)===n?'selected':'')+'>'+n+'%</option>').join('')+'</select></label>'+
+       '<label>Music level during dialogue<select id="mixDuck">'+
+        [25,35,50,65].map(n=>'<option value="'+n+'" '+((renderMix?.duck_pct??35)===n?'selected':'')+'>'+n+'% of music level</option>').join('')+'</select></label>'+
+       '<label>Start/end fade<select id="mixFade">'+
+        [250,500,1000].map(n=>'<option value="'+n+'" '+((renderMix?.fade_ms??500)===n?'selected':'')+'>'+n+' ms</option>').join('')+'</select></label>'+
+       '<button type="button" class="secondary" id="mixSave" '+(dirty||renderJobs.some(j=>Number(j.revision)===Number(project.revision))?'disabled':'')+'>Save music mix for this revision</button>'+
+       (renderMix?'<p class="hint">Current revision preset: '+esc(renderMix.track_id)+' · '+Number(renderMix.gain_pct)+'% music · '+Number(renderMix.duck_pct)+'% dialogue duck · '+Number(renderMix.fade_ms)+'ms fades</p>':'<p class="hint">No music overlay preset. Existing hard-cut output remains the default.</p>')+
+       '</fieldset>'+
       '<div class="actions"><button type="button" class="secondary" id="renderToggle">'+(renderEnabled?'Disable private renderer':'Enable private renderer')+'</button>'+
       '<button type="button" class="primary" id="renderQueue" '+(!renderEnabled||!renderCert?.eligible||dirty?'disabled':'')+'>Queue private render</button></div>'+
       '<p class="hint">Execute one approved job on the server: php scripts/artist-world-private-render.php --editor-id=EDITOR_ID. Outputs remain outside the web root, awaiting a separate video review phase.</p>'+
@@ -275,6 +288,21 @@
       await load();note(answer.changed?'Private video review recorded. Publication remains disabled.':'Video was already reviewed.');
     }catch(e){note(e.message||'Review unavailable.',true);}finally{busy=false;}
   });
+  const mixSave=host.querySelector('#mixSave');
+  if(mixSave)mixSave.onclick=async()=>{
+   if(busy||dirty)return;
+   const track=host.querySelector('#mixTrack')?.value||'';
+   if(!track){note('Choose a licensed Stonefellow song already on the timeline.',true);return;}
+   if(!window.confirm('Apply a revision-locked, licensed soundtrack mix to the next private MP4? This does not publish the film.'))return;
+   busy=true;try{
+    await c.api('story-assembly.php',{action:'configure_mix',assembly_id:Number(view.id),
+     revision:Number(view.revision),track_id:track,
+     gain_pct:Number(host.querySelector('#mixGain').value),
+     duck_pct:Number(host.querySelector('#mixDuck').value),
+     fade_ms:Number(host.querySelector('#mixFade').value)});
+    await load();note('Licensed music bed preset saved. Queue a new private render to apply it.');
+   }catch(e){note(e.message,true);}finally{busy=false;}
+  };
   const renderQueue=host.querySelector('#renderQueue');
   if(renderQueue)renderQueue.onclick=async()=>{
     if(busy||dirty||!renderCert?.eligible)return;
@@ -338,7 +366,8 @@
    composerEnabled=Boolean(r.composer_enabled);proposals=Array.isArray(r.composer_proposals)?r.composer_proposals:[];
    storyboard=r.storyboard||null;renderCert=r.render_certification||null;
    renderEnabled=Boolean(r.render_enabled);renderJobs=Array.isArray(r.render_jobs)?r.render_jobs:[];
-   audioMasters=Array.isArray(r.render_audio_candidates)?r.render_audio_candidates:[];previewMs=0;
+   audioMasters=Array.isArray(r.render_audio_candidates)?r.render_audio_candidates:[];
+   renderMix=r.render_mix||null;previewMs=0;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
    draw();
