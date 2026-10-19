@@ -245,6 +245,7 @@ function sf_render_run_once(int $editor):array{
   }
   $rendered=$workspace.'/draft.mp4';
   $effective=$manifest;
+  if(function_exists('sf_render_edl_build'))sf_render_edl_build($manifest,$transition,$mix);
   if($transition!==null){
    if(!sf_render_enabled()||sf_render_transition_settings($editor,$assembly,$revision)!==$transition)
     throw new RuntimeException('Private video transition preset changed during execution.');
