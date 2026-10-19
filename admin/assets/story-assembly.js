@@ -75,7 +75,7 @@
         '<span class="hint">'+(card.kind==='track'?'Sync: '+esc(card.sync_clearance)+' · Master: '+esc(card.master_clearance):
             'Publishing: '+esc(card.publication_clearance)+' · Source file: '+(card.asset_present?'present':'unavailable'))+'</span>'+
         '</div></article>').join('')+'</div>'+
-       (renderEdl?'<div class="assembly-edl" aria-label="Synchronized private production timeline">'+
+       (renderEdl?.clips?.length?'<div class="assembly-edl" aria-label="Synchronized private production timeline">'+
         '<h4>G4C · synchronized production timeline</h4>'+
         '<p class="hint">Exact editorial timings for the saved revision. Overlap, dialogue and licensed music are synchronized metadata, not a public video.</p>'+
         '<p><strong>Final timing: '+humanTime(renderEdl.output_total_ms)+'</strong> · '+renderEdl.output_total_ms+
