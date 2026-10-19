@@ -75,6 +75,11 @@ function sf_render_transition_effective_manifest(array $plan,array $settings):ar
  sf_render_transition_validate($plan,$settings['style'],$settings['overlap_ms']);
  $effective=$plan;$count=count($plan['items']);$overlap=$settings['overlap_ms'];
  $effective['total_ms']=$plan['total_ms']-($count-1)*$overlap;
+ if(function_exists('sf_render_edl_build')){
+  $edl=sf_render_edl_build($plan,$settings);
+  $effective['edl_duck_windows']=$edl['dialogue_duck_windows'];
+  if($edl['output_total_ms']!==$effective['total_ms'])throw new RuntimeException('Crossfade EDL duration mismatch.');
+ }
  foreach($effective['items'] as $i=>&$item)
   if($i>0)$item['duration_ms']-=$overlap;
  unset($item);

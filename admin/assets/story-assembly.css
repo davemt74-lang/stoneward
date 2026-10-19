@@ -66,3 +66,12 @@
 .assembly-transition select{width:100%;min-width:0}
 .assembly-transition p,.assembly-transition button{grid-column:1/-1}
 @media(max-width:680px){.assembly-transition{grid-template-columns:1fr}}
+
+/* G4C: synchronized metadata EDL, separate from authenticated private media review */
+.assembly-edl{border:1px solid rgba(165,154,139,.35);border-radius:12px;padding:16px;margin:18px 0;background:rgba(120,120,120,.045)}
+.assembly-edl h4{margin:0 0 8px}
+.assembly-edl-tracks{display:grid;gap:6px;max-height:310px;overflow:auto;margin:12px 0}
+.assembly-edl-clip,.assembly-edl-cut,.assembly-edl-duck{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 10px;border-left:3px solid rgba(180,160,120,.8);background:rgba(127,127,127,.07);font-size:.86rem}
+.assembly-edl-cut{border-left-color:rgba(116,158,192,.8)}
+.assembly-edl-duck{border-left-color:rgba(150,185,136,.8)}
+@media(max-width:620px){.assembly-edl-clip{flex-wrap:wrap}}

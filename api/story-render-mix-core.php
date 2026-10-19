@@ -90,8 +90,10 @@ function sf_render_mix_filter(array $manifest,array $mix):string{
  $parts=['[1:a]aformat=sample_fmts=fltp:channel_layouts=stereo,'.
   'atrim=duration='.sprintf('%.3f',$total/1000).',asetpts=PTS-STARTPTS,'.
   'volume='.sprintf('%.2f',$mix['gain_pct']/100)];
+ $edl=function_exists('sf_render_edl_build')?sf_render_edl_build($manifest,null,null):null;
+ if($edl!==null&&isset($manifest['edl_duck_windows']))$edl['dialogue_duck_windows']=$manifest['edl_duck_windows'];
  $offset=0;
- foreach($manifest['items'] as $item){
+ if($edl===null)foreach($manifest['items'] as $item){
   $duration=(int)$item['duration_ms'];
   if($duration<500||$duration>20000)throw new InvalidArgumentException('Invalid mix timing source.');
   if($item['kind']==='transcript'){
@@ -100,7 +102,15 @@ function sf_render_mix_filter(array $manifest,array $mix):string{
   }
   $offset+=$duration;
  }
- if($offset!==$total)throw new RuntimeException('Timeline timing changed during bed composition.');
+ if($edl!==null){
+  foreach($edl['dialogue_duck_windows'] as $window){
+   $from=sprintf('%.3f',$window['start_ms']/1000);
+   $to=sprintf('%.3f',$window['end_ms']/1000);
+   $parts[]='volume='.sprintf('%.2f',$mix['duck_pct']/100).":enable='between(t,$from,$to)'";
+  }
+  if($edl['output_total_ms']!==$total)
+   throw new RuntimeException('EDL timing changed during bed composition.');
+ }elseif($offset!==$total)throw new RuntimeException('Timeline timing changed during bed composition.');
  $parts[]='afade=t=in:st=0:d='.$fade;
  $parts[]='afade=t=out:st='.$end.':d='.$fade.'[bed]';
  return implode(',',$parts).';[0:a]aformat=sample_fmts=fltp:channel_layouts=stereo[dialogue];'.

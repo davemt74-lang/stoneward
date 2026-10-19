@@ -4,7 +4,7 @@ $root=dirname(__DIR__);
 $get=static fn(string $name):string=>(string)file_get_contents($root.'/'.$name);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $name)
- if(!str_contains($get($name),'1.3.124'))throw new RuntimeException('Mismatched G4A release: '.$name);
+ if(!str_contains($get($name),'1.3.125'))throw new RuntimeException('Mismatched G4A release: '.$name);
 if(!str_contains($get('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.61'")
  ||!str_contains($get('api/migrations.php'),"'id'=>'2026-10-18-051'")
  ||!str_contains($get('api/migrations.php'),"'story_render_mixes'"))

@@ -2,7 +2,7 @@
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
- let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,renderTransition=null,composerEnabled=false,busy=false,dirty=false;
+ let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,renderTransition=null,renderEdl=null,composerEnabled=false,busy=false,dirty=false;
  let previewMs=0,previewTimer=null;
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -75,7 +75,22 @@
         '<span class="hint">'+(card.kind==='track'?'Sync: '+esc(card.sync_clearance)+' · Master: '+esc(card.master_clearance):
             'Publishing: '+esc(card.publication_clearance)+' · Source file: '+(card.asset_present?'present':'unavailable'))+'</span>'+
         '</div></article>').join('')+'</div>'+
-       '<div class="assembly-preview-controls"><button id="assemblyPreviewPlay" type="button">Play timing</button>'+
+       (renderEdl?.clips?.length?'<div class="assembly-edl" aria-label="Synchronized private production timeline">'+
+        '<h4>G4C · synchronized production timeline</h4>'+
+        '<p class="hint">Exact editorial timings for the saved revision. Overlap, dialogue and licensed music are synchronized metadata, not a public video.</p>'+
+        '<p><strong>Final timing: '+humanTime(renderEdl.output_total_ms)+'</strong> · '+renderEdl.output_total_ms+
+          ' ms · '+renderEdl.cuts.length+' cuts · '+renderEdl.dialogue_duck_windows.length+' dialogue windows</p>'+
+        '<div class="assembly-edl-tracks">'+
+          (renderEdl.clips||[]).map(c=>'<div class="assembly-edl-clip"><strong>#'+Number(c.ordinal)+' '+esc(c.kind)+'</strong>'+
+            '<span>'+Number(c.output_in_ms)+'–'+Number(c.output_out_ms)+' ms</span></div>').join('')+
+          (renderEdl.cuts||[]).map(c=>'<div class="assembly-edl-cut">Transition '+esc(c.style)+
+            ' · '+Number(c.start_ms)+'–'+Number(c.end_ms)+' ms</div>').join('')+
+          (renderEdl.dialogue_duck_windows||[]).map(w=>'<div class="assembly-edl-duck">Dialogue duck '+
+            Number(w.start_ms)+'–'+Number(w.end_ms)+' ms</div>').join('')+
+        '</div><p class="hint">Licensed soundtrack: '+(renderEdl.music.enabled?
+            Number(renderEdl.music.gain_pct)+'% background · '+Number(renderEdl.music.duck_pct)+'% under dialogue':
+            'No approved music bed preset')+'</p></div>':'')+
+    '<div class="assembly-preview-controls"><button id="assemblyPreviewPlay" type="button">Play timing</button>'+
        '<button id="assemblyPreviewReset" type="button" class="secondary">Reset</button>'+
        '<label>Virtual playhead<input id="assemblyPreviewRange" type="range" min="0" max="'+Math.max(1,Number(storyboard.total_ms))+
        '" step="100" value="'+Math.min(previewMs,Number(storyboard.total_ms))+'"></label>'+
@@ -388,7 +403,7 @@
    storyboard=r.storyboard||null;renderCert=r.render_certification||null;
    renderEnabled=Boolean(r.render_enabled);renderJobs=Array.isArray(r.render_jobs)?r.render_jobs:[];
    audioMasters=Array.isArray(r.render_audio_candidates)?r.render_audio_candidates:[];
-   renderMix=r.render_mix||null;renderTransition=r.render_transition||null;previewMs=0;
+   renderMix=r.render_mix||null;renderTransition=r.render_transition||null;renderEdl=r.render_edl||null;previewMs=0;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
    draw();
