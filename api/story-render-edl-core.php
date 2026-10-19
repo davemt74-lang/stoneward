@@ -90,7 +90,10 @@ function sf_render_edl_preview(int $editor,int $assembly,int $revision):array{
  if(count($saved['items'])===0)return [];
  $plan=['revision'=>$revision,'items'=>$saved['items'],
   'total_ms'=>array_sum(array_map(static fn($v)=>(int)$v['duration_ms'],$saved['items']))];
- return sf_render_edl_build($plan,
-  sf_render_transition_settings($editor,$assembly,$revision),
-  sf_render_mix_settings($editor,$assembly,$revision));
+ try{
+  return sf_render_edl_build($plan,
+   sf_render_transition_settings($editor,$assembly,$revision),
+   sf_render_mix_settings($editor,$assembly,$revision));
+ }catch(InvalidArgumentException $e){return [];}
+
 }
