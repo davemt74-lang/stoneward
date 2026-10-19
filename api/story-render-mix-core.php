@@ -91,6 +91,7 @@ function sf_render_mix_filter(array $manifest,array $mix):string{
   'atrim=duration='.sprintf('%.3f',$total/1000).',asetpts=PTS-STARTPTS,'.
   'volume='.sprintf('%.2f',$mix['gain_pct']/100)];
  $edl=function_exists('sf_render_edl_build')?sf_render_edl_build($manifest,null,null):null;
+ if($edl!==null&&isset($manifest['edl_duck_windows']))$edl['dialogue_duck_windows']=$manifest['edl_duck_windows'];
  $offset=0;
  if($edl===null)foreach($manifest['items'] as $item){
   $duration=(int)$item['duration_ms'];
