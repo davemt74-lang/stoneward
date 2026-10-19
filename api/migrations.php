@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.61';
+const SF_DB_SCHEMA_TARGET = '1.3.62';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -571,6 +571,28 @@ function sf_migration_definitions(): array {
                 require_once SF_ROOT.'/api/story-render-worker-core.php';
                 require_once SF_ROOT.'/api/story-render-transition-core.php';
                 sf_render_transition_schema();
+            },
+        ],
+        [
+            'id'=>'2026-10-19-053',
+            'app_version'=>'1.3.127',
+            'description'=>'Exact-revision per-cut private FFmpeg transition preset ledger',
+            'revision'=>'1',
+            'apply'=>function(): void {
+                require_once SF_ROOT.'/api/media-core.php';
+                require_once SF_ROOT.'/api/team-workspace-core.php';
+                require_once SF_ROOT.'/api/story-capture-core.php';
+                require_once SF_ROOT.'/api/story-capture-rights-core.php';
+                require_once SF_ROOT.'/api/story-transcript-core.php';
+                require_once SF_ROOT.'/api/story-scene-core.php';
+                require_once SF_ROOT.'/api/story-media-evidence-core.php';
+                require_once SF_ROOT.'/api/story-assembly-core.php';
+                require_once SF_ROOT.'/api/storyboard-preview-core.php';
+                require_once SF_ROOT.'/api/story-render-source-core.php';
+                require_once SF_ROOT.'/api/story-render-worker-core.php';
+                require_once SF_ROOT.'/api/story-render-transition-core.php';
+                require_once SF_ROOT.'/api/story-render-cut-core.php';
+                sf_render_cut_schema();
             },
         ],
     ];

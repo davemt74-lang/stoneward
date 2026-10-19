@@ -19,6 +19,7 @@ require_once SF_ROOT.'/api/story-render-worker-core.php';
 require_once SF_ROOT.'/api/story-render-mix-core.php';
 require_once SF_ROOT.'/api/story-render-transition-core.php';
 require_once SF_ROOT.'/api/story-render-edl-core.php';
+require_once SF_ROOT.'/api/story-render-cut-core.php';
 $editor=0;
 foreach(array_slice($argv,1) as $arg)
  if(preg_match('/^--editor-id=([1-9][0-9]*)$/D',$arg,$m))$editor=(int)$m[1];

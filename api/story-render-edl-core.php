@@ -21,32 +21,40 @@ function sf_render_edl_build(array $plan,?array $transition=null,?array $mix=nul
  }
  if($sourceTotal<1000||$sourceTotal>60000||$sourceTotal!==(int)($plan['total_ms']??-1))
   throw new InvalidArgumentException('EDL does not match the saved source timeline.');
- $overlap=0;$style='cut';
+ $overlap=0;$style='cut';$boundaries=[];
  if($transition!==null){
-  $style=(string)($transition['style']??'');
-  $overlap=$transition['overlap_ms']??null;
-  if(!in_array($style,['fade','wipeleft'],true)||!in_array($overlap,[250,500],true)
-    ||$count<2||$count>6||$sourceTotal>30000)
-   throw new InvalidArgumentException('Unapproved crossfade timeline settings.');
-  foreach($items as $item)
-   if((int)$item['duration_ms']<$overlap*2+500)
-    throw new InvalidArgumentException('Crossfaded clips require safe handles.');
- }
+  $style=(string)($transition['style']??'');$overlap=$transition['overlap_ms']??null;
+  if(!in_array($style,['fade','wipeleft'],true)||!in_array($overlap,[250,500],true)||$count<2||$count>6||$sourceTotal>30000)
+   throw new InvalidArgumentException('Invalid transition base.');
+  $boundaries=$transition['cuts']??array_fill(0,$count-1,['style'=>$style,'overlap_ms'=>$overlap]);
+  if(!is_array($boundaries)||!array_is_list($boundaries)||count($boundaries)!==$count-1)
+   throw new InvalidArgumentException('Invalid cut count.');
+  foreach($boundaries as $cut)
+   if(!is_array($cut)||array_keys($cut)!==['style','overlap_ms']||!in_array($cut['style'],['fade','wipeleft'],true)||!in_array($cut['overlap_ms'],[250,500],true))
+    throw new InvalidArgumentException('Invalid cut preset.');
+  foreach($items as $i=>$item){
+   $in=$i===0?0:$boundaries[$i-1]['overlap_ms'];
+   $out=$i===$count-1?0:$boundaries[$i]['overlap_ms'];
+   if((int)$item['duration_ms']<$in+$out+500)throw new InvalidArgumentException('Invalid source handles.');
+  }
+ }else $boundaries=array_fill(0,max(0,$count-1),['style'=>'cut','overlap_ms'=>0]);
  $clips=[];$cuts=[];$duck=[];$cursor=0;
  foreach($items as $i=>$item){
-  $start=$cursor-($i===0?0:$overlap);
+  $incoming=$i===0?0:$boundaries[$i-1]['overlap_ms'];
+  $outgoing=$i===$count-1?0:$boundaries[$i]['overlap_ms'];
+  $start=$cursor-$incoming;
   $end=$start+(int)$item['duration_ms'];
   if($i>0)$cuts[]=[
-    'after_ordinal'=>$i,'before_ordinal'=>$i+1,'style'=>$style,
-    'start_ms'=>$start,'end_ms'=>$start+$overlap,'duration_ms'=>$overlap
+    'after_ordinal'=>$i,'before_ordinal'=>$i+1,'style'=>$boundaries[$i-1]['style'],
+    'start_ms'=>$start,'end_ms'=>$start+$incoming,'duration_ms'=>$incoming
   ];
   $clips[]=[
    'ordinal'=>$i+1,'kind'=>(string)$item['kind'],
    'output_in_ms'=>$start,'output_out_ms'=>$end,
    'source_in_ms'=>(int)($item['start_ms']??$item['in_ms']??0),
    'duration_ms'=>(int)$item['duration_ms'],
-   'overlap_in_ms'=>$i===0?0:$overlap,
-   'overlap_out_ms'=>$i===$count-1?0:$overlap
+   'overlap_in_ms'=>$incoming,
+   'overlap_out_ms'=>$outgoing
   ];
   if($item['kind']==='transcript'){
    // Adjacent dialogue cues may overlap; merge the windows instead of applying
@@ -75,6 +83,7 @@ function sf_render_edl_build(array $plan,?array $transition=null,?array $mix=nul
   'revision'=>(int)($plan['revision']??0),
   'source_total_ms'=>$sourceTotal,'output_total_ms'=>$cursor,
   'overlap_ms'=>$overlap,'clips'=>$clips,'cuts'=>$cuts,
+  'variable_overlaps'=>$transition!==null&&isset($transition['cuts']),
   'dialogue_duck_windows'=>$duck,'music'=>$music,
   'metadata_only'=>true,'render_authorized'=>false,'publication_enabled'=>false
  ];
