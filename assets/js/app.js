@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.134';
+  window.STONEFELLOW_APP_BUILD='1.3.135';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu');
@@ -676,13 +676,14 @@
       canvas.innerHTML='<section class="module"><h1>Creative Capture</h1><p role="alert">'+esc(e.message||'Unavailable')+'</p></section>';return;}
     const requests=Array.isArray(data.requests)?data.requests:[],
       my=Array.isArray(data.submissions)?data.submissions:[];
-    let assignedTasks=[],taskUpdates=[],scheduleBoard={tasks:[],counts:{}},myAvailability=[];
+    let assignedTasks=[],taskUpdates=[],scheduleBoard={tasks:[],counts:{}},myAvailability=[],myDeadlineRequests=[];
     try{
       const response=await api('story-production-tasks.php');
       assignedTasks=Array.isArray(response.tasks)?response.tasks:[];
       taskUpdates=Array.isArray(response.task_updates)?response.task_updates:[];
       scheduleBoard=response.schedule_board||scheduleBoard;
       myAvailability=Array.isArray(response.my_availability)?response.my_availability:[];
+      myDeadlineRequests=Array.isArray(response.my_deadline_requests)?response.my_deadline_requests:[];
     }catch(e){/* Capture functionality stays usable during task-service outage. */}
 
     canvas.innerHTML='<article class="module capture-studio"><div class="module-kicker">ARTIST WORLD · CREATIVE STUDIO</div>'+
@@ -712,6 +713,7 @@
       (assignedTasks.map(t=>{
         const proofs=my.filter(x=>Number(x.request_id)===Number(t.source_id));
         const calendar=(scheduleBoard.tasks||[]).find(x=>Number(x.task_id)===Number(t.id))||{};
+        const extensions=myDeadlineRequests.filter(x=>Number(x.task_id)===Number(t.id));
         return '<div class="capture-request"><small>'+esc(t.status)+' · '+esc(t.target_role)+'</small>'+
           '<h3>'+esc(t.title)+'</h3><p>'+esc(t.brief)+'</p>'+
           (calendar.due_at?'<p class="player-note">Due '+esc(calendar.due_at)+' · '+esc(calendar.priority)+
@@ -724,7 +726,14 @@
             '</select></label><textarea data-assigned-note="'+Number(t.id)+'" rows="2" maxlength="750" '+
             'placeholder="Describe your work and evidence for human review (15+ characters)"></textarea>'+
             '<div class="actions"><button type="button" data-assigned-progress="'+Number(t.id)+'">Record progress</button>'+
-            '<button type="button" data-assigned-submit="'+Number(t.id)+'">Submit completed work</button></div>':
+            '<button type="button" data-assigned-submit="'+Number(t.id)+'">Submit completed work</button></div>'+
+            (calendar.due_at?'<details><summary>Ask Agent team for a deadline extension</summary>'+
+              '<p class="player-note">Propose a later date and explain the reason. The production editor must review it in Agent Chat before anything changes.</p>'+
+              '<label>Proposed date (local)<input type="datetime-local" data-extension-date="'+Number(t.id)+'"></label>'+
+              '<label>Reason<textarea rows="2" maxlength="900" data-extension-reason="'+Number(t.id)+'" placeholder="Explain why the original deadline needs an extension (25+ characters)"></textarea></label>'+
+              '<button type="button" data-extension-request="'+Number(t.id)+'">Request editor approval in chat</button></details>':'')+
+            (extensions.length?'<p class="player-note">Extension history: '+extensions.slice(0,5).map(x=>
+              '#'+Number(x.id)+' · '+esc(x.status)+' · '+esc(x.proposed_due_at)).join(' | ')+'</p>':''):
             '<p>Evidence #'+Number(t.evidence_id||0)+' · '+esc(t.status)+
             (t.review_basis?' · '+esc(t.review_basis):'')+'</p>')+'</div>';
       }).join('')||'<p>No private production tasks assigned to you.</p>')+
@@ -759,6 +768,22 @@
         await renderCreativeCapture();
       }catch(err){if(status)status.textContent=err.message||'Availability update unavailable.';}
     };
+    canvas.querySelectorAll('[data-extension-request]').forEach(button=>button.onclick=async()=>{
+      const id=Number(button.dataset.extensionRequest),
+        value=canvas.querySelector('[data-extension-date="'+id+'"]')?.value||'',
+        reason=canvas.querySelector('[data-extension-reason="'+id+'"]')?.value.trim()||'',
+        timestamp=new Date(value),status=canvas.querySelector('#assignedTaskStatus');
+      if(!id||!value||!Number.isFinite(timestamp.getTime())||reason.length<25){
+        if(status)status.textContent='Choose a later date and provide at least 25 characters explaining the request.';return;
+      }
+      button.disabled=true;
+      try{
+        const reply=await api('story-production-tasks.php',{action:'request_deadline',task_id:id,
+          proposed_due_at:timestamp.toISOString().replace('.000Z','Z'),reason});
+        if(status)status.textContent='Extension request #'+Number(reply.request?.id)+' saved. Editor review appears in Agent Chat; the current date is unchanged.';
+        await renderCreativeCapture();
+      }catch(err){if(status)status.textContent=err.message||'Deadline request unavailable.';button.disabled=false;}
+    });
     canvas.querySelectorAll('[data-assigned-progress]').forEach(button=>button.onclick=async()=>{
       const task=Number(button.dataset.assignedProgress);
       const note=canvas.querySelector('[data-assigned-note="'+task+'"]')?.value.trim()||'';

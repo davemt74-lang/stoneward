@@ -10,6 +10,54 @@
     try{return await c.api('agent-chat.php'+(conversationId?'?conversation_id='+encodeURIComponent(conversationId):''));}
     catch(e){if(conversationId){conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');return c.api('agent-chat.php');}throw e;}
   }
+
+  function localDateInput(utc){
+    if(!utc)return '';
+    const value=new Date(utc);if(!Number.isFinite(value.getTime()))return '';
+    const local=new Date(value.getTime()-value.getTimezoneOffset()*60000);
+    return local.toISOString().slice(0,16);
+  }
+  function calendarHtml(calendar){
+    if(!calendar||!Array.isArray(calendar.tasks))return '';
+    const requests=Array.isArray(calendar.pending_requests)?calendar.pending_requests:[];
+    const counts=calendar.counts||{};
+    return '<section class="admin-agent-calendar" aria-label="Private production calendar and human approval queue">'+
+      '<div class="admin-agent-calendar-head"><strong>Production calendar</strong><small>Snapshot · '+esc(calendar.as_of||'')+
+      ' · UTC source deadlines, displayed in your local time</small></div>'+
+      '<p class="hint">'+Number(counts.overdue||0)+' overdue · '+Number(counts.due_soon||0)+' due soon · '+
+      Number(counts.availability_conflict||0)+' crew conflicts · '+requests.length+' extension reviews</p>'+
+      '<div class="admin-agent-calendar-list">'+calendar.tasks.map(t=>{
+        const due=localDateInput(t.due_at);
+        return '<div class="admin-agent-calendar-task">'+
+          '<div><strong>#'+Number(t.task_id)+' · '+esc(t.title)+'</strong><p>'+esc(t.status)+' · '+
+          esc(t.target_role)+' · assigned #'+Number(t.assigned_to||0)+
+          (t.due_at?' · due '+esc(new Date(t.due_at).toLocaleString()):' · unscheduled')+
+          (t.flags?.length?' · '+esc(t.flags.join(', ')):'')+'</p></div>'+
+          (!['approved','rejected'].includes(t.status)?
+            '<details><summary>Set deadline in chat</summary>'+
+            '<label>Due (local)<input type="datetime-local" data-agent-task-due="'+Number(t.task_id)+'" value="'+esc(due)+'"></label>'+
+            '<label>Priority<select data-agent-task-priority="'+Number(t.task_id)+'">'+
+            ['normal','high','critical'].map(p=>'<option value="'+p+'" '+(t.priority===p?'selected':'')+'>'+p+'</option>').join('')+
+            '</select></label>'+
+            '<label>Reason<textarea data-agent-task-reason="'+Number(t.task_id)+'" maxlength="750" rows="2" placeholder="Why change this due date? 20+ characters"></textarea></label>'+
+            '<button type="button" class="secondary" data-agent-task-schedule="'+Number(t.task_id)+'">Confirm due date</button></details>':'')+
+          '</div>';
+      }).join('')+'</div>'+
+      '<h4>Deadline extension requests · human review</h4>'+
+      (requests.length?requests.map(q=>
+        '<div class="admin-agent-deadline-request" data-agent-request="'+Number(q.id)+'">'+
+        '<strong>Request #'+Number(q.id)+' · '+esc(q.title)+'</strong>'+
+        '<p>Contributor #'+Number(q.requested_by)+' · task #'+Number(q.task_id)+
+        ' · current '+esc(new Date(q.expected_due_at).toLocaleString())+
+        ' → requested '+esc(new Date(q.proposed_due_at).toLocaleString())+'</p>'+
+        '<p>Reason: '+esc(q.reason)+'</p>'+
+        '<label>Independent review basis<textarea rows="2" maxlength="900" data-agent-deadline-basis="'+Number(q.id)+'" placeholder="Your decision and evidence, at least 25 characters"></textarea></label>'+
+        '<div class="actions"><button type="button" data-agent-deadline-review="approved" data-request-id="'+Number(q.id)+'">Approve date</button>'+
+        '<button type="button" class="secondary" data-agent-deadline-review="rejected" data-request-id="'+Number(q.id)+'">Reject request</button></div></div>'
+      ).join(''):'<p class="hint">No deadline extensions awaiting approval.</p>')+
+      '<p class="hint">Every date change requires a separate authenticated click and is written to the existing audit history. No automatic crew reassignment or publication.</p>'+
+      '</section>';
+  }
   function messageHtml(m){
     const who=m.role==='assistant'?'Stonefellow Admin Agent':'Admin';
     const feedback=m.role==='assistant'&&Number(m.id)>0?'<div class="admin-agent-feedback"><button type="button" class="secondary" data-admin-agent-feedback="helpful" data-message-id="'+Number(m.id)+'">Helpful</button><button type="button" class="secondary" data-admin-agent-feedback="not_helpful" data-message-id="'+Number(m.id)+'">Not helpful</button></div>':'';
@@ -17,7 +65,8 @@
     let next='';
     if(m.role==='assistant'&&action.type==='prepare_campaign')next='<button type="button" data-admin-agent-action="campaigns" class="secondary">Prepare exact-review campaign draft</button>';
     else if(m.role==='assistant'&&action.type==='prepare_journey')next='<button type="button" data-admin-agent-action="journey" class="secondary">Prepare exact-review journey draft</button>';
-    else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-admin-agent-action="production-review" class="secondary">Open private Production Review</button>';
+    else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-agent-show-calendar class="secondary">Show production calendar here</button>';
+    else if(m.role==='assistant'&&action.type==='production_schedule_calendar')next=calendarHtml(action.production_calendar);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
@@ -62,6 +111,43 @@
       try{await navigator.clipboard.writeText(String(draft.text||''));ctx()?.say?.('Draft copied for manual review. Nothing was sent.');}
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
+
+    root.querySelectorAll('[data-agent-show-calendar]').forEach(button=>button.onclick=async()=>{
+      button.disabled=true;try{await send('production calendar');}
+      catch(e){ctx()?.say?.(e.message||'Calendar unavailable.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-deadline-review]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.requestId),decision=button.dataset.agentDeadlineReview;
+      const basis=root.querySelector('[data-agent-deadline-basis="'+id+'"]')?.value.trim()||'';
+      if(!id||basis.length<25){c.say('Explain the human review decision in at least 25 characters.');return;}
+      if(!window.confirm('Record '+decision+' for deadline request #'+id+'? Approval will change only this exact task due date.'))return;
+      button.disabled=true;
+      try{
+        const result=await c.api('story-production-tasks.php',{action:'review_deadline',request_id:id,decision,basis});
+        c.say('Reviewed request #'+id+' · '+esc(result.review?.status||decision)+'. Refreshing this chat calendar.');
+        await send('production calendar');
+      }catch(e){c.say(e.message||'Review could not be completed; status was not changed.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-task-schedule]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.agentTaskSchedule);
+      const value=root.querySelector('[data-agent-task-due="'+id+'"]')?.value||'';
+      const reason=root.querySelector('[data-agent-task-reason="'+id+'"]')?.value.trim()||'';
+      const priority=root.querySelector('[data-agent-task-priority="'+id+'"]')?.value||'normal';
+      const time=new Date(value);
+      if(!id||!value||!Number.isFinite(time.getTime())||reason.length<20){
+        c.say('Select a valid date and provide a scheduling reason (20+ characters).');return;
+      }
+      if(!window.confirm('Save exact due date and priority for task #'+id+'? This will not change crew or approvals.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-production-tasks.php',{action:'schedule',task_id:id,
+          due_at:time.toISOString().replace('.000Z','Z'),priority,reason});
+        c.say('Human-scheduled task #'+id+'. Refreshing the chat calendar.');
+        await send('production calendar');
+      }catch(e){c.say(e.message||'Deadline update unavailable.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-admin-agent-feedback]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c)return;button.disabled=true;
       try{await c.api('agent-feedback.php',{message_id:Number(button.dataset.messageId),rating:button.dataset.adminAgentFeedback});c.say('Private response feedback saved.');}
@@ -91,7 +177,7 @@
       const transcript=root.querySelector('#adminAgentTranscript'),items=get.messages||[];
       window.SFAdminAgentCanvas.commerceMessages=items;
       transcript.innerHTML=items.length?items.map(messageHtml).join(''):
-        '<div class="admin-agent-welcome"><h2>What can I help with?</h2><p>Ask about editorial production, assembly #123, orders, fans or campaigns.</p></div>';
+        '<div class="admin-agent-welcome"><h2>What can I help with?</h2><p>Ask for the production calendar, overdue tasks, crew schedule, approvals or assembly #123. Review everything in chat.</p></div>';
       bindActions(transcript);
       transcript.scrollTop=transcript.scrollHeight;
     }catch(err){
@@ -165,10 +251,10 @@
         ' No automatic edits, external model export, rendering or publishing.</p>'+
         '<ul class="admin-brain-list">'+(editorial.available?(editorialList||'<li>No saved private assemblies.</li>'):
            '<li>Editor-only production evidence.</li>')+'</ul>'+
-        '<button type="button" class="secondary" id="brainProductionOpen">Open private Production Review</button>'+
+        '<button type="button" class="secondary" id="brainProductionOpen">Show production calendar in chat</button>'+
         '<h3>Permitted tools</h3><ul class="admin-brain-list">'+safeTools+'</ul>';
       drawer.querySelector('#brainCommerceOpen').onclick=()=>{closeBrain();c.openView('commerce-ops');};
-      drawer.querySelector('#brainProductionOpen').onclick=()=>{closeBrain();c.openView('production-review');};
+      drawer.querySelector('#brainProductionOpen').onclick=()=>{closeBrain();send('production calendar').catch(e=>c.say(e.message));};
       drawer.querySelector('#adminBrainDetailedHistory').onclick=()=>{closeBrain();window.SFAgentCampaigns?.showHistory?.();};
     }catch(e){const p=drawer.querySelector('#adminBrainMissionContent');if(p)p.textContent='Operational Brain data is unavailable.';}
   }

@@ -47,3 +47,19 @@
  .admin-agent-chat .admin-agent-message{max-width:100%}
 }
 @media(max-width:420px){.admin-agent-chat-heading p{font-size:.7rem}.admin-agent-chat-controls{width:100%}.admin-agent-chat-controls .secondary{flex:1}.admin-chat-footer .admin-chatbar{grid-template-columns:minmax(0,1fr) 42px 42px}}
+
+/* G4M — production schedule and governed approvals live in the chat transcript */
+.admin-agent-calendar{display:grid;gap:12px;margin:12px 0;padding:12px;border:1px solid rgba(130,135,140,.22);border-radius:12px;min-width:0;max-width:100%}
+.admin-agent-calendar-head{display:flex;gap:8px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.admin-agent-calendar-head small{opacity:.72}
+.admin-agent-calendar-list{display:grid;gap:8px;max-height:440px;overflow-y:auto}
+.admin-agent-calendar-task,.admin-agent-deadline-request{padding:10px;border:1px solid rgba(140,140,140,.21);border-radius:9px;min-width:0}
+.admin-agent-calendar-task p,.admin-agent-deadline-request p{font-size:.86rem;margin:4px 0}
+.admin-agent-calendar details{margin-top:5px}
+.admin-agent-calendar summary{cursor:pointer}
+.admin-agent-calendar label{display:grid;gap:4px;margin-top:7px;font-size:.84rem}
+.admin-agent-calendar textarea,.admin-agent-calendar select,.admin-agent-calendar input{max-width:100%;min-width:0}
+.admin-agent-calendar button{margin-top:8px}
+.admin-agent-calendar .actions{display:flex;gap:9px;flex-wrap:wrap}
+.admin-agent-calendar .hint{font-size:.82rem;opacity:.78}
+@media(max-width:650px){.admin-agent-calendar{padding:8px}.admin-agent-calendar .actions button{flex:1 1 130px}}
