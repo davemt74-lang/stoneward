@@ -18,6 +18,7 @@ require_once __DIR__.'/stem-agent-bridge.php';
 require_once __DIR__.'/stem-production-advisor.php';
 require_once __DIR__.'/story-production-search-core.php';
 require_once __DIR__.'/story-director-core.php';
+require_once __DIR__.'/story-agent-brain-bridge.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -119,6 +120,7 @@ function sf_admin_agent_operational_context(): array {
 function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
+    elseif(preg_match('/\\b(?:editorial (?:assembly|production|review|status|timeline)|(?:story|production) assembly|production (?:status|queue|pipeline)|video production review|assembly\\s*#?\\s*[0-9]+|ai director (?:review|approval|production))\\b/',$m)){$type='production_editorial_status';$view='production-review';}
     elseif(preg_match('/\\b(?:director shot list|missing shots|missing footage|coverage gaps|shot recommendations|ai director)\\b/',$m)){$type='production_director_coverage';$view='brain';}
     elseif(preg_match('/\\b(?:artist world|production evidence|creative capture|scene evidence|story graph|shot footage)\\b/',$m)){$type='production_evidence_search';$view='brain';}
     elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
@@ -214,6 +216,17 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
         'feedback_summary'=>sf_agent_feedback_summary('admin',$adminId),
         'recovery_summary'=>sf_agent_mission_recovery_summary('admin',$adminId),
         'commerce'=>sf_agent_commerce_admin_snapshot(),
+        'editorial_production'=>(static function()use($adminId):array{
+            try{
+                if(!sf_team_can($adminId,'team.assign_roles'))
+                    return ['available'=>false,'assemblies'=>[],'attention_total'=>0];
+                return sf_story_agent_brain_summary($adminId);
+            }catch(Throwable $e){
+                // Legacy admin-only test fixtures may not provision Team Workspace;
+                // fail closed rather than breaking the entire Admin Agent Brain.
+                return ['available'=>false,'assemblies'=>[],'attention_total'=>0];
+            }
+        })(),
         'research_opportunities'=>sf_agent_proactive_admin_research(sf_admin_agent_operational_context())
     ];
 }
@@ -230,6 +243,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
         $missionPlan=sf_agent_mission_plan_save('admin',$adminId,$threadId,$message,$missionPlan);}
     $types=[
+      'production_editorial_status'=>'Private editorial production status is unavailable; no editorial action was performed.',
       'production_director_coverage'=>'Director coverage data is unavailable.',
       'production_evidence_search'=>'No matching reviewed Artist World production evidence was found.',
       'stem_mix_review'=>'I can inspect real private Stem Studio track, bus, send, FX, automation and mastering metadata, compare bounded reference evidence, recommend specific adjustments and prepare exact reviewed changes. Provide a song ID. Native VST audio is not independently recreated and no mix is changed automatically.',
@@ -244,6 +258,22 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
     ];
     $text=$types[$plan['type']];
+    if($plan['type']==='production_editorial_status'){
+        try{
+            // Never use provider inference for private editorial status.
+            // Scoped, read-only backend data only; independent tool executor absent.
+            if(preg_match('/\\bassembly\\s*#?\\s*([0-9]{1,9})\\b/i',$message,$matches)){
+                $focus=(int)$matches[1];
+                $text=sf_story_agent_brain_brief($adminId,$focus);
+                $editorial=sf_story_agent_brain_inspect($adminId,$focus);
+            }else{
+                $text=sf_story_agent_brain_brief($adminId);
+                $editorial=sf_story_agent_brain_summary($adminId);
+            }
+        }catch(Throwable $e){
+            $text='Private editorial evidence is unavailable or you lack production-editor authority. No changes occurred.';
+        }
+    }
     if($plan['type']==='production_director_coverage'){
       try{$text=sf_director_admin_brief($adminId);}
       catch(Throwable $e){$text='Artist World Director coverage data is temporarily unavailable. No shot request was created.';}
@@ -326,6 +356,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
+    if($plan['type']==='production_editorial_status'&&!empty($editorial))$action['editorial_production']=$editorial;
     if($plan['type']==='stem_mix_review'&&!empty($stemReview))$action['stem_review']=$stemReview;
     if($plan['type']==='stem_mix_review'&&!empty($production))$action['production_brief']=sf_stem_production_brief($production);
     if($plan['type']==='draft_commerce_reply' && !empty($replyDraft)){
