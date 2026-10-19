@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SF_DB_SCHEMA_TARGET = '1.3.63';
+const SF_DB_SCHEMA_TARGET = '1.3.64';
 
 function sf_migration_driver(): string {
     return (string)(sf_db_config()['driver'] ?? '');
@@ -610,6 +610,24 @@ function sf_migration_definitions(): array {
                 require_once SF_ROOT.'/api/story-assembly-core.php';
                 require_once SF_ROOT.'/api/story-assembly-history-core.php';
                 sf_assembly_history_schema();
+            },
+        ],
+        [
+            'id'=>'2026-10-19-055',
+            'app_version'=>'1.3.130',
+            'description'=>'Governed private restoration requests, human decisions and audit ledger',
+            'revision'=>'1',
+            'apply'=>function(): void {
+                require_once SF_ROOT.'/api/media-core.php';
+                require_once SF_ROOT.'/api/team-workspace-core.php';
+                require_once SF_ROOT.'/api/story-capture-core.php';
+                require_once SF_ROOT.'/api/story-capture-rights-core.php';
+                require_once SF_ROOT.'/api/story-transcript-core.php';
+                require_once SF_ROOT.'/api/story-scene-core.php';
+                require_once SF_ROOT.'/api/story-assembly-core.php';
+                require_once SF_ROOT.'/api/story-assembly-history-core.php';
+                require_once SF_ROOT.'/api/story-assembly-restore-core.php';
+                sf_assembly_restore_schema();
             },
         ],
     ];
