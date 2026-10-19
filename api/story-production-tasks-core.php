@@ -78,13 +78,19 @@ function sf_production_task_propose_gap(int $editor,string $code):array{
  if(!$request)$request=sf_director_create_draft($editor,$code);
  sf_production_task_events_schema();
  $now=gmdate('c');$spec=$catalog[$code];
- $q=$db->prepare("INSERT INTO story_production_tasks(task_key,kind,source_id,target_role,title,brief,
- status,contributor_note,review_basis,created_by,created_at,updated_at)
- VALUES(?,'shot',?,?,?,?, 'proposed','','',?,?,?)");
- $q->execute([$key,$request,$spec['target_role'],$spec['title'],$spec['brief'],$editor,$now,$now]);
- $id=(int)$db->lastInsertId();
- sf_team_audit($editor,'production.task_proposed','story_production_task',(string)$id,
-  'Private Director coverage task proposed; shot request remains human-reviewed draft');
+ if($db->inTransaction())throw new RuntimeException('Nested task proposal.');
+ $db->beginTransaction();
+ try{
+  $q=$db->prepare("INSERT INTO story_production_tasks(task_key,kind,source_id,target_role,title,brief,
+   status,contributor_note,review_basis,created_by,created_at,updated_at)
+   VALUES(?,'shot',?,?,?,?, 'proposed','','',?,?,?)");
+  $q->execute([$key,$request,$spec['target_role'],$spec['title'],$spec['brief'],$editor,$now,$now]);
+  $id=(int)$db->lastInsertId();
+  sf_production_task_event($id,$editor,null,'proposed','none','proposed','Editor proposed verified Director coverage task');
+  sf_team_audit($editor,'production.task_proposed','story_production_task',(string)$id,
+   'Private Director coverage task proposed; shot request remains human-reviewed draft');
+  $db->commit();
+ }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
  return ['id'=>$id,'existing'=>false,'request_id'=>$request];
 }
 /** One source AI proposal, one reviewed production task; no AI tool authority. */
@@ -100,13 +106,20 @@ function sf_production_task_propose_editorial(int $editor,int $proposal):array{
  if($prior!==false)return ['id'=>(int)$prior,'existing'=>true];
  sf_production_task_events_schema();
  $now=gmdate('c');
- $q=$db->prepare("INSERT INTO story_production_tasks(task_key,kind,source_id,target_role,title,brief,
- status,contributor_note,review_basis,created_by,created_at,updated_at)
- VALUES(?,'editorial',?,'producer',?,?,'proposed','','',?,?,?)");
- $q->execute([$key,$proposal,'Review AI Director proposal #'.$proposal,
-  'Review saved private storyboard proposal and provide an editorial assessment; approval still belongs to an authorized editor.',$editor,$now,$now]);
- $id=(int)$db->lastInsertId();sf_team_audit($editor,'production.task_proposed','story_production_task',(string)$id,
-  'Private editorial review task proposed for verified AI Director proposal');
+ if($db->inTransaction())throw new RuntimeException('Nested editorial proposal.');
+ $db->beginTransaction();
+ try{
+  $q=$db->prepare("INSERT INTO story_production_tasks(task_key,kind,source_id,target_role,title,brief,
+   status,contributor_note,review_basis,created_by,created_at,updated_at)
+   VALUES(?,'editorial',?,'producer',?,?,'proposed','','',?,?,?)");
+  $q->execute([$key,$proposal,'Review AI Director proposal #'.$proposal,
+   'Review saved private storyboard proposal and provide an editorial assessment; approval still belongs to an authorized editor.',$editor,$now,$now]);
+  $id=(int)$db->lastInsertId();
+  sf_production_task_event($id,$editor,null,'proposed','none','proposed','Private editorial review proposed');
+  sf_team_audit($editor,'production.task_proposed','story_production_task',(string)$id,
+   'Private editorial review task proposed for verified AI Director proposal');
+  $db->commit();
+ }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
  return ['id'=>$id,'existing'=>false];
 }
 function sf_production_task_assign(int $editor,int $task,int $assignee):void{
