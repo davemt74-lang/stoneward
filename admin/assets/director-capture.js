@@ -35,7 +35,7 @@
       (taskData.composer_queue||[]).map(g=>
         '<button type="button" data-task-editorial="'+Number(g.id)+'">Propose AI editorial review #'+Number(g.id)+'</button>').join('')+
       '</div><div class="director-list">'+
-      (taskData.tasks||[]).map(t=>{
+      ((taskData.tasks||[]).map(t=>{
         const eligible=(taskData.roster||[]).filter(u=>t.target_role==='all'||(u.team_roles||[]).includes(t.target_role));
         return '<div class="director-row"><div><small>Task #'+Number(t.id)+' · '+esc(t.kind)+
           ' · '+esc(t.status)+' · '+esc(t.target_role)+'</small><strong>'+esc(t.title)+'</strong>'+
