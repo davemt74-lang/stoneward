@@ -6,6 +6,7 @@ require_once __DIR__.'/story-capture-core.php';
 require_once __DIR__.'/story-production-tasks-core.php';
 require_once __DIR__.'/story-production-task-lifecycle-core.php';
 require_once __DIR__.'/story-production-scheduling-core.php';
+require_once __DIR__.'/story-production-deadline-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $user=sf_require_user(false,$method!=='GET');
 $id=(int)$user['id'];header('Cache-Control: no-store, private');
@@ -13,9 +14,15 @@ try{
  if($method==='GET')sf_json_response(['ok'=>true,'tasks'=>sf_production_task_list($id),
   'task_updates'=>sf_production_task_notifications($id),
   'schedule_board'=>sf_production_schedule_board($id),
-  'my_availability'=>sf_production_availability_list($id,$id)]);
+  'my_availability'=>sf_production_availability_list($id,$id),
+  'my_deadline_requests'=>sf_production_deadline_requests($id)]);
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();
+ if(($p['action']??'')==='request_deadline'){
+  sf_json_response(['ok'=>true,'request'=>sf_production_deadline_request($id,
+    (int)($p['task_id']??0),(string)($p['proposed_due_at']??''),
+    (string)($p['reason']??'')),'automatic_approval'=>false]);
+ }
  if(($p['action']??'')==='availability'){
   sf_production_availability_set($id,(string)($p['start_date']??''),
    (string)($p['end_date']??''),(string)($p['status']??''),(string)($p['note']??''));
