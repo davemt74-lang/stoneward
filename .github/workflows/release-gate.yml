@@ -398,6 +398,9 @@ jobs:
           php -l admin/api/story-render-review.php
           php tests/section88d3g4d-review-cues.php
           php tests/section88d3g4d-release.php
+          php -l api/story-render-cut-core.php
+          php tests/section88d3g4e-per-cut.php
+          php tests/section88d3g4e-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
