@@ -401,6 +401,10 @@ jobs:
           php -l api/story-render-cut-core.php
           php tests/section88d3g4e-per-cut.php
           php tests/section88d3g4e-release.php
+          php -l api/story-composer-core.php
+          node --check admin/assets/story-assembly.js
+          php tests/section88d3g4f-refinement.php
+          php tests/section88d3g4f-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
