@@ -16,6 +16,7 @@ require_once SF_ROOT.'/api/story-media-evidence-core.php';
 require_once SF_ROOT.'/api/story-render-source-core.php';
 require_once SF_ROOT.'/api/story-render-worker-core.php';
 require_once SF_ROOT.'/api/story-render-mix-core.php';
+require_once SF_ROOT.'/api/story-render-transition-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $me=sf_admin_require_auth($method!=='GET');
 $id=(int)$me['id'];
@@ -33,6 +34,7 @@ try{
     'render_enabled'=>sf_render_enabled(),
     'render_jobs'=>$assemblyId>0?sf_render_jobs($id,$assemblyId):[],
     'render_mix'=>$assemblyId>0?sf_render_mix_settings($id,$assemblyId,(int)(sf_assembly_read($id,$assemblyId)['revision']??0)):null,
+    'render_transition'=>$assemblyId>0?sf_render_transition_settings($id,$assemblyId,(int)(sf_assembly_read($id,$assemblyId)['revision']??0)):null,
     'render_audio_candidates'=>$assemblyId>0?sf_render_audio_candidates($id):[],
     'candidates'=>sf_assembly_candidates($id),'publication_enabled'=>false,
     'video_rendering_enabled'=>false,'ai_provider_invocation'=>false]);
@@ -40,6 +42,12 @@ try{
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();
  $action=(string)($p['action']??'');
+ if($action==='configure_transition'){
+   sf_render_transition_set($id,(int)($p['assembly_id']??0),
+     (int)($p['revision']??0),(string)($p['style']??''),
+     (int)($p['overlap_ms']??0));
+   sf_json_response(['ok'=>true,'message'=>'Private audio/video crossfades recorded.']);
+ }
  if($action==='configure_mix'){
    sf_render_mix_set($id,(int)($p['assembly_id']??0),(int)($p['revision']??0),
      (string)($p['track_id']??''),(int)($p['gain_pct']??0),
