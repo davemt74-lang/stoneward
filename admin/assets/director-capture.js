@@ -7,7 +7,7 @@
     let data;
     try{data=await ctx.api('story-capture.php');}
     catch(e){host.insertAdjacentHTML('beforeend','<section class="panel"><h2>Creative Director</h2><p role="alert">'+esc(e.message||'Capture unavailable')+'</p></section>');return;}
-    let taskData={tasks:[],coverage:{gaps:[]},composer_queue:[],roster:[]};
+    let taskData={tasks:[],coverage:{gaps:[]},composer_queue:[],roster:[],task_updates:[]};
     try{taskData=await ctx.api('story-production-tasks.php');}
     catch(e){/* Preserve existing shot review when optional task ledger is unavailable. */}
     const types=[['photo','Photo'],['video','Video'],['audio','Audio'],['ambient','Ambient sound'],['dialogue','Dialogue'],['story_idea','Story beat'],['screenshot','Suggested screenshot']];
@@ -52,13 +52,25 @@
             eligible.map(u=>'<option value="'+Number(u.id)+'" '+(Number(t.assigned_to)===Number(u.id)?'selected':'')+'>'+
               esc(u.display_name||('User #'+u.id))+'</option>').join('')+'</select>'+
             '<button type="button" data-task-assign="'+Number(t.id)+'">Assign</button></div>':'')+
+          (t.status==='rejected'?'<div class="director-task-controls">'+
+            '<p class="hint">Reopen only after documenting why the evidence was rejected. Old evidence stays in the audit history.</p>'+
+            '<select data-task-recover-assignee="'+Number(t.id)+'">'+
+            '<option value="">Choose eligible contributor</option>'+
+            eligible.map(u=>'<option value="'+Number(u.id)+'" '+(Number(t.assigned_to)===Number(u.id)?'selected':'')+'>'+
+              esc(u.display_name||('User #'+u.id))+'</option>').join('')+'</select>'+
+            '<textarea data-task-recover-basis="'+Number(t.id)+'" rows="2" maxlength="900" placeholder="Reason and corrective direction (25+ characters)"></textarea>'+
+            '<button type="button" data-task-reopen="'+Number(t.id)+'">Reopen with review</button></div>':'')+
           (t.status==='submitted'?'<div class="director-task-controls">'+
             '<textarea data-task-basis="'+Number(t.id)+'" maxlength="900" rows="2" placeholder="Independent verification and review basis (25+ characters)"></textarea>'+
             '<button type="button" data-task-review="'+Number(t.id)+'" data-decision="approved">Approve completion</button>'+
             '<button type="button" data-task-review="'+Number(t.id)+'" data-decision="rejected">Reject</button></div>':'')+
           '</div>';
       }).join('')||'<p>No production tasks assigned yet. Use a Director coverage recommendation to propose one.</p>')+
-      '</div><p role="status" id="directorTaskStatus"></p></details><h3>Existing shot list</h3>'+
+      '</div><details><summary>Evidence-linked task activity · '+Number((taskData.task_updates||[]).length)+' recent updates</summary>'+
+      '<ol class="director-task-activity">'+(taskData.task_updates||[]).map(e=>
+        '<li><time>'+esc(e.created_at)+'</time> · Task #'+Number(e.task_id)+
+        ' · '+esc(e.event_type)+' → '+esc(e.status_to)+'</li>').join('')+'</ol></details>'+
+      '<p role="status" id="directorTaskStatus"></p></details><h3>Existing shot list</h3>'+
 
       '<div class="director-list">'+requests.map(r=>
         '<div class="director-row"><div><small>'+esc(r.review_status)+' · '+esc(r.shot_type)+' · '+esc(r.target_role)+'</small>'+
@@ -102,6 +114,14 @@
       if(window.confirm('Record '+b.dataset.decision+' for this completed task? This is not publication clearance.'))
         void taskPost({action:'review',task_id:Number(b.dataset.taskReview),
           decision:b.dataset.decision,basis});
+    });
+    section.querySelectorAll('[data-task-reopen]').forEach(button=>button.onclick=()=>{
+      const id=Number(button.dataset.taskReopen);
+      const user=Number(section.querySelector('[data-task-recover-assignee="'+id+'"]')?.value||0);
+      const basis=section.querySelector('[data-task-recover-basis="'+id+'"]')?.value.trim()||'';
+      if(!user||basis.length<25){if(taskStatus)taskStatus.textContent='Choose an eligible contributor and give 25+ characters of corrective evidence.';return;}
+      if(window.confirm('Reopen rejected work as a new assigned attempt? Prior evidence will remain in the private task activity history.'))
+        void taskPost({action:'reopen',task_id:id,assignee_id:user,basis});
     });
     const status=section.querySelector('#directorStatus');
     const post=async body=>{
