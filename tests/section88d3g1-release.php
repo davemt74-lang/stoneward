@@ -4,12 +4,12 @@ $root=dirname(__DIR__);
 $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $p)
- if(!str_contains($read($p),'1.3.123'))throw new RuntimeException('Incorrect release identity: '.$p);
-if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.60'")
+ if(!str_contains($read($p),'1.3.124'))throw new RuntimeException('Incorrect release identity: '.$p);
+if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.61'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-048'")
  ||!str_contains($read('api/migrations.php'),"'story_render_track_masters'"))
  throw new RuntimeException('Render master binding migration missing.');
-if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.60'")
+if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.61'")
  ||!str_contains($read('version.php'),'private-sha256-source-certification-revision-scoped-track-masters-no-render'))
  throw new RuntimeException('Render source feature version claim mismatch.');
 $core=$read('api/story-render-source-core.php');
