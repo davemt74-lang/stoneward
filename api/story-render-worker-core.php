@@ -226,6 +226,9 @@ function sf_render_run_once(int $editor):array{
  $workspace='';$final='';
  try{
   $manifest=sf_render_plan($editor,$assembly,$revision);
+  $transition=function_exists('sf_render_transition_settings')
+    ?sf_render_transition_settings($editor,$assembly,$revision):null;
+  if($transition!==null)sf_render_transition_validate($manifest,$transition['style'],$transition['overlap_ms']);
   $mix=function_exists('sf_render_mix_settings')
     ?sf_render_mix_settings($editor,$assembly,$revision):null;
   if($mix!==null&&function_exists('sf_render_mix_source'))
@@ -241,16 +244,25 @@ function sf_render_run_once(int $editor):array{
    sf_render_segment($item,$segment);$segments[]=$segment;
   }
   $rendered=$workspace.'/draft.mp4';
-  sf_render_concat($segments,$workspace.'/cuts.ffconcat',$rendered);
+  $effective=$manifest;
+  if($transition!==null){
+   if(!sf_render_enabled()||sf_render_transition_settings($editor,$assembly,$revision)!==$transition)
+    throw new RuntimeException('Private video transition preset changed during execution.');
+   sf_render_transition_apply($segments,$manifest,$transition,$rendered);
+   $effective=sf_render_transition_effective_manifest($manifest,$transition);
+  }else{
+   sf_render_concat($segments,$workspace.'/cuts.ffconcat',$rendered);
+  }
   if($mix!==null){
    if(!sf_render_enabled()||sf_render_mix_settings($editor,$assembly,$revision)!==$mix)
     throw new RuntimeException('Licensed music mix settings changed during execution.');
-   sf_render_mix_apply($manifest,$mix,$rendered,$workspace.'/mixed.mp4');
+   sf_render_mix_apply($effective,$mix,$rendered,$workspace.'/mixed.mp4');
    $rendered=$workspace.'/mixed.mp4';
   }
   $fresh=sf_render_plan($editor,$assembly,$revision); // rights and hashes checked after work
   if(!sf_render_enabled()||$fresh['total_ms']!==$manifest['total_ms']
-    ||($mix!==null&&sf_render_mix_settings($editor,$assembly,$revision)!==$mix))
+    ||($mix!==null&&sf_render_mix_settings($editor,$assembly,$revision)!==$mix)
+    ||($transition!==null&&sf_render_transition_settings($editor,$assembly,$revision)!==$transition))
    throw new RuntimeException('Source certification changed during rendering.');
   $sha=hash_file('sha256',$rendered);$size=filesize($rendered);
   if(!is_string($sha)||!is_int($size)||$size<100||$size>150*1024*1024)
