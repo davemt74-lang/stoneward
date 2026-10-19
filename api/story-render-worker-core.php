@@ -228,7 +228,7 @@ function sf_render_run_once(int $editor):array{
   $manifest=sf_render_plan($editor,$assembly,$revision);
   $transition=function_exists('sf_render_transition_settings')
     ?sf_render_transition_settings($editor,$assembly,$revision):null;
-  if($transition!==null)sf_render_transition_validate($manifest,$transition['style'],$transition['overlap_ms']);
+  if($transition!==null)sf_render_transition_validate($manifest,$transition['style'],$transition['overlap_ms'],$transition);
   $mix=function_exists('sf_render_mix_settings')
     ?sf_render_mix_settings($editor,$assembly,$revision):null;
   if($mix!==null&&function_exists('sf_render_mix_source'))
