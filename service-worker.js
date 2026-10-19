@@ -1,7 +1,7 @@
-/* Stonefellow 1.3.127: version-exact, network-first static assets.
+/* Stonefellow 1.3.128: version-exact, network-first static assets.
    Cache-first with ignoreSearch was serving stale app.js with new CSS after deployment. */
-const BUILD='1.3.127';
-const CACHE='stonefellow-static-v1.3.127';
+const BUILD='1.3.128';
+const CACHE='stonefellow-static-v1.3.128';
 const SHELL=['offline.html','assets/css/site.css','assets/css/turntable-builder.css','assets/css/artist-world.css','assets/js/turntable-parts.js','assets/js/app.js','assets/js/build-integrity.js','assets/js/artist-home-renderer.js','assets/js/library.js','assets/js/owned-music.js','assets/js/agent-brain.js','assets/js/agent-chat-canvas.js','assets/icons/stonefellow-pwa.svg'];
 const scope=()=>self.registration.scope;
 const abs=p=>new URL(p,scope()).href;

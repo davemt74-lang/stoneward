@@ -3,7 +3,7 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
  let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,renderTransition=null,renderEdl=null,composerEnabled=false,busy=false,dirty=false;
- let previewMs=0,previewTimer=null;
+ let previewMs=0,previewTimer=null,undoEdits=[],redoEdits=[],savedSnapshot='';
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
  function ctx(){return window.STONEFELLOW_ADMIN_CONTEXT;}
@@ -14,6 +14,20 @@
  function sourceFor(item){return candidates.find(x=>key(x)===key(item));}
  function warnFor(item){const src=sourceFor(item);return !src?'Source no longer verified / available':
   src.publication_clearance!=='cleared'?(src.kind==='track'?'Confirm synchronization and master-use music licenses':'Publication clearance: '+src.publication_clearance):'';}
+ function editSnapshot(){return JSON.stringify(view?.items||[]);}
+ function editCheckpoint(){if(!view)return;undoEdits.push(editSnapshot());if(undoEdits.length>40)undoEdits.shift();redoEdits=[];}
+ function editSync(){
+   dirty=Boolean(view&&editSnapshot()!==savedSnapshot);
+   const save=document.getElementById('assemblySave');if(save)save.disabled=!dirty;
+   const label=document.getElementById('assemblyDirty');
+   if(label)label.textContent=dirty?'Unsaved local edits':'Saved private editorial draft';
+   const undo=document.getElementById('assemblyUndo'),redo=document.getElementById('assemblyRedo');
+   if(undo)undo.disabled=!undoEdits.length;if(redo)redo.disabled=!redoEdits.length;
+ }
+ function editRestore(stack,other){
+   if(!view||!stack.length)return;other.push(editSnapshot());
+   view.items=JSON.parse(stack.pop());dirty=editSnapshot()!==savedSnapshot;draw();
+ }
  function draw(){
   if(previewTimer){clearInterval(previewTimer);previewTimer=null;}
   const host=panel(),c=ctx();if(!host||!c)return;
@@ -46,10 +60,16 @@
        '<div class="assembly-inputs"><label>Source in (ms)<input type="number" min="0" step="1" data-asm-field="in_ms" data-i="'+i+'" value="'+ms(r.in_ms)+'" '+(isImage?'readonly':'')+'></label>'+
        '<label>Source out (ms)<input type="number" min="0" step="1" data-asm-field="out_ms" data-i="'+i+'" value="'+ms(r.out_ms)+'" '+(isImage?'readonly':'')+'></label>'+
        '<label>Timeline duration (ms)<input type="number" min="500" max="600000" step="100" data-asm-field="duration_ms" data-i="'+i+'" value="'+ms(r.duration_ms)+'"></label></div>'+
-       '<label>Director notes<input maxlength="600" data-asm-field="notes" data-i="'+i+'" value="'+esc(r.notes||'')+'" placeholder="Why this beat matters"></label>'+
+       (isImage?'<div class="assembly-trim-hint">Still image: adjust its placement duration above.</div>':
+        '<div class="assembly-trim"><button type="button" data-trim-side="in" data-trim-index="'+i+'">Trim IN +100 ms</button>'+
+        '<button type="button" data-trim-side="out" data-trim-index="'+i+'">Trim OUT −100 ms</button>'+
+        '<small>Non-destructive source edit; saving creates a new revision.</small></div>')+
+        '<label>Director notes<input maxlength="600" data-asm-field="notes" data-i="'+i+'" value="'+esc(r.notes||'')+'" placeholder="Why this beat matters"></label>'+
        (warning?'<p class="assembly-warning">'+esc(warning)+'</p>':'')+'</article>';
     }).join(''):'<p class="hint">No segments. Select a verified scene, verified dialogue or catalog track.</p>')+'</div>'+
-    '<div class="actions"><button type="button" class="primary" id="assemblySave" '+(!dirty?'disabled':'')+'>Save timeline revision</button>'+
+    '<div class="actions"><button type="button" class="secondary" id="assemblyUndo" '+(!undoEdits.length?'disabled':'')+'>Undo</button>'+
+     '<button type="button" class="secondary" id="assemblyRedo" '+(!redoEdits.length?'disabled':'')+'>Redo</button>'+
+     '<button type="button" class="primary" id="assemblySave" '+(!dirty?'disabled':'')+'>Save timeline revision</button>'+
     '<span id="assemblyDirty">'+(dirty?'Unsaved local edits':'Saved private editorial draft')+'</span></div>'+
     '<div class="assembly-director"><h3>Director’s proposed coverage</h3>'+
     '<p class="hint">Deterministic editorial suggestions from this assembly, not an LLM inference or finished edit.</p>'+
@@ -62,7 +82,7 @@
     (project&&storyboard?'<section class="assembly-storyboard" aria-label="Private production storyboard">'+
        '<div class="assembly-board-head"><div><h3>Storyboard · timed production preview</h3>'+
        '<p class="hint">Private metadata-only timing simulation. Scene cards are descriptions, not thumbnails or streaming footage.</p></div>'+
-       '<span>'+humanTime(storyboard.total_ms)+' · revision '+Number(storyboard.revision)+'</span></div>'+
+       '<span>'+humanTime(renderEdl?.output_total_ms||storyboard.total_ms)+' · revision '+Number(storyboard.revision)+'</span></div>'+
        '<div class="assembly-board-reel">'+
        (storyboard.cards||[]).map((card,i)=>'<article class="assembly-board-card'+(card.source_verified?'':' unverified')+'" data-board-index="'+i+'">'+
         '<div class="assembly-board-art" aria-hidden="true">'+
@@ -92,9 +112,9 @@
             'No approved music bed preset')+'</p></div>':'')+
     '<div class="assembly-preview-controls"><button id="assemblyPreviewPlay" type="button">Play timing</button>'+
        '<button id="assemblyPreviewReset" type="button" class="secondary">Reset</button>'+
-       '<label>Virtual playhead<input id="assemblyPreviewRange" type="range" min="0" max="'+Math.max(1,Number(storyboard.total_ms))+
-       '" step="100" value="'+Math.min(previewMs,Number(storyboard.total_ms))+'"></label>'+
-       '<output id="assemblyPreviewClock">'+humanTime(previewMs)+' / '+humanTime(storyboard.total_ms)+'</output></div>'+
+       '<label>Virtual playhead<input id="assemblyPreviewRange" type="range" min="0" max="'+Math.max(1,Number(renderEdl?.output_total_ms||storyboard.total_ms))+
+       '" step="100" value="'+Math.min(previewMs,Number(renderEdl?.output_total_ms||storyboard.total_ms))+'"></label>'+
+       '<output id="assemblyPreviewClock">'+humanTime(previewMs)+' / '+humanTime(renderEdl?.output_total_ms||storyboard.total_ms)+'</output></div>'+
        '<div class="assembly-readiness"><h3>Production readiness</h3>'+
        '<p><strong>'+((storyboard.blockers||[]).length?'Blocked — '+storyboard.blockers.length+' action(s) required':
           'Evidence/rights preflight clear; render worker still unavailable')+'</strong></p>'+
@@ -124,11 +144,17 @@
           return '<article class="assembly-proposal"><strong>Proposal #'+Number(p.id)+' · revision '+Number(p.revision)+' · '+esc(p.status)+'</strong>'+
            (p.provider?'<p class="hint">Provider: '+esc(p.provider)+' / '+esc(p.model)+'</p>':'')+
            (q.logline?'<p>'+esc(q.logline)+'</p><p class="hint">Proposed positions: '+esc(order)+'</p>'+
-           '<ol>'+((q.beats||[]).map(b=>'<li>'+esc(b.reason)+' · '+esc(b.transition)+'</li>').join(''))+'</ol>'+
+           '<ol>'+((q.beats||[]).map(b=>'<li>'+esc(b.reason)+' · '+esc(b.transition)+(Number(b.trim_start_ms||0)+Number(b.trim_end_ms||0)>0?' · trim IN +'+Number(b.trim_start_ms||0)+' / OUT −'+Number(b.trim_end_ms||0)+' ms':'')+'</li>').join(''))+'</ol>'+
            ((q.missing_shots||[]).length?'<p class="hint">Missing shots: '+esc(q.missing_shots.join('; '))+'</p>':''):'')+
            (p.status==='pending_review'?'<button type="button" data-composer-review="approved" data-proposal-id="'+Number(p.id)+'">Approve proposal</button>'+
              '<button type="button" class="secondary" data-composer-review="rejected" data-proposal-id="'+Number(p.id)+'">Reject</button>':'')+
            (p.status==='approved'?'<button type="button" class="primary" data-composer-apply="'+Number(p.id)+'" '+(Number(p.revision)!==Number(project.revision)||dirty?'disabled':'')+'>Apply approved ordering</button>':'')+
+          ((['approved','applied'].includes(p.status)&&
+             (p.status==='applied'?Number(p.applied_revision)===Number(project.revision):
+                Number(p.revision)===Number(project.revision)&&
+                (q.order||[]).every((v,i)=>Number(v)===i))&&
+              (q.beats||[]).some(x=>Number(x.trim_start_ms||0)+Number(x.trim_end_ms||0)>0))?
+            '<button type="button" class="secondary" data-composer-refine="'+Number(p.id)+'" '+(dirty?'disabled':'')+'>Stage AI trim ideas</button>':'')+
           '</article>';
         }).join(''):'<p class="hint">No AI composition proposals for this assembly.</p>')+
        '</div>':'')+
@@ -221,26 +247,40 @@
     catch(e){note(e.message,true);}finally{busy=false;}
   };
   if(!view)return;
+  host.querySelector('#assemblyUndo').onclick=()=>editRestore(undoEdits,redoEdits);
+  host.querySelector('#assemblyRedo').onclick=()=>editRestore(redoEdits,undoEdits);
   host.querySelector('#assemblyAdd').onclick=()=>{
    const v=host.querySelector('#assemblySource')?.value;
    const src=editorCandidates().find(x=>key(x)===v);
    if(!src){note('Select a verified source.',true);return;}
    if(view.items.length>=50){note('Maximum 50 editorial items.',true);return;}
-   view.items.push(defaultItem(src));changed();draw();
+   editCheckpoint();view.items.push(defaultItem(src));changed();draw();
   };
   host.querySelectorAll('[data-asm-field]').forEach(input=>input.onchange=()=>{
    const i=Number(input.dataset.i),field=input.dataset.asmField;
    if(!view.items[i])return;
-   view.items[i][field]=field==='notes'?input.value:ms(input.value);changed();
+   editCheckpoint();view.items[i][field]=field==='notes'?input.value:ms(input.value);changed();editSync();
   });
   host.querySelectorAll('[data-assembly-up],[data-assembly-down],[data-assembly-remove]').forEach(b=>b.onclick=()=>{
    const type=b.hasAttribute('data-assembly-remove')?'remove':(b.hasAttribute('data-assembly-up')?'up':'down');
    const i=Number(b.dataset[type==='remove'?'assemblyRemove':(type==='up'?'assemblyUp':'assemblyDown')]);
-   if(type==='remove'){view.items.splice(i,1);}else{
+   if(type==='remove'){editCheckpoint();view.items.splice(i,1);}else{
     const j=i+(type==='up'?-1:1);if(j<0||j>=view.items.length)return;
-    [view.items[i],view.items[j]]=[view.items[j],view.items[i]];
+    editCheckpoint();[view.items[i],view.items[j]]=[view.items[j],view.items[i]];
    }
    changed();draw();
+  });
+  host.querySelectorAll('[data-trim-side]').forEach(button=>button.onclick=()=>{
+    const i=Number(button.dataset.trimIndex),side=button.dataset.trimSide;
+    const item=view.items[i],src=sourceFor(item);
+    if(!item||!src||src.category==='image'||!['in','out'].includes(side))return;
+    const start=Number(item.in_ms),end=Number(item.out_ms);
+    if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||end-start<600){
+      note('Trimming would remove the required 500 ms minimum.',true);return;
+    }
+    editCheckpoint();
+    if(side==='in')item.in_ms=start+100;else item.out_ms=end-100;
+    item.duration_ms=item.out_ms-item.in_ms;changed();draw();
   });
   host.querySelector('#assemblySave').onclick=async ()=>{
    if(!dirty||busy)return;busy=true;
@@ -255,21 +295,26 @@
   const playback=host.querySelector('#assemblyPreviewPlay');
   function refreshPlayhead(){
     if(!storyboard||!range)return;
-    previewMs=Math.max(0,Math.min(Number(storyboard.total_ms),previewMs));
+    const endMs=Number(renderEdl?.output_total_ms||storyboard.total_ms);
+    previewMs=Math.max(0,Math.min(endMs,previewMs));
     range.value=String(previewMs);
     const clock=host.querySelector('#assemblyPreviewClock');
-    if(clock)clock.textContent=humanTime(previewMs)+' / '+humanTime(storyboard.total_ms);
+    if(clock)clock.textContent=humanTime(previewMs)+' / '+humanTime(endMs);
     host.querySelectorAll('[data-board-index]').forEach(node=>{
-      const card=storyboard.cards[Number(node.dataset.boardIndex)];
-      node.classList.toggle('playing',Boolean(card&&previewMs>=card.start_ms&&previewMs<card.end_ms));
+      const i=Number(node.dataset.boardIndex),clip=renderEdl?.clips?.[i],card=storyboard.cards[i];
+      const start=clip?clip.output_in_ms:card?.start_ms,finish=clip?clip.output_out_ms:card?.end_ms;
+      node.classList.toggle('playing',Number.isFinite(start)&&Number.isFinite(finish)&&
+        previewMs>=start&&previewMs<finish);
     });
-    if(previewMs>=storyboard.total_ms&&previewTimer){clearInterval(previewTimer);previewTimer=null;if(playback)playback.textContent='Play timing';}
+    if(previewMs>=endMs&&previewTimer){
+      clearInterval(previewTimer);previewTimer=null;if(playback)playback.textContent='Play timing';
+    }
   }
   if(range){
     range.oninput=()=>{previewMs=Number(range.value);refreshPlayhead();};
     playback.onclick=()=>{
       if(previewTimer){clearInterval(previewTimer);previewTimer=null;playback.textContent='Play timing';return;}
-      if(previewMs>=storyboard.total_ms)previewMs=0;
+      if(previewMs>=Number(renderEdl?.output_total_ms||storyboard.total_ms))previewMs=0;
       let lastTick=Date.now();
       previewTimer=setInterval(()=>{
         const now=Date.now();previewMs+=Math.max(0,Math.min(1000,now-lastTick));lastTick=now;
@@ -467,6 +512,38 @@
      await load();note('Approved ordering applied to a new private timeline revision.');}
    catch(e){note(e.message,true);}finally{busy=false;}
   });
+  host.querySelectorAll('[data-composer-refine]').forEach(button=>button.onclick=()=>{
+    if(busy||dirty)return;
+    const proposal=proposals.find(p=>Number(p.id)===Number(button.dataset.composerRefine));
+    const q=proposal?.suggestion,beats=q?.beats,order=q?.order;
+    const eligible=proposal&&(proposal.status==='applied'?
+      Number(proposal.applied_revision)===Number(view.revision):
+      proposal.status==='approved'&&Number(proposal.revision)===Number(view.revision)&&
+        Array.isArray(order)&&order.length===view.items.length&&order.every((v,i)=>Number(v)===i));
+    if(!eligible||!Array.isArray(beats)||beats.length!==view.items.length){
+      note('Approved AI refinement no longer matches this saved revision.',true);return;
+    }
+    const next=JSON.parse(editSnapshot());let applied=0;
+    for(let i=0;i<next.length;i++){
+      const item=next[i],beat=beats[i],source=sourceFor(item);
+      const start=Number(beat?.trim_start_ms??0),end=Number(beat?.trim_end_ms??0);
+      if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||
+         start<0||end<0||start>500||end>500||start%100!==0||end%100!==0||
+         start+end>Math.max(0,Number(item.duration_ms)-500)){
+        note('AI trim is outside safe editorial limits.',true);return;
+      }
+      if(start+end===0||source?.category==='image')continue;
+      const inbound=Number(item.in_ms),outbound=Number(item.out_ms);
+      if(!Number.isSafeInteger(inbound)||!Number.isSafeInteger(outbound)||
+         outbound-inbound<start+end+500)continue;
+      item.in_ms=inbound+start;item.out_ms=outbound-end;
+      item.duration_ms=item.out_ms-item.in_ms;applied++;
+    }
+    if(!applied){note('No verified media clips can use these AI trim ideas.',true);return;}
+    if(!window.confirm('Stage '+applied+' AI trim refinements locally? Nothing will be saved, published or rendered. Review every change and save a new private revision explicitly.'))return;
+    editCheckpoint();view.items=next;changed();draw();
+    note('Staged '+applied+' suggestions. Review the source times and save when ready.');
+  });
   host.querySelectorAll('[data-assembly-shot]').forEach(b=>b.onclick=async ()=>{
    const code=b.dataset.assemblyShot,g=(view.director?.gaps||[]).find(x=>x.code===code);
    if(!g||!window.confirm('Create an UNPUBLISHED suggested shot request for '+view.title+'?'))return;
@@ -493,6 +570,7 @@
    renderMix=r.render_mix||null;renderTransition=r.render_transition||null;renderEdl=r.render_edl||null;previewMs=0;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
+    savedSnapshot=editSnapshot();undoEdits=[];redoEdits=[];dirty=false;
    draw();
   }catch(e){host.innerHTML='<section class="panel"><h2>Story Assembly unavailable</h2><p role="alert">'+esc(e.message||'Unable to load editor')+'</p></section>';}
  }
