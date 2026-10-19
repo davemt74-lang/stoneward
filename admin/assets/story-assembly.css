@@ -94,3 +94,11 @@
 .assembly-cut-row select{width:100%;min-width:0}
 .assembly-per-cut>button{justify-self:start}
 @media(max-width:660px){.assembly-cut-row{grid-template-columns:1fr 1fr}.assembly-cut-row>span{grid-column:1/-1}}
+
+/* 88D3G4F — source-safe precision trim tools and session undo/redo */
+.assembly-trim{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:9px 0}
+.assembly-trim button{font-size:.82rem;border-radius:8px;min-height:34px}
+.assembly-trim small,.assembly-trim-hint{font-size:.78rem;opacity:.78}
+.assembly-trim-hint{padding:8px 0}
+.assembly-proposal [data-composer-refine]{margin-top:10px}
+@media(max-width:600px){.assembly-trim button{flex:1 1 130px}}
