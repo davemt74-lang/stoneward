@@ -3,7 +3,7 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
  let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,renderTransition=null,renderEdl=null,composerEnabled=false,busy=false,dirty=false;
- let previewMs=0,previewTimer=null;
+ let previewMs=0,previewTimer=null,undoEdits=[],redoEdits=[],savedSnapshot='';
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
  function ctx(){return window.STONEFELLOW_ADMIN_CONTEXT;}
@@ -14,6 +14,20 @@
  function sourceFor(item){return candidates.find(x=>key(x)===key(item));}
  function warnFor(item){const src=sourceFor(item);return !src?'Source no longer verified / available':
   src.publication_clearance!=='cleared'?(src.kind==='track'?'Confirm synchronization and master-use music licenses':'Publication clearance: '+src.publication_clearance):'';}
+ function editSnapshot(){return JSON.stringify(view?.items||[]);}
+ function editCheckpoint(){if(!view)return;undoEdits.push(editSnapshot());if(undoEdits.length>40)undoEdits.shift();redoEdits=[];}
+ function editSync(){
+   dirty=Boolean(view&&editSnapshot()!==savedSnapshot);
+   const save=document.getElementById('assemblySave');if(save)save.disabled=!dirty;
+   const label=document.getElementById('assemblyDirty');
+   if(label)label.textContent=dirty?'Unsaved local edits':'Saved private editorial draft';
+   const undo=document.getElementById('assemblyUndo'),redo=document.getElementById('assemblyRedo');
+   if(undo)undo.disabled=!undoEdits.length;if(redo)redo.disabled=!redoEdits.length;
+ }
+ function editRestore(stack,other){
+   if(!view||!stack.length)return;other.push(editSnapshot());
+   view.items=JSON.parse(stack.pop());dirty=editSnapshot()!==savedSnapshot;draw();
+ }
  function draw(){
   if(previewTimer){clearInterval(previewTimer);previewTimer=null;}
   const host=panel(),c=ctx();if(!host||!c)return;
@@ -46,10 +60,16 @@
        '<div class="assembly-inputs"><label>Source in (ms)<input type="number" min="0" step="1" data-asm-field="in_ms" data-i="'+i+'" value="'+ms(r.in_ms)+'" '+(isImage?'readonly':'')+'></label>'+
        '<label>Source out (ms)<input type="number" min="0" step="1" data-asm-field="out_ms" data-i="'+i+'" value="'+ms(r.out_ms)+'" '+(isImage?'readonly':'')+'></label>'+
        '<label>Timeline duration (ms)<input type="number" min="500" max="600000" step="100" data-asm-field="duration_ms" data-i="'+i+'" value="'+ms(r.duration_ms)+'"></label></div>'+
-       '<label>Director notes<input maxlength="600" data-asm-field="notes" data-i="'+i+'" value="'+esc(r.notes||'')+'" placeholder="Why this beat matters"></label>'+
+       (isImage?'<div class="assembly-trim-hint">Still image: adjust its placement duration above.</div>':
+        '<div class="assembly-trim"><button type="button" data-trim-side="in" data-trim-index="'+i+'">Trim IN +100 ms</button>'+
+        '<button type="button" data-trim-side="out" data-trim-index="'+i+'">Trim OUT −100 ms</button>'+
+        '<small>Non-destructive source edit; saving creates a new revision.</small></div>')+
+        '<label>Director notes<input maxlength="600" data-asm-field="notes" data-i="'+i+'" value="'+esc(r.notes||'')+'" placeholder="Why this beat matters"></label>'+
        (warning?'<p class="assembly-warning">'+esc(warning)+'</p>':'')+'</article>';
     }).join(''):'<p class="hint">No segments. Select a verified scene, verified dialogue or catalog track.</p>')+'</div>'+
-    '<div class="actions"><button type="button" class="primary" id="assemblySave" '+(!dirty?'disabled':'')+'>Save timeline revision</button>'+
+    '<div class="actions"><button type="button" class="secondary" id="assemblyUndo" '+(!undoEdits.length?'disabled':'')+'>Undo</button>'+
+     '<button type="button" class="secondary" id="assemblyRedo" '+(!redoEdits.length?'disabled':'')+'>Redo</button>'+
+     '<button type="button" class="primary" id="assemblySave" '+(!dirty?'disabled':'')+'>Save timeline revision</button>'+
     '<span id="assemblyDirty">'+(dirty?'Unsaved local edits':'Saved private editorial draft')+'</span></div>'+
     '<div class="assembly-director"><h3>Director’s proposed coverage</h3>'+
     '<p class="hint">Deterministic editorial suggestions from this assembly, not an LLM inference or finished edit.</p>'+
@@ -221,26 +241,40 @@
     catch(e){note(e.message,true);}finally{busy=false;}
   };
   if(!view)return;
+  host.querySelector('#assemblyUndo').onclick=()=>editRestore(undoEdits,redoEdits);
+  host.querySelector('#assemblyRedo').onclick=()=>editRestore(redoEdits,undoEdits);
   host.querySelector('#assemblyAdd').onclick=()=>{
    const v=host.querySelector('#assemblySource')?.value;
    const src=editorCandidates().find(x=>key(x)===v);
    if(!src){note('Select a verified source.',true);return;}
    if(view.items.length>=50){note('Maximum 50 editorial items.',true);return;}
-   view.items.push(defaultItem(src));changed();draw();
+   editCheckpoint();view.items.push(defaultItem(src));changed();draw();
   };
   host.querySelectorAll('[data-asm-field]').forEach(input=>input.onchange=()=>{
    const i=Number(input.dataset.i),field=input.dataset.asmField;
    if(!view.items[i])return;
-   view.items[i][field]=field==='notes'?input.value:ms(input.value);changed();
+   editCheckpoint();view.items[i][field]=field==='notes'?input.value:ms(input.value);changed();editSync();
   });
   host.querySelectorAll('[data-assembly-up],[data-assembly-down],[data-assembly-remove]').forEach(b=>b.onclick=()=>{
    const type=b.hasAttribute('data-assembly-remove')?'remove':(b.hasAttribute('data-assembly-up')?'up':'down');
    const i=Number(b.dataset[type==='remove'?'assemblyRemove':(type==='up'?'assemblyUp':'assemblyDown')]);
-   if(type==='remove'){view.items.splice(i,1);}else{
+   if(type==='remove'){editCheckpoint();view.items.splice(i,1);}else{
     const j=i+(type==='up'?-1:1);if(j<0||j>=view.items.length)return;
-    [view.items[i],view.items[j]]=[view.items[j],view.items[i]];
+    editCheckpoint();[view.items[i],view.items[j]]=[view.items[j],view.items[i]];
    }
    changed();draw();
+  });
+  host.querySelectorAll('[data-trim-side]').forEach(button=>button.onclick=()=>{
+    const i=Number(button.dataset.trimIndex),side=button.dataset.trimSide;
+    const item=view.items[i],src=sourceFor(item);
+    if(!item||!src||src.category==='image'||!['in','out'].includes(side))return;
+    const start=Number(item.in_ms),end=Number(item.out_ms);
+    if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||end-start<600){
+      note('Trimming would remove the required 500 ms minimum.',true);return;
+    }
+    editCheckpoint();
+    if(side==='in')item.in_ms=start+100;else item.out_ms=end-100;
+    item.duration_ms=item.out_ms-item.in_ms;changed();draw();
   });
   host.querySelector('#assemblySave').onclick=async ()=>{
    if(!dirty||busy)return;busy=true;
@@ -493,6 +527,7 @@
    renderMix=r.render_mix||null;renderTransition=r.render_transition||null;renderEdl=r.render_edl||null;previewMs=0;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
+    savedSnapshot=editSnapshot();undoEdits=[];redoEdits=[];dirty=false;
    draw();
   }catch(e){host.innerHTML='<section class="panel"><h2>Story Assembly unavailable</h2><p role="alert">'+esc(e.message||'Unable to load editor')+'</p></section>';}
  }
