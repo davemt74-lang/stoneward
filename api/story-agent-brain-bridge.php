@@ -30,13 +30,13 @@ function sf_story_agent_brain_summary(int $editor):array{
   foreach($q->fetchAll(PDO::FETCH_ASSOC) as $p)$composer[(string)$p['status']]=(int)$p['total'];
   sf_assembly_restore_schema();
   $q=sf_db()->prepare("SELECT status,COUNT(*) AS total FROM story_assembly_restore_proposals
-    WHERE assembly_id=? GROUP BY status");
-  $q->execute([$id]);$restores=[];
+    WHERE assembly_id=? AND expected_revision=? GROUP BY status");
+  $q->execute([$id,$revision]);$restores=[];
   foreach($q->fetchAll(PDO::FETCH_ASSOC) as $p)$restores[(string)$p['status']]=(int)$p['total'];
   sf_render_jobs_schema();
   $q=sf_db()->prepare("SELECT status,COUNT(*) AS total FROM story_render_jobs
-    WHERE assembly_id=? GROUP BY status");
-  $q->execute([$id]);$render=[];
+    WHERE assembly_id=? AND revision=? GROUP BY status");
+  $q->execute([$id,$revision]);$render=[];
   foreach($q->fetchAll(PDO::FETCH_ASSOC) as $p)$render[(string)$p['status']]=(int)$p['total'];
   $attention=(int)($composer['pending_review']??0)+(int)($restores['pending_review']??0)
     +(int)($render['private_review']??0);
@@ -79,11 +79,11 @@ function sf_story_agent_brain_inspect(int $editor,int $assembly):array{
    'status'=>(string)$v['status'],'updated_at'=>(string)$v['updated_at']
  ],array_slice($jobs,0,12));
  $review=[];
- foreach($proposals as $p)if($p['status']==='pending_review')$review[]=[
+ foreach($proposals as $p)if($p['status']==='pending_review'&&$p['revision']===$revision)$review[]=[
    'kind'=>'ai_director_proposal','id'=>$p['id'],'revision'=>$p['revision']];
- foreach($restoration as $p)if($p['status']==='pending_review')$review[]=[
+ foreach($restoration as $p)if($p['status']==='pending_review'&&$p['expected_revision']===$revision)$review[]=[
    'kind'=>'revision_restore','id'=>$p['id'],'revision'=>$p['expected_revision']];
- foreach($renders as $p)if($p['status']==='private_review')$review[]=[
+ foreach($renders as $p)if($p['status']==='private_review'&&$p['revision']===$revision)$review[]=[
    'kind'=>'private_video','id'=>$p['job_id'],'revision'=>$p['revision']];
  $rightsPending=(int)($plan['publication_rights_pending']??0);
  $invalid=(int)($plan['invalid_source_items']??0);
