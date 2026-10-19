@@ -1,5 +1,19 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/media-core.php';
+require_once __DIR__.'/team-workspace-core.php';
+require_once __DIR__.'/story-capture-core.php';
+require_once __DIR__.'/story-capture-rights-core.php';
+require_once __DIR__.'/story-transcript-core.php';
+require_once __DIR__.'/story-scene-core.php';
+require_once __DIR__.'/story-assembly-core.php';
+require_once __DIR__.'/story-assembly-history-core.php';
+require_once __DIR__.'/story-assembly-restore-core.php';
+require_once __DIR__.'/story-composer-core.php';
+require_once __DIR__.'/storyboard-preview-core.php';
+require_once __DIR__.'/story-media-evidence-core.php';
+require_once __DIR__.'/story-render-source-core.php';
+require_once __DIR__.'/story-render-worker-core.php';
 /**
  * G4I: private editorial read model for the *existing* Admin Agent Brain.
  * No second job executor, model call, approval, source path or media bytes.
@@ -47,6 +61,7 @@ function sf_story_agent_brain_inspect(int $editor,int $assembly):array{
  $restores=sf_assembly_restore_list($editor,$assembly);
  $jobs=sf_render_jobs($editor,$assembly);
  $history=sf_assembly_history_list($editor,$assembly);
+ $cert=sf_render_source_admin_status($editor,$assembly,$revision);
  $proposals=array_map(static fn($v)=>[
    'id'=>(int)$v['id'],'revision'=>(int)$v['revision'],
    'status'=>(string)$v['status'],'provider'=>(string)($v['provider']??''),
@@ -83,6 +98,8 @@ function sf_story_agent_brain_inspect(int $editor,int $assembly):array{
   'clip_count'=>count($saved['items']),'director_coverage_gaps'=>$gaps,
   'invalid_source_count'=>$invalid,'publication_rights_pending'=>$rightsPending,
   'source_evidence'=>'verified_at_editorial_save_with_live_read_checks',
+  'source_certification'=>['eligible'=>(bool)($cert['eligible']??false),
+    'checks'=>(string)($cert['checks']??'blocked')],
   'render_ready'=>false,'render_statuses'=>$renders,
   'ai_director_proposals'=>$proposals,'restore_proposals'=>$restoration,
   'revision_history'=>array_map(static fn($v)=>[
