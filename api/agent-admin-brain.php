@@ -216,12 +216,17 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
         'feedback_summary'=>sf_agent_feedback_summary('admin',$adminId),
         'recovery_summary'=>sf_agent_mission_recovery_summary('admin',$adminId),
         'commerce'=>sf_agent_commerce_admin_snapshot(),
-        'editorial_production'=>sf_team_can($adminId,'team.assign_roles')
-            ?(static function()use($adminId):array{
-                try{return sf_story_agent_brain_summary($adminId);}
-                catch(Throwable $e){return ['available'=>false,'assemblies'=>[],'attention_total'=>0];}
-              })()
-            :['available'=>false,'assemblies'=>[],'attention_total'=>0],
+        'editorial_production'=>(static function()use($adminId):array{
+            try{
+                if(!sf_team_can($adminId,'team.assign_roles'))
+                    return ['available'=>false,'assemblies'=>[],'attention_total'=>0];
+                return sf_story_agent_brain_summary($adminId);
+            }catch(Throwable $e){
+                // Legacy admin-only test fixtures may not provision Team Workspace;
+                // fail closed rather than breaking the entire Admin Agent Brain.
+                return ['available'=>false,'assemblies'=>[],'attention_total'=>0];
+            }
+        })(),
         'research_opportunities'=>sf_agent_proactive_admin_research(sf_admin_agent_operational_context())
     ];
 }
