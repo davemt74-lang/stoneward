@@ -82,7 +82,7 @@
     (project&&storyboard?'<section class="assembly-storyboard" aria-label="Private production storyboard">'+
        '<div class="assembly-board-head"><div><h3>Storyboard · timed production preview</h3>'+
        '<p class="hint">Private metadata-only timing simulation. Scene cards are descriptions, not thumbnails or streaming footage.</p></div>'+
-       '<span>'+humanTime(storyboard.total_ms)+' · revision '+Number(storyboard.revision)+'</span></div>'+
+       '<span>'+humanTime(renderEdl?.output_total_ms||storyboard.total_ms)+' · revision '+Number(storyboard.revision)+'</span></div>'+
        '<div class="assembly-board-reel">'+
        (storyboard.cards||[]).map((card,i)=>'<article class="assembly-board-card'+(card.source_verified?'':' unverified')+'" data-board-index="'+i+'">'+
         '<div class="assembly-board-art" aria-hidden="true">'+
@@ -112,9 +112,9 @@
             'No approved music bed preset')+'</p></div>':'')+
     '<div class="assembly-preview-controls"><button id="assemblyPreviewPlay" type="button">Play timing</button>'+
        '<button id="assemblyPreviewReset" type="button" class="secondary">Reset</button>'+
-       '<label>Virtual playhead<input id="assemblyPreviewRange" type="range" min="0" max="'+Math.max(1,Number(storyboard.total_ms))+
-       '" step="100" value="'+Math.min(previewMs,Number(storyboard.total_ms))+'"></label>'+
-       '<output id="assemblyPreviewClock">'+humanTime(previewMs)+' / '+humanTime(storyboard.total_ms)+'</output></div>'+
+       '<label>Virtual playhead<input id="assemblyPreviewRange" type="range" min="0" max="'+Math.max(1,Number(renderEdl?.output_total_ms||storyboard.total_ms))+
+       '" step="100" value="'+Math.min(previewMs,Number(renderEdl?.output_total_ms||storyboard.total_ms))+'"></label>'+
+       '<output id="assemblyPreviewClock">'+humanTime(previewMs)+' / '+humanTime(renderEdl?.output_total_ms||storyboard.total_ms)+'</output></div>'+
        '<div class="assembly-readiness"><h3>Production readiness</h3>'+
        '<p><strong>'+((storyboard.blockers||[]).length?'Blocked — '+storyboard.blockers.length+' action(s) required':
           'Evidence/rights preflight clear; render worker still unavailable')+'</strong></p>'+
@@ -295,21 +295,26 @@
   const playback=host.querySelector('#assemblyPreviewPlay');
   function refreshPlayhead(){
     if(!storyboard||!range)return;
-    previewMs=Math.max(0,Math.min(Number(storyboard.total_ms),previewMs));
+    const endMs=Number(renderEdl?.output_total_ms||storyboard.total_ms);
+    previewMs=Math.max(0,Math.min(endMs,previewMs));
     range.value=String(previewMs);
     const clock=host.querySelector('#assemblyPreviewClock');
-    if(clock)clock.textContent=humanTime(previewMs)+' / '+humanTime(storyboard.total_ms);
+    if(clock)clock.textContent=humanTime(previewMs)+' / '+humanTime(endMs);
     host.querySelectorAll('[data-board-index]').forEach(node=>{
-      const card=storyboard.cards[Number(node.dataset.boardIndex)];
-      node.classList.toggle('playing',Boolean(card&&previewMs>=card.start_ms&&previewMs<card.end_ms));
+      const i=Number(node.dataset.boardIndex),clip=renderEdl?.clips?.[i],card=storyboard.cards[i];
+      const start=clip?clip.output_in_ms:card?.start_ms,finish=clip?clip.output_out_ms:card?.end_ms;
+      node.classList.toggle('playing',Number.isFinite(start)&&Number.isFinite(finish)&&
+        previewMs>=start&&previewMs<finish);
     });
-    if(previewMs>=storyboard.total_ms&&previewTimer){clearInterval(previewTimer);previewTimer=null;if(playback)playback.textContent='Play timing';}
+    if(previewMs>=endMs&&previewTimer){
+      clearInterval(previewTimer);previewTimer=null;if(playback)playback.textContent='Play timing';
+    }
   }
   if(range){
     range.oninput=()=>{previewMs=Number(range.value);refreshPlayhead();};
     playback.onclick=()=>{
       if(previewTimer){clearInterval(previewTimer);previewTimer=null;playback.textContent='Play timing';return;}
-      if(previewMs>=storyboard.total_ms)previewMs=0;
+      if(previewMs>=Number(renderEdl?.output_total_ms||storyboard.total_ms))previewMs=0;
       let lastTick=Date.now();
       previewTimer=setInterval(()=>{
         const now=Date.now();previewMs+=Math.max(0,Math.min(1000,now-lastTick));lastTick=now;
