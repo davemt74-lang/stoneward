@@ -3,12 +3,12 @@ declare(strict_types=1);
 $root=dirname(__DIR__);$read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js','.htaccess',
  'assets/js/app.js','assets/css/turntable-builder.css'] as $path)
- if(!str_contains($read($path),'1.3.131'))throw new RuntimeException('G4G stale release identity: '.$path);
-if(!str_contains($read('api/migrations.php'),"const SF_DB_SCHEMA_TARGET = '1.3.64'")
+ if(!str_contains($read($path),'1.3.132'))throw new RuntimeException('G4G stale release identity: '.$path);
+if(!str_contains($read('api/migrations.php'),"const SF_DB_SCHEMA_TARGET = '1.3.65'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-19-054'")
  ||!str_contains($read('api/migrations.php'),'sf_assembly_history_schema();'))
  throw new RuntimeException('G4G history migration 054 missing.');
-if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.64'")
+if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.65'")
  ||!str_contains($read('version.php'),"'artist_world_review_history'=>'immutable-editorial-snapshots-private-diffs-ai-decision-history'"))
  throw new RuntimeException('G4G version or capability contract absent.');
 $history=$read('api/story-assembly-history-core.php');
