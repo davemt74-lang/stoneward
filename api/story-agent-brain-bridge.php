@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__.'/media-core.php';
-require_once __DIR__.'/team-workspace-core.php';
+if(!function_exists('sf_media_ensure_schema'))require_once __DIR__.'/media-core.php';
+if(!function_exists('sf_team_can'))require_once __DIR__.'/team-workspace-core.php';
 require_once __DIR__.'/story-capture-core.php';
 require_once __DIR__.'/story-capture-rights-core.php';
 require_once __DIR__.'/story-transcript-core.php';
