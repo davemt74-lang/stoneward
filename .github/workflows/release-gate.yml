@@ -433,6 +433,12 @@ jobs:
           node --check assets/js/app.js
           php tests/section88d3g4l-scheduling.php
           php tests/section88d3g4l-release.php
+          php -l api/story-production-deadline-core.php
+          php -l api/agent-admin-brain.php
+          node --check admin/assets/agent-canvas.js
+          node --check assets/js/app.js
+          php tests/section88d3g4m-chat-calendar.php
+          php tests/section88d3g4m-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
