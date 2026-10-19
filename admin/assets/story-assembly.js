@@ -169,8 +169,10 @@
       (renderJobs.length?renderJobs.map(j=>'<article class="assembly-render-job"><p class="hint"><strong>Private render #'+Number(j.id)+'</strong> · revision '+Number(j.revision)+' · '+esc(j.status)+
         ' · '+Number(j.output_bytes||0)+' bytes</p>'+
         (['private_review','approved_private'].includes(j.status)&&Number(j.revision)===Number(project.revision)?
-         '<video controls preload="metadata" controlsList="nodownload noplaybackrate" disablepictureinpicture playsinline class="assembly-video-private" src="api/story-render-review.php?action=stream&amp;job_id='+Number(j.id)+'" aria-label="Private reviewed video #'+Number(j.id)+'"></video>'+
-         '<p class="hint">Authenticated private reviewer playback. No public or unguarded video URL.</p>':'')+
+         '<video controls preload="metadata" controlsList="nodownload noplaybackrate" disablepictureinpicture playsinline class="assembly-video-private" data-private-review-video="'+Number(j.id)+'" src="api/story-render-review.php?action=stream&amp;job_id='+Number(j.id)+'" aria-label="Private reviewed video #'+Number(j.id)+'"></video>'+
+         '<p class="hint">Authenticated private reviewer playback. No public or unguarded video URL.</p>'+
+         '<div class="assembly-qc"><button type="button" data-load-review-cues="'+Number(j.id)+'" '+(dirty?'disabled':'')+'>Load verified QC cues</button>'+
+         '<div data-review-cue-host="'+Number(j.id)+'" aria-live="polite"></div></div>':'')+
         (j.status==='private_review'?'<label>Human editorial review basis<textarea rows="2" minlength="25" maxlength="1000" data-render-basis="'+Number(j.id)+'" placeholder="Record what you checked in the video and any restrictions."></textarea></label>'+
          '<div class="actions"><button type="button" data-render-review="approved_private" data-render-id="'+Number(j.id)+'">Approve private draft</button>'+
          '<button type="button" class="secondary" data-render-review="rejected" data-render-id="'+Number(j.id)+'">Reject private draft</button></div>':'')+
@@ -311,6 +313,58 @@
       const answer=await c.api('story-render-review.php',{action:'review',job_id:jobId,decision,basis});
       await load();note(answer.changed?'Private video review recorded. Publication remains disabled.':'Video was already reviewed.');
     }catch(e){note(e.message||'Review unavailable.',true);}finally{busy=false;}
+  });
+  host.querySelectorAll('[data-load-review-cues]').forEach(button=>button.onclick=async()=>{
+    if(busy||dirty)return;
+    const jobId=Number(button.dataset.loadReviewCues);
+    const area=host.querySelector('[data-review-cue-host="'+jobId+'"]');
+    const video=host.querySelector('[data-private-review-video="'+jobId+'"]');
+    if(!area||!video)return;
+    button.disabled=true;area.textContent='Verifying private output and source rights…';
+    try{
+      const r=await c.api('story-render-review.php?action=cues&job_id='+encodeURIComponent(jobId));
+      const qc=r.review;
+      if(!qc||Number(qc.job_id)!==jobId||qc.private_only!==true||
+         !Array.isArray(qc.cues)||qc.cues.length>40||
+         !Number.isSafeInteger(qc.duration_ms)||qc.duration_ms<1000||qc.duration_ms>60000)
+        throw new Error('Invalid authenticated cue sheet.');
+      const cues=qc.cues;
+      for(const cue of cues){
+        if(!['clip','transition','dialogue'].includes(cue.type)||
+           !Number.isSafeInteger(cue.start_ms)||!Number.isSafeInteger(cue.end_ms)||
+           cue.start_ms<0||cue.end_ms>qc.duration_ms||cue.end_ms<cue.start_ms)
+          throw new Error('Invalid authenticated cue.');
+      }
+      area.innerHTML='<p class="hint">Verified '+humanTime(qc.duration_ms)+
+        ' private cut · select a marker to seek inside the authenticated player.</p>'+
+        '<div class="assembly-qc-list">'+cues.map((cue,i)=>
+          '<button type="button" data-qc-seek="'+i+'" class="assembly-qc-cue" aria-label="Seek to cue '+(i+1)+'">'+
+          '<strong>'+esc(cue.type)+' · '+esc(cue.label)+'</strong><span>'+
+          humanTime(cue.start_ms)+' – '+humanTime(cue.end_ms)+'</span></button>'
+        ).join('')+'</div><output class="assembly-qc-clock" aria-live="off">0:00</output>';
+      area.querySelectorAll('[data-qc-seek]').forEach(b=>b.onclick=()=>{
+        const cue=cues[Number(b.dataset.qcSeek)];
+        if(!cue)return;
+        const seek=()=>{
+          const cap=Number.isFinite(video.duration)&&video.duration>0?
+            Math.max(0,video.duration-0.04):qc.duration_ms/1000;
+          video.currentTime=Math.min(cue.start_ms/1000,cap);
+          video.focus();
+        };
+        if(video.readyState>=1)seek();else video.addEventListener('loadedmetadata',seek,{once:true});
+      });
+      video.addEventListener('timeupdate',()=>{
+        const ms=Math.max(0,video.currentTime*1000);
+        const clock=area.querySelector('.assembly-qc-clock');
+        if(clock)clock.textContent=humanTime(ms);
+        area.querySelectorAll('[data-qc-seek]').forEach(b=>{
+          const cue=cues[Number(b.dataset.qcSeek)];
+          b.classList.toggle('active',Boolean(cue&&ms>=cue.start_ms&&
+            ms<(cue.end_ms===cue.start_ms?cue.end_ms+100:cue.end_ms)));
+        });
+      });
+      button.hidden=true;
+    }catch(e){area.textContent='Private QC cues unavailable: '+(e.message||'verification failed');button.disabled=false;}
   });
   const mixSave=host.querySelector('#mixSave');
   if(mixSave)mixSave.onclick=async()=>{

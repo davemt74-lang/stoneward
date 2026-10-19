@@ -75,3 +75,12 @@
 .assembly-edl-cut{border-left-color:rgba(116,158,192,.8)}
 .assembly-edl-duck{border-left-color:rgba(150,185,136,.8)}
 @media(max-width:620px){.assembly-edl-clip{flex-wrap:wrap}}
+
+/* 88D3G4D — authenticated private cut/dialogue review markers */
+.assembly-qc{padding:12px 0 18px;max-width:840px}
+.assembly-qc-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:8px;margin:10px 0;max-height:230px;overflow-y:auto}
+.assembly-qc-cue{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 10px;text-align:left;border:1px solid rgba(160,157,149,.38);border-radius:8px;background:rgba(110,110,110,.05);cursor:pointer}
+.assembly-qc-cue strong{font-size:.85rem}
+.assembly-qc-cue span,.assembly-qc-clock{font-size:.8rem;font-variant-numeric:tabular-nums}
+.assembly-qc-cue.active{border-color:var(--accent,#d8a76c);box-shadow:0 0 0 1px rgba(205,150,78,.35)}
+.assembly-qc-cue:focus-visible{outline:2px solid var(--accent,#d8a76c);outline-offset:2px}

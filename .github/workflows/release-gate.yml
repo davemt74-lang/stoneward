@@ -394,6 +394,10 @@ jobs:
           php tests/section88d3g4b-release.php
           php -l api/story-render-edl-core.php
           php tests/section88d3g4c-synchronized-edl.php
+          php -l api/story-render-review-core.php
+          php -l admin/api/story-render-review.php
+          php tests/section88d3g4d-review-cues.php
+          php tests/section88d3g4d-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php

@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.125',
+  'stonefellow'=>'1.3.126',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
@@ -61,6 +61,7 @@ echo json_encode([
   'artist_world_render_review'=>'admin-authenticated-ranged-private-mp4-human-review-no-publication',
   'artist_world_audio_mix'=>'licensed-revision-locked-music-bed-dialogue-duck-fades-supervised-private-output',
   'artist_world_crossfade'=>'private-video-audio-overlapping-transitions',
+  'artist_world_private_qc'=>'hash-verified-revision-gated-video-review-cue-sheet-millisecond-seek',
 
   'song_media'=>'audio-artwork-photo-video-document-archive-uploader',
   'audio_metadata'=>'ffprobe-wav-riff-mp3-frame-id3-fallback',

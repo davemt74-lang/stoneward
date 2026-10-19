@@ -111,3 +111,43 @@ function sf_render_review_decide(int $editor,int $jobId,string $decision,string 
   $db->commit();return true;
  }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
+
+/**
+ * 88D3G4D: human editorial QC cue sheet for one authenticated, hash-verified,
+ * rights-cleared private output. No public media URLs or source file details.
+ */
+function sf_render_review_cues(int $editor,int $jobId):array{
+ $verified=sf_render_review_file($editor,$jobId);
+ $plan=sf_render_plan($editor,(int)$verified['assembly_id'],(int)$verified['revision']);
+ if(!function_exists('sf_render_edl_build')||!function_exists('sf_render_transition_settings')
+   ||!function_exists('sf_render_mix_settings'))
+  throw new RuntimeException('Synchronized private review is unavailable.');
+ $assembly=(int)$verified['assembly_id'];$revision=(int)$verified['revision'];
+ $transition=sf_render_transition_settings($editor,$assembly,$revision);
+ $mix=sf_render_mix_settings($editor,$assembly,$revision);
+ $edl=sf_render_edl_build($plan,$transition,$mix);
+ if(($edl['output_total_ms']??0)<1000||($edl['output_total_ms']??0)>60000)
+  throw new RuntimeException('Private review timing exceeds supported bounds.');
+ // Deliberately select a minimal metadata shape to prevent future render
+ // manifest fields from leaking raw paths or private capture identities.
+ $cues=[];
+ foreach($edl['clips'] as $clip){
+  $cues[]=['type'=>'clip','ordinal'=>(int)$clip['ordinal'],
+   'label'=>match($clip['kind']){'scene'=>'Scene','transcript'=>'Dialogue','track'=>'Music'},
+   'start_ms'=>(int)$clip['output_in_ms'],'end_ms'=>(int)$clip['output_out_ms']];
+ }
+ foreach($edl['cuts'] as $cut){
+  $cues[]=['type'=>'transition','ordinal'=>(int)$cut['after_ordinal'],
+   'label'=>(string)$cut['style'],'start_ms'=>(int)$cut['start_ms'],
+   'end_ms'=>(int)$cut['end_ms']];
+ }
+ foreach($edl['dialogue_duck_windows'] as $window){
+  $cues[]=['type'=>'dialogue','ordinal'=>0,'label'=>'Dialogue/music duck',
+   'start_ms'=>(int)$window['start_ms'],'end_ms'=>(int)$window['end_ms']];
+ }
+ usort($cues,static fn($a,$b)=>$a['start_ms']<=>$b['start_ms']
+   ?:strcmp($a['type'],$b['type'])?:$a['ordinal']<=>$b['ordinal']);
+ return ['job_id'=>(int)$verified['job_id'],'revision'=>$revision,
+  'duration_ms'=>(int)$edl['output_total_ms'],'cues'=>$cues,
+  'private_only'=>true,'publication_allowed'=>false,'download_allowed'=>false];
+}
