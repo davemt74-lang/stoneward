@@ -16,7 +16,7 @@ $studio=$read('admin/assets/director-capture.js');$capture=$read('assets/js/app.
 foreach(['sf_production_schedule_set(','sf_production_availability_set(',
  'sf_production_schedule_board(','sf_production_schedule_recommendations('] as $fn)
  if(!str_contains($core,$fn))throw new RuntimeException('G4L schedule core incomplete: '.$fn);
-if(!str_contains($core,"sf_production_task_editor($editor)")
+if(!str_contains($core,'sf_production_task_editor($editor)')
  ||!str_contains($core,'sf_production_task_list($viewer)')
  ||!str_contains($core,'sf_team_audit(')
  ||!str_contains($core,'sf_production_task_event(')
