@@ -31,7 +31,7 @@ function sf_production_task_events_schema():void{
 function sf_production_task_event(int $task,int $actor,?int $recipient,string $type,
  string $before,string $after,string $note='',?int $evidence=null):void{
  if(!sf_db()->inTransaction())throw new RuntimeException('Task event must be transactional.');
- if(!in_array($type,['proposed','assigned','reassigned','progress','submitted','approved','rejected','reopened'],true))
+ if(!in_array($type,['proposed','assigned','reassigned','progress','submitted','approved','rejected','reopened','scheduled'],true))
   throw new InvalidArgumentException('Unknown production event.');
  $q=sf_db()->prepare('INSERT INTO story_production_task_events
    (task_id,actor_id,recipient_id,event_type,status_from,status_to,evidence_id,note,created_at)
