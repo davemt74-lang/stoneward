@@ -125,6 +125,8 @@ function sf_production_deadline_review(int $editor,int $request,string $decision
   if($decision==='approved'){
    $q=$db->prepare('SELECT status,assigned_to FROM story_production_tasks WHERE id=?');
    $q->execute([$task]);$current=$q->fetch(PDO::FETCH_ASSOC);
+   if(strtotime((string)$p['proposed_due_at'])<=time())
+     throw new RuntimeException('Requested deadline is no longer in the future.');
    if(!$current||!in_array($current['status'],['assigned','in_progress'],true)||
       (int)$current['assigned_to']!==(int)$p['assigned_to']||
       $p['proposed_due_at']<=$p['expected_due_at'])
@@ -158,7 +160,13 @@ function sf_production_calendar_chat(int $editor,string $now=''):array{
  $board=sf_production_schedule_board($editor,$now);
  $requests=sf_production_deadline_requests($editor);
  $pending=array_values(array_filter($requests,static fn($p)=>$p['status']==='pending_review'));
- $tasks=array_slice($board['tasks'],0,25);
+ $tasks=$board['tasks'];
+ usort($tasks,static function(array $a,array $b):int{
+  $aKey=$a['due_at']??'9999-12-31T23:59:59Z';
+  $bKey=$b['due_at']??'9999-12-31T23:59:59Z';
+  return strcmp($aKey,$bKey)?:($a['task_id']<=>$b['task_id']);
+ });
+ $tasks=array_slice($tasks,0,25);
  return ['as_of'=>$board['as_of'],'counts'=>$board['counts'],
    'tasks'=>$tasks,'pending_requests'=>array_map(static fn($p)=>[
       'id'=>(int)$p['id'],'task_id'=>(int)$p['task_id'],
