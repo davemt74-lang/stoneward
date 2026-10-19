@@ -116,8 +116,9 @@ function sf_assembly_restore_review(int $editor,int $id,string $decision,string 
  if(strlen($basis)<25)throw new InvalidArgumentException('Document a review basis of at least 25 characters.');
  $p=sf_assembly_restore_get($editor,$id);
  if($p['status']!=='pending_review')throw new RuntimeException('Restoration was already reviewed.');
- // Both approvals and denials are scoped to this exact still-current draft.
- sf_assembly_restore_verify($editor,$p);
+ // A rejection must remain possible even after media-rights revocation.
+ // Approvals, however, re-check every restored source and digest.
+ if($decision==='approved')sf_assembly_restore_verify($editor,$p);
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested restoration review.');
  $db->beginTransaction();
  try{
