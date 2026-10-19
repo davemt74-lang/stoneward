@@ -405,6 +405,9 @@ jobs:
           node --check admin/assets/story-assembly.js
           php tests/section88d3g4f-refinement.php
           php tests/section88d3g4f-release.php
+          php -l api/story-assembly-history-core.php
+          php tests/section88d3g4g-history.php
+          php tests/section88d3g4g-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php

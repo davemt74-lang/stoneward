@@ -3,7 +3,7 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
  let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,renderTransition=null,renderEdl=null,composerEnabled=false,busy=false,dirty=false;
- let previewMs=0,previewTimer=null,undoEdits=[],redoEdits=[],savedSnapshot='';
+ let previewMs=0,previewTimer=null,undoEdits=[],redoEdits=[],savedSnapshot='',revisionHistory=[],historyComparison=null;
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
  function ctx(){return window.STONEFELLOW_ADMIN_CONTEXT;}
@@ -49,6 +49,17 @@
    (project?'<div class="assembly-heading"><strong>'+esc(project.title)+'</strong><span>Revision '+Number(project.revision)+' · '+humanTime(total)+' / 60:00 max</span></div>'+
     '<div class="form-grid"><label class="field">Verified source or catalog track<select id="assemblySource">'+selected+'</select></label>'+
     '<button type="button" class="secondary" id="assemblyAdd">Add selected source</button></div>'+
+    '<section class="assembly-visual" aria-label="G4G visual multi-lane timeline"><h3>Visual production timeline</h3>'+
+    '<p class="hint">Metadata only · '+(renderEdl?.clips?.length?'Certified output-overlap clock':'Saved editorial source timing')+'</p>'+
+    '<div class="assembly-visual-tracks">'+items.map((item,i)=>{
+      const clip=renderEdl?.clips?.[i];
+      const start=clip?Number(clip.output_in_ms):items.slice(0,i).reduce((n,x)=>n+ms(x.duration_ms),0);
+      const duration=ms(item.duration_ms),overall=Math.max(1,Number(renderEdl?.output_total_ms||total));
+      const left=Math.max(0,Math.min(100,start/overall*100)),width=Math.max(.6,Math.min(100-left,duration/overall*100));
+      return '<div class="assembly-visual-row"><span>'+esc((i+1)+'. '+item.kind)+'</span><div class="assembly-visual-rail">'+
+        '<div class="assembly-visual-bar '+esc(item.kind)+'" style="left:'+left.toFixed(3)+'%;width:'+width.toFixed(3)+'%"'+
+        ' title="'+esc(start+'–'+(start+duration)+' ms')+'"></div></div></div>';
+    }).join('')+'</div></section>'+
     '<div id="assemblyTimeline" class="assembly-timeline" aria-label="Private editorial timeline">'+
     (items.length?items.map((r,i)=>{
       const src=sourceFor(r);const warning=warnFor(r);const isImage=src?.category==='image';
@@ -71,6 +82,30 @@
      '<button type="button" class="secondary" id="assemblyRedo" '+(!redoEdits.length?'disabled':'')+'>Redo</button>'+
      '<button type="button" class="primary" id="assemblySave" '+(!dirty?'disabled':'')+'>Save timeline revision</button>'+
     '<span id="assemblyDirty">'+(dirty?'Unsaved local edits':'Saved private editorial draft')+'</span></div>'+
+    '<section class="assembly-history"><h3>G4G · Revision comparison</h3>'+
+    '<p class="hint">Archived editorial metadata only. Older revisions cannot be reconstructed until an existing assembly is saved again.</p>'+
+    '<div class="assembly-history-picker"><label>From<select id="historyFrom">'+revisionHistory.map((x,i)=>
+      '<option value="'+Number(x.revision)+'" '+(i===1?'selected':'')+'>Revision '+Number(x.revision)+'</option>').join('')+'</select></label>'+
+    '<label>To<select id="historyTo">'+revisionHistory.map((x,i)=>
+      '<option value="'+Number(x.revision)+'" '+(i===0?'selected':'')+'>Revision '+Number(x.revision)+'</option>').join('')+'</select></label>'+
+    '<button type="button" id="historyCompare" '+(revisionHistory.length<2?'disabled':'')+'>Compare versions</button></div>'+
+    (historyComparison?'<div class="assembly-history-result"><strong>Revision '+Number(historyComparison.from_revision)+' → '+Number(historyComparison.to_revision)+'</strong>'+
+      '<p>'+Number(historyComparison.from_count)+' → '+Number(historyComparison.to_count)+' clips · '+
+      humanTime(historyComparison.from_duration_ms)+' → '+humanTime(historyComparison.to_duration_ms)+'</p>'+
+      (historyComparison.changes?.length?'<ul>'+historyComparison.changes.map(x=>
+        '<li>'+esc(x.type)+' · '+esc(x.kind)+' at #'+Number(x.ordinal)+
+        (x.from_ordinal?' (was #'+Number(x.from_ordinal)+')':'')+
+        (x.fields?.length?' · '+esc(x.fields.join(', ')):'')+'</li>').join('')+'</ul>':
+        '<p>No content changes in these revisions.</p>')+'</div>':'')+
+    '<div class="assembly-history-records">'+revisionHistory.map(x=>
+      '<div>Rev '+Number(x.revision)+' · '+Number(x.item_count)+' clips · '+
+      humanTime(x.duration_ms)+' · '+esc(x.created_at)+'</div>').join('')+'</div>'+
+    '<details><summary>AI Director review history</summary>'+
+    (proposals.length?proposals.map(x=>'<p class="hint">Proposal #'+Number(x.id)+' · rev '+Number(x.revision)+
+      ' · '+esc(x.status)+' · '+esc(x.reviewed_at||x.created_at||'Not reviewed')+
+      (x.applied_revision?' · applied in rev '+Number(x.applied_revision):'')+'</p>').join(''):
+      '<p class="hint">No AI proposals recorded.</p>')+
+    '</details></section>'+
     '<div class="assembly-director"><h3>Director’s proposed coverage</h3>'+
     '<p class="hint">Deterministic editorial suggestions from this assembly, not an LLM inference or finished edit.</p>'+
     (plan.gaps.length?plan.gaps.map(g=>'<div class="assembly-gap"><span><strong>'+esc(g.code.replace(/_/g,' '))+'</strong> · '+esc(g.brief)+
@@ -247,6 +282,22 @@
     catch(e){note(e.message,true);}finally{busy=false;}
   };
   if(!view)return;
+  const comparisonButton=host.querySelector('#historyCompare');
+  if(comparisonButton)comparisonButton.onclick=async()=>{
+    if(busy||dirty){note('Save or discard local edits before comparing saved revisions.',true);return;}
+    const from=Number(host.querySelector('#historyFrom')?.value),to=Number(host.querySelector('#historyTo')?.value);
+    if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from<1||to<1||from===to){
+      note('Select two different revisions.',true);return;
+    }
+    busy=true;
+    try{
+      const r=await c.api('story-assembly.php?action=compare_revisions&assembly_id='+
+        encodeURIComponent(Number(view.id))+'&from_revision='+from+'&to_revision='+to);
+      historyComparison=r.comparison||null;draw();
+      note('Private comparison loaded; no video or timeline changed.');
+    }catch(e){note('Comparison unavailable: '+(e.message||'verification failed'),true);}
+    finally{busy=false;}
+  };
   host.querySelector('#assemblyUndo').onclick=()=>editRestore(undoEdits,redoEdits);
   host.querySelector('#assemblyRedo').onclick=()=>editRestore(redoEdits,undoEdits);
   host.querySelector('#assemblyAdd').onclick=()=>{
@@ -568,6 +619,7 @@
    renderEnabled=Boolean(r.render_enabled);renderJobs=Array.isArray(r.render_jobs)?r.render_jobs:[];
    audioMasters=Array.isArray(r.render_audio_candidates)?r.render_audio_candidates:[];
    renderMix=r.render_mix||null;renderTransition=r.render_transition||null;renderEdl=r.render_edl||null;previewMs=0;
+    revisionHistory=Array.isArray(r.revision_history)?r.revision_history:[];historyComparison=null;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
     savedSnapshot=editSnapshot();undoEdits=[];redoEdits=[];dirty=false;

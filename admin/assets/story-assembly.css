@@ -102,3 +102,22 @@
 .assembly-trim-hint{padding:8px 0}
 .assembly-proposal [data-composer-refine]{margin-top:10px}
 @media(max-width:600px){.assembly-trim button{flex:1 1 130px}}
+
+/* G4G: distinct media-type lanes and immutable private editorial history */
+.assembly-visual,.assembly-history{min-width:0;padding:16px;margin:16px 0;border:1px solid rgba(165,155,142,.26);border-radius:12px}
+.assembly-visual h3,.assembly-history h3{margin:0 0 8px}
+.assembly-visual-tracks{display:grid;gap:7px;max-height:420px;overflow:auto}
+.assembly-visual-row{display:grid;grid-template-columns:100px minmax(0,1fr);align-items:center;gap:10px;font-variant-numeric:tabular-nums;font-size:.8rem}
+.assembly-visual-row>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.assembly-visual-rail{height:22px;position:relative;min-width:0;border-radius:6px;background:rgba(127,127,127,.1)}
+.assembly-visual-bar{height:18px;top:2px;position:absolute;border-radius:4px;background:#5684b8;min-width:3px}
+.assembly-visual-bar.transcript{background:#b58a4d}
+.assembly-visual-bar.track{background:#6e9b7d}
+.assembly-history-picker{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:12px 0}
+.assembly-history-picker label{display:grid;gap:4px;min-width:130px}
+.assembly-history-picker select{max-width:100%}
+.assembly-history-records{display:grid;gap:3px;max-height:180px;overflow:auto;font-size:.8rem}
+.assembly-history-records>div{padding:5px 8px;border-bottom:1px solid rgba(127,127,127,.2)}
+.assembly-history-result{max-height:300px;overflow:auto;padding:10px 12px;margin:10px 0;border-radius:8px;background:rgba(120,120,120,.06)}
+.assembly-history-result ul{padding-left:24px}
+@media(max-width:620px){.assembly-visual-row{grid-template-columns:72px minmax(0,1fr)}.assembly-history-picker label{min-width:100px;flex:1 1 100px}}
