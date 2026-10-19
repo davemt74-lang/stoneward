@@ -51,9 +51,16 @@ function sf_story_agent_brain_summary(int $editor):array{
  $work=sf_production_task_list($editor);
  $taskStatuses=[];
  foreach($work as $t)$taskStatuses[(string)$t['status']]=($taskStatuses[(string)$t['status']]??0)+1;
+ $taskUpdates=sf_production_task_notifications($editor);
  return ['available'=>true,'scope'=>'admin_editor_only',
   'production_task_statuses'=>$taskStatuses,
   'production_task_review_pending'=>(int)($taskStatuses['submitted']??0),
+  'production_task_in_progress'=>(int)($taskStatuses['in_progress']??0),
+  'production_task_recovery_needed'=>(int)($taskStatuses['rejected']??0),
+  'production_task_recent_events'=>array_map(static fn($e)=>[
+    'task_id'=>(int)$e['task_id'],'event_type'=>(string)$e['event_type'],
+    'status'=>(string)$e['status_to']
+  ],array_slice($taskUpdates,0,10)),
   'production_tasks'=>array_map(static fn($t)=>[
     'id'=>(int)$t['id'],'kind'=>(string)$t['kind'],'status'=>(string)$t['status'],
     'assigned_to'=>(int)($t['assigned_to']??0),'target_role'=>(string)$t['target_role']
@@ -146,6 +153,8 @@ function sf_story_agent_brain_brief(int $editor,?int $assembly=null):string{
  $s=sf_story_agent_brain_summary($editor);
  return 'Stonefellow editorial production: '.$s['total_shown'].' recent private assemblies, '.
    $s['production_task_review_pending'].' crew task submissions awaiting independent review, '.
+   $s['production_task_in_progress'].' crew tasks in progress, '.
+   $s['production_task_recovery_needed'].' rejected crew tasks needing human rework review, '.
    $s['attention_total'].' recorded human review items across those assemblies. '.
    ($s['assemblies']?implode('; ',array_map(static fn($a)=>
     '#'.$a['assembly_id'].' rev '.$a['revision'].' ('.$a['approval_attention'].' review)',array_slice($s['assemblies'],0,6))):

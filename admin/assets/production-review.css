@@ -26,3 +26,10 @@
 .director-task-controls select,.director-task-controls textarea{max-width:100%;width:100%}
 .director-task-controls button{justify-self:start}
 @media(max-width:700px){.director-task-controls{width:100%;max-width:100%}}
+
+/* G4K — quiet evidence/progress timeline and rejected work recovery */
+.director-task-activity{max-height:210px;overflow:auto;display:grid;gap:6px;padding:8px 8px 8px 22px;font-size:.81rem}
+.director-task-activity li{padding:5px 0;border-bottom:1px solid rgba(127,127,127,.2)}
+.director-task-activity time{font-variant-numeric:tabular-nums;opacity:.7}
+.director-task-controls .hint{line-height:1.45}
+.director-task-panel details summary{cursor:pointer}
