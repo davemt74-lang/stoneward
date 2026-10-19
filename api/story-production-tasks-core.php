@@ -42,7 +42,9 @@ function sf_production_task_read(int $viewer,int $task):array{
  sf_production_tasks_schema();
  $q=sf_db()->prepare('SELECT * FROM story_production_tasks WHERE id=?');$q->execute([$task]);
  $row=$q->fetch(PDO::FETCH_ASSOC);
- if(!$row||(!sf_team_can($viewer,'team.assign_roles')&&(int)$row['assigned_to']!==$viewer))
+ if(!$row||(!sf_team_can($viewer,'team.assign_roles')&&(
+   (int)$row['assigned_to']!==$viewer||
+   ($row['target_role']!=='all'&&!in_array($row['target_role'],sf_capture_roles($viewer),true)))))
   throw new RuntimeException('Private task not available.');
  return $row;
 }
@@ -54,7 +56,10 @@ function sf_production_task_list(int $viewer):array{
  assigned_to,evidence_id,contributor_note,review_basis,created_by,reviewed_by,created_at,updated_at
  FROM story_production_tasks '.($admin?'':'WHERE assigned_to=? ').
  'ORDER BY id DESC LIMIT 75');
- $q->execute($admin?[]:[$viewer]);return $q->fetchAll(PDO::FETCH_ASSOC);
+ $q->execute($admin?[]:[$viewer]);$rows=$q->fetchAll(PDO::FETCH_ASSOC);
+ if(!$admin)$rows=array_values(array_filter($rows,static fn($x)=>
+   $x['target_role']==='all'||in_array($x['target_role'],sf_capture_roles($viewer),true)));
+ return $rows;
 }
 /** Human-triggered conversion of verified Director gap to private task, never publish shot request. */
 function sf_production_task_propose_gap(int $editor,string $code):array{
