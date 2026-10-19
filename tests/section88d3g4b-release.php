@@ -4,13 +4,13 @@ $root=dirname(__DIR__);
 $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $p)
- if(!str_contains($read($p),'1.3.128'))
+ if(!str_contains($read($p),'1.3.129'))
   throw new RuntimeException('G4B release identity mismatch: '.$p);
-if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.62'")
+if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.63'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-052'")
  ||!str_contains($read('api/migrations.php'),"'story_render_transitions'"))
  throw new RuntimeException('Crossfade migration and private ledger are missing.');
-if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.62'")
+if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.63'")
  ||!str_contains($read('version.php'),'private-video-audio-overlapping-transitions'))
  throw new RuntimeException('Crossfade version flag incorrect.');
 $core=$read('api/story-render-transition-core.php');
