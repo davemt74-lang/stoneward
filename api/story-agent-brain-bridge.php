@@ -17,6 +17,7 @@ require_once __DIR__.'/story-render-worker-core.php';
 require_once __DIR__.'/story-director-core.php';
 require_once __DIR__.'/story-production-tasks-core.php';
 require_once __DIR__.'/story-production-scheduling-core.php';
+require_once __DIR__.'/story-production-deadline-core.php';
 /**
  * G4I: private editorial read model for the *existing* Admin Agent Brain.
  * No second job executor, model call, approval, source path or media bytes.
@@ -54,12 +55,14 @@ function sf_story_agent_brain_summary(int $editor):array{
  foreach($work as $t)$taskStatuses[(string)$t['status']]=($taskStatuses[(string)$t['status']]??0)+1;
  $taskUpdates=sf_production_task_notifications($editor);
  $scheduling=sf_production_schedule_recommendations($editor);
+ $pendingExtensions=array_filter(sf_production_deadline_requests($editor),static fn($x)=>$x['status']==='pending_review');
  return ['available'=>true,'scope'=>'admin_editor_only',
   'production_task_statuses'=>$taskStatuses,
   'production_task_review_pending'=>(int)($taskStatuses['submitted']??0),
   'production_task_in_progress'=>(int)($taskStatuses['in_progress']??0),
   'production_task_recovery_needed'=>(int)($taskStatuses['rejected']??0),
   'production_scheduling'=>$scheduling,
+  'production_deadline_extensions_pending'=>count($pendingExtensions),
   'production_task_recent_events'=>array_map(static fn($e)=>[
     'task_id'=>(int)$e['task_id'],'event_type'=>(string)$e['event_type'],
     'status'=>(string)$e['status_to']
@@ -160,6 +163,7 @@ function sf_story_agent_brain_brief(int $editor,?int $assembly=null):string{
    $s['production_task_recovery_needed'].' rejected crew tasks needing human rework review, '.
    $s['production_scheduling']['counts']['overdue'].' overdue deadlines, '.
    $s['production_scheduling']['counts']['availability_conflict'].' crew scheduling conflicts, '.
+   $s['production_deadline_extensions_pending'].' deadline extensions awaiting human approval in Agent Chat, '.
    $s['attention_total'].' recorded human review items across those assemblies. '.
    ($s['assemblies']?implode('; ',array_map(static fn($a)=>
     '#'.$a['assembly_id'].' rev '.$a['revision'].' ('.$a['approval_attention'].' review)',array_slice($s['assemblies'],0,6))):
