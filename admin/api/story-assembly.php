@@ -44,6 +44,7 @@ try{
     'render_jobs'=>$assemblyId>0?sf_render_jobs($id,$assemblyId):[],
     'render_mix'=>$assemblyId>0?sf_render_mix_settings($id,$assemblyId,(int)(sf_assembly_read($id,$assemblyId)['revision']??0)):null,
     'render_transition'=>$assemblyId>0?sf_render_transition_settings($id,$assemblyId,(int)(sf_assembly_read($id,$assemblyId)['revision']??0)):null,
+    'render_edl'=>$assemblyId>0?sf_render_edl_preview($id,$assemblyId,(int)(sf_assembly_read($id,$assemblyId)['revision']??0)):null,
     'render_audio_candidates'=>$assemblyId>0?sf_render_audio_candidates($id):[],
     'candidates'=>sf_assembly_candidates($id),'publication_enabled'=>false,
     'video_rendering_enabled'=>false,'ai_provider_invocation'=>false]);
