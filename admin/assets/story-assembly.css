@@ -51,3 +51,11 @@
 .assembly-render-job label{display:grid;gap:6px;margin:12px 0}
 .assembly-render-job textarea{max-width:840px;box-sizing:border-box;min-width:0;width:100%}
 .assembly-render-job .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* 88D3G4A — scoped music bed setup */
+.assembly-mix-preset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0;border:1px solid rgba(170,160,145,.3);border-radius:12px;padding:16px;min-width:0}
+.assembly-mix-preset legend{padding:0 8px;font-weight:700}
+.assembly-mix-preset label{display:grid;gap:6px;min-width:0}
+.assembly-mix-preset select{width:100%;min-width:0}
+.assembly-mix-preset p,.assembly-mix-preset button{grid-column:1/-1}
+@media(max-width:680px){.assembly-mix-preset{grid-template-columns:1fr}}

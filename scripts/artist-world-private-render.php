@@ -16,6 +16,7 @@ require_once SF_ROOT.'/api/story-composer-core.php';
 require_once SF_ROOT.'/api/storyboard-preview-core.php';
 require_once SF_ROOT.'/api/story-render-source-core.php';
 require_once SF_ROOT.'/api/story-render-worker-core.php';
+require_once SF_ROOT.'/api/story-render-mix-core.php';
 $editor=0;
 foreach(array_slice($argv,1) as $arg)
  if(preg_match('/^--editor-id=([1-9][0-9]*)$/D',$arg,$m))$editor=(int)$m[1];

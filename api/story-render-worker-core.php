@@ -226,6 +226,10 @@ function sf_render_run_once(int $editor):array{
  $workspace='';$final='';
  try{
   $manifest=sf_render_plan($editor,$assembly,$revision);
+  $mix=function_exists('sf_render_mix_settings')
+    ?sf_render_mix_settings($editor,$assembly,$revision):null;
+  if($mix!==null&&function_exists('sf_render_mix_source'))
+    sf_render_mix_source($manifest,$mix);
   $private=sf_render_private_root();
   $workspace=$private.'/work-'.$jobId.'-'.bin2hex(random_bytes(8));
   if(!mkdir($workspace,0700))throw new RuntimeException('Private worker directory unavailable.');
@@ -238,8 +242,15 @@ function sf_render_run_once(int $editor):array{
   }
   $rendered=$workspace.'/draft.mp4';
   sf_render_concat($segments,$workspace.'/cuts.ffconcat',$rendered);
+  if($mix!==null){
+   if(!sf_render_enabled()||sf_render_mix_settings($editor,$assembly,$revision)!==$mix)
+    throw new RuntimeException('Licensed music mix settings changed during execution.');
+   sf_render_mix_apply($manifest,$mix,$rendered,$workspace.'/mixed.mp4');
+   $rendered=$workspace.'/mixed.mp4';
+  }
   $fresh=sf_render_plan($editor,$assembly,$revision); // rights and hashes checked after work
-  if(!sf_render_enabled()||$fresh['total_ms']!==$manifest['total_ms'])
+  if(!sf_render_enabled()||$fresh['total_ms']!==$manifest['total_ms']
+    ||($mix!==null&&sf_render_mix_settings($editor,$assembly,$revision)!==$mix))
    throw new RuntimeException('Source certification changed during rendering.');
   $sha=hash_file('sha256',$rendered);$size=filesize($rendered);
   if(!is_string($sha)||!is_int($size)||$size<100||$size>150*1024*1024)
