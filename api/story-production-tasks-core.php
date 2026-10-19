@@ -153,6 +153,7 @@ function sf_production_task_submit(int $actor,int $task,int $evidence,string $no
   if($evidence!==(int)$row['source_id'])
    throw new RuntimeException('Editorial evidence must reference original proposal.');
  }else throw new RuntimeException('Unknown task type.');
+ sf_production_task_events_schema();
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested submission unsupported.');
  $db->beginTransaction();
  try{
