@@ -411,6 +411,11 @@ jobs:
           php -l api/story-assembly-restore-core.php
           php tests/section88d3g4h-governed-restore.php
           php tests/section88d3g4h-release.php
+          php -l api/story-agent-brain-bridge.php
+          php -l api/agent-admin-brain.php
+          node --check admin/assets/agent-canvas.js
+          php tests/section88d3g4i-agent-editorial.php
+          php tests/section88d3g4i-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
