@@ -408,6 +408,9 @@ jobs:
           php -l api/story-assembly-history-core.php
           php tests/section88d3g4g-history.php
           php tests/section88d3g4g-release.php
+          php -l api/story-assembly-restore-core.php
+          php tests/section88d3g4h-governed-restore.php
+          php tests/section88d3g4h-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
