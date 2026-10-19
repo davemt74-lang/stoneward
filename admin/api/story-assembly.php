@@ -9,6 +9,7 @@ require_once SF_ROOT.'/api/story-transcript-core.php';
 require_once SF_ROOT.'/api/story-scene-core.php';
 require_once SF_ROOT.'/api/story-assembly-core.php';
 require_once SF_ROOT.'/api/story-assembly-history-core.php';
+require_once SF_ROOT.'/api/story-assembly-restore-core.php';
 require_once SF_ROOT.'/api/ai.php';
 require_once SF_ROOT.'/api/story-inference-worker-core.php';
 require_once SF_ROOT.'/api/story-composer-core.php';
@@ -36,6 +37,7 @@ try{
   sf_json_response(['ok'=>true,'assemblies'=>sf_assembly_list($id),
     'assembly'=>$assemblyId>0?sf_assembly_read($id,$assemblyId):null,
     'revision_history'=>$assemblyId>0?sf_assembly_history_list($id,$assemblyId):[],
+    'restoration_proposals'=>$assemblyId>0?sf_assembly_restore_list($id,$assemblyId):[],
     'composer_enabled'=>sf_composer_enabled(),
     'composer_proposals'=>$assemblyId>0?sf_composer_list($id,$assemblyId):[],
     'storyboard'=>$assemblyId>0?sf_storyboard_preview($id,$assemblyId):null,
@@ -52,6 +54,20 @@ try{
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();
  $action=(string)($p['action']??'');
+ if($action==='request_restore'){
+   sf_json_response(['ok'=>true,'proposal'=>sf_assembly_restore_request($id,
+     (int)($p['assembly_id']??0),(int)($p['revision']??0),
+     (int)($p['target_revision']??0),(string)($p['reason']??''))]);
+ }
+ if($action==='review_restore'){
+   sf_json_response(['ok'=>true,'changed'=>sf_assembly_restore_review($id,
+     (int)($p['proposal_id']??0),(string)($p['decision']??''),
+     (string)($p['basis']??''))]);
+ }
+ if($action==='apply_restore'){
+   sf_json_response(['ok'=>true,'result'=>sf_assembly_restore_apply($id,
+     (int)($p['proposal_id']??0))]);
+ }
  if($action==='configure_transition'){
    sf_render_transition_set($id,(int)($p['assembly_id']??0),
      (int)($p['revision']??0),(string)($p['style']??''),

@@ -3,7 +3,7 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
  let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,renderTransition=null,renderEdl=null,composerEnabled=false,busy=false,dirty=false;
- let previewMs=0,previewTimer=null,undoEdits=[],redoEdits=[],savedSnapshot='',revisionHistory=[],historyComparison=null;
+ let previewMs=0,previewTimer=null,undoEdits=[],redoEdits=[],savedSnapshot='',revisionHistory=[],historyComparison=null,restoreRequests=[];
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
  function ctx(){return window.STONEFELLOW_ADMIN_CONTEXT;}
@@ -105,7 +105,27 @@
       ' · '+esc(x.status)+' · '+esc(x.reviewed_at||x.created_at||'Not reviewed')+
       (x.applied_revision?' · applied in rev '+Number(x.applied_revision):'')+'</p>').join(''):
       '<p class="hint">No AI proposals recorded.</p>')+
-    '</details></section>'+
+    '</details>'+
+    '<div class="assembly-restore"><h4>G4H · Governed revision restoration</h4>'+
+    '<p class="hint">A restore is a proposal, not a rollback. An authorized editor must request, explicitly approve, then apply. The server revalidates current source permissions and creates a NEW revision; existing footage, licensing and review history are never copied.</p>'+
+    '<label>Historical version<select id="restoreTarget">'+revisionHistory.filter(x=>Number(x.revision)<Number(project.revision)).map(x=>
+      '<option value="'+Number(x.revision)+'">Revision '+Number(x.revision)+' · '+Number(x.item_count)+' clips</option>').join('')+'</select></label>'+
+    '<label>Reason for change<textarea id="restoreReason" rows="2" maxlength="750" placeholder="Document why this earlier editorial sequence should be proposed for restoration (25+ characters)"></textarea></label>'+
+    '<button type="button" id="restoreRequest" '+(dirty||revisionHistory.filter(x=>Number(x.revision)<Number(project.revision)).length===0?'disabled':'')+'>Request restoration review</button>'+
+    '<div class="assembly-restore-list">'+restoreRequests.map(req=>
+      '<article class="assembly-restore-item"><strong>Request #'+Number(req.id)+'</strong> · rev '+
+      Number(req.target_revision)+' → new revision from '+Number(req.expected_revision)+
+      ' · '+esc(req.status)+
+      '<p class="hint">'+esc(req.reason)+'</p>'+
+      (req.reviewed_at?'<p class="hint">Review: '+esc(req.review_basis||'')+' · '+esc(req.reviewed_at)+'</p>':'')+
+      (req.status==='pending_review'?
+        '<label>Approval/rejection basis<textarea data-restore-basis="'+Number(req.id)+'" rows="2" maxlength="1000" placeholder="Record evidence and decision (25+ characters)"></textarea></label>'+
+        '<div class="actions"><button type="button" data-restore-review="approved" data-restore-id="'+Number(req.id)+'" '+(dirty||Number(req.expected_revision)!==Number(project.revision)?'disabled':'')+'>Approve restoration</button>'+
+        '<button type="button" class="secondary" data-restore-review="rejected" data-restore-id="'+Number(req.id)+'" '+(dirty||Number(req.expected_revision)!==Number(project.revision)?'disabled':'')+'>Reject</button></div>':'')+
+      (req.status==='approved'?
+        '<button type="button" class="secondary" data-restore-apply="'+Number(req.id)+'" '+(dirty||Number(req.expected_revision)!==Number(project.revision)?'disabled':'')+'>Apply approved restoration as new draft revision</button>':'')+
+      (req.applied_revision?'<p class="hint">Applied as revision '+Number(req.applied_revision)+'</p>':'')+
+      '</article>').join('')+'</div></div></section>'+
     '<div class="assembly-director"><h3>Director’s proposed coverage</h3>'+
     '<p class="hint">Deterministic editorial suggestions from this assembly, not an LLM inference or finished edit.</p>'+
     (plan.gaps.length?plan.gaps.map(g=>'<div class="assembly-gap"><span><strong>'+esc(g.code.replace(/_/g,' '))+'</strong> · '+esc(g.brief)+
@@ -298,6 +318,43 @@
     }catch(e){note('Comparison unavailable: '+(e.message||'verification failed'),true);}
     finally{busy=false;}
   };
+  const requestRestore=host.querySelector('#restoreRequest');
+  if(requestRestore)requestRestore.onclick=async()=>{
+    if(busy||dirty)return;
+    const target=Number(host.querySelector('#restoreTarget')?.value),
+      reason=host.querySelector('#restoreReason')?.value.trim()||'';
+    if(!Number.isSafeInteger(target)||target<1||target>=Number(view.revision)||reason.length<25){
+      note('Choose an earlier archived revision and explain the request (25+ characters).',true);return;
+    }
+    if(!window.confirm('Request human review of restoring revision '+target+'? This will not change any files, current clips or permissions.'))return;
+    busy=true;
+    try{
+      const answer=await c.api('story-assembly.php',{action:'request_restore',
+        assembly_id:Number(view.id),revision:Number(view.revision),target_revision:target,reason});
+      await load();note('Governed restoration request #'+Number(answer.proposal.id)+' recorded for review.');
+    }catch(e){note('Request rejected: '+(e.message||'rights or revision verification failed'),true);}
+    finally{busy=false;}
+  };
+  host.querySelectorAll('[data-restore-review]').forEach(button=>button.onclick=async()=>{
+    if(busy||dirty)return;
+    const id=Number(button.dataset.restoreId),decision=button.dataset.restoreReview;
+    const basis=host.querySelector('[data-restore-basis="'+id+'"]')?.value.trim()||'';
+    if(basis.length<25){note('Document the restoration review basis (25+ characters).',true);return;}
+    if(!window.confirm('Record '+decision+' for restoration request #'+id+'? Approval alone does not change the timeline.'))return;
+    busy=true;try{
+      await c.api('story-assembly.php',{action:'review_restore',proposal_id:id,decision,basis});
+      await load();note('Restoration review '+decision+'. No clip was changed.');
+    }catch(e){note('Review blocked: '+(e.message||'verification failed'),true);}finally{busy=false;}
+  });
+  host.querySelectorAll('[data-restore-apply]').forEach(button=>button.onclick=async()=>{
+    if(busy||dirty)return;
+    const id=Number(button.dataset.restoreApply);
+    if(!window.confirm('Apply approved restoration #'+id+' as a NEW private revision? The server will recheck every current source. Previous render and music permits do not transfer.'))return;
+    busy=true;try{
+      const answer=await c.api('story-assembly.php',{action:'apply_restore',proposal_id:id});
+      await load();note('Approved restoration applied as private revision '+Number(answer.result.revision)+'. Rights and render certification must be reviewed again.');
+    }catch(e){note('Restore unavailable: '+(e.message||'source, approval or revision changed'),true);}finally{busy=false;}
+  });
   host.querySelector('#assemblyUndo').onclick=()=>editRestore(undoEdits,redoEdits);
   host.querySelector('#assemblyRedo').onclick=()=>editRestore(redoEdits,undoEdits);
   host.querySelector('#assemblyAdd').onclick=()=>{
@@ -620,6 +677,7 @@
    audioMasters=Array.isArray(r.render_audio_candidates)?r.render_audio_candidates:[];
    renderMix=r.render_mix||null;renderTransition=r.render_transition||null;renderEdl=r.render_edl||null;previewMs=0;
     revisionHistory=Array.isArray(r.revision_history)?r.revision_history:[];historyComparison=null;
+    restoreRequests=Array.isArray(r.restoration_proposals)?r.restoration_proposals:[];
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
     savedSnapshot=editSnapshot();undoEdits=[];redoEdits=[];dirty=false;
