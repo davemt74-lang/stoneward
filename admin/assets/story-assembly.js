@@ -169,8 +169,10 @@
       (renderJobs.length?renderJobs.map(j=>'<article class="assembly-render-job"><p class="hint"><strong>Private render #'+Number(j.id)+'</strong> · revision '+Number(j.revision)+' · '+esc(j.status)+
         ' · '+Number(j.output_bytes||0)+' bytes</p>'+
         (['private_review','approved_private'].includes(j.status)&&Number(j.revision)===Number(project.revision)?
-         '<video controls preload="metadata" controlsList="nodownload noplaybackrate" disablepictureinpicture playsinline class="assembly-video-private" src="api/story-render-review.php?action=stream&amp;job_id='+Number(j.id)+'" aria-label="Private reviewed video #'+Number(j.id)+'"></video>'+
-         '<p class="hint">Authenticated private reviewer playback. No public or unguarded video URL.</p>':'')+
+         '<video controls preload="metadata" controlsList="nodownload noplaybackrate" disablepictureinpicture playsinline class="assembly-video-private" data-private-review-video="'+Number(j.id)+'" src="api/story-render-review.php?action=stream&amp;job_id='+Number(j.id)+'" aria-label="Private reviewed video #'+Number(j.id)+'"></video>'+
+         '<p class="hint">Authenticated private reviewer playback. No public or unguarded video URL.</p>'+
+         '<div class="assembly-qc"><button type="button" data-load-review-cues="'+Number(j.id)+'" '+(dirty?'disabled':'')+'>Load verified QC cues</button>'+
+         '<div data-review-cue-host="'+Number(j.id)+'" aria-live="polite"></div></div>':'')+
         (j.status==='private_review'?'<label>Human editorial review basis<textarea rows="2" minlength="25" maxlength="1000" data-render-basis="'+Number(j.id)+'" placeholder="Record what you checked in the video and any restrictions."></textarea></label>'+
          '<div class="actions"><button type="button" data-render-review="approved_private" data-render-id="'+Number(j.id)+'">Approve private draft</button>'+
          '<button type="button" class="secondary" data-render-review="rejected" data-render-id="'+Number(j.id)+'">Reject private draft</button></div>':'')+
