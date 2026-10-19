@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/story-production-task-lifecycle-core.php';
 /** 88D3G4J: explicit editorial production tasks backed by existing capture and review records. */
 function sf_production_tasks_schema():void{
  static $ready=false;if($ready)return;
@@ -75,6 +76,7 @@ function sf_production_task_propose_gap(int $editor,string $code):array{
  if(!$found)throw new RuntimeException('Director gap has already been filled.');
  $request=(int)($found['draft_request_id']??0);
  if(!$request)$request=sf_director_create_draft($editor,$code);
+ sf_production_task_events_schema();
  $now=gmdate('c');$spec=$catalog[$code];
  $q=$db->prepare("INSERT INTO story_production_tasks(task_key,kind,source_id,target_role,title,brief,
  status,contributor_note,review_basis,created_by,created_at,updated_at)
@@ -96,6 +98,7 @@ function sf_production_task_propose_editorial(int $editor,int $proposal):array{
  $key='composer:'.$proposal;$q=$db->prepare('SELECT id FROM story_production_tasks WHERE task_key=?');
  $q->execute([$key]);$prior=$q->fetchColumn();
  if($prior!==false)return ['id'=>(int)$prior,'existing'=>true];
+ sf_production_task_events_schema();
  $now=gmdate('c');
  $q=$db->prepare("INSERT INTO story_production_tasks(task_key,kind,source_id,target_role,title,brief,
  status,contributor_note,review_basis,created_by,created_at,updated_at)
@@ -108,7 +111,7 @@ function sf_production_task_propose_editorial(int $editor,int $proposal):array{
 }
 function sf_production_task_assign(int $editor,int $task,int $assignee):void{
  sf_production_task_editor($editor);$row=sf_production_task_read($editor,$task);
- if($row['status']!=='proposed'&&$row['status']!=='assigned')
+ if(!in_array($row['status'],['proposed','assigned','in_progress'],true))
   throw new RuntimeException('Task cannot be reassigned after work submission.');
  if($assignee<1||($row['target_role']!=='all'&&
    !in_array($row['target_role'],sf_capture_roles($assignee),true)))
@@ -116,13 +119,16 @@ function sf_production_task_assign(int $editor,int $task,int $assignee):void{
  $u=sf_db()->prepare('SELECT id,status FROM users WHERE id=?');$u->execute([$assignee]);
  if(($u->fetch(PDO::FETCH_ASSOC)['status']??'')!=='active')
   throw new RuntimeException('Assignee is not active.');
+ sf_production_task_events_schema();
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested assignment unsupported.');
  $db->beginTransaction();
  try{
   $q=$db->prepare("UPDATE story_production_tasks SET assigned_to=?,status='assigned',
-   updated_at=? WHERE id=? AND status IN ('proposed','assigned')");
+   updated_at=? WHERE id=? AND status IN ('proposed','assigned','in_progress')");
   $q->execute([$assignee,gmdate('c'),$task]);
   if($q->rowCount()<1)throw new RuntimeException('Task changed; reload.');
+  sf_production_task_event($task,$editor,$assignee,((int)$row['assigned_to']>0?'reassigned':'assigned'),
+    $row['status'],'assigned','Assigned to an active role-eligible crew member');
   sf_team_audit($editor,'production.task_assigned','story_production_task',(string)$task,
    'Production task assigned to active role-eligible contributor');
   $db->commit();
@@ -131,7 +137,7 @@ function sf_production_task_assign(int $editor,int $task,int $assignee):void{
 /** Submit an existing contributor-owned capture; never silently approve the media. */
 function sf_production_task_submit(int $actor,int $task,int $evidence,string $note):void{
  $row=sf_production_task_read($actor,$task);
- if((int)$row['assigned_to']!==$actor||$row['status']!=='assigned')
+ if((int)$row['assigned_to']!==$actor||!in_array($row['status'],['assigned','in_progress'],true))
   throw new RuntimeException('Only assigned contributor can submit.');
  $note=sf_capture_clean($note,750);
  if(strlen($note)<15)throw new InvalidArgumentException('Provide a 15-character production note.');
@@ -151,9 +157,10 @@ function sf_production_task_submit(int $actor,int $task,int $evidence,string $no
  $db->beginTransaction();
  try{
   $q=$db->prepare("UPDATE story_production_tasks SET status='submitted',evidence_id=?,
-   contributor_note=?,updated_at=? WHERE id=? AND status='assigned' AND assigned_to=?");
+   contributor_note=?,updated_at=? WHERE id=? AND status IN ('assigned','in_progress') AND assigned_to=?");
   $q->execute([$evidence,$note,gmdate('c'),$task,$actor]);
   if($q->rowCount()!==1)throw new RuntimeException('Task was modified; reload.');
+  sf_production_task_event($task,$actor,null,'submitted',$row['status'],'submitted',$note,$evidence);
   sf_team_audit($actor,'production.task_evidence_submitted','story_production_task',(string)$task,
    'Linked contributor evidence submitted for independent human review');
   $db->commit();
@@ -181,12 +188,15 @@ function sf_production_task_review(int $editor,int $task,string $decision,string
     throw new RuntimeException('AI Director proposal requires an independent editor decision.');
   }else throw new RuntimeException('Unsupported task kind.');
  }
+ sf_production_task_events_schema();
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested task review not allowed.');
  $db->beginTransaction();try{
   $q=$db->prepare("UPDATE story_production_tasks SET status=?,review_basis=?,reviewed_by=?,
  updated_at=? WHERE id=? AND status='submitted'");
   $q->execute([$decision,$basis,$editor,gmdate('c'),$task]);
   if($q->rowCount()!==1)throw new RuntimeException('Task already reviewed.');
+  sf_production_task_event($task,$editor,(int)$row['assigned_to'],$decision,'submitted',$decision,
+    $basis,(int)($row['evidence_id']??0)?:null);
   sf_team_audit($editor,'production.task_reviewed','story_production_task',(string)$task,
    'Human-verified production task '.$decision.' (does not imply publication clearance)');
   $db->commit();
