@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.131';
+  window.STONEFELLOW_APP_BUILD='1.3.132';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu');
@@ -676,6 +676,12 @@
       canvas.innerHTML='<section class="module"><h1>Creative Capture</h1><p role="alert">'+esc(e.message||'Unavailable')+'</p></section>';return;}
     const requests=Array.isArray(data.requests)?data.requests:[],
       my=Array.isArray(data.submissions)?data.submissions:[];
+    let assignedTasks=[];
+    try{
+      const response=await api('story-production-tasks.php');
+      assignedTasks=Array.isArray(response.tasks)?response.tasks:[];
+    }catch(e){/* Capture functionality stays usable during task-service outage. */}
+
     canvas.innerHTML='<article class="module capture-studio"><div class="module-kicker">ARTIST WORLD · CREATIVE STUDIO</div>'+
       '<h1>Capture the world around the music.</h1>'+
       '<p>Respond to a Director request or contribute your own background scene, photograph, ambient sound, dialogue or story idea. All submissions remain private until reviewed.</p>'+
@@ -698,12 +704,41 @@
       '<label>People and likeness release<select name="people_release_status"><option value="unconfirmed">Not yet cleared</option><option value="requires_review">May require releases</option><option value="not_applicable">No recognizable people</option></select></label>'+
       '<label class="capture-agreement"><input name="rights_attested" type="checkbox" required> I have the right to submit this material for private editorial review. Publication and use of likenesses require separate approval.</label>'+
       '<button class="buy-primary" type="submit">Submit for review</button><p role="status" id="creativeCaptureStatus"></p></form></section></div>'+
+      '<section class="capture-history"><h2>My assigned production tasks</h2>'+
+      '<p class="player-note">Tasks are private. Submit your own captured evidence or an editorial assessment. A separate human editor decides when work is complete; publication rights are independent.</p>'+
+      (assignedTasks.map(t=>{
+        const proofs=my.filter(x=>Number(x.request_id)===Number(t.source_id));
+        return '<div class="capture-request"><small>'+esc(t.status)+' · '+esc(t.target_role)+'</small>'+
+          '<h3>'+esc(t.title)+'</h3><p>'+esc(t.brief)+'</p>'+
+          (t.status==='assigned'?'<label>Evidence<select data-assigned-evidence="'+Number(t.id)+'">'+
+            (t.kind==='editorial'?'<option value="'+Number(t.source_id)+'">Review proposal #'+Number(t.source_id)+'</option>':
+              '<option value="">Select your capture for this exact request</option>'+
+              proofs.map(x=>'<option value="'+Number(x.id)+'">#'+Number(x.id)+' · '+esc(x.title)+' · '+esc(x.review_status)+'</option>').join(''))+
+            '</select></label><textarea data-assigned-note="'+Number(t.id)+'" rows="2" maxlength="750" '+
+            'placeholder="Describe your work and evidence for human review (15+ characters)"></textarea>'+
+            '<button type="button" data-assigned-submit="'+Number(t.id)+'">Submit completed work</button>':
+            '<p>Evidence #'+Number(t.evidence_id||0)+' · '+esc(t.status)+
+            (t.review_basis?' · '+esc(t.review_basis):'')+'</p>')+'</div>';
+      }).join('')||'<p>No private production tasks assigned to you.</p>')+
+      '<p role="status" id="assignedTaskStatus"></p></section>'+
       '<section class="capture-history"><h2>My contributions</h2>'+
       (my.map(r=>'<div><time>'+esc(r.created_at||'')+'</time><strong>'+esc(r.title||'')+'</strong><small>'+esc(r.review_status||'')+'</small></div>').join('')||'<p>Nothing submitted yet.</p>')+'</section>'+
       '<p class="player-note">AI suggestions and original uploads are evidence for an editorial review—not automatic permission to generate or publish a finished video.</p></article>';
     canvas.querySelectorAll('[data-capture-request]').forEach(b=>b.onclick=()=>{
       $('#creativeCaptureRequest',canvas).value=b.dataset.captureRequest;
       $('#creativeCaptureForm',canvas).scrollIntoView({behavior:'smooth',block:'center'});
+    });
+    canvas.querySelectorAll('[data-assigned-submit]').forEach(button=>button.onclick=async()=>{
+      const task=Number(button.dataset.assignedSubmit),evidence=Number(
+        canvas.querySelector('[data-assigned-evidence="'+task+'"]')?.value||0);
+      const note=canvas.querySelector('[data-assigned-note="'+task+'"]')?.value.trim()||'';
+      const status=canvas.querySelector('#assignedTaskStatus');
+      if(evidence<1||note.length<15){if(status)status.textContent='Select valid evidence and provide at least 15 characters of notes.';return;}
+      button.disabled=true;try{
+        await api('story-production-tasks.php',{action:'submit',task_id:task,evidence_id:evidence,note});
+        if(status)status.textContent='Evidence submitted privately for independent human review. Nothing was published.';
+        await renderCreativeCapture();
+      }catch(err){if(status)status.textContent=err.message||'Task submission unavailable.';button.disabled=false;}
     });
     const formCapture=$('#creativeCaptureForm',canvas),camera=$('#creativeCamera',canvas);
     camera.onchange=()=>{if(camera.files?.length)formCapture.querySelector('[name="file"]').value='';};

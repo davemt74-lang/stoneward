@@ -4,12 +4,12 @@ $root=dirname(__DIR__);
 $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $p)
- if(!str_contains($read($p),'1.3.131'))throw new RuntimeException('Release identity mismatch: '.$p);
-if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.64'")
+ if(!str_contains($read($p),'1.3.132'))throw new RuntimeException('Release identity mismatch: '.$p);
+if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.65'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-046'")
  ||!str_contains($read('api/migrations.php'),"'story_composer_proposals'"))
  throw new RuntimeException('Composer migration/integrity table missing.');
-if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.64'")
+if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.65'")
  ||!str_contains($read('version.php'),
  'supervised-metadata-only-llm-story-proposals-explicit-human-approval-revisioned-apply'))
  throw new RuntimeException('Composer public capability contract incorrect.');
