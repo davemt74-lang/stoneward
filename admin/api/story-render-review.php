@@ -15,12 +15,20 @@ require_once SF_ROOT.'/api/storyboard-preview-core.php';
 require_once SF_ROOT.'/api/story-render-source-core.php';
 require_once SF_ROOT.'/api/story-render-worker-core.php';
 require_once SF_ROOT.'/api/story-render-review-core.php';
+require_once SF_ROOT.'/api/story-render-mix-core.php';
+require_once SF_ROOT.'/api/story-render-transition-core.php';
+require_once SF_ROOT.'/api/story-render-edl-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $me=sf_admin_require_auth($method!=='GET');
 $editor=(int)$me['id'];
 if(!sf_team_can($editor,'team.assign_roles'))
  sf_json_response(['ok'=>false,'error'=>'forbidden'],403);
 try{
+ if($method==='GET'&&($_GET['action']??'')==='cues'){
+  header('Cache-Control: private, no-store, max-age=0, must-revalidate');
+  header('X-Content-Type-Options: nosniff');
+  sf_json_response(['ok'=>true,'review'=>sf_render_review_cues($editor,(int)($_GET['job_id']??0))]);
+ }
  if($method==='GET'&&($_GET['action']??'')==='stream'){
   $jobId=(int)($_GET['job_id']??0);
   $file=sf_render_review_file($editor,$jobId);
