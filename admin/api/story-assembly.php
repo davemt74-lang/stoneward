@@ -18,6 +18,7 @@ require_once SF_ROOT.'/api/story-render-worker-core.php';
 require_once SF_ROOT.'/api/story-render-mix-core.php';
 require_once SF_ROOT.'/api/story-render-transition-core.php';
 require_once SF_ROOT.'/api/story-render-edl-core.php';
+require_once SF_ROOT.'/api/story-render-cut-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $me=sf_admin_require_auth($method!=='GET');
 $id=(int)$me['id'];
@@ -48,6 +49,11 @@ try{
      (int)($p['revision']??0),(string)($p['style']??''),
      (int)($p['overlap_ms']??0));
    sf_json_response(['ok'=>true,'message'=>'Private audio/video crossfades recorded.']);
+ }
+ if($action==='configure_cuts'){
+   if(!is_array($p['cuts']??null))sf_json_response(['ok'=>false,'error'=>'invalid_cuts'],422);
+   sf_render_cut_set($id,(int)($p['assembly_id']??0),(int)($p['revision']??0),$p['cuts']);
+   sf_json_response(['ok'=>true,'message'=>'Individual revision-locked audio/video cuts recorded.']);
  }
  if($action==='configure_mix'){
    sf_render_mix_set($id,(int)($p['assembly_id']??0),(int)($p['revision']??0),
