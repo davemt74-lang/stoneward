@@ -676,11 +676,13 @@
       canvas.innerHTML='<section class="module"><h1>Creative Capture</h1><p role="alert">'+esc(e.message||'Unavailable')+'</p></section>';return;}
     const requests=Array.isArray(data.requests)?data.requests:[],
       my=Array.isArray(data.submissions)?data.submissions:[];
-    let assignedTasks=[],taskUpdates=[];
+    let assignedTasks=[],taskUpdates=[],scheduleBoard={tasks:[],counts:{}},myAvailability=[];
     try{
       const response=await api('story-production-tasks.php');
       assignedTasks=Array.isArray(response.tasks)?response.tasks:[];
       taskUpdates=Array.isArray(response.task_updates)?response.task_updates:[];
+      scheduleBoard=response.schedule_board||scheduleBoard;
+      myAvailability=Array.isArray(response.my_availability)?response.my_availability:[];
     }catch(e){/* Capture functionality stays usable during task-service outage. */}
 
     canvas.innerHTML='<article class="module capture-studio"><div class="module-kicker">ARTIST WORLD · CREATIVE STUDIO</div>'+
@@ -709,8 +711,12 @@
       '<p class="player-note">Tasks are private. Submit your own captured evidence or an editorial assessment. A separate human editor decides when work is complete; publication rights are independent.</p>'+
       (assignedTasks.map(t=>{
         const proofs=my.filter(x=>Number(x.request_id)===Number(t.source_id));
+        const calendar=(scheduleBoard.tasks||[]).find(x=>Number(x.task_id)===Number(t.id))||{};
         return '<div class="capture-request"><small>'+esc(t.status)+' · '+esc(t.target_role)+'</small>'+
           '<h3>'+esc(t.title)+'</h3><p>'+esc(t.brief)+'</p>'+
+          (calendar.due_at?'<p class="player-note">Due '+esc(calendar.due_at)+' · '+esc(calendar.priority)+
+            ' priority'+(calendar.flags?.length?' · '+esc(calendar.flags.join(', ')):'')+'</p>':'')+
+
           (['assigned','in_progress'].includes(t.status)?'<label>Evidence<select data-assigned-evidence="'+Number(t.id)+'">'+
             (t.kind==='editorial'?'<option value="'+Number(t.source_id)+'">Review proposal #'+Number(t.source_id)+'</option>':
               '<option value="">Select your capture for this exact request</option>'+
@@ -722,6 +728,14 @@
             '<p>Evidence #'+Number(t.evidence_id||0)+' · '+esc(t.status)+
             (t.review_basis?' · '+esc(t.review_basis):'')+'</p>')+'</div>';
       }).join('')||'<p>No private production tasks assigned to you.</p>')+
+      '<details><summary>My crew availability</summary><p class="player-note">Mark when you are available. The AI Director may suggest scheduling changes but cannot automatically assign you.</p>'+
+      '<form id="crewAvailabilityForm"><label>From<input name="start_date" type="date" required></label>'+
+      '<label>To<input name="end_date" type="date" required></label>'+
+      '<label>Status<select name="status"><option value="available">Available</option><option value="limited">Limited</option><option value="unavailable">Unavailable</option></select></label>'+
+      '<label>Notes<textarea name="note" rows="2" maxlength="500" required placeholder="Availability or production conflicts (10+ characters)"></textarea></label>'+
+      '<button type="submit">Save availability</button><p role="status" id="crewAvailabilityStatus"></p></form>'+
+      '<ul>'+myAvailability.map(x=>'<li>'+esc(x.start_date)+' – '+esc(x.end_date)+' · '+esc(x.status)+
+         ' · '+esc(x.note)+'</li>').join('')+'</ul></details>'+
       '<details><summary>My task activity ('+Number(taskUpdates.length)+')</summary>'+
       '<ol class="capture-task-activity">'+taskUpdates.map(e=>
         '<li>'+esc(e.created_at)+' · Task #'+Number(e.task_id)+' · '+
@@ -734,6 +748,17 @@
       $('#creativeCaptureRequest',canvas).value=b.dataset.captureRequest;
       $('#creativeCaptureForm',canvas).scrollIntoView({behavior:'smooth',block:'center'});
     });
+    const availabilityForm=canvas.querySelector('#crewAvailabilityForm');
+    if(availabilityForm)availabilityForm.onsubmit=async event=>{
+      event.preventDefault();
+      const values=Object.fromEntries(new FormData(availabilityForm).entries());
+      const status=canvas.querySelector('#crewAvailabilityStatus');
+      if(String(values.note||'').trim().length<10){if(status)status.textContent='Explain availability in at least 10 characters.';return;}
+      try{
+        await api('story-production-tasks.php',{action:'availability',...values});
+        await renderCreativeCapture();
+      }catch(err){if(status)status.textContent=err.message||'Availability update unavailable.';}
+    };
     canvas.querySelectorAll('[data-assigned-progress]').forEach(button=>button.onclick=async()=>{
       const task=Number(button.dataset.assignedProgress);
       const note=canvas.querySelector('[data-assigned-note="'+task+'"]')?.value.trim()||'';
