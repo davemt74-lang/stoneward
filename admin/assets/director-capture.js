@@ -7,6 +7,9 @@
     let data;
     try{data=await ctx.api('story-capture.php');}
     catch(e){host.insertAdjacentHTML('beforeend','<section class="panel"><h2>Creative Director</h2><p role="alert">'+esc(e.message||'Capture unavailable')+'</p></section>');return;}
+    let taskData={tasks:[],coverage:{gaps:[]},composer_queue:[],roster:[]};
+    try{taskData=await ctx.api('story-production-tasks.php');}
+    catch(e){/* Preserve existing shot review when optional task ledger is unavailable. */}
     const types=[['photo','Photo'],['video','Video'],['audio','Audio'],['ambient','Ambient sound'],['dialogue','Dialogue'],['story_idea','Story beat'],['screenshot','Suggested screenshot']];
     const roles=data.role_types||{};
     const queue=Array.isArray(data.review_queue)?data.review_queue:[],
@@ -23,7 +26,40 @@
       '<label>Origin<select name="suggestion_origin"><option value="human">Director / human</option><option value="ai_suggestion">AI suggestion pending review</option></select></label>'+
       '<label><input name="publish" type="checkbox"> Open for contributors now (human-created requests only)</label>'+
       '<button type="submit" class="primary">Add capture request</button></form>'+
-      '<p id="directorStatus" role="status"></p><h3>Existing shot list</h3>'+
+      '<p id="directorStatus" role="status"></p>'+
+      '<details class="director-task-panel" open><summary>Production tasks · crew and editor review</summary>'+
+      '<p class="hint">Create proposals from verified Director coverage gaps or real pending AI editorial proposals. A human editor assigns and opens any linked shot request separately. No automatic publishing.</p>'+
+      '<div class="director-task-actions">'+
+      (taskData.coverage?.gaps||[]).map(g=>
+        '<button type="button" data-task-gap="'+esc(g.code)+'">Propose '+esc(g.title)+' · '+Number(g.approved_assets)+'/'+Number(g.recommended_minimum)+'</button>').join('')+
+      (taskData.composer_queue||[]).map(g=>
+        '<button type="button" data-task-editorial="'+Number(g.id)+'">Propose AI editorial review #'+Number(g.id)+'</button>').join('')+
+      '</div><div class="director-list">'+
+      (taskData.tasks||[]).map(t=>{
+        const eligible=(taskData.roster||[]).filter(u=>t.target_role==='all'||(u.team_roles||[]).includes(t.target_role));
+        return '<div class="director-row"><div><small>Task #'+Number(t.id)+' · '+esc(t.kind)+
+          ' · '+esc(t.status)+' · '+esc(t.target_role)+'</small><strong>'+esc(t.title)+'</strong>'+
+          '<p>'+esc(t.brief)+'</p>'+
+          (t.kind==='shot'?'<p class="hint">Linked shot request #'+Number(t.source_id)+
+            ' must be explicitly opened by a human before capture submission.</p>':'')+
+          (t.evidence_id?'<p class="hint">Private evidence #'+Number(t.evidence_id)+
+            ' · '+esc(t.contributor_note||'')+'</p>':'')+
+          (t.reviewed_by?'<p class="hint">Human reviewer #'+Number(t.reviewed_by)+
+            ': '+esc(t.review_basis||'')+'</p>':'')+
+          '</div>'+
+          (['proposed','assigned'].includes(t.status)?'<div class="director-task-controls"><select data-task-assignee="'+Number(t.id)+'">'+
+            '<option value="">Choose eligible team member</option>'+
+            eligible.map(u=>'<option value="'+Number(u.id)+'" '+(Number(t.assigned_to)===Number(u.id)?'selected':'')+'>'+
+              esc(u.display_name||('User #'+u.id))+'</option>').join('')+'</select>'+
+            '<button type="button" data-task-assign="'+Number(t.id)+'">Assign</button></div>':'')+
+          (t.status==='submitted'?'<div class="director-task-controls">'+
+            '<textarea data-task-basis="'+Number(t.id)+'" maxlength="900" rows="2" placeholder="Independent verification and review basis (25+ characters)"></textarea>'+
+            '<button type="button" data-task-review="'+Number(t.id)+'" data-decision="approved">Approve completion</button>'+
+            '<button type="button" data-task-review="'+Number(t.id)+'" data-decision="rejected">Reject</button></div>':'')+
+          '</div>';
+      }).join('')||'<p>No production tasks assigned yet. Use a Director coverage recommendation to propose one.</p>')+
+      '</div><p role="status" id="directorTaskStatus"></p></details><h3>Existing shot list</h3>'+
+
       '<div class="director-list">'+requests.map(r=>
         '<div class="director-row"><div><small>'+esc(r.review_status)+' · '+esc(r.shot_type)+' · '+esc(r.target_role)+'</small>'+
         '<strong>'+esc(r.title||'')+'</strong><p>'+esc(r.brief||'')+'</p></div>'+
@@ -40,6 +76,33 @@
           '<button type="button" data-capture-review="'+Number(r.id)+'" data-decision="rejected">Reject</button></div>':'')+'</div>').join('')||'<p>No contributions yet.</p>')+
       '</div><p><small>Approval for editing does not publish, license, synthesize a likeness, or release any finished production.</small></p>';
     host.append(section);
+    const taskStatus=section.querySelector('#directorTaskStatus');
+    async function taskPost(payload){
+      try{
+        await ctx.api('story-production-tasks.php',payload);
+        section.remove();await render(host);
+      }catch(e){if(taskStatus)taskStatus.textContent=e.message||'Task update rejected.';}
+    }
+    section.querySelectorAll('[data-task-gap]').forEach(b=>b.onclick=()=>{
+      if(window.confirm('Create one private Director task proposal? No request will be published.'))
+        void taskPost({action:'propose_gap',code:b.dataset.taskGap});
+    });
+    section.querySelectorAll('[data-task-editorial]').forEach(b=>b.onclick=()=>{
+      if(window.confirm('Create private human review task for this actual AI proposal?'))
+        void taskPost({action:'propose_editorial',proposal_id:Number(b.dataset.taskEditorial)});
+    });
+    section.querySelectorAll('[data-task-assign]').forEach(b=>b.onclick=()=>{
+      const user=Number(section.querySelector('[data-task-assignee="'+b.dataset.taskAssign+'"]')?.value);
+      if(user>0&&window.confirm('Assign this private task to the selected role-eligible person?'))
+        void taskPost({action:'assign',task_id:Number(b.dataset.taskAssign),assignee_id:user});
+    });
+    section.querySelectorAll('[data-task-review]').forEach(b=>b.onclick=()=>{
+      const basis=section.querySelector('[data-task-basis="'+b.dataset.taskReview+'"]')?.value.trim()||'';
+      if(basis.length<25){if(taskStatus)taskStatus.textContent='Record at least 25 characters of independent review evidence.';return;}
+      if(window.confirm('Record '+b.dataset.decision+' for this completed task? This is not publication clearance.'))
+        void taskPost({action:'review',task_id:Number(b.dataset.taskReview),
+          decision:b.dataset.decision,basis});
+    });
     const status=section.querySelector('#directorStatus');
     const post=async body=>{
       try{await ctx.api('story-capture.php',body);status.textContent='Change recorded in the production audit timeline.';section.remove();await render(host);}
