@@ -60,6 +60,8 @@ function sf_render_transition_set(int $editor,int $assembly,int $revision,string
  sf_assembly_editor($editor);sf_render_transition_schema();
  $plan=sf_render_plan($editor,$assembly,$revision);
  sf_render_transition_validate($plan,$style,$overlap);
+ // Ensure new MySQL table before starting a transaction (DDL commits implicitly).
+ if(function_exists('sf_render_cut_schema'))sf_render_cut_schema();
  if(function_exists('sf_team_ensure_schema'))sf_team_ensure_schema();
  $db=sf_db();if($db->inTransaction())throw new RuntimeException('Nested transition transaction forbidden.');
  $db->beginTransaction();
