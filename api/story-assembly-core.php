@@ -223,7 +223,7 @@ function sf_assembly_director_plan(int $editor,array $items):array{
    'recommendation_origin'=>'deterministic_rules','automatic_changes'=>false,'ready_to_render'=>false];
 }
 /** All-or-nothing optimistic revision update with a unique ordered sequence. */
-function sf_assembly_replace(int $editor,int $assemblyId,int $revision,array $items):array{
+function sf_assembly_replace(int $editor,int $assemblyId,int $revision,array $items,?callable $onApplied=null):array{
  sf_assembly_editor($editor);sf_assembly_schema();
  if($assemblyId<1||$revision<1||count($items)>50)
   throw new InvalidArgumentException('Invalid assembly revision or more than 50 timeline items.');
@@ -259,6 +259,7 @@ function sf_assembly_replace(int $editor,int $assemblyId,int $revision,array $it
   foreach($prepared as $v)$q->execute([$assemblyId,$v['ordinal'],$v['kind'],$v['source_id'],
     $v['source_submission_id'],$v['in_ms'],$v['out_ms'],$v['duration_ms'],$v['notes'],gmdate('c')]);
   if(function_exists('sf_assembly_history_archive'))sf_assembly_history_archive($editor,$assemblyId,$revision+1,$prepared);
+  if($onApplied!==null)$onApplied($revision+1);
   sf_team_audit($editor,'capture.assembly_revised','story_assembly',(string)$assemblyId,
     'Revised private editorial timeline from revision '.$revision.' to '.($revision+1));
   $db->commit();return ['assembly_id'=>$assemblyId,'revision'=>$revision+1,'item_count'=>count($prepared),'duration_ms'=>$sum];
