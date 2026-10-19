@@ -13,10 +13,10 @@ $user=sf_admin_require_auth($method!=='GET');$editor=(int)$user['id'];
 if(!sf_team_can($editor,'team.assign_roles'))
  sf_json_response(['ok'=>false,'error'=>'forbidden'],403);
 try{
- if($method==='GET')sf_json_response(['ok'=>true,'tasks'=>sf_production_task_list($editor),
+ if($method==='GET'){sf_composer_schema();sf_json_response(['ok'=>true,'tasks'=>sf_production_task_list($editor),
    'coverage'=>sf_director_coverage($editor),'roster'=>sf_team_roster($editor),
    'composer_queue'=>sf_db()->query("SELECT id,assembly_id,revision,status
-     FROM story_composer_proposals WHERE status='pending_review' ORDER BY id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC)]);
+     FROM story_composer_proposals WHERE status='pending_review' ORDER BY id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC)]);}
  if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
  $p=sf_request_json();$action=(string)($p['action']??'');
  if($action==='propose_gap')sf_json_response(['ok'=>true,'task'=>sf_production_task_propose_gap($editor,(string)($p['code']??''))]);
