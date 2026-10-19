@@ -10,9 +10,9 @@ function sf_story_agent_brain_summary(int $editor):array{
  $recent=[];$needs=0;
  foreach($rows as $a){
   $id=(int)$a['id'];$revision=(int)$a['revision'];
+  sf_composer_schema();
   $q=sf_db()->prepare("SELECT status,COUNT(*) AS total FROM story_composer_proposals
-    WHERE assembly_id=? GROUP BY status");
-  sf_composer_schema();$q->execute([$id]);$composer=[];
+    WHERE assembly_id=? GROUP BY status");$q->execute([$id]);$composer=[];
   foreach($q->fetchAll(PDO::FETCH_ASSOC) as $p)$composer[(string)$p['status']]=(int)$p['total'];
   sf_assembly_restore_schema();
   $q=sf_db()->prepare("SELECT status,COUNT(*) AS total FROM story_assembly_restore_proposals
