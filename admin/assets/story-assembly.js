@@ -144,11 +144,17 @@
           return '<article class="assembly-proposal"><strong>Proposal #'+Number(p.id)+' · revision '+Number(p.revision)+' · '+esc(p.status)+'</strong>'+
            (p.provider?'<p class="hint">Provider: '+esc(p.provider)+' / '+esc(p.model)+'</p>':'')+
            (q.logline?'<p>'+esc(q.logline)+'</p><p class="hint">Proposed positions: '+esc(order)+'</p>'+
-           '<ol>'+((q.beats||[]).map(b=>'<li>'+esc(b.reason)+' · '+esc(b.transition)+'</li>').join(''))+'</ol>'+
+           '<ol>'+((q.beats||[]).map(b=>'<li>'+esc(b.reason)+' · '+esc(b.transition)+(Number(b.trim_start_ms||0)+Number(b.trim_end_ms||0)>0?' · trim IN +'+Number(b.trim_start_ms||0)+' / OUT −'+Number(b.trim_end_ms||0)+' ms':'')+'</li>').join(''))+'</ol>'+
            ((q.missing_shots||[]).length?'<p class="hint">Missing shots: '+esc(q.missing_shots.join('; '))+'</p>':''):'')+
            (p.status==='pending_review'?'<button type="button" data-composer-review="approved" data-proposal-id="'+Number(p.id)+'">Approve proposal</button>'+
              '<button type="button" class="secondary" data-composer-review="rejected" data-proposal-id="'+Number(p.id)+'">Reject</button>':'')+
            (p.status==='approved'?'<button type="button" class="primary" data-composer-apply="'+Number(p.id)+'" '+(Number(p.revision)!==Number(project.revision)||dirty?'disabled':'')+'>Apply approved ordering</button>':'')+
+          ((['approved','applied'].includes(p.status)&&
+             (p.status==='applied'?Number(p.applied_revision)===Number(project.revision):
+                Number(p.revision)===Number(project.revision)&&
+                (q.order||[]).every((v,i)=>Number(v)===i))&&
+              (q.beats||[]).some(x=>Number(x.trim_start_ms||0)+Number(x.trim_end_ms||0)>0))?
+            '<button type="button" class="secondary" data-composer-refine="'+Number(p.id)+'" '+(dirty?'disabled':'')+'>Stage AI trim ideas</button>':'')+
           '</article>';
         }).join(''):'<p class="hint">No AI composition proposals for this assembly.</p>')+
        '</div>':'')+
