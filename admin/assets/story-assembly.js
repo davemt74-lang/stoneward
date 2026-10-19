@@ -162,6 +162,21 @@
        [250,500].map(n=>'<option value="'+n+'" '+((renderTransition?.overlap_ms??250)===n?'selected':'')+'>'+n+' ms</option>').join('')+'</select></label>'+
        '<button type="button" class="secondary" id="transitionSave" '+(dirty||renderJobs.some(j=>Number(j.revision)===Number(project.revision))?'disabled':'')+'>Save crossfades for this revision</button>'+
        (renderTransition?'<p class="hint">Current revision: '+esc(renderTransition.style)+' · '+Number(renderTransition.overlap_ms)+' ms between each clip</p>':'<p class="hint">No crossfade preset: current hard cuts remain unchanged.</p>')+
+       (renderTransition&&items.length>=2&&items.length<=6?
+         '<div class="assembly-per-cut"><strong>G4E · edit each video/audio transition</strong>'+
+         '<p class="hint">Individual cut styles and overlaps. Only saved revisions; locked after a render is queued. The existing global settings remain the fallback.</p>'+
+         items.slice(1).map((item,i)=>{
+           const cut=renderTransition.cuts?.[i]||renderTransition;
+           return '<div class="assembly-cut-row" data-cut-ordinal="'+(i+1)+'"><span>Cut '+(i+1)+' → '+(i+2)+'</span>'+
+             '<label>Effect<select data-cut-style="'+i+'">'+
+             ['fade','wipeleft'].map(v=>'<option value="'+v+'" '+(cut.style===v?'selected':'')+'>'+esc(v==='fade'?'Dissolve':'Wipe left')+'</option>').join('')+
+             '</select></label><label>Overlap<select data-cut-overlap="'+i+'">'+
+             [250,500].map(n=>'<option value="'+n+'" '+(Number(cut.overlap_ms)===n?'selected':'')+'>'+n+' ms</option>').join('')+
+             '</select></label></div>';
+         }).join('')+
+         '<button type="button" id="cutSave" class="secondary" '+(dirty||renderJobs.some(j=>Number(j.revision)===Number(project.revision))?'disabled':'')+'>Save individually approved cuts</button>'+
+         '</div>':'')+
+
        '</fieldset>'+
       '<div class="actions"><button type="button" class="secondary" id="renderToggle">'+(renderEnabled?'Disable private renderer':'Enable private renderer')+'</button>'+
       '<button type="button" class="primary" id="renderQueue" '+(!renderEnabled||!renderCert?.eligible||dirty?'disabled':'')+'>Queue private render</button></div>'+
@@ -392,6 +407,24 @@
        overlap_ms:Number(host.querySelector('#transitionOverlap').value)});
      await load();note('Revision-scoped audio and video crossfades saved.');
     }catch(e){note(e.message,true);}finally{busy=false;}
+  };
+  const cutSave=host.querySelector('#cutSave');
+  if(cutSave)cutSave.onclick=async()=>{
+   if(busy||dirty||!renderTransition)return;
+   const count=Math.max(0,(view.items||[]).length-1),cuts=[];
+   for(let i=0;i<count;i++){
+    const style=host.querySelector('[data-cut-style="'+i+'"]')?.value;
+    const overlap=Number(host.querySelector('[data-cut-overlap="'+i+'"]')?.value);
+    if(!['fade','wipeleft'].includes(style)||![250,500].includes(overlap)){
+     note('Use only approved transition effects and overlaps.',true);return;
+    }
+    cuts.push({style,overlap_ms:overlap});
+   }
+   if(!window.confirm('Save these individual video and audio cuts for this exact private revision? Existing queued jobs cannot be changed.'))return;
+   busy=true;try{
+    await c.api('story-assembly.php',{action:'configure_cuts',assembly_id:Number(view.id),revision:Number(view.revision),cuts});
+    await load();note('Per-cut visual and audio overlaps saved for the certified revision.');
+   }catch(e){note('Cut preset was not saved: '+(e.message||'verification failed'),true);}finally{busy=false;}
   };
   const renderQueue=host.querySelector('#renderQueue');
   if(renderQueue)renderQueue.onclick=async()=>{
