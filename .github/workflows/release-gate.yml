@@ -386,6 +386,12 @@ jobs:
           node --check admin/assets/story-assembly.js
           php tests/section88d3g4a-music-mix.php
           php tests/section88d3g4a-release.php
+          php -l api/story-render-transition-core.php
+          php -l api/story-render-worker-core.php
+          php -l admin/api/story-assembly.php
+          node --check admin/assets/story-assembly.js
+          php tests/section88d3g4b-crossfade.php
+          php tests/section88d3g4b-release.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php

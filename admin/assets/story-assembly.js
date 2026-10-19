@@ -2,7 +2,7 @@
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const ms=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
- let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,composerEnabled=false,busy=false,dirty=false;
+ let chosen=0,view=null,all=[],candidates=[],proposals=[],storyboard=null,renderCert=null,renderEnabled=false,renderJobs=[],audioMasters=[],renderMix=null,renderTransition=null,composerEnabled=false,busy=false,dirty=false;
  let previewMs=0,previewTimer=null;
  const key=r=>String(r.kind)+':'+String(r.source_id);
  const humanTime=n=>{const s=Math.floor(Math.max(0,n)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -138,6 +138,15 @@
         [250,500,1000].map(n=>'<option value="'+n+'" '+((renderMix?.fade_ms??500)===n?'selected':'')+'>'+n+' ms</option>').join('')+'</select></label>'+
        '<button type="button" class="secondary" id="mixSave" '+(dirty||renderJobs.some(j=>Number(j.revision)===Number(project.revision))?'disabled':'')+'>Save music mix for this revision</button>'+
        (renderMix?'<p class="hint">Current revision preset: '+esc(renderMix.track_id)+' · '+Number(renderMix.gain_pct)+'% music · '+Number(renderMix.duck_pct)+'% dialogue duck · '+Number(renderMix.fade_ms)+'ms fades</p>':'<p class="hint">No music overlay preset. Existing hard-cut output remains the default.</p>')+
+       '</fieldset>'+
+      '<fieldset class="assembly-transition"><legend>Video & audio crossfades</legend>'+
+       '<p class="hint">Optional short-clip pilot (2–6 shots, 30 seconds maximum). Applies real overlapping video transitions and matched audio crossfades; output duration is shortened by each overlap. Saved settings lock after a render is queued.</p>'+
+       '<label>Visual transition<select id="transitionStyle">'+
+       ['fade','wipeleft'].map(v=>'<option value="'+v+'" '+((renderTransition?.style??'fade')===v?'selected':'')+'>'+esc(v==='fade'?'Dissolve':'Wipe left')+'</option>').join('')+'</select></label>'+
+       '<label>Overlap duration<select id="transitionOverlap">'+
+       [250,500].map(n=>'<option value="'+n+'" '+((renderTransition?.overlap_ms??250)===n?'selected':'')+'>'+n+' ms</option>').join('')+'</select></label>'+
+       '<button type="button" class="secondary" id="transitionSave" '+(dirty||renderJobs.some(j=>Number(j.revision)===Number(project.revision))?'disabled':'')+'>Save crossfades for this revision</button>'+
+       (renderTransition?'<p class="hint">Current revision: '+esc(renderTransition.style)+' · '+Number(renderTransition.overlap_ms)+' ms between each clip</p>':'<p class="hint">No crossfade preset: current hard cuts remain unchanged.</p>')+
        '</fieldset>'+
       '<div class="actions"><button type="button" class="secondary" id="renderToggle">'+(renderEnabled?'Disable private renderer':'Enable private renderer')+'</button>'+
       '<button type="button" class="primary" id="renderQueue" '+(!renderEnabled||!renderCert?.eligible||dirty?'disabled':'')+'>Queue private render</button></div>'+
@@ -303,6 +312,18 @@
     await load();note('Licensed music bed preset saved. Queue a new private render to apply it.');
    }catch(e){note(e.message,true);}finally{busy=false;}
   };
+  const transitionSave=host.querySelector('#transitionSave');
+  if(transitionSave)transitionSave.onclick=async()=>{
+    if(busy||dirty)return;
+    if(!window.confirm('Configure the next supervised private render to use real video and audio crossfades? Any existing music bed is kept, with corrected timing.'))return;
+    busy=true;try{
+     await c.api('story-assembly.php',{action:'configure_transition',
+       assembly_id:Number(view.id),revision:Number(view.revision),
+       style:host.querySelector('#transitionStyle').value,
+       overlap_ms:Number(host.querySelector('#transitionOverlap').value)});
+     await load();note('Revision-scoped audio and video crossfades saved.');
+    }catch(e){note(e.message,true);}finally{busy=false;}
+  };
   const renderQueue=host.querySelector('#renderQueue');
   if(renderQueue)renderQueue.onclick=async()=>{
     if(busy||dirty||!renderCert?.eligible)return;
@@ -367,7 +388,7 @@
    storyboard=r.storyboard||null;renderCert=r.render_certification||null;
    renderEnabled=Boolean(r.render_enabled);renderJobs=Array.isArray(r.render_jobs)?r.render_jobs:[];
    audioMasters=Array.isArray(r.render_audio_candidates)?r.render_audio_candidates:[];
-   renderMix=r.render_mix||null;previewMs=0;
+   renderMix=r.render_mix||null;renderTransition=r.render_transition||null;previewMs=0;
    if(chosen&&!r.assembly){chosen=0;dirty=false;}
    view=r.assembly||null;if(view&&!Array.isArray(view.items))view.items=[];
    draw();
