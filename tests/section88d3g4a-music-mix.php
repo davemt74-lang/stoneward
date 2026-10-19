@@ -19,16 +19,16 @@ $failAudit=false;$rights=true;
 function sf_team_audit(int $editor,string $action,string $kind,string $id,string $details):void{
  global $failAudit;if($failAudit)throw new RuntimeException('Audit unavailable.');
 }
-function sf_render_plan(int $editor,int $assembly,int $revision):array{
+function sf_render_source_manifest(int $editor,int $assembly,int $revision):array{
  global $rights,$root;
  sf_assembly_editor($editor);
  if($assembly!==10||$revision!==4||!$rights)throw new RuntimeException('Certification invalid.');
  return ['assembly_id'=>10,'revision'=>4,'total_ms'=>3000,
   'items'=>[
    ['kind'=>'track','source_id'=>'catalog-song-1','category'=>'audio',
-    'path'=>$root.'/work/bed.wav','duration_ms'=>1000,'start_ms'=>0],
+    'path'=>$root.'/work/bed.wav','mime'=>'audio/x-wav','source_duration_ms'=>4000,'duration_ms'=>1000,'start_ms'=>0],
    ['kind'=>'transcript','source_id'=>'7','category'=>'audio',
-    'path'=>$root.'/work/voice.wav','duration_ms'=>2000,'start_ms'=>1000]
+    'path'=>$root.'/work/voice.wav','mime'=>'audio/x-wav','source_duration_ms'=>4000,'duration_ms'=>2000,'start_ms'=>1000]
   ]];
 }
 require dirname(__DIR__).'/api/story-render-worker-core.php';
