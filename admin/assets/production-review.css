@@ -33,3 +33,9 @@
 .director-task-activity time{font-variant-numeric:tabular-nums;opacity:.7}
 .director-task-controls .hint{line-height:1.45}
 .director-task-panel details summary{cursor:pointer}
+
+/* G4L human-scheduled production, understated urgency and accessible date controls */
+.director-task-controls label{display:grid;gap:4px;font-size:.84rem}
+.director-task-controls input[type="datetime-local"]{width:100%;max-width:100%;min-height:36px}
+.director-task-panel .hint{line-height:1.48}
+.director-task-panel [data-task-schedule]{justify-self:start}
