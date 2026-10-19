@@ -21,7 +21,7 @@ if(!str_contains($bridge,'function sf_story_agent_brain_summary(')
  ||!str_contains($agent,'sf_story_agent_brain_summary(')
  ||!str_contains($agent,'sf_story_agent_brain_brief(')
  ||!str_contains($ui,'brainProductionOpen')
- ||!str_contains($ui,"data-admin-agent-action=\"production-review\""))
+ ||!str_contains($ui,'data-agent-show-calendar'))
  throw new RuntimeException('G4I editorial brain, policy boundary or reviewer navigation missing.');
 if(str_contains($bridge,'sf_render_enqueue(')||str_contains($bridge,'sf_assembly_replace(')
  ||str_contains($bridge,'sf_composer_apply(')||str_contains($bridge,'sf_assembly_restore_apply('))
