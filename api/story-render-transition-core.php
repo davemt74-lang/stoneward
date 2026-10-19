@@ -23,14 +23,38 @@ function sf_render_transition_schema():void{
  }
  $ready=true;
 }
-function sf_render_transition_validate(array $plan,string $style,int $overlap):void{
- if(!in_array($style,['fade','wipeleft'],true)||!in_array($overlap,[250,500],true))
-  throw new InvalidArgumentException('Only approved visual transitions and overlaps supported.');
- if(count($plan['items'])<2||count($plan['items'])>6||(int)$plan['total_ms']>30000)
-  throw new RuntimeException('Crossfade pilot is limited to 2–6 clips and 30 seconds.');
- foreach($plan['items'] as $item)
-  if((int)$item['duration_ms']<$overlap*2+500)
-   throw new RuntimeException('Each shot must be long enough for stable video and audio overlaps.');
+/** Canonical per-cut plan used by FFmpeg, the EDL and licensed dialogue ducking. */
+function sf_render_transition_cuts(array $plan,array $settings):array{
+ $items=$plan['items']??[];$count=count($items);
+ if($count<2||$count>6||(int)($plan['total_ms']??0)>30000)
+  throw new RuntimeException('Crossfade pilot accepts 2–6 clips and 30 seconds.');
+ $baseStyle=$settings['style']??null;$baseOverlap=$settings['overlap_ms']??null;
+ if(!in_array($baseStyle,['fade','wipeleft'],true)
+   ||!in_array($baseOverlap,[250,500],true))
+  throw new InvalidArgumentException('Only approved global transition presets are supported.');
+ $cuts=$settings['cuts']??array_fill(0,$count-1,
+  ['style'=>$baseStyle,'overlap_ms'=>$baseOverlap]);
+ if(!is_array($cuts)||!array_is_list($cuts)||count($cuts)!==$count-1)
+  throw new InvalidArgumentException('Per-cut plan must contain exactly one entry per boundary.');
+ $out=[];
+ foreach($cuts as $cut){
+  if(!is_array($cut)||array_keys($cut)!==['style','overlap_ms']
+    ||!in_array($cut['style'],['fade','wipeleft'],true)
+    ||!in_array($cut['overlap_ms'],[250,500],true))
+   throw new InvalidArgumentException('Unsafe per-cut visual or audio overlap.');
+  $out[]=['style'=>$cut['style'],'overlap_ms'=>$cut['overlap_ms']];
+ }
+ foreach($items as $i=>$item){
+  $before=$i===0?0:$out[$i-1]['overlap_ms'];
+  $after=$i===$count-1?0:$out[$i]['overlap_ms'];
+  if((int)$item['duration_ms']<$before+$after+500)
+   throw new RuntimeException('A shot is too short for adjacent audio and video handles.');
+ }
+ return $out;
+}
+function sf_render_transition_validate(array $plan,string $style,int $overlap,array $settings=[]):void{
+ $settings=['style'=>$style,'overlap_ms'=>$overlap]+$settings;
+ sf_render_transition_cuts($plan,$settings);
 }
 function sf_render_transition_set(int $editor,int $assembly,int $revision,string $style,int $overlap):void{
  sf_assembly_editor($editor);sf_render_transition_schema();
@@ -58,6 +82,7 @@ function sf_render_transition_set(int $editor,int $assembly,int $revision,string
     WHERE assembly_id=?');
    $q->execute([$revision,$style,$overlap,$editor,gmdate('c'),$assembly]);
   }
+  if(function_exists('sf_render_cut_clear'))sf_render_cut_clear($assembly);
   sf_team_audit($editor,'capture.render_transition_reviewed','story_assembly',(string)$assembly,
     'Private visual and audio crossfade preset scoped to immutable render revision');
   $db->commit();
@@ -68,26 +93,32 @@ function sf_render_transition_settings(int $editor,int $assembly,int $revision):
  $q=sf_db()->prepare('SELECT revision,style,overlap_ms FROM story_render_transitions WHERE assembly_id=?');
  $q->execute([$assembly]);$v=$q->fetch(PDO::FETCH_ASSOC);
  if(!$v||(int)$v['revision']!==$revision)return null;
- return ['style'=>(string)$v['style'],'overlap_ms'=>(int)$v['overlap_ms']];
+ $settings=['style'=>(string)$v['style'],'overlap_ms'=>(int)$v['overlap_ms']];
+ if(function_exists('sf_render_cut_settings')){
+  $cuts=sf_render_cut_settings($editor,$assembly,$revision);
+  if($cuts!==null)$settings['cuts']=$cuts;
+ }
+ return $settings;
 }
 /** For a subsequent music bed, correct start/duck times for overlapping clips. */
 function sf_render_transition_effective_manifest(array $plan,array $settings):array{
- sf_render_transition_validate($plan,$settings['style'],$settings['overlap_ms']);
- $effective=$plan;$count=count($plan['items']);$overlap=$settings['overlap_ms'];
- $effective['total_ms']=$plan['total_ms']-($count-1)*$overlap;
+ $cuts=sf_render_transition_cuts($plan,$settings);
+ $effective=$plan;$shorten=array_sum(array_column($cuts,'overlap_ms'));
+ $effective['total_ms']=(int)$plan['total_ms']-$shorten;
  if(function_exists('sf_render_edl_build')){
   $edl=sf_render_edl_build($plan,$settings);
   $effective['edl_duck_windows']=$edl['dialogue_duck_windows'];
-  if($edl['output_total_ms']!==$effective['total_ms'])throw new RuntimeException('Crossfade EDL duration mismatch.');
+  if($edl['output_total_ms']!==$effective['total_ms'])
+   throw new RuntimeException('Crossfade EDL duration mismatch.');
  }
  foreach($effective['items'] as $i=>&$item)
-  if($i>0)$item['duration_ms']-=$overlap;
+  if($i>0)$item['duration_ms']-=$cuts[$i-1]['overlap_ms'];
  unset($item);
  return $effective;
 }
 /** Only generated private segment names can enter the FFmpeg plan. */
 function sf_render_transition_args(array $segments,array $plan,array $setting,string $out):array {
- sf_render_transition_validate($plan,$setting['style'],$setting['overlap_ms']);
+ $cuts=sf_render_transition_cuts($plan,$setting);
  if(count($segments)!==count($plan['items']))
   throw new InvalidArgumentException('Segment count does not match certified timeline.');
  if(!preg_match('~/draft\.mp4$~',$out))
@@ -104,14 +135,14 @@ function sf_render_transition_args(array $segments,array $plan,array $setting,st
   $filters[]='['.$i.':a]aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[a'.$i.']';
  }
  $v='v0';$a='a0';$durationMs=(int)$plan['items'][0]['duration_ms'];
- $time=sprintf('%.3f',$setting['overlap_ms']/1000);
  for($i=1;$i<count($segments);$i++){
-  $offset=sprintf('%.3f',($durationMs-$setting['overlap_ms'])/1000);
+  $cut=$cuts[$i-1];$time=sprintf('%.3f',$cut['overlap_ms']/1000);
+  $offset=sprintf('%.3f',($durationMs-$cut['overlap_ms'])/1000);
   $nv='vx'.$i;$na='ax'.$i;
-  $filters[]='['.$v.'][v'.$i.']xfade=transition='.$setting['style'].':duration='.$time.':offset='.$offset.'['.$nv.']';
+  $filters[]='['.$v.'][v'.$i.']xfade=transition='.$cut['style'].':duration='.$time.':offset='.$offset.'['.$nv.']';
   $filters[]='['.$a.'][a'.$i.']acrossfade=d='.$time.':c1=tri:c2=tri['.$na.']';
   $v=$nv;$a=$na;
-  $durationMs+=(int)$plan['items'][$i]['duration_ms']-$setting['overlap_ms'];
+  $durationMs+=(int)$plan['items'][$i]['duration_ms']-$cut['overlap_ms'];
  }
  $filters[]='['.$v.']format=yuv420p[video]';
  array_push($args,'-filter_complex',implode(';',$filters),
