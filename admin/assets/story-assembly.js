@@ -507,6 +507,38 @@
      await load();note('Approved ordering applied to a new private timeline revision.');}
    catch(e){note(e.message,true);}finally{busy=false;}
   });
+  host.querySelectorAll('[data-composer-refine]').forEach(button=>button.onclick=()=>{
+    if(busy||dirty)return;
+    const proposal=proposals.find(p=>Number(p.id)===Number(button.dataset.composerRefine));
+    const q=proposal?.suggestion,beats=q?.beats,order=q?.order;
+    const eligible=proposal&&(proposal.status==='applied'?
+      Number(proposal.applied_revision)===Number(view.revision):
+      proposal.status==='approved'&&Number(proposal.revision)===Number(view.revision)&&
+        Array.isArray(order)&&order.length===view.items.length&&order.every((v,i)=>Number(v)===i));
+    if(!eligible||!Array.isArray(beats)||beats.length!==view.items.length){
+      note('Approved AI refinement no longer matches this saved revision.',true);return;
+    }
+    const next=JSON.parse(editSnapshot());let applied=0;
+    for(let i=0;i<next.length;i++){
+      const item=next[i],beat=beats[i],source=sourceFor(item);
+      const start=Number(beat?.trim_start_ms??0),end=Number(beat?.trim_end_ms??0);
+      if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||
+         start<0||end<0||start>500||end>500||start%100!==0||end%100!==0||
+         start+end>Math.max(0,Number(item.duration_ms)-500)){
+        note('AI trim is outside safe editorial limits.',true);return;
+      }
+      if(start+end===0||source?.category==='image')continue;
+      const inbound=Number(item.in_ms),outbound=Number(item.out_ms);
+      if(!Number.isSafeInteger(inbound)||!Number.isSafeInteger(outbound)||
+         outbound-inbound<start+end+500)continue;
+      item.in_ms=inbound+start;item.out_ms=outbound-end;
+      item.duration_ms=item.out_ms-item.in_ms;applied++;
+    }
+    if(!applied){note('No verified media clips can use these AI trim ideas.',true);return;}
+    if(!window.confirm('Stage '+applied+' AI trim refinements locally? Nothing will be saved, published or rendered. Review every change and save a new private revision explicitly.'))return;
+    editCheckpoint();view.items=next;changed();draw();
+    note('Staged '+applied+' suggestions. Review the source times and save when ready.');
+  });
   host.querySelectorAll('[data-assembly-shot]').forEach(b=>b.onclick=async ()=>{
    const code=b.dataset.assemblyShot,g=(view.director?.gaps||[]).find(x=>x.code===code);
    if(!g||!window.confirm('Create an UNPUBLISHED suggested shot request for '+view.title+'?'))return;
