@@ -3,13 +3,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.132',
+  'stonefellow'=>'1.3.133',
   'public_controller'=>'stonefellow-v120.php',
   'admin_controller'=>'admin/index.php',
   'notifications'=>'timeline-drawer',
   'listening_analytics'=>'enabled',
   'operations'=>'v1.2',
-  'database_schema_target'=>'1.3.65',
+  'database_schema_target'=>'1.3.66',
   'homepage_web_designer'=>'visual-inline-editing-private-drafts-atomic-publishing-version-history',
   'customer_agent_brain'=>'per-account-explicit-memory-private-conversation-consent-and-deletion',
   'admin_agent_brain'=>'separate-operational-chat-proposals-and-mission-ledger',
@@ -67,6 +67,7 @@ echo json_encode([
   'artist_world_governed_restore'=>'reviewed-historical-source-restore-with-atomic-approval-consumption',
   'artist_world_agent_editorial'=>'admin-only-live-evidence-approval-production-ledger-read-only',
   'artist_world_crew_tasks'=>'director-gap-task-assignment-evidence-human-completion-approval',
+  'artist_world_task_lifecycle'=>'source-linked-progress-recovery-history-private-activity',
   'artist_world_private_qc'=>'hash-verified-revision-gated-video-review-cue-sheet-millisecond-seek',
 
   'song_media'=>'audio-artwork-photo-video-document-archive-uploader',
