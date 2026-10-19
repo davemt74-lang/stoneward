@@ -85,7 +85,15 @@ function sf_assembly_history_compare(int $editor,int $assembly,int $before,int $
  $b=sf_assembly_history_read($editor,$assembly,$after);
  $old=$a['items'];$new=$b['items'];$rows=[];
  $id=static fn($v):string=>(string)$v['kind'].'|'.(string)$v['source_id'];
- $oldKeys=array_map($id,$old);$newKeys=array_map($id,$new);
+ $sequence=static function(array $items)use($id):array{
+  $occurrences=[];$out=[];
+  foreach($items as $item){
+   $key=$id($item);$occurrences[$key]=($occurrences[$key]??0)+1;
+   $out[]=$key.'|#'.$occurrences[$key];
+  }
+  return $out;
+ };
+ $oldKeys=$sequence($old);$newKeys=$sequence($new);
  foreach($old as $i=>$clip) {
   if(!in_array($oldKeys[$i],$newKeys,true))
    $rows[]=['type'=>'removed','ordinal'=>$i+1,'kind'=>$clip['kind'],'source_id'=>$clip['source_id']];
