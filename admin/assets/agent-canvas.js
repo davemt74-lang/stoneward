@@ -62,14 +62,19 @@
     if(!Array.isArray(queue))return '';
     return '<section class="admin-agent-calendar" aria-label="Private footage review">'+
       '<strong>Footage inspection · recent submissions</strong>'+
-      '<p class="hint">Metadata only. Review original footage and separate rights clearance in the existing authenticated Creative Director interface before approval.</p>'+
+      '<p class="hint">Private, editor-only source preview. Editorial approval and publication rights remain independent.</p>'+
       (queue.length?queue.map(item=>'<div class="admin-agent-calendar-task">'+
         '<div><strong>#'+Number(item.id)+' · '+esc(item.title)+'</strong>'+
         '<p>'+esc(item.submission_type)+' · '+esc(item.review_status)+
         ' · contributor #'+Number(item.contributor_id)+
         ' · external AI: '+esc(item.external_ai_clearance)+
         ' · publication: '+esc(item.publication_clearance)+'</p>'+
-        '<p>'+esc(item.description||'')+'</p></div></div>').join(''):
+        '<p>'+esc(item.description||'')+'</p>'+
+        '<div class="admin-agent-footage-preview">'+
+        (item.submission_type==='video'?
+          '<video controls playsinline preload="none" aria-label="Private video submission '+Number(item.id)+'" src="api/story-footage-preview.php?submission_id='+Number(item.id)+'"></video>':
+          '<img loading="lazy" alt="Private contributor photo" src="api/story-footage-preview.php?submission_id='+Number(item.id)+'">')+
+        '</div></div></div>').join(''):
         '<p>No video or photo contributions in the recent queue.</p>')+
       '<button type="button" class="secondary" data-agent-open-footage-review>Open Creative Director review in Team Workspace</button></section>';
   }
