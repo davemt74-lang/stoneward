@@ -149,7 +149,14 @@
             '<div class="actions">'+
             (index>0?'<button type="button" class="secondary" data-agent-timeline-move="up" data-assembly-id="'+Number(t.id)+'" data-revision="'+Number(t.revision)+'" data-index="'+index+'">Move earlier</button>':'')+
             (index<t.items.length-1?'<button type="button" class="secondary" data-agent-timeline-move="down" data-assembly-id="'+Number(t.id)+'" data-revision="'+Number(t.revision)+'" data-index="'+index+'">Move later</button>':'')+
-            '</div>':'')+'</div></div>').join('')+
+            '</div>':'')+
+          (t.status==='draft'&&(i.kind!=='scene'||Number(i.out_ms)>Number(i.in_ms))?
+            '<details class="admin-agent-timeline-trim"><summary>Adjust clip source range</summary>'+
+            '<div class="actions"><label>In (ms)<input type="number" step="1" min="0" max="86400000" data-agent-trim-in value="'+Number(i.in_ms)+'"></label>'+
+            '<label>Out (ms)<input type="number" step="1" min="1" max="86400000" data-agent-trim-out value="'+Number(i.out_ms)+'"></label></div>'+
+            '<button type="button" class="secondary" data-agent-timeline-trim data-assembly-id="'+Number(t.id)+'" data-revision="'+Number(t.revision)+'" data-index="'+index+'">Review trim</button>'+
+            '<p class="hint">Trim stays within the independently verified original scene or audio range.</p></details>':'')+
+          '</div></div>').join('')+
         '<p class="hint">Original source and publication rights require independent review. All changes use the existing revision and audit ledger.</p></section>';
     }
     return Array.isArray(list)?'<section class="admin-agent-calendar"><strong>Editorial assemblies</strong>'+
@@ -260,6 +267,30 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-timeline-trim]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const card=button.closest('.admin-agent-calendar-task');
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision),
+        index=Number(button.dataset.index);
+      const rawIn=card?.querySelector('[data-agent-trim-in]')?.value??'';
+      const rawOut=card?.querySelector('[data-agent-trim-out]')?.value??'';
+      const inMs=Number(rawIn),outMs=Number(rawOut);
+      const basis=button.closest('.admin-agent-calendar')?.querySelector('[data-agent-timeline-basis="'+id+'"]')?.value.trim()||'';
+      if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(revision)||revision<1||
+         !Number.isSafeInteger(index)||index<0||!/^\\d+$/.test(rawIn)||!/^\\d+$/.test(rawOut)||
+         !Number.isSafeInteger(inMs)||!Number.isSafeInteger(outMs)||outMs-inMs<500||basis.length<25){
+        c.say('Select an exact clip interval of at least 500 ms and document the editorial reason (25+ characters).');return;
+      }
+      if(!window.confirm('Trim clip '+(index+1)+' in assembly #'+id+' revision '+revision+
+        ' to '+inMs+'–'+outMs+' milliseconds? This changes only the private editorial timeline.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_trim',assembly_id:id,revision,index,
+          in_ms:inMs,out_ms:outMs,review_basis:basis,confirmed:true});
+        c.say('Clip trim saved with independent source checks and human review evidence.');
+        await send('assembly #'+id+' timeline');
+      }catch(e){c.say(e.message||'Trim not saved. Refresh the current timeline.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-timeline-move]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision),
