@@ -354,7 +354,6 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
             $text='Verified clip insertion preview is unavailable or editor permission is missing. No changes made.';
         }
     }
-    if($plan['type']==='production_timeline_insert'&&isset($insertPreview))$action['insert_preview']=$insertPreview;
     if($plan['type']==='production_timeline_inspect'){
         try{
             require_once __DIR__.'/story-agent-brain-bridge.php';
@@ -483,6 +482,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='production_director_coverage'&&isset($director))$action['director_coverage']=$director;
     if($plan['type']==='production_director_coverage'&&isset($shotMatches))$action['director_scene_matches']=$shotMatches;
     if($plan['type']==='production_scene_candidates'&&isset($scenes))$action['scene_candidates']=$scenes;
+    if($plan['type']==='production_timeline_insert'&&isset($insertPreview))$action['insert_preview']=$insertPreview;
     if($plan['type']==='production_timeline_inspect'){
         if(isset($timeline)&&is_array($timeline))$action['timeline_inspection']=$timeline;
         if(isset($assemblies))$action['timeline_assemblies']=$assemblies;
