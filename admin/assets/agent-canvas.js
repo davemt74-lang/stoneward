@@ -285,6 +285,46 @@
           '</div></div>').join(''):'<p>No eligible replacement scenes found. Search another topic or verify new submitted footage first.</p>')+
       '<p class="hint">Confirmation checks the original clip, live revision and source validity. Every committed change is written to Team Activity and the revision history.</p></section>';
   }
+  function footageIntelligenceHtml(view){
+    if(!view)return '';
+    const eligible=Array.isArray(view.eligible_captures)?view.eligible_captures:[];
+    const jobs=Array.isArray(view.jobs)?view.jobs:[];
+    return '<section class="admin-agent-calendar admin-agent-footage-intelligence" aria-label="AI footage evidence and retake review">'+
+      '<strong>AI Director · visual footage intelligence</strong>'+
+      '<p class="hint">Source-bound video intelligence uses three sampled frames, not a continuous video analysis. Audio jobs provide transcription, not unverified sound classification. External AI permission must be reviewed independently.</p>'+
+      '<p>Provider execution: '+(view.enabled?'enabled':'disabled')+' · '+
+      eligible.length+' consented captures shown · '+jobs.length+' job records</p>'+
+      (!view.enabled?'<button type="button" class="secondary" data-agent-footage-enable>Review AI footage opt-in</button>':'')+
+      (eligible.length?'<details open><summary>Eligible private capture sources</summary>'+
+        eligible.map(c=>'<div class="admin-agent-calendar-task"><strong>#'+Number(c.submission_id)+
+          ' · '+esc(c.title)+'</strong><p>'+esc(c.category)+' · '+esc(c.task_type)+'</p>'+
+          '<button type="button" class="secondary" data-agent-footage-enqueue="'+Number(c.submission_id)+
+          '" data-task-type="'+esc(c.task_type)+'">Request '+(c.task_type==='scene'?'visual':'audio transcript')+
+          ' analysis</button></div>').join('')+'</details>':
+        '<p class="hint">No independently cleared visual or audio sources. Review contributions, immutable source bytes and external-AI rights first.</p>')+
+      '<strong>Supervised jobs and editorial results</strong>'+
+      (jobs.length?jobs.map(j=>
+        '<div class="admin-agent-calendar-task admin-agent-footage-analysis">'+
+        '<strong>Job #'+Number(j.job_id)+' · '+esc(j.capture_title)+'</strong>'+
+        '<p>'+esc(j.task_type)+' · worker '+esc(j.status)+' · human review '+esc(j.review_status)+
+        ' · external AI '+esc(j.external_ai_clearance)+'</p>'+
+        (j.description?'<p>'+esc(j.description)+'</p>':'')+
+        (j.text_summary?'<p>Transcribed audio (whole-clip only): '+esc(j.text_summary)+'</p>':'')+
+        (j.frames||[]).map((v,i)=>'<div class="admin-agent-calendar-task"><strong>Sample #'+(i+1)+
+          ' · '+(Number(v.sampled_frame_ms)/1000).toFixed(2)+'s</strong>'+
+          '<p>'+esc(v.description)+'</p><p class="hint">Candidate usable: '+
+          (v.usable_suggestion?'suggested yes':'review needed / suggested no')+'</p>'+
+          (v.retake_note?'<p>Retake idea: '+esc(v.retake_note)+'</p>':'')+'</div>').join('')+
+        (j.shot_recommendations||[]).map(t=>'<p class="hint">Additional shot: '+esc(t)+'</p>').join('')+
+        (j.review_status==='pending_review'&&j.external_ai_clearance==='cleared'?
+          '<div class="actions"><button type="button" class="secondary" data-agent-footage-decision="approved" data-job-id="'+Number(j.job_id)+'">Approve private analysis draft</button>'+
+          '<button type="button" class="secondary" data-agent-footage-decision="rejected" data-job-id="'+Number(j.job_id)+'">Reject draft</button></div>':'')+
+        (j.review_status==='approved'&&!j.imported_id?
+          '<p class="hint">Approved machine observation. To create a timecoded canonical scene, explicitly import and independently verify in the existing footage review; no automatic promotion.</p>':'')+
+        '</div>').join(''):'<p>There are no supervised analyses yet.</p>')+
+      '<button type="button" class="secondary" data-agent-footage-refresh>Refresh visual intelligence</button>'+
+      '<p class="hint">Queueing never immediately invokes a provider. A separate supervised server worker processes one bounded job; machine drafts are neither identity evidence nor publication approval.</p></section>';
+  }
   function aiDirectorSequenceHtml(view){
     if(!view)return '';
     if(view.requires_selection){
@@ -509,6 +549,7 @@
     else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-agent-show-calendar class="secondary">Show production calendar here</button>';
     else if(m.role==='assistant'&&action.type==='production_schedule_calendar')next=calendarHtml(action.production_calendar);
     else if(m.role==='assistant'&&action.type==='production_footage_review')next=footageHtml(action.footage_queue);
+    else if(m.role==='assistant'&&action.type==='production_footage_intelligence')next=footageIntelligenceHtml(action.footage_intelligence);
     else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage,action.director_scene_matches);
     else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
@@ -609,6 +650,47 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-footage-refresh]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      button.disabled=true;
+      try{await send('footage intelligence');}catch(e){c.say(e.message||'Refresh failed.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-footage-enable]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      if(!window.confirm('Enable supervised visual and audio inference for independently consented production captures? Future confirmed job requests may send private images, three MP4 frames, or audio to the configured AI provider. No automatic publication or reprocessing of uncertain jobs.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-inference.php',{action:'configure_execution',enabled:true});
+        c.say('Supervised footage analysis enabled. Each eligible capture must still be requested separately.');
+        await send('footage intelligence');
+      }catch(e){c.say(e.message||'AI analysis opt-in was not saved.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-footage-enqueue]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const submission_id=Number(button.dataset.agentFootageEnqueue),task_type=button.dataset.taskType;
+      if(!Number.isSafeInteger(submission_id)||submission_id<1||!['scene','transcript'].includes(task_type))return;
+      if(!window.confirm('Queue one '+task_type+' analysis for private capture #'+submission_id+
+          '? Exact source fingerprint and independent external-AI consent will be checked again. A supervised worker must run before results exist.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-inference.php',{action:'enqueue',submission_id,task_type});
+        c.say('Private inference queued or existing job reused; provider execution is separate.');
+        await send('footage intelligence');
+      }catch(e){c.say(e.message||'Capture source and consent verification failed.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-footage-decision]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const job_id=Number(button.dataset.jobId),decision=button.dataset.agentFootageDecision;
+      if(!Number.isSafeInteger(job_id)||job_id<1||!['approved','rejected'].includes(decision))return;
+      if(!window.confirm((decision==='approved'?'Approve':'Reject')+' machine observation #'+job_id+
+          ' for private editorial consideration? This does not verify or publish the canonical footage.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-inference.php',{action:'review_result',job_id,decision});
+        c.say('Human review recorded. Canonical timecode selection and verification remain separate.');
+        await send('footage intelligence');
+      }catch(e){c.say(e.message||'Review could not be recorded.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-director-open]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.agentDirectorOpen);
