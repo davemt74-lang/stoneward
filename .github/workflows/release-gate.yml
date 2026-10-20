@@ -444,6 +444,7 @@ jobs:
           php tests/section88d3g5a-chat-decisions.php
           php tests/section88d3g5b-shot-matches.php
           php tests/section88d3g5c-clip-preview.php
+          php tests/section88d3g5d-chat-reorder.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php

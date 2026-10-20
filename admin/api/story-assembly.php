@@ -8,6 +8,7 @@ require_once SF_ROOT.'/api/story-capture-rights-core.php';
 require_once SF_ROOT.'/api/story-transcript-core.php';
 require_once SF_ROOT.'/api/story-scene-core.php';
 require_once SF_ROOT.'/api/story-assembly-core.php';
+require_once SF_ROOT.'/api/story-assembly-chat-core.php';
 require_once SF_ROOT.'/api/story-assembly-history-core.php';
 require_once SF_ROOT.'/api/story-assembly-restore-core.php';
 require_once SF_ROOT.'/api/ai.php';
@@ -125,6 +126,13 @@ try{
  if($action==='create'){
   sf_json_response(['ok'=>true,'assembly_id'=>sf_assembly_create($id,
    (string)($p['title']??''),(string)($p['brief']??''))]);
+ }
+ if($action==='chat_move'){
+  if(($p['confirmed']??null)!==true)
+   throw new InvalidArgumentException('Timeline move requires separate human confirmation.');
+  sf_json_response(['ok'=>true,'result'=>sf_assembly_chat_move($id,
+    (int)($p['assembly_id']??0),(int)($p['revision']??0),(int)($p['index']??-1),
+    (string)($p['direction']??''),(string)($p['review_basis']??''))]);
  }
  if($action==='replace'){
   if(!is_array($p['items']??null))sf_json_response(['ok'=>false,'error'=>'invalid_items'],422);
