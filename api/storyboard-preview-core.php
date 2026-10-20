@@ -82,8 +82,22 @@ function sf_storyboard_track_rights(int $editor,int $assemblyId,int $revision):a
  foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
   $id=(string)$r['track_id'];$scope=(string)$r['license_type'];
   if(!in_array($scope,['sync','master'],true))continue;
-  $out[$id][$scope]=((int)$r['reviewed_revision']===$revision)
-     ?(string)$r['status']:'stale_revision';
+  // A human restriction never turns into an auto-clearance merely because
+  // the assembly revision advanced. Only an explicit new decision lifts it.
+  $out[$id][$scope]=(string)$r['status']==='restricted'?'restricted':
+    (((int)$r['reviewed_revision']===$revision)?(string)$r['status']:'stale_revision');
+ }
+ require_once __DIR__.'/story-stonefellow-music-auto-core.php';
+ $assembly=sf_assembly_read($editor,$assemblyId);
+ foreach((array)($assembly['items']??[]) as $item){
+  if(($item['kind']??'')!=='track')continue;
+  $id=(string)$item['source_id'];
+  $eligibility=sf_stonefellow_music_auto_status($id);
+  if(empty($eligibility['eligible']))continue;
+  foreach(['sync','master'] as $scope)
+   if(!isset($out[$id][$scope])||$out[$id][$scope]==='stale_revision')
+    $out[$id][$scope]='cleared';
+  $out[$id]['authorization_origin']='stonefellow_original_standing_authorization';
  }
  return $out;
 }
