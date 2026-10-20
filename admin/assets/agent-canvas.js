@@ -58,6 +58,21 @@
       '<p class="hint">Every date change requires a separate authenticated click and is written to the existing audit history. No automatic crew reassignment or publication.</p>'+
       '</section>';
   }
+  function footageHtml(queue){
+    if(!Array.isArray(queue))return '';
+    return '<section class="admin-agent-calendar" aria-label="Private footage review">'+
+      '<strong>Footage inspection · recent submissions</strong>'+
+      '<p class="hint">Metadata only. Review original footage and separate rights clearance in the existing authenticated Creative Director interface before approval.</p>'+
+      (queue.length?queue.map(item=>'<div class="admin-agent-calendar-task">'+
+        '<div><strong>#'+Number(item.id)+' · '+esc(item.title)+'</strong>'+
+        '<p>'+esc(item.submission_type)+' · '+esc(item.review_status)+
+        ' · contributor #'+Number(item.contributor_id)+
+        ' · external AI: '+esc(item.external_ai_clearance)+
+        ' · publication: '+esc(item.publication_clearance)+'</p>'+
+        '<p>'+esc(item.description||'')+'</p></div></div>').join(''):
+        '<p>No video or photo contributions in the recent queue.</p>')+
+      '<button type="button" class="secondary" data-agent-open-footage-review>Inspect original media and review decisions</button></section>';
+  }
   function messageHtml(m){
     const who=m.role==='assistant'?'Stonefellow Admin Agent':'Admin';
     const feedback=m.role==='assistant'&&Number(m.id)>0?'<div class="admin-agent-feedback"><button type="button" class="secondary" data-admin-agent-feedback="helpful" data-message-id="'+Number(m.id)+'">Helpful</button><button type="button" class="secondary" data-admin-agent-feedback="not_helpful" data-message-id="'+Number(m.id)+'">Not helpful</button></div>':'';
@@ -67,6 +82,7 @@
     else if(m.role==='assistant'&&action.type==='prepare_journey')next='<button type="button" data-admin-agent-action="journey" class="secondary">Prepare exact-review journey draft</button>';
     else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-agent-show-calendar class="secondary">Show production calendar here</button>';
     else if(m.role==='assistant'&&action.type==='production_schedule_calendar')next=calendarHtml(action.production_calendar);
+    else if(m.role==='assistant'&&action.type==='production_footage_review')next=footageHtml(action.footage_queue);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
@@ -100,6 +116,7 @@
   }
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
+    root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('production-review'));
     root.querySelectorAll('[data-agent-commerce-review]').forEach(b=>b.onclick=()=>{
       const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(m=>String(m.action?.request_key)===b.dataset.agentCommerceReview);
       if(entry?.action?.draft)window.SFAgentCommerceReview?.open?.(entry.action);
