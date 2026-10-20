@@ -325,6 +325,29 @@
       '<button type="button" class="secondary" data-agent-footage-refresh>Refresh visual intelligence</button>'+
       '<p class="hint">Queueing never immediately invokes a provider. A separate supervised server worker processes one bounded job; machine drafts are neither identity evidence nor publication approval.</p></section>';
   }
+  function directorContinuityHtml(plan,title){
+    if(!plan||!Array.isArray(plan.issues)||!Array.isArray(plan.coverage_gaps))return '';
+    const music=plan.music_pacing||{},arcs=Array.isArray(plan.character_arcs)?plan.character_arcs:[];
+    const issues=plan.issues.slice(0,12),gaps=plan.coverage_gaps.slice(0,12);
+    return '<details class="admin-agent-calendar-task" aria-label="Source-grounded continuity review">'+
+      '<summary>'+esc(title)+' · '+issues.length+' handoff reviews · '+gaps.length+' coverage suggestions</summary>'+
+      '<p class="hint">Verified fictional story links and source-duration estimates only. This is not an inferred real-world identity, measured music tempo, video-quality score or publication clearance.</p>'+
+      '<p>Music cues '+Number(music.cue_count||0)+' · approximate cue duration '+
+        (Number(music.cue_duration_ms||0)/1000).toFixed(1)+'s · estimated sequence share '+
+        (100*Number(music.estimated_music_fraction||0)).toFixed(1)+'%'+
+        ' · music/dialogue adjacencies '+Number(music.dialogue_adjacent_to_music||0)+'</p>'+
+      (arcs.length?'<strong>Verified character-story appearances</strong>'+
+        arcs.slice(0,10).map(a=>'<p>'+esc(a.label)+' · '+Number(a.appearance_count)+
+          ' linked clips · first #'+Number(a.first_clip)+' · last #'+Number(a.last_clip)+
+          ' · '+esc(a.arc_status)+'</p>').join(''):'<p class="hint">No editor-verified character links are available.</p>')+
+      (issues.length?'<strong>Continuity handoffs to review</strong>'+
+        issues.map(i=>'<p>Clip '+Number(i.position||0)+' · '+esc(i.message)+'</p>').join(''):
+        '<p class="hint">No specific story handoff flagged by these deterministic rules.</p>')+
+      (gaps.length?'<strong>Missing-coverage ideas</strong>'+
+        gaps.map(g=>'<p>'+esc(g.message)+' · suggested role '+esc(g.target_role||'editor')+'</p>').join(''):'')+
+      '<p class="hint">Review in Agent Chat before authorizing any sequence changes. Music licensing for eligible original Stonefellow tracks follows standing authorization, with explicit exceptions honored.</p>'+
+      '</details>';
+  }
   function aiDirectorSequenceHtml(view){
     if(!view)return '';
     if(view.requires_selection){
@@ -360,6 +383,7 @@
           ' grounded evidence item(s) · Human editorial review required</p>'+
           '</div>').join('')+'</details>':
         '<p class="hint">No verified story-graph or reviewed three-frame observations are linked to the eligible sources yet.</p>')+
+      directorContinuityHtml(view.continuity_current,'Current story and soundtrack continuity')+
       '<p class="hint">Model access: '+(view.enabled?'enabled':'disabled')+
         ' · external-AI evidence: '+(view.eligible_for_external_ai?'eligible':'not yet cleared')+'</p>'+
       (!view.eligible_for_external_ai?'<p class="hint">'+esc(view.eligibility_note||'')+'</p>':'')+
@@ -379,6 +403,7 @@
           '<p>Provider: '+esc(p.provider||'awaiting execution')+
             ' · '+Number(p.proposed_additions||0)+' verified additions</p>'+
           (p.logline?'<p>'+esc(p.logline)+'</p>':'')+
+          directorContinuityHtml(p.continuity_preview,'Proposed sequence continuity')+
           (beats.length?'<details><summary>Inspect '+beats.length+' proposed editorial beats</summary>'+
             beats.map((b,i)=>'<div class="admin-agent-calendar-task"><strong>#'+(i+1)+
               ' · '+esc(b.transition)+'</strong>'+
