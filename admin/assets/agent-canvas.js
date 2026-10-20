@@ -285,6 +285,79 @@
           '</div></div>').join(''):'<p>No eligible replacement scenes found. Search another topic or verify new submitted footage first.</p>')+
       '<p class="hint">Confirmation checks the original clip, live revision and source validity. Every committed change is written to Team Activity and the revision history.</p></section>';
   }
+  function transitionHtml(review){
+    if(!review)return '';
+    if(review.requires_selection){
+      const rows=Array.isArray(review.assemblies)?review.assemblies:[];
+      return '<section class="admin-agent-calendar" aria-label="Choose an assembly for private playback">'+
+        '<strong>Transitions and playback · choose a production</strong>'+
+        (rows.length?rows.map(a=>'<div class="admin-agent-calendar-task">'+
+          '<strong>Assembly #'+Number(a.id)+' · '+esc(a.title)+'</strong>'+
+          '<p>Revision '+Number(a.revision)+' · '+esc(a.status)+'</p>'+
+          '<button type="button" class="secondary" data-agent-transition-assembly="'+Number(a.id)+'">Review transitions here</button></div>').join(''):
+          '<p>No assemblies available for private review.</p>')+'</section>';
+    }
+    const a=review.assembly;
+    if(!a)return '';
+    const id=Number(a.id),rev=Number(a.revision);
+    const cards=Array.isArray(review.cards)?review.cards:[];
+    const edl=review.edl||{},issues=Array.isArray(review.blockers)?review.blockers:[];
+    const cross=review.transition||null;
+    const preferredStyle=cross?.style||'fade',preferredOverlap=Number(cross?.overlap_ms||250);
+    const options=(style)=>'<option value="fade"'+(style==='fade'?' selected':'')+
+      '>Audio/video dissolve (audio bridge)</option>'+
+      '<option value="wipeleft"'+(style==='wipeleft'?' selected':'')+'>Video wipe with audio crossfade</option>';
+    const overlapOptions=(value)=>[250,500].map(n=>
+      '<option value="'+n+'"'+(Number(value)===n?' selected':'')+'>'+n+' ms</option>').join('');
+    const inputs='<label>Reviewed editorial reason<textarea rows="2" maxlength="400" data-agent-transition-basis placeholder="Document why this cut timing supports the production (25+ characters)."></textarea></label>';
+    const settings=a.status==='draft'?
+      '<section><strong>Revision-locked audio/video crossfade</strong>'+
+      '<p class="hint">Pilot: 2–6 clips, up to 30 seconds, all original sources and music masters independently certified. Preview settings are not a render.</p>'+
+      inputs+
+      '<div class="actions"><label>Transition style<select data-agent-transition-style>'+options(preferredStyle)+'</select></label>'+
+      '<label>Shared overlap<select data-agent-transition-overlap>'+overlapOptions(preferredOverlap)+'</select></label></div>'+
+      '<button type="button" class="secondary" data-agent-transition-global data-assembly-id="'+id+'" data-revision="'+rev+'">Review and save crossfade</button>'+
+      (cross&&Number(review.cut_count)>0?
+        '<details><summary>Customize each video/audio bridge</summary>'+
+        (Array.isArray(review.cuts)?review.cuts:[]).map((cut,i)=>
+          '<div class="admin-agent-calendar-task" data-agent-transition-cut="'+i+'">'+
+          '<strong>Boundary '+(i+1)+' → '+(i+2)+'</strong>'+
+          '<div class="actions"><label>Style<select data-agent-cut-style>'+options(cut.style)+'</select></label>'+
+          '<label>Overlap<select data-agent-cut-overlap>'+overlapOptions(cut.overlap_ms)+'</select></label></div></div>').join('')+
+        '<button type="button" class="secondary" data-agent-transition-cuts data-assembly-id="'+id+'" data-revision="'+rev+'">Confirm individual audio/video bridges</button>'+
+        '</details>':'<p class="hint">Save a shared crossfade first to unlock per-cut timing.</p>')+
+      '</section>':'<p>Assembly is not an editable draft.</p>';
+    const reviewVideos=Array.isArray(review.render_reviews)?review.render_reviews:[];
+    return '<section class="admin-agent-calendar admin-agent-transition-review" aria-label="Private transition and playback review">'+
+      '<strong>Storyboard / soundtrack · '+esc(a.title)+' · revision '+rev+'</strong>'+
+      '<p class="hint">Metadata-only storyboard, never an invented video preview. Timings are source-derived.</p>'+
+      (cards.length?cards.map((c,i)=>'<div class="admin-agent-calendar-task">'+
+        '<strong>#'+(i+1)+' '+esc(c.kind)+' · '+esc(c.label)+'</strong>'+
+        '<p>Story time '+(Number(c.start_ms)/1000).toFixed(2)+'–'+
+        (Number(c.end_ms)/1000).toFixed(2)+'s · '+(c.source_verified?'verified':'not verified')+'</p>'+
+        '<p class="hint">Publication: '+esc(c.publication_clearance)+
+        (c.kind==='track'?' · sync: '+esc(c.sync_clearance)+' · master: '+esc(c.master_clearance):'')+
+        '</p></div>').join(''):'<p>No storyboard cues recorded.</p>')+
+      '<p><strong>Current cut plan:</strong> '+Number(review.cut_count)+' boundaries'+
+        (cross?' · '+esc(cross.style)+' / '+Number(cross.overlap_ms)+'ms':' · hard cuts / no saved crossfade')+'</p>'+
+      (edl.available?'<p class="hint">EDL output duration: '+(Number(edl.output_total_ms)/1000).toFixed(2)+'s · '+Number((edl.dialogue_duck_windows||[]).length)+' dialogue duck windows.</p>':
+        '<p class="hint">No certified EDL projection available for this sequence.</p>')+
+      (edl.dialogue_duck_windows||[]).slice(0,12).map(w=>
+        '<p class="hint">Audio duck: '+(Number(w.start_ms)/1000).toFixed(2)+'–'+
+        (Number(w.end_ms)/1000).toFixed(2)+'s</p>').join('')+
+      (issues.length?'<details><summary>'+issues.length+' certification blockers</summary>'+
+         issues.map(b=>'<p class="hint">'+esc(b.message)+'</p>').join('')+'</details>':'')+
+      settings+
+      '<section><strong>Private rendered playback</strong>'+
+      (reviewVideos.length?reviewVideos.map(v=>'<div class="admin-agent-calendar-task">'+
+        '<p>Certified render #'+Number(v.job_id)+' · '+esc(v.status)+' · revision '+Number(v.revision)+'</p>'+
+        '<div class="admin-agent-footage-preview"><video controls playsinline preload="none" '+
+          'aria-label="Verified private review video" src="api/story-render-review.php?action=stream&amp;job_id='+
+          Number(v.job_id)+'"></video></div></div>').join(''):
+        '<p class="hint">No verified private render for this revision. The storyboard above is a cue preview, not video playback.</p>')+
+      '</section><p class="hint">No edits, renders, music transfers or publication were performed by this preview.</p>'+
+      '</section>';
+  }
   function timelineHtml(action){
     const t=action.timeline_inspection,list=action.timeline_assemblies;
     if(t&&Array.isArray(t.items)){
@@ -327,6 +400,7 @@
     else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage,action.director_scene_matches);
     else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
+    else if(m.role==='assistant'&&action.type==='production_timeline_transitions')next=transitionHtml(action.transition_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_insert')next=timelineInsertHtml(action.insert_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_edit')next=timelineEditHtml(action.edit_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_media')next=timelineMediaHtml(action.media_preview);
@@ -421,6 +495,59 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-transition-assembly]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.agentTransitionAssembly);
+      if(!Number.isSafeInteger(id)||id<1)return;
+      button.disabled=true;
+      try{await send('review transitions for assembly #'+id);}
+      catch(e){c.say(e.message||'Transition review unavailable.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-transition-global]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const card=button.closest('.admin-agent-transition-review');
+      const style=card?.querySelector('[data-agent-transition-style]')?.value||'';
+      const overlap=Number(card?.querySelector('[data-agent-transition-overlap]')?.value);
+      const basis=card?.querySelector('[data-agent-transition-basis]')?.value.trim()||'';
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision);
+      if(!['fade','wipeleft'].includes(style)||![250,500].includes(overlap)||basis.length<25||
+         !Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(revision)||revision<1){
+        c.say('Choose an approved audio/video crossfade and write a 25+ character review basis.');return;
+      }
+      if(!window.confirm('Save '+style+' '+overlap+' ms synchronized audio/video crossfade for assembly #'+id+
+        ' revision '+revision+'? Every original media and rights gate must pass.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_transition',assembly_id:id,revision,style,
+          overlap_ms:overlap,review_basis:basis,confirmed:true});
+        c.say('Revision-locked crossfade reviewed and saved. Opening updated transition preview.');
+        await send('review transitions for assembly #'+id);
+      }catch(e){c.say(e.message||'Transition failed source/rights or revision checks.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-transition-cuts]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const card=button.closest('.admin-agent-transition-review');
+      const basis=card?.querySelector('[data-agent-transition-basis]')?.value.trim()||'';
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision);
+      const cuts=[...(card?.querySelectorAll('[data-agent-transition-cut]')||[])].map(node=>({
+        style:node.querySelector('[data-agent-cut-style]')?.value||'',
+        overlap_ms:Number(node.querySelector('[data-agent-cut-overlap]')?.value)
+      }));
+      if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(revision)||revision<1||
+         basis.length<25||cuts.length<1||cuts.length>5||
+         cuts.some(x=>!['fade','wipeleft'].includes(x.style)||![250,500].includes(x.overlap_ms))){
+        c.say('Select exact approved cut effects and document the editor review basis.');return;
+      }
+      if(!window.confirm('Save '+cuts.length+' individually timed audio/video bridges in assembly #'+id+
+        ' revision '+revision+'? No render will be started.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_cuts',assembly_id:id,revision,
+          cuts,review_basis:basis,confirmed:true});
+        c.say('Each audio/video cut is now scoped to the current editorial revision.');
+        await send('review transitions for assembly #'+id);
+      }catch(e){c.say(e.message||'Per-cut review was not saved.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-media-choose]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.agentMediaChoose),kind=button.dataset.mediaKind,
