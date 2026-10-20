@@ -10,6 +10,7 @@ require_once SF_ROOT.'/api/story-scene-core.php';
 require_once SF_ROOT.'/api/story-assembly-core.php';
 require_once SF_ROOT.'/api/story-assembly-chat-core.php';
 require_once SF_ROOT.'/api/story-assembly-chat-insert-core.php';
+require_once SF_ROOT.'/api/story-assembly-chat-edit-core.php';
 require_once SF_ROOT.'/api/story-assembly-history-core.php';
 require_once SF_ROOT.'/api/story-assembly-restore-core.php';
 require_once SF_ROOT.'/api/ai.php';
@@ -127,6 +128,23 @@ try{
  if($action==='create'){
   sf_json_response(['ok'=>true,'assembly_id'=>sf_assembly_create($id,
    (string)($p['title']??''),(string)($p['brief']??''))]);
+ }
+ if($action==='chat_remove'||$action==='chat_replace'){
+  if(($p['confirmed']??null)!==true)
+   throw new InvalidArgumentException('Editorial timeline changes require explicit human confirmation.');
+  if(!is_int($p['index']??null)||!is_string($p['expected_source_id']??null))
+   throw new InvalidArgumentException('Exact clip index and original source ID required.');
+  $args=[$id,(int)($p['assembly_id']??0),(int)($p['revision']??0),
+    $p['index'],$p['expected_source_id']];
+  if($action==='chat_replace'){
+   if(!is_string($p['new_source_id']??null))
+    throw new InvalidArgumentException('Verified replacement scene ID required.');
+   $result=sf_assembly_chat_replace(...[...$args,$p['new_source_id'],
+     (string)($p['review_basis']??'')]);
+  }else{
+   $result=sf_assembly_chat_remove(...[...$args,(string)($p['review_basis']??'')]);
+  }
+  sf_json_response(['ok'=>true,'result'=>$result]);
  }
  if($action==='chat_insert'){
   if(($p['confirmed']??null)!==true)
