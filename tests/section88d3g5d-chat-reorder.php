@@ -48,4 +48,7 @@ g5dPass(str_contains($api,"'chat_move'")&&str_contains($api,"'confirmed'")&&
  str_contains($api,'sf_assembly_chat_move(')&&str_contains($ui,'data-agent-timeline-move')&&
  str_contains($ui,"send('assembly #'+id+' timeline')"),
  'Authenticated exact-review API and chat timeline actions are wired together.');
+g5dPass(str_contains($ui,"closest('.admin-agent-calendar')") &&
+ str_contains($ui,"closest('.admin-agent-calendar-task')"),
+ 'Repeated chat snapshots use review justifications from the exact clicked card.');
 echo "G5D: $g5dChecks certified reorder assertions passed".PHP_EOL;
