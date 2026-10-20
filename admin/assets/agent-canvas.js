@@ -124,7 +124,14 @@
         (Number(s.end_ms)/1000).toFixed(2)+'s · '+esc(s.location||'Unspecified location')+'</p>'+
         '<p>'+esc(s.description)+'</p><p class="hint">Source: '+esc(s.origin)+
         ' · people release: '+esc(s.people_release_status)+
-        ' · publishing: '+esc(s.publication_clearance)+'</p></div></div>').join(''):
+        ' · publishing: '+esc(s.publication_clearance)+'</p>'+
+        (s.media_category==='video'?
+          '<div class="admin-agent-footage-preview"><video controls playsinline preload="none" aria-label="Verified scene clip #'+Number(s.scene_id)+'"'+
+          ' data-agent-scene-start="'+(Number(s.start_ms)/1000).toFixed(3)+'" data-agent-scene-end="'+(Number(s.end_ms)/1000).toFixed(3)+'"'+
+          ' src="api/story-footage-preview.php?submission_id='+Number(s.submission_id)+'"></video></div>':
+          s.media_category==='image'?
+          '<div class="admin-agent-footage-preview"><img loading="lazy" alt="Verified still scene" src="api/story-footage-preview.php?submission_id='+Number(s.submission_id)+'"></div>':'')+
+        '</div></div>').join(''):
         '<p>No verified scene annotations are available.</p>')+'</section>';
   }
   function timelineHtml(action){
@@ -188,6 +195,21 @@
   }
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
+    root.querySelectorAll('video[data-agent-scene-start]').forEach(video=>{
+      const start=Math.max(0,Number(video.dataset.agentSceneStart)||0);
+      const end=Number(video.dataset.agentSceneEnd)||0;
+      if(!(end>start))return;
+      video.addEventListener('loadedmetadata',()=>{
+        if(Number.isFinite(video.duration)&&start<video.duration)video.currentTime=start;
+      });
+      video.addEventListener('timeupdate',()=>{
+        if(video.currentTime>=end){video.pause();}
+      });
+      video.addEventListener('play',()=>{
+        if(video.currentTime>=end)video.currentTime=start;
+      });
+    });
+
     root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('team'));
     root.querySelectorAll('[data-agent-create-shot-draft]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
