@@ -44,7 +44,7 @@ function sf_inference_extract_video_frame(array $media,?int $sampleAtMs=null):ar
  try{
   $args=[$binary,'-nostdin','-v','error','-ss',sprintf('%.3f',$window['sampled_frame_ms']/1000),
     '-i',(string)$media['path'],'-frames:v','1','-vf','scale=w=768:h=768:force_original_aspect_ratio=decrease',
-    '-q:v','5','-f','image2','-y',$temp];
+    '-c:v','mjpeg','-q:v','5','-f','image2','-y',$temp];
   $proc=@proc_open($args,[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],
    $pipes,null,null,['bypass_shell'=>true]);
   if(!is_resource($proc))throw new RuntimeException('FFmpeg could not be started.');
