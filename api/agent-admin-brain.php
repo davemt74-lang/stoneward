@@ -121,6 +121,7 @@ function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
+    elseif(preg_match('/\\b(?:footage review|review footage|inspect footage|footage inspection|capture review queue|video submissions?)\\b/',$m)){$type='production_footage_review';$view='agent-chat';}
     elseif(preg_match('/\\b(?:editorial (?:assembly|production|review|status|timeline)|(?:story|production) assembly|production (?:status|queue|pipeline)|video production review|assembly\\s*#?\\s*[0-9]+|ai director (?:review|approval|production))\\b/',$m)){$type='production_editorial_status';$view='production-review';}
     elseif(preg_match('/\\b(?:director shot list|missing shots|missing footage|coverage gaps|shot recommendations|ai director)\\b/',$m)){$type='production_director_coverage';$view='brain';}
     elseif(preg_match('/\\b(?:artist world|production evidence|creative capture|scene evidence|story graph|shot footage)\\b/',$m)){$type='production_evidence_search';$view='brain';}
@@ -248,6 +249,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'production_schedule_calendar'=>'Private production calendar is unavailable; no schedule or crew assignment changed.',
       'production_director_coverage'=>'Director coverage data is unavailable.',
       'production_evidence_search'=>'No matching reviewed Artist World production evidence was found.',
+      'production_footage_review'=>'The private footage review queue is unavailable.',
       'stem_mix_review'=>'I can inspect real private Stem Studio track, bus, send, FX, automation and mastering metadata, compare bounded reference evidence, recommend specific adjustments and prepare exact reviewed changes. Provide a song ID. Native VST audio is not independently recreated and no mix is changed automatically.',
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
@@ -289,6 +291,20 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
             }
         }catch(Throwable $e){
             $text='Private editorial evidence is unavailable or you lack production-editor authority. No changes occurred.';
+        }
+    }
+    if($plan['type']==='production_footage_review'){
+        try{
+            require_once __DIR__.'/story-capture-core.php';
+            $rows=sf_capture_review_queue($adminId); // Server enforces editor authority.
+            $footage=array_slice(array_values(array_filter($rows,static fn(array $item):bool =>
+                in_array((string)$item['submission_type'],['video','photo'],true))),0,30);
+            // No source URI, raw media bytes, private provider requests, or unsanitized HTML.
+            $text='Private footage review queue: '.count($footage).
+                ' recent video and photo submissions. Inspect the source and releases before any decision. '.
+                'No external AI analysis, publication, or editing approval was performed.';
+        }catch(Throwable $e){
+            $text='Footage inspection is unavailable or production-editor permission is missing. No changes were made.';
         }
     }
     if($plan['type']==='production_director_coverage'){
@@ -375,6 +391,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
     if($plan['type']==='production_editorial_status'&&!empty($editorial))$action['editorial_production']=$editorial;
     if($plan['type']==='production_schedule_calendar'&&!empty($calendar))$action['production_calendar']=$calendar;
+    if($plan['type']==='production_footage_review'&&isset($footage))$action['footage_queue']=$footage;
     if($plan['type']==='stem_mix_review'&&!empty($stemReview))$action['stem_review']=$stemReview;
     if($plan['type']==='stem_mix_review'&&!empty($production))$action['production_brief']=sf_stem_production_brief($production);
     if($plan['type']==='draft_commerce_reply' && !empty($replyDraft)){
