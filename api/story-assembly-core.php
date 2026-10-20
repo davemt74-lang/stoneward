@@ -66,7 +66,7 @@ function sf_assembly_candidates(int $editor):array{
    a.category,COALESCE(r.status,'unreviewed') AS rights
    FROM story_scene_annotations n
    JOIN story_capture_submissions s ON s.id=n.submission_id
-   JOIN media_assets a ON a.id=n.asset_id
+   JOIN media_assets a ON a.id=n.asset_id AND a.id=s.asset_id
    LEFT JOIN story_capture_rights_reviews r
      ON r.submission_id=s.id AND r.purpose='publication'
    WHERE n.review_status='verified' AND s.review_status='approved_for_edit'
@@ -128,7 +128,7 @@ function sf_assembly_validate_item(array $item):array{
     n.review_status,s.review_status AS capture_review
     FROM story_scene_annotations n
     JOIN story_capture_submissions s ON s.id=n.submission_id
-    JOIN media_assets a ON a.id=n.asset_id WHERE n.id=?");
+    JOIN media_assets a ON a.id=n.asset_id AND a.id=s.asset_id WHERE n.id=?");
  }else{
   $q=$db->prepare("SELECT t.submission_id,MIN(g.start_ms) AS start_ms,
    MAX(g.end_ms) AS end_ms,t.review_status,s.review_status AS capture_review,
