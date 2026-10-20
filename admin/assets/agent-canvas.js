@@ -87,6 +87,19 @@
       ).join(''):'<p>All minimum editorial coverage targets are currently satisfied.</p>')+
       '<p class="hint">Human review is required to draft, assign or open any shot request. Existing Creative Director tools retain those controls.</p></section>';
   }
+  function sceneCandidateHtml(items){
+    if(!Array.isArray(items))return '';
+    return '<section class="admin-agent-calendar" aria-label="Verified scene clip recommendations"><strong>Verified scene candidates</strong>'+
+      '<p class="hint">Timecoded, editor-reviewed observations only. Publication clearance is independent; no edit or render has been performed.</p>'+
+      (items.length?items.map(s=>'<div class="admin-agent-calendar-task"><div>'+
+        '<strong>Scene #'+Number(s.scene_id)+' · '+esc(s.capture_title)+'</strong>'+
+        '<p>Submission #'+Number(s.submission_id)+' · '+(Number(s.start_ms)/1000).toFixed(2)+'s–'+
+        (Number(s.end_ms)/1000).toFixed(2)+'s · '+esc(s.location||'Unspecified location')+'</p>'+
+        '<p>'+esc(s.description)+'</p><p class="hint">Source: '+esc(s.origin)+
+        ' · people release: '+esc(s.people_release_status)+
+        ' · publishing: '+esc(s.publication_clearance)+'</p></div></div>').join(''):
+        '<p>No verified scene annotations are available.</p>')+'</section>';
+  }
   function messageHtml(m){
     const who=m.role==='assistant'?'Stonefellow Admin Agent':'Admin';
     const feedback=m.role==='assistant'&&Number(m.id)>0?'<div class="admin-agent-feedback"><button type="button" class="secondary" data-admin-agent-feedback="helpful" data-message-id="'+Number(m.id)+'">Helpful</button><button type="button" class="secondary" data-admin-agent-feedback="not_helpful" data-message-id="'+Number(m.id)+'">Not helpful</button></div>':'';
@@ -98,6 +111,7 @@
     else if(m.role==='assistant'&&action.type==='production_schedule_calendar')next=calendarHtml(action.production_calendar);
     else if(m.role==='assistant'&&action.type==='production_footage_review')next=footageHtml(action.footage_queue);
     else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage);
+    else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
