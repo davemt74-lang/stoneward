@@ -116,7 +116,7 @@
   }
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
-    root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('creative-director'));
+    root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('production-review'));
     root.querySelectorAll('[data-agent-commerce-review]').forEach(b=>b.onclick=()=>{
       const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(m=>String(m.action?.request_key)===b.dataset.agentCommerceReview);
       if(entry?.action?.draft)window.SFAgentCommerceReview?.open?.(entry.action);
