@@ -161,6 +161,7 @@
     return '<section class="admin-agent-calendar admin-agent-timeline-insert" aria-label="Review verified footage insertion">'+
       '<strong>Proposed insertion · '+esc(assembly.title)+' · revision '+revision+'</strong>'+
       '<p class="hint">Choose a source and exact slot. Editorial rights are separate from publication clearance. This preview makes no edits.</p>'+
+      (preview.position_warning?'<p class="hint">'+esc(preview.position_warning)+'</p>':'')+
       '<label>Position<select data-agent-insert-position>'+
       (selected===null?'<option value="" selected>Choose insertion position</option>':'')+options+'</select></label>'+
       '<label>Editor review evidence<textarea rows="2" maxlength="400" data-agent-insert-basis placeholder="Why does this verified scene belong here? 25+ characters."></textarea></label>'+
