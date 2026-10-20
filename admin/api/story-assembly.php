@@ -127,6 +127,15 @@ try{
   sf_json_response(['ok'=>true,'assembly_id'=>sf_assembly_create($id,
    (string)($p['title']??''),(string)($p['brief']??''))]);
  }
+ if($action==='chat_trim'){
+  if(($p['confirmed']??null)!==true)
+   throw new InvalidArgumentException('Timeline trim requires separate human confirmation.');
+  if(!is_int($p['in_ms']??null)||!is_int($p['out_ms']??null))
+   throw new InvalidArgumentException('Exact integer millisecond trim points required.');
+  sf_json_response(['ok'=>true,'result'=>sf_assembly_chat_trim($id,
+    (int)($p['assembly_id']??0),(int)($p['revision']??0),(int)($p['index']??-1),
+    $p['in_ms'],$p['out_ms'],(string)($p['review_basis']??''))]);
+ }
  if($action==='chat_move'){
   if(($p['confirmed']??null)!==true)
    throw new InvalidArgumentException('Timeline move requires separate human confirmation.');
