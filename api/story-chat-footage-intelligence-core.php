@@ -4,10 +4,14 @@ declare(strict_types=1);
 function sf_chat_footage_intelligence(int $editor):array{
  if($editor<1||!sf_team_can($editor,'team.assign_roles'))
   throw new RuntimeException('Production editor required.');
+ require_once __DIR__.'/story-capture-core.php';
+ require_once __DIR__.'/story-scene-core.php';
+ require_once __DIR__.'/story-transcript-core.php';
  require_once __DIR__.'/story-media-evidence-core.php';
  require_once __DIR__.'/story-capture-rights-core.php';
  require_once __DIR__.'/story-inference-queue-core.php';
  require_once __DIR__.'/story-inference-worker-core.php';
+ require_once __DIR__.'/story-production-review-core.php';
  require_once __DIR__.'/story-production-review-core.php';
  $items=sf_production_review_items($editor,35);
  $rows=[];
