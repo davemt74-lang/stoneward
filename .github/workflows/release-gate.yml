@@ -455,6 +455,7 @@ jobs:
           php tests/section88d3g5d5-end-to-end.php
           php tests/section88d3g5e1-ai-director-sequences.php
           php tests/section88d3g5e2-visual-intelligence.php
+          php tests/section88d3g5e3-scene-understanding.php
           node --check admin/assets/agent-canvas.js
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php

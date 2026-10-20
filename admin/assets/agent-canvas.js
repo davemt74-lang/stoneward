@@ -342,10 +342,24 @@
     const a=view.assembly;if(!a)return '';
     const id=Number(a.id),revision=Number(a.revision);
     const proposals=Array.isArray(view.proposals)?view.proposals:[];
+    const sceneEvidence=Array.isArray(view.scene_recommendations)?view.scene_recommendations:[];
+    const sceneSources=view.source_understanding&&typeof view.source_understanding==='object'?view.source_understanding:{};
+    const verifiedStoryLinks=Object.values(sceneSources).reduce((n,v)=>n+
+      (Array.isArray(v.story_connections)?v.story_connections.length:0),0);
     return '<section class="admin-agent-calendar admin-agent-director-sequence" aria-label="AI Director private sequence proposals">'+
       '<strong>AI Director · '+esc(a.title)+' · revision '+revision+'</strong>'+
       '<p class="hint">Existing '+Number(view.existing_count)+' verified cues · up to '+
         Number(view.candidate_count)+' additional eligible sources. No invented footage or unapproved media.</p>'+
+      '<p class="hint">Scene understanding: '+verifiedStoryLinks+
+        ' editor-verified story links · '+sceneEvidence.length+
+        ' source-grounded editorial suggestions. Machine visual samples are observational, not verified people or release evidence.</p>'+
+      (sceneEvidence.length?'<details><summary>Review linked scene, character-story and music evidence</summary>'+
+        sceneEvidence.slice(0,14).map(e=>'<div class="admin-agent-calendar-task">'+
+          '<strong>'+esc(e.source_key)+' · '+esc(e.kind)+'</strong>'+
+          '<p>'+esc(e.suggestion)+'</p><p class="hint">'+Number(e.evidence_count)+
+          ' grounded evidence item(s) · Human editorial review required</p>'+
+          '</div>').join('')+'</details>':
+        '<p class="hint">No verified story-graph or reviewed three-frame observations are linked to the eligible sources yet.</p>')+
       '<p class="hint">Model access: '+(view.enabled?'enabled':'disabled')+
         ' · external-AI evidence: '+(view.eligible_for_external_ai?'eligible':'not yet cleared')+'</p>'+
       (!view.eligible_for_external_ai?'<p class="hint">'+esc(view.eligibility_note||'')+'</p>':'')+
