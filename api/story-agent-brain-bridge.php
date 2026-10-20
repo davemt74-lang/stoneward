@@ -115,6 +115,22 @@ function sf_story_agent_brain_inspect(int $editor,int $assembly):array{
    'code'=>(string)($g['code']??''),'missing'=>(int)($g['missing']??0),
    'role'=>(string)($g['target_role']??'')
  ],array_slice((array)($plan['gaps']??[]),0,6));
+ $understandingCounts=['verified_story_links'=>0,
+   'reviewed_visual_sources'=>0,'original_stonefellow_music'=>0,
+   'suggested_retakes'=>0,'source_evidence_stale'=>false];
+ if($saved['status']==='draft'){
+  try{
+   $ctx=sf_composer_context($editor,$assembly,$revision);
+   foreach((array)($ctx['source_understanding']??[]) as $entry){
+    $understandingCounts['verified_story_links']+=count((array)($entry['story_connections']??[]));
+    if(!empty($entry['visual_observations']))
+     $understandingCounts['reviewed_visual_sources']++;
+    $understandingCounts['suggested_retakes']+=count((array)($entry['retake_ideas']??[]));
+    if(($entry['music_status']??'')==='original_stonefellow_standing_authorization')
+     $understandingCounts['original_stonefellow_music']++;
+   }
+  }catch(Throwable $e){$understandingCounts['source_evidence_stale']=true;}
+ }
  // Deliberately do not return full private source manifests, titles, notes,
  // contributor identities, transcripts, LLM proposals, hashes or asset paths.
  return [
@@ -122,6 +138,7 @@ function sf_story_agent_brain_inspect(int $editor,int $assembly):array{
   'clip_count'=>count($saved['items']),'director_coverage_gaps'=>$gaps,
   'invalid_source_count'=>$invalid,'publication_rights_pending'=>$rightsPending,
   'source_evidence'=>'verified_at_editorial_save_with_live_read_checks',
+  'director_scene_understanding'=>$understandingCounts,
   'source_certification'=>['eligible'=>(bool)($cert['eligible']??false),
     'checks'=>(string)($cert['checks']??'blocked')],
   'render_ready'=>false,'render_statuses'=>$renders,
