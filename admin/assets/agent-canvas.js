@@ -134,6 +134,51 @@
         '</div></div>').join(''):
         '<p>No verified scene annotations are available.</p>')+'</section>';
   }
+  function timelineInsertHtml(preview){
+    if(!preview)return '';
+    const topic=String(preview.topic||'').trim(),assembly=preview.assembly;
+    if(preview.requires_selection){
+      const projects=Array.isArray(preview.assemblies)?preview.assemblies:[];
+      return '<section class="admin-agent-calendar" aria-label="Choose the editorial assembly for a verified shot">'+
+        '<strong>Insert verified footage · select an assembly</strong>'+
+        '<p class="hint">Nothing has changed. Choose the draft project to inspect eligible footage and placement.</p>'+
+        (projects.length?projects.map(a=>'<div class="admin-agent-calendar-task"><div>'+
+          '<strong>Assembly #'+Number(a.id)+' · '+esc(a.title)+'</strong>'+
+          '<p>Revision '+Number(a.revision)+' · '+Number(a.item_count)+' timeline items</p>'+
+          '<button type="button" class="secondary" data-agent-insert-assembly="'+Number(a.id)+'"'+
+          ' data-insert-topic="'+esc(topic)+'" data-insert-placement="'+esc(preview.placement||'')+'"'+
+          ' data-insert-slot="'+(Number.isInteger(preview.slot)?Number(preview.slot):'')+'">Use this assembly</button>'+
+          '</div></div>').join(''):'<p>No editable draft assemblies found. Create one in the existing story editor.</p>')+
+        '</section>';
+    }
+    if(!assembly||!Array.isArray(preview.matches))return '';
+    const id=Number(assembly.id),count=Number(assembly.item_count),revision=Number(assembly.revision);
+    const selected=Number.isInteger(preview.slot)?preview.slot:null;
+    const options=Array.from({length:Math.max(0,Math.min(51,count+1))},(_,i)=>
+      '<option value="'+i+'"'+(selected===i?' selected':'')+'>'+
+      (i===0?'At beginning':'After clip #'+i)+'</option>').join('');
+    const matches=preview.matches;
+    return '<section class="admin-agent-calendar admin-agent-timeline-insert" aria-label="Review verified footage insertion">'+
+      '<strong>Proposed insertion · '+esc(assembly.title)+' · revision '+revision+'</strong>'+
+      '<p class="hint">Choose a source and exact slot. Editorial rights are separate from publication clearance. This preview makes no edits.</p>'+
+      '<label>Position<select data-agent-insert-position>'+
+      (selected===null?'<option value="" selected>Choose insertion position</option>':'')+options+'</select></label>'+
+      '<label>Editor review evidence<textarea rows="2" maxlength="400" data-agent-insert-basis placeholder="Why does this verified scene belong here? 25+ characters."></textarea></label>'+
+      (matches.length?matches.map(item=>'<div class="admin-agent-calendar-task"><div>'+
+        '<strong>Verified scene #'+Number(item.source_id)+' · '+esc(item.label)+'</strong>'+
+        '<p>Submission #'+Number(item.submission_id)+' · '+(Number(item.in_ms)/1000).toFixed(2)+'–'+
+          (Number(item.out_ms)/1000).toFixed(2)+'s · '+esc(item.category)+'</p>'+
+        '<p class="hint">Publication clearance: '+esc(item.publication_clearance)+
+          ' · metadata matches: '+Number(item.term_matches)+'</p>'+
+        (item.category==='video'?
+          '<details><summary>Preview source footage</summary><div class="admin-agent-footage-preview"><video controls playsinline preload="none" src="api/story-footage-preview.php?submission_id='+
+            Number(item.submission_id)+'"></video></div></details>':'')+
+        '<button type="button" class="secondary" data-agent-insert-source="'+Number(item.source_id)+'"'+
+        ' data-assembly-id="'+id+'" data-revision="'+revision+'" data-source-label="'+esc(item.label)+'">Review and insert</button>'+
+        '</div></div>').join(''):
+        '<p>No new verified scenes match this request. Approve the contribution and scene evidence in the review workspace, or try another topic.</p>')+
+      '<p class="hint">After confirmation the entire source-bound timeline is validated again. Existing clips keep their order and trims; no rendering or publishing.</p></section>';
+  }
   function timelineHtml(action){
     const t=action.timeline_inspection,list=action.timeline_assemblies;
     if(t&&Array.isArray(t.items)){
@@ -176,6 +221,7 @@
     else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage,action.director_scene_matches);
     else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
+    else if(m.role==='assistant'&&action.type==='production_timeline_insert')next=timelineInsertHtml(action.insert_preview);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
@@ -267,6 +313,44 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-insert-assembly]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.agentInsertAssembly),topic=button.dataset.insertTopic||'';
+      const placement=button.dataset.insertPlacement||'';
+      const slot=button.dataset.insertSlot===''?null:Number(button.dataset.insertSlot);
+      if(!Number.isSafeInteger(id)||id<1)return;
+      const position=placement==='after_opening'?' after opening scene':
+        placement==='after_clip'&&slot!==null?' after clip #'+slot:
+        placement==='before_clip'&&slot!==null?' before clip #'+(slot+1):
+        placement==='start'?' at beginning':placement==='end'?' at end':'';
+      button.disabled=true;
+      try{await send('add verified '+(topic||'scene')+' clip to assembly #'+id+position);}
+      catch(e){c.say(e.message||'Unable to load insertion preview.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-insert-source]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const card=button.closest('.admin-agent-timeline-insert');
+      const rawPosition=card?.querySelector('[data-agent-insert-position]')?.value??'';
+      const position=Number(rawPosition);
+      const basis=card?.querySelector('[data-agent-insert-basis]')?.value.trim()||'';
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision);
+      const sourceId=String(button.dataset.agentInsertSource||'');
+      if(!/^\\d+$/.test(rawPosition)||!Number.isSafeInteger(position)||position<0||
+         !Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(revision)||revision<1||
+         !/^[1-9]\\d*$/.test(sourceId)||basis.length<25){
+        c.say('Choose a timeline position and document the source selection in at least 25 characters.');return;
+      }
+      if(!window.confirm('Insert verified scene #'+sourceId+' into assembly #'+id+
+        ' at position '+(position+1)+' using revision '+revision+
+        '? Only the private editorial timeline will change.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_insert',assembly_id:id,revision,
+          index:position,source_id:sourceId,review_basis:basis,confirmed:true});
+        c.say('Verified scene added with an auditable review decision. Reloading the assembly timeline.');
+        await send('assembly #'+id+' timeline');
+      }catch(e){c.say(e.message||'Insert not applied. Refresh the current assembly revision.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-timeline-trim]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const card=button.closest('.admin-agent-calendar-task');
