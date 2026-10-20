@@ -157,6 +157,8 @@ function sf_assembly_validate_item(array $item):array{
   'in_ms'=>$in,'out_ms'=>$out,'duration_ms'=>$duration,'notes'=>$notes];
 }
 function sf_assembly_create(int $editor,string $title,string $brief=''):int{
+ // Initial revision must be immutable too; every assembly starts with rev 1.
+ require_once __DIR__.'/story-assembly-history-core.php';
  sf_assembly_editor($editor);sf_assembly_schema();
  $title=sf_capture_clean($title,180);$brief=sf_capture_clean($brief,1500);
  if(strlen($title)<3)throw new InvalidArgumentException('Title must contain at least 3 characters.');
@@ -169,7 +171,7 @@ function sf_assembly_create(int $editor,string $title,string $brief=''):int{
     (title,brief,revision,status,created_by,created_at,updated_at)
     VALUES(?,?,1,'draft',?,?,?)");
   $q->execute([$title,$brief,$editor,$now,$now]);$id=(int)$db->lastInsertId();
-  if(function_exists('sf_assembly_history_archive'))sf_assembly_history_archive($editor,$id,1,[]);
+  sf_assembly_history_archive($editor,$id,1,[]);
   sf_team_audit($editor,'capture.assembly_created','story_assembly',(string)$id,'Private editorial assembly created');
   $db->commit();return $id;
  }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
