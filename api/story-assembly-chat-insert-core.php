@@ -50,6 +50,13 @@ function sf_assembly_chat_insert_preview(int $editorId,?int $assemblyId,string $
  if(!$assembly||$assembly['status']!=='draft')
   throw new RuntimeException('This assembly cannot accept new clips.');
  $count=count($assembly['items']);
+ $positionWarning='';
+ if($placement==='after_opening'){
+  $slot=null;
+  foreach($assembly['items'] as $i=>$item)
+   if($item['kind']==='scene'){$slot=$i+1;break;}
+  if($slot===null)$positionWarning='No verified opening scene exists in this assembly. Select an exact clip position.';
+ }
  if($placement==='end')$slot=$count;
  if($slot!==null&&($slot<0||$slot>$count))
   throw new InvalidArgumentException('The requested clip position is outside the current timeline.');
@@ -79,7 +86,7 @@ function sf_assembly_chat_insert_preview(int $editorId,?int $assemblyId,string $
      'revision'=>(int)$assembly['revision'],'status'=>(string)$assembly['status'],
      'item_count'=>$count],
    'assemblies'=>[],'matches'=>array_slice($available,0,12),
-   'topic'=>$topic,'slot'=>$slot,'placement'=>$placement,
+   'topic'=>$topic,'slot'=>$slot,'placement'=>$placement,'position_warning'=>$positionWarning,
    'requires_selection'=>false,'private_only'=>true,'executed_changes'=>false];
 }
 function sf_assembly_chat_insert(int $editorId,int $assemblyId,int $revision,int $index,
