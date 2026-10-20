@@ -180,6 +180,50 @@
         '<p>No new verified scenes match this request. Approve the contribution and scene evidence in the review workspace, or try another topic.</p>')+
       '<p class="hint">After confirmation the entire source-bound timeline is validated again. Existing clips keep their order and trims; no rendering or publishing.</p></section>';
   }
+  function timelineMediaHtml(preview){
+    if(!preview)return '';
+    const kind=preview.kind==='transcript'?'transcript':'track',name=kind==='track'?'Stonefellow music':'verified dialogue';
+    const topic=String(preview.topic||'').trim();
+    if(preview.requires_selection){
+      const projects=Array.isArray(preview.assemblies)?preview.assemblies:[];
+      return '<section class="admin-agent-calendar" aria-label="Choose music or dialogue assembly">'+
+        '<strong>Place '+esc(name)+' · choose a production</strong>'+
+        (projects.length?projects.map(a=>'<div class="admin-agent-calendar-task">'+
+          '<strong>Assembly #'+Number(a.id)+' · '+esc(a.title)+'</strong>'+
+          '<button type="button" class="secondary" data-agent-media-choose="'+Number(a.id)+'"'+
+          ' data-media-kind="'+kind+'" data-media-topic="'+esc(topic)+'"'+
+          ' data-media-placement="'+esc(preview.placement||'')+'"'+
+          ' data-media-slot="'+(Number.isInteger(preview.slot)?Number(preview.slot):'')+'">Review placement</button>'+
+          '</div>').join(''):'<p>No editable draft assemblies found.</p>')+'</section>';
+    }
+    const a=preview.assembly,matches=Array.isArray(preview.matches)?preview.matches:[];
+    if(!a)return '';
+    const id=Number(a.id),revision=Number(a.revision),count=Number(a.item_count);
+    const selected=Number.isInteger(preview.slot)?preview.slot:null;
+    const choices=Array.from({length:Math.max(0,Math.min(count+1,51))},(_,i)=>
+      '<option value="'+i+'"'+(selected===i?' selected':'')+'>'+
+      (i===0?'At beginning':'After clip #'+i)+'</option>').join('');
+    return '<section class="admin-agent-calendar admin-agent-media-placement" aria-label="Review original music or verified dialogue">'+
+      '<strong>Place '+esc(name)+' · '+esc(a.title)+' · revision '+revision+'</strong>'+
+      '<p class="hint">'+(kind==='track'?
+        'Original Stonefellow music: sync and master-use approved automatically under standing artist authorization. Explicit rights exceptions are excluded.':
+        'Dialogue must be independently editorially verified; contributor publication clearance remains separate.')+
+        ' This preview makes no timeline changes.</p>'+
+      (preview.position_warning?'<p class="hint">'+esc(preview.position_warning)+'</p>':'')+
+      '<label>Sequence position<select data-agent-media-position>'+
+      (selected===null?'<option value="" selected>Choose exact position</option>':'')+choices+'</select></label>'+
+      '<label>Editor placement reason<textarea rows="2" maxlength="400" data-agent-media-basis placeholder="Why should this cue be placed here? At least 25 characters."></textarea></label>'+
+      (matches.length?matches.map(item=>
+        '<div class="admin-agent-calendar-task"><strong>'+esc(item.label)+'</strong>'+
+        '<p>Source '+esc(item.source_id)+' · '+(Number(item.duration_ms)/1000).toFixed(2)+'s'+
+        (kind==='track'?' · artist music approval: automatic':
+          ' · publication: '+esc(item.publication_clearance))+'</p>'+
+        '<button type="button" class="secondary" data-agent-media-source="'+esc(item.source_id)+'"'+
+        ' data-media-kind="'+kind+'" data-assembly-id="'+id+'" data-revision="'+revision+
+        '">Review placement</button></div>').join(''):
+        '<p>No matching approved '+esc(name)+' sources. Check the existing catalog or verified transcripts.</p>')+
+      '<p class="hint">Original files stay unchanged. Publication, contribution rights and rendering certification remain separate.</p></section>';
+  }
   function timelineEditHtml(preview){
     if(!preview)return '';
     const op=preview.operation==='replace'?'replace':'remove',target=preview.index;
@@ -285,6 +329,7 @@
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
     else if(m.role==='assistant'&&action.type==='production_timeline_insert')next=timelineInsertHtml(action.insert_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_edit')next=timelineEditHtml(action.edit_preview);
+    else if(m.role==='assistant'&&action.type==='production_timeline_media')next=timelineMediaHtml(action.media_preview);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
@@ -376,6 +421,44 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-media-choose]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.agentMediaChoose),kind=button.dataset.mediaKind,
+        topic=button.dataset.mediaTopic||'',place=button.dataset.mediaPlacement||'';
+      const slot=button.dataset.mediaSlot===''?null:Number(button.dataset.mediaSlot);
+      if(!Number.isSafeInteger(id)||id<1||!['track','transcript'].includes(kind))return;
+      const position=place==='after_opening'?' after opening scene':
+        place==='after_clip'&&slot!==null?' after clip #'+slot:
+        place==='before_clip'&&slot!==null?' before clip #'+(slot+1):
+        place==='start'?' at beginning':place==='end'?' at end':'';
+      button.disabled=true;
+      try{await send('add '+(topic||'original')+' '+(kind==='track'?'music':'dialogue')+
+        ' to assembly #'+id+position);}
+      catch(e){c.say(e.message||'Could not select this assembly.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-media-source]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const card=button.closest('.admin-agent-media-placement');
+      const raw=card?.querySelector('[data-agent-media-position]')?.value??'';
+      const index=Number(raw),basis=card?.querySelector('[data-agent-media-basis]')?.value.trim()||'';
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision),
+        kind=button.dataset.mediaKind,sourceId=String(button.dataset.agentMediaSource||'');
+      if(!/^\\d+$/.test(raw)||!Number.isSafeInteger(index)||index<0||!Number.isSafeInteger(id)||id<1||
+         !Number.isSafeInteger(revision)||revision<1||!['track','transcript'].includes(kind)||
+         !sourceId||basis.length<25){
+        c.say('Choose an exact timeline position and document the editorial reason (25+ characters).');return;
+      }
+      if(!window.confirm('Place '+(kind==='track'?'original Stonefellow music':'verified dialogue')+
+          ' '+sourceId+' at clip '+(index+1)+' in assembly #'+id+
+          ' revision '+revision+'? Music permission is automatic only for eligible originals.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_add_media',assembly_id:id,revision,index,
+          kind,source_id:sourceId,review_basis:basis,confirmed:true});
+        c.say('Music or dialogue placement saved to the existing revision and Team Activity ledger.');
+        await send('assembly #'+id+' timeline');
+      }catch(e){c.say(e.message||'Placement was not saved; refresh current assembly.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-edit-command]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const command=button.dataset.agentEditCommand||'';

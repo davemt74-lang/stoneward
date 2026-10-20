@@ -62,7 +62,7 @@ function sf_admin_agent_thread_messages(int $adminId,string $threadId): array {
     $privateIntents=['production_editorial_status','production_schedule_calendar',
       'production_director_coverage','production_evidence_search','production_footage_review',
       'production_scene_candidates','production_timeline_inspect','production_timeline_insert',
-      'production_timeline_edit'];
+      'production_timeline_edit','production_timeline_media'];
     foreach($rows as &$row){
         $row['action']=json_decode((string)$row['action_json'],true)?:[];
         unset($row['action_json']);
@@ -138,6 +138,7 @@ function sf_admin_agent_plan(string $message): array {
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
     elseif(preg_match('/\\b(?:footage review|review footage|inspect footage|footage inspection|capture review queue|video submissions?)\\b/',$m)){$type='production_footage_review';$view='agent-chat';}
+    elseif(preg_match('/\\b(?:add|insert|place|append)\\b.{0,200}\\b(?:music|song|track|dialogue|dialog|transcript|voiceover|narration)\\b/i',$m)){$type='production_timeline_media';$view='agent-chat';}
     elseif(preg_match('/\\b(?:remove|delete|replace|swap)\\b.{0,200}\\b(?:clip|scene|shot|footage)\\b/i',$m)){$type='production_timeline_edit';$view='agent-chat';}
     elseif(preg_match('/\\b(?:add|insert|place|append)\\b.{0,200}\\b(?:shot|scene|clip|footage|video)\\b/i',$m)){$type='production_timeline_insert';$view='agent-chat';}
     elseif(preg_match('/\\b(?:timeline assembly|assembly timeline|timeline clips|clip sequence|storyboard timeline|assembly\\s*#?\\s*[0-9]+\\s+timeline|timeline\\s+(?:for\\s+)?assembly\\s*#?\\s*[0-9]+)\\b/',$m)){$type='production_timeline_inspect';$view='agent-chat';}
@@ -274,6 +275,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'production_timeline_inspect'=>'Private timeline review is unavailable.',
       'production_timeline_insert'=>'Private insertion preview is unavailable. Nothing changed.',
       'production_timeline_edit'=>'Private timeline edit preview is unavailable. No changes made.',
+      'production_timeline_media'=>'Original-music and dialogue placement preview unavailable. Nothing changed.',
       'stem_mix_review'=>'I can inspect real private Stem Studio track, bus, send, FX, automation and mastering metadata, compare bounded reference evidence, recommend specific adjustments and prepare exact reviewed changes. Provide a song ID. Native VST audio is not independently recreated and no mix is changed automatically.',
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
@@ -336,6 +338,24 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
                 'No external AI analysis, publication, or editing approval was performed.';
         }catch(Throwable $e){
             $text='Footage inspection is unavailable or production-editor permission is missing. No changes were made.';
+        }
+    }
+    if($plan['type']==='production_timeline_media'){
+        try{
+            require_once __DIR__.'/story-assembly-chat-media-core.php';
+            $intent=sf_assembly_chat_media_intent($message);
+            $mediaPreview=sf_assembly_chat_media_preview($adminId,$intent['assembly_id'],
+                $intent['kind'],$intent['media_topic'],$intent['slot'],$intent['placement']);
+            $text=$mediaPreview['requires_selection']?
+              'Choose a draft assembly. No music or dialogue has been placed.':
+              'Private assembly #'.$mediaPreview['assembly']['id'].' revision '.
+              $mediaPreview['assembly']['revision'].': '.count($mediaPreview['matches']).
+              ' verified '.($intent['kind']==='track'?'Stonefellow original tracks':'dialogue recordings').
+              ' eligible for review. Original Stonefellow music receives standing artist '.
+              'sync/master-use authorization automatically; third-party exceptions do not. '.
+              'Timeline placement still requires an explicit editor decision.';
+        }catch(Throwable $e){
+            $text='Private music or dialogue preview unavailable, or production editor access denied. No changes made.';
         }
     }
     if($plan['type']==='production_timeline_edit'){
@@ -505,6 +525,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='production_scene_candidates'&&isset($scenes))$action['scene_candidates']=$scenes;
     if($plan['type']==='production_timeline_insert'&&isset($insertPreview))$action['insert_preview']=$insertPreview;
     if($plan['type']==='production_timeline_edit'&&isset($editPreview))$action['edit_preview']=$editPreview;
+    if($plan['type']==='production_timeline_media'&&isset($mediaPreview))$action['media_preview']=$mediaPreview;
     if($plan['type']==='production_timeline_inspect'){
         if(isset($timeline)&&is_array($timeline))$action['timeline_inspection']=$timeline;
         if(isset($assemblies))$action['timeline_assemblies']=$assemblies;

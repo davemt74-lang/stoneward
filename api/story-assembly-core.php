@@ -52,9 +52,14 @@ function sf_assembly_tracks():array{
   if(!is_array($t))continue;
   $id=(string)($t['id']??'');$title=trim((string)($t['title']??''));
   if($id===''||strlen($id)>128||$title==='')continue;
+  require_once __DIR__.'/story-stonefellow-music-auto-core.php';
+  $authorization=sf_stonefellow_music_auto_status($id);
   $rows[]=['kind'=>'track','source_id'=>$id,'label'=>sf_capture_clean($title,180),
    'duration_ms'=>max(0,min(86400000,(int)round((float)($t['duration']??0)*1000))),
-   'publication_clearance'=>'requires_music_license_review','submission_id'=>null];
+   'publication_clearance'=>!empty($authorization['eligible'])?'original_music_auto_authorized':
+     'requires_music_license_review',
+   'music_auto_authorized'=>!empty($authorization['eligible']),
+   'authorization_reason'=>(string)$authorization['reason'],'submission_id'=>null];
   if(count($rows)>=300)break;
  }
  return $rows;
@@ -216,7 +221,15 @@ function sf_assembly_director_plan(int $editor,array $items):array{
  if($items&&($items[0]['kind']??'')!=='scene')$tips[]='Consider starting with a verified establishing scene.';
  if($items&&($items[count($items)-1]['kind']??'')!=='scene')$tips[]='Consider ending with a verified visual scene.';
  if($unreleased)$tips[]='Some source captures lack independent publication clearance; private assembly is not a distribution license.';
- if($music)$tips[]='Track references are editorial only; confirm synchronization and master-use rights before publication.';
+ if($music){
+  require_once __DIR__.'/story-stonefellow-music-auto-core.php';
+  $auto=0;
+  foreach($items as $musicItem)
+   if(($musicItem['kind']??'')==='track'&&
+     !empty(sf_stonefellow_music_auto_status((string)$musicItem['source_id'])['eligible']))$auto++;
+  if($auto)$tips[]=$auto.' Stonefellow original music cue(s) use standing artist authorization; master media certification is separate.';
+  if($auto<$music)$tips[]='Some music cues still require individual sync and master rights review.';
+ }
  return ['gaps'=>$gaps,'notes'=>$tips,'verified_visuals'=>$visual,'verified_dialogue'=>$dialogue,
    'music_references'=>$music,'publication_rights_pending'=>$unreleased,
    'invalid_source_items'=>$invalid,
