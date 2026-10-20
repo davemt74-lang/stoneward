@@ -180,6 +180,67 @@
         '<p>No new verified scenes match this request. Approve the contribution and scene evidence in the review workspace, or try another topic.</p>')+
       '<p class="hint">After confirmation the entire source-bound timeline is validated again. Existing clips keep their order and trims; no rendering or publishing.</p></section>';
   }
+  function timelineEditHtml(preview){
+    if(!preview)return '';
+    const op=preview.operation==='replace'?'replace':'remove',target=preview.index;
+    const topic=String(preview.topic||'').trim();
+    const command=(id,index)=>op+' clip '+(index===null?'':'#'+(index+1)+' ')+
+      'in assembly #'+id+(op==='replace'&&topic?' with '+topic+' footage':'');
+    if(preview.requires_selection){
+      const projects=Array.isArray(preview.assemblies)?preview.assemblies:[];
+      return '<section class="admin-agent-calendar admin-agent-timeline-edit" aria-label="Choose editorial assembly">'+
+        '<strong>Review clip '+op+' · select an assembly</strong>'+
+        '<p class="hint">No editing has occurred. Select a draft assembly to review the current sequence.</p>'+
+        (projects.length?projects.map(a=>'<div class="admin-agent-calendar-task">'+
+          '<strong>Assembly #'+Number(a.id)+' · '+esc(a.title)+'</strong>'+
+          '<p>Revision '+Number(a.revision)+' · '+Number(a.item_count)+' items</p>'+
+          '<button type="button" class="secondary" data-agent-edit-command="'+
+          esc(command(Number(a.id),target))+'">Review this assembly</button></div>').join(''):
+          '<p>No editable assemblies found.</p>')+'</section>';
+    }
+    const a=preview.assembly,items=Array.isArray(preview.items)?preview.items:[];
+    if(!a)return '';
+    const id=Number(a.id),revision=Number(a.revision);
+    const head='<strong>Assembly #'+id+' · '+esc(a.title)+' · revision '+revision+'</strong>'+
+      '<p class="hint">Private editorial change only. Source media files remain intact. Rights for publication remain separate.</p>';
+    if(!Number.isInteger(target)||target<0||target>=items.length){
+      return '<section class="admin-agent-calendar admin-agent-timeline-edit" aria-label="Select exact clip to '+op+'">'+head+
+        '<p>Choose the exact current clip to '+op+'. No changes have been applied.</p>'+
+        (items.length?items.map((item,i)=>'<div class="admin-agent-calendar-task">'+
+          '<strong>#'+(i+1)+' · '+esc(item.kind)+' · source '+esc(item.source_id)+'</strong>'+
+          '<p>'+esc(item.notes||'')+'</p>'+
+          ((op==='remove'||item.kind==='scene')?
+            '<button type="button" class="secondary" data-agent-edit-command="'+
+              esc(command(id,i))+'">Review '+op+'</button>':
+            '<p class="hint">Only verified scenes can replace other scenes in this workflow.</p>')+
+          '</div>').join(''):'<p>The assembly contains no clips to change.</p>')+'</section>';
+    }
+    const old=items[target],matches=Array.isArray(preview.matches)?preview.matches:[];
+    return '<section class="admin-agent-calendar admin-agent-timeline-edit" aria-label="Confirm private clip '+op+'">'+head+
+      '<p><strong>Clip #'+(target+1)+'</strong> · '+esc(old.kind)+' · source '+esc(old.source_id)+
+      ' · '+(Number(old.in_ms)/1000).toFixed(2)+'–'+(Number(old.out_ms)/1000).toFixed(2)+'s</p>'+
+      '<p>'+esc(old.notes||'')+'</p>'+
+      '<label>Human editorial justification<textarea rows="2" maxlength="400" data-agent-edit-basis placeholder="Explain why this exact clip should change (at least 25 characters)."></textarea></label>'+
+      (op==='remove'?
+        '<button type="button" class="secondary" data-agent-edit-confirm="remove" data-assembly-id="'+id+
+          '" data-revision="'+revision+'" data-index="'+target+'" data-old-source="'+esc(old.source_id)+'">Review removal</button>':
+        old.kind!=='scene'?'<p>Replacement is limited to verified scene-to-scene swaps.</p>':
+        matches.length?'<strong>Choose a verified replacement</strong>'+
+          matches.map(m=>'<div class="admin-agent-calendar-task"><div>'+
+          '<strong>Scene #'+Number(m.source_id)+' · '+esc(m.label)+'</strong>'+
+          '<p>Submission #'+Number(m.submission_id)+' · '+(Number(m.in_ms)/1000).toFixed(2)+
+          '–'+(Number(m.out_ms)/1000).toFixed(2)+'s</p>'+
+          '<p class="hint">Publication clearance: '+esc(m.publication_clearance)+
+          ' · '+Number(m.term_matches)+' search terms matched</p>'+
+          (m.category==='video'?'<details><summary>Inspect original video</summary>'+
+            '<div class="admin-agent-footage-preview"><video controls playsinline preload="none" src="api/story-footage-preview.php?submission_id='+
+            Number(m.submission_id)+'"></video></div></details>':'')+
+          '<button type="button" class="secondary" data-agent-edit-confirm="replace"'+
+          ' data-assembly-id="'+id+'" data-revision="'+revision+'" data-index="'+target+
+          '" data-old-source="'+esc(old.source_id)+'" data-new-source="'+Number(m.source_id)+'">Review replacement</button>'+
+          '</div></div>').join(''):'<p>No eligible replacement scenes found. Search another topic or verify new submitted footage first.</p>')+
+      '<p class="hint">Confirmation checks the original clip, live revision and source validity. Every committed change is written to Team Activity and the revision history.</p></section>';
+  }
   function timelineHtml(action){
     const t=action.timeline_inspection,list=action.timeline_assemblies;
     if(t&&Array.isArray(t.items)){
@@ -223,6 +284,7 @@
     else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
     else if(m.role==='assistant'&&action.type==='production_timeline_insert')next=timelineInsertHtml(action.insert_preview);
+    else if(m.role==='assistant'&&action.type==='production_timeline_edit')next=timelineEditHtml(action.edit_preview);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
@@ -314,6 +376,42 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-edit-command]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const command=button.dataset.agentEditCommand||'';
+      if(command.length<8||command.length>250)return;
+      button.disabled=true;
+      try{await send(command);}
+      catch(e){c.say(e.message||'Unable to refresh the editor review.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-edit-confirm]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const card=button.closest('.admin-agent-timeline-edit');
+      const basis=card?.querySelector('[data-agent-edit-basis]')?.value.trim()||'';
+      const operation=button.dataset.agentEditConfirm;
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision),
+        index=Number(button.dataset.index);
+      const expected=String(button.dataset.oldSource||''),replacement=String(button.dataset.newSource||'');
+      if(!['remove','replace'].includes(operation)||!Number.isSafeInteger(id)||id<1||
+         !Number.isSafeInteger(revision)||revision<1||!Number.isSafeInteger(index)||index<0||
+         !expected||basis.length<25||(operation==='replace'&&!/^[1-9]\\d*$/.test(replacement))){
+        c.say('Select the exact clip and record at least 25 characters of human review evidence.');return;
+      }
+      const description=operation==='remove'?
+        'Remove clip #'+(index+1)+' (source '+expected+')':
+        'Replace scene '+expected+' with verified scene '+replacement+' at clip #'+(index+1);
+      if(!window.confirm(description+' from assembly #'+id+' revision '+revision+
+          '? This changes the private editorial timeline, not the original files or publishing rights.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:operation==='remove'?'chat_remove':'chat_replace',
+          assembly_id:id,revision,index,expected_source_id:expected,
+          ...(operation==='replace'?{new_source_id:replacement}:{}),
+          review_basis:basis,confirmed:true});
+        c.say('Editor-confirmed '+operation+' saved to revision and Team Activity history. Reloading timeline.');
+        await send('assembly #'+id+' timeline');
+      }catch(e){c.say(e.message||'Edit rejected. Reload the current timeline revision.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-insert-assembly]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.agentInsertAssembly),topic=button.dataset.insertTopic||'';
