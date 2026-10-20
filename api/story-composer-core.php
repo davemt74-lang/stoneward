@@ -157,7 +157,7 @@ function sf_composer_validate_suggestion(array $result,array $context):array{
  $logline=sf_capture_clean($result['logline']??'',500);
  if($logline===''||strlen($logline)>500)throw new InvalidArgumentException('Composer logline is required.');
  $beats=$result['beats']??null;
- if(!is_array($beats)||count($beats)!==$count)
+ if(!is_array($beats)||count($beats)!==$size)
   throw new InvalidArgumentException('Composer must explain each editorial beat.');
  $safe=[];
  foreach($beats as $i=>$b){
