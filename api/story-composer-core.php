@@ -265,7 +265,7 @@ function sf_composer_list(int $editor,int $assemblyId):array{
   unset($row['suggestion_json']);
  }unset($row);return $rows;
 }
-function sf_composer_review(int $editor,int $proposalId,string $decision):bool{
+function sf_composer_review(int $editor,int $proposalId,string $decision,string $basis=''):bool{
  sf_assembly_editor($editor);sf_composer_schema();
  if(!in_array($decision,['approved','rejected'],true))
   throw new InvalidArgumentException('Invalid proposal review decision.');
@@ -273,7 +273,8 @@ function sf_composer_review(int $editor,int $proposalId,string $decision):bool{
   WHERE id=? AND status='pending_review'");
  $q->execute([$decision,$editor,gmdate('c'),$proposalId]);
  if($q->rowCount())sf_team_audit($editor,'capture.composer_review','story_composer_proposal',
-  (string)$proposalId,'Private AI editorial suggestion '.$decision);
+  (string)$proposalId,'Private AI editorial suggestion '.$decision.
+   ($basis!==''?' · Human evidence: '.sf_capture_clean($basis,400):''));
  return $q->rowCount()===1;
 }
 /** Explicit second editor action: apply approved permutation only, not AI text. */
