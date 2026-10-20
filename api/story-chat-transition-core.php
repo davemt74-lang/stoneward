@@ -8,6 +8,10 @@ declare(strict_types=1);
 function sf_chat_transition_preview(int $editor,?int $assemblyId):array{
  if($editor<1||!sf_team_can($editor,'team.assign_roles'))
   throw new RuntimeException('Production editor permission required.');
+ require_once __DIR__.'/story-capture-core.php';
+ require_once __DIR__.'/story-capture-rights-core.php';
+ require_once __DIR__.'/story-transcript-core.php';
+ require_once __DIR__.'/story-scene-core.php';
  require_once __DIR__.'/story-assembly-core.php';
  if($assemblyId===null){
   $rows=sf_assembly_list($editor);
@@ -20,12 +24,16 @@ function sf_chat_transition_preview(int $editor,?int $assemblyId):array{
  }
  $assembly=sf_assembly_read($editor,$assemblyId);
  if(!$assembly)throw new InvalidArgumentException('Private assembly not found.');
+ require_once __DIR__.'/story-composer-core.php';
  require_once __DIR__.'/storyboard-preview-core.php';
- require_once __DIR__.'/story-render-edl-core.php';
+ require_once __DIR__.'/story-media-evidence-core.php';
+ require_once __DIR__.'/story-render-source-core.php';
+ require_once __DIR__.'/story-render-worker-core.php';
  require_once __DIR__.'/story-render-review-core.php';
- require_once __DIR__.'/story-render-transition-core.php';
- require_once __DIR__.'/story-render-cut-core.php';
  require_once __DIR__.'/story-render-mix-core.php';
+ require_once __DIR__.'/story-render-transition-core.php';
+ require_once __DIR__.'/story-render-edl-core.php';
+ require_once __DIR__.'/story-render-cut-core.php';
  $revision=(int)$assembly['revision'];
  $story=sf_storyboard_preview($editor,$assemblyId);
  $edl=sf_render_edl_preview($editor,$assemblyId,$revision);
