@@ -9,9 +9,11 @@ function sf_director_scene_candidates(int $editorId,int $limit=24):array{
  $limit=max(1,min(40,$limit));
  $sql="SELECT n.id AS scene_id,n.submission_id,n.start_ms,n.end_ms,n.description,
    n.location_label,n.origin,s.title AS capture_title,s.people_release_status,
+   a.category AS media_category,
    COALESCE(r.status,'unreviewed') AS publication_clearance
    FROM story_scene_annotations n
    JOIN story_capture_submissions s ON s.id=n.submission_id
+   JOIN media_assets a ON a.id=n.asset_id AND a.id=s.asset_id AND a.category IN ('image','video')
    LEFT JOIN story_capture_rights_reviews r
      ON r.submission_id=s.id AND r.purpose='publication'
    WHERE n.review_status='verified' AND s.review_status='approved_for_edit'
@@ -24,6 +26,7 @@ function sf_director_scene_candidates(int $editorId,int $limit=24):array{
      'start_ms'=>(int)$r['start_ms'],'end_ms'=>(int)$r['end_ms'],
      'description'=>sf_capture_clean((string)$r['description'],240),
      'capture_title'=>sf_capture_clean((string)$r['capture_title'],180),
+     'media_category'=>(string)$r['media_category'],
      'location'=>sf_capture_clean((string)$r['location_label'],180),
      'origin'=>(string)$r['origin'],
      'people_release_status'=>(string)$r['people_release_status'],
