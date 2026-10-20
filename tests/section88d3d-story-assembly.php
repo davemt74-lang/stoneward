@@ -21,8 +21,9 @@ function sf_team_audit(int $id,string $evt,string $kind,string $entity,string $d
  global $failAudit;if($failAudit)throw new RuntimeException('Activity audit failed.');
 }
 function sf_catalog():array{
- return [['id'=>'stone-song-1','title'=>'Original Stonefellow song','duration'=>80,
+ $fixture=[['id'=>'stone-song-1','title'=>'Original Stonefellow song','duration'=>80,
   'metadata'=>['copyright_text'=>'Unverified sync license']]];
+ return array_merge($fixture,(array)($GLOBALS['g5d3_extra_catalog']??[]));
 }
 require dirname(__DIR__).'/api/story-capture-core.php';
 require dirname(__DIR__).'/api/story-capture-rights-core.php';
