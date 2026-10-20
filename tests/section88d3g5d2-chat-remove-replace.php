@@ -115,6 +115,7 @@ editPass($final['items'][0]['source_id']===$after['items'][0]['source_id']&&
 editDeny(fn()=>sf_assembly_chat_replace(1,$id,6,1,(string)$scene,(string)$newScene,
  'Stale chat card is not allowed to overwrite latest revision.'),
  'Stale replacement is rejected.');
+require_once dirname(__DIR__).'/api/agent-admin-brain.php';
 $agent=(string)file_get_contents(dirname(__DIR__).'/api/agent-admin-brain.php');
 $api=(string)file_get_contents(dirname(__DIR__).'/admin/api/story-assembly.php');
 $ui=(string)file_get_contents(dirname(__DIR__).'/admin/assets/agent-canvas.js');
