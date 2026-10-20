@@ -103,8 +103,15 @@ $inserted=sf_assembly_chat_insert(1,$id,8,0,(string)$scene,
 fullPass($inserted['revision']===9&&
  sf_assembly_read(1,$id)['items'][0]['source_id']===(string)$scene,
  'Verified original footage added as opening without bypassing source review.');
+fullDeny(fn()=>sf_assembly_chat_replace(1,$id,9,0,(string)$scene,(string)$still,
+ 'Previously rejected footage cannot enter the saved timeline as a verified edit.'),
+ 'Previously revoked replacement scene is rejected.');
+// The fixture deliberately rejected this source in the earlier section.
+// Simulate independent re-verification before the newly authorized swap.
+$db->prepare("UPDATE story_scene_annotations SET review_status='verified' WHERE id=?")
+ ->execute([$still]);
 $replaced=sf_assembly_chat_replace(1,$id,9,0,(string)$scene,(string)$still,
- 'Use the independently verified static detail shot as the new opening.');
+ 'Use the independently reverified static detail shot as the new opening.');
 fullPass($replaced['revision']===10&&
  sf_assembly_read(1,$id)['items'][0]['source_id']===(string)$still,
  'Verified scene replacement applies one deterministic, audited revision.');
