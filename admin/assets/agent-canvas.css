@@ -63,3 +63,7 @@
 .admin-agent-calendar .actions{display:flex;gap:9px;flex-wrap:wrap}
 .admin-agent-calendar .hint{font-size:.82rem;opacity:.78}
 @media(max-width:650px){.admin-agent-calendar{padding:8px}.admin-agent-calendar .actions button{flex:1 1 130px}}
+
+/* G5A private footage preview stays within the minimal chat card. */
+.admin-agent-footage-preview{max-width:100%;margin-top:8px}
+.admin-agent-footage-preview video,.admin-agent-footage-preview img{display:block;max-width:100%;width:100%;max-height:300px;object-fit:contain;background:#141414;border-radius:8px}
