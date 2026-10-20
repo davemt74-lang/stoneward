@@ -181,13 +181,27 @@ function sf_capture_review_queue(int $adminId):array {
     LEFT JOIN story_capture_rights_reviews pub ON pub.submission_id=s.id AND pub.purpose='publication'
     ORDER BY s.id DESC LIMIT 150")->fetchAll(PDO::FETCH_ASSOC);
 }
-function sf_capture_review(int $adminId,int $submissionId,string $decision):void {
+function sf_capture_review(int $adminId,int $submissionId,string $decision,string $basis=''):void {
   if(!sf_team_can($adminId,'team.assign_roles'))throw new RuntimeException('Administrator required.');
   if(!in_array($decision,['approved_for_edit','needs_release','rejected'],true))
     throw new InvalidArgumentException('Unknown editorial decision.');
-  sf_capture_schema();
-  $q=sf_db()->prepare('UPDATE story_capture_submissions SET review_status=?,updated_at=? WHERE id=? AND review_status=?');
-  $q->execute([$decision,gmdate('c'),$submissionId,'pending_review']);
-  if(!$q->rowCount())throw new InvalidArgumentException('Submission is unavailable or already reviewed.');
-  sf_team_audit($adminId,'capture.reviewed','capture_submission',(string)$submissionId,'Reviewed contribution: '.$decision);
+  $basis=sf_capture_clean($basis,400);
+  if($basis!==''&&strlen($basis)<25)throw new InvalidArgumentException('Review basis must be at least 25 characters.');
+  sf_capture_schema();$db=sf_db();
+  $ownTransaction=!$db->inTransaction();
+  $savepoint='sf_capture_review_'.$submissionId;
+  if($ownTransaction)$db->beginTransaction();
+  else $db->exec('SAVEPOINT '.$savepoint);
+  try{
+    $q=$db->prepare('UPDATE story_capture_submissions SET review_status=?,updated_at=? WHERE id=? AND review_status=?');
+    $q->execute([$decision,gmdate('c'),$submissionId,'pending_review']);
+    if(!$q->rowCount())throw new InvalidArgumentException('Submission is unavailable or already reviewed.');
+    sf_team_audit($adminId,'capture.reviewed','capture_submission',(string)$submissionId,
+      'Reviewed contribution: '.$decision.($basis!==''?' · Basis: '.$basis:''));
+    if($ownTransaction)$db->commit();else $db->exec('RELEASE SAVEPOINT '.$savepoint);
+  }catch(Throwable $e){
+    if($ownTransaction){if($db->inTransaction())$db->rollBack();}
+    else {$db->exec('ROLLBACK TO SAVEPOINT '.$savepoint);$db->exec('RELEASE SAVEPOINT '.$savepoint);}
+    throw $e;
+  }
 }
