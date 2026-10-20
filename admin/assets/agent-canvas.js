@@ -285,6 +285,55 @@
           '</div></div>').join(''):'<p>No eligible replacement scenes found. Search another topic or verify new submitted footage first.</p>')+
       '<p class="hint">Confirmation checks the original clip, live revision and source validity. Every committed change is written to Team Activity and the revision history.</p></section>';
   }
+  function productionQualityHtml(report){
+    if(!report)return '';
+    if(report.requires_selection){
+      const projects=Array.isArray(report.assemblies)?report.assemblies:[];
+      return '<section class="admin-agent-calendar" aria-label="Select private production to certify">'+
+        '<strong>Production certification · choose an assembly</strong>'+
+        '<p class="hint">Read-only checks. No media will be changed or published.</p>'+
+        (projects.length?projects.map(a=>'<div class="admin-agent-calendar-task">'+
+          '<strong>Assembly #'+Number(a.id)+' · '+esc(a.title)+'</strong>'+
+          '<p>Revision '+Number(a.revision)+' · '+esc(a.status)+'</p>'+
+          '<button type="button" class="secondary" data-agent-quality-open="'+
+            esc('audit assembly #'+Number(a.id))+'">Check this production</button></div>').join(''):
+          '<p>No private production assemblies are available.</p>')+'</section>';
+    }
+    const a=report.assembly;
+    if(!a)return '';
+    const id=Number(a.id),revision=Number(a.revision);
+    const gates=Array.isArray(report.gates)?report.gates:[];
+    const blockers=Array.isArray(report.blockers)?report.blockers:[];
+    const completed=Number(report.passed),total=Number(report.total);
+    const job=Number(report.latest_private_job_id||0);
+    return '<section class="admin-agent-calendar admin-agent-production-certification" aria-label="Verified production certification">'+
+      '<strong>Production integrity · '+esc(a.title)+' · revision '+revision+'</strong>'+
+      '<p><strong>'+completed+' / '+total+' current readiness gates passed</strong></p>'+
+      '<p class="hint">These are objective release-safety checks, not an AI quality or legal-ownership score. The review is read-only.</p>'+
+      gates.map(g=>'<div class="admin-agent-calendar-task">'+
+        '<strong>'+(g.passed?'✓':'○')+' '+esc(g.label)+'</strong>'+
+        '<p class="hint">'+esc(g.detail)+'</p></div>').join('')+
+      (blockers.length?'<details><summary>Open source and rights issues ('+blockers.length+')</summary>'+
+        blockers.map(b=>'<p class="hint">'+esc(b.message)+'</p>').join('')+'</details>':'')+
+      '<p class="hint">Archived revisions: '+Number(report.history_count||0)+
+        ' · Record integrity checked: '+Number((report.verified_history||[]).length)+
+        ' most recent archives</p>'+
+      (job>0?'<div class="admin-agent-footage-preview">'+
+        '<strong>Certified private playback · job #'+job+'</strong>'+
+        '<video controls playsinline preload="none" aria-label="Current revision private video" src="api/story-render-review.php?action=stream&amp;job_id='+job+'"></video>'+
+        '</div>':
+        '<p class="hint">No currently verified private render available. The storyboard is metadata only.</p>')+
+      '<div class="actions">'+
+        '<button type="button" class="secondary" data-agent-quality-open="'+
+           esc('assembly #'+id+' timeline')+'">Review timeline</button>'+
+        '<button type="button" class="secondary" data-agent-quality-open="'+
+           esc('review transitions for assembly #'+id)+'">Review audio/video bridges</button>'+
+        '<button type="button" class="secondary" data-agent-quality-open="'+
+           esc('audit assembly #'+id)+'">Refresh checks</button>'+
+      '</div>'+
+      '<p class="hint">No changes or automatic publication. Only separately authorized, confirmed editor operations can modify this assembly.</p>'+
+      '</section>';
+  }
   function transitionHtml(review){
     if(!review)return '';
     if(review.requires_selection){
@@ -401,6 +450,7 @@
     else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
     else if(m.role==='assistant'&&action.type==='production_timeline_transitions')next=transitionHtml(action.transition_preview);
+    else if(m.role==='assistant'&&action.type==='production_timeline_certification')next=productionQualityHtml(action.quality_audit);
     else if(m.role==='assistant'&&action.type==='production_timeline_insert')next=timelineInsertHtml(action.insert_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_edit')next=timelineEditHtml(action.edit_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_media')next=timelineMediaHtml(action.media_preview);
@@ -495,6 +545,14 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-quality-open]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const command=button.dataset.agentQualityOpen||'';
+      if(command.length<10||command.length>200)return;
+      button.disabled=true;
+      try{await send(command);}
+      catch(e){c.say(e.message||'Production evidence refresh unavailable.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-transition-assembly]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.agentTransitionAssembly);
