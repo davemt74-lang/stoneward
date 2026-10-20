@@ -11,6 +11,7 @@ require_once SF_ROOT.'/api/story-assembly-core.php';
 require_once SF_ROOT.'/api/story-assembly-chat-core.php';
 require_once SF_ROOT.'/api/story-assembly-chat-insert-core.php';
 require_once SF_ROOT.'/api/story-assembly-chat-edit-core.php';
+require_once SF_ROOT.'/api/story-assembly-chat-media-core.php';
 require_once SF_ROOT.'/api/story-assembly-history-core.php';
 require_once SF_ROOT.'/api/story-assembly-restore-core.php';
 require_once SF_ROOT.'/api/ai.php';
@@ -128,6 +129,16 @@ try{
  if($action==='create'){
   sf_json_response(['ok'=>true,'assembly_id'=>sf_assembly_create($id,
    (string)($p['title']??''),(string)($p['brief']??''))]);
+ }
+ if($action==='chat_add_media'){
+  if(($p['confirmed']??null)!==true)
+    throw new InvalidArgumentException('Media placement requires an explicit editor confirmation.');
+  if(!is_int($p['index']??null)||!is_string($p['kind']??null)
+    ||!is_string($p['source_id']??null))
+    throw new InvalidArgumentException('Exact index, media kind and canonical source ID required.');
+  sf_json_response(['ok'=>true,'result'=>sf_assembly_chat_media_insert($id,
+    (int)($p['assembly_id']??0),(int)($p['revision']??0),$p['index'],
+    $p['kind'],$p['source_id'],(string)($p['review_basis']??''))]);
  }
  if($action==='chat_remove'||$action==='chat_replace'){
   if(($p['confirmed']??null)!==true)
