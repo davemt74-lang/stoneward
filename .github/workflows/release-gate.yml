@@ -449,6 +449,7 @@ jobs:
           php tests/section88d3g5d-source-identity.php
           php tests/section88d3g5d1-chat-insert.php
           php tests/section88d3g5d2-chat-remove-replace.php
+          php tests/section88d3g5d3-music-dialogue.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php
