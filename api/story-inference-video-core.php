@@ -22,13 +22,21 @@ function sf_inference_ffmpeg_binary():string{
  * Input must have passed sf_inference_media_path and lease/rights validation.
  * Output temporary image is deleted by sf_inference_dispatch in a finally block.
  */
-function sf_inference_extract_video_frame(array $media):array{
+function sf_inference_extract_video_frame(array $media,?int $sampleAtMs=null):array{
  if(($media['mime']??'')!=='video/mp4'||($media['task_type']??'')!=='scene')
   throw new InvalidArgumentException('Only private MP4 scene sources may be sampled.');
  $binary=sf_inference_ffmpeg_binary();
  if($binary===''||!function_exists('proc_open'))
   throw new RuntimeException('Host does not provide supervised FFmpeg frame extraction.');
- $window=sf_inference_frame_window((int)round((float)($media['duration_seconds']??0)*1000));
+ $duration=(int)round((float)($media['duration_seconds']??0)*1000);
+ $window=sf_inference_frame_window($duration);
+ if($sampleAtMs!==null){
+  if($sampleAtMs<0||$sampleAtMs>=$duration)
+   throw new InvalidArgumentException('Frame time outside verified video duration.');
+  $window=['sampled_frame_ms'=>$sampleAtMs,
+    'start_ms'=>max(0,$sampleAtMs-200),
+    'end_ms'=>min($duration,$sampleAtMs+200)];
+ }
  $temp=tempnam(sys_get_temp_dir(),'sf-private-frame-');
  if($temp===false)throw new RuntimeException('Private temporary frame unavailable.');
  chmod($temp,0600);
