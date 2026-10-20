@@ -74,7 +74,16 @@
         (item.submission_type==='video'?
           '<video controls playsinline preload="none" aria-label="Private video submission '+Number(item.id)+'" src="api/story-footage-preview.php?submission_id='+Number(item.id)+'"></video>':
           '<img loading="lazy" alt="Private contributor photo" src="api/story-footage-preview.php?submission_id='+Number(item.id)+'">')+
-        '</div></div></div>').join(''):
+        '</div>'+
+        (item.review_status==='pending_review'?
+          '<details class="admin-agent-capture-decision"><summary>Review this submission in chat</summary>'+
+          '<label>Human review evidence<textarea rows="2" maxlength="400" data-agent-capture-basis="'+Number(item.id)+'" placeholder="Document the evidence for your editorial decision (25+ characters)"></textarea></label>'+
+          '<div class="actions">'+
+          '<button type="button" data-agent-capture-review="approved_for_edit" data-submission-id="'+Number(item.id)+'">Approve for editing</button>'+
+          '<button type="button" class="secondary" data-agent-capture-review="needs_release" data-submission-id="'+Number(item.id)+'">Needs release</button>'+
+          '<button type="button" class="secondary" data-agent-capture-review="rejected" data-submission-id="'+Number(item.id)+'">Reject</button></div>'+
+          '<p class="hint">Editorial approval is not an external AI clearance or a publication license.</p></details>':'')+
+        '</div></div>').join(''):
         '<p>No video or photo contributions in the recent queue.</p>')+
       '<button type="button" class="secondary" data-agent-open-footage-review>Open Creative Director review in Team Workspace</button></section>';
   }
@@ -167,6 +176,23 @@
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
     root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('team'));
+    root.querySelectorAll('[data-agent-capture-review]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.submissionId),decision=button.dataset.agentCaptureReview;
+      const basis=root.querySelector('[data-agent-capture-basis="'+id+'"]')?.value.trim()||'';
+      if(!Number.isSafeInteger(id)||id<1||!['approved_for_edit','needs_release','rejected'].includes(decision)||basis.length<25){
+        c.say('Provide a specific human review basis (at least 25 characters).');return;
+      }
+      if(!window.confirm('Record '+decision.replaceAll('_',' ')+' for capture #'+id+'? This records an editorial review, never a publication or AI rights grant.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-capture.php',{action:'review_submission',submission_id:id,decision,
+          review_basis:basis,via_agent_chat:true,confirmed:true});
+        c.say('Capture #'+id+' reviewed and recorded in Team Activity. Refreshing footage cards.');
+        await send('review footage');
+      }catch(e){c.say(e.message||'The capture review was not completed.');button.disabled=false;}
+    });
+
     root.querySelectorAll('[data-agent-commerce-review]').forEach(b=>b.onclick=()=>{
       const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(m=>String(m.action?.request_key)===b.dataset.agentCommerceReview);
       if(entry?.action?.draft)window.SFAgentCommerceReview?.open?.(entry.action);
