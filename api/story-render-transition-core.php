@@ -56,7 +56,7 @@ function sf_render_transition_validate(array $plan,string $style,int $overlap,ar
  $settings=['style'=>$style,'overlap_ms'=>$overlap]+$settings;
  sf_render_transition_cuts($plan,$settings);
 }
-function sf_render_transition_set(int $editor,int $assembly,int $revision,string $style,int $overlap):void{
+function sf_render_transition_set(int $editor,int $assembly,int $revision,string $style,int $overlap,string $reviewBasis=''):void{
  sf_assembly_editor($editor);sf_render_transition_schema();
  $plan=sf_render_plan($editor,$assembly,$revision);
  sf_render_transition_validate($plan,$style,$overlap);
@@ -86,7 +86,8 @@ function sf_render_transition_set(int $editor,int $assembly,int $revision,string
   }
   if(function_exists('sf_render_cut_clear'))sf_render_cut_clear($assembly);
   sf_team_audit($editor,'capture.render_transition_reviewed','story_assembly',(string)$assembly,
-    'Private visual and audio crossfade preset scoped to immutable render revision');
+    'Private visual/audio crossfade scoped to immutable render revision'.
+     ($reviewBasis!==''?' · Editor basis: '.substr(trim($reviewBasis),0,400):''));
   $db->commit();
  }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }

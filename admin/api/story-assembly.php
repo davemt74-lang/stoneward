@@ -25,6 +25,7 @@ require_once SF_ROOT.'/api/story-render-mix-core.php';
 require_once SF_ROOT.'/api/story-render-transition-core.php';
 require_once SF_ROOT.'/api/story-render-edl-core.php';
 require_once SF_ROOT.'/api/story-render-cut-core.php';
+require_once SF_ROOT.'/api/story-chat-transition-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $me=sf_admin_require_auth($method!=='GET');
 $id=(int)$me['id'];
@@ -71,6 +72,23 @@ try{
  if($action==='apply_restore'){
    sf_json_response(['ok'=>true,'result'=>sf_assembly_restore_apply($id,
      (int)($p['proposal_id']??0))]);
+ }
+ if($action==='chat_transition'||$action==='chat_cuts'){
+  if(($p['confirmed']??null)!==true)
+    throw new InvalidArgumentException('Exact transition change needs editor confirmation.');
+  $basis=(string)($p['review_basis']??'');
+  if($action==='chat_transition'){
+    if(!is_int($p['overlap_ms']??null))
+      throw new InvalidArgumentException('Exact transition overlap required.');
+    sf_chat_transition_global($id,(int)($p['assembly_id']??0),
+      (int)($p['revision']??0),(string)($p['style']??''),$p['overlap_ms'],$basis);
+  }else{
+    if(!is_array($p['cuts']??null))
+      throw new InvalidArgumentException('Exact transition cut list required.');
+    sf_chat_transition_cuts($id,(int)($p['assembly_id']??0),
+      (int)($p['revision']??0),$p['cuts'],$basis);
+  }
+  sf_json_response(['ok'=>true,'message'=>'Private transition review recorded for exact assembly revision.']);
  }
  if($action==='configure_transition'){
    sf_render_transition_set($id,(int)($p['assembly_id']??0),

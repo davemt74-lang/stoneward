@@ -62,7 +62,7 @@ function sf_admin_agent_thread_messages(int $adminId,string $threadId): array {
     $privateIntents=['production_editorial_status','production_schedule_calendar',
       'production_director_coverage','production_evidence_search','production_footage_review',
       'production_scene_candidates','production_timeline_inspect','production_timeline_insert',
-      'production_timeline_edit','production_timeline_media'];
+      'production_timeline_edit','production_timeline_media','production_timeline_transitions'];
     foreach($rows as &$row){
         $row['action']=json_decode((string)$row['action_json'],true)?:[];
         unset($row['action_json']);
@@ -138,6 +138,7 @@ function sf_admin_agent_plan(string $message): array {
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
     elseif(preg_match('/\\b(?:footage review|review footage|inspect footage|footage inspection|capture review queue|video submissions?)\\b/',$m)){$type='production_footage_review';$view='agent-chat';}
+    elseif(preg_match('/\\b(?:transition|crossfade|audio bridge|audio crossfade|video preview|preview playback|playback review|review cuts|cut transitions?|storyboard preview)\\b/i',$m)){$type='production_timeline_transitions';$view='agent-chat';}
     elseif(preg_match('/\\b(?:add|insert|place|append)\\b.{0,200}\\b(?:music|song|track|dialogue|dialog|transcript|voiceover|narration)\\b/i',$m)){$type='production_timeline_media';$view='agent-chat';}
     elseif(preg_match('/\\b(?:remove|delete|replace|swap)\\b.{0,200}\\b(?:clip|scene|shot|footage)\\b/i',$m)){$type='production_timeline_edit';$view='agent-chat';}
     elseif(preg_match('/\\b(?:add|insert|place|append)\\b.{0,200}\\b(?:shot|scene|clip|footage|video)\\b/i',$m)){$type='production_timeline_insert';$view='agent-chat';}
@@ -276,6 +277,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'production_timeline_insert'=>'Private insertion preview is unavailable. Nothing changed.',
       'production_timeline_edit'=>'Private timeline edit preview is unavailable. No changes made.',
       'production_timeline_media'=>'Original-music and dialogue placement preview unavailable. Nothing changed.',
+      'production_timeline_transitions'=>'Private transitions and playback review unavailable. No media changes made.',
       'stem_mix_review'=>'I can inspect real private Stem Studio track, bus, send, FX, automation and mastering metadata, compare bounded reference evidence, recommend specific adjustments and prepare exact reviewed changes. Provide a song ID. Native VST audio is not independently recreated and no mix is changed automatically.',
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
@@ -338,6 +340,29 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
                 'No external AI analysis, publication, or editing approval was performed.';
         }catch(Throwable $e){
             $text='Footage inspection is unavailable or production-editor permission is missing. No changes were made.';
+        }
+    }
+    if($plan['type']==='production_timeline_transitions'){
+        try{
+            require_once __DIR__.'/story-chat-transition-core.php';
+            $transitionId=null;
+            if(preg_match('/\\bassembly\\s*#?\\s*([1-9][0-9]{0,8})\\b/i',$message,$m))
+                $transitionId=(int)$m[1];
+            $transitionPreview=sf_chat_transition_preview($adminId,$transitionId);
+            if($transitionPreview['requires_selection']){
+                $text='Select a private assembly to inspect its existing transition cuts and playback reviews.';
+            }else{
+                $a=$transitionPreview['assembly'];
+                $text='Assembly #'.$a['id'].' revision '.$a['revision'].': '.
+                    count($transitionPreview['cards']).' storyboard cues, '.
+                    $transitionPreview['cut_count'].' cut boundaries and '.
+                    count($transitionPreview['render_reviews']).
+                    ' independently verified private render(s). You can review precise audio/video '.
+                    'crossfades and cue timing in chat. No new video was rendered or published. '.
+                    'Transitions require complete source certification and an explicit editorial decision.';
+            }
+        }catch(Throwable $e){
+            $text='Private playback or transition inspection unavailable or editor permission denied. No changes made.';
         }
     }
     if($plan['type']==='production_timeline_media'){
@@ -526,6 +551,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='production_timeline_insert'&&isset($insertPreview))$action['insert_preview']=$insertPreview;
     if($plan['type']==='production_timeline_edit'&&isset($editPreview))$action['edit_preview']=$editPreview;
     if($plan['type']==='production_timeline_media'&&isset($mediaPreview))$action['media_preview']=$mediaPreview;
+    if($plan['type']==='production_timeline_transitions'&&isset($transitionPreview))$action['transition_preview']=$transitionPreview;
     if($plan['type']==='production_timeline_inspect'){
         if(isset($timeline)&&is_array($timeline))$action['timeline_inspection']=$timeline;
         if(isset($assemblies))$action['timeline_assemblies']=$assemblies;
