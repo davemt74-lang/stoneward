@@ -63,7 +63,7 @@ function sf_admin_agent_thread_messages(int $adminId,string $threadId): array {
       'production_director_coverage','production_evidence_search','production_footage_review',
       'production_scene_candidates','production_timeline_inspect','production_timeline_insert',
       'production_timeline_edit','production_timeline_media','production_timeline_transitions',
-      'production_timeline_certification'];
+      'production_timeline_certification','production_ai_director_sequence'];
     foreach($rows as &$row){
         $row['action']=json_decode((string)$row['action_json'],true)?:[];
         unset($row['action_json']);
@@ -139,6 +139,7 @@ function sf_admin_agent_plan(string $message): array {
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
     elseif(preg_match('/\\b(?:footage review|review footage|inspect footage|footage inspection|capture review queue|video submissions?)\\b/',$m)){$type='production_footage_review';$view='agent-chat';}
+    elseif(preg_match('/\\b(?:ai director (?:sequence|compose|composition|proposal|storyboard)|(?:compose|generate|propose|review)\\s+(?:an?\\s+)?(?:ai\\s+)?(?:story|film|video|production)\\s+sequence|ai sequence|director proposal)\\b/i',$m)){$type='production_ai_director_sequence';$view='agent-chat';}
     elseif(preg_match('/\\b(?:production certification|certify (?:the )?production|production readiness|full timeline audit|timeline certification|production quality gate|production audit|audit assembly|certify assembly)\\b/i',$m)){$type='production_timeline_certification';$view='agent-chat';}
     elseif(preg_match('/\\b(?:transitions?|crossfades?|audio bridges?|audio crossfades?|video preview|preview playback|playback review|review cuts|cut transitions?|storyboard preview)\\b/i',$m)){$type='production_timeline_transitions';$view='agent-chat';}
     elseif(preg_match('/\\b(?:add|insert|place|append)\\b.{0,200}\\b(?:music|song|track|dialogue|dialog|transcript|voiceover|narration)\\b/i',$m)){$type='production_timeline_media';$view='agent-chat';}
@@ -281,6 +282,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'production_timeline_media'=>'Original-music and dialogue placement preview unavailable. Nothing changed.',
       'production_timeline_transitions'=>'Private transitions and playback review unavailable. No media changes made.',
       'production_timeline_certification'=>'Private production certification unavailable. No editing changes made.',
+      'production_ai_director_sequence'=>'Private AI Director proposals are unavailable. No model or edit action was started.',
       'stem_mix_review'=>'I can inspect real private Stem Studio track, bus, send, FX, automation and mastering metadata, compare bounded reference evidence, recommend specific adjustments and prepare exact reviewed changes. Provide a song ID. Native VST audio is not independently recreated and no mix is changed automatically.',
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
@@ -343,6 +345,29 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
                 'No external AI analysis, publication, or editing approval was performed.';
         }catch(Throwable $e){
             $text='Footage inspection is unavailable or production-editor permission is missing. No changes were made.';
+        }
+    }
+    if($plan['type']==='production_ai_director_sequence'){
+        try{
+            require_once __DIR__.'/story-chat-ai-director-core.php';
+            $directorId=null;
+            if(preg_match('/\\bassembly\\s*#?\\s*([1-9][0-9]{0,8})\\b/i',$message,$m))
+                $directorId=(int)$m[1];
+            $directorSequence=sf_chat_ai_director_overview($adminId,$directorId);
+            if($directorSequence['requires_selection']){
+                $text='Select the draft film to review its governed AI Director sequence proposals.';
+            }else{
+                $text='Private AI Director for assembly #'.$directorSequence['assembly']['id'].
+                    ', revision '.$directorSequence['assembly']['revision'].': '.
+                    count($directorSequence['proposals']).' recent editorial proposals, '.
+                    $directorSequence['candidate_count'].' currently eligible additional sources. '.
+                    'AI composition is '.($directorSequence['enabled']?'enabled':'disabled').
+                    '. Source metadata is sent to a configured provider only after explicit opt-in and '.
+                    'a confirmed proposal request; the supervised worker runs separately. '.
+                    'No footage is fabricated, no edits are applied and no video is published automatically.';
+            }
+        }catch(Throwable $e){
+            $text='AI Director review is unavailable or editor access is denied. No model calls or edits were made.';
         }
     }
     if($plan['type']==='production_timeline_certification'){
@@ -576,6 +601,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='production_timeline_media'&&isset($mediaPreview))$action['media_preview']=$mediaPreview;
     if($plan['type']==='production_timeline_transitions'&&isset($transitionPreview))$action['transition_preview']=$transitionPreview;
     if($plan['type']==='production_timeline_certification'&&isset($qualityAudit))$action['quality_audit']=$qualityAudit;
+    if($plan['type']==='production_ai_director_sequence'&&isset($directorSequence))$action['ai_director_sequence']=$directorSequence;
     if($plan['type']==='production_timeline_inspect'){
         if(isset($timeline)&&is_array($timeline))$action['timeline_inspection']=$timeline;
         if(isset($assemblies))$action['timeline_assemblies']=$assemblies;
