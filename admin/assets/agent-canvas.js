@@ -71,7 +71,7 @@
         ' · publication: '+esc(item.publication_clearance)+'</p>'+
         '<p>'+esc(item.description||'')+'</p></div></div>').join(''):
         '<p>No video or photo contributions in the recent queue.</p>')+
-      '<button type="button" class="secondary" data-agent-open-footage-review>Inspect original media and review decisions</button></section>';
+      '<button type="button" class="secondary" data-agent-open-footage-review>Open Creative Director review in Team Workspace</button></section>';
   }
   function directorHtml(report){
     if(!report||!Array.isArray(report.gaps))return '';
@@ -161,7 +161,7 @@
   }
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
-    root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('production-review'));
+    root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('team'));
     root.querySelectorAll('[data-agent-commerce-review]').forEach(b=>b.onclick=()=>{
       const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(m=>String(m.action?.request_key)===b.dataset.agentCommerceReview);
       if(entry?.action?.draft)window.SFAgentCommerceReview?.open?.(entry.action);
