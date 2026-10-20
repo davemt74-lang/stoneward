@@ -106,6 +106,12 @@ function sf_inference_dispatch(array $media,array $provider,?callable $transport
     'language'=>'und','timing'=>'whole_clip_estimate'];
  }
  if($task!=='scene')throw new InvalidArgumentException('Invalid inference task.');
+ // MP4 scene jobs inspect three distinct actual frames in ONE supervised
+ // call. No frame remains on disk; human editorial import remains separate.
+ if($media['mime']==='video/mp4'){
+  require_once __DIR__.'/story-footage-intelligence-core.php';
+  return sf_footage_dispatch_video($media,$provider,$transport);
+ }
  $temporaryFrame=null;$frameWindow=['start_ms'=>0,'end_ms'=>0,'sampled_frame_ms'=>null];
  if($media['mime']==='video/mp4'){
   require_once __DIR__.'/story-inference-video-core.php';
