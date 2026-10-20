@@ -117,10 +117,18 @@ function sf_story_agent_brain_inspect(int $editor,int $assembly):array{
  ],array_slice((array)($plan['gaps']??[]),0,6));
  $understandingCounts=['verified_story_links'=>0,
    'reviewed_visual_sources'=>0,'original_stonefellow_music'=>0,
-   'suggested_retakes'=>0,'source_evidence_stale'=>false];
+   'suggested_retakes'=>0,'source_evidence_stale'=>false,
+   'character_arcs'=>0,'continuity_handoffs'=>0,
+   'missing_story_coverage'=>0,'estimated_music_duration_ms'=>0];
  if($saved['status']==='draft'){
   try{
    $ctx=sf_composer_context($editor,$assembly,$revision);
+   $continuity=(array)($ctx['continuity']??[]);
+   $understandingCounts['character_arcs']=count((array)($continuity['character_arcs']??[]));
+   $understandingCounts['continuity_handoffs']=count((array)($continuity['issues']??[]));
+   $understandingCounts['missing_story_coverage']=count((array)($continuity['coverage_gaps']??[]));
+   $understandingCounts['estimated_music_duration_ms']=
+     (int)($continuity['music_pacing']['cue_duration_ms']??0);
    foreach((array)($ctx['source_understanding']??[]) as $entry){
     $understandingCounts['verified_story_links']+=count((array)($entry['story_connections']??[]));
     if(!empty($entry['visual_observations']))
@@ -147,7 +155,13 @@ function sf_story_agent_brain_inspect(int $editor,int $assembly):array{
     'revision'=>(int)$v['revision'],'item_count'=>(int)$v['item_count']
   ],array_slice($history,0,12)),
   'review_queue'=>array_slice($review,0,25),
-  'next_actions'=>sf_story_agent_brain_next_actions($gaps,$invalid,$rightsPending,$review),
+  'next_actions'=>array_slice(array_merge(
+    sf_story_agent_brain_next_actions($gaps,$invalid,$rightsPending,$review),
+    (!$understandingCounts['source_evidence_stale']&&
+      ($understandingCounts['continuity_handoffs']>0||
+       $understandingCounts['missing_story_coverage']>0))?[
+       ['code'=>'review_director_story_continuity','priority'=>'normal',
+        'requires_human'=>true]]:[]),0,12),
   'private_only'=>true,'authorizes_edits'=>false,'authorizes_render'=>false,
   'authorizes_publication'=>false,'external_model_access'=>false
  ];
