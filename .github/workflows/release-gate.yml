@@ -453,6 +453,7 @@ jobs:
           php tests/section88d3g5d4-transitions.php
           php tests/section88d3g5d4-preview.php
           php tests/section88d3g5d5-end-to-end.php
+          php tests/section88d3g5e1-ai-director-sequences.php
           node --check admin/assets/agent-canvas.js
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
