@@ -13,6 +13,8 @@ function sf_director_scene_understanding(int $editor,array $sources):array{
  require_once __DIR__.'/story-transcript-core.php';
  require_once __DIR__.'/story-capture-rights-core.php';
  require_once __DIR__.'/story-stonefellow-music-auto-core.php';
+ require_once __DIR__.'/story-media-evidence-core.php';
+ require_once __DIR__.'/story-inference-queue-core.php';
  require_once __DIR__.'/story-inference-worker-core.php';
  sf_story_graph_schema();
  sf_inference_results_schema();
