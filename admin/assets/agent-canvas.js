@@ -87,7 +87,7 @@
         '<p>No video or photo contributions in the recent queue.</p>')+
       '<button type="button" class="secondary" data-agent-open-footage-review>Open Creative Director review in Team Workspace</button></section>';
   }
-  function directorHtml(report){
+  function directorHtml(report,matches){
     if(!report||!Array.isArray(report.gaps))return '';
     return '<section class="admin-agent-calendar" aria-label="AI Director evidence-based recommendations">'+
       '<strong>AI Director · coverage recommendations</strong>'+
@@ -97,9 +97,22 @@
         '<div class="admin-agent-calendar-task"><div><strong>'+esc(g.title)+'</strong>'+
         '<p>'+Number(g.approved_assets)+' / '+Number(g.recommended_minimum)+' '+esc(g.shot_type)+' assets · target '+esc(g.target_role)+'</p>'+
         '<p>'+esc(g.brief)+'</p><p class="hint">'+esc(g.reason)+
-        (g.draft_request_id?' · Existing draft #'+Number(g.draft_request_id):' · Draft not created')+'</p></div></div>'
+        (g.draft_request_id?' · Existing draft #'+Number(g.draft_request_id):
+          ' · Draft not created')+'</p>'+
+        (!g.draft_request_id?'<button type="button" class="secondary" data-agent-create-shot-draft="'+esc(g.code)+'">Create private shot-request draft</button>':'')+
+        '</div></div>'
       ).join(''):'<p>All minimum editorial coverage targets are currently satisfied.</p>')+
-      '<p class="hint">Human review is required to draft, assign or open any shot request. Existing Creative Director tools retain those controls.</p></section>';
+      '<p class="hint">Human review is required before opening or assigning any shot request. Draft creation is private and cannot publish.</p>'+
+      (matches&&Array.isArray(matches.matches)?
+        '<h4>Reviewed scene matches'+(matches.query?' · '+esc(matches.query):'')+'</h4>'+
+        '<p class="hint">Literal matching against verified scene metadata, not automated image interpretation.</p>'+
+        (matches.matches.length?matches.matches.map(m=>
+          '<div class="admin-agent-calendar-task"><div><strong>Scene #'+Number(m.scene_id)+' · '+esc(m.capture_title)+'</strong>'+
+          '<p>Clip '+(Number(m.start_ms)/1000).toFixed(2)+'–'+(Number(m.end_ms)/1000).toFixed(2)+'s · '+
+          Number(m.match_count)+' term matches · '+esc(m.location||'Location unspecified')+'</p>'+
+          '<p>'+esc(m.description)+'</p><p class="hint">Publication: '+esc(m.publication_clearance)+
+          ' · people release: '+esc(m.people_release_status)+'</p></div></div>').join(''):
+          '<p>No verified scene matches for this topic.</p>'):'')+'</section>';
   }
   function sceneCandidateHtml(items){
     if(!Array.isArray(items))return '';
@@ -139,7 +152,7 @@
     else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-agent-show-calendar class="secondary">Show production calendar here</button>';
     else if(m.role==='assistant'&&action.type==='production_schedule_calendar')next=calendarHtml(action.production_calendar);
     else if(m.role==='assistant'&&action.type==='production_footage_review')next=footageHtml(action.footage_queue);
-    else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage);
+    else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage,action.director_scene_matches);
     else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
@@ -176,6 +189,19 @@
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
     root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('team'));
+    root.querySelectorAll('[data-agent-create-shot-draft]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const code=button.dataset.agentCreateShotDraft||'';
+      if(!/^[a-z0-9_]{3,60}$/.test(code))return;
+      if(!window.confirm('Create a private AI Director shot-request draft for '+code+'? It will not be opened to contributors or assigned.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-director.php',{action:'create_draft',recommendation_code:code});
+        c.say('Private shot-request draft created. Review it before opening to contributors.');
+        await send('director shot list');
+      }catch(e){c.say(e.message||'Shot-request draft could not be created.');button.disabled=false;}
+    });
+
     root.querySelectorAll('[data-agent-capture-review]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.submissionId),decision=button.dataset.agentCaptureReview;
