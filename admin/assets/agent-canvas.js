@@ -285,6 +285,69 @@
           '</div></div>').join(''):'<p>No eligible replacement scenes found. Search another topic or verify new submitted footage first.</p>')+
       '<p class="hint">Confirmation checks the original clip, live revision and source validity. Every committed change is written to Team Activity and the revision history.</p></section>';
   }
+  function aiDirectorSequenceHtml(view){
+    if(!view)return '';
+    if(view.requires_selection){
+      const drafts=Array.isArray(view.assemblies)?view.assemblies:[];
+      return '<section class="admin-agent-calendar" aria-label="Choose private AI Director production">'+
+        '<strong>AI Director · select a draft film</strong>'+
+        '<p class="hint">All suggestions remain private until an editor separately reviews and applies them.</p>'+
+        (drafts.length?drafts.map(a=>'<div class="admin-agent-calendar-task"><strong>Assembly #'+
+          Number(a.id)+' · '+esc(a.title)+'</strong><p>Rev '+Number(a.revision)+
+          ' · '+Number(a.item_count)+' cues</p>'+
+          '<button type="button" class="secondary" data-agent-director-open="'+Number(a.id)+
+          '">Review AI sequence</button></div>').join(''):
+          '<p>There are no editable draft assemblies.</p>')+'</section>';
+    }
+    const a=view.assembly;if(!a)return '';
+    const id=Number(a.id),revision=Number(a.revision);
+    const proposals=Array.isArray(view.proposals)?view.proposals:[];
+    return '<section class="admin-agent-calendar admin-agent-director-sequence" aria-label="AI Director private sequence proposals">'+
+      '<strong>AI Director · '+esc(a.title)+' · revision '+revision+'</strong>'+
+      '<p class="hint">Existing '+Number(view.existing_count)+' verified cues · up to '+
+        Number(view.candidate_count)+' additional eligible sources. No invented footage or unapproved media.</p>'+
+      '<p class="hint">Model access: '+(view.enabled?'enabled':'disabled')+
+        ' · external-AI evidence: '+(view.eligible_for_external_ai?'eligible':'not yet cleared')+'</p>'+
+      (!view.eligible_for_external_ai?'<p class="hint">'+esc(view.eligibility_note||'')+'</p>':'')+
+      (!view.enabled?
+        '<button type="button" class="secondary" data-agent-director-enable>Review AI Composer opt-in</button>':
+        view.eligible_for_external_ai?
+        '<button type="button" class="secondary" data-agent-director-queue data-assembly-id="'+id+
+          '" data-revision="'+revision+'">Request a supervised AI sequence</button>':'')+
+      '<p class="hint">Generating an AI proposal is a separate supervised server-side worker action. Queued means awaiting worker execution, not a completed AI result. Your Admin provider keys stay server-side.</p>'+
+      (proposals.length?proposals.map(p=>{
+        const status=String(p.status||''),current=p.is_current===true;
+        const raw=Array.isArray(p.source_keys)?p.source_keys:[];
+        const beats=Array.isArray(p.beats)?p.beats:[];
+        const gaps=Array.isArray(p.missing_shots)?p.missing_shots:[];
+        return '<div class="admin-agent-calendar-task admin-agent-director-proposal">'+
+          '<strong>Proposal #'+Number(p.id)+' · '+esc(status)+' · revision '+Number(p.revision)+'</strong>'+
+          '<p>Provider: '+esc(p.provider||'awaiting execution')+
+            ' · '+Number(p.proposed_additions||0)+' verified additions</p>'+
+          (p.logline?'<p>'+esc(p.logline)+'</p>':'')+
+          (beats.length?'<details><summary>Inspect '+beats.length+' proposed editorial beats</summary>'+
+            beats.map((b,i)=>'<div class="admin-agent-calendar-task"><strong>#'+(i+1)+
+              ' · '+esc(b.transition)+'</strong>'+
+              '<p class="hint">Verified source '+esc(raw[i]||String(b.source_index))+'</p>'+
+              '<p>'+esc(b.reason)+'</p></div>').join('')+
+            '</details>':'')+
+          (gaps.length?'<details><summary>Suggested missing coverage</summary>'+
+            gaps.map(g=>'<p>'+esc(typeof g==='string'?g:String(g.brief||''))+'</p>').join('')+
+            '</details>':'')+
+          (current&&status==='pending_review'?
+            '<label>Human editorial decision basis<textarea data-agent-director-basis rows="2" maxlength="400" placeholder="Record 25+ characters about the proposed sources, order and story."></textarea></label>'+
+            '<div class="actions"><button type="button" class="secondary" data-agent-director-review="approved" data-proposal-id="'+Number(p.id)+'" data-assembly-id="'+id+'" data-revision="'+revision+'">Approve proposal</button>'+
+            '<button type="button" class="secondary" data-agent-director-review="rejected" data-proposal-id="'+Number(p.id)+'" data-assembly-id="'+id+'" data-revision="'+revision+'">Reject proposal</button></div>':'')+
+          (current&&status==='approved'?
+            '<p class="hint">Human-reviewed proposal. A second, explicit confirmation is required to change the private timeline.</p>'+
+            '<button type="button" class="secondary" data-agent-director-apply data-proposal-id="'+Number(p.id)+'" data-assembly-id="'+id+'" data-revision="'+revision+'">Review and apply sequence</button>':'')+
+          (!current?'<p class="hint">Previous revision — cannot be applied.</p>':'')+
+          '</div>';
+      }).join(''):'<p>No AI sequence proposals for this production revision yet.</p>')+
+      '<button type="button" class="secondary" data-agent-director-open="'+id+'">Refresh proposal status</button>'+
+      '<p class="hint">The AI may only propose known clip IDs and time-bound transitions. Recording, rendering, licenses and publication remain separate approvals.</p>'+
+      '</section>';
+  }
   function productionQualityHtml(report){
     if(!report)return '';
     if(report.requires_selection){
@@ -451,6 +514,7 @@
     else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
     else if(m.role==='assistant'&&action.type==='production_timeline_transitions')next=transitionHtml(action.transition_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_certification')next=productionQualityHtml(action.quality_audit);
+    else if(m.role==='assistant'&&action.type==='production_ai_director_sequence')next=aiDirectorSequenceHtml(action.ai_director_sequence);
     else if(m.role==='assistant'&&action.type==='production_timeline_insert')next=timelineInsertHtml(action.insert_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_edit')next=timelineEditHtml(action.edit_preview);
     else if(m.role==='assistant'&&action.type==='production_timeline_media')next=timelineMediaHtml(action.media_preview);
@@ -545,6 +609,78 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-director-open]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.agentDirectorOpen);
+      if(!Number.isSafeInteger(id)||id<1)return;
+      button.disabled=true;
+      try{await send('ai director sequence assembly #'+id);}
+      catch(e){c.say(e.message||'Director inspection failed.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-director-enable]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      if(!window.confirm('Enable the governed AI Composer? Future explicit requests may send cleared, metadata-only Stonefellow production evidence to your configured AI provider. This does not grant media edits, publication or recurring permission for uncleared contributors.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'configure_composer',enabled:true});
+        c.say('AI Composer enabled with explicit owner opt-in. You must still choose an assembly and request each proposal separately.');
+        const section=button.closest('.admin-agent-director-sequence');
+        const match=section?.querySelector('[data-agent-director-open]');
+        if(match)await send('ai director sequence assembly #'+Number(match.dataset.agentDirectorOpen));
+      }catch(e){c.say(e.message||'AI Composer opt-in was not saved.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-director-queue]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision);
+      if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(revision)||revision<1)return;
+      if(!window.confirm('Queue one metadata-only AI Director proposal for assembly #'+id+' revision '+revision+'? Only independently consented scene/dialogue summaries and eligible original Stonefellow music can be sent to your configured model. The supervised server worker generates the proposal; no timeline changes now.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_composer_queue',assembly_id:id,revision,confirmed:true});
+        c.say('AI Director request queued or already reserved for this revision. Refresh after the supervised composer worker runs.');
+        await send('ai director sequence assembly #'+id);
+      }catch(e){c.say(e.message||'AI proposal was not queued. Check provider, rights and the enabled switch.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-director-review]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const card=button.closest('.admin-agent-director-proposal');
+      const basis=card?.querySelector('[data-agent-director-basis]')?.value.trim()||'';
+      const proposal_id=Number(button.dataset.proposalId),assembly_id=Number(button.dataset.assemblyId),
+        revision=Number(button.dataset.revision),decision=button.dataset.agentDirectorReview;
+      if(basis.length<25||!['approved','rejected'].includes(decision)||
+        !Number.isSafeInteger(proposal_id)||proposal_id<1||
+        !Number.isSafeInteger(assembly_id)||assembly_id<1||
+        !Number.isSafeInteger(revision)||revision<1){
+        c.say('Document at least 25 characters explaining the editorial approval or rejection.');return;
+      }
+      if(!window.confirm((decision==='approved'?'Approve':'Reject')+' AI Director proposal #'+proposal_id+
+        ' at revision '+revision+'? Approval does not yet change any production clip.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_composer_review',
+          assembly_id,revision,proposal_id,decision,review_basis:basis,confirmed:true});
+        c.say('Human AI Director review saved to the existing Agent Brain activity ledger.');
+        await send('ai director sequence assembly #'+assembly_id);
+      }catch(e){c.say(e.message||'The proposal review failed or was already decided.');button.disabled=false;}
+    });
+    root.querySelectorAll('[data-agent-director-apply]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const proposal_id=Number(button.dataset.proposalId),assembly_id=Number(button.dataset.assemblyId),
+        revision=Number(button.dataset.revision);
+      if(!Number.isSafeInteger(proposal_id)||proposal_id<1||
+        !Number.isSafeInteger(assembly_id)||assembly_id<1||
+        !Number.isSafeInteger(revision)||revision<1)return;
+      if(!window.confirm('Apply the reviewed AI sequence proposal #'+proposal_id+
+        ' to private assembly #'+assembly_id+' revision '+revision+
+        '? This will reorder verified clips and optionally add approved footage, dialogue or original music. It will save a new audited revision without rendering or publishing.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_composer_apply',
+          assembly_id,revision,proposal_id,confirmed:true});
+        c.say('Approved AI Director sequence saved. Reviewing the exact new private timeline.');
+        await send('assembly #'+assembly_id+' timeline');
+      }catch(e){c.say(e.message||'AI sequence could not be applied: source, consent or revision may have changed.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-quality-open]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const command=button.dataset.agentQualityOpen||'';
