@@ -128,6 +128,30 @@ try{
     (int)($p['revision']??0));
   sf_json_response(['ok'=>true,'message'=>'Private scoped music-license review recorded.']);
  }
+ if(in_array($action,['chat_composer_queue','chat_composer_review','chat_composer_apply'],true)){
+  if(($p['confirmed']??null)!==true)
+   throw new InvalidArgumentException('AI Director requires an explicit editor confirmation.');
+  $aid=(int)($p['assembly_id']??0);$revision=(int)($p['revision']??0);
+  if($aid<1||$revision<1)throw new InvalidArgumentException('Exact assembly revision required.');
+  $live=sf_assembly_read($id,$aid);
+  if(!$live||$live['status']!=='draft'||(int)$live['revision']!==$revision)
+   throw new RuntimeException('Assembly changed; refresh before proceeding.');
+  if($action==='chat_composer_queue'){
+   sf_json_response(['ok'=>true,'proposal'=>sf_composer_queue($id,$aid,$revision)]);
+  }
+  $proposalId=(int)($p['proposal_id']??0);
+  $matches=array_values(array_filter(sf_composer_list($id,$aid),
+    static fn(array $r):bool=>(int)$r['id']===$proposalId&&
+      (int)$r['revision']===$revision));
+  if(count($matches)!==1)throw new RuntimeException('Proposal is stale or belongs to another assembly.');
+  if($action==='chat_composer_review'){
+   $basis=sf_capture_clean((string)($p['review_basis']??''),400);
+   if(strlen($basis)<25)throw new InvalidArgumentException('Review rationale must contain at least 25 characters.');
+   sf_json_response(['ok'=>true,'changed'=>sf_composer_review($id,$proposalId,
+    (string)($p['decision']??''),$basis)]);
+  }
+  sf_json_response(['ok'=>true,'result'=>sf_composer_apply($id,$proposalId)]);
+ }
  if($action==='configure_composer'){
   if(!is_bool($p['enabled']??null))sf_json_response(['ok'=>false,'error'=>'invalid_enabled'],422);
   sf_composer_configure($id,$p['enabled']);
