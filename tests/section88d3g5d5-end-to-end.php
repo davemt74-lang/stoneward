@@ -68,13 +68,13 @@ $db->prepare('UPDATE story_assembly_revisions SET digest=? WHERE assembly_id=? A
  ->execute([$digest,$id,$recent]);
 fullPass(fullGate(sf_chat_production_certification(1,$id),'history')['passed'],
  'Integrity gate recovers after the exact archived digest is restored.');
-$db->prepare("UPDATE story_transcript_annotations SET review_status='rejected' WHERE id=?")
+$db->prepare("UPDATE story_transcripts SET review_status='rejected' WHERE id=?")
  ->execute([$narration]);
 $revoked=sf_chat_production_certification(1,$id);
 fullPass(!fullGate($revoked,'source')['passed']&&
  !$revoked['all_readiness_gates_passed'],
  'A revoked verified dialogue source immediately invalidates production certification.');
-$db->prepare("UPDATE story_transcript_annotations SET review_status='verified' WHERE id=?")
+$db->prepare("UPDATE story_transcripts SET review_status='verified' WHERE id=?")
  ->execute([$narration]);
 fullPass(fullGate(sf_chat_production_certification(1,$id),'source')['passed'],
  'Revalidated verified dialogue restores the source-integrity gate.');
