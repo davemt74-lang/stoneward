@@ -20,7 +20,12 @@ try{
    sf_json_response(['ok'=>true]);
  }
  if($action==='review_submission'){
-   sf_capture_review($id,(int)($b['submission_id']??0),(string)($b['decision']??''));
+   $basis=(string)($b['review_basis']??'');
+   if(!empty($b['via_agent_chat'])){
+     if(($b['confirmed']??null)!==true||strlen(trim($basis))<25)
+       throw new InvalidArgumentException('Chat review requires explicit confirmation and a written basis.');
+   }
+   sf_capture_review($id,(int)($b['submission_id']??0),(string)($b['decision']??''),$basis);
    sf_json_response(['ok'=>true]);
  }
  if($action==='review_rights'){
