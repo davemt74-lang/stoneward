@@ -38,7 +38,7 @@ function sf_render_cut_clear(int $assembly):void{
  $q=sf_db()->prepare('DELETE FROM story_render_cut_presets WHERE assembly_id=?');
  $q->execute([$assembly]);
 }
-function sf_render_cut_set(int $editor,int $assembly,int $revision,array $cuts):void{
+function sf_render_cut_set(int $editor,int $assembly,int $revision,array $cuts,string $reviewBasis=''):void{
  sf_assembly_editor($editor);sf_render_cut_schema();
  $plan=sf_render_plan($editor,$assembly,$revision); // source SHA and rights
  $settings=sf_render_transition_settings($editor,$assembly,$revision);
@@ -72,7 +72,8 @@ function sf_render_cut_set(int $editor,int $assembly,int $revision,array $cuts):
    $q->execute([$revision,$json,$editor,gmdate('c'),$assembly]);
   }
   sf_team_audit($editor,'capture.render_cuts_reviewed','story_assembly',(string)$assembly,
-    'Private per-cut audio/video overlaps authorized at exact immutable revision');
+    'Private per-cut audio/video overlap reviewed at exact revision'.
+    ($reviewBasis!==''?' · Editor basis: '.substr(trim($reviewBasis),0,400):''));
   $db->commit();
  }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
