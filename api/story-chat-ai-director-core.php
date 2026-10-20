@@ -56,6 +56,12 @@ function sf_chat_ai_director_overview(int $editor,?int $assemblyId):array{
   'enabled'=>sf_composer_enabled(),'eligible_for_external_ai'=>$eligible,
   'eligibility_note'=>$reason,'candidate_count'=>$context===null?0:count($context['candidate_pool']),
   'existing_count'=>count($assembly['items']),'proposals'=>$out,
+  'scene_recommendations'=>$context===null?[]:
+    sf_director_scene_recommendations(
+      array_merge($context['items'],$context['candidate_pool']),
+      (array)($context['source_understanding']??[])),
+  'source_understanding'=>$context===null?[]:
+    array_slice((array)($context['source_understanding']??[]),0,12,true),
   'worker'=>'supervised_cli_only','read_only'=>true,'private_only'=>true,
   'model_invoked'=>false,'changes_applied'=>false,'published'=>false];
 }
