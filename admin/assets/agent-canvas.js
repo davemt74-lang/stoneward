@@ -137,13 +137,20 @@
   function timelineHtml(action){
     const t=action.timeline_inspection,list=action.timeline_assemblies;
     if(t&&Array.isArray(t.items)){
-      return '<section class="admin-agent-calendar" aria-label="Read-only editorial timeline">'+
+      return '<section class="admin-agent-calendar" aria-label="Governed editorial timeline">'+
         '<strong>Assembly #'+Number(t.id)+' · '+esc(t.title)+' · revision '+Number(t.revision)+'</strong>'+
-        '<p class="hint">Private editorial plan. No edits, media exports, renders or publication.</p>'+
-        t.items.map(i=>'<div class="admin-agent-calendar-task"><div><strong>#'+Number(i.ordinal)+' · '+esc(i.kind)+'</strong>'+
+        '<p class="hint">Private editorial plan. Exact clip reorder requires human confirmation and revision verification; no media export, render or publication.</p>'+
+        (t.status==='draft'?
+          '<label>Human editorial reason<textarea data-agent-timeline-basis="'+Number(t.id)+'" rows="2" maxlength="400" placeholder="Why should the sequence change? At least 25 characters."></textarea></label>':'')+
+        t.items.map((i,index)=>'<div class="admin-agent-calendar-task"><div><strong>#'+(index+1)+' · '+esc(i.kind)+'</strong>'+
           '<p>Source '+esc(i.source_id)+' · '+(Number(i.in_ms)/1000).toFixed(2)+'–'+
-          (Number(i.out_ms)/1000).toFixed(2)+'s</p><p>'+esc(i.notes||'')+'</p></div></div>').join('')+
-        '<p class="hint">Original source and publication rights require independent review.</p></section>';
+          (Number(i.out_ms)/1000).toFixed(2)+'s</p><p>'+esc(i.notes||'')+'</p>'+
+          (t.status==='draft'?
+            '<div class="actions">'+
+            (index>0?'<button type="button" class="secondary" data-agent-timeline-move="up" data-assembly-id="'+Number(t.id)+'" data-revision="'+Number(t.revision)+'" data-index="'+index+'">Move earlier</button>':'')+
+            (index<t.items.length-1?'<button type="button" class="secondary" data-agent-timeline-move="down" data-assembly-id="'+Number(t.id)+'" data-revision="'+Number(t.revision)+'" data-index="'+index+'">Move later</button>':'')+
+            '</div>':'')+'</div></div>').join('')+
+        '<p class="hint">Original source and publication rights require independent review. All changes use the existing revision and audit ledger.</p></section>';
     }
     return Array.isArray(list)?'<section class="admin-agent-calendar"><strong>Editorial assemblies</strong>'+
       list.map(a=>'<p>Assembly #'+Number(a.id)+' · '+esc(a.title)+' · '+Number(a.item_count)+' items · rev '+Number(a.revision)+'</p>').join('')+
@@ -253,6 +260,25 @@
       catch(e){ctx()?.say?.('Copy unavailable. Select the draft text in chat to copy it.');}
     });
 
+    root.querySelectorAll('[data-agent-timeline-move]').forEach(button=>button.onclick=async()=>{
+      const c=ctx();if(!c||busy)return;
+      const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision),
+        index=Number(button.dataset.index),direction=button.dataset.agentTimelineMove;
+      const basis=root.querySelector('[data-agent-timeline-basis="'+id+'"]')?.value.trim()||'';
+      if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(revision)||revision<1||
+         !Number.isSafeInteger(index)||index<0||!['up','down'].includes(direction)||basis.length<25){
+        c.say('Enter a documented editorial reason (25+ characters) before reordering.');return;
+      }
+      if(!window.confirm('Move clip '+(index+1)+' '+direction+' in assembly #'+id+
+        ' revision '+revision+'? This changes the private timeline and writes an audit event.'))return;
+      button.disabled=true;
+      try{
+        await c.api('story-assembly.php',{action:'chat_move',assembly_id:id,revision,index,direction,
+          review_basis:basis,confirmed:true});
+        c.say('Timeline revision saved with human review evidence. Refreshing the assembly in chat.');
+        await send('assembly #'+id+' timeline');
+      }catch(e){c.say(e.message||'Timeline was not modified. Refresh its current revision.');button.disabled=false;}
+    });
     root.querySelectorAll('[data-agent-show-calendar]').forEach(button=>button.onclick=async()=>{
       button.disabled=true;try{await send('production calendar');}
       catch(e){ctx()?.say?.(e.message||'Calendar unavailable.');button.disabled=false;}
