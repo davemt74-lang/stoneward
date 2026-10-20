@@ -139,6 +139,8 @@ $ui=(string)file_get_contents(dirname(__DIR__).'/admin/assets/agent-canvas.js');
 $composer=(string)file_get_contents(dirname(__DIR__).'/api/story-composer-core.php');
 understandingPass(str_contains($ui,'source-grounded editorial suggestions')&&
  str_contains($composer,'source_understanding')&&
- str_contains($composer,'sf_director_scene_understanding('),
+ str_contains($composer,'sf_director_scene_understanding(')&&
+ str_contains((string)file_get_contents(dirname(__DIR__).'/api/story-agent-brain-bridge.php'),
+  "'director_scene_understanding'"),
  'Agent Chat and supervised Director share the same source-provenance understanding contract.');
 echo "G5E3: $g5e3 integrated assertions passed".PHP_EOL;
