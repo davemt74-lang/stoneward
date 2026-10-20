@@ -308,7 +308,11 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
         }
     }
     if($plan['type']==='production_director_coverage'){
-      try{$text=sf_director_admin_brief($adminId);}
+      try{
+        require_once __DIR__.'/story-director-core.php';
+        $director=sf_director_coverage($adminId);
+        $text=sf_director_admin_brief($adminId).' Recommendations are based only on editorial review counts, not frame analysis. ';
+      }
       catch(Throwable $e){$text='Artist World Director coverage data is temporarily unavailable. No shot request was created.';}
     }
     if($plan['type']==='production_evidence_search'){
@@ -392,6 +396,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='production_editorial_status'&&!empty($editorial))$action['editorial_production']=$editorial;
     if($plan['type']==='production_schedule_calendar'&&!empty($calendar))$action['production_calendar']=$calendar;
     if($plan['type']==='production_footage_review'&&isset($footage))$action['footage_queue']=$footage;
+    if($plan['type']==='production_director_coverage'&&isset($director))$action['director_coverage']=$director;
     if($plan['type']==='stem_mix_review'&&!empty($stemReview))$action['stem_review']=$stemReview;
     if($plan['type']==='stem_mix_review'&&!empty($production))$action['production_brief']=sf_stem_production_brief($production);
     if($plan['type']==='draft_commerce_reply' && !empty($replyDraft)){

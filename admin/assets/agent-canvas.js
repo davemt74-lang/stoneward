@@ -73,6 +73,20 @@
         '<p>No video or photo contributions in the recent queue.</p>')+
       '<button type="button" class="secondary" data-agent-open-footage-review>Inspect original media and review decisions</button></section>';
   }
+  function directorHtml(report){
+    if(!report||!Array.isArray(report.gaps))return '';
+    return '<section class="admin-agent-calendar" aria-label="AI Director evidence-based recommendations">'+
+      '<strong>AI Director · coverage recommendations</strong>'+
+      '<p class="hint">Suggestions derived from editorially approved asset counts. No footage frames were inspected, no AI model was invoked and no shot was automatically assigned.</p>'+
+      '<p>'+Number(report.pending_review||0)+' pending submissions · '+Number(report.needs_likeness_or_release_review||0)+' need external AI rights review</p>'+
+      (report.gaps.length?report.gaps.map(g=>
+        '<div class="admin-agent-calendar-task"><div><strong>'+esc(g.title)+'</strong>'+
+        '<p>'+Number(g.approved_assets)+' / '+Number(g.recommended_minimum)+' '+esc(g.shot_type)+' assets · target '+esc(g.target_role)+'</p>'+
+        '<p>'+esc(g.brief)+'</p><p class="hint">'+esc(g.reason)+
+        (g.draft_request_id?' · Existing draft #'+Number(g.draft_request_id):' · Draft not created')+'</p></div></div>'
+      ).join(''):'<p>All minimum editorial coverage targets are currently satisfied.</p>')+
+      '<p class="hint">Human review is required to draft, assign or open any shot request. Existing Creative Director tools retain those controls.</p></section>';
+  }
   function messageHtml(m){
     const who=m.role==='assistant'?'Stonefellow Admin Agent':'Admin';
     const feedback=m.role==='assistant'&&Number(m.id)>0?'<div class="admin-agent-feedback"><button type="button" class="secondary" data-admin-agent-feedback="helpful" data-message-id="'+Number(m.id)+'">Helpful</button><button type="button" class="secondary" data-admin-agent-feedback="not_helpful" data-message-id="'+Number(m.id)+'">Not helpful</button></div>':'';
@@ -83,6 +97,7 @@
     else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-agent-show-calendar class="secondary">Show production calendar here</button>';
     else if(m.role==='assistant'&&action.type==='production_schedule_calendar')next=calendarHtml(action.production_calendar);
     else if(m.role==='assistant'&&action.type==='production_footage_review')next=footageHtml(action.footage_queue);
+    else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
