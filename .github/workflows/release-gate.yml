@@ -439,6 +439,7 @@ jobs:
           node --check assets/js/app.js
           php tests/section88d3g4m-chat-calendar.php
           php tests/section88d3g4m-release.php
+          php tests/section88d3g5-chat-audit.php
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
           php tests/section86a-stem-zip.php

@@ -71,7 +71,7 @@
         ' · publication: '+esc(item.publication_clearance)+'</p>'+
         '<p>'+esc(item.description||'')+'</p></div></div>').join(''):
         '<p>No video or photo contributions in the recent queue.</p>')+
-      '<button type="button" class="secondary" data-agent-open-footage-review>Inspect original media and review decisions</button></section>';
+      '<button type="button" class="secondary" data-agent-open-footage-review>Open Creative Director review in Team Workspace</button></section>';
   }
   function directorHtml(report){
     if(!report||!Array.isArray(report.gaps))return '';
@@ -100,6 +100,21 @@
         ' · publishing: '+esc(s.publication_clearance)+'</p></div></div>').join(''):
         '<p>No verified scene annotations are available.</p>')+'</section>';
   }
+  function timelineHtml(action){
+    const t=action.timeline_inspection,list=action.timeline_assemblies;
+    if(t&&Array.isArray(t.items)){
+      return '<section class="admin-agent-calendar" aria-label="Read-only editorial timeline">'+
+        '<strong>Assembly #'+Number(t.id)+' · '+esc(t.title)+' · revision '+Number(t.revision)+'</strong>'+
+        '<p class="hint">Private editorial plan. No edits, media exports, renders or publication.</p>'+
+        t.items.map(i=>'<div class="admin-agent-calendar-task"><div><strong>#'+Number(i.ordinal)+' · '+esc(i.kind)+'</strong>'+
+          '<p>Source '+esc(i.source_id)+' · '+(Number(i.in_ms)/1000).toFixed(2)+'–'+
+          (Number(i.out_ms)/1000).toFixed(2)+'s</p><p>'+esc(i.notes||'')+'</p></div></div>').join('')+
+        '<p class="hint">Original source and publication rights require independent review.</p></section>';
+    }
+    return Array.isArray(list)?'<section class="admin-agent-calendar"><strong>Editorial assemblies</strong>'+
+      list.map(a=>'<p>Assembly #'+Number(a.id)+' · '+esc(a.title)+' · '+Number(a.item_count)+' items · rev '+Number(a.revision)+'</p>').join('')+
+      '<p class="hint">Ask: assembly #123 timeline</p></section>':'';
+  }
   function messageHtml(m){
     const who=m.role==='assistant'?'Stonefellow Admin Agent':'Admin';
     const feedback=m.role==='assistant'&&Number(m.id)>0?'<div class="admin-agent-feedback"><button type="button" class="secondary" data-admin-agent-feedback="helpful" data-message-id="'+Number(m.id)+'">Helpful</button><button type="button" class="secondary" data-admin-agent-feedback="not_helpful" data-message-id="'+Number(m.id)+'">Not helpful</button></div>':'';
@@ -112,6 +127,7 @@
     else if(m.role==='assistant'&&action.type==='production_footage_review')next=footageHtml(action.footage_queue);
     else if(m.role==='assistant'&&action.type==='production_director_coverage')next=directorHtml(action.director_coverage);
     else if(m.role==='assistant'&&action.type==='production_scene_candidates')next=sceneCandidateHtml(action.scene_candidates);
+    else if(m.role==='assistant'&&action.type==='production_timeline_inspect')next=timelineHtml(action);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
@@ -145,7 +161,7 @@
   }
   function bindActions(root){
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
-    root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('production-review'));
+    root.querySelectorAll('[data-agent-open-footage-review]').forEach(b=>b.onclick=()=>ctx()?.openView?.('team'));
     root.querySelectorAll('[data-agent-commerce-review]').forEach(b=>b.onclick=()=>{
       const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(m=>String(m.action?.request_key)===b.dataset.agentCommerceReview);
       if(entry?.action?.draft)window.SFAgentCommerceReview?.open?.(entry.action);

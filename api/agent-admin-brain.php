@@ -56,7 +56,22 @@ function sf_admin_agent_thread_list(int $adminId): array {
 function sf_admin_agent_thread_messages(int $adminId,string $threadId): array {
     sf_admin_agent_thread($adminId,$threadId);$q=sf_db()->prepare('SELECT id,role,content,action_json,created_at FROM admin_agent_messages WHERE admin_user_id=? AND thread_id=? ORDER BY id DESC LIMIT 40');
     $q->execute([$adminId,$threadId]);$rows=array_reverse($q->fetchAll(PDO::FETCH_ASSOC));
-    foreach($rows as &$row){$row['action']=json_decode((string)$row['action_json'],true)?:[];unset($row['action_json']);}
+    $mayReadProduction=false;
+    try{$mayReadProduction=sf_team_can($adminId,'team.assign_roles');}
+    catch(Throwable $e){$mayReadProduction=false;} // Fail closed on missing or changing role schema.
+    $privateIntents=['production_editorial_status','production_schedule_calendar',
+      'production_director_coverage','production_evidence_search','production_footage_review',
+      'production_scene_candidates','production_timeline_inspect'];
+    foreach($rows as &$row){
+        $row['action']=json_decode((string)$row['action_json'],true)?:[];
+        unset($row['action_json']);
+        if(!$mayReadProduction && $row['role']==='assistant' &&
+            in_array((string)($row['action']['type']??''),$privateIntents,true)){
+            $row['content']='Production evidence unavailable: editor access required.';
+            $row['action']=[];
+        }
+    }
+    unset($row);
     return $rows;
 }
 function sf_admin_agent_save_message(int $adminId,string $threadId,string $role,string $text,array $action=[]): void {
@@ -122,6 +137,7 @@ function sf_admin_agent_plan(string $message): array {
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
     elseif(preg_match('/\\b(?:footage review|review footage|inspect footage|footage inspection|capture review queue|video submissions?)\\b/',$m)){$type='production_footage_review';$view='agent-chat';}
+    elseif(preg_match('/\\b(?:timeline assembly|assembly timeline|timeline clips|clip sequence|storyboard timeline|assembly\\s*#?\\s*[0-9]+\\s+timeline|timeline\\s+(?:for\\s+)?assembly\\s*#?\\s*[0-9]+)\\b/',$m)){$type='production_timeline_inspect';$view='agent-chat';}
     elseif(preg_match('/\\b(?:editorial (?:assembly|production|review|status|timeline)|(?:story|production) assembly|production (?:status|queue|pipeline)|video production review|assembly\\s*#?\\s*[0-9]+|ai director (?:review|approval|production))\\b/',$m)){$type='production_editorial_status';$view='production-review';}
     elseif(preg_match('/\\b(?:scene clips?|scene-level footage|usable moments|clip recommendations?|reviewed scenes?)\\b/',$m)){$type='production_scene_candidates';$view='agent-chat';}
     elseif(preg_match('/\\b(?:director shot list|missing shots|missing footage|coverage gaps|shot recommendations|ai director)\\b/',$m)){$type='production_director_coverage';$view='brain';}
@@ -252,6 +268,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'production_evidence_search'=>'No matching reviewed Artist World production evidence was found.',
       'production_footage_review'=>'The private footage review queue is unavailable.',
       'production_scene_candidates'=>'Private verified scene candidates are unavailable.',
+      'production_timeline_inspect'=>'Private timeline review is unavailable.',
       'stem_mix_review'=>'I can inspect real private Stem Studio track, bus, send, FX, automation and mastering metadata, compare bounded reference evidence, recommend specific adjustments and prepare exact reviewed changes. Provide a song ID. Native VST audio is not independently recreated and no mix is changed automatically.',
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
@@ -299,14 +316,38 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
         try{
             require_once __DIR__.'/story-capture-core.php';
             $rows=sf_capture_review_queue($adminId); // Server enforces editor authority.
-            $footage=array_slice(array_values(array_filter($rows,static fn(array $item):bool =>
-                in_array((string)$item['submission_type'],['video','photo'],true))),0,30);
+            $footage=array_map(static fn(array $r):array => [
+                'id'=>(int)$r['id'],'contributor_id'=>(int)$r['contributor_id'],
+                'title'=>(string)$r['title'],'description'=>(string)$r['description'],
+                'submission_type'=>(string)$r['submission_type'],
+                'review_status'=>(string)$r['review_status'],
+                'external_ai_clearance'=>(string)$r['external_ai_clearance'],
+                'publication_clearance'=>(string)$r['publication_clearance']],
+                array_slice(array_values(array_filter($rows,static fn(array $item):bool =>
+                    in_array((string)$item['submission_type'],['video','photo'],true))),0,30));
             // No source URI, raw media bytes, private provider requests, or unsanitized HTML.
             $text='Private footage review queue: '.count($footage).
                 ' recent video and photo submissions. Inspect the source and releases before any decision. '.
                 'No external AI analysis, publication, or editing approval was performed.';
         }catch(Throwable $e){
             $text='Footage inspection is unavailable or production-editor permission is missing. No changes were made.';
+        }
+    }
+    if($plan['type']==='production_timeline_inspect'){
+        try{
+            require_once __DIR__.'/story-agent-brain-bridge.php';
+            if(preg_match('/\\bassembly\\s*#?\\s*(\\d{1,9})\\b/i',$message,$idMatch)){
+                $timeline=sf_assembly_read($adminId,(int)$idMatch[1]);
+                $text=$timeline?'Private assembly #'.$timeline['id'].' revision '.$timeline['revision'].
+                    ' has '.count($timeline['items']).' ordered timeline items. Editor review required for modifications.':
+                    'That assembly was not found. No changes were made.';
+            }else{
+                $assemblies=array_slice(sf_assembly_list($adminId),0,12);
+                $text='Private editorial assemblies: '.count($assemblies).
+                    ' recent records. Ask for assembly #ID timeline to inspect ordered clips in chat.';
+            }
+        }catch(Throwable $e){
+            $text='Timeline inspection unavailable or editor authority missing. No changes were made.';
         }
     }
     if($plan['type']==='production_scene_candidates'){
@@ -411,6 +452,10 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='production_footage_review'&&isset($footage))$action['footage_queue']=$footage;
     if($plan['type']==='production_director_coverage'&&isset($director))$action['director_coverage']=$director;
     if($plan['type']==='production_scene_candidates'&&isset($scenes))$action['scene_candidates']=$scenes;
+    if($plan['type']==='production_timeline_inspect'){
+        if(isset($timeline)&&is_array($timeline))$action['timeline_inspection']=$timeline;
+        if(isset($assemblies))$action['timeline_assemblies']=$assemblies;
+    }
     if($plan['type']==='stem_mix_review'&&!empty($stemReview))$action['stem_review']=$stemReview;
     if($plan['type']==='stem_mix_review'&&!empty($production))$action['production_brief']=sf_stem_production_brief($production);
     if($plan['type']==='draft_commerce_reply' && !empty($replyDraft)){
