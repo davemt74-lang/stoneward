@@ -56,7 +56,9 @@ function sf_admin_agent_thread_list(int $adminId): array {
 function sf_admin_agent_thread_messages(int $adminId,string $threadId): array {
     sf_admin_agent_thread($adminId,$threadId);$q=sf_db()->prepare('SELECT id,role,content,action_json,created_at FROM admin_agent_messages WHERE admin_user_id=? AND thread_id=? ORDER BY id DESC LIMIT 40');
     $q->execute([$adminId,$threadId]);$rows=array_reverse($q->fetchAll(PDO::FETCH_ASSOC));
-    $mayReadProduction=sf_team_can($adminId,'team.assign_roles');
+    $mayReadProduction=false;
+    try{$mayReadProduction=sf_team_can($adminId,'team.assign_roles');}
+    catch(Throwable $e){$mayReadProduction=false;} // Fail closed on missing or changing role schema.
     $privateIntents=['production_editorial_status','production_schedule_calendar',
       'production_director_coverage','production_evidence_search','production_footage_review',
       'production_scene_candidates','production_timeline_inspect'];
