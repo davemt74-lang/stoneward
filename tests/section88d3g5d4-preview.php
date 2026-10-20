@@ -19,7 +19,7 @@ $choose=sf_chat_transition_preview(1,null);
 previewPass($choose['requires_selection']&&count($choose['assemblies'])>=1&&
  !$choose['executed_changes'],'Unknown assembly displays selector without mutation.');
 $view=sf_chat_transition_preview(1,$id);
-previewPass(!$view['requires_selection']&&$view['assembly']['revision']===4&&
+previewPass(!$view['requires_selection']&&$view['assembly']['revision']===(int)sf_assembly_read(1,$id)['revision']&&
  count($view['cards'])===3&&$view['cut_count']===2,
  'Chat storyboard reads exact current private cue and boundary count.');
 previewPass($view['metadata_only']&&!$view['published']&&
