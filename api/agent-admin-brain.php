@@ -63,7 +63,7 @@ function sf_admin_agent_thread_messages(int $adminId,string $threadId): array {
       'production_director_coverage','production_evidence_search','production_footage_review',
       'production_scene_candidates','production_timeline_inspect','production_timeline_insert',
       'production_timeline_edit','production_timeline_media','production_timeline_transitions',
-      'production_timeline_certification','production_ai_director_sequence'];
+      'production_timeline_certification','production_ai_director_sequence','production_footage_intelligence'];
     foreach($rows as &$row){
         $row['action']=json_decode((string)$row['action_json'],true)?:[];
         unset($row['action_json']);
@@ -138,6 +138,7 @@ function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
+    elseif(preg_match('/\\b(?:footage intelligence|analy[sz]e (?:the )?(?:video|footage|shots?)|visual analysis|scene visual analysis|retake suggestions?|ai footage review|review footage analysis)\\b/i',$m)){$type='production_footage_intelligence';$view='agent-chat';}
     elseif(preg_match('/\\b(?:footage review|review footage|inspect footage|footage inspection|capture review queue|video submissions?)\\b/',$m)){$type='production_footage_review';$view='agent-chat';}
     elseif(preg_match('/\\b(?:ai director (?:sequence|compose|composition|proposal|storyboard)|(?:compose|generate|propose|review)\\s+(?:an?\\s+)?(?:ai\\s+)?(?:story|film|video|production)\\s+sequence|ai sequence|director proposal)\\b/i',$m)){$type='production_ai_director_sequence';$view='agent-chat';}
     elseif(preg_match('/\\b(?:production certification|certify (?:the )?production|production readiness|full timeline audit|timeline certification|production quality gate|production audit|audit assembly|certify assembly)\\b/i',$m)){$type='production_timeline_certification';$view='agent-chat';}
@@ -275,6 +276,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'production_director_coverage'=>'Director coverage data is unavailable.',
       'production_evidence_search'=>'No matching reviewed Artist World production evidence was found.',
       'production_footage_review'=>'The private footage review queue is unavailable.',
+      'production_footage_intelligence'=>'Private footage intelligence is unavailable. No model was invoked.',
       'production_scene_candidates'=>'Private verified scene candidates are unavailable.',
       'production_timeline_inspect'=>'Private timeline review is unavailable.',
       'production_timeline_insert'=>'Private insertion preview is unavailable. Nothing changed.',
@@ -368,6 +370,21 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
             }
         }catch(Throwable $e){
             $text='AI Director review is unavailable or editor access is denied. No model calls or edits were made.';
+        }
+    }
+    if($plan['type']==='production_footage_intelligence'){
+        try{
+            require_once __DIR__.'/story-chat-footage-intelligence-core.php';
+            $visualIntelligence=sf_chat_footage_intelligence($adminId);
+            $text='Private footage intelligence: '.count($visualIntelligence['jobs']).
+                ' recent supervised analyses and '.count($visualIntelligence['eligible_captures']).
+                ' eligible, independently cleared capture sources. Video results can show three '.
+                'sampled visual moments and suggested retakes. Existing audio analysis is transcription-only. '.
+                'Models are '.($visualIntelligence['enabled']?'enabled':'disabled').
+                '. Execution uses the supervised worker; drafts need editor review and independently verified import. '.
+                'No source or publication has changed.';
+        }catch(Throwable $e){
+            $text='Private footage intelligence is unavailable or editor clearance is missing. No analysis was started.';
         }
     }
     if($plan['type']==='production_timeline_certification'){
@@ -593,6 +610,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='production_editorial_status'&&!empty($editorial))$action['editorial_production']=$editorial;
     if($plan['type']==='production_schedule_calendar'&&!empty($calendar))$action['production_calendar']=$calendar;
     if($plan['type']==='production_footage_review'&&isset($footage))$action['footage_queue']=$footage;
+    if($plan['type']==='production_footage_intelligence'&&isset($visualIntelligence))$action['footage_intelligence']=$visualIntelligence;
     if($plan['type']==='production_director_coverage'&&isset($director))$action['director_coverage']=$director;
     if($plan['type']==='production_director_coverage'&&isset($shotMatches))$action['director_scene_matches']=$shotMatches;
     if($plan['type']==='production_scene_candidates'&&isset($scenes))$action['scene_candidates']=$scenes;
