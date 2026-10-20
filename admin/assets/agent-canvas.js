@@ -234,7 +234,7 @@
     root.querySelectorAll('[data-agent-capture-review]').forEach(button=>button.onclick=async()=>{
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.submissionId),decision=button.dataset.agentCaptureReview;
-      const basis=root.querySelector('[data-agent-capture-basis="'+id+'"]')?.value.trim()||'';
+      const basis=button.closest('.admin-agent-calendar-task')?.querySelector('[data-agent-capture-basis="'+id+'"]')?.value.trim()||'';
       if(!Number.isSafeInteger(id)||id<1||!['approved_for_edit','needs_release','rejected'].includes(decision)||basis.length<25){
         c.say('Provide a specific human review basis (at least 25 characters).');return;
       }
@@ -264,7 +264,7 @@
       const c=ctx();if(!c||busy)return;
       const id=Number(button.dataset.assemblyId),revision=Number(button.dataset.revision),
         index=Number(button.dataset.index),direction=button.dataset.agentTimelineMove;
-      const basis=root.querySelector('[data-agent-timeline-basis="'+id+'"]')?.value.trim()||'';
+      const basis=button.closest('.admin-agent-calendar')?.querySelector('[data-agent-timeline-basis="'+id+'"]')?.value.trim()||'';
       if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(revision)||revision<1||
          !Number.isSafeInteger(index)||index<0||!['up','down'].includes(direction)||basis.length<25){
         c.say('Enter a documented editorial reason (25+ characters) before reordering.');return;
