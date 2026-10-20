@@ -48,6 +48,11 @@ function sf_chat_ai_director_overview(int $editor,?int $assemblyId):array{
     'beats'=>$beats,'missing_shots'=>array_slice((array)($suggestion['missing_shots']??[]),0,5),
     'proposed_additions'=>(int)($suggestion['proposed_additions']??0),
     'source_keys'=>array_slice((array)($suggestion['source_keys']??[]),0,34),
+    'continuity_preview'=>[
+      'issue_count'=>(int)($suggestion['continuity_preview']['issue_count']??0),
+      'issues'=>array_slice((array)($suggestion['continuity_preview']['issues']??[]),0,12),
+      'coverage_gaps'=>array_slice((array)($suggestion['continuity_preview']['coverage_gaps']??[]),0,10),
+      'music_pacing'=>(array)($suggestion['continuity_preview']['music_pacing']??[])],
     'is_current'=>(int)$p['revision']===$revision];
  }
  return ['requires_selection'=>false,'assemblies'=>[],
@@ -56,6 +61,7 @@ function sf_chat_ai_director_overview(int $editor,?int $assemblyId):array{
   'enabled'=>sf_composer_enabled(),'eligible_for_external_ai'=>$eligible,
   'eligibility_note'=>$reason,'candidate_count'=>$context===null?0:count($context['candidate_pool']),
   'existing_count'=>count($assembly['items']),'proposals'=>$out,
+  'continuity_current'=>$context===null?null:$context['continuity'],
   'scene_recommendations'=>$context===null?[]:
     sf_director_scene_recommendations(
       array_merge($context['items'],$context['candidate_pool']),
