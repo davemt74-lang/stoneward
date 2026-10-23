@@ -457,6 +457,8 @@ jobs:
           php tests/section88d3g5e2-visual-intelligence.php
           php tests/section88d3g5e3-scene-understanding.php
           php tests/section88d3g5e4-continuity.php
+          node tests/section89a-floating-agent-voice.cjs
+          node tests/section89a-runtime-gate.cjs
           node --check admin/assets/agent-canvas.js
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php

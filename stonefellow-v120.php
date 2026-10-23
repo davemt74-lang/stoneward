@@ -162,8 +162,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 
   <main id="mainContent" class="stage" tabindex="-1">
     <section class="agent-stage" aria-label="Stonefellow Agent">
-      <button id="agentOrb" class="agent-orb" type="button" aria-label="Stonefellow Agent">
+      <button id="agentOrb" class="agent-orb" type="button" aria-label="Open Agent Chat" aria-controls="agentChatPopup" aria-expanded="false">
         <span class="orb-core"></span><span class="orb-ring ring-a"></span><span class="orb-ring ring-b"></span>
+        <span class="agent-face" aria-hidden="true"><span class="agent-eye"></span><span class="agent-eye"></span><span class="agent-mouth"></span></span>
       </button>
       <div class="agent-meta"><span id="agentState">IDLE</span></div>
       <p id="agentMessage" class="agent-message" aria-live="polite">Hey. I’m the Stonefellow agent. I can play you something, tell you about the music, or help you make your own record.</p>
@@ -217,13 +218,20 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php endif; ?>
       <button type="button" data-quick-action="newsletter"><strong>Newsletter</strong><span>Join Stonefellow email updates</span></button>
     </div>
+    <div class="chat-composer-shell">
+      <section id="agentChatPopup" class="agent-chat-popup" aria-label="Stonefellow conversation" hidden>
+        <header class="agent-chat-popup-head"><div><strong>Stonefellow Agent</strong><span id="agentChatPopupState" role="status">Ready</span></div><div class="agent-chat-popup-tools"><button id="agentChatNew" type="button">New chat</button><button id="agentChatClose" type="button" aria-label="Close Agent Chat">×</button></div></header>
+        <div id="agentChatPopupMessages" class="agent-chat-popup-messages" role="log" aria-live="polite" aria-label="Conversation history"><p class="agent-chat-empty">Your conversation will appear here. Use the bar below to type or speak.</p></div>
+      </section>
     <form id="chatForm" class="chatbar" autocomplete="off">
       <button id="chatQuickButton" class="chat-action plus" type="button" aria-label="Open quick actions" aria-expanded="false">+</button>
+      <button id="agentChatToggle" class="chat-action chat-toggle" type="button" aria-label="Open Agent Chat" aria-expanded="false" aria-controls="agentChatPopup" title="Open Agent Chat">▤</button>
       <label class="sr-only" for="chatInput">Ask Stonefellow anything</label>
       <input id="chatInput" type="text" placeholder="Ask Stonefellow anything…" maxlength="320">
       <button id="voiceButton" class="chat-action mic" type="button" aria-label="Start conversation" aria-pressed="false">◉</button>
       <button class="chat-action send" type="submit" aria-label="Send message">↑</button>
     </form>
+    </div>
     <div class="social-links" aria-label="Stonefellow social links">
       <a href="#" data-social="instagram">Instagram</a>
       <a href="#" data-social="youtube">YouTube</a>
