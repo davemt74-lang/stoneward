@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/api/agent-admin-brain.php';
+require_once dirname(__DIR__).'/api/agent-capability-audit.php';
 
 $fails=0;
 $check=static function(bool $valid,string $label)use(&$fails):void{
@@ -51,6 +52,9 @@ foreach(sf_admin_agent_module_routes() as $intent=>$route){
 }
 $check(!sf_agent_tool_allowed('admin_module_navigate','fan',true),'Fan cannot invoke Admin navigation');
 $check(!sf_agent_tool_executable('admin_module_navigate','admin',true),'Navigation never becomes a direct write tool');
+$audit=sf_agent_capability_audit();
+$check($audit['checks_passed'] && !in_array('admin_module_navigate',$audit['unsafe_owner_paths'],true),
+    'Admin asset owner is local and passes the capability audit');
 $check(sf_admin_agent_plan('Create a newsletter campaign')['type']==='prepare_campaign','Existing campaign approval path preserved');
 $check(sf_admin_agent_plan('Create a campaign for my album release')['type']==='prepare_campaign','Campaign intent wins over album navigation');
 $check(sf_admin_agent_plan('Build a follow-up journey')['type']==='prepare_journey','Existing journey approval path preserved');
