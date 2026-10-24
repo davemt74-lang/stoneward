@@ -459,6 +459,8 @@ jobs:
           php tests/section88d3g5e4-continuity.php
           node tests/section89a-floating-agent-voice.cjs
           node tests/section89a-runtime-gate.cjs
+          node tests/section90a-voice-transcription.cjs
+          node tests/section90a-ci-ephemeral-credentials.cjs
           node --check admin/assets/agent-canvas.js
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
@@ -524,20 +526,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: MySQL checkout inventory certification
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_DATABASE: stonefellow_test
-          MYSQL_USER: stonefellow
-          MYSQL_PASSWORD: stonefellow
-          MYSQL_ROOT_PASSWORD: isolated-test-root
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pisolated-test-root"
-          --health-interval=5s --health-timeout=5s --health-retries=15
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: PHP MySQL driver
@@ -546,12 +535,37 @@ jobs:
           php-version: '8.3'
           extensions: pdo_mysql
           coverage: none
+      - name: Start isolated MySQL with ephemeral CI credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          sf_ci_db_password="$(openssl rand -hex 24)"
+          sf_ci_root_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$sf_ci_db_password"
+          echo "::add-mask::$sf_ci_root_password"
+          printf 'SF_E2_DB_USER=stonefellow\nSF_E2_DB_PASS=%s\n' "$sf_ci_db_password" >> "$GITHUB_ENV"
+          docker run --detach --name stonefellow-ci-mysql \
+            --publish 127.0.0.1:3306:3306 \
+            --env MYSQL_DATABASE=stonefellow_test \
+            --env MYSQL_USER=stonefellow \
+            --env MYSQL_PASSWORD="$sf_ci_db_password" \
+            --env MYSQL_ROOT_PASSWORD="$sf_ci_root_password" mysql:8.0
+          for attempt in {1..45}; do
+            if docker exec stonefellow-ci-mysql mysql -h127.0.0.1 \
+              -ustonefellow -p"$sf_ci_db_password" stonefellow_test \
+              -e 'SELECT 1' >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'Disposable MySQL service did not become ready.' >&2
+          exit 1
       - name: Real MySQL commerce and simultaneous final-unit checkout
-        env:
-          SF_E2_DB_USER: stonefellow
-          SF_E2_DB_PASS: stonefellow
         run: |
           SF_E4_EPHEMERAL=yes php tests/section75e4-mysql-legacy-upgrade.php
           php tests/section75e2-mysql-commerce.php
           php tests/section84b6-mysql-device-pairing.php
           php tests/section88d2g-mysql-production.php
+      - name: Remove disposable MySQL service
+        if: always()
+        run: docker rm --force stonefellow-ci-mysql || true
