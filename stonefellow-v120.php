@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.135');
+define('SF_BUILD', '1.3.136');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -161,6 +161,9 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php endif; ?>
 
   <main id="mainContent" class="stage" tabindex="-1">
+    <section id="dynamicCanvas" class="dynamic-canvas" aria-live="polite"><?=sf_seo_server_html($seo)?></section>
+  </main>
+  <!-- Keep the floating companion outside the scrolling page and player layers. -->
     <section class="agent-stage" aria-label="Stonefellow Agent">
       <button id="agentOrb" class="agent-orb" type="button" aria-label="Open Agent Chat" aria-controls="agentChatPopup" aria-expanded="false">
         <span class="orb-core"></span><span class="orb-ring ring-a"></span><span class="orb-ring ring-b"></span>
@@ -168,14 +171,13 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       </button>
       <div class="agent-meta"><span id="agentState">IDLE</span></div>
       <p id="agentMessage" class="agent-message" aria-live="polite">Hey. I’m the Stonefellow agent. I can play you something, tell you about the music, or help you make your own record.</p>
+      <button id="agentInterrupt" class="agent-interrupt" type="button" hidden aria-label="Interrupt the Agent and listen">Stop speaking · listen</button>
       <div id="starterActions" class="starter-actions">
         <button type="button" data-command="play something">Play something</button>
         <button type="button" data-command="make me a record">Make me a record</button>
         <button type="button" data-command="show me the catalog">Look around</button>
       </div>
     </section>
-    <section id="dynamicCanvas" class="dynamic-canvas" aria-live="polite"><?=sf_seo_server_html($seo)?></section>
-  </main>
 
   <div id="queueBackdrop" class="drawer-backdrop queue-backdrop" hidden></div>
   <aside id="queueDrawer" class="queue-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="queueDrawerTitle">

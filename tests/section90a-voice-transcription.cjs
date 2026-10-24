@@ -5,13 +5,14 @@ const path=require('node:path');
 const vm=require('node:vm');
 
 const app=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
-const body=app.match(/recognition\.onresult=e=>\{([\s\S]*?)\};recognition\.onerror=/)?.[1];
+const body=app.match(/recognition\.onresult=e=>\{([\s\S]*?)\};\n    recognition\.onerror=/)?.[1];
 assert.ok(body,'Recognition result handler must be available for behavioral testing');
 const events=[],turns=[];
 const context={
   st:{conversationOn:true},recognition:{},input:{value:'Unsent typed message'},
   showTranscript:(text,phase)=>events.push({text,phase}),
-  submitVoiceTurn:spoken=>{turns.push(spoken);context.setBusy(true)}
+  listeningPrompt:()=> 'Listening…',
+  submitRecognizedVoiceTurn:spoken=>{turns.push(spoken);context.setBusy(true)}
 };
 vm.createContext(context);
 vm.runInContext('let voiceTurnBusy=false;recognition.onresult=e=>{'+body+'};globalThis.setBusy=v=>{voiceTurnBusy=v}',context);
