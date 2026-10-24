@@ -18,7 +18,8 @@ $checks=[
  'All legacy Admin views plus Team Workspace remain'=>substr_count($index,'<button type="button" data-view=')>=30&&str_contains($index,'data-view="team"')
    &&str_contains($index,'data-view="production-review"'),
  'Unified UI binds one existing canonical Admin context'=>str_contains($ui,'window.STONEFELLOW_ADMIN_CONTEXT')
-     && str_contains($main,'window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,reloadCore}'),
+     && substr_count($main,'window.STONEFELLOW_ADMIN_CONTEXT=')===1
+     && str_contains($main,'window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,reloadCore,'),
  'No alternate network or save endpoints introduced'=>!preg_match('/\bfetch\s*\(|\bXMLHttpRequest\b|\bapi\s*\(/',$ui),
  'Buttons are moved rather than cloned'=>str_contains($ui,'actions.append(el)')&&!str_contains($ui,'cloneNode('),
  'Live-render DOM watching is batched without losing views'=>str_contains($ui,'new MutationObserver(()=>{')
