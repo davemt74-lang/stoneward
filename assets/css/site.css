@@ -528,7 +528,15 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 
 /* Floating companion and composer-anchored conversation (voice and text share one thread). */
 .chat-composer-shell{position:relative;width:min(760px,100%);margin:auto}
-.chat-composer-shell .chatbar{width:100%;grid-template-columns:42px 42px minmax(0,1fr) 42px 42px}
+.chat-composer-shell .chatbar{width:100%;min-width:0;grid-template-columns:42px 42px minmax(0,1fr) 42px 42px;gap:2px}
+.chat-composer-shell .chatbar input{min-width:0;padding-left:8px;padding-right:8px;text-overflow:ellipsis}
+.chat-composer-shell .chat-action{display:grid;place-items:center;flex-shrink:0;cursor:pointer}
+.chat-composer-shell .chat-action:focus-visible,.agent-chat-popup button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.voice-transcript{display:flex;align-items:flex-start;gap:10px;width:min(100%,720px);margin:0 auto 9px;padding:10px 13px;border:1px solid rgba(77,164,255,.35);background:rgba(var(--surface-rgb),.98);color:var(--ink);border-radius:13px;box-shadow:0 8px 25px rgba(0,0,0,.17);font-size:.83rem;line-height:1.4;overflow-wrap:anywhere;max-height:98px;overflow-y:auto}
+.voice-transcript[hidden]{display:none!important}
+.voice-transcript-dot{display:block;flex:none;width:8px;height:8px;margin-top:.36em;border-radius:50%;background:#4da4ff;box-shadow:0 0 0 4px rgba(77,164,255,.13)}
+.voice-transcript[data-phase="heard"] .voice-transcript-dot,.voice-transcript[data-phase="responding"] .voice-transcript-dot{background:#46c586;box-shadow:0 0 0 4px rgba(70,197,134,.13)}
+.voice-transcript[data-phase="waiting"] .voice-transcript-dot,.voice-transcript[data-phase="error"] .voice-transcript-dot{background:var(--danger);box-shadow:0 0 0 4px rgba(240,100,104,.13)}
 .chat-action.chat-toggle{font-size:1.3rem;line-height:1;border:1px solid transparent}
 .chat-action.chat-toggle[aria-expanded=true]{background:var(--soft);color:var(--accent);border-color:var(--line)}
 .agent-chat-popup{position:absolute;left:0;right:0;bottom:calc(100% + 12px);height:min(54dvh,510px);min-height:230px;z-index:58;display:flex;flex-direction:column;border:1px solid var(--line2);border-radius:20px;background:rgba(var(--surface-rgb),.98);backdrop-filter:blur(24px);box-shadow:0 24px 76px rgba(0,0,0,.48);overflow:hidden;color:var(--ink)}
@@ -542,7 +550,7 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .agent-chat-popup-entry.from-user{align-self:flex-end;background:rgba(140,119,86,.17);border-bottom-left-radius:14px;border-bottom-right-radius:4px}
 .agent-chat-popup-entry.notice{align-self:center;max-width:100%;background:transparent;border-style:dashed;border-radius:10px;color:var(--muted)}
 .agent-chat-popup-entry strong{display:block;font-size:.68rem;letter-spacing:.07em;margin-bottom:5px;color:var(--muted)}.agent-chat-popup-entry p{white-space:pre-wrap;line-height:1.55;font-size:.88rem;margin:0}
-body.has-player .agent-chat-popup{bottom:calc(100% + 112px)}
+body.has-player .agent-chat-popup{bottom:calc(100% + 12px)}
 
 /* The companion remains present on the artist homepage and while the popup is open. */
 .stage .agent-stage,body.artist-home-active .agent-stage{display:flex;position:fixed;z-index:56;right:max(20px,env(safe-area-inset-right));bottom:132px;width:min(265px,calc(100vw - 28px));max-width:none;margin:0;align-items:flex-end;text-align:right;pointer-events:none;filter:drop-shadow(0 12px 28px rgba(0,0,0,.38))}
@@ -562,4 +570,4 @@ body.builder-workspace-active .stage .agent-stage{display:flex!important}
 @keyframes companion-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 @keyframes companion-blink{0%,43%,47%,100%{transform:translateY(-3px) scaleY(1)}45%{transform:translateY(-3px) scaleY(.1)}}
 @keyframes companion-talk{from{height:3px}to{height:12px}}
-@media(max-width:720px){.chat-composer-shell .chatbar{grid-template-columns:37px 37px minmax(0,1fr) 38px 38px}.chat-composer-shell .chat-action{width:37px;height:37px}.chat-composer-shell .chatbar input{height:40px;padding:0 5px;font-size:.89rem}.agent-chat-popup{height:min(54dvh,475px);left:-2px;right:-2px}.agent-chat-popup-messages{padding:11px}.agent-chat-popup-head{padding:9px 11px}.stage .agent-stage,body.artist-home-active .agent-stage{right:12px;bottom:125px;width:min(220px,65vw)}.agent-stage .agent-message{font-size:.74rem;max-height:100px}.agent-stage .agent-orb{width:70px;height:70px}.agent-stage .orb-core{inset:15px}.agent-face{transform:scale(.8)}body.has-player .agent-stage{bottom:230px}body.agent-chat-open .agent-stage{right:18px;bottom:calc(134px + min(54dvh,475px));width:70px}body.has-player.agent-chat-open .agent-stage{bottom:calc(246px + min(54dvh,475px))}}
+@media(max-width:720px){.chat-composer-shell{width:100%}.chat-composer-shell .chatbar{grid-template-columns:37px 37px minmax(0,1fr) 38px 38px}.chat-composer-shell .chat-action{width:37px;height:37px}.chat-composer-shell .chatbar input{height:40px;padding:0 5px;font-size:.89rem}.voice-transcript{font-size:.76rem;padding:8px 11px;max-height:88px}.agent-chat-popup{height:min(54dvh,475px);left:-2px;right:-2px}.agent-chat-popup-messages{padding:11px}.agent-chat-popup-head{padding:9px 11px}.stage .agent-stage,body.artist-home-active .agent-stage{right:12px;bottom:125px;width:min(220px,65vw)}.agent-stage .agent-message{font-size:.74rem;max-height:100px}.agent-stage .agent-orb{width:70px;height:70px}.agent-stage .orb-core{inset:15px}.agent-face{transform:scale(.8)}body.has-player .agent-stage{bottom:230px}body.agent-chat-open .agent-stage{right:18px;bottom:calc(134px + min(54dvh,475px));width:70px}body.has-player.agent-chat-open .agent-stage{bottom:calc(246px + min(54dvh,475px))}}

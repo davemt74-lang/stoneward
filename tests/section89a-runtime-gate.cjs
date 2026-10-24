@@ -20,6 +20,7 @@ async function scenario(stopMidReply){
     command:async()=>{trace.push('command');await command;trace.push('command-complete')},
     pendingReply:audio,
     agent:mode=>trace.push('status-'+mode),
+    showTranscript:(value,phase)=>trace.push('transcript-'+phase),
     say:async()=>trace.push('unexpected-error'),
     scheduleConversationListen:()=>trace.push('restart')
   };

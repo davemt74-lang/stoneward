@@ -219,6 +219,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button type="button" data-quick-action="newsletter"><strong>Newsletter</strong><span>Join Stonefellow email updates</span></button>
     </div>
     <div class="chat-composer-shell">
+      <div id="voiceTranscript" class="voice-transcript" role="status" aria-live="polite" hidden><span class="voice-transcript-dot" aria-hidden="true"></span><span id="voiceTranscriptText"></span></div>
       <section id="agentChatPopup" class="agent-chat-popup" aria-label="Stonefellow conversation" hidden>
         <header class="agent-chat-popup-head"><div><strong>Stonefellow Agent</strong><span id="agentChatPopupState" role="status">Ready</span></div><div class="agent-chat-popup-tools"><button id="agentChatNew" type="button">New chat</button><button id="agentChatClose" type="button" aria-label="Close Agent Chat">×</button></div></header>
         <div id="agentChatPopupMessages" class="agent-chat-popup-messages" role="log" aria-live="polite" aria-label="Conversation history"><p class="agent-chat-empty">Your conversation will appear here. Use the bar below to type or speak.</p></div>
