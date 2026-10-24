@@ -58,6 +58,8 @@ $check($audit['checks_passed'] && !in_array('admin_module_navigate',$audit['unsa
 $check(sf_admin_agent_plan('Create a newsletter campaign')['type']==='prepare_campaign','Existing campaign approval path preserved');
 $check(sf_admin_agent_plan('Create a campaign for my album release')['type']==='prepare_campaign','Campaign intent wins over album navigation');
 $check(sf_admin_agent_plan('Build a follow-up journey')['type']==='prepare_journey','Existing journey approval path preserved');
+$check(sf_admin_agent_plan('Create a follow-up for order SF-REAL-111: Contact warehouse')['type']==='prepare_commerce_followup',
+    'Order follow-up wins over general journey matching');
 $check(sf_admin_agent_plan('Add a song to the timeline')['type']==='production_timeline_media','Song placement preserves governed production tool');
 $check(sf_admin_agent_plan('Show CRM subscribers')['type']==='crm_report','Existing CRM inspection preserved');
 $check(sf_admin_agent_plan('Hello, how are you?')['type']==='research','General conversation remains conversational');

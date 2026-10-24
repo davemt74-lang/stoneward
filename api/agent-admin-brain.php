@@ -172,6 +172,8 @@ function sf_admin_agent_plan(string $message): array {
     // a sentence also mentions an album, song, release or another module.
     if(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m))
         return ['type'=>'prepare_campaign','view'=>'campaigns','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
+    if(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m))
+        return ['type'=>'prepare_commerce_followup','view'=>'commerce-ops','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
     if(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m))
         return ['type'=>'prepare_journey','view'=>'automations','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
     // Clip/timeline edits use their distinct exact-review production logic.
@@ -198,7 +200,6 @@ function sf_admin_agent_plan(string $message): array {
     elseif(preg_match('/\\b(?:scene clips?|scene-level footage|usable moments|clip recommendations?|reviewed scenes?)\\b/',$m)){$type='production_scene_candidates';$view='agent-chat';}
     elseif(preg_match('/\\b(?:director shot list|missing shots|missing footage|coverage gaps|shot recommendations|ai director)\\b/',$m)){$type='production_director_coverage';$view='brain';}
     elseif(preg_match('/\\b(?:artist world|production evidence|creative capture|scene evidence|story graph|shot footage)\\b/',$m)){$type='production_evidence_search';$view='brain';}
-    elseif(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m)){$type='prepare_commerce_followup';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|prepare|write)\b.*\b(reply|response)\b.*\border\b/',$m)){$type='draft_commerce_reply';$view='commerce-ops';}
     elseif(preg_match('/\b(approval|approvals|proposals|action history|agent actions)\b/',$m)){$type='review_actions';$view='brain';}
     elseif(preg_match('/\b(orders?|commerce|stripe|refunds?|payments?|fulfill(?:ment)?|shipping|follow[ -]?ups?)\b/',$m)){$type='commerce_report';$view='commerce-ops';}
