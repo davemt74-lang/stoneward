@@ -26,6 +26,13 @@ function sf_agent_skill_definitions(): array {
       'admin_commerce_insights'=>['label'=>'Review store commerce exceptions','contexts'=>['admin'],'tool'=>'commerce_aggregate','intents'=>['commerce_report']],
       'admin_commerce_followup'=>['label'=>'Prepare reviewed customer follow-up','contexts'=>['admin'],'tool'=>'commerce_followup_add','intents'=>['prepare_commerce_followup']],
       'admin_crm_insights'=>['label'=>'Review CRM aggregates','contexts'=>['admin'],'tool'=>'crm_aggregate','intents'=>['crm_report']],
+      'admin_module_navigation'=>['label'=>'Find and open authorized Admin workspaces, including private audio upload','contexts'=>['admin'],'tool'=>'admin_module_navigate','intents'=>[
+        'bulk_music_import','upload_audio','metadata_templates','media_library','catalog_manager',
+        'release_manager','shows_manager','rights_manager','distribution_manager','press_manager',
+        'knowledge_manager','products_manager','ticketing_manager','membership_manager',
+        'account_manager','team_manager','ai_settings','site_settings','operating_calendar',
+        'payments_manager','fulfillment_manager','pod_manager','customer_lifecycle'
+      ]],
       'admin_campaign_insights'=>['label'=>'Review campaign aggregates','contexts'=>['admin'],'tool'=>'campaign_aggregate','intents'=>['journey_report']],
       'admin_campaign_validation'=>['label'=>'Validate campaign graph','contexts'=>['admin'],'tool'=>'campaign_graph_validate','intents'=>['validate_campaign']],
       'admin_campaign_drafts'=>['label'=>'Prepare reviewed campaign draft','contexts'=>['admin'],'tool'=>'campaign_draft_save','intents'=>['prepare_campaign']],

@@ -461,6 +461,8 @@ jobs:
           node tests/section89a-runtime-gate.cjs
           node tests/section90a-voice-transcription.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
+          php tests/section90b-admin-module-routes.php
+          node tests/section90b-admin-module-client.cjs
           node --check admin/assets/agent-canvas.js
           php tests/section88d1a-release-identity.php
           php tests/section86a-stem-studio.php
