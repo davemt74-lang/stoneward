@@ -19,10 +19,10 @@ function sf_agent_public_artist_provider_context(string $query,int $maxChars=380
         static fn(string $term):bool=>strlen($term)>=3&&!in_array($term,
             ['the','and','for','are','can','you','what','who','how','with','have','about','stonefellow','please','tell','show','some','from','does','your','our'],true)
     )));
-    $artistQuery=(bool)preg_match('/\b(?:stonefellow|artists?|songs?|tracks?|music|albums?|releases?|concerts?|shows?|tour|credits?|discography|biography|catalog|recordings?)\b/i',$query);
+    $artistQuery=(bool)preg_match('/\b(?:stonefellow|artists?|songs?|tracks?|music|albums?|releases?|concerts?|shows|tour|credits?|discography|biography|catalog|recordings?)\b/i',$query);
     $overview=$artistQuery && (bool)preg_match('/\b(?:list|all|latest|discography|catalog|published|overview|artist biography|artist bio|about stonefellow|stonefellow story|upcoming shows|concerts|tour dates)\b/i',$query);
     $preferred=preg_match('/\b(?:biography|artist bio|artist story|about stonefellow)\b/i',$query)?'published_artist_story':
-        (preg_match('/\b(?:shows?|concerts?|tour dates|gigs?)\b/i',$query)?'public_show':
+        (preg_match('/\b(?:shows|concerts?|tour dates|gigs?)\b/i',$query)?'public_show':
         (preg_match('/\b(?:albums?|releases?|discography)\b/i',$query)?'published_release':
         (preg_match('/\b(?:songs?|tracks?|recordings?)\b/i',$query)?'published_track':'')));
     $records=[];
