@@ -134,8 +134,57 @@ function sf_admin_agent_operational_context(): array {
     $summary['commerce_triage']=(array)($commerce['triage']??[]);
     return $summary;
 }
+/**
+ * Installed Admin destinations, with server-selected intents. This list grants
+ * no write authority: every destination retains its normal authenticated API,
+ * media upload, publication, billing and approval checks.
+ */
+function sf_admin_agent_module_routes(): array {
+    return [
+      'bulk_music_import'=>['view'=>'uploads','label'=>'Folder Scan & Upload','pattern'=>'/\b(?:scan|bulk[ -]?upload|bulk[ -]?import|import)\b.{0,85}\b(?:folder|directory|batch|music files?|audio files?)\b/i','reply'=>'I can open the folder importer to scan MP3/WAV files, apply a metadata template, and review the batch before importing. No files are uploaded until you choose a folder and approve the batch.'],
+      'upload_audio'=>['view'=>'media','label'=>'Upload audio','pattern'=>'/\b(?:upload|attach|import)\b.{0,85}\b(?:songs?|tracks?|mp3|wav|audio|music files?)\b/i','reply'=>'Let’s upload your recording. Choose a WAV or MP3 from your computer using the button below. Stonefellow will store and analyze it privately in Media Library; then we can attach it to a catalog track, add credits and artwork, and separately review publishing. Uploading does not publish a song.'],
+      'metadata_templates'=>['view'=>'templates','label'=>'Metadata Templates','pattern'=>'/\b(?:metadata templates?|isrc templates?|template defaults?)\b/i','reply'=>'I can open Metadata Templates to set default credits, rights, genre, cover art and ISRC policies for new music imports.'],
+      'media_library'=>['view'=>'media','label'=>'Media Library','pattern'=>'/\b(?:media library|media assets?|uploaded files?|audio library)\b/i','reply'=>'I can open your private Media Library, inspect managed audio and artwork, and help attach existing files to their proper songs and releases.'],
+      'catalog_manager'=>['view'=>'catalog','label'=>'Catalog','pattern'=>'/\b(?:song catalog|track catalog|master catalog|recordings? catalog|catalog|song list|track list|(?:add|create|make) (?:a )?(?:new )?(?:song|track))\b/i','reply'=>'I can open Stonefellow’s master catalog and recording editor to organize titles, credits, ISRCs, audio and release metadata.'],
+      'release_manager'=>['view'=>'releases','label'=>'Releases','pattern'=>'/\b(?:albums?|releases?|ep[s]?|singles?)\b.{0,70}\b(?:edit|create|manage|publish|plan|open|review|list|build|show|view)\b|\b(?:edit|create|manage|publish|plan|open|review|list|build|show|view)\b.{0,70}\b(?:albums?|releases?|ep[s]?|singles?)\b/i','reply'=>'I can open Releases to build a Stonefellow album or single, organize its tracks and artwork, and check readiness before publication.'],
+      'shows_manager'=>['view'=>'shows','label'=>'Shows + Live','pattern'=>'/\b(?:tour dates?|concerts?|live dates?|upcoming shows?|past shows?|shows calendar|show listings?|shows|(?:plan|book|schedule) (?:a |my )?tour)\b/i','reply'=>'I can open the show calendar to manage upcoming performances, show details, and linked media.'],
+      'rights_manager'=>['view'=>'rights','label'=>'Rights + Licensing','pattern'=>'/\b(?:music rights|publishing splits?|licens(?:e|ing)|copyright clearance|rights parties)\b/i','reply'=>'I can open Rights & Licensing to inspect writers, masters, splits and outstanding clearance issues. Rights changes retain their existing review requirements.'],
+      'distribution_manager'=>['view'=>'distribution','label'=>'Distribution + Publishing','pattern'=>'/\b(?:dsp|distribution|streaming platform|music publishing)\b/i','reply'=>'I can open Distribution to review release metadata, destinations, delivery status and publication readiness. I won’t claim a release was delivered without a confirmed result.'],
+      'press_manager'=>['view'=>'press','label'=>'EPK + Press','pattern'=>'/\b(?:press kit|epk|press contacts?|press outreach|media coverage)\b/i','reply'=>'I can open the EPK and Press workspace to review your press materials, contacts and outreach drafts. Sending messages requires separate approval.'],
+      'knowledge_manager'=>['view'=>'knowledge','label'=>'Knowledge Base','pattern'=>'/\b(?:knowledge base|upload knowledge|knowledge files?|documents? library)\b/i','reply'=>'I can open your private Knowledge Base to organize source documents, upload approved references and search for relevant information.'],
+      'products_manager'=>['view'=>'products','label'=>'Merch + Products','pattern'=>'/\b(?:merchandise|merch products?|product catalog|store products?)\b/i','reply'=>'I can open Merch & Products to review listings, variations, pricing and stock before any customer-facing changes.'],
+      'ticketing_manager'=>['view'=>'ticketing','label'=>'Tickets + VIP','pattern'=>'/\b(?:ticketing|ticket offers?|vip reservations?|guest lists?|rsvp)\b/i','reply'=>'I can open ticketing and VIP offers to inspect capacities, guest lists and reservations. Confirmed changes use the ticketing workflow.'],
+      'membership_manager'=>['view'=>'membership','label'=>'Membership + VIP','pattern'=>'/\b(?:memberships?|vip benefits?|member content)\b/i','reply'=>'I can open Membership & VIP to review levels, benefits and member-facing content.'],
+      'account_manager'=>['view'=>'users','label'=>'Users + Tokens','pattern'=>'/\b(?:user accounts?|manage users?|token grants?|active tokens?|user permissions?)\b/i','reply'=>'I can open Users & Tokens to inspect accounts, roles and token grants. Account and permission changes remain protected by the existing administrator controls.'],
+      'team_manager'=>['view'=>'team','label'=>'Team Workspace','pattern'=>'/\b(?:team workspace|team members?|role assignments?|staff permissions?)\b/i','reply'=>'I can open Team Workspace to review assignments and permissions. I will use the signed-in administrator’s authority for protected edits.'],
+      'ai_settings'=>['view'=>'ai','label'=>'AI Providers','pattern'=>'/\b(?:ai providers?|llm settings?|openai settings?|claude settings?|elevenlabs settings?|voice provider settings?)\b/i','reply'=>'I can open AI Providers to review the configured model, voice and routing settings. Provider credentials stay server-side and are never included in model replies.'],
+      'site_settings'=>['view'=>'settings','label'=>'Site Settings','pattern'=>'/\b(?:site settings?|website settings?|homepage settings?|appearance settings?)\b/i','reply'=>'I can open Site Settings to adjust Stonefellow’s branding, homepage and site preferences through the normal reviewed controls.'],
+      'operating_calendar'=>['view'=>'calendar','label'=>'Operating Calendar','pattern'=>'/\b(?:operating calendar|release calendar|marketing calendar|calendar events?)\b/i','reply'=>'I can open the Operating Calendar to inspect plans, milestones and upcoming work.'],
+      'payments_manager'=>['view'=>'payments','label'=>'Payments & Stripe','pattern'=>'/\b(?:stripe settings?|payment settings?|stripe connection|billing provider)\b/i','reply'=>'I can open Payments & Stripe to review the payment connection and its health. Monetary actions still require the authenticated billing workflow.'],
+      'fulfillment_manager'=>['view'=>'fulfillment','label'=>'Fulfillment + Care','pattern'=>'/\b(?:fulfillment|shipments?|returns?|support cases?)\b/i','reply'=>'I can open Fulfillment & Care to inspect shipments, returns and customer support cases before submitting any updates.'],
+      'pod_manager'=>['view'=>'pod','label'=>'POD Handoffs','pattern'=>'/\b(?:pod handoffs?|print[ -]?on[ -]?demand handoffs?)\b/i','reply'=>'I can open POD Handoffs to review physical release production and existing fulfillment handoffs.'],
+      'customer_lifecycle'=>['view'=>'customer','label'=>'Customer Lifecycle','pattern'=>'/\b(?:customer lifecycle|customer subscriptions?|account lifecycle)\b/i','reply'=>'I can open Customer Lifecycle to review account and subscription events using the existing privacy and billing boundaries.'],
+    ];
+}
 function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
+    // Preserve existing exact-review campaign and journey contracts even when
+    // a sentence also mentions an album, song, release or another module.
+    if(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m))
+        return ['type'=>'prepare_campaign','view'=>'campaigns','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
+    if(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m))
+        return ['type'=>'prepare_commerce_followup','view'=>'commerce-ops','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
+    if(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m))
+        return ['type'=>'prepare_journey','view'=>'automations','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
+    // Clip/timeline edits use their distinct exact-review production logic.
+    if(!preg_match('/\b(?:timeline|assembly|clip|footage|storyboard|scene)\b/i',$message)){
+        foreach(sf_admin_agent_module_routes() as $intent=>$route){
+            if(preg_match($route['pattern'],$message))return [
+                'type'=>$intent,'view'=>$route['view'],'requires_confirmation'=>false,
+                'execution'=>'owner_initiated_workflow'
+            ];
+        }
+    }
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
     elseif(preg_match('/\\b(?:footage intelligence|analy[sz]e (?:the )?(?:video|footage|shots?)|visual analysis|scene visual analysis|retake suggestions?|ai footage review|review footage analysis)\\b/i',$m)){$type='production_footage_intelligence';$view='agent-chat';}
@@ -151,10 +200,7 @@ function sf_admin_agent_plan(string $message): array {
     elseif(preg_match('/\\b(?:scene clips?|scene-level footage|usable moments|clip recommendations?|reviewed scenes?)\\b/',$m)){$type='production_scene_candidates';$view='agent-chat';}
     elseif(preg_match('/\\b(?:director shot list|missing shots|missing footage|coverage gaps|shot recommendations|ai director)\\b/',$m)){$type='production_director_coverage';$view='brain';}
     elseif(preg_match('/\\b(?:artist world|production evidence|creative capture|scene evidence|story graph|shot footage)\\b/',$m)){$type='production_evidence_search';$view='brain';}
-    elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_campaign';$view='campaigns';}
-    elseif(preg_match('/\b(?:add|create|prepare)\b.*\b(?:follow[ -]?up|order note)\b/',$m)){$type='prepare_commerce_followup';$view='commerce-ops';}
     elseif(preg_match('/\b(draft|prepare|write)\b.*\b(reply|response)\b.*\border\b/',$m)){$type='draft_commerce_reply';$view='commerce-ops';}
-    elseif(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m)){$type='prepare_journey';$view='automations';}
     elseif(preg_match('/\b(approval|approvals|proposals|action history|agent actions)\b/',$m)){$type='review_actions';$view='brain';}
     elseif(preg_match('/\b(orders?|commerce|stripe|refunds?|payments?|fulfill(?:ment)?|shipping|follow[ -]?ups?)\b/',$m)){$type='commerce_report';$view='commerce-ops';}
     elseif(preg_match('/\b(?:fan engagement|fan journeys?|listening trends?|song discovery|repeat listening|music conversion|song conversion|listening performance)\b/',$m)){$type='journey_report';$view='analytics';}
@@ -193,8 +239,11 @@ function sf_admin_agent_external_facts(array $context):array {
  */
 function sf_admin_agent_research_reply(string $message,array $context,array $prior,int $adminId=0): ?string {
     if(!function_exists('sf_ai_llm_candidates'))return null;
-    $facts=sf_admin_agent_external_facts($context);
-    $system="You are Stonefellow's administrative research assistant. Use only the aggregate operational facts supplied. Never request or reveal any fan's private conversations or memories. Never claim to have edited CRM, sent messages, purchased, published, changed a journey or saved a campaign. The current tool contract allows no direct writes. State uncertainty if data is absent. Keep your answer under 220 words.\\nAGGREGATE FACTS: ".json_encode($facts,JSON_UNESCAPED_SLASHES);
+    $facts=preg_match('/\b(?:crm|subscribers?|campaigns?|audience|fans?|commerce|orders?|payments?|conversion|journeys?|analytics|sales)\b/i',$message)
+        ?sf_admin_agent_external_facts($context):[];
+    // Only static capability names are described here. No private catalog,
+    // customer, media or knowledge records are exported to a provider.
+    $system="You are Stonefellow's proactive Admin Agent. Answer the actual question first. Stonefellow includes a Catalog, Media Library, WAV/MP3 upload, metadata templates, releases, live shows, rights, distribution, press, Knowledge Base, CRM, campaigns, membership, commerce, settings and calendar. Guide the administrator to the appropriate built-in workflow. The model itself does not execute privileged writes; all actual changes use the existing authenticated tool interface and approvals. Never claim to have uploaded, published, sent, charged, modified or saved anything without a confirmed tool result. Do not repeat unrelated CRM statistics. Ask one focused question if needed. Keep your reply under 220 words.\\nAGGREGATE FACTS: ".json_encode($facts,JSON_UNESCAPED_SLASHES);
     // $prior and private Admin feedback are intentionally not exported.
     foreach(array_slice(sf_ai_llm_candidates('agent_brain'),0,2) as $provider){
         try{
@@ -296,7 +345,8 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'journey_report'=>sf_fan_journey_agent_message((array)($context['fan_journey_signals']??[])).' '.sf_87d_admin_agent_message((array)($context['verified_fan_conversion']??[])).' Existing lifecycle automation runs in 30 days: '.(int)($context['journey_counts']['journeys_started']??0).' started, '.(int)($context['journey_counts']['journeys_failed']??0).' failed.',
       'research'=>'I can help investigate Stonefellow campaigns, CRM aggregates, fan journeys, and operational actions. Specify an area to inspect; no private customer conversations are shared with Admin.'
     ];
-    $text=$types[$plan['type']];
+    $module=sf_admin_agent_module_routes()[$plan['type']]??null;
+    $text=$module!==null?(string)$module['reply']:($types[$plan['type']]??$types['research']);
     if($plan['type']==='production_schedule_calendar'){
         try{
             $calendar=sf_production_calendar_chat($adminId);

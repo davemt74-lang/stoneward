@@ -583,7 +583,15 @@
     const feedback=m.role==='assistant'&&Number(m.id)>0?'<div class="admin-agent-feedback"><button type="button" class="secondary" data-admin-agent-feedback="helpful" data-message-id="'+Number(m.id)+'">Helpful</button><button type="button" class="secondary" data-admin-agent-feedback="not_helpful" data-message-id="'+Number(m.id)+'">Not helpful</button></div>':'';
     const action=m.action||{};
     let next='';
-    if(m.role==='assistant'&&action.type==='prepare_campaign')next='<button type="button" data-admin-agent-action="campaigns" class="secondary">Prepare exact-review campaign draft</button>';
+    const moduleRoute=action.tool_contract?.tool_id==='admin_module_navigate'&&adminModuleViews.has(action.view);
+    if(m.role==='assistant'&&moduleRoute&&action.type==='upload_audio'){
+      next='<button type="button" data-admin-agent-action="upload_audio" class="primary">Choose WAV / MP3 file</button> '+
+        '<button type="button" data-admin-agent-action="media" class="secondary">Open Media Library</button>';
+    }
+    else if(m.role==='assistant'&&moduleRoute){
+      next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Open '+esc(adminModuleLabels[action.view]||'Admin workspace')+'</button>';
+    }
+    else if(m.role==='assistant'&&action.type==='prepare_campaign')next='<button type="button" data-admin-agent-action="campaigns" class="secondary">Prepare exact-review campaign draft</button>';
     else if(m.role==='assistant'&&action.type==='prepare_journey')next='<button type="button" data-admin-agent-action="journey" class="secondary">Prepare exact-review journey draft</button>';
     else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-agent-show-calendar class="secondary">Show production calendar here</button>';
     else if(m.role==='assistant'&&action.type==='production_schedule_calendar')next=calendarHtml(action.production_calendar);
@@ -621,12 +629,21 @@
     const evidence=brief.map(i=>'<li><strong>'+esc(i.title)+'</strong> — '+esc(i.reason)+'</li>').join('');
     return '<article class="admin-agent-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+who+'</strong><p>'+esc(m.content||'')+'</p>'+(stageCards?'<div class="admin-agent-stages"><strong>Governed mission steps</strong><ul>'+stageCards+'</ul><p>Inspect the relevant editor before separately approving any changes.</p></div>':'')+(evidence?'<div class="admin-agent-insights"><strong>Evidence-backed opportunities</strong><ul>'+evidence+'</ul></div>':'')+next+feedback+'</article>';
   }
+  const adminModuleLabels={uploads:'Folder Scan & Upload',media:'Media Library',templates:'Metadata Templates',catalog:'Catalog',releases:'Releases',shows:'Shows + Live',rights:'Rights & Licensing',distribution:'Distribution',press:'EPK + Press',knowledge:'Knowledge Base',products:'Merch & Products',ticketing:'Tickets + VIP',membership:'Membership + VIP',users:'Users & Tokens',team:'Team Workspace',ai:'AI Providers',settings:'Site Settings',calendar:'Operating Calendar',payments:'Payments & Stripe',fulfillment:'Fulfillment & Care',pod:'POD Handoffs',customer:'Customer Lifecycle'};
+  const adminModuleViews=new Set(Object.keys(adminModuleLabels));
   function action(type){
     const c=ctx();if(!c)return;
     if(type==='brain'){showBrain();return;}
     if(type==='campaigns'){c.openView('campaigns');setTimeout(()=>window.SFAgentCampaigns?.open?.('newsletter'),0);return;}
     if(type==='journey'){c.openView('automations');setTimeout(()=>window.SFAutomationsAdmin?.openAutomation?.(0),0);return;}
+    if(type==='upload_audio'){
+      c.openView('media');
+      // Must run from the user's own click: browsers forbid agent-initiated file selection.
+      if(typeof window.SFMediaAdmin?.pickUploadFiles==='function')window.SFMediaAdmin.pickUploadFiles('','','audio_candidate');
+      return;
+    }
     if(type==='production-review'){c.openView('production-review');return;}
+    if(adminModuleViews.has(type)){c.openView(type);return;}
     if(['crm','automations','analytics','commerce-ops'].includes(type))c.openView(type);
   }
   function bindActions(root){

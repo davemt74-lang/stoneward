@@ -56,7 +56,7 @@ function sf_agent_capability_audit(?array $snapshot=null): array {
         $report['by_kind'][$kind]=($report['by_kind'][$kind]??0)+1;
 
         // Resolve only repository-local source paths. Never probe arbitrary paths.
-        if(!is_string($owner) || !preg_match('~\A(?:api/|admin/api/|assets/js/)[a-zA-Z0-9_./-]+\z~D',$owner)
+        if(!is_string($owner) || !preg_match('~\A(?:api/|admin/api/|admin/assets/|assets/js/)[a-zA-Z0-9_./-]+\z~D',$owner)
             || str_contains($owner,'..') || str_contains($owner,'//')) {
             $report['unsafe_owner_paths'][]=$id;
         } elseif(!is_file(dirname(__DIR__).'/'.$owner)) {
