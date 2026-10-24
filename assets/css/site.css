@@ -527,6 +527,10 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 @media(max-width:780px){.capture-layout{grid-template-columns:1fr}.capture-submit{order:-1}}
 
 /* Floating companion and composer-anchored conversation (voice and text share one thread). */
+.chat-footer{z-index:80}
+/* Drawers must still sit over the composer and companion when opened. */
+.drawer-backdrop{z-index:129}
+.notification-drawer,.queue-drawer{z-index:130}
 .chat-composer-shell{position:relative;width:min(760px,100%);margin:auto}
 .chat-composer-shell .chatbar{width:100%;min-width:0;grid-template-columns:42px 42px minmax(0,1fr) 42px 42px;gap:2px}
 .chat-composer-shell .chatbar input{min-width:0;padding-left:8px;padding-right:8px;text-overflow:ellipsis}
@@ -553,21 +557,22 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 body.has-player .agent-chat-popup{bottom:calc(100% + 12px)}
 
 /* The companion remains present on the artist homepage and while the popup is open. */
-.stage .agent-stage,body.artist-home-active .agent-stage{display:flex;position:fixed;z-index:56;right:max(20px,env(safe-area-inset-right));bottom:132px;width:min(265px,calc(100vw - 28px));max-width:none;margin:0;align-items:flex-end;text-align:right;pointer-events:none;filter:drop-shadow(0 12px 28px rgba(0,0,0,.38))}
+body>.agent-stage,body.artist-home-active>.agent-stage{display:flex;position:fixed;z-index:90;right:max(20px,env(safe-area-inset-right));bottom:var(--sf-agent-dock-bottom,142px);width:min(265px,calc(100vw - 28px));max-width:none;margin:0;align-items:flex-end;text-align:right;pointer-events:none;filter:drop-shadow(0 12px 28px rgba(0,0,0,.38));transition:bottom .18s ease,right .18s ease}
 .agent-stage .agent-orb{pointer-events:auto;width:86px;height:86px;flex-shrink:0;margin:0 0 5px;animation:companion-float 4s ease-in-out infinite;cursor:pointer}
 .agent-stage .orb-core{inset:19px;background:radial-gradient(circle at 35% 25%,#f5dcaf 0,#ba9461 38%,#5d4536 74%,#1b1a1b 100%);box-shadow:inset -7px -8px 10px rgba(0,0,0,.25),0 0 24px rgba(201,169,110,.18)}
 .agent-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:11px;pointer-events:none}.agent-eye{width:7px;height:8px;background:#19191e;border-radius:50%;transform:translateY(-3px);animation:companion-blink 5.2s infinite}.agent-mouth{position:absolute;top:53px;left:39px;width:11px;height:3px;border-radius:0 0 10px 10px;background:#211d21;transition:height .16s}
 .agent-orb.speaking .agent-mouth{height:11px;animation:companion-talk .32s ease-in-out infinite alternate}.agent-orb.listening .ring-a{border-color:#4da4ff;box-shadow:0 0 22px rgba(77,164,255,.25)}.agent-orb.thinking .ring-b{border-top-color:#46c586}.agent-orb.speaking .ring-a{border-color:#f06468;box-shadow:0 0 22px rgba(240,100,104,.25)}
 .agent-stage .agent-meta{pointer-events:none;font-size:.59rem;letter-spacing:.16em;margin:0 7px 9px;background:rgba(var(--surface-rgb),.9);border:1px solid var(--line);padding:4px 8px;border-radius:20px}
 .agent-stage .agent-message{pointer-events:none;max-width:265px;max-height:116px;overflow:hidden;font-family:var(--body-font);font-size:.82rem;line-height:1.45;text-align:left;padding:11px 13px;border:1px solid var(--line2);border-radius:14px;background:rgba(var(--surface-rgb),.97);overflow-wrap:anywhere;box-shadow:0 12px 32px rgba(0,0,0,.2)}
+.agent-stage .agent-interrupt{pointer-events:auto;cursor:pointer;border:1px solid rgba(240,100,104,.5);background:rgba(var(--surface-rgb),.96);color:var(--ink);border-radius:30px;padding:6px 12px;font-size:.74rem;margin:4px 0 5px}
+.agent-stage .agent-interrupt[hidden]{display:none!important}
+body.drawer-open>.agent-stage,body.queue-open>.agent-stage{visibility:hidden}
 .agent-stage .starter-actions{display:none}
-body.has-player .agent-stage{bottom:245px}
-body.agent-chat-open .agent-stage{z-index:65;bottom:calc(146px + min(54dvh,510px));right:max(22px,calc(50% - 370px));width:90px}
+body.agent-chat-open>.agent-stage{z-index:90;bottom:min(calc(var(--sf-agent-dock-bottom,142px) + var(--sf-agent-popup-rise,522px) - 25px),calc(100dvh - 86px));right:max(22px,calc(50% - 370px));width:90px}
 body.agent-chat-open .agent-stage .agent-message,body.agent-chat-open .agent-stage .agent-meta{display:none}
-body.has-player.agent-chat-open .agent-stage{bottom:calc(258px + min(54dvh,510px))}
 .has-site-hero .agent-stage{background-image:none}
-body.builder-workspace-active .stage .agent-stage{display:flex!important}
+body.builder-workspace-active>.agent-stage{display:flex!important}
 @keyframes companion-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 @keyframes companion-blink{0%,43%,47%,100%{transform:translateY(-3px) scaleY(1)}45%{transform:translateY(-3px) scaleY(.1)}}
 @keyframes companion-talk{from{height:3px}to{height:12px}}
-@media(max-width:720px){.chat-composer-shell{width:100%}.chat-composer-shell .chatbar{grid-template-columns:37px 37px minmax(0,1fr) 38px 38px}.chat-composer-shell .chat-action{width:37px;height:37px}.chat-composer-shell .chatbar input{height:40px;padding:0 5px;font-size:.89rem}.voice-transcript{font-size:.76rem;padding:8px 11px;max-height:88px}.agent-chat-popup{height:min(54dvh,475px);left:-2px;right:-2px}.agent-chat-popup-messages{padding:11px}.agent-chat-popup-head{padding:9px 11px}.stage .agent-stage,body.artist-home-active .agent-stage{right:12px;bottom:125px;width:min(220px,65vw)}.agent-stage .agent-message{font-size:.74rem;max-height:100px}.agent-stage .agent-orb{width:70px;height:70px}.agent-stage .orb-core{inset:15px}.agent-face{transform:scale(.8)}body.has-player .agent-stage{bottom:230px}body.agent-chat-open .agent-stage{right:18px;bottom:calc(134px + min(54dvh,475px));width:70px}body.has-player.agent-chat-open .agent-stage{bottom:calc(246px + min(54dvh,475px))}}
+@media(max-width:720px){.chat-composer-shell{width:100%}.chat-composer-shell .chatbar{grid-template-columns:37px 37px minmax(0,1fr) 38px 38px}.chat-composer-shell .chat-action{width:37px;height:37px}.chat-composer-shell .chatbar input{height:40px;padding:0 5px;font-size:.89rem}.voice-transcript{font-size:.76rem;padding:8px 11px;max-height:88px}.agent-chat-popup{height:min(54dvh,475px);left:-2px;right:-2px}.agent-chat-popup-messages{padding:11px}.agent-chat-popup-head{padding:9px 11px}body>.agent-stage,body.artist-home-active>.agent-stage{right:12px;width:min(220px,65vw)}.agent-stage .agent-message{font-size:.74rem;max-height:100px}.agent-stage .agent-orb{width:70px;height:70px}.agent-stage .orb-core{inset:15px}.agent-face{transform:scale(.8)}body.agent-chat-open>.agent-stage{right:18px;width:70px}}

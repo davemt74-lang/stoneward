@@ -460,6 +460,7 @@ jobs:
           node tests/section89a-floating-agent-voice.cjs
           node tests/section89a-runtime-gate.cjs
           node tests/section90a-voice-transcription.cjs
+          node tests/section90d-ambient-agent-voice.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs

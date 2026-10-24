@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const app=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
-const implementation=app.split('\n').find(x=>x.trimStart().startsWith('async function submitVoiceTurn('));
+const implementation=app.match(/  async function submitVoiceTurn\(spoken\)\{[\s\S]*?\n  \}\n  function submitRecognizedVoiceTurn/)?.[0].replace(/\n  function submitRecognizedVoiceTurn$/,'');
 assert.ok(implementation,'Voice-turn implementation should remain present');
 
 async function scenario(stopMidReply){
@@ -17,10 +17,13 @@ async function scenario(stopMidReply){
     clearTimeout:()=>trace.push('clear-timer'),
     conversationRestartTimer:null,
     st:{conversationOn:true},
+    musicFollowupUntil:0,
+    Date,
     command:async()=>{trace.push('command');await command;trace.push('command-complete')},
     pendingReply:audio,
     agent:mode=>trace.push('status-'+mode),
     showTranscript:(value,phase)=>trace.push('transcript-'+phase),
+    listeningPrompt:()=> 'Listening…',
     say:async()=>trace.push('unexpected-error'),
     scheduleConversationListen:()=>trace.push('restart')
   };
