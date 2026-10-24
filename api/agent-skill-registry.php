@@ -12,6 +12,7 @@ function sf_agent_skill_definitions(): array {
     return [
       'catalog_discovery'=>['label'=>'Find published music','contexts'=>['public','customer','admin'],'tool'=>'public_catalog_search','intents'=>['public_catalog_search']],
       'published_site_search'=>['label'=>'Search published site','contexts'=>['public','customer','admin'],'tool'=>'public_site_search','intents'=>['public_site_search']],
+      'published_artist_facts'=>['label'=>'Research published Stonefellow music and artist information','contexts'=>['public','customer','admin'],'tool'=>'public_artist_facts','intents'=>['public_artist_research']],
       'public_recommendations'=>['label'=>'Recommend published tracks','contexts'=>['public','customer','admin'],'tool'=>'recommend_public_track','intents'=>['player_recommend']],
       'playback_queue'=>['label'=>'Manage local playback queue','contexts'=>['public','customer','admin'],'tool'=>'queue_track','intents'=>['queue_track']],
       'customer_favorites'=>['label'=>'Manage my favorites','contexts'=>['customer'],'tool'=>'favorite_track','intents'=>['favorite_save','favorite_remove']],

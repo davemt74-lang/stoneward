@@ -8,6 +8,7 @@ function sf_agent_tool_registry(): array {
     return [
         'public_catalog_search'=>['label'=>'Public catalog discovery','kind'=>'read','scope'=>'fan','owner'=>'api/search-core.php','handler'=>'sf_catalog_search','confirmation'=>false,'execution'=>'server'],
         'public_site_search'=>['label'=>'Published site search','kind'=>'read','scope'=>'fan','owner'=>'api/search-core.php','handler'=>'sf_site_search','confirmation'=>false,'execution'=>'server'],
+        'public_artist_facts'=>['label'=>'Read verified public music and artist facts','kind'=>'read','scope'=>'fan','owner'=>'api/agent-public-artist-context.php','handler'=>'sf_agent_public_artist_provider_context','confirmation'=>false,'execution'=>'server'],
         'recommend_public_track'=>['label'=>'Public track recommendation','kind'=>'read','scope'=>'fan','owner'=>'api/agent-runtime.php','handler'=>'sf_agent_recommend_track','confirmation'=>false,'execution'=>'server'],
         'favorite_track'=>['label'=>'Favorite a track','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/personalization.php','handler'=>'set_favorite','confirmation'=>true,'execution'=>'authenticated_api'],
         'create_playlist'=>['label'=>'Create a playlist','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/playlists.php','handler'=>'create','confirmation'=>true,'execution'=>'authenticated_api'],

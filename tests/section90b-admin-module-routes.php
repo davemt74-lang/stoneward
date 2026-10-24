@@ -64,6 +64,7 @@ $check(sf_admin_agent_plan('Add a song to the timeline')['type']==='production_t
 $check(sf_admin_agent_plan('Show CRM subscribers')['type']==='crm_report','Existing CRM inspection preserved');
 $check(sf_admin_agent_plan('Hello, how are you?')['type']==='research','General conversation remains conversational');
 $source=(string)file_get_contents(dirname(__DIR__).'/api/agent-admin-brain.php');
-$check(str_contains($source,'No private catalog,') && !str_contains($source,'sf_catalog(),JSON_UNESCAPED_SLASHES'),
-    'Private catalog is not included in external model prompts');
+$check(str_contains($source,'sf_agent_public_artist_provider_context($message,3600)')
+    && !str_contains($source,'sf_catalog(),JSON_UNESCAPED_SLASHES'),
+    'Provider receives allowlisted public artist context, never raw private catalog');
 exit($fails?1:0);

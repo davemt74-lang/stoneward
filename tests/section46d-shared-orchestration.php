@@ -23,7 +23,9 @@ $fanSource=(string)file_get_contents(dirname(__DIR__).'/api/agent-chat.php');
 $checks['Admin calls shared contract before action']=str_contains($admin,"sf_agent_orchestration_contract('admin',$"."plan['type'])");
 $checks['Customer calls shared contract before response']=str_contains($fanSource,"sf_agent_orchestration_contract('customer'");
 $checks['LLM has no privileged tool executor']=str_contains($admin,'The model itself does not execute privileged writes');
-$checks['Model only receives aggregate context']=str_contains($admin,'AGGREGATE FACTS: ')&&str_contains($admin,'sf_admin_agent_operational_context()');
+$checks['Model context is limited to aggregate and approved public artist facts']=str_contains($admin,'AGGREGATE FACTS: ')
+ && str_contains($admin,'sf_agent_public_artist_provider_context($message,3600)')
+ && str_contains($admin,'sf_admin_agent_operational_context()');
 $checks['Provider failures never leak exception to Admin']=!str_contains($admin,'throw $e;')&&!str_contains($admin,'return $e->getMessage()');
 $bad=0;foreach($checks as $n=>$ok){echo ($ok?'PASS':'FAIL').' '.$n.PHP_EOL;if(!$ok)$bad++;}
 exit($bad?1:0);

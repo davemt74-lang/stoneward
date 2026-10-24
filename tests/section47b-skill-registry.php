@@ -9,7 +9,10 @@ $tools=fn(array $skills): array=>array_column($skills,'tool_id');
 $checks=[
  'Every non-internal tool has one skill manifest'=>count($registry)===count($defs)+1 && count(array_unique(array_column($defs,'tool')))==count($defs),
  'No internal audit skill'=>!in_array('agent_brain_log',array_column($defs,'tool'),true),
- 'Public inventory contains only published/queue reads'=>count($public)===4 && !in_array('create_playlist',$tools($public),true) && !in_array('crm_aggregate',$tools($public),true),
+ 'Public inventory contains published/queue/public-artist reads'=>count($public)===5
+    && in_array('public_artist_facts',$tools($public),true)
+    && !in_array('create_playlist',$tools($public),true)
+    && !in_array('crm_aggregate',$tools($public),true),
  'Customer can discover private profile tools'=>in_array('create_playlist',$tools($customer),true) && in_array('favorite_track',$tools($customer),true),
  'Customer cannot discover Admin capabilities'=>!in_array('crm_aggregate',$tools($customer),true) && !in_array('campaign_draft_save',$tools($customer),true),
  'Admin cannot discover customer-private skills'=>in_array('crm_aggregate',$tools($admin),true) && !in_array('favorite_track',$tools($admin),true),
