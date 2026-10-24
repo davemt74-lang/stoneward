@@ -47,3 +47,5 @@ open/close, and recovery after a recognition network interruption.
 
 No database migration. The Agent's action permissions and approved data classes
 are unchanged; this section does not grant any new LLM context or write tools.
+The 1.3.136 build advances the public/Admin/PWA cache identifiers together;
+historical applied migration versions and checksums are unchanged.
