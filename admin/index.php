@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.136');
+define('SF_ADMIN_BUILD','1.3.137');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -22,6 +22,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/campaigns.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/agent-actions.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/agent-canvas.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/agent-catalog-review.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/production-review.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/story-assembly.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/media.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
@@ -143,6 +144,13 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         </form>
         <span id="adminAgentComposerStatus" class="sr-only" role="status" aria-live="polite"></span>
       </footer>
+      <button id="adminFloatingAgent" class="admin-floating-agent" type="button"
+              data-mode="idle" aria-label="Open Stonefellow Admin Agent Chat" aria-pressed="false"
+              title="Open Agent Chat · tap again for microphone">
+        <span class="admin-floating-ring" aria-hidden="true"></span>
+        <span class="admin-floating-core" aria-hidden="true"><span class="admin-floating-eyes"><i></i><i></i></span><span class="admin-floating-mouth"></span></span>
+        <span class="admin-floating-caption" id="adminFloatingAgentState">READY</span>
+      </button>
     </div>
   </div>
 
@@ -160,6 +168,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/campaigns.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-actions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-commerce-review.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/agent-catalog-review.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-canvas.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/media.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/stem-waveform.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>\n  <script src="assets/stem-timeline.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>

@@ -33,7 +33,7 @@ $checks=[
  'Schema target current release'=>version_compare($schema,'1.3.35','>=')&&str_contains($migrations,"SF_DB_SCHEMA_TARGET = '".$schema."'")&&str_contains($version,"'database_schema_target'=>'".$schema."'"),
  'Migration 035 installed'=>str_contains($migrations,"'id'=>'2026-10-12-035'")&&str_contains($migrations,'sf_agent_actions_ensure_schema()'),
  'Authenticated CSRF governance'=>str_contains($api,"sf_admin_require_auth($"."method!=='GET')"),
- 'Sending and publishing not executable'=>str_contains($registry,"if(!in_array($"."toolId,['campaign_draft_save','automation_draft_save','commerce_followup_add','stem_automation_update'],true))return false") && !str_contains($registry,"'campaign_publish','commerce_followup_add'") && !str_contains($registry,"'campaign_send_email','commerce_followup_add'"),
+ 'Sending and publishing not executable'=>str_contains($registry,"if(!in_array($"."toolId,['campaign_draft_save','automation_draft_save','commerce_followup_add','stem_automation_update','catalog_metadata_update'],true))return false") && !str_contains($registry,"'campaign_publish','commerce_followup_add'") && !str_contains($registry,"'campaign_send_email','commerce_followup_add'"),
  'Approval requires exact digest'=>str_contains($core,'hash_equals($'."p['payload_hash']"),
  'No automatic replay of uncertain status'=>str_contains($core,"'review_required'")&&str_contains($core,"'reviewed_no_retry'"),
  'Mandatory real campaign persistence test'=>str_contains($ci,'php tests/section44j-live-campaign-save.php'),

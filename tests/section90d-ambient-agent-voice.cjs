@@ -60,7 +60,7 @@ check('Music wake phrase protects against lyrics while natural follow-ups work',
 
 check('ElevenLabs preferred; local system voice is fallback when unavailable',async()=>{
   let localCalls=0,remoteResult=false;
-  const sandbox={st:{conversationOn:true,playing:false},voicePlaybackPending:false,agentInterrupt:{hidden:false},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},agent:()=>{}};
+  const sandbox={st:{conversationOn:true,playing:false},voiceRepliesEnabled:true,voiceInteractionStarted:true,voicePlaybackPending:false,agentInterrupt:{hidden:false},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},agent:()=>{}};
   vm.createContext(sandbox);
   vm.runInContext(functionSource('agentSpeak',true)+';globalThis.run=agentSpeak',sandbox);
   assert.equal(await sandbox.run('Test voice'),true);assert.equal(localCalls,1);

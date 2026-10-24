@@ -617,6 +617,11 @@
         next='<button type="button" class="primary" data-agent-commerce-review="'+esc(action.request_key)+'">Review follow-up proposal</button>';
       }else next='<button type="button" class="secondary" data-admin-agent-action="commerce-ops">Open Commerce Operations</button>';
     }
+    else if(m.role==='assistant'&&action.type==='edit_catalog_metadata'){
+      if(action.draft&&action.request_key){
+        next='<button type="button" class="primary" data-agent-catalog-review="'+esc(action.request_key)+'">Review and save catalog change</button>';
+      }else next='<button type="button" class="secondary" data-admin-agent-action="catalog">Open Catalog</button>';
+    }
     else if(m.role==='assistant'&&['crm_report','journey_report'].includes(action.type))next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Review '+esc(action.view)+'</button>';
     const brief=Array.isArray(action.insights)?action.insights.slice(0,3):[];
     const stages=action.mission_plan && Array.isArray(action.mission_plan.steps)?action.mission_plan.steps.slice(0,4):[];
@@ -697,6 +702,11 @@
     root.querySelectorAll('[data-agent-commerce-review]').forEach(b=>b.onclick=()=>{
       const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(m=>String(m.action?.request_key)===b.dataset.agentCommerceReview);
       if(entry?.action?.draft)window.SFAgentCommerceReview?.open?.(entry.action);
+    });
+    root.querySelectorAll('[data-agent-catalog-review]').forEach(button=>button.onclick=()=>{
+      const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(row=>
+        String(row.action?.request_key)===button.dataset.agentCatalogReview);
+      if(entry?.action?.draft)window.SFAgentCatalogReview?.open?.(entry.action);
     });
     root.querySelectorAll('[data-agent-copy-reply]').forEach(button=>button.onclick=async()=>{
       const msg=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(row=>Number(row.id)===Number(button.dataset.agentCopyReply));
@@ -1083,12 +1093,14 @@
     c.canvas.innerHTML=
       '<div class="admin-agent-chat" id="adminAgentChat">'+
       '<header class="admin-agent-chat-heading"><div><small>ADMIN AGENT · OPERATIONS</small><p>Private Admin Brain · Commerce, CRM, Artist World production and operational research</p></div>'+
-      '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
+      '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentSpeechToggle" aria-pressed="true" title="Toggle on-device speech for Admin Agent replies">Voice on</button><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
       '<section class="admin-agent-chat-thread" aria-label="Admin Agent conversation">'+
       '<div class="admin-agent-transcript" id="adminAgentTranscript" role="log" aria-live="polite" aria-relevant="additions text"><p>Loading your conversation…</p></div></section>'+
       '<p class="admin-agent-chat-status" id="adminAgentChatStatus" role="status"></p>'+
       '</div>';
     const root=c.canvas.querySelector('#adminAgentChat');
+    root.querySelector('#adminAgentSpeechToggle').onclick=()=>c.toggleAdminSpeech?.();
+    c.updateAdminVoiceControl?.();
     root.querySelector('#adminAgentOpenBrain').onclick=showBrain;
     root.querySelector('#adminAgentNewThread').onclick=()=>{
       conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');
@@ -1102,7 +1114,10 @@
       transcript.innerHTML=items.length?items.map(messageHtml).join(''):
         '<div class="admin-agent-welcome"><h2>What can I help with?</h2><p>Ask for the production calendar, overdue tasks, crew schedule, approvals or assembly #123. Review everything in chat.</p></div>';
       bindActions(transcript);
-      transcript.scrollTop=transcript.scrollHeight;
+      // Section 90E: the document owns Agent Chat scrolling. The composer is fixed.
+      requestAnimationFrame(()=>{
+        if(root.isConnected&&document.body.contains(root))window.scrollTo({top:document.documentElement.scrollHeight,behavior:'auto'});
+      });
     }catch(err){
       if(root.isConnected)root.querySelector('#adminAgentTranscript').innerHTML=
         '<p class="admin-agent-load-error">Conversation unavailable. Your saved messages have not been changed.</p>';

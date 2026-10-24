@@ -70,10 +70,22 @@ function sf_admin_normalize_isrc(mixed $v): string {
 
 function sf_admin_isrc_valid(string $s): bool { return $s==='' || (bool)preg_match('/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/',$s); }
 
-function sf_admin_write_catalog(array $catalog): void {
+function sf_admin_write_catalog(array $catalog,?string $expectedContentHash=null): void {
     $json=json_encode(array_values($catalog), JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
     if ($json===false) throw new RuntimeException('Could not encode catalog.');
     $catalogPath=SF_ROOT.'/data/catalog.json';
+    // All Admin writers share this advisory lock. A governed Agent edit also
+    // requires the exact source-file revision, preventing lost updates.
+    $lock=fopen(SF_ROOT.'/data/.catalog-writer.lock','c');
+    if($lock===false)throw new RuntimeException('Catalog writer lock unavailable.');
+    if(!flock($lock,LOCK_EX)){fclose($lock);throw new RuntimeException('Could not acquire catalog writer lock.');}
+    try {
+    if($expectedContentHash!==null){
+        $current=file_get_contents($catalogPath);
+        if($current===false||!preg_match('/^[a-f0-9]{64}$/D',$expectedContentHash)
+            ||!hash_equals($expectedContentHash,hash('sha256',$current)))
+            throw new RuntimeException('Catalog changed during Agent review; no edit was saved.');
+    }
     $tmp=$catalogPath.'.tmp.'.bin2hex(random_bytes(3));
     if(file_put_contents($tmp,$json,LOCK_EX)===false) throw new RuntimeException('Could not write catalog.');
     if(!rename($tmp,$catalogPath)){@unlink($tmp);throw new RuntimeException('Could not finalize catalog.');}
@@ -85,6 +97,7 @@ function sf_admin_write_catalog(array $catalog): void {
     $tmp2=$jsPath.'.tmp.'.bin2hex(random_bytes(3));
     if(file_put_contents($tmp2,$js,LOCK_EX)===false) throw new RuntimeException('Could not write catalog JavaScript.');
     if(!rename($tmp2,$jsPath)){@unlink($tmp2);throw new RuntimeException('Could not finalize catalog JavaScript.');}
+    }finally{flock($lock,LOCK_UN);fclose($lock);}
 }
 
 function sf_admin_media_index(): array {
