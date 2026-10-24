@@ -2,8 +2,9 @@
 
 The public Stonefellow agent floats independently of the dynamically replaced page
 canvas and remains above the footer/player/chat popup. Its vertical position tracks
-the actual footer and popup dimensions, including the live transcript. Artist
-homepage configurations no longer hide the primary Agent Chat composer.
+the actual footer and popup dimensions, including the live transcript. The
+published Artist Homepage chat visibility preference remains honored; clicking
+the floating companion reveals the chat composer even when initially hidden.
 
 The configured server-side ElevenLabs voice remains the preferred spoken reply.
 If that provider is unavailable, the device's built-in speech synthesis is used

@@ -29,7 +29,8 @@ check('Floating Agent exists outside route canvas and above the chat footer',()=
   assert.match(css,/body>\.agent-stage[^\n]*z-index:90/);
   assert.match(css,/body\.agent-chat-open>\.agent-stage[^\n]*var\(--sf-agent-popup-rise/);
   assert.ok(app.includes('dockObserver.observe(chatFooter)'));
-  assert.ok(app.includes("document.body.classList.remove('artist-home-chat-hidden')"));
+  assert.ok(app.includes("document.body.classList.toggle('artist-home-chat-hidden',home.chat_bar_enabled===false)"));
+  assert.ok(app.includes("if(document.body.classList.contains('artist-home-chat-hidden'))"));
 });
 
 check('Music is ducked, remains playing and original loudness is restored',()=>{
