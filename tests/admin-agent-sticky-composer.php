@@ -34,7 +34,7 @@ $checks=[
  'New chat focuses unified footer'=>str_contains($chat,"document.querySelector('#adminChatInput')?.focus()"),
  'Conversation history still loads from original API'=>str_contains($chat,'const get=await load()') && str_contains($chat,'items.map(messageHtml)'),
  'Document scroll automatically shows newest response'=>str_contains($chat,"window.scrollTo({top:document.documentElement.scrollHeight,behavior:'auto'})") && !str_contains($chat,'transcript.scrollTop=transcript.scrollHeight;'),
- 'Conversation has a single vertical document scroller'=>str_contains($css,'.admin-app.admin-agent-chat-active .workspace{') && str_contains($css,'height:auto;') && str_contains($css,'.admin-agent-chat .admin-agent-transcript{overflow:visible'),
+ 'Conversation has a single vertical document scroller'=>preg_match('/\.admin-app\.admin-agent-chat-active \.workspace\{[^}]*height:auto;[^}]*overflow:visible/', $css)===1 && preg_match('/\.admin-agent-chat \.admin-agent-transcript\{[^}]*overflow:visible/', $css)===1,
  'Layout reserves document space for sticky composer'=>str_contains($css,'.admin-app.admin-agent-chat-active .admin-canvas{') && str_contains($css,'padding:16px 0 156px') && str_contains($siteCss,'.admin-chat-footer{position:fixed'),
  'Old IDLE strip hidden on chat, not other Admin pages'=>str_contains($css,'.admin-app.admin-agent-chat-active .agent-strip{display:none}'),
  'Sticky footer remains visible on narrow screens'=>str_contains($siteCss,'.admin-chat-footer{left:0}') && str_contains($css,'@media(max-width:760px)'),
