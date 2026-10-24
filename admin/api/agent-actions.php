@@ -2,6 +2,15 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/agent-tool-registry.php';
+function sf_admin_agent_action_audit(string $tool): array {
+    return match($tool){
+        'catalog_metadata_update'=>['agent_catalog','catalog_metadata'],
+        'stem_automation_update'=>['agent_stem','stem_automation'],
+        'commerce_followup_add'=>['agent_commerce','commerce_followup'],
+        'automation_draft_save'=>['agent_campaign','journey_draft'],
+        default=>['agent_campaign','campaign_draft']
+    };
+}
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $admin=sf_admin_require_auth($method!=='GET');
 $uid=(int)$admin['id'];
@@ -20,12 +29,14 @@ try{
         if(!sf_agent_tool_executable($tool,'admin',true))sf_json_response(['ok'=>false,'error'=>'tool_not_allowed'],403);
         $draft=is_array($b['draft']??null)?$b['draft']:[];
         $proposal=sf_agent_action_prepare($uid,(string)($b['request_key']??''),$tool,$draft);
-        sf_agent_brain_log($uid,$tool==='stem_automation_update'?'agent_stem':($tool==='commerce_followup_add'?'agent_commerce':'agent_campaign'),'action_proposed',['route'=>$tool==='stem_automation_update'?'stem_automation':($tool==='commerce_followup_add'?'commerce_followup':($tool==='automation_draft_save'?'journey_draft':'campaign_draft')),'action'=>$tool,'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'payload_hash'=>$proposal['payload_hash'],'requires_confirmation'=>true]);
+        [$scope,$route]=sf_admin_agent_action_audit($tool);
+        sf_agent_brain_log($uid,$scope,'action_proposed',['route'=>$route,'action'=>$tool,'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'payload_hash'=>$proposal['payload_hash'],'requires_confirmation'=>true]);
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     if($action==='approve'){
         $proposal=sf_agent_action_approve($uid,(string)($b['proposal_id']??''),(string)($b['payload_hash']??''),(string)($b['typed_confirmation']??''));
-        sf_agent_brain_log($uid,$proposal['tool_id']==='stem_automation_update'?'agent_stem':($proposal['tool_id']==='commerce_followup_add'?'agent_commerce':'agent_campaign'),'action_approved',['route'=>$proposal['tool_id']==='stem_automation_update'?'stem_automation':($proposal['tool_id']==='commerce_followup_add'?'commerce_followup':($proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft')),'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
+        [$scope,$route]=sf_admin_agent_action_audit($proposal['tool_id']);
+        sf_agent_brain_log($uid,$scope,'action_approved',['route'=>$route,'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'requires_confirmation'=>true]);
         sf_json_response(['ok'=>true,'proposal'=>$proposal]);
     }
     if($action==='cancel'||$action==='reconcile'){
@@ -43,11 +54,17 @@ try{
         $proposal=sf_agent_action_execute($uid,$id);
         // Replaying a completed request must not duplicate the Admin event trail.
         if($previous['status']!=='completed'){
-            sf_agent_brain_log($uid,$proposal['tool_id']==='stem_automation_update'?'agent_stem':($proposal['tool_id']==='commerce_followup_add'?'agent_commerce':'agent_campaign'),'action_result',['route'=>$proposal['tool_id']==='stem_automation_update'?'stem_automation':($proposal['tool_id']==='commerce_followup_add'?'commerce_followup':($proposal['tool_id']==='automation_draft_save'?'journey_draft':'campaign_draft')),'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'entity_id'=>$proposal['tool_id']==='automation_draft_save'?($proposal['result']['automation_id']??null):($proposal['result']['campaign_id']??null),'requires_confirmation'=>true]);
+            [$scope,$route]=sf_admin_agent_action_audit($proposal['tool_id']);
+            $entityId=$proposal['result']['track_id']??($proposal['result']['order_id']??($proposal['result']['automation_id']??($proposal['result']['campaign_id']??null)));
+            sf_agent_brain_log($uid,$scope,'action_result',['route'=>$route,'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'entity_id'=>$entityId,'requires_confirmation'=>true]);
             if($proposal['tool_id']==='stem_automation_update'){
                 sf_log_admin_action($uid,'agent_stem_automation_saved','track',
                     (string)($proposal['result']['track_id']??''),
                     ['proposal_id'=>$proposal['id'],'revision'=>$proposal['result']['revision']??null]);
+            }elseif($proposal['tool_id']==='catalog_metadata_update'){
+                sf_log_admin_action($uid,'agent_catalog_metadata_updated','track',
+                    (string)($proposal['result']['track_id']??''),
+                    ['proposal_id'=>$proposal['id'],'changed_field'=>$proposal['result']['field']??'']);
             }else{
             $isJourney=$proposal['tool_id']==='automation_draft_save';
             $isCommerce=$proposal['tool_id']==='commerce_followup_add';

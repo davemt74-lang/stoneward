@@ -3,7 +3,7 @@ declare(strict_types=1);
 $root=dirname(__DIR__);$read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $p)
- if(!str_contains($read($p),'1.3.136'))throw new RuntimeException('Build identity stale: '.$p);
+ if(!str_contains($read($p),'1.3.137'))throw new RuntimeException('Build identity stale: '.$p);
 if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.68'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-049'")
  ||!str_contains($read('api/migrations.php'),"'story_render_jobs'"))

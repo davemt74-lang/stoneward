@@ -547,7 +547,7 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .agent-chat-popup[hidden]{display:none!important}
 .agent-chat-popup-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:67px;padding:12px 18px;border-bottom:1px solid var(--line)}
 .agent-chat-popup-head strong{display:block;font-size:.95rem}.agent-chat-popup-head span{display:block;font-size:.68rem;letter-spacing:.13em;color:var(--muted);margin-top:3px}
-.agent-chat-popup-tools{display:flex;gap:8px;align-items:center}.agent-chat-popup-tools button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:9px;min-height:34px;padding:4px 10px;cursor:pointer}.agent-chat-popup-tools #agentChatClose{font-size:1.25rem;min-width:35px}
+.agent-chat-popup-tools{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;align-items:center}.agent-chat-popup-tools button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:9px;min-height:34px;padding:4px 9px;cursor:pointer}.agent-chat-popup-tools button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}.agent-chat-popup-tools #agentChatClose{font-size:1.25rem;min-width:35px}
 .agent-chat-popup-messages{flex:1;min-height:0;padding:18px;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:14px}
 .agent-chat-empty{color:var(--muted);font-size:.83rem;margin:auto;text-align:center;max-width:32ch}
 .agent-chat-popup-entry{max-width:min(85%,600px);align-self:flex-start;background:var(--soft);padding:11px 14px;border:1px solid var(--line);border-radius:14px;border-bottom-left-radius:4px;overflow-wrap:anywhere}

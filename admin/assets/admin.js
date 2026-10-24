@@ -7,12 +7,44 @@
   const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80)||'track';
   const app={csrf:null,templates:[],catalog:[],releases:[],shows:[],crm:{summary:{},contacts:[],community_posts:[],agent_engagements:[]},knowledge:{folders:[],files:[]},knowledgeFolder:'',users:[],packages:[],ai:{providers:{},routing:{}},site:{splash_enabled:false,splash_revision:'1',artist_homepage_enabled:false,fan_community_enabled:false},lifecycle:{email:{},billing:{},outbox:[],webhooks:[],billing_audit:[]},analytics:null,operations:null,dashboard:null,view:'dashboard',scanGroups:[],scanEntries:[],folderName:'',catalogFilter:'',missingOnly:false,releaseDraftTracks:[]};
   const canvas=$('#adminCanvas'), viewTitle=$('#viewTitle'), adminApp=$('#adminApp'), folderInput=$('#folderInput');
+  let adminSpeechEnabled=localStorage.getItem('stonefellow.admin.voice.replies.v1')!=='off';
+  let adminSpeechActive=false,adminSpeechResolve=null;
+  function updateAdminVoiceControl(){const button=$('#adminAgentSpeechToggle');if(!button)return;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}
+  function stopAdminSpeech(){
+    if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
+    try{window.speechSynthesis?.cancel()}catch(_){}
+    if(adminSpeechActive){adminSpeechActive=false;agent('idle')}
+  }
+  function toggleAdminSpeech(){adminSpeechEnabled=!adminSpeechEnabled;localStorage.setItem('stonefellow.admin.voice.replies.v1',adminSpeechEnabled?'on':'off');if(!adminSpeechEnabled)stopAdminSpeech();updateAdminVoiceControl()}
+  async function speakAdminReply(raw){
+    if(!adminSpeechEnabled)return;
+    const synthesis=window.speechSynthesis,Utterance=window.SpeechSynthesisUtterance;
+    if(!synthesis||!Utterance){$('#adminAgentComposerStatus').textContent='Spoken replies need browser speech support. Chat still works.';return}
+    let voices=synthesis.getVoices().filter(voice=>voice.localService===true);
+    if(!voices.length){await new Promise(resolve=>{const timer=setTimeout(done,900);function done(){clearTimeout(timer);synthesis.removeEventListener?.('voiceschanged',done);resolve()}synthesis.addEventListener?.('voiceschanged',done)});voices=synthesis.getVoices().filter(voice=>voice.localService===true)}
+    if(!adminSpeechEnabled)return;
+    const voice=voices.find(item=>/^en[-_]/i.test(item.lang))||voices[0];
+    if(!voice){$('#adminAgentComposerStatus').textContent='No on-device voice installed. Admin chat remains text-only; private replies were not sent to a speech provider.';return}
+    const text=String(raw||'').replace(/```[\s\S]*?```/g,' ').replace(/\[[^\]]+\]\([^)]*\)/g,' ').replace(/[#*_`>]+/g,' ').trim().slice(0,1600);
+    if(!text)return;
+    stopAdminSpeech();
+    const utterance=new Utterance(text);utterance.voice=voice;utterance.lang=voice.lang||'en-US';utterance.rate=1;
+    return new Promise(resolve=>{
+      let done=false;
+      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;adminSpeechActive=false;agent('idle');resolve(ok)};
+      adminSpeechResolve=finish;
+      utterance.onstart=()=>{if(!done){adminSpeechActive=true;agent('speaking',text)}};
+      utterance.onend=()=>finish(true);
+      utterance.onerror=()=>finish(false);
+      try{synthesis.speak(utterance)}catch(_){finish(false)}
+    });
+  }
 
   async function jsonFetch(url,opts={}){opts.credentials='same-origin';const r=await fetch(url,opts);let j={};try{j=await r.json()}catch(_){throw new Error('The server returned an invalid response.')}if(!r.ok||j.ok===false){const e=new Error(j.message||j.errors?.join(' ')||j.error||'Request failed.');e.payload=j;e.status=r.status;throw e}return j}
   async function refreshAdminAuth(){const j=await jsonFetch('api/auth.php',{cache:'no-store'});if(!j.authenticated){location.href='login.php';throw new Error('Administrator login required.')}app.csrf=j.csrf||null;return j}
   async function api(path,body,retried=false){const opts={cache:'no-store'};if(body!==undefined){if(!app.csrf)await refreshAdminAuth();opts.method='POST';opts.headers={'Content-Type':'application/json','X-CSRF-Token':app.csrf};opts.body=JSON.stringify(body)}try{return await jsonFetch('api/'+path,opts)}catch(e){if(body!==undefined&&!retried&&e.payload?.error==='csrf_failed'){await refreshAdminAuth();return api(path,body,true)}if(e.payload?.error==='authentication_required'||e.payload?.error==='admin_required'){location.href='login.php'}throw e}}
   async function uploadApi(path,formData,retried=false){if(!app.csrf)await refreshAdminAuth();const r=await fetch('api/'+path,{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':app.csrf},body:formData});let j={};try{j=await r.json()}catch(_){throw new Error('The server returned an invalid upload response.')}if(!r.ok||j.ok===false){if(!retried&&j.error==='csrf_failed'){await refreshAdminAuth();return uploadApi(path,formData,true)}const e=new Error(j.message||j.error||'Upload failed.');e.payload=j;throw e}return j}
-  function agent(mode,text){const orb=$('#adminOrb'), status=$('#agentStatus'), msg=$('#agentMessage');orb.className='admin-orb'+(mode==='listening'?' listening':'');status.textContent=(mode||'idle').toUpperCase();if(text)msg.textContent=text}
+  function agent(mode,text){const orb=$('#adminOrb'), status=$('#agentStatus'), msg=$('#agentMessage');orb.className='admin-orb'+(mode==='listening'?' listening':'');status.textContent=(mode||'idle').toUpperCase();if(text)msg.textContent=text;const float=$('#adminFloatingAgent');if(float){float.dataset.mode=mode||'idle';float.setAttribute('aria-pressed',mode==='listening'?'true':'false');const caption=$('#adminFloatingAgentState');if(caption)caption.textContent=mode==='listening'?'LISTENING':mode==='thinking'?'THINKING':mode==='speaking'?'SPEAKING':'READY';}}
   function say(text){agent('idle',text)}
 
   async function startApp(){
@@ -36,13 +68,13 @@
     }
   }
   let shellBound=false;
-  function bindShell(){if(shellBound)return;shellBound=true;$('#adminNav').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b)openView(b.dataset.view)});$('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');$('#openAdminAgentChat').onclick=()=>openView('agent-chat');folderInput.addEventListener('change',()=>{const entries=[...folderInput.files].map(f=>({file:f,relativePath:f.webkitRelativePath||f.name,uid:crypto.randomUUID?.()||Math.random().toString(36).slice(2)}));scanEntries(entries,folderInput.files[0]?.webkitRelativePath?.split('/')[0]||'Selected folder');folderInput.value=''});bindAgent()}
+  function bindShell(){if(shellBound)return;shellBound=true;$('#adminNav').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b)openView(b.dataset.view)});$('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');$('#openAdminAgentChat').onclick=()=>openView('agent-chat');$('#adminFloatingAgent').onclick=()=>{if(adminSpeechActive)stopAdminSpeech();if(app.view!=='agent-chat'){openView('agent-chat');return;}const mic=$('#adminVoiceButton');if(mic&&!mic.disabled)mic.click();else $('#adminChatInput')?.focus();};folderInput.addEventListener('change',()=>{const entries=[...folderInput.files].map(f=>({file:f,relativePath:f.webkitRelativePath||f.name,uid:crypto.randomUUID?.()||Math.random().toString(36).slice(2)}));scanEntries(entries,folderInput.files[0]?.webkitRelativePath?.split('/')[0]||'Selected folder');folderInput.value=''});bindAgent()}
   async function reloadCore(){const [t,c,s,r,sh,crm,k,u,pkg,a,life]=await Promise.all([api('templates.php'),api('catalog.php'),api('state.php'),api('releases.php'),api('shows.php'),api('crm.php'),api('knowledge.php'),api('users.php'),api('packages.php'),api('ai-providers.php'),api('customer-lifecycle.php')]);app.templates=t.templates||[];app.catalog=c.catalog||[];app.dashboard=s;app.releases=r.releases||[];app.shows=sh.shows||[];app.crm={summary:crm.summary||{},contacts:crm.contacts||[],community_posts:crm.community_posts||[],agent_engagements:crm.agent_engagements||[]};app.knowledge=k.knowledge||{folders:[],files:[]};app.users=u.users||[];app.packages=pkg.packages||[];app.ai={providers:a.providers||{},routing:a.routing||{}};app.lifecycle={email:life.email||{},billing:life.billing||{},outbox:life.outbox||[],webhooks:life.webhooks||[],billing_audit:life.billing_audit||[]};app.site=s.site||app.site;if(s.csrf)app.csrf=s.csrf;if(life.csrf)app.csrf=life.csrf}
   const titles={'commerce-ops':'Commerce Operations',payments:'Payments & Stripe',dashboard:'Dashboard',catalog:'Catalog',media:'Media Library',uploads:'Folder Scan & Upload',templates:'Metadata Templates',releases:'Releases',distribution:'Distribution + Publishing',press:'EPK + Press',shows:'Shows + Live',crm:'Fans + CRM',automations:'Segments + Automations',campaigns:'Campaigns',products:'Merch + Products',knowledge:'Knowledge Base',orders:'Orders',fulfillment:'Fulfillment + Care',pod:'POD Handoffs',users:'Users + Tokens',team:'Team Workspace','production-review':'AI Production Review',packages:'Monthly Packages',membership:'Membership + VIP',ticketing:'Tickets + VIP',ai:'AI Providers',brain:'Agent Brain','agent-chat':'Admin Agent Chat',customer:'Customer Lifecycle',analytics:'Performance Intelligence',calendar:'Operating Calendar',rights:'Rights + Licensing',operations:'Operations',settings:'Settings'};
   function openView(view){if(view!=='settings')window.SFStoriesAdmin?.close?.(true);app.view=view;adminApp.classList.toggle('admin-agent-chat-active',view==='agent-chat');viewTitle.textContent=titles[view]||'Admin';$$('#adminNav [data-view]').forEach(b=>{const active=b.dataset.view===view;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});$('#sidebar').classList.remove('open');({dashboard:renderDashboard,catalog:renderCatalog,media:()=>window.SFMediaAdmin?.renderMediaLibrary?.()||say('Media module is unavailable.'),uploads:renderUploads,templates:renderTemplates,releases:renderReleases,distribution:()=>window.SFDistributionAdmin?.renderDistribution?.()||say('Distribution module is unavailable.'),press:()=>window.SFPressAdmin?.renderPress?.()||say('Press module is unavailable.'),shows:renderShows,crm:renderCRM,automations:()=>window.SFAutomationsAdmin?.renderAutomations?.()||say('Automation module is unavailable.'),campaigns:()=>window.SFCampaignAdmin?.renderCampaigns?.()||say('Campaign module is unavailable.'),products:()=>window.SFProductsAdmin?.renderProducts?.()||say('Products module is unavailable.'),payments:()=>window.SFStripeConnectAdmin?.render?.()||say('Stripe connection module is unavailable.'),knowledge:renderKnowledge,orders:renderOrders,'commerce-ops':()=>window.SFCommerceOperations?.render?.()||say('Commerce Operations module unavailable.'),fulfillment:()=>window.SFFulfillmentAdmin?.renderFulfillment?.()||say('Fulfillment module is unavailable.'),pod:renderPod,users:renderUsers,team:()=>window.SFTeamAdmin?.render?.()||say('Team Workspace unavailable.'),'production-review':()=>window.SFProductionReviewAdmin?.render?.()||say('Production Review unavailable.'),packages:renderPackages,membership:()=>window.SFMembershipAdmin?.renderMembership?.()||say('Membership module is unavailable.'),ticketing:()=>window.SFTicketingAdmin?.renderTicketing?.()||say('Ticketing module is unavailable.'),ai:renderAIProviders,brain:renderAgentBrain,'agent-chat':()=>window.SFAdminAgentCanvas?.render?.().catch(e=>say('Admin Agent unavailable.')),customer:renderCustomerLifecycle,analytics:renderAnalytics,calendar:()=>window.SFOperatingCalendar?.renderCalendar?.()||say('Operating Calendar module is unavailable.'),rights:()=>window.SFRightsAdmin?.renderRights?.()||say('Rights module is unavailable.'),operations:renderOperations,settings:renderSettings}[view]||renderDashboard)()}
 
   function head(kicker,title,copy,actions=''){return `<div class="canvas-head"><div><div class="eyebrow">${esc(kicker)}</div><h1>${esc(title)}</h1><p>${esc(copy)}</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>`}
-  window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,reloadCore};
+  window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,reloadCore,toggleAdminSpeech,updateAdminVoiceControl};
   function renderDashboard(){
     const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},search=d.search_analytics||{},library=d.library_analytics||{},crm=d.crm_summary||{},recentNotificationEvents=d.recent_notification_events||[],recentSearchEvents=d.recent_search_events||[],daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
     canvas.innerHTML=head('STONEFELLOW OPERATIONS','Dashboard','Recent customers, purchases, listening, activity, Agent Brain, catalog health, and launch operations in one place.',`<button class="secondary" id="dashboardRefresh" type="button">Refresh</button>`)+
@@ -366,7 +398,7 @@
       const message=input.value.trim();
       if(!message||pending)return;
       if(!window.SFAdminAgentCanvas?.send){say('Admin Agent unavailable; your draft was preserved.');return;}
-      pending=true;sendButton.disabled=true;voice.disabled=true;input.readOnly=true;
+      stopAdminSpeech();pending=true;sendButton.disabled=true;voice.disabled=true;input.readOnly=true;agent('thinking','Working on your request…');
       const status=$('#adminAgentComposerStatus');
       status.textContent='Sending message…';
       form.setAttribute('aria-busy','true');
@@ -376,11 +408,12 @@
         // Do not erase a draft typed or dictated during a pending request.
         if(input.value.trim()===message)input.value='';
         resize();status.textContent='Message sent.';
+        if(response.text)void speakAdminReply(response.text);
       }catch(err){
         status.textContent='Message could not be sent. Your draft is still here.';
         say('Admin Agent unavailable; message was not confirmed.');
       }finally{
-        pending=false;sendButton.disabled=false;voice.disabled=!recognition&&!(window.SpeechRecognition||window.webkitSpeechRecognition);
+        pending=false;sendButton.disabled=false;voice.disabled=!recognition&&!(window.SpeechRecognition||window.webkitSpeechRecognition);if(!adminSpeechActive)agent('idle');
         input.readOnly=false;form.removeAttribute('aria-busy');
       }
     }
@@ -388,7 +421,7 @@
     const R=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(R){
       recognition=new R();recognition.lang='en-US';recognition.interimResults=true;
-      voice.onclick=()=>{if(pending)return;voiceSubmitted=false;try{recognition.start();voice.classList.add('active');agent('listening','Listening…');}catch(_){}};
+      voice.onclick=()=>{if(pending)return;stopAdminSpeech();voiceSubmitted=false;try{recognition.start();voice.classList.add('active');agent('listening','Listening…');}catch(_){}};
       recognition.onresult=e=>{
         let transcript='';let final=false;
         for(let i=0;i<e.results.length;i++){

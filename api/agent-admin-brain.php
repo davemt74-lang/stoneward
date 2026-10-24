@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/agent-orchestration.php';
 require_once __DIR__.'/agent-public-artist-context.php';
+require_once __DIR__.'/agent-catalog-actions.php';
 require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-admin-intelligence.php';
 require_once __DIR__.'/fan-discovery-paths.php';
@@ -177,6 +178,8 @@ function sf_admin_agent_plan(string $message): array {
         return ['type'=>'prepare_commerce_followup','view'=>'commerce-ops','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
     if(preg_match('/\b(draft|create|prepare|build)\b.*\b(journey|automation|follow.up|sequence)\b|\b(journey|automation)\b.*\b(draft|create|prepare|build)\b/',$m))
         return ['type'=>'prepare_journey','view'=>'automations','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
+    if(sf_agent_catalog_parse_edit($message)!==null)
+        return ['type'=>'edit_catalog_metadata','view'=>'catalog','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
     // Clip/timeline edits use their distinct exact-review production logic.
     if(!preg_match('/\b(?:timeline|assembly|clip|footage|storyboard|scene)\b/i',$message)){
         foreach(sf_admin_agent_module_routes() as $intent=>$route){
@@ -347,6 +350,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
       'prepare_campaign'=>'I can prepare a campaign in the existing Campaign Builder. You must inspect its complete draft, approve the exact hash, and separately authorize saving. Nothing will be sent or published.',
       'prepare_journey'=>'I can prepare an unpublished journey in the existing Automation Builder. You must inspect the steps and consent rules, approve the exact hash, then separately authorize saving.',
       'prepare_commerce_followup'=>'I can prepare a customer-order follow-up for exact Admin approval. Use: Create follow-up for order SF-ORDER-ID: your note. The action only saves a note; it never refunds, charges, emails, or changes shipping.',
+      'edit_catalog_metadata'=>'I can make a reviewed change to an existing song. Say: Set genre for song "Exact Song Title" to Americana. The track must exist; nothing changes until you review and approve it.',
       'draft_commerce_reply'=>'To draft an unsent customer-service response, type: Draft reply for order SF-ORDER-ID about shipping, refunds, payment, or digital access. A human must inspect and send any reply manually.',
       'commerce_report'=>(empty($context['commerce_available'])?'Commerce data is temporarily unavailable. Open Commerce Operations to inspect current orders.':'Commerce queue: '.(int)($context['commerce_attention']??0).' customer orders need attention, including '.(int)($context['commerce_summary']['payment_attention']??0).' payment exceptions, '.(int)($context['commerce_summary']['refund_attention']??0).' pending refunds and '.(int)($context['commerce_summary']['fulfillment_pending']??0).' awaiting fulfillment. Open Commerce Operations to review each order.'),
       'review_actions'=>'You have '.array_sum($missionState['counts']).' recent Agent missions, including '.(int)($missionState['counts']['review_required']??0).' requiring review and '.(int)($missionState['counts']['completed']??0).' completed. Open Agent actions for exact proposals, approved results, and interrupted work. Never automatically retry uncertain operations.',
@@ -600,6 +604,19 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
         $text.=' '.sf_fan_conversion_agent_copy((array)$context['fan_campaign_guidance']);
     $contract=sf_agent_orchestration_contract('admin',$plan['type']);
     if($plan['requires_confirmation']&&!$contract['may_prepare_reviewed_proposal'])throw new RuntimeException('The reviewed action is not registered.');
+    if($plan['type']==='edit_catalog_metadata'){
+        try{
+            $catalogDraft=sf_agent_catalog_draft_from_chat($message);
+            if($catalogDraft!==null){
+                $text='I found “'.$catalogDraft['track_title'].'”. Proposed '.
+                    $catalogDraft['field'].' change: “'.$catalogDraft['previous'].'” → “'.
+                    $catalogDraft['value'].'”. Review the exact proposal below before saving. No catalog changes have been made.';
+            }
+        }catch(InvalidArgumentException|RuntimeException $e){
+            $text='I could not prepare that edit: '.$e->getMessage().
+                ' Try: Set genre for song "Exact Song Title" to Americana.';
+        }
+    }
     if($plan['type']==='prepare_commerce_followup'){
         $draft=sf_agent_commerce_parse_followup($message);
         if($draft===null)$text='To prepare a reviewed follow-up, type: Create follow-up for order SF-ORDER-ID: the exact note. No customer record has been changed.';
@@ -692,6 +709,10 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     if($plan['type']==='prepare_commerce_followup' && !empty($draft) && $contract['may_prepare_reviewed_proposal']){
         $action['draft']=$draft;
         $action['request_key']='commerce_'.bin2hex(random_bytes(16));
+    }
+    if($plan['type']==='edit_catalog_metadata' && !empty($catalogDraft) && $contract['may_prepare_reviewed_proposal']){
+        $action['draft']=$catalogDraft;
+        $action['request_key']='catalog_'.bin2hex(random_bytes(16));
     }
     sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
     return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'mission_plan'=>$missionPlan,'insights'=>$brief,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
