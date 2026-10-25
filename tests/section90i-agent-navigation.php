@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__).'/api/agent-admin-brain.php';
+require_once dirname(__DIR__).'/api/agent-runtime.php';
 
 $passed=0;$failed=0;
 $check=static function(string $label,bool $ok)use(&$passed,&$failed):void{
