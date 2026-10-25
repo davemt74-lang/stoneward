@@ -35,6 +35,7 @@ function sf_agent_skill_definitions(): array {
         'payments_manager','fulfillment_manager','pod_manager','customer_lifecycle'
       ]],
       'admin_catalog_metadata'=>['label'=>'Prepare exact reviewed music catalog metadata edits','contexts'=>['admin'],'tool'=>'catalog_metadata_update','intents'=>['edit_catalog_metadata']],
+      'admin_song_draft_intake'=>['label'=>'Guide an administrator through reviewed, unpublished song intake','contexts'=>['admin'],'tool'=>'agent_song_draft_save','intents'=>['save_song_draft']],
       'admin_campaign_insights'=>['label'=>'Review campaign aggregates','contexts'=>['admin'],'tool'=>'campaign_aggregate','intents'=>['journey_report']],
       'admin_campaign_validation'=>['label'=>'Validate campaign graph','contexts'=>['admin'],'tool'=>'campaign_graph_validate','intents'=>['validate_campaign']],
       'admin_campaign_drafts'=>['label'=>'Prepare reviewed campaign draft','contexts'=>['admin'],'tool'=>'campaign_draft_save','intents'=>['prepare_campaign']],

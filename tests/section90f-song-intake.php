@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__).'/api/bootstrap.php';
 require_once dirname(__DIR__).'/api/agent-song-intake.php';
 require_once dirname(__DIR__).'/api/agent-tool-registry.php';
+require_once dirname(__DIR__).'/api/agent-skill-registry.php';
 $passed=0;$failed=0;
 $check=function(string $description,bool $pass)use(&$passed,&$failed):void{
     echo ($pass?'PASS ':'FAIL ').$description.PHP_EOL;
@@ -66,5 +67,10 @@ $check('Song draft tool is visible only with Admin scope and confirmation',sf_ag
     &&!sf_agent_tool_allowed('agent_song_draft_save','admin',false)
     &&!sf_agent_tool_allowed('agent_song_draft_save','fan',true)
     &&!sf_agent_tool_executable('agent_song_draft_save','admin',true));
+$skill=sf_agent_skill_for_intent('admin','save_song_draft');
+$check('Admin skill describes reviewed intake without direct execution',($skill['tool_id']??'')==='agent_song_draft_save'
+    &&($skill['requires_exact_approval']??false)===true
+    &&($skill['may_execute_directly']??true)===false
+    &&sf_agent_skill_for_intent('customer','save_song_draft')===null);
 echo "Section 90F private song intake: $passed passed, $failed failed".PHP_EOL;
 exit($failed?1:0);
