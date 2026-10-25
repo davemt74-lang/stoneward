@@ -4,8 +4,8 @@ $root=dirname(__DIR__);
 $read=static fn(string $f):string=>(string)file_get_contents($root.'/'.$f);
 $files=['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'];
-foreach($files as $f)if(!str_contains($read($f),'1.3.139'))
- throw new RuntimeException('Missing v1.3.139 build identity in '.$f);
+foreach($files as $f)if(!str_contains($read($f),'1.3.140'))
+ throw new RuntimeException('Missing v1.3.140 build identity in '.$f);
 if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.68'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-043'")
  ||!str_contains($read('api/migrations.php'),"'story_inference_results'"))
