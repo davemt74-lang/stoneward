@@ -9,8 +9,9 @@ $tools=fn(array $skills): array=>array_column($skills,'tool_id');
 $checks=[
  'Every non-internal tool has one skill manifest'=>count($registry)===count($defs)+1 && count(array_unique(array_column($defs,'tool')))==count($defs),
  'No internal audit skill'=>!in_array('agent_brain_log',array_column($defs,'tool'),true),
- 'Public inventory contains published/queue/public-artist reads'=>count($public)===5
+ 'Public inventory contains published/queue/public-artist reads and page navigation'=>count($public)===6
     && in_array('public_artist_facts',$tools($public),true)
+    && in_array('public_page_navigate',$tools($public),true)
     && !in_array('create_playlist',$tools($public),true)
     && !in_array('crm_aggregate',$tools($public),true),
  'Customer can discover private profile tools'=>in_array('create_playlist',$tools($customer),true) && in_array('favorite_track',$tools($customer),true),
