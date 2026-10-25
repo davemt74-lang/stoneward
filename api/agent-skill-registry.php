@@ -37,6 +37,7 @@ function sf_agent_skill_definitions(): array {
       'admin_catalog_metadata'=>['label'=>'Prepare exact reviewed music catalog metadata edits','contexts'=>['admin'],'tool'=>'catalog_metadata_update','intents'=>['edit_catalog_metadata']],
       'admin_song_draft_intake'=>['label'=>'Guide an administrator through reviewed, unpublished song intake','contexts'=>['admin'],'tool'=>'agent_song_draft_save','intents'=>['save_song_draft']],
       'admin_song_catalog_preflight'=>['label'=>'Review rights and artwork, then approve private song catalog preparation','contexts'=>['admin'],'tool'=>'agent_song_catalog_prepare','intents'=>['prepare_song_catalog']],
+      'admin_song_catalog_publish'=>['label'=>'Review and explicitly publish one catalog track using separate listening audio','contexts'=>['admin'],'tool'=>'agent_song_catalog_publish','intents'=>['publish_song_catalog']],
       'admin_campaign_insights'=>['label'=>'Review campaign aggregates','contexts'=>['admin'],'tool'=>'campaign_aggregate','intents'=>['journey_report']],
       'admin_campaign_validation'=>['label'=>'Validate campaign graph','contexts'=>['admin'],'tool'=>'campaign_graph_validate','intents'=>['validate_campaign']],
       'admin_campaign_drafts'=>['label'=>'Prepare reviewed campaign draft','contexts'=>['admin'],'tool'=>'campaign_draft_save','intents'=>['prepare_campaign']],

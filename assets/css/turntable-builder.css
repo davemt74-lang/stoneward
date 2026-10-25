@@ -1,4 +1,4 @@
-:root{--stonefellow-builder-css-build:'1.3.139'}
+:root{--stonefellow-builder-css-build:'1.3.140'}
 
 /* Section 54 — desktop modular vinyl-builder. Mobile retains the existing builder layout. */
 .builder-parts-picker{border-top:1px solid var(--line);padding:22px 0 10px}

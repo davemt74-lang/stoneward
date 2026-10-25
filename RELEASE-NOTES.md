@@ -1,4 +1,15 @@
-# Stonefellow v1.3.139 — Section 90G: Private song catalog preflight
+# Stonefellow v1.3.140 — Section 90H: Reviewed song catalog publication
+
+- Prepared, rights-reviewed private song drafts now have a separate Admin-controlled publication workflow.
+- Public listening requires an independently uploaded MP3 export; the original WAV/MP3 source is never published as preview audio.
+- A confirmation-gated publishing action creates one real public catalog track, with safe deduplication, stable track identity, owner-only receipt and resumable partial-write recovery.
+- The original master remains a private media attachment. Album/release creation remains a separate workflow.
+- Admin Agent Chat can open publishing review, handle preview uploads and display a public track link after successful publication.
+- Includes Section 90H acceptance checks for scope, rights, duplicate protection, public data boundaries and UI actions.
+
+## Previous release
+
+### Stonefellow v1.3.139 — Section 90G: Private song catalog preflight
 
 Admin Agent Chat now extends the guided recording upload with a private artwork picker, cover preview, artist/lyrics/composition credits, composition and master ownership, optional ISRC and release date, explicit-content metadata, and an administrator rights attestation. The server calculates readiness against the saved recording and cover asset (including ownership and content hashes) and checks duplicate ISRC values.
 

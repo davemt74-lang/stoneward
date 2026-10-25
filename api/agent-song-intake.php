@@ -97,7 +97,7 @@ function sf_agent_song_intake_list(int $adminId,?string $directory=null):array {
     $records=[];
     foreach(glob($dir.'/sd_'.str_repeat('?',32).'.json')?:[] as $path){
         $r=json_decode((string)file_get_contents($path),true);
-        if(!is_array($r)||(int)($r['owner_id']??0)!==$adminId||!in_array(($r['status']??''),['draft','catalog_ready'],true))continue;
+        if(!is_array($r)||(int)($r['owner_id']??0)!==$adminId||!in_array(($r['status']??''),['draft','catalog_ready','published'],true))continue;
         $records[]=$r;
     }
     usort($records,static fn($a,$b)=>strcmp((string)($b['created_at']??''),(string)($a['created_at']??'')));

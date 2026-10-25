@@ -13,7 +13,12 @@ if($method==='GET'){
     foreach($drafts as &$draft){
         $audio=sf_media_asset((int)($draft['asset_id']??0));
         $artwork=empty($draft['artwork_asset_id'])?null:sf_media_asset((int)$draft['artwork_asset_id']);
-        $draft['readiness']=sf_agent_song_intake_readiness($draft,$audio,$artwork,sf_catalog());
+        $catalog=sf_catalog();
+        if(($draft['status']??'')==='published'){
+            $publishedId=(string)($draft['published_track_id']??'');
+            $catalog=array_values(array_filter($catalog,static fn($track)=>($track['id']??'')!==$publishedId));
+        }
+        $draft['readiness']=sf_agent_song_intake_readiness($draft,$audio,$artwork,$catalog);
     }
     unset($draft);
     sf_json_response(['ok'=>true,'drafts'=>$drafts]);
