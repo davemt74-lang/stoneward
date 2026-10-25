@@ -5,7 +5,7 @@ $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $files=['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'];
 foreach($files as $f)
- if(!str_contains($read($f),'1.3.140'))throw new RuntimeException('Release identity not updated: '.$f);
+ if(!str_contains($read($f),'1.3.141'))throw new RuntimeException('Release identity not updated: '.$f);
 if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.68'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-044'")
  ||!str_contains($read('api/migrations.php'),"'story_inference_imports'"))

@@ -474,6 +474,8 @@ jobs:
           node tests/section90g-agent-song-review.cjs
           php tests/section90h-song-catalog.php
           node tests/section90h-agent-song-publish.cjs
+          php tests/section90i-agent-navigation.php
+          node tests/section90i-agent-navigation.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs

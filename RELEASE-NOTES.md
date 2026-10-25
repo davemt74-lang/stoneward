@@ -1,4 +1,14 @@
-# Stonefellow v1.3.140 — Section 90H: Reviewed song catalog publication
+# Stonefellow v1.3.141 — Section 90I: Agent page navigation
+
+- Natural-language public Agent commands can switch between installed Stonefellow pages, including Music, Releases, Shows, My Library, Agent Chat and Agent Brain.
+- The Admin Agent can switch directly to an authorized Admin workspace (for example, Dashboard, Releases, CRM, Analytics or Settings) when the owner explicitly asks to open it. The persistent composer and saved chat history remain available.
+- Destinations are resolved from fixed route aliases; arbitrary URLs, private file paths, and cross-account navigation are not accepted.
+- No upload, publish, payment, campaign or account mutation is triggered by a navigation command. Existing edit proposals and approvals are unchanged.
+- No database migration. PHP intent tests and browser wiring checks run in the full release gate.
+
+## Previous release
+
+### Stonefellow v1.3.140 — Section 90H: Reviewed song catalog publication
 
 - Prepared, rights-reviewed private song drafts now have a separate Admin-controlled publication workflow.
 - Public listening requires an independently uploaded MP3 export; the original WAV/MP3 source is never published as preview audio.
@@ -7,9 +17,7 @@
 - Admin Agent Chat can open publishing review, handle preview uploads and display a public track link after successful publication.
 - Includes Section 90H acceptance checks for scope, rights, duplicate protection, public data boundaries and UI actions.
 
-## Previous release
-
-### Stonefellow v1.3.139 — Section 90G: Private song catalog preflight
+### Earlier: Stonefellow v1.3.139 — Section 90G: Private song catalog preflight
 
 Admin Agent Chat now extends the guided recording upload with a private artwork picker, cover preview, artist/lyrics/composition credits, composition and master ownership, optional ISRC and release date, explicit-content metadata, and an administrator rights attestation. The server calculates readiness against the saved recording and cover asset (including ownership and content hashes) and checks duplicate ISRC values.
 

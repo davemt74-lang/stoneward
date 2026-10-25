@@ -589,6 +589,9 @@
         '<button type="button" data-admin-agent-action="upload_audio" class="secondary">Choose WAV / MP3 file</button> '+
         '<button type="button" data-admin-agent-action="media" class="secondary">Open Media Library</button>';
     }
+    else if(m.role==='assistant'&&action.type==='navigate_admin_page'&&moduleRoute){
+      next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Return to '+esc(adminModuleLabels[action.view])+'</button>';
+    }
     else if(m.role==='assistant'&&moduleRoute){
       next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Open '+esc(adminModuleLabels[action.view]||'Admin workspace')+'</button>';
     }
@@ -635,7 +638,7 @@
     const evidence=brief.map(i=>'<li><strong>'+esc(i.title)+'</strong> — '+esc(i.reason)+'</li>').join('');
     return '<article class="admin-agent-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+who+'</strong><p>'+esc(m.content||'')+'</p>'+(stageCards?'<div class="admin-agent-stages"><strong>Governed mission steps</strong><ul>'+stageCards+'</ul><p>Inspect the relevant editor before separately approving any changes.</p></div>':'')+(evidence?'<div class="admin-agent-insights"><strong>Evidence-backed opportunities</strong><ul>'+evidence+'</ul></div>':'')+next+feedback+'</article>';
   }
-  const adminModuleLabels={uploads:'Folder Scan & Upload',media:'Media Library',templates:'Metadata Templates',catalog:'Catalog',releases:'Releases',shows:'Shows + Live',rights:'Rights & Licensing',distribution:'Distribution',press:'EPK + Press',knowledge:'Knowledge Base',products:'Merch & Products',ticketing:'Tickets + VIP',membership:'Membership + VIP',users:'Users & Tokens',team:'Team Workspace',ai:'AI Providers',settings:'Site Settings',calendar:'Operating Calendar',payments:'Payments & Stripe',fulfillment:'Fulfillment & Care',pod:'POD Handoffs',customer:'Customer Lifecycle'};
+  const adminModuleLabels={dashboard:'Dashboard',uploads:'Folder Scan & Upload',media:'Media Library',templates:'Metadata Templates',catalog:'Catalog',releases:'Releases',distribution:'Distribution',press:'EPK + Press',shows:'Shows + Live',crm:'Fans + CRM',automations:'Segments + Automations',campaigns:'Campaigns',products:'Merch & Products',payments:'Payments & Stripe',knowledge:'Knowledge Base',orders:'Orders','commerce-ops':'Commerce Operations',fulfillment:'Fulfillment & Care',pod:'POD Handoffs',users:'Users & Tokens',team:'Team Workspace','production-review':'AI Production Review',packages:'Monthly Packages',membership:'Membership + VIP',ticketing:'Tickets + VIP',ai:'AI Providers',brain:'Agent Brain','agent-chat':'Admin Agent Chat',customer:'Customer Lifecycle',analytics:'Performance Intelligence',calendar:'Operating Calendar',rights:'Rights & Licensing',operations:'Operations',settings:'Site Settings'};
   const adminModuleViews=new Set(Object.keys(adminModuleLabels));
   function newSongKey(){
     const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
@@ -1386,6 +1389,9 @@
       if(conversationId)sessionStorage.setItem('stonefellow.admin.agent.thread',conversationId);
       c.openView('agent-chat');
       const status=c.canvas.querySelector('#adminAgentChatStatus');if(status)status.textContent='';
+      if(r.action?.auto_navigate===true &&
+         r.action?.tool_contract?.tool_id==='admin_module_navigate' &&
+         adminModuleViews.has(r.action.view))c.openView(r.action.view);
       return r;
     }finally{busy=false;}
   }
