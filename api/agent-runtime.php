@@ -5,6 +5,7 @@ require_once __DIR__.'/agent-customer-brain.php';
 require_once __DIR__.'/agent-customer-context.php';
 require_once __DIR__.'/fan-discovery-paths.php';
 require_once __DIR__.'/fan-commerce-advisor.php';
+require_once __DIR__.'/agent-navigation.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -191,6 +192,7 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
 }
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
+    if(sf_agent_public_page_target($message)!==null)return 'page_navigate';
     if(preg_match('/\\b(?:remove|unsave)\\b.*\\b(?:favorite|favorites)\\b|\\b(?:unfavorite|unlike)\\b/',$q))return 'favorite_remove';
     if(preg_match('/\\b(?:add|save|mark)\\b.*\\b(?:favorite|favorites)\\b|\\bfavorite (?:this|that|the)\\b/',$q))return 'favorite_save';
     if(preg_match('/\b(clear|empty) (?:the )?(?:queue|up next)\b/',$q))return 'queue_clear';
@@ -255,6 +257,17 @@ function sf_agent_local_route(string $message,array $client=[]): string {
 function sf_agent_policy(string $route,string $message,array $client=[],?int $userId=null): array {
     $active=(string)($client['active_track_id']??'');$track=sf_agent_find_track($message,$active);$action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
+        case 'page_navigate':
+            $page=sf_agent_public_page_target($message);
+            if($page!==null){
+                $destination=$page['view'];
+                if($destination==='community'&&empty(sf_site_settings()['fan_community_enabled'])){
+                    $destination='newsletter';
+                    $text='The fan community is not open yet. I’ll open the newsletter page.';
+                }else{$text='Opening '.$page['label'].'.';}
+                $action=['type'=>'open_view','view'=>$destination];
+            }else{$text='I can open an installed Stonefellow page. Which page would you like?';}
+            break;
         case 'favorite_save':
         case 'favorite_remove':
             if($track){
@@ -451,6 +464,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'queue_play_next'=>'Asks to make a named/current track play next.',
         'queue_remove'=>'Asks to remove a named/current track from Up Next.',
         'queue_clear'=>'Asks to clear the Up Next queue.',
+        'page_navigate'=>'Explicitly asks to switch to an installed Stonefellow page without modifying data.',
         'site_search'=>'Asks to search across the public Stonefellow site, including music, shows, stories, videos, photos, merch or offers.',
         'catalog_search'=>'Asks to find/search Stonefellow tracks or releases by title, mood, theme, lyric, credit, story, or other catalog clue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
@@ -539,7 +553,8 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     if($isAdmin||sf_can_use_ai($user,128)['ok']){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
-    $route=(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
+    // Explicit page navigation takes priority over advisory JEV classifications.
+    $route=sf_agent_public_page_target($message)!==null?'page_navigate':(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
     sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$jev['run_id']??'','status'=>$jev['status']??($routeSource==='local'?'local_fallback':'error'),'input_tokens'=>$jev['input_tokens']??0,'output_tokens'=>$jev['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action']]);
     if(!$plan['needs_llm']){
         $text=$plan['text']!==''?$plan['text']:'Ready.';

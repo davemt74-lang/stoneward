@@ -4,7 +4,7 @@ $root=dirname(__DIR__);
 $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $p)
- if(!str_contains($read($p),'1.3.140'))
+ if(!str_contains($read($p),'1.3.141'))
   throw new RuntimeException('G4D release identity mismatch: '.$p);
 if(!str_contains($read('version.php'),"'database_schema_target'=>'1.3.68'")
  ||!str_contains($read('version.php'),"'artist_world_private_qc'=>'hash-verified-revision-gated-video-review-cue-sheet-millisecond-seek'"))

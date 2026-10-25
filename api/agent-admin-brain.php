@@ -21,6 +21,7 @@ require_once __DIR__.'/stem-production-advisor.php';
 require_once __DIR__.'/story-production-search-core.php';
 require_once __DIR__.'/story-director-core.php';
 require_once __DIR__.'/story-agent-brain-bridge.php';
+require_once __DIR__.'/agent-navigation.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -189,6 +190,11 @@ function sf_admin_agent_plan(string $message): array {
             ];
         }
     }
+    // Existing module intents and their audited review behavior remain stable;
+    // this fills gaps such as Dashboard, Agent Brain and Analytics.
+    $destination=sf_agent_admin_page_target($message);
+    if($destination!==null)return ['type'=>'navigate_admin_page','view'=>$destination['view'],
+        'requires_confirmation'=>false,'execution'=>'browser_navigation'];
     if(preg_match('/\\b(?:stem|reaper|mix(?:ing)?|envelope|auxiliary bus|audio automation)\\b/',$m)){$type='stem_mix_review';$view='catalog';}
     elseif(preg_match('/\\b(?:production calendar|editorial calendar|production schedule|crew schedule|crew deadlines|deadline extensions?|overdue production|upcoming shoots?|production due dates|shoot calendar)\\b/',$m)){$type='production_schedule_calendar';$view='agent-chat';}
     elseif(preg_match('/\\b(?:footage intelligence|analy[sz]e (?:the )?(?:video|footage|shots?)|visual analysis|scene visual analysis|retake suggestions?|ai footage review|review footage analysis)\\b/i',$m)){$type='production_footage_intelligence';$view='agent-chat';}
@@ -360,6 +366,10 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
     ];
     $module=sf_admin_agent_module_routes()[$plan['type']]??null;
     $text=$module!==null?(string)$module['reply']:($types[$plan['type']]??$types['research']);
+    if($plan['type']==='navigate_admin_page'){
+        $destination=sf_agent_admin_page_destinations()[$plan['view']]??null;
+        $text=$destination!==null?'Opening '.$destination['label'].'.':'That Admin destination is unavailable.';
+    }
     if($plan['type']==='production_schedule_calendar'){
         try{
             $calendar=sf_production_calendar_chat($adminId);
@@ -683,6 +693,11 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message): ar
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
+    $navigation=sf_agent_admin_page_target($message);
+    if($navigation!==null && $navigation['view']===$plan['view'] &&
+        $contract['tool_id']==='admin_module_navigate' && !$plan['requires_confirmation']){
+        $action['auto_navigate']=true;
+    }
     if($plan['type']==='production_editorial_status'&&!empty($editorial))$action['editorial_production']=$editorial;
     if($plan['type']==='production_schedule_calendar'&&!empty($calendar))$action['production_calendar']=$calendar;
     if($plan['type']==='production_footage_review'&&isset($footage))$action['footage_queue']=$footage;

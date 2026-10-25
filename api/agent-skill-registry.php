@@ -15,6 +15,7 @@ function sf_agent_skill_definitions(): array {
       'published_artist_facts'=>['label'=>'Research published Stonefellow music and artist information','contexts'=>['public','customer','admin'],'tool'=>'public_artist_facts','intents'=>['public_artist_research']],
       'public_recommendations'=>['label'=>'Recommend published tracks','contexts'=>['public','customer','admin'],'tool'=>'recommend_public_track','intents'=>['player_recommend']],
       'playback_queue'=>['label'=>'Manage local playback queue','contexts'=>['public','customer','admin'],'tool'=>'queue_track','intents'=>['queue_track']],
+      'public_page_navigation'=>['label'=>'Switch to an installed Stonefellow page','contexts'=>['public','customer'],'tool'=>'public_page_navigate','intents'=>['page_navigate']],
       'customer_favorites'=>['label'=>'Manage my favorites','contexts'=>['customer'],'tool'=>'favorite_track','intents'=>['favorite_save','favorite_remove']],
       'customer_playlists'=>['label'=>'Build my playlists','contexts'=>['customer'],'tool'=>'create_playlist','intents'=>['create_playlist']],
       'customer_voice'=>['label'=>'Generate customer voice reply','contexts'=>['customer'],'tool'=>'elevenlabs_voice','intents'=>['voice_reply']],
@@ -28,7 +29,7 @@ function sf_agent_skill_definitions(): array {
       'admin_commerce_followup'=>['label'=>'Prepare reviewed customer follow-up','contexts'=>['admin'],'tool'=>'commerce_followup_add','intents'=>['prepare_commerce_followup']],
       'admin_crm_insights'=>['label'=>'Review CRM aggregates','contexts'=>['admin'],'tool'=>'crm_aggregate','intents'=>['crm_report']],
       'admin_module_navigation'=>['label'=>'Find and open authorized Admin workspaces, including private audio upload','contexts'=>['admin'],'tool'=>'admin_module_navigate','intents'=>[
-        'bulk_music_import','upload_audio','metadata_templates','media_library','catalog_manager',
+        'navigate_admin_page','bulk_music_import','upload_audio','metadata_templates','media_library','catalog_manager',
         'release_manager','shows_manager','rights_manager','distribution_manager','press_manager',
         'knowledge_manager','products_manager','ticketing_manager','membership_manager',
         'account_manager','team_manager','ai_settings','site_settings','operating_calendar',
