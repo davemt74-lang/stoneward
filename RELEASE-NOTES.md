@@ -1,3 +1,13 @@
+# Stonefellow v1.3.139 — Section 90G: Private song catalog preflight
+
+Admin Agent Chat now extends the guided recording upload with a private artwork picker, cover preview, artist/lyrics/composition credits, composition and master ownership, optional ISRC and release date, explicit-content metadata, and an administrator rights attestation. The server calculates readiness against the saved recording and cover asset (including ownership and content hashes) and checks duplicate ISRC values.
+
+An explicit **Prepare for catalog** approval moves a revisioned private song draft to `catalog_ready` exactly once. The operation does **not** write the public catalog, publish audio, create a release, or contact fans. Owner-scoped drafts remain stored privately; repeat approval is idempotent, stale revisions cannot be prepared, and Admin audit logs record the transition. The next phase can build catalog staging/publication from these reviewed records with a separate approval.
+
+No new database migration. Full PHP and browser-contract tests run in the release gate.
+
+---
+
 # Stonefellow v1.3.45 — Section 46: Dual Agent Brain & Unified Canvas
 
 Stonefellow now uses a **private customer Agent Brain per authenticated account**, a **separate operational Admin Agent Brain per administrator**, and one shared server-governed tool registry. Customers can manage explicitly saved preferences and private conversations inside My Agent Brain and My Agent Chat; Admin receives an operational chat workspace with an Agent Brain sidebar, missions, evidence and exact-review approvals. Customer chat content and individual memory are never included in Admin operational reporting.

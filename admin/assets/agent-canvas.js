@@ -648,29 +648,52 @@
     if(s.state==='choose')body='<p>Select an MP3 or WAV from this device. The recording stays private.</p>'+
       '<button type="button" class="primary" data-agent-song-choose>Choose audio file</button>';
     else if(s.state==='uploading')body='<p role="status">Uploading and analyzing the recording. Please keep this tab open…</p>';
-    else if(s.state==='editing'||s.state==='saving'){
+    else if(['editing','saving','uploading_artwork'].includes(s.state)){
       const inputs=[['title','Song title','text',180],['release','Release / album (optional)','text',180],
         ['genre','Genre (optional)','text',120],['year','Year (optional)','number',4],
-        ['words_by','Lyrics by (optional)','text',180],['music_by','Music by (optional)','text',180]];
+        ['words_by','Lyrics by','text',180],['music_by','Music by','text',180],
+        ['artist_display','Performing artist','text',180],['master_owner','Master recording rights owner','text',180],
+        ['composition_owner','Composition rights owner','text',180],
+        ['isrc','ISRC (optional)','text',12],['release_date','Release date (optional)','date',10]];
       body='<p><strong>'+esc(asset.original_name||'Recording')+'</strong> · '+
         Number(asset.duration_seconds||0).toFixed(1)+' seconds · '+esc(asset.codec||'audio')+'</p>'+
-        '<p class="hint">Metadata detected where available. Edit anything below before saving.</p>'+
+        '<p class="hint">Metadata detected where available. Review ownership and artwork before preparing this private catalog package.</p>'+
         '<form data-agent-song-form><div class="admin-agent-song-fields">'+
         inputs.map(([name,label,type,max])=>'<label>'+esc(label)+'<input name="'+name+'" type="'+type+'" '+
-          (type==='number'?'min="1900" max="2100"':'maxlength="'+max+'"')+
+          (type==='number'?'min="1900" max="2100"':type==='date'?'':'maxlength="'+max+'"')+
           ' value="'+esc(details[name]||'')+'" '+(name==='title'?'required':'')+'></label>').join('')+
-        '</div><label>Private notes (optional)<textarea name="notes" maxlength="1000" rows="3">'+esc(details.notes||'')+'</textarea></label>'+
-        '<div class="actions"><button type="submit" class="primary" '+(s.state==='saving'?'disabled':'')+'>'+
+        '</div><div class="admin-agent-song-artwork">'+
+          (Number(s.artwork?.id||details.artwork_asset_id||0)>0?
+            '<img alt="Private song artwork preview" loading="lazy" src="../api/media.php?id='+Number(s.artwork?.id||details.artwork_asset_id)+'&variant=thumb">':'')+
+          '<div><strong>Cover artwork</strong><p class="hint">JPG, PNG, WebP or GIF. Private until later publication.</p>'+
+          '<button type="button" class="secondary" data-agent-artwork-choose '+(s.state!=='editing'?'disabled':'')+'>'+
+          (Number(s.artwork?.id||details.artwork_asset_id||0)>0?'Replace artwork':'Upload artwork')+'</button>'+
+          '<input type="file" data-agent-artwork-file accept="image/jpeg,image/png,image/webp,image/gif" hidden></div></div>'+
+        '<label><input name="explicit" type="checkbox" '+(details.explicit?'checked':'')+'> Explicit lyrics / content</label>'+
+        '<label><input name="rights_confirmed" type="checkbox" '+(details.rights_confirmed?'checked':'')+
+          '> I confirm I have authority over this original recording and its composition for catalog preparation.</label>'+
+        '<label>Private notes (optional)<textarea name="notes" maxlength="1000" rows="3">'+esc(details.notes||'')+'</textarea></label>'+
+        '<div class="actions"><button type="submit" class="primary" '+(s.state!=='editing'?'disabled':'')+'>'+
         (s.expectedHash?'Update private song draft':'Save private song draft')+'</button> '+
         '<button type="button" class="secondary" data-agent-song-cancel '+(s.state==='saving'?'disabled':'')+'>Cancel</button></div></form>';
     }else if(s.state==='saved'){
       body='<p><strong>'+esc(s.draft?.title||'Song')+'</strong> saved as a private draft.</p>'+
         '<p class="hint">Recording #'+Number(s.draft?.asset_id||0)+' is stored. No release, public catalog change, or publication occurred.</p>'+
+        '<p><strong>Catalog preflight:</strong> '+Number(s.readiness?.score||0)+'% '+
+        (s.readiness?.ready?'· Ready for private handoff':'· Needs review')+'</p>'+
+        (s.readiness?.blockers?.length?'<ul>'+s.readiness.blockers.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')+
+        '<p>Next: review artwork, composition and master rights, then prepare the private catalog handoff.</p>'+
+        '<div class="actions"><button type="button" class="primary" data-agent-song-review>Review artwork and rights</button> '+
+        '<button type="button" class="secondary" data-agent-song-prepare '+(s.readiness?.ready?'':'disabled')+'>Prepare for catalog</button> '+
+        '<button type="button" class="secondary" data-agent-song-start>Upload another song</button></div>';
+    }else if(s.state==='prepared'){
+      body='<p><strong>'+esc(s.draft?.title||'Song')+'</strong> passed private catalog preflight.</p>'+
+        '<p class="hint">Metadata, source recording, artwork and ownership checked. No public track or release was created. Publication requires a separate workflow.</p>'+
         '<button type="button" class="secondary" data-agent-song-start>Upload another song</button>';
     }
     return '<section id="adminAgentSongIntake" class="admin-agent-calendar admin-agent-song-intake" aria-label="Guided song upload">'+
-      '<div class="admin-agent-calendar-head"><strong>New song · private intake</strong><span>Step '+
-      (s.state==='saved'?'3':s.state==='editing'||s.state==='saving'?'2':'1')+' of 3</span></div>'+
+      '<div class="admin-agent-calendar-head"><strong>New song · private intake and catalog review</strong><span>Step '+
+      (s.state==='prepared'?'4':s.state==='saved'?'3':s.state==='editing'||s.state==='saving'||s.state==='uploading_artwork'?'2':'1')+' of 4</span></div>'+
       (s.error?'<p class="form-error" role="alert">'+esc(s.error)+'</p>':'')+body+
       (s.state!=='saved'?'<input type="file" data-agent-song-file accept=".wav,.mp3,audio/wav,audio/mpeg" hidden>':'')+'</section>';
   }
@@ -680,7 +703,37 @@
     transcript.insertAdjacentHTML('beforeend',songDetailsHtml());
     const panel=transcript.querySelector('#adminAgentSongIntake');
     panel.querySelectorAll('[data-agent-song-start]').forEach(b=>b.onclick=startSongIntake);
+    panel.querySelector('[data-agent-song-review]')?.addEventListener('click',()=>{
+      const d=songIntake.draft;if(!d)return;
+      songIntake.state='editing';songIntake.expectedHash=d.payload_hash;
+      songIntake.fields=Object.fromEntries(songFieldNames.map(k=>[k,d[k]??'']));
+      songIntake.artwork={id:Number(d.artwork_asset_id||0)};
+      showSongIntake();
+    });
+    panel.querySelector('[data-agent-song-prepare]')?.addEventListener('click',()=>prepareSongDraft());
     panel.querySelector('[data-agent-song-cancel]')?.addEventListener('click',()=>{songIntake=null;panel.remove();});
+    const artworkPicker=panel.querySelector('[data-agent-artwork-file]');
+    panel.querySelector('[data-agent-artwork-choose]')?.addEventListener('click',()=>artworkPicker?.click());
+    artworkPicker?.addEventListener('change',async()=>{
+      const file=artworkPicker.files?.[0];if(!file||!songIntake)return;
+      if(!/\.(jpg|jpeg|png|webp|gif)$/i.test(file.name)||file.size<1){
+        songIntake.error='Choose a nonempty JPG, PNG, WebP or GIF artwork file.';showSongIntake();return;
+      }
+      const active=songIntake;
+      const form=panel.querySelector('[data-agent-song-form]');
+      if(form)songIntake.fields=songFieldsFromForm(form);
+      songIntake.state='uploading_artwork';songIntake.error='';showSongIntake();
+      try{
+        const data=new FormData();data.append('file',file,file.name);
+        const response=await ctx().uploadApi('media-upload.php',data);
+        if(songIntake!==active)return;
+        if(response.asset?.category!=='image'||Number(response.asset?.id||0)<1)
+          throw new Error('Uploaded artwork did not resolve to a managed image.');
+        songIntake.artwork=response.asset;
+        songIntake.fields.artwork_asset_id=Number(response.asset.id);
+        songIntake.state='editing';showSongIntake();
+      }catch(e){if(songIntake!==active)return;songIntake.state='editing';songIntake.error=e.message||'Artwork upload failed.';showSongIntake();}
+    });
     const picker=panel.querySelector('[data-agent-song-file]');
     panel.querySelector('[data-agent-song-choose]')?.addEventListener('click',()=>picker?.click());
     picker?.addEventListener('change',async()=>{
@@ -699,26 +752,47 @@
         songIntake.asset=asset;
         songIntake.fields={title:tags.title||asset.title||file.name.replace(/\.[^.]+$/,''),
           release:tags.album||'Unreleased',genre:tags.genre||'',year:/^\d{4}$/.test(String(tags.year||''))?tags.year:'',
-          words_by:'',music_by:'',notes:''};
+          words_by:'',music_by:'',notes:'',artist_display:'Stonefellow',master_owner:'',composition_owner:'',
+          isrc:'',release_date:'',explicit:false,rights_confirmed:false,artwork_asset_id:0};
         songIntake.state='editing';showSongIntake();
       }catch(e){if(songIntake!==active)return;songIntake.state='choose';songIntake.error=e.message||'The recording was not uploaded.';showSongIntake();}
     });
     panel.querySelector('[data-agent-song-form]')?.addEventListener('submit',async event=>{
       event.preventDefault();if(songIntake.state==='saving'||!songIntake.asset)return;
       const active=songIntake;
-      const data=new FormData(event.currentTarget);
-      const fields=Object.fromEntries(['title','release','genre','year','words_by','music_by','notes'].map(k=>[k,String(data.get(k)||'').trim()]));
+      const fields=songFieldsFromForm(event.currentTarget);
+      fields.artwork_asset_id=Number(songIntake.artwork?.id||fields.artwork_asset_id||0);
       if(!fields.title){songIntake.error='Please enter a song title.';songIntake.fields=fields;showSongIntake();return;}
       songIntake.fields=fields;songIntake.state='saving';songIntake.error='';showSongIntake();
       try{
         const response=await ctx().api('agent-song-intake.php',{action:songIntake.expectedHash?'update_draft':'save_draft',
           request_key:songIntake.key,asset_id:Number(songIntake.asset.id),expected_hash:songIntake.expectedHash||'',...fields});
         if(songIntake!==active)return;
-        songIntake.state='saved';songIntake.draft=response.draft;showSongIntake();
+        songIntake.state='saved';songIntake.draft=response.draft;songIntake.readiness=response.readiness;showSongIntake();
         await loadSongDrafts();
       }catch(e){if(songIntake!==active)return;songIntake.state='editing';songIntake.error=e.message||'Song draft was not saved.';showSongIntake();}
     });
     if(songIntake.state!=='uploading')panel.scrollIntoView({block:'nearest'});
+  }
+  const songFieldNames=['title','release','genre','year','words_by','music_by','notes',
+    'artist_display','master_owner','composition_owner','isrc','release_date','explicit','rights_confirmed','artwork_asset_id'];
+  function songFieldsFromForm(form){
+    const data=new FormData(form);
+    return Object.fromEntries(songFieldNames.map(k=>[k,
+      k==='explicit'||k==='rights_confirmed'?data.get(k)==='on':
+      k==='artwork_asset_id'?Number(songIntake?.artwork?.id||songIntake?.fields?.artwork_asset_id||0):
+      String(data.get(k)||'').trim()]));
+  }
+  async function prepareSongDraft(){
+    if(!songIntake?.draft||songIntake.state!=='saved')return;
+    const d=songIntake.draft;
+    if(!window.confirm('Prepare this private song for catalog handoff? This will NOT publish or expose the song.'))return;
+    songIntake.error='';
+    try{
+      const response=await ctx().api('agent-song-intake.php',{
+        action:'prepare_catalog',request_key:d.request_key,expected_hash:d.payload_hash,confirmed:true});
+      songIntake.draft=response.draft;songIntake.state='prepared';showSongIntake();await loadSongDrafts();
+    }catch(e){songIntake.error=e.message||'Preflight failed. Review missing fields and artwork.';showSongIntake();}
   }
   function startSongIntake(){
     songIntake={state:'choose',key:newSongKey(),error:'',asset:null,fields:null};
@@ -732,14 +806,16 @@
       const drafts=Array.isArray(result.drafts)?result.drafts.slice(0,6):[];
       target.innerHTML='<details><summary>Private song drafts ('+drafts.length+((result.drafts||[]).length>6?'+':'')+')</summary>'+
         (drafts.length?drafts.map(d=>'<p><strong>'+esc(d.title)+'</strong> · '+esc(d.filename)+
-          ' · '+esc(d.created_at||'')+' · Unpublished <button type="button" class="secondary" data-agent-song-edit="'+esc(d.id)+'">Edit draft</button></p>').join(''):
+          ' · '+esc(d.created_at||'')+' · '+(d.status==='catalog_ready'?'Prepared for catalog':'Unpublished')+
+          ' · Preflight '+Number(d.readiness?.score||0)+'% '+(d.status==='draft'?'<button type="button" class="secondary" data-agent-song-edit="'+esc(d.id)+'">Edit / review draft</button>':'')+'</p>').join(''):
           '<p class="hint">No song drafts yet.</p>')+'</details>';
       target.querySelectorAll('[data-agent-song-edit]').forEach(button=>button.onclick=()=>{
         const draft=result.drafts.find(d=>d.id===button.dataset.agentSongEdit);
         if(!draft)return;
         songIntake={state:'editing',key:draft.request_key,error:'',expectedHash:draft.payload_hash,
           asset:{id:draft.asset_id,original_name:draft.filename,duration_seconds:draft.duration_seconds,codec:draft.codec},
-          fields:Object.fromEntries(['title','release','genre','year','words_by','music_by','notes'].map(k=>[k,draft[k]||'']))};
+          artwork:{id:Number(draft.artwork_asset_id||0)},
+          fields:Object.fromEntries(songFieldNames.map(k=>[k,draft[k]??'']))};
         showSongIntake();
       });
     }catch(_){const target=c.canvas.querySelector('#adminAgentSongDrafts');if(target)target.textContent='Private draft list unavailable.';}

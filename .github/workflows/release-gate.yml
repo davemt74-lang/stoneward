@@ -468,6 +468,10 @@ jobs:
           php -l admin/api/agent-song-intake.php
           php tests/section90f-song-intake.php
           node tests/section90f-agent-song-upload.cjs
+          php -l api/agent-song-intake.php
+          php -l admin/api/agent-song-intake.php
+          php tests/section90g-song-preflight.php
+          node tests/section90g-agent-song-review.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs
