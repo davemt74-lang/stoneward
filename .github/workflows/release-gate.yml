@@ -464,6 +464,10 @@ jobs:
           php tests/section90e-agent-catalog-actions.php
           node tests/section90e-admin-scroll.cjs
           node tests/section90e-agent-voice.cjs
+          php -l api/agent-song-intake.php
+          php -l admin/api/agent-song-intake.php
+          php tests/section90f-song-intake.php
+          node tests/section90f-agent-song-upload.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs
