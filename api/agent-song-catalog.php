@@ -13,7 +13,9 @@ function sf_agent_song_catalog_track_id(string $key):string {
 function sf_agent_song_catalog_candidate(array $draft,array $master,array $preview,array $cover,
     int $owner,array $catalog=[]):array {
     if($owner<1||(int)($draft['owner_id']??0)!==$owner||($draft['status']??'')!=='catalog_ready'
-        ||empty($draft['prepared_at']))throw new RuntimeException('A prepared, owner-approved song is required.');
+        ||empty($draft['prepared_at'])
+        ||!preg_match('/^[a-f0-9]{64}$/D',(string)($draft['payload_hash']??'')))
+        throw new RuntimeException('A prepared, revisioned, owner-approved song is required.');
     $id=sf_agent_song_catalog_track_id((string)($draft['request_key']??''));
     // The preflight may discover an already-published copy of this same stable
     // track ID after a crash. Validate all other ISRC collisions normally.

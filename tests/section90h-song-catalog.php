@@ -26,6 +26,7 @@ $raw=['request_key'=>$key,'title'=>'Desert Transmission','release'=>'New Single'
     'artwork_asset_id'=>42,'isrc'=>'USABC2600001','release_date'=>'2026-12-03','explicit'=>false,
     'notes'=>'Private notes must never appear in the public catalog.'];
 $draft=sf_agent_song_intake_normalize($raw,$audio,11,$art);
+$draft['payload_hash']=hash('sha256',json_encode($draft,JSON_THROW_ON_ERROR));
 $draft['status']='catalog_ready';$draft['prepared_at']=gmdate('c');
 $candidate=sf_agent_song_catalog_candidate($draft,$audio,$preview,$art,11);
 $check('Prepared and rights-approved song produces stable published track',
@@ -60,6 +61,7 @@ $check('Unprepared, unauthorized, unconfirmed or missing rights cannot publish',
     $throws(fn()=>sf_agent_song_catalog_candidate(array_replace($draft,['status'=>'draft']),$audio,$preview,$art,11))
     &&$throws(fn()=>sf_agent_song_catalog_candidate($draft,$audio,$preview,$art,12))
     &&$throws(fn()=>sf_agent_song_catalog_candidate(array_replace($draft,['rights_confirmed'=>false]),$audio,$preview,$art,11))
+    &&$throws(fn()=>sf_agent_song_catalog_candidate(array_replace($draft,['payload_hash'=>'']),$audio,$preview,$art,11))
     &&$throws(fn()=>sf_agent_song_catalog_candidate(array_replace($draft,['prepared_at'=>'']),$audio,$preview,$art,11)));
 $check('Private original can never be reused as public preview',
     $throws(fn()=>sf_agent_song_catalog_candidate($draft,$audio,array_replace($preview,['id'=>41]),$art,11))
