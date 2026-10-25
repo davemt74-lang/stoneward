@@ -86,6 +86,9 @@
 .admin-agent-calendar .hint{font-size:.82rem;opacity:.78}
 .admin-agent-song-intake{width:min(730px,100%);max-width:100%;margin:18px 0 24px}
 .admin-agent-song-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px}
+.admin-agent-song-artwork{display:flex;align-items:center;gap:14px;padding:10px 0;flex-wrap:wrap}
+.admin-agent-song-artwork img{width:104px;height:104px;object-fit:cover;border-radius:12px;flex-shrink:0}
+.admin-agent-song-intake input[type=checkbox]{width:auto;vertical-align:middle;margin-right:8px}
 .admin-agent-song-intake input,.admin-agent-song-intake textarea{width:100%;box-sizing:border-box}
 .admin-agent-song-drafts{margin:10px 4px 0;max-width:730px}
 .admin-agent-song-drafts summary{cursor:pointer;color:var(--accent);font-size:.84rem}
