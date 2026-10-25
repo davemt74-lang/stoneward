@@ -84,6 +84,12 @@
 .admin-agent-calendar button{margin-top:8px}
 .admin-agent-calendar .actions{display:flex;gap:9px;flex-wrap:wrap}
 .admin-agent-calendar .hint{font-size:.82rem;opacity:.78}
+.admin-agent-song-intake{width:min(730px,100%);max-width:100%;margin:18px 0 24px}
+.admin-agent-song-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px}
+.admin-agent-song-intake input,.admin-agent-song-intake textarea{width:100%;box-sizing:border-box}
+.admin-agent-song-drafts{margin:10px 4px 0;max-width:730px}
+.admin-agent-song-drafts summary{cursor:pointer;color:var(--accent);font-size:.84rem}
+.admin-agent-song-drafts p{font-size:.82rem;margin:8px 0;overflow-wrap:anywhere}
 @media(max-width:650px){.admin-agent-calendar{padding:8px}.admin-agent-calendar .actions button{flex:1 1 130px}}
 
 /* G5A private footage preview stays within the minimal chat card. */

@@ -2,7 +2,7 @@
   'use strict';
   /** One Admin chat canvas + slide-out Brain; same server-owned mission ledger. */
   let conversationId=sessionStorage.getItem('stonefellow.admin.agent.thread')||'';
-  let busy=false,lastBrain=null,previousFocus=null;
+  let busy=false,lastBrain=null,previousFocus=null,songIntake=null;
   const ctx=()=>window.STONEFELLOW_ADMIN_CONTEXT;
   const esc=s=>ctx()?.esc?.(String(s??''))||'';
   async function load(){
@@ -585,7 +585,8 @@
     let next='';
     const moduleRoute=action.tool_contract?.tool_id==='admin_module_navigate'&&adminModuleViews.has(action.view);
     if(m.role==='assistant'&&moduleRoute&&action.type==='upload_audio'){
-      next='<button type="button" data-admin-agent-action="upload_audio" class="primary">Choose WAV / MP3 file</button> '+
+      next='<button type="button" data-agent-song-start class="primary">Guided song upload</button> '+
+        '<button type="button" data-admin-agent-action="upload_audio" class="secondary">Choose WAV / MP3 file</button> '+
         '<button type="button" data-admin-agent-action="media" class="secondary">Open Media Library</button>';
     }
     else if(m.role==='assistant'&&moduleRoute){
@@ -636,6 +637,113 @@
   }
   const adminModuleLabels={uploads:'Folder Scan & Upload',media:'Media Library',templates:'Metadata Templates',catalog:'Catalog',releases:'Releases',shows:'Shows + Live',rights:'Rights & Licensing',distribution:'Distribution',press:'EPK + Press',knowledge:'Knowledge Base',products:'Merch & Products',ticketing:'Tickets + VIP',membership:'Membership + VIP',users:'Users & Tokens',team:'Team Workspace',ai:'AI Providers',settings:'Site Settings',calendar:'Operating Calendar',payments:'Payments & Stripe',fulfillment:'Fulfillment & Care',pod:'POD Handoffs',customer:'Customer Lifecycle'};
   const adminModuleViews=new Set(Object.keys(adminModuleLabels));
+  function newSongKey(){
+    const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+    return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  function songDetailsHtml(){
+    if(!songIntake)return '';
+    const s=songIntake,asset=s.asset||{},details=s.fields||{};
+    let body='';
+    if(s.state==='choose')body='<p>Select an MP3 or WAV from this device. The recording stays private.</p>'+
+      '<button type="button" class="primary" data-agent-song-choose>Choose audio file</button>';
+    else if(s.state==='uploading')body='<p role="status">Uploading and analyzing the recording. Please keep this tab open…</p>';
+    else if(s.state==='editing'||s.state==='saving'){
+      const inputs=[['title','Song title','text',180],['release','Release / album (optional)','text',180],
+        ['genre','Genre (optional)','text',120],['year','Year (optional)','number',4],
+        ['words_by','Lyrics by (optional)','text',180],['music_by','Music by (optional)','text',180]];
+      body='<p><strong>'+esc(asset.original_name||'Recording')+'</strong> · '+
+        Number(asset.duration_seconds||0).toFixed(1)+' seconds · '+esc(asset.codec||'audio')+'</p>'+
+        '<p class="hint">Metadata detected where available. Edit anything below before saving.</p>'+
+        '<form data-agent-song-form><div class="admin-agent-song-fields">'+
+        inputs.map(([name,label,type,max])=>'<label>'+esc(label)+'<input name="'+name+'" type="'+type+'" '+
+          (type==='number'?'min="1900" max="2100"':'maxlength="'+max+'"')+
+          ' value="'+esc(details[name]||'')+'" '+(name==='title'?'required':'')+'></label>').join('')+
+        '</div><label>Private notes (optional)<textarea name="notes" maxlength="1000" rows="3">'+esc(details.notes||'')+'</textarea></label>'+
+        '<div class="actions"><button type="submit" class="primary" '+(s.state==='saving'?'disabled':'')+'>'+
+        (s.expectedHash?'Update private song draft':'Save private song draft')+'</button> '+
+        '<button type="button" class="secondary" data-agent-song-cancel '+(s.state==='saving'?'disabled':'')+'>Cancel</button></div></form>';
+    }else if(s.state==='saved'){
+      body='<p><strong>'+esc(s.draft?.title||'Song')+'</strong> saved as a private draft.</p>'+
+        '<p class="hint">Recording #'+Number(s.draft?.asset_id||0)+' is stored. No release, public catalog change, or publication occurred.</p>'+
+        '<button type="button" class="secondary" data-agent-song-start>Upload another song</button>';
+    }
+    return '<section id="adminAgentSongIntake" class="admin-agent-calendar admin-agent-song-intake" aria-label="Guided song upload">'+
+      '<div class="admin-agent-calendar-head"><strong>New song · private intake</strong><span>Step '+
+      (s.state==='saved'?'3':s.state==='editing'||s.state==='saving'?'2':'1')+' of 3</span></div>'+
+      (s.error?'<p class="form-error" role="alert">'+esc(s.error)+'</p>':'')+body+
+      (s.state!=='saved'?'<input type="file" data-agent-song-file accept=".wav,.mp3,audio/wav,audio/mpeg" hidden>':'')+'</section>';
+  }
+  function showSongIntake(){
+    const transcript=ctx()?.canvas?.querySelector('#adminAgentTranscript');if(!transcript||!songIntake)return;
+    transcript.querySelector('#adminAgentSongIntake')?.remove();
+    transcript.insertAdjacentHTML('beforeend',songDetailsHtml());
+    const panel=transcript.querySelector('#adminAgentSongIntake');
+    panel.querySelectorAll('[data-agent-song-start]').forEach(b=>b.onclick=startSongIntake);
+    panel.querySelector('[data-agent-song-cancel]')?.addEventListener('click',()=>{songIntake=null;panel.remove();});
+    const picker=panel.querySelector('[data-agent-song-file]');
+    panel.querySelector('[data-agent-song-choose]')?.addEventListener('click',()=>picker?.click());
+    picker?.addEventListener('change',async()=>{
+      const active=songIntake;
+      const file=picker.files?.[0];if(!file)return;
+      if(!/\.(wav|mp3)$/i.test(file.name)||file.size<1){songIntake.error='Choose a nonempty MP3 or WAV file.';showSongIntake();return;}
+      songIntake.state='uploading';songIntake.error='';showSongIntake();
+      try{
+        const form=new FormData();form.append('file',file,file.name);
+        const result=await ctx().uploadApi('media-upload.php',form);
+        if(songIntake!==active)return;
+        const asset=result.asset||{};
+        if(!Number.isSafeInteger(Number(asset.id))||Number(asset.id)<1||asset.category!=='audio')
+          throw new Error('The uploaded file did not resolve to an audio asset.');
+        const tags=asset.technical?.normalized_tags||{};
+        songIntake.asset=asset;
+        songIntake.fields={title:tags.title||asset.title||file.name.replace(/\.[^.]+$/,''),
+          release:tags.album||'Unreleased',genre:tags.genre||'',year:/^\d{4}$/.test(String(tags.year||''))?tags.year:'',
+          words_by:'',music_by:'',notes:''};
+        songIntake.state='editing';showSongIntake();
+      }catch(e){if(songIntake!==active)return;songIntake.state='choose';songIntake.error=e.message||'The recording was not uploaded.';showSongIntake();}
+    });
+    panel.querySelector('[data-agent-song-form]')?.addEventListener('submit',async event=>{
+      event.preventDefault();if(songIntake.state==='saving'||!songIntake.asset)return;
+      const active=songIntake;
+      const data=new FormData(event.currentTarget);
+      const fields=Object.fromEntries(['title','release','genre','year','words_by','music_by','notes'].map(k=>[k,String(data.get(k)||'').trim()]));
+      if(!fields.title){songIntake.error='Please enter a song title.';songIntake.fields=fields;showSongIntake();return;}
+      songIntake.fields=fields;songIntake.state='saving';songIntake.error='';showSongIntake();
+      try{
+        const response=await ctx().api('agent-song-intake.php',{action:songIntake.expectedHash?'update_draft':'save_draft',
+          request_key:songIntake.key,asset_id:Number(songIntake.asset.id),expected_hash:songIntake.expectedHash||'',...fields});
+        if(songIntake!==active)return;
+        songIntake.state='saved';songIntake.draft=response.draft;showSongIntake();
+        await loadSongDrafts();
+      }catch(e){if(songIntake!==active)return;songIntake.state='editing';songIntake.error=e.message||'Song draft was not saved.';showSongIntake();}
+    });
+    if(songIntake.state!=='uploading')panel.scrollIntoView({block:'nearest'});
+  }
+  function startSongIntake(){
+    songIntake={state:'choose',key:newSongKey(),error:'',asset:null,fields:null};
+    showSongIntake();
+  }
+  async function loadSongDrafts(){
+    const c=ctx();if(!c)return;
+    try{
+      const result=await c.api('agent-song-intake.php');
+      const target=c.canvas.querySelector('#adminAgentSongDrafts');if(!target)return;
+      const drafts=Array.isArray(result.drafts)?result.drafts.slice(0,6):[];
+      target.innerHTML='<details><summary>Private song drafts ('+drafts.length+((result.drafts||[]).length>6?'+':'')+')</summary>'+
+        (drafts.length?drafts.map(d=>'<p><strong>'+esc(d.title)+'</strong> · '+esc(d.filename)+
+          ' · '+esc(d.created_at||'')+' · Unpublished <button type="button" class="secondary" data-agent-song-edit="'+esc(d.id)+'">Edit draft</button></p>').join(''):
+          '<p class="hint">No song drafts yet.</p>')+'</details>';
+      target.querySelectorAll('[data-agent-song-edit]').forEach(button=>button.onclick=()=>{
+        const draft=result.drafts.find(d=>d.id===button.dataset.agentSongEdit);
+        if(!draft)return;
+        songIntake={state:'editing',key:draft.request_key,error:'',expectedHash:draft.payload_hash,
+          asset:{id:draft.asset_id,original_name:draft.filename,duration_seconds:draft.duration_seconds,codec:draft.codec},
+          fields:Object.fromEntries(['title','release','genre','year','words_by','music_by','notes'].map(k=>[k,draft[k]||'']))};
+        showSongIntake();
+      });
+    }catch(_){const target=c.canvas.querySelector('#adminAgentSongDrafts');if(target)target.textContent='Private draft list unavailable.';}
+  }
   function action(type){
     const c=ctx();if(!c)return;
     if(type==='brain'){showBrain();return;}
@@ -652,6 +760,7 @@
     if(['crm','automations','analytics','commerce-ops'].includes(type))c.openView(type);
   }
   function bindActions(root){
+    root.querySelectorAll('[data-agent-song-start]').forEach(b=>b.onclick=startSongIntake);
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
     root.querySelectorAll('video[data-agent-scene-start]').forEach(video=>{
       const start=Math.max(0,Number(video.dataset.agentSceneStart)||0);
@@ -1094,6 +1203,7 @@
       '<div class="admin-agent-chat" id="adminAgentChat">'+
       '<header class="admin-agent-chat-heading"><div><small>ADMIN AGENT · OPERATIONS</small><p>Private Admin Brain · Commerce, CRM, Artist World production and operational research</p></div>'+
       '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentSpeechToggle" aria-pressed="true" title="Toggle on-device speech for Admin Agent replies">Voice on</button><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
+      '<div class="admin-agent-song-drafts" id="adminAgentSongDrafts" aria-label="Saved private song drafts"></div>'+
       '<section class="admin-agent-chat-thread" aria-label="Admin Agent conversation">'+
       '<div class="admin-agent-transcript" id="adminAgentTranscript" role="log" aria-live="polite" aria-relevant="additions text"><p>Loading your conversation…</p></div></section>'+
       '<p class="admin-agent-chat-status" id="adminAgentChatStatus" role="status"></p>'+
@@ -1112,8 +1222,10 @@
       const transcript=root.querySelector('#adminAgentTranscript'),items=get.messages||[];
       window.SFAdminAgentCanvas.commerceMessages=items;
       transcript.innerHTML=items.length?items.map(messageHtml).join(''):
-        '<div class="admin-agent-welcome"><h2>What can I help with?</h2><p>Ask for the production calendar, overdue tasks, crew schedule, approvals or assembly #123. Review everything in chat.</p></div>';
+        '<div class="admin-agent-welcome"><h2>What can I help with?</h2><p>Ask for a song upload, production calendar, overdue tasks, crew schedule, approvals or assembly #123. Review everything in chat.</p><button type="button" data-agent-song-start class="secondary">Upload a new song</button></div>';
       bindActions(transcript);
+      if(songIntake)showSongIntake();
+      loadSongDrafts();
       // Section 90E: the document owns Agent Chat scrolling. The composer is fixed.
       requestAnimationFrame(()=>{
         if(root.isConnected&&document.body.contains(root))window.scrollTo({top:document.documentElement.scrollHeight,behavior:'auto'});
