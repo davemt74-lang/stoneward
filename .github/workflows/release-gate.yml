@@ -488,6 +488,8 @@ jobs:
           node tests/section90j-agent-page-context.cjs
           node tests/section90k-admin-popup-menu.cjs
           node tests/section90l-conversational-voice.cjs
+          php tests/section90m-player-conversation.php
+          node tests/section90m-player-conversation.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs
