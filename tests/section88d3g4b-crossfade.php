@@ -85,7 +85,25 @@ $filter=$args[array_search('-filter_complex',$args,true)+1];
 verifyG4B(str_contains($filter,'xfade=transition=fade')&&str_contains($filter,'acrossfade=d=0.250')
  &&str_contains($filter,'offset=1.750')&&str_contains($filter,'offset=3.500'),
  'Three-shot FFmpeg uses frame-overlapping xfade and synchronized audio acrossfade');
-sf_render_transition_apply($segs,$plan,$setting,$root.'/work/draft.mp4');
+try{sf_render_transition_apply($segs,$plan,$setting,$root.'/work/draft.mp4');}
+catch(RuntimeException $error){
+ // CI-only diagnostics for synthetic fixtures. Production worker error surfaces
+ // stay deliberately generic and do not expose arbitrary local file paths.
+ $diagnostic=$args;
+ $level=array_search('-loglevel',$diagnostic,true);
+ if($level!==false)$diagnostic[$level+1]='warning';
+ array_unshift($diagnostic,'timeout','12s');
+ $pipes=[];
+ $process=@proc_open($diagnostic,[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes,null,null,['bypass_shell'=>true]);
+ $reason='FFmpeg diagnostic could not start';
+ if(is_resource($process)){
+  fclose($pipes[0]);
+  stream_get_contents($pipes[1]);
+  $reason=(string)stream_get_contents($pipes[2],3200);
+  fclose($pipes[1]);fclose($pipes[2]);proc_close($process);
+ }
+ throw new RuntimeException('Synthetic crossfade failed: '.substr(trim($reason),0,3000),0,$error);
+}
 verifyG4B(is_file($root.'/work/draft.mp4')&&sf_render_has_audio($root.'/work/draft.mp4'),
  'Real FFmpeg 720p private crossfade MP4 contains audio and valid video');
 $durationCmd=escapeshellarg(sf_render_ffprobe()).' -v error -show_entries format=duration -of default=nw=1:nk=1 '.
