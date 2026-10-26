@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.144';
+  window.STONEFELLOW_APP_BUILD='1.3.145';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -11,7 +11,7 @@
   let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupEntries=[];
   const voiceReplyToggle=$('#agentVoiceReplyToggle');
   let voiceRepliesEnabled=localStorage.getItem('stonefellow.voice.replies.v1')!=='off',voiceInteractionStarted=false;
-  let voicePlaybackPending=false,speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0;
+  let voicePlaybackPending=false,speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
   const conversationBargeIn=window.StonefellowBargeIn?.create(()=>{
     if(st.conversationOn&&voicePlaybackPending)interruptVoicePlayback();
   });
@@ -36,6 +36,67 @@
       if(musicOriginalVolume===null)musicOriginalVolume=audio.volume;
       audio.volume=Math.min(musicOriginalVolume,voicePlaybackPending?0.16:0.4);
     }else if(musicOriginalVolume!==null){audio.volume=musicOriginalVolume;musicOriginalVolume=null}
+  }
+  // The user-facing level is independent of automatic conversation ducking.
+  function playerVolume(){return musicOriginalVolume===null?audio.volume:musicOriginalVolume}
+  function setPlayerVolume(value){
+    const requested=Number(value);
+    if(!Number.isFinite(requested))return null;
+    const level=Math.max(0,Math.min(1,requested));
+    if(level>0)lastAudibleVolume=level;
+    if(musicOriginalVolume!==null){musicOriginalVolume=level;syncConversationMusic()}
+    else audio.volume=level;
+    return Math.round(level*100);
+  }
+  function playerState(){
+    const duration=Number.isFinite(audio.duration)?Math.max(0,Math.floor(audio.duration)):0;
+    const position=Number.isFinite(audio.currentTime)?Math.max(0,Math.floor(audio.currentTime)):0;
+    return {player_is_playing:!!st.track&&!audio.paused?1:0,player_volume_percent:Math.round(playerVolume()*100),player_position_seconds:Math.min(86400,position),player_duration_seconds:Math.min(86400,duration)};
+  }
+  function describePlayer(){
+    if(!st.track)return 'No song is loaded in the Stonefellow player.';
+    const state=audio.paused?'paused':'playing';
+    const duration=Number.isFinite(audio.duration)?audio.duration:Number(st.track.duration||0);
+    const progress=duration>0?' At '+time(audio.currentTime)+' of '+time(duration)+'.':'';
+    return '“'+st.track.title+'”'+(st.track.release?' from '+st.track.release:'')+' is '+state+'.'+progress+' Player volume is '+Math.round(playerVolume()*100)+' percent.';
+  }
+  async function executePlayerAgentAction(action){
+    if(!action||!['play_track','pause_player','resume_player','next_track','previous_track','player_status','set_player_volume'].includes(action.type))return null;
+    switch(action.type){
+      case 'player_status':return describePlayer();
+      case 'set_player_volume':{
+        const mode=String(action.mode||'');let target=playerVolume();
+        if(mode==='mute')target=0;
+        else if(mode==='unmute')target=target>0?target:lastAudibleVolume;
+        else if(mode==='set')target=Math.max(0,Math.min(100,Number(action.percent)||0))/100;
+        else if(mode==='adjust')target+=Math.max(-100,Math.min(100,Number(action.percent)||0))/100;
+        else return describePlayer();
+        const actual=setPlayerVolume(target);
+        return actual===null?'I could not change the volume.':'Stonefellow player volume is now '+actual+' percent.';
+      }
+      case 'pause_player':
+        if(!st.track)return 'There is no song to pause.';
+        if(audio.paused)return '“'+st.track.title+'” is already paused.';
+        recordListen('pause');audio.pause();st.playing=false;updateFooterPlayer();
+        return 'Paused “'+st.track.title+'.”';
+      case 'resume_player':
+        if(!st.track)return 'There is no song loaded. Tell me which Stonefellow song to play.';
+        if(!audio.paused)return '“'+st.track.title+'” is already playing.';
+        try{await audio.play();recordListen('resume');st.playing=true;updateFooterPlayer();syncConversationMusic();return 'Resumed “'+st.track.title+'.”'}
+        catch(_){st.playing=false;updateFooterPlayer();return 'The browser blocked playback. Press Play in the Stonefellow player to enable audio.'}
+      case 'play_track':{
+        const track=trackById(action.track_id);
+        if(!track)return 'I could not find that published song in the player.';
+        const started=await play(track,0,'agent');
+        return started?'Playing “'+track.title+'.”':'The browser could not play “'+track.title+'.” Check its audio file or press Play.';
+      }
+      case 'next_track':
+      case 'previous_track':
+        if(!st.track)return 'There is no song loaded. Tell me which song to start.';
+        stepTrack(action.type==='next_track'?1:-1);
+        return action.type==='next_track'?'Moving to the next song.':'Moving to the previous song.';
+    }
+    return null;
   }
   function interruptVoicePlayback(){
     voicePlaybackSequence++;
@@ -409,7 +470,7 @@
       }
     });
   }
-  async function liveAgent(text){await loadAuth();if(!st.auth.authenticated){await say('Create a free account to use the live Stonefellow AI agent. Your music player will keep playing.',()=>navigate('register'));return}agent('thinking','Thinking…');try{const u=new URL(location.href),view=history.state?.view||window.STONEFELLOW_INITIAL_ROUTE?.view||u.searchParams.get('view')||(String(u.pathname).replace(/\/+$/,'').endsWith('/search')?'search':'home'),client_state={view,route_id:history.state?.params?.id||u.searchParams.get('id')||'',active_track_id:st.track?.id||'',builder_format:st.builder.format,builder_side_a_count:st.builder.A.length,builder_side_b_count:st.builder.B.length,builder_side_a_seconds:sideTime('A'),builder_side_b_seconds:sideTime('B'),builder_limit_seconds:limit(),builder_draft_id:Number(st.builderDrafts.activeId||0),playlist_id:st.playlistPlayback.playlistId||null,playlist_name:st.playlistPlayback.playlistName||'',agent_listening_session_id:agentSessionVisible()?st.agentSession.id:'',queue_count:st.queue.items.length,home_suggestion_kind:st.home.data?.suggestion?.kind||'',home_suggestion_title:st.home.data?.suggestion?.title||'',notification_unread:Number(st.drawer.data?.unread||0),latest_notification_title:st.drawer.data?.notifications?.[0]?.title||'',search_query:$('#siteSearchInput',canvas)?.value||$('#catalogSearch',canvas)?.value||''};const j=await secureJsonPost('agent-chat.php',{message:text,conversation_id:st.conversationId,client_state});st.conversationId=j.conversation_id||st.conversationId;if(st.conversationId)localStorage.setItem('stonefellow.agent.conversation',st.conversationId);await executeAgentAction(j.action);await say(String(j.text||'').trim()||'The Agent received your message but returned no reply. Please try again.');}catch(e){if(e.payload?.error==='active_tokens_required'){await say(e.message||'You are out of Active Tokens.',()=>navigate('plans'));return}await say('The live agent is unavailable right now. '+e.message)}}
+  async function liveAgent(text){await loadAuth();if(!st.auth.authenticated){await say('Create a free account to use the live Stonefellow AI agent. Your music player will keep playing.',()=>navigate('register'));return}agent('thinking','Thinking…');try{const u=new URL(location.href),view=history.state?.view||window.STONEFELLOW_INITIAL_ROUTE?.view||u.searchParams.get('view')||(String(u.pathname).replace(/\/+$/,'').endsWith('/search')?'search':'home'),client_state={view,route_id:history.state?.params?.id||u.searchParams.get('id')||'',active_track_id:st.track?.id||'',...playerState(),builder_format:st.builder.format,builder_side_a_count:st.builder.A.length,builder_side_b_count:st.builder.B.length,builder_side_a_seconds:sideTime('A'),builder_side_b_seconds:sideTime('B'),builder_limit_seconds:limit(),builder_draft_id:Number(st.builderDrafts.activeId||0),playlist_id:st.playlistPlayback.playlistId||null,playlist_name:st.playlistPlayback.playlistName||'',agent_listening_session_id:agentSessionVisible()?st.agentSession.id:'',queue_count:st.queue.items.length,home_suggestion_kind:st.home.data?.suggestion?.kind||'',home_suggestion_title:st.home.data?.suggestion?.title||'',notification_unread:Number(st.drawer.data?.unread||0),latest_notification_title:st.drawer.data?.notifications?.[0]?.title||'',search_query:$('#siteSearchInput',canvas)?.value||$('#catalogSearch',canvas)?.value||''};const j=await secureJsonPost('agent-chat.php',{message:text,conversation_id:st.conversationId,client_state});st.conversationId=j.conversation_id||st.conversationId;if(st.conversationId)localStorage.setItem('stonefellow.agent.conversation',st.conversationId);const playerResult=await executePlayerAgentAction(j.action);if(playerResult===null)await executeAgentAction(j.action);await say(playerResult??(String(j.text||'').trim()||'The Agent received your message but returned no reply. Please try again.'));}catch(e){if(e.payload?.error==='active_tokens_required'){await say(e.message||'You are out of Active Tokens.',()=>navigate('plans'));return}await say('The live agent is unavailable right now. '+e.message)}}
   function membershipBenefitList(b={}){const x=[];if(Number(b.merch_discount_percent||0)>0)x.push(Number(b.merch_discount_percent)+'% merch discount');if(Number(b.early_access_days||0)>0)x.push(Number(b.early_access_days)+' days early access');if(b.vip_access)x.push('VIP access');if(b.priority_presale)x.push('priority presale');if(b.member_content)x.push('member exclusives');if(b.exclusive_downloads)x.push('exclusive downloads');if(b.member_only_offers)x.push('member-only offers');return x}
   function membershipBenefitText(b={}){const x=membershipBenefitList(b);return esc(x.length?x.join(' · '):'Stonefellow membership benefits')}
   function memberContentCard(c){const a=c.access||{},open=!!a.allowed,media=open?publicEntityMediaHtml(c.media||[],'MEMBER MEDIA'):'';return '<article class="member-content-card '+(open?'unlocked':'locked')+'"><div class="member-content-head"><div><div class="module-kicker">'+esc(String(c.content_type||'member').replaceAll('_',' '))+(a.early_access?' · EARLY ACCESS':'')+'</div><h3>'+esc(c.title)+'</h3></div><span class="member-lock">'+(open?'UNLOCKED':'MEMBERS')+'</span></div><p>'+esc(c.teaser||'')+'</p>'+(open&&c.body_text?'<div class="member-content-body">'+esc(c.body_text).replace(/\n/g,'<br>')+'</div>':'')+(open&&c.external_url?'<a class="buy-primary button-link" href="'+esc(c.external_url)+'" target="_blank" rel="noopener">Open member access</a>':'')+media+(!open?'<small>'+esc(a.required_package_name?('Requires '+a.required_package_name):'Active membership required')+'</small>':'')+'</article>'}
@@ -962,7 +1023,7 @@
   function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}navigate(view,params,false)}
 
   function updateFooterPlayer(){window.StonefellowTurntable?.sync?.(st.track,st.playing,st.builder);if(!st.track){footerPlayer.hidden=true;return}footerPlayer.hidden=false;playerTitle.textContent=st.track.title;playerRelease.textContent=st.track.release||'Stonefellow';playerToggle.textContent=st.playing?'Ⅱ':'▶';playerToggle.setAttribute('aria-label',st.playing?'Pause':'Play');const art=st.track.artwork||'';playerArtwork.innerHTML=art?`<img src="${esc(art)}" alt="">`:'<span>SF</span>';document.body.classList.add('has-player')}
-  function play(t,resumeAt=0,source='player',keepPlaylist=false){if(!t)return;const changing=!st.track||st.track.id!==t.id;if(changing&&st.track&&st.playing){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}if(!keepPlaylist)clearPlaylistPlayback();st.playSource=source||'player';st.track=t;if(changing){audio.pause();audio.src=t.audio||'';audio.load()}const startAt=Math.max(0,Number(resumeAt)||0);const applyResume=()=>{if(startAt>0&&Number.isFinite(audio.duration)&&audio.duration>startAt+1)audio.currentTime=startAt};if(changing&&startAt>0)audio.addEventListener('loadedmetadata',applyResume,{once:true});else applyResume();st.playing=true;updateFooterPlayer();audio.play().then(()=>{recordListen(startAt>0?'resume':'start');agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');updateFooterPlayer()}).catch(()=>{st.playing=false;updateFooterPlayer();agent('idle','The catalog entry is ready, but this browser could not play its audio file. Add or verify '+(t.audio||'the track file')+'.')})}
+  function play(t,resumeAt=0,source='player',keepPlaylist=false){if(!t)return Promise.resolve(false);const changing=!st.track||st.track.id!==t.id;if(changing&&st.track&&st.playing){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}if(!keepPlaylist)clearPlaylistPlayback();st.playSource=source||'player';st.track=t;if(changing){audio.pause();audio.src=t.audio||'';audio.load()}const startAt=Math.max(0,Number(resumeAt)||0);const applyResume=()=>{if(startAt>0&&Number.isFinite(audio.duration)&&audio.duration>startAt+1)audio.currentTime=startAt};if(changing&&startAt>0)audio.addEventListener('loadedmetadata',applyResume,{once:true});else applyResume();st.playing=true;updateFooterPlayer();return audio.play().then(()=>{recordListen(startAt>0?'resume':'start');agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');updateFooterPlayer();return true}).catch(()=>{st.playing=false;updateFooterPlayer();agent('idle','The catalog entry is ready, but this browser could not play its audio file. Add or verify '+(t.audio||'the track file')+'.');return false})}
   function toggle(){if(!st.track)return;if(st.playing){recordListen('pause');audio.pause();st.playing=false;agent('idle','Paused “'+st.track.title+'.”')}else{audio.play().then(()=>{recordListen('resume');st.playing=true;agent('playing','Playing “'+st.track.title+'.”');updateFooterPlayer()}).catch(()=>{st.playing=false;updateFooterPlayer()})}updateFooterPlayer()}
   function stepTrack(delta){
     if(agentSessionActive()&&delta>0){advanceAgentSession('skip').then(session=>{if(!session||session.status!=='active'){renderAgentSessionPanel();return}const ids=sessionTrackIds();st.playlistPlayback.index=Number(session.current_index||0);const t=trackById(ids[st.playlistPlayback.index]);if(t)play(t,0,'agent_session',true);renderAgentSessionPanel()});return}
@@ -1395,7 +1456,7 @@
     const title=$('#mixTitle',canvas);if(title)title.onchange=e=>{st.builder.title=e.target.value.trim()||'My Stonefellow Record';persist();renderBuilder()};
     const sl=$('.builder-song-list',canvas);catalog.forEach(t=>{const b=document.createElement('button');b.type='button';b.className='builder-song';const added=has(t.id),eligible=!!t.podEligible;b.disabled=added||!eligible;b.title=!eligible?'Not available for custom vinyl':added?'Already on your record':'Add to this record';b.innerHTML='<span><strong>'+esc(t.title)+'</strong><small>'+esc((t.mood||[]).join(' • '))+' • '+time(t.duration)+'</small></span><span>'+(added?'✓':eligible?'+':'Preview only')+'</span>';b.onclick=()=>{const r=add(t);if(r.ok){renderBuilder();say('Added “'+t.title+'” to Side '+r.side+'.')}else say(r.why==='full'?'That will not fit on either side.':'That track is already on your build.')};sl.appendChild(b)});
     $('#agentChoose',canvas).onclick=()=>fillBuild('both');$('#orderBuild',canvas).onclick=addBuildToCart;$('#saveBuild',canvas).onclick=()=>{void saveBuilderDraft(false);};$('#exportBuild',canvas).onclick=()=>{persist();download('stonefellow-'+norm(st.builder.title).replace(/ /g,'-')+'-build.json',{artist:'Stonefellow',...st.builder,tracks:{A:st.builder.A.map(trackById),B:st.builder.B.map(trackById)}});say('Exported your build as JSON.')};$('#clearBuild',canvas).onclick=()=>{if(!confirmBuilderReplacement())return;st.builder=defaultBuild();builderCleanFingerprint=builderDraftFingerprint(st.builder);st.builderDrafts.activeId=0;localStorage.removeItem('stonefellow.build.draft.id');persist();renderBuilder();say('Blank build. Start anywhere you want.')};const dd=$('#dedupeBuild',canvas);if(dd)dd.onclick=dedupeBuild;
-    window.StonefellowTurntable?.mount?.({canvas,appState:st,catalog,releases,esc,persist,play,trackById,trackArtwork,say,navigate,money,renderBuilder,togglePlayback:()=>{if(st.track)toggle();else{const first=trackById(st.builder.A?.[0])||catalog[0];if(first)play(first,0,'record_builder');else say('Choose a song to start playback.');}},getVolume:()=>audio.volume,setVolume:value=>{audio.volume=Math.min(1,Math.max(0,Number(value)||0));}});
+    window.StonefellowTurntable?.mount?.({canvas,appState:st,catalog,releases,esc,persist,play,trackById,trackArtwork,say,navigate,money,renderBuilder,togglePlayback:()=>{if(st.track)toggle();else{const first=trackById(st.builder.A?.[0])||catalog[0];if(first)play(first,0,'record_builder');else say('Choose a song to start playback.');}},getVolume:()=>playerVolume(),setVolume:value=>setPlayerVolume(value)});
     if(!vinylArtState.loaded&&!vinylArtState.loading)void loadVinylArtCollections();
     if(st.auth.authenticated&&!st.builderDrafts.loaded)loadBuilderDrafts().then(()=>{const u=new URL(location.href);if((u.searchParams.get('view')||'home')==='builder')renderBuilder()});
   }

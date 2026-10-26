@@ -219,11 +219,34 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
     if(preg_match('/\bplaylist\s+(?:for|about)\s+(.{2,60})$/iu',$message,$m))return sf_clean_text('Stonefellow — '.trim((string)$m[1]),80);
     return $fallback;
 }
+/** Transport instructions are resolved locally before advisory model routing. */
+function sf_agent_explicit_player_route(string $message): ?string {
+    $q=strtolower(trim($message));
+    if(preg_match('/\b(?:unmute|un-mute|turn (?:the )?(?:sound|volume) back on)\b/',$q))return 'player_volume';
+    if(preg_match('/\b(?:mute|volume|louder|quieter|softer|turn (?:it|the music|the sound) (?:up|down)|turn (?:up|down) (?:the )?(?:music|sound)|lower (?:it|the sound)|raise (?:it|the sound))\b/',$q))return 'player_volume';
+    if(preg_match('/\b(?:what(?:\'s| is) playing|which (?:song|track) is (?:this|playing)|what (?:song|track) is this|current (?:song|track)|how (?:much|long) (?:time )?(?:is )?left|how far (?:into|through) (?:this|the) (?:song|track)|player status|is (?:the )?(?:music|song|track|player) playing)\b/',$q))return 'player_status';
+    if(preg_match('/\b(?:resume|unpause|continue)\s*(?:the\s+)?(?:music|song|track|player|playback|it)?\s*[.!?]*$/',$q)||preg_match('/\b(?:play|start) (?:the |this )?(?:music|song|track|player|playback|current song|current track)\s*[.!?]*$/',$q))return 'player_resume';
+    if(preg_match('/\b(?:pause|stop)\s*(?:the\s+)?(?:music|song|track|player|playback|it|this)?\s*[.!?]*$/',$q))return 'player_pause';
+    if(preg_match('/\b(?:next (?:song|track)|skip (?:this|the )?(?:song|track)|skip it|skip)\s*[.!?]*$/',$q))return 'player_next';
+    if(preg_match('/\b(?:previous (?:song|track)|last (?:song|track)|go back (?:a|one) (?:song|track)|play (?:the )?previous (?:song|track))\s*[.!?]*$/',$q))return 'player_previous';
+    return null;
+}
+function sf_agent_player_volume_action(string $message): array {
+    $q=strtolower(trim($message));
+    if(preg_match('/\b(?:unmute|un-mute|turn (?:the )?(?:sound|volume) back on)\b/',$q))return ['type'=>'set_player_volume','mode'=>'unmute'];
+    if(preg_match('/\b(?:mute|silence)\b/',$q))return ['type'=>'set_player_volume','mode'=>'mute'];
+    if(preg_match('/\b(\d{1,3})\s*(?:percent\b|%)/',$q,$m))return ['type'=>'set_player_volume','mode'=>'set','percent'=>max(0,min(100,(int)$m[1]))];
+    if(preg_match('/\b(?:volume|sound)\s*(?:to|at|=)\s*(\d{1,3})\b/',$q,$m))return ['type'=>'set_player_volume','mode'=>'set','percent'=>max(0,min(100,(int)$m[1]))];
+    if(preg_match('/\b(?:up|louder|raise|increase|higher)\b/',$q))return ['type'=>'set_player_volume','mode'=>'adjust','percent'=>10];
+    if(preg_match('/\b(?:down|quieter|softer|lower|decrease)\b/',$q))return ['type'=>'set_player_volume','mode'=>'adjust','percent'=>-10];
+    return ['type'=>'player_status'];
+}
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
     if(sf_agent_page_context_request($message))return 'page_context';
     if(sf_agent_detail_request($message)!==null)return 'page_detail';
     if(sf_agent_public_page_target($message)!==null)return 'page_navigate';
+    if(($playerRoute=sf_agent_explicit_player_route($message))!==null)return $playerRoute;
     if(preg_match('/\\b(?:remove|unsave)\\b.*\\b(?:favorite|favorites)\\b|\\b(?:unfavorite|unlike)\\b/',$q))return 'favorite_remove';
     if(preg_match('/\\b(?:add|save|mark)\\b.*\\b(?:favorite|favorites)\\b|\\bfavorite (?:this|that|the)\\b/',$q))return 'favorite_save';
     if(preg_match('/\b(clear|empty) (?:the )?(?:queue|up next)\b/',$q))return 'queue_clear';
@@ -234,9 +257,6 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     if(preg_match('/\b(end|stop|close) (?:this |the )?(?:listening )?session\b/',$q))return 'listening_session_end';
     if(preg_match('/\b(i like this|like this|love this|this is good)\b/',$q))return 'listening_session_like';
     if(preg_match('/\b(i do not like this|i don.t like this|dislike this|not for me|skip this kind)\b/',$q))return 'listening_session_dislike';
-    if(preg_match('/\b(pause|stop music|stop song)\b/',$q))return 'player_pause';
-    if(preg_match('/\b(next song|next track|skip)\b/',$q))return 'player_next';
-    if(preg_match('/\b(previous song|previous track|go back a song)\b/',$q))return 'player_previous';
     if(sf_fan_discovery_path_from_message($message)!==null&&preg_match('/\\b(?:session|guided listen|playlist)\\b/',$q))return 'listening_session_start';
     if(preg_match('/\b(play|listen to)\b/',$q)&&sf_agent_find_track($message,(string)($client['active_track_id']??'')))return 'player_play_named';
     if(preg_match('/guided (album|release)|listen through .*album|walk me through .*release/',$q))return 'listening_session_guided_release';
@@ -366,9 +386,12 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             if($track){$type=$route==='queue_add'?'queue_add_track':($route==='queue_play_next'?'queue_play_next':'queue_remove_track');$action=['type'=>$type,'track_id'=>(string)$track['id']];$text=$route==='queue_add'?'I’ll add “'.($track['title']??'').'” to Up Next.':($route==='queue_play_next'?'“'.($track['title']??'').'” will play next.':'I’ll remove “'.($track['title']??'').'” from Up Next.');}
             else{$action=['type'=>'open_queue'];$text='Open Up Next and choose the track you want.';}
             break;
-        case 'player_pause':$action=['type'=>'pause_player'];$text='Paused.';break;
-        case 'player_next':$action=['type'=>'next_track'];$text='Next track.';break;
-        case 'player_previous':$action=['type'=>'previous_track'];$text='Going back one track.';break;
+        case 'player_pause':$action=['type'=>'pause_player'];$text='I’ll pause the player.';break;
+        case 'player_resume':$action=['type'=>'resume_player'];$text='I’ll resume the player.';break;
+        case 'player_next':$action=['type'=>'next_track'];$text='I’ll skip to the next track.';break;
+        case 'player_previous':$action=['type'=>'previous_track'];$text='I’ll go back one track.';break;
+        case 'player_status':$action=['type'=>'player_status'];$text='Checking the player.';break;
+        case 'player_volume':$action=sf_agent_player_volume_action($message);$text='I’ll adjust the Stonefellow player volume.';break;
         case 'site_search':
             $query=sf_search_extract_intent_query($message);$search=sf_site_search(['q'=>$query,'limit'=>8]);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_site_search','query'=>$query,'result_type'=>'all'];$text=$count>0?'I found '.$count.' public Stonefellow result'.($count===1?'':'s').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open site search.":"I didn’t find a public Stonefellow match, but I’ll open site search with suggestions.";$profile='catalog';break;
         case 'catalog_search':
@@ -497,7 +520,7 @@ function sf_jev_endpoint(string $url): string {
 function sf_agent_jev_route(string $message,array $client=[]): ?array {
     $d=sf_ai_resolve_decision();if(!$d)return null;$url=sf_jev_endpoint((string)($d['endpoint_url']??''));if($url==='')return null;
     $model=trim((string)($d['model']??''))?:'typesafe/jev-1.13';
-    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??''),'notification_unread'=>(int)($client['notification_unread']??0),'latest_notification_title'=>(string)($client['latest_notification_title']??''),'current_search_query'=>(string)($client['search_query']??'')];
+    $state=['message'=>$message,'current_view'=>(string)($client['view']??'home'),'active_track_id'=>(string)($client['active_track_id']??''),'player_is_playing'=>(int)($client['player_is_playing']??0),'player_volume_percent'=>(int)($client['player_volume_percent']??0),'player_position_seconds'=>(int)($client['player_position_seconds']??0),'player_duration_seconds'=>(int)($client['player_duration_seconds']??0),'builder_format'=>(string)($client['builder_format']??''),'builder_side_a_count'=>(int)($client['builder_side_a_count']??0),'builder_side_b_count'=>(int)($client['builder_side_b_count']??0),'builder_side_a_seconds'=>(int)($client['builder_side_a_seconds']??0),'builder_side_b_seconds'=>(int)($client['builder_side_b_seconds']??0),'builder_limit_seconds'=>(int)($client['builder_limit_seconds']??0),'builder_draft_id'=>(int)($client['builder_draft_id']??0),'queue_count'=>(int)($client['queue_count']??0),'home_suggestion_kind'=>(string)($client['home_suggestion_kind']??''),'home_suggestion_title'=>(string)($client['home_suggestion_title']??''),'notification_unread'=>(int)($client['notification_unread']??0),'latest_notification_title'=>(string)($client['latest_notification_title']??''),'current_search_query'=>(string)($client['search_query']??'')];
     $criteria=[
         'admin_campaign_overview'=>'Administrator asks for aggregate CRM or campaign dashboard status; never expose contact records.',
         'player_play_named'=>'Explicitly asks to play a named Stonefellow song or the current song.',
@@ -507,6 +530,9 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'listening_session_release'=>'Asks to play through a named album/release.',
         'listening_session_guided_release'=>'Asks for a guided album/release listening experience with context between tracks.',
         'player_pause'=>'Asks to pause or stop current music playback.',
+        'player_resume'=>'Asks to resume or unpause the current song.',
+        'player_volume'=>'Asks to set, increase, decrease, mute or unmute the current music volume.',
+        'player_status'=>'Asks what song is playing, whether the player is paused or what the playback progress is.',
         'player_next'=>'Asks for the next song or to skip.',
         'player_previous'=>'Asks to go back to the previous song.',
         'favorite_save'=>'Asks to add a specific or current song to personal favorites.',
@@ -591,7 +617,7 @@ function sf_agent_normalize_client_state(array $raw): array {
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
     }
-    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999];
+    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
     foreach($numbers as $key=>$max){
         if(isset($raw[$key])&&is_numeric($raw[$key]))$out[$key]=max(0,min($max,(int)$raw[$key]));
     }
@@ -602,12 +628,13 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     sf_entitlements_ensure_schema();$client=sf_agent_normalize_client_state($client);$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
     $client['_authorized_admin']=$isAdmin;
     $decisionUsage=0;$routeSource='local';$jev=null;
-    if($isAdmin||sf_can_use_ai($user,128)['ok']){
+    $explicitPlayer=sf_agent_explicit_player_route($message);
+    if($explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
     // Explicit page navigation takes priority over advisory JEV classifications.
     $explicitContext=sf_agent_page_context_request($message)?'page_context':(sf_agent_detail_request($message)!==null?'page_detail':(sf_agent_public_page_target($message)!==null?'page_navigate':null));
-    $route=$explicitContext??(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
+    $route=$explicitContext??$explicitPlayer??(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
     sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$jev['run_id']??'','status'=>$jev['status']??($routeSource==='local'?'local_fallback':'error'),'input_tokens'=>$jev['input_tokens']??0,'output_tokens'=>$jev['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action']]);
     if(!$plan['needs_llm']){
         $text=$plan['text']!==''?$plan['text']:'Ready.';
@@ -615,7 +642,10 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         sf_log_user_activity($userId,'agent_interaction','Agent: '.$plan['route'],'agent',$conversationId,['action'=>$plan['action_name'],'needs_llm'=>false]);
         return ['text'=>$text,'provider'=>$routeSource==='jev'?'jev+policy':'stonefellow-policy','model'=>$jev['model']??'policy','input_tokens'=>(int)($jev['input_tokens']??0),'output_tokens'=>(int)($jev['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
     }
-    $context=sf_agent_context($message,$plan['context_profile'],$userId);$personalMemory=sf_agent_customer_memory_context($userId);if($personalMemory!=='')$context.="\n\n".$personalMemory;$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
+    $context=sf_agent_context($message,$plan['context_profile'],$userId);
+    $playingTrack=sf_agent_find_track('',(string)($client['active_track_id']??''));
+    if($playingTrack){$context.="\n\nBROWSER PLAYER (transient state reported by the signed-in page, not an authorization source): ".($client['player_is_playing']??0?'playing':'paused').'; current published song '.(string)$playingTrack['title'].'; release '.(string)($playingTrack['release']??'').'; position '.(int)($client['player_position_seconds']??0).' seconds of '.(int)($client['player_duration_seconds']??0).' seconds; player volume '.(int)($client['player_volume_percent']??0).' percent.';}
+    $personalMemory=sf_agent_customer_memory_context($userId);if($personalMemory!=='')$context.="\n\n".$personalMemory;$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
     $system="You are the Stonefellow music-site agent. Be concise, warm, knowledgeable, and grounded. Use only the supplied Stonefellow context for factual claims about songs, releases, credits, purchases, or artist history. If the context lacks the answer, say so. Never claim a purchase, playback change, account change, or builder edit happened unless the Stonefellow action layer reports it. The structured route is advisory context, not permission to invent actions.\n\nROUTE: ".$plan['route']."\nCONTEXT PROFILE: ".$plan['context_profile']."\n\n".$context;
     if(function_exists('sf_privacy_personalization_enabled') && sf_privacy_personalization_enabled($userId)){
         $guidance=(string)(sf_agent_feedback_summary('customer',$userId)['guidance']??'');
