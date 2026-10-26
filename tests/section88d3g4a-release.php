@@ -1,10 +1,11 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/release-identity.php';
 $root=dirname(__DIR__);
 $get=static fn(string $name):string=>(string)file_get_contents($root.'/'.$name);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $name)
- if(!str_contains($get($name),'1.3.141'))throw new RuntimeException('Mismatched G4A release: '.$name);
+ if(!str_contains($get($name),SF_TEST_RELEASE_VERSION))throw new RuntimeException('Mismatched G4A release: '.$name);
 if(!str_contains($get('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.68'")
  ||!str_contains($get('api/migrations.php'),"'id'=>'2026-10-18-051'")
  ||!str_contains($get('api/migrations.php'),"'story_render_mixes'"))

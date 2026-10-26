@@ -1,10 +1,11 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/release-identity.php';
 $root=dirname(__DIR__);
 $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 foreach(['stonefellow-v120.php','admin/index.php','version.php','service-worker.js',
  '.htaccess','assets/js/app.js','assets/css/turntable-builder.css'] as $p)
- if(!str_contains($read($p),'1.3.141'))throw new RuntimeException('Incorrect release identity: '.$p);
+ if(!str_contains($read($p),SF_TEST_RELEASE_VERSION))throw new RuntimeException('Incorrect release identity: '.$p);
 if(!str_contains($read('api/migrations.php'),"SF_DB_SCHEMA_TARGET = '1.3.68'")
  ||!str_contains($read('api/migrations.php'),"'id'=>'2026-10-18-048'")
  ||!str_contains($read('api/migrations.php'),"'story_render_track_masters'"))
