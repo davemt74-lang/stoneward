@@ -33,21 +33,28 @@
     if(!adminSpeechEnabled||requested!==adminSpeechSequence){unavailable();return}
     const voice=voices.find(item=>/^en[-_]/i.test(item.lang))||voices[0];
     if(!voice){$('#adminAgentComposerStatus').textContent='No on-device voice installed. Admin chat remains text-only; private replies were not sent to a speech provider.';unavailable();return}
-    const text=String(raw||'').replace(/```[\s\S]*?```/g,' ').replace(/\[[^\]]+\]\([^)]*\)/g,' ').replace(/[#*_`>]+/g,' ').trim().slice(0,1600);
+    const text=String(raw||'').replace(/```[\s\S]*?```/g,' ').replace(/\[[^\]]+\]\([^)]*\)/g,' ').replace(/[#*_`>]+/g,' ').trim();
     if(!text){unavailable();return}
+    const parts=globalThis.StonefellowSpeechSegments?.split?.(text,180)||[text];
     stopAdminSpeech();
     const playingSequence=adminSpeechSequence;
     adminSpeechPending=true;
     if(adminConversationEnabled)void adminConversationMonitor?.start();
-    const utterance=new Utterance(text);utterance.voice=voice;utterance.lang=voice.lang||'en-US';utterance.rate=1;
     return new Promise(resolve=>{
-      let done=false;
+      let done=false,index=0;
       const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;adminConversationMonitor?.stop();agent('idle');adminConversationResume?.()}resolve(ok)};
       adminSpeechResolve=finish;
-      utterance.onstart=()=>{if(!done&&playingSequence===adminSpeechSequence){adminSpeechActive=true;agent('speaking',text)}};
-      utterance.onend=()=>finish(true);
-      utterance.onerror=()=>finish(false);
-      try{synthesis.speak(utterance)}catch(_){finish(false)}
+      const next=()=>{
+        if(done)return;
+        if(!adminSpeechEnabled||playingSequence!==adminSpeechSequence){finish(false);return}
+        if(index>=parts.length){finish(true);return}
+        const utterance=new Utterance(parts[index++]);utterance.voice=voice;utterance.lang=voice.lang||'en-US';utterance.rate=1;
+        utterance.onstart=()=>{if(!done&&playingSequence===adminSpeechSequence){adminSpeechActive=true;agent('speaking',text)}};
+        utterance.onend=next;
+        utterance.onerror=()=>finish(false);
+        try{synthesis.speak(utterance)}catch(_){finish(false)}
+      };
+      next();
     });
   }
 
