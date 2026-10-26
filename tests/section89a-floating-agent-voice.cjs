@@ -16,7 +16,7 @@ const checks={
   'Interim transcript has a dedicated accessible surface':page.includes('id="voiceTranscript"')&&page.includes('role="status" aria-live="polite"')&&app.includes("showTranscript(spoken?'You: '+spoken"),
   'Speech recognition never overwrites the typed chat draft':!app.includes('input.value=transcript.trim()')&&app.includes('const phrases=[];let finalReceived=false;'),
   'Player does not displace the chat popup from the chat bar':css.includes('body.has-player .agent-chat-popup{bottom:calc(100% + 12px)}'),
-  'Reply gate waits for request and spoken output':app.includes('voiceTurnBusy=true;')&&app.includes('await command(spoken);await pendingReply')&&app.includes('finally{voiceTurnBusy=false;if(st.conversationOn)'),
+  'Reply gate waits for request and spoken output':app.includes('voiceTurnBusy=true;')&&app.includes('await command(spoken);await pendingReply')&&app.includes('finally{if(turn===voiceTurnGeneration){voiceTurnBusy=false;if(st.conversationOn)'),
   'Recognition cannot restart during processing or speaking':app.includes('||voiceTurnBusy)return;')&&app.includes("['THINKING','RESPONDING','SPEAKING']"),
   'Both typed and voiced questions appear in conversation':app.includes("popupEntry('user',text)")&&app.includes("popupEntry('assistant',answer)"),
   'Normal private chat endpoint remains in use':app.includes("secureJsonPost('agent-chat.php'")&&app.includes("api('agent-brain.php'"),

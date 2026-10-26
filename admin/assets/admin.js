@@ -8,12 +8,13 @@
   const app={csrf:null,templates:[],catalog:[],releases:[],shows:[],crm:{summary:{},contacts:[],community_posts:[],agent_engagements:[]},knowledge:{folders:[],files:[]},knowledgeFolder:'',users:[],packages:[],ai:{providers:{},routing:{}},site:{splash_enabled:false,splash_revision:'1',artist_homepage_enabled:false,fan_community_enabled:false},lifecycle:{email:{},billing:{},outbox:[],webhooks:[],billing_audit:[]},analytics:null,operations:null,dashboard:null,view:'dashboard',scanGroups:[],scanEntries:[],folderName:'',catalogFilter:'',missingOnly:false,releaseDraftTracks:[]};
   const canvas=$('#adminCanvas'), viewTitle=$('#viewTitle'), adminApp=$('#adminApp'), folderInput=$('#folderInput');
   let adminSpeechEnabled=localStorage.getItem('stonefellow.admin.voice.replies.v1')!=='off';
-  let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0;
+  let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0,adminSpeechText='';
   let adminConversationMonitor=null,adminConversationResume=null,adminConversationEnabled=false;
   function updateAdminVoiceControl(){for(const button of [$('#adminAgentSpeechToggle'),$('#adminChatPopupVoice')]){if(!button)continue;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}}
   function stopAdminSpeech(){
     adminSpeechSequence++;
     adminConversationMonitor?.stop();
+    adminSpeechText='';
     if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
     try{window.speechSynthesis?.cancel()}catch(_){}
     adminSpeechPending=false;
@@ -38,11 +39,12 @@
     const parts=globalThis.StonefellowSpeechSegments?.split?.(text,180)||[text];
     stopAdminSpeech();
     const playingSequence=adminSpeechSequence;
+    adminSpeechText=text;
     adminSpeechPending=true;
     if(adminConversationEnabled)void adminConversationMonitor?.start();
     return new Promise(resolve=>{
       let done=false,index=0;
-      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;adminConversationMonitor?.stop();agent('idle');adminConversationResume?.()}resolve(ok)};
+      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;adminSpeechText='';adminConversationMonitor?.stop();agent('idle');adminConversationResume?.()}resolve(ok)};
       adminSpeechResolve=finish;
       const next=()=>{
         if(done)return;
@@ -460,16 +462,18 @@
     adminConversationResume=()=>{
       if(conversationOn&&!pending&&!adminSpeechPending){agent('listening','I’m listening.');scheduleListen()}
     };
-    adminConversationMonitor=window.StonefellowBargeIn?.create(()=>{
-      if(conversationOn&&adminSpeechPending)stopAdminSpeech();
-    });
+    adminConversationMonitor=window.StonefellowBargeIn?.create(spoken=>{
+      if(!conversationOn||!adminSpeechPending)return;
+      stopAdminSpeech();
+      void submit(spoken);
+    },window,signal=>window.StonefellowBargeIn.verifyAgentSpeech(adminSpeechText,window,signal));
     const resize=()=>{input.style.height='auto';input.style.height=Math.min(160,Math.max(44,input.scrollHeight))+'px';};
     input.addEventListener('input',resize);
     input.addEventListener('keydown',e=>{
       if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();if(!pending)form.requestSubmit();}
     });
-    async function submit(){
-      const message=input.value.trim();
+    async function submit(voiceOverride=null){
+      const message=String(voiceOverride??input.value).trim();
       if(!message||pending)return;
       if(!window.SFAdminAgentCanvas?.send){say('Admin Agent unavailable; your draft was preserved.');return;}
       stopAdminSpeech();pending=true;clearTimeout(restartTimer);

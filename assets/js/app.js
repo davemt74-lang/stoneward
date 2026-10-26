@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.146';
+  window.STONEFELLOW_APP_BUILD='1.3.147';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -8,13 +8,15 @@
   const defaultBuild=()=>({version:4,format:'vinyl',title:'My Stonefellow Record',theme:'desert',A:[],B:[],playerModules:{base:'base-studio',platter:'platter-classic',arm:'arm-studio',label:'label-classic',effect:'effect-none'},coverFront:'stonefellow',coverBack:'stonefellow',customNote:'',savedAt:null});
   const bootAuth=window.STONEFELLOW_AUTH_BOOTSTRAP||{authenticated:false,user:null};
   const st={auth:{loaded:true,authenticated:!!bootAuth.authenticated,user:bootAuth.user||null,csrf:null},plans:[],selectedPlanId:null,conversationId:localStorage.getItem('stonefellow.agent.conversation')||'',conversationOn:false,voiceAudio:null,track:null,playing:false,audio:audio,builder:(newBuild&&newBuild.version===4)?newBuild:(legacyBuildV3?{...defaultBuild(),...legacyBuildV3,version:4}:(legacyBuildV2?{...defaultBuild(),...legacyBuildV2,version:4}:defaultBuild())),builderDrafts:{loaded:false,items:[],activeId:Number(localStorage.getItem('stonefellow.build.draft.id')||0)},cart:readJSON('stonefellow.cart.v03',[]),campaignCode:localStorage.getItem('stonefellow.campaign.code')||'',store:null,drawer:{tab:'notifications',data:null},listenSession:localStorage.getItem('stonefellow.listen.session')||'',lastProgressAt:0,playSource:'player',playlistPlayback:{playlistId:null,playlistName:'',trackIds:[],index:-1},personalization:{loaded:false,favorites:{tracks:[],releases:[]},continue_listening:[],history:[],recommendations:{personalized:false,summary:'',signals:{},items:[]}},playlists:{loaded:false,items:[]},historyPage:{rows:[],sessions:[],summary:null,nextBefore:null,loaded:false},agentSession:{id:'',title:'',mode:'',status:'',currentIndex:0,tracks:[]},queue:{loaded:false,items:[],open:false,history:readJSON('stonefellow.queue.history.v1',[])},home:{loaded:false,data:null},fanEngagementLoaded:false};
-  let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupEntries=[];
+  let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,voiceTurnGeneration=0,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupEntries=[];
   const voiceReplyToggle=$('#agentVoiceReplyToggle');
   let voiceRepliesEnabled=localStorage.getItem('stonefellow.voice.replies.v1')!=='off',voiceInteractionStarted=false;
-  let voicePlaybackPending=false,speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
-  const conversationBargeIn=window.StonefellowBargeIn?.create(()=>{
-    if(st.conversationOn&&voicePlaybackPending)interruptVoicePlayback();
-  });
+  let voicePlaybackPending=false,voicePlaybackText='',speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
+  const conversationBargeIn=window.StonefellowBargeIn?.create(spoken=>{
+    if(!st.conversationOn||!voicePlaybackPending)return;
+    interruptVoicePlayback();
+    void submitVoiceTurn(spoken);
+  },window,signal=>window.StonefellowBargeIn.verifyAgentSpeech(voicePlaybackText,window,signal));
   const voiceTranscript=$('#voiceTranscript'),voiceTranscriptText=$('#voiceTranscriptText');
   function showTranscript(text,phase='listening'){
     if(!voiceTranscript||!voiceTranscriptText)return;
@@ -105,6 +107,7 @@
     if(st.voiceAudio&&!st.voiceAudio.paused)st.voiceAudio.pause();
     if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
     voicePlaybackPending=false;
+    voicePlaybackText='';
     if(agentInterrupt)agentInterrupt.hidden=true;
     syncConversationMusic();
     if(st.conversationOn){showTranscript('Agent interrupted. Listening for you…','listening');agent('listening','I’m listening.');scheduleConversationListen()}
@@ -204,7 +207,7 @@
       if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
     }
     const sequence=++voicePlaybackSequence;
-    voicePlaybackPending=true;syncConversationMusic();
+    voicePlaybackPending=true;voicePlaybackText=String(text);syncConversationMusic();
     if(st.conversationOn){
       clearTimeout(conversationRestartTimer);
       try{recognition?.abort()}catch(_){}
@@ -220,7 +223,7 @@
       return await speakWithDeviceVoice(text,sequence);
     }finally{
       if(sequence===voicePlaybackSequence){
-        conversationBargeIn?.stop();voicePlaybackPending=false;syncConversationMusic();
+        conversationBargeIn?.stop();voicePlaybackPending=false;voicePlaybackText='';syncConversationMusic();
         if(agentInterrupt)agentInterrupt.hidden=true;
         agent(st.conversationOn?'listening':st.playing?'playing':'idle');
         if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen();
@@ -1586,10 +1589,11 @@
   }
   function stopConversation(){st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;interruptVoicePlayback();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
   async function submitVoiceTurn(spoken){
+    const turn=++voiceTurnGeneration;
     voiceTurnBusy=true;clearTimeout(conversationRestartTimer);try{recognition?.stop()}catch(_){}
     showTranscript('You: '+spoken,'heard');agent('thinking','Thinking…');
     try{await command(spoken);await pendingReply}catch(e){await say('I could not process that message. '+e.message)}
-    finally{voiceTurnBusy=false;if(st.conversationOn){musicFollowupUntil=Date.now()+18000;agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}}
+    finally{if(turn===voiceTurnGeneration){voiceTurnBusy=false;if(st.conversationOn){musicFollowupUntil=Date.now()+18000;agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}}}
   }
   function submitRecognizedVoiceTurn(spoken){
     const woke=musicWakePhrase.test(spoken),words=spoken.replace(musicWakePhrase,'').trim();

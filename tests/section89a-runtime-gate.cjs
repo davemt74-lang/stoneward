@@ -28,7 +28,7 @@ async function scenario(stopMidReply){
     scheduleConversationListen:()=>trace.push('restart')
   };
   vm.createContext(sandbox);
-  vm.runInContext(`let voiceTurnBusy=false;${implementation}\nglobalThis.run=submitVoiceTurn;globalThis.isBusy=()=>voiceTurnBusy`,sandbox);
+  vm.runInContext(`let voiceTurnBusy=false,voiceTurnGeneration=0;${implementation}\nglobalThis.run=submitVoiceTurn;globalThis.isBusy=()=>voiceTurnBusy`,sandbox);
   const task=sandbox.run('Hello Stonefellow');
   assert.equal(sandbox.isBusy(),true,'Must become busy synchronously');
   assert.equal(trace.filter(x=>x==='command').length,1);
