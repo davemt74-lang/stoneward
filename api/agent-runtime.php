@@ -224,10 +224,10 @@ function sf_agent_explicit_player_route(string $message): ?string {
     $q=strtolower(trim($message));
     if(preg_match('/\b(?:unmute|un-mute|turn (?:the )?(?:sound|volume) back on)\b/',$q))return 'player_volume';
     if(preg_match('/\b(?:mute|volume|louder|quieter|softer|turn (?:it|the music|the sound) (?:up|down)|turn (?:up|down) (?:the )?(?:music|sound)|lower (?:it|the sound)|raise (?:it|the sound))\b/',$q))return 'player_volume';
-    if(preg_match('/\b(?:what(?:\'s| is) playing|which (?:song|track) is (?:this|playing)|what (?:song|track) is this|current (?:song|track)|how (?:much|long) (?:time )?(?:is )?left|how far (?:into|through) (?:this|the) (?:song|track)|player status|is (?:the )?(?:music|song|track|player) playing)\b/',$q))return 'player_status';
+    if(preg_match('/\b(?:what(?:\'s| is) playing|which (?:song|track) is (?:this|playing)|what (?:song|track) is this|(?:what(?:\'s| is)|show me|tell me) (?:the )?current (?:song|track)|how (?:much|long) (?:time )?(?:is )?left|how far (?:into|through) (?:this|the) (?:song|track)|player status|is (?:the )?(?:music|song|track|player) playing)\b/',$q))return 'player_status';
     if(preg_match('/\b(?:resume|unpause|continue)\s*(?:the\s+)?(?:music|song|track|player|playback|it)?\s*[.!?]*$/',$q)||preg_match('/\b(?:play|start) (?:the |this )?(?:music|song|track|player|playback|current song|current track)\s*[.!?]*$/',$q))return 'player_resume';
     if(preg_match('/\b(?:pause|stop)\s*(?:the\s+)?(?:music|song|track|player|playback|it|this)?\s*[.!?]*$/',$q))return 'player_pause';
-    if(preg_match('/\b(?:next (?:song|track)|skip (?:this|the )?(?:song|track)|skip it|skip)\s*[.!?]*$/',$q))return 'player_next';
+    if(preg_match('/\b(?:next (?:song|track)|skip (?:this |the )?(?:song|track)|skip it|skip)\s*[.!?]*$/',$q))return 'player_next';
     if(preg_match('/\b(?:previous (?:song|track)|last (?:song|track)|go back (?:a|one) (?:song|track)|play (?:the )?previous (?:song|track))\s*[.!?]*$/',$q))return 'player_previous';
     return null;
 }
