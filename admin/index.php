@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.142');
+define('SF_ADMIN_BUILD','1.3.143');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -134,9 +134,24 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 
       <main id="adminCanvas" class="admin-canvas" aria-live="polite"></main>
 
+      <aside id="adminChatPopup" class="admin-chat-popup" role="dialog" aria-modal="false" aria-label="Stonefellow Admin Agent conversation" hidden>
+        <header class="admin-chat-popup-head">
+          <div><strong>Stonefellow Admin Agent</strong><span id="adminChatPopupState">PRIVATE CONVERSATION</span></div>
+          <div class="admin-chat-popup-actions">
+            <button type="button" id="adminChatPopupVoice" aria-pressed="true" aria-label="Toggle spoken Agent replies">Voice on</button>
+            <button type="button" id="adminChatPopupNew">New chat</button>
+            <button type="button" id="adminChatPopupFull">Full chat</button>
+            <button type="button" id="adminChatPopupClose" aria-label="Close Admin Agent chat">×</button>
+          </div>
+        </header>
+        <div id="adminChatPopupMessages" class="admin-chat-popup-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+        <p class="admin-chat-popup-hint">Type or speak using the bar below. Open Full chat to review detailed actions and approvals.</p>
+      </aside>
+
       <footer class="admin-chat-footer" aria-label="Admin Agent sticky composer">
         <div class="agent-strip"><button id="adminOrb" type="button" class="admin-orb" aria-label="Stonefellow Admin Agent"></button><span id="agentStatus">IDLE</span><p id="agentMessage">Ask me to scan a folder, create a metadata template, find missing ISRCs, or show the catalog.</p></div>
         <form id="adminChatForm" class="admin-chatbar" autocomplete="off">
+          <button type="button" id="adminChatPopupToggle" class="chat-button" aria-label="Open Admin Agent conversation" aria-expanded="false" aria-controls="adminChatPopup">▤</button>
           <label class="sr-only" for="adminChatInput">Ask Stonefellow Admin</label>
           <textarea id="adminChatInput" rows="1" maxlength="4000" placeholder="Message your Admin Agent…" aria-label="Message your Admin Agent"></textarea>
           <button id="adminVoiceButton" type="button" class="chat-button" aria-label="Voice input">◉</button>
@@ -145,8 +160,8 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <span id="adminAgentComposerStatus" class="sr-only" role="status" aria-live="polite"></span>
       </footer>
       <button id="adminFloatingAgent" class="admin-floating-agent" type="button"
-              data-mode="idle" aria-label="Open Stonefellow Admin Agent Chat" aria-pressed="false"
-              title="Open Agent Chat · tap again for microphone">
+              data-mode="idle" aria-label="Open or close Stonefellow Admin Agent conversation" aria-pressed="false"
+              title="Toggle Admin Agent conversation · microphone available in the chat bar">
         <span class="admin-floating-ring" aria-hidden="true"></span>
         <span class="admin-floating-core" aria-hidden="true"><span class="admin-floating-eyes"><i></i><i></i></span><span class="admin-floating-mouth"></span></span>
         <span class="admin-floating-caption" id="adminFloatingAgentState">READY</span>

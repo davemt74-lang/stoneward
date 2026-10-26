@@ -68,7 +68,11 @@ ok(str_contains($agent,"builder_side_a_seconds")&&str_contains($agent,"builder_l
 
 ok(!preg_match('/(?<!\\$)\\$\\([^\\n)]*\\)\\.forEach/',$app),'no list controls call forEach on the single-element selector helper');
 
-ok(str_contains($css,'.menu-sheet{')&&str_contains($css,'max-height:calc(100vh - 78px)'),'user dropdown is viewport constrained');
+ok(str_contains($css,'.menu-sheet{')
+  && str_contains($css,'max-height:calc(100dvh - 72px)')
+  && str_contains($css,'.menu-sheet nav{')
+  && str_contains($css,'overflow-y:auto'),
+  'user dropdown remains viewport constrained while its links scroll independently');
 ok(str_contains($css,'padding:9px 9px')&&str_contains($css,'line-height:1.15'),'user dropdown rows use compact spacing');
 ok(str_contains($css,'@media(max-height:760px)'),'short viewport receives tighter dropdown spacing');
 ok(str_contains($html,'id="menuAccount"')&&str_contains($html,'id="menuQueueLink"')&&str_contains($html,'id="menuLogout"'),'compact dropdown retains account, queue, and logout links');

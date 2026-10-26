@@ -2,13 +2,56 @@
   'use strict';
   /** One Admin chat canvas + slide-out Brain; same server-owned mission ledger. */
   let conversationId=sessionStorage.getItem('stonefellow.admin.agent.thread')||'';
-  let busy=false,lastBrain=null,previousFocus=null,songIntake=null;
+  let busy=false,lastBrain=null,previousFocus=null,songIntake=null,popupSequence=0;
   const ctx=()=>window.STONEFELLOW_ADMIN_CONTEXT;
   const esc=s=>ctx()?.esc?.(String(s??''))||'';
   async function load(){
     const c=ctx();if(!c)throw new Error('Admin workspace not available.');
     try{return await c.api('agent-chat.php'+(conversationId?'?conversation_id='+encodeURIComponent(conversationId):''));}
     catch(e){if(conversationId){conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');return c.api('agent-chat.php');}throw e;}
+  }
+  function isPopupOpen(){const popup=document.querySelector('#adminChatPopup');return !!popup&&!popup.hidden;}
+  async function refreshPopup(){
+    const popup=document.querySelector('#adminChatPopup'),transcript=document.querySelector('#adminChatPopupMessages');
+    if(!popup||popup.hidden||!transcript)return;
+    const sequence=++popupSequence;
+    transcript.innerHTML='<p class="admin-chat-popup-empty" role="status">Loading your Admin conversation…</p>';
+    try{
+      const response=await load();
+      if(sequence!==popupSequence||popup.hidden)return;
+      const messages=Array.isArray(response.messages)?response.messages:[];
+      transcript.innerHTML=messages.length?messages.map(m=>
+        '<article class="admin-chat-popup-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+
+        (m.role==='assistant'?'Stonefellow Admin Agent':'You')+'</strong><p>'+esc(m.content||'')+'</p></article>'
+      ).join(''):'<p class="admin-chat-popup-empty">Your Admin conversation will appear here. Use the bar below to ask your Agent.</p>';
+      transcript.scrollTo?.({top:transcript.scrollHeight,behavior:'instant'});
+      const state=document.querySelector('#adminChatPopupState');if(state)state.textContent='PRIVATE CONVERSATION';
+    }catch(error){
+      if(sequence===popupSequence&&!popup.hidden){
+        transcript.innerHTML='<p class="admin-chat-popup-empty" role="alert">Conversation unavailable. Your saved messages have not been changed.</p>';
+        const state=document.querySelector('#adminChatPopupState');if(state)state.textContent='CONNECTION UNAVAILABLE';
+      }
+    }
+  }
+  function togglePopup(force){
+    const popup=document.querySelector('#adminChatPopup');if(!popup)return;
+    const show=typeof force==='boolean'?force:popup.hidden;
+    popup.hidden=!show;
+    document.querySelector('#adminApp')?.classList.toggle('admin-chat-popup-open',show);
+    for(const id of ['adminChatPopupToggle','openAdminAgentChat']){
+      const button=document.getElementById(id);if(button)button.setAttribute('aria-expanded',String(show));
+    }
+    if(show)void refreshPopup();else popupSequence++;
+  }
+  function newThread(){
+    conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');
+    if(isPopupOpen()){
+      popupSequence++;
+      const transcript=document.querySelector('#adminChatPopupMessages');
+      if(transcript)transcript.innerHTML='<p class="admin-chat-popup-empty">New conversation. Type or speak below to begin.</p>';
+      const state=document.querySelector('#adminChatPopupState');if(state)state.textContent='NEW CHAT';
+    }
+    else if(ctx()?.app?.view==='agent-chat')void render().catch(e=>ctx()?.say?.(e.message));
   }
 
   function localDateInput(utc){
@@ -1354,10 +1397,7 @@
     root.querySelector('#adminAgentSpeechToggle').onclick=()=>c.toggleAdminSpeech?.();
     c.updateAdminVoiceControl?.();
     root.querySelector('#adminAgentOpenBrain').onclick=showBrain;
-    root.querySelector('#adminAgentNewThread').onclick=()=>{
-      conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');
-      render().then(()=>document.querySelector('#adminChatInput')?.focus()).catch(e=>c.say(e.message));
-    };
+    root.querySelector('#adminAgentNewThread').onclick=()=>{newThread();document.querySelector('#adminChatInput')?.focus();};
     try{
       const get=await load();if(!root.isConnected)return;
       lastBrain=get.brain||null;
@@ -1378,17 +1418,18 @@
       throw err;
     }
   }
-  async function send(text){
+  async function send(text,options={}){
     if(busy)throw new Error('An Admin Agent request is already in progress.');
     const c=ctx();if(!c)throw new Error('Admin workspace unavailable.');
     const message=String(text||'').trim();if(!message)return;
     busy=true;
     try{
+      const preserveView=options.preserveView===true&&c.app?.view!=='agent-chat';
       const r=await c.api('agent-chat.php',{message,conversation_id:conversationId,
         client_state:{view:c.app?.view||'agent-chat'}});
       conversationId=r.conversation_id||conversationId;
       if(conversationId)sessionStorage.setItem('stonefellow.admin.agent.thread',conversationId);
-      c.openView('agent-chat');
+      if(preserveView){if(isPopupOpen())await refreshPopup();}else c.openView('agent-chat');
       const status=c.canvas.querySelector('#adminAgentChatStatus');if(status)status.textContent='';
       if(r.action?.auto_navigate===true &&
          r.action?.tool_contract?.tool_id==='admin_module_navigate' &&
@@ -1458,5 +1499,5 @@
       drawer.querySelector('#adminBrainDetailedHistory').onclick=()=>{closeBrain();window.SFAgentCampaigns?.showHistory?.();};
     }catch(e){const p=drawer.querySelector('#adminBrainMissionContent');if(p)p.textContent='Operational Brain data is unavailable.';}
   }
-  window.SFAdminAgentCanvas={render,send,showBrain};
+  window.SFAdminAgentCanvas={render,send,showBrain,togglePopup,isPopupOpen,refreshPopup,newThread};
 })();

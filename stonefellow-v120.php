@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.142');
+define('SF_BUILD', '1.3.143');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -127,16 +127,20 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="?view=agent-brain" data-view="agent-brain" id="menuAgentBrain">My Agent Brain</a>
           <a href="?view=agent-chat" data-view="agent-chat" id="menuAgentChat">My Agent Chat</a>
           <a href="#" id="menuQueueLink">Up Next</a>
-<?php if(($currentUser['role']??'')==='admin'): ?>
-          <a href="admin/" id="menuAdmin">Admin</a>
-<?php endif; ?>
-          <a href="logout.php" id="menuLogout">Logout</a>
 <?php else: ?>
           <a href="?view=login" data-view="login" id="menuLogin">Login</a>
           <a href="?view=register" data-view="register" id="menuRegister">Create account</a>
 <?php endif; ?>
-          <div class="menu-version">Stonefellow v<?=sf_h(SF_BUILD)?></div>
         </nav>
+<?php if($currentUser): ?>
+        <div class="menu-session-actions" aria-label="Account actions">
+<?php if(($currentUser['role']??'')==='admin'): ?>
+          <a href="admin/" id="menuAdmin">Admin dashboard</a>
+<?php endif; ?>
+          <a href="logout.php" id="menuLogout">Logout</a>
+        </div>
+<?php endif; ?>
+        <div class="menu-version">Stonefellow v<?=sf_h(SF_BUILD)?></div>
       </div>
     </details>
     </div>

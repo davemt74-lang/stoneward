@@ -485,6 +485,7 @@ jobs:
           node tests/section90i-agent-navigation.cjs
           php tests/section90j-agent-page-context.php
           node tests/section90j-agent-page-context.cjs
+          node tests/section90k-admin-popup-menu.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs
