@@ -42,7 +42,7 @@ async function testAdminPrivateVoice(){
   const synthesis={getVoices:()=>[remote,local],cancel:()=>{},speak:utterance=>{spoken.push(utterance);utterance.onstart();utterance.onend()}};
   const sandbox={window:{speechSynthesis:synthesis,SpeechSynthesisUtterance:function(text){this.text=text}},adminSpeechEnabled:true,adminSpeechActive:false,adminSpeechPending:false,adminSpeechSequence:0,adminSpeechResolve:null,adminConversationMonitor:null,adminConversationResume:null,adminConversationEnabled:false,agent:mode=>states.push(mode),$:()=>({textContent:''}),setTimeout};
   vm.createContext(sandbox);
-  vm.runInContext(extract(adminApp,'stopAdminSpeech')+';'+extract(adminApp,'speakAdminReply')+';globalThis.speakTest=speakAdminReply',sandbox);
+  vm.runInContext(extract(adminApp,'cancelAdminSpeechOutput')+';'+extract(adminApp,'stopAdminSpeech')+';'+extract(adminApp,'speakAdminReply')+';globalThis.speakTest=speakAdminReply',sandbox);
   assert.equal(await sandbox.speakTest('Private CRM reply'),true);
   assert.equal(spoken.length,1);
   assert.equal(spoken[0].voice,local,'Admin must use only on-device voices');

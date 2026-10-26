@@ -26,7 +26,7 @@ function fixture(){
 async function shortStopDuringTts(){
   const {browser,recognizers,flush}=fixture();let interruptions=0,last='';
   const monitor=browser.StonefellowBargeIn.create(phrase=>{interruptions++;last=phrase},browser,
-    signal=>browser.StonefellowBargeIn.verifyAgentSpeech('Here are the latest tracks and how to stop a song.',browser,signal));
+    signal=>browser.StonefellowBargeIn.verifyAgentSpeech('Here are the latest tracks and how to pause a song.',browser,signal));
   assert.equal(await monitor.start(),true);
   await flush();
   assert.equal(recognizers.length,1,'recognition must start before any loudness event');

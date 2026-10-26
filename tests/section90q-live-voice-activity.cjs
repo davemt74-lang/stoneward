@@ -17,7 +17,7 @@ function extract(source,name){
 
 function createFixture(){
   const recognizers=[],timers=new Map(),frames=new Map();
-  let timerId=0,frameId=0,amplitude=0.004,released=0,closed=0,requests=0;
+  let timerId=0,frameId=0,amplitude=0.004,released=0,closed=0,requests=0,now=100000;
   const stream={getTracks:()=>[{stop:()=>released++}]};
   const analyser={getFloatTimeDomainData:samples=>samples.fill(amplitude)};
   class Recognition {
@@ -43,24 +43,24 @@ function createFixture(){
     clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:callback=>{const id=++frameId;frames.set(id,callback);return id},
     cancelAnimationFrame:id=>frames.delete(id)};
-  vm.runInNewContext(read('assets/js/conversation-barge-in.js'),{window:browser,AbortController,Float32Array});
+  vm.runInNewContext(read('assets/js/conversation-barge-in.js'),{window:browser,AbortController,Float32Array,Date:{now:()=>now}});
   const flush=async()=>{await new Promise(resolve=>setImmediate(resolve))};
   const pump=(energy,count)=>{amplitude=energy;for(let i=0;i<count;i++){
     const entry=frames.entries().next().value;
     assert.ok(entry,'audio activity sampling must remain active');
     frames.delete(entry[0]);entry[1]();
   }};
-  const advance=(delay)=>{for(const [id,timer] of [...timers])if(timer.delay===delay){timers.delete(id);timer.callback();return true}return false};
-  return {browser,recognizers,timers,frames,flush,pump,advance,
+  const advance=(delay)=>{for(const [id,timer] of [...timers])if(timer.delay===delay){timers.delete(id);now+=delay;timer.callback();return true}return false};
+  return {browser,recognizers,timers,frames,flush,pump,advance,elapse:ms=>{now+=ms},
     get released(){return released},get closed(){return closed},get requests(){return requests}};
 }
 
-async function voiceSilencesAgentBeforeTranscript(){
+async function voiceSilencesAgentAfterEchoProbe(){
   const f=createFixture(),events=[];
   const barge=f.browser.StonefellowBargeIn.create(
     phrase=>events.push(['turn',phrase]),f.browser,
     signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('The album has a new song.',f.browser,signal),
-    ()=>events.push(['silence']));
+    stage=>{events.push([stage]);return true});
   assert.equal(await barge.prepare(),true,'mic tap is acquired before voice output');
   assert.equal(await barge.start(),true);
   await f.flush();
@@ -68,12 +68,15 @@ async function voiceSilencesAgentBeforeTranscript(){
   assert.equal(f.recognizers.length,1);
   f.pump(0.004,10);assert.equal(events.length,0,'quiet background must not interrupt');
   f.pump(0.16,4);
-  assert.deepEqual(events,[['silence']],'detect voice and silence TTS before ASR final');
+  assert.deepEqual(events,[['probe']],'mic activity first requests a reversible pause');
+  assert.equal(f.advance(180),true,'wait for speaker echo to decay');
+  f.pump(0.16,3);
+  assert.deepEqual(events,[['probe'],['confirm']],'independent speech must continue after audio pauses');
   f.recognizers[0].emit('Can you play the previous track?',false);
-  assert.equal(events.length,1,'interim words preserve the full request');
+  assert.equal(events.length,2,'interim words preserve the full request');
   f.recognizers[0].emit('Can you play the previous track?',true);
   await f.flush();
-  assert.deepEqual(events,[['silence'],['turn','Can you play the previous track?']]);
+  assert.deepEqual(events,[['probe'],['confirm'],['turn','Can you play the previous track?']]);
   assert.equal(barge.active,false,'one speech turn must finish exactly once');
   assert.equal(f.advance(5000),false,'successful recognition clears fallback timer');
   barge.close();assert.equal(f.released,1,'conversation off must release mic track');
@@ -85,18 +88,61 @@ async function failedRecognitionNeverResumesAgent(){
   const barge=f.browser.StonefellowBargeIn.create(
     phrase=>events.push(['turn',phrase]),f.browser,
     signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('Let me explain this album.',f.browser,signal),
-    ()=>events.push(['silence']));
+    stage=>{events.push([stage]);return true});
   await barge.start();await f.flush();
-  f.pump(0.15,4);assert.deepEqual(events,[['silence']]);
+  f.pump(0.15,4);assert.deepEqual(events,[['probe']]);
+  assert.equal(f.advance(180),true);
+  f.pump(0.15,3);assert.deepEqual(events,[['probe'],['confirm']]);
   f.recognizers[0].onerror?.({error:'no-speech'});await f.flush();
   assert.equal(f.advance(250),true,'failed recognition must rearm while playback stays stopped');
   await f.flush();assert.equal(f.recognizers.length,2);
   assert.equal(f.advance(5000),true,'failure after voice activity exits through listening fallback');
   await f.flush();
-  assert.deepEqual(events,[['silence'],['turn','']],'no transcript must never replay interrupted audio');
+  assert.deepEqual(events,[['probe'],['confirm'],['turn','']],'confirmed interruption must never replay old audio');
   assert.equal(barge.active,false);
   f.recognizers[1].emit('Too late');await f.flush();
-  assert.equal(events.length,2,'late ASR events cannot create duplicates');
+  assert.equal(events.length,3,'late ASR events cannot create duplicates');
+  barge.close();
+}
+
+async function agentEchoCannotCancelItsOwnReply(){
+  const f=createFixture(),events=[];
+  const barge=f.browser.StonefellowBargeIn.create(
+    phrase=>events.push(['turn',phrase]),f.browser,
+    signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('The album has a new song.',f.browser,signal),
+    stage=>{events.push([stage]);return true});
+  await barge.start();await f.flush();
+  f.pump(0.16,4);
+  assert.deepEqual(events,[['probe']]);
+  f.recognizers[0].emit('The album has a new song.',true);
+  assert.equal(f.advance(180),true);
+  f.pump(0.065,8);
+  f.pump(0.004,12);
+  assert.equal(f.advance(640),true);
+  assert.deepEqual(events,[['probe'],['resume']],'speaker-only echo must resume the same reply');
+  f.pump(0.16,12);
+  assert.deepEqual(events,[['probe'],['resume']],'calibrated speaker energy cannot repeatedly barge in');
+  f.elapse(1000);f.pump(0.32,4);
+  assert.deepEqual(events,[['probe'],['resume'],['probe']],'louder participant can still trigger a later acoustic probe');
+  assert.equal(f.advance(180),true);
+  f.pump(0.32,3);
+  assert.deepEqual(events,[['probe'],['resume'],['probe'],['confirm']],'independent voice still wins after echo calibration');
+  assert.equal(barge.active,true,'recognition remains primed');
+  assert.equal(f.advance(5000),true,'real interruption gets a missing-transcript fallback');
+  assert.deepEqual(events.at(-1),['turn','']);
+  barge.close();
+}
+
+async function stopDuringProbeIsNotReplayed(){
+  const f=createFixture(),events=[];
+  const barge=f.browser.StonefellowBargeIn.create(
+    phrase=>events.push(['turn',phrase]),f.browser,
+    signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('I will explain the recording.',f.browser,signal),
+    stage=>{events.push([stage]);return true});
+  await barge.start();await f.flush();f.pump(0.2,4);
+  f.recognizers[0].emit('stop');await f.flush();
+  assert.deepEqual(events,[['probe'],['turn','stop']],'short stop must be accepted while audio is paused');
+  assert.equal(f.advance(640),false,'no echo-probe resume may restart an interrupted reply');
   barge.close();
 }
 
@@ -124,6 +170,8 @@ async function playbackHoldsAreWiredWithoutKillingRecognition(){
     voiceAudioCancel:()=>{cancelAudio++},speechFallbackResolve:()=>{},
     window:{speechSynthesis:{cancel:()=>cancelSpeech++}},
     conversationBargeIn:{stop:()=>monitorStopped++},
+    restoreVoiceProbeMusic:()=>{},
+    cancelLocalVoiceOutput:()=>cancelSpeech++,
     agent:()=>{},showTranscript:text=>{shown=text}
   };
   vm.createContext(publicContext);
@@ -139,6 +187,7 @@ async function playbackHoldsAreWiredWithoutKillingRecognition(){
     adminConversationEnabled:true,adminSpeechPending:true,adminSpeechSequence:8,
     adminSpeechActive:true,adminSpeechResolve:()=>{},
     window:{speechSynthesis:{cancel:()=>adminCancelled++}},
+    cancelAdminSpeechOutput:()=>adminCancelled++,
     adminConversationMonitor:{stop:()=>adminStopped++},
     $:()=>({textContent:''}),agent:()=>{}
   };
@@ -151,9 +200,11 @@ async function playbackHoldsAreWiredWithoutKillingRecognition(){
   assert.equal(adminStopped,0,'Admin speech hold must not abort ASR');
 }
 
-Promise.resolve().then(voiceSilencesAgentBeforeTranscript)
+Promise.resolve().then(voiceSilencesAgentAfterEchoProbe)
   .then(failedRecognitionNeverResumesAgent)
+  .then(agentEchoCannotCancelItsOwnReply)
+  .then(stopDuringProbeIsNotReplayed)
   .then(prepareAfterCloseCannotReopenMic)
   .then(playbackHoldsAreWiredWithoutKillingRecognition)
-  .then(()=>console.log('Section 90Q live voice: VAD silence, complete request, ASR fallback, and mic lifecycle PASS'))
+  .then(()=>console.log('Section 90Q live voice: echo probing, independent voice, ASR fallback, and mic lifecycle PASS'))
   .catch(error=>{console.error(error);process.exitCode=1});
