@@ -8,32 +8,43 @@
   const app={csrf:null,templates:[],catalog:[],releases:[],shows:[],crm:{summary:{},contacts:[],community_posts:[],agent_engagements:[]},knowledge:{folders:[],files:[]},knowledgeFolder:'',users:[],packages:[],ai:{providers:{},routing:{}},site:{splash_enabled:false,splash_revision:'1',artist_homepage_enabled:false,fan_community_enabled:false},lifecycle:{email:{},billing:{},outbox:[],webhooks:[],billing_audit:[]},analytics:null,operations:null,dashboard:null,view:'dashboard',scanGroups:[],scanEntries:[],folderName:'',catalogFilter:'',missingOnly:false,releaseDraftTracks:[]};
   const canvas=$('#adminCanvas'), viewTitle=$('#viewTitle'), adminApp=$('#adminApp'), folderInput=$('#folderInput');
   let adminSpeechEnabled=localStorage.getItem('stonefellow.admin.voice.replies.v1')!=='off';
-  let adminSpeechActive=false,adminSpeechResolve=null;
+  let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0;
+  let adminConversationMonitor=null,adminConversationResume=null,adminConversationEnabled=false;
   function updateAdminVoiceControl(){for(const button of [$('#adminAgentSpeechToggle'),$('#adminChatPopupVoice')]){if(!button)continue;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}}
   function stopAdminSpeech(){
+    adminSpeechSequence++;
+    adminConversationMonitor?.stop();
     if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
     try{window.speechSynthesis?.cancel()}catch(_){}
+    adminSpeechPending=false;
     if(adminSpeechActive){adminSpeechActive=false;agent('idle')}
+    adminConversationResume?.();
   }
   function toggleAdminSpeech(){adminSpeechEnabled=!adminSpeechEnabled;localStorage.setItem('stonefellow.admin.voice.replies.v1',adminSpeechEnabled?'on':'off');if(!adminSpeechEnabled)stopAdminSpeech();updateAdminVoiceControl()}
   async function speakAdminReply(raw){
-    if(!adminSpeechEnabled)return;
+    if(!adminSpeechEnabled){adminConversationResume?.();return}
+    const requested=++adminSpeechSequence;
+    adminSpeechPending=true;
+    const unavailable=()=>{if(requested===adminSpeechSequence){adminSpeechPending=false;adminConversationResume?.()}};
     const synthesis=window.speechSynthesis,Utterance=window.SpeechSynthesisUtterance;
-    if(!synthesis||!Utterance){$('#adminAgentComposerStatus').textContent='Spoken replies need browser speech support. Chat still works.';return}
+    if(!synthesis||!Utterance){$('#adminAgentComposerStatus').textContent='Spoken replies need browser speech support. Chat still works.';unavailable();return}
     let voices=synthesis.getVoices().filter(voice=>voice.localService===true);
     if(!voices.length){await new Promise(resolve=>{const timer=setTimeout(done,900);function done(){clearTimeout(timer);synthesis.removeEventListener?.('voiceschanged',done);resolve()}synthesis.addEventListener?.('voiceschanged',done)});voices=synthesis.getVoices().filter(voice=>voice.localService===true)}
-    if(!adminSpeechEnabled)return;
+    if(!adminSpeechEnabled||requested!==adminSpeechSequence){unavailable();return}
     const voice=voices.find(item=>/^en[-_]/i.test(item.lang))||voices[0];
-    if(!voice){$('#adminAgentComposerStatus').textContent='No on-device voice installed. Admin chat remains text-only; private replies were not sent to a speech provider.';return}
+    if(!voice){$('#adminAgentComposerStatus').textContent='No on-device voice installed. Admin chat remains text-only; private replies were not sent to a speech provider.';unavailable();return}
     const text=String(raw||'').replace(/```[\s\S]*?```/g,' ').replace(/\[[^\]]+\]\([^)]*\)/g,' ').replace(/[#*_`>]+/g,' ').trim().slice(0,1600);
-    if(!text)return;
+    if(!text){unavailable();return}
     stopAdminSpeech();
+    const playingSequence=adminSpeechSequence;
+    adminSpeechPending=true;
+    if(adminConversationEnabled)void adminConversationMonitor?.start();
     const utterance=new Utterance(text);utterance.voice=voice;utterance.lang=voice.lang||'en-US';utterance.rate=1;
     return new Promise(resolve=>{
       let done=false;
-      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;adminSpeechActive=false;agent('idle');resolve(ok)};
+      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;adminConversationMonitor?.stop();agent('idle');adminConversationResume?.()}resolve(ok)};
       adminSpeechResolve=finish;
-      utterance.onstart=()=>{if(!done){adminSpeechActive=true;agent('speaking',text)}};
+      utterance.onstart=()=>{if(!done&&playingSequence===adminSpeechSequence){adminSpeechActive=true;agent('speaking',text)}};
       utterance.onend=()=>finish(true);
       utterance.onerror=()=>finish(false);
       try{synthesis.speak(utterance)}catch(_){finish(false)}
@@ -414,7 +425,37 @@
   function bindAgent(){
     const form=$('#adminChatForm'),input=$('#adminChatInput'),voice=$('#adminVoiceButton');
     const sendButton=form.querySelector('button[type="submit"]');
-    let pending=false,recognition=null,voiceSubmitted=false;
+    let pending=false,recognition=null,voiceSubmitted=false,conversationOn=false,recognitionActive=false;
+    let restartTimer=null,networkFailures=0;
+    const updateVoiceButton=()=>{
+      voice.classList.toggle('active',conversationOn);
+      voice.setAttribute('aria-pressed',String(conversationOn));
+      voice.setAttribute('aria-label',conversationOn?'End conversation':'Start conversation');
+      voice.title=conversationOn?'Conversation active · click to stop':'Start hands-free conversation';
+    };
+    const scheduleListen=(delay=320)=>{
+      clearTimeout(restartTimer);
+      if(!conversationOn||pending||adminSpeechPending||!recognition)return;
+      restartTimer=setTimeout(startListen,delay);
+    };
+    function startListen(){
+      if(!conversationOn||pending||adminSpeechPending||recognitionActive||!recognition)return;
+      voiceSubmitted=false;
+      try{recognition.start()}
+      catch(e){if(e.name==='InvalidStateError'){scheduleListen(600);return}stopConversation();$('#adminAgentComposerStatus').textContent='The microphone could not start. Click to retry.'}
+    }
+    function stopConversation(){
+      conversationOn=false;adminConversationEnabled=false;clearTimeout(restartTimer);
+      try{recognition?.abort()}catch(_){}recognitionActive=false;
+      stopAdminSpeech();updateVoiceButton();agent('idle','Conversation mode is off.');
+      $('#adminAgentComposerStatus').textContent='Conversation mode is off.';
+    }
+    adminConversationResume=()=>{
+      if(conversationOn&&!pending&&!adminSpeechPending){agent('listening','I’m listening.');scheduleListen()}
+    };
+    adminConversationMonitor=window.StonefellowBargeIn?.create(()=>{
+      if(conversationOn&&adminSpeechPending)stopAdminSpeech();
+    });
     const resize=()=>{input.style.height='auto';input.style.height=Math.min(160,Math.max(44,input.scrollHeight))+'px';};
     input.addEventListener('input',resize);
     input.addEventListener('keydown',e=>{
@@ -424,7 +465,9 @@
       const message=input.value.trim();
       if(!message||pending)return;
       if(!window.SFAdminAgentCanvas?.send){say('Admin Agent unavailable; your draft was preserved.');return;}
-      stopAdminSpeech();pending=true;sendButton.disabled=true;voice.disabled=true;input.readOnly=true;agent('thinking','Working on your request…');
+      stopAdminSpeech();pending=true;clearTimeout(restartTimer);
+      try{recognition?.abort()}catch(_){}recognitionActive=false;
+      sendButton.disabled=true;input.readOnly=true;agent('thinking','Working on your request…');
       const status=$('#adminAgentComposerStatus');
       status.textContent='Sending message…';
       form.setAttribute('aria-busy','true');
@@ -439,26 +482,48 @@
         status.textContent='Message could not be sent. Your draft is still here.';
         say('Admin Agent unavailable; message was not confirmed.');
       }finally{
-        pending=false;sendButton.disabled=false;voice.disabled=!recognition&&!(window.SpeechRecognition||window.webkitSpeechRecognition);if(!adminSpeechActive)agent('idle');
+        pending=false;sendButton.disabled=false;if(!adminSpeechActive&&!adminSpeechPending)agent(conversationOn?'listening':'idle');
         input.readOnly=false;form.removeAttribute('aria-busy');
+        if(conversationOn&&!adminSpeechPending)scheduleListen();
       }
     }
     form.addEventListener('submit',e=>{e.preventDefault();void submit();});
     const R=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(R){
-      recognition=new R();recognition.lang='en-US';recognition.interimResults=true;
-      voice.onclick=()=>{if(pending)return;stopAdminSpeech();voiceSubmitted=false;try{recognition.start();voice.classList.add('active');agent('listening','Listening…');}catch(_){}};
+      recognition=new R();recognition.lang='en-US';recognition.interimResults=true;recognition.continuous=false;
+      voice.onclick=()=>{
+        if(conversationOn){stopConversation();return}
+        if(pending)return;
+        stopAdminSpeech();conversationOn=true;adminConversationEnabled=true;networkFailures=0;updateVoiceButton();
+        agent('listening','I’m listening.');$('#adminAgentComposerStatus').textContent='Conversation active · speak naturally.';
+        startListen();
+      };
+      recognition.onstart=()=>{
+        recognitionActive=true;
+        if(!conversationOn||pending||adminSpeechPending){try{recognition.abort()}catch(_){}return}
+        agent('listening','I’m listening.');
+      };
       recognition.onresult=e=>{
+        if(!conversationOn||pending||adminSpeechPending||voiceSubmitted)return;
         let transcript='';let final=false;
         for(let i=0;i<e.results.length;i++){
           transcript+=e.results[i][0].transcript;
           if(e.results[i].isFinal)final=true;
         }
+        if(transcript.trim())networkFailures=0;
         input.value=transcript.trim();resize();
-        if(final&&!voiceSubmitted){voiceSubmitted=true;voice.classList.remove('active');void submit();}
+        if(final&&transcript.trim()){voiceSubmitted=true;void submit();}
       };
-      recognition.onend=()=>{voice.classList.remove('active');agent('idle');};
-      recognition.onerror=()=>{voice.classList.remove('active');agent('idle','Voice input unavailable. You can still type.');};
+      recognition.onend=()=>{recognitionActive=false;if(conversationOn&&!pending&&!adminSpeechPending)scheduleListen(networkFailures?Math.min(7500,600*2**networkFailures):320)};
+      recognition.onerror=e=>{
+        recognitionActive=false;
+        if(e.error==='not-allowed'||e.error==='service-not-allowed'||e.error==='audio-capture'){
+          stopConversation();$('#adminAgentComposerStatus').textContent='Microphone permission or device unavailable. Check browser access.';return;
+        }
+        if(e.error==='network'){networkFailures=Math.min(5,networkFailures+1);$('#adminAgentComposerStatus').textContent='Speech service interrupted. Retrying…'}
+        if(conversationOn&&!pending&&!adminSpeechPending)scheduleListen(e.error==='network'?Math.min(7500,600*2**networkFailures):500);
+      };
+      updateVoiceButton();
     }else{voice.disabled=true;voice.title='Voice input is not supported by this browser';}
     resize();
   }
