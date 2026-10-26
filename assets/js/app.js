@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.145';
+  window.STONEFELLOW_APP_BUILD='1.3.146';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -139,40 +139,62 @@
     if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence)return null;
     const selected=installed.find(voice=>/^en[-_]/i.test(voice.lang))||installed[0];
     if(!selected)return false;
+    const parts=globalThis.StonefellowSpeechSegments?.split?.(text,180)||[String(text)];
+    if(!parts.length)return true;
     return new Promise(resolve=>{
-      const utterance=new window.SpeechSynthesisUtterance(String(text).slice(0,1600));
-      utterance.voice=selected;utterance.lang=selected.lang||'en-US';utterance.rate=1;
-      let finished=false;
+      let finished=false,index=0;
       const done=ok=>{if(finished)return;finished=true;if(speechFallbackResolve===done)speechFallbackResolve=null;resolve(ok)};
       speechFallbackResolve=done;
-      utterance.onstart=()=>{if(voiceRepliesEnabled&&sequence===voicePlaybackSequence)agent('speaking',text)};
-      utterance.onend=()=>done(true);
-      utterance.onerror=()=>done(false);
-      try{window.speechSynthesis.cancel();window.speechSynthesis.speak(utterance)}catch(_){done(false)}
+      const next=()=>{
+        if(finished)return;
+        if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence){done(null);return}
+        if(index>=parts.length){done(true);return}
+        const utterance=new window.SpeechSynthesisUtterance(parts[index++]);
+        utterance.voice=selected;utterance.lang=selected.lang||'en-US';utterance.rate=1;
+        utterance.onstart=()=>{if(!finished&&sequence===voicePlaybackSequence)agent('speaking',text)};
+        utterance.onend=next;
+        utterance.onerror=()=>done(false);
+        try{window.speechSynthesis.speak(utterance)}catch(_){done(false)}
+      };
+      try{window.speechSynthesis.cancel();next()}catch(_){done(false)}
     });
   }
   async function elevenLabsSpeak(text,retried=false,sequence=voicePlaybackSequence){
     if(!st.auth.authenticated)return false;
+    const parts=globalThis.StonefellowSpeechSegments?.split?.(text,1400)||[String(text)];
+    let nextUnspoken=0;
     try{
-      const r=await fetch((cfg.apiBase||'api')+'/agent-voice.php',{
-        method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':st.auth.csrf||''},body:JSON.stringify({text:String(text).slice(0,1800)})
-      });
-      if(!r.ok){
-        if(r.status===403&&!retried){let j={};try{j=await r.clone().json()}catch(_){}if(j.error==='csrf_failed'){await loadAuth(true);return elevenLabsSpeak(text,true,sequence)}}
-        return false;
+      for(let index=0;index<parts.length;index++){
+        nextUnspoken=index;
+        if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence)return null;
+        let r,attemptedRefresh=retried;
+        while(true){
+          r=await fetch((cfg.apiBase||'api')+'/agent-voice.php',{
+            method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':st.auth.csrf||''},body:JSON.stringify({text:parts[index]})
+          });
+          if(r.status!==403||attemptedRefresh)break;
+          let j={};try{j=await r.clone().json()}catch(_){}
+          if(j.error!=='csrf_failed')break;
+          attemptedRefresh=true;await loadAuth(true);
+          if(sequence!==voicePlaybackSequence)return null;
+        }
+        if(!r.ok)return index?{remaining:parts.slice(index).join(' ')}:false;
+        const blob=await r.blob(),url=URL.createObjectURL(blob);
+        if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence){URL.revokeObjectURL(url);return null}
+        if(st.voiceAudio)st.voiceAudio.pause();
+        const a=new Audio(url);st.voiceAudio=a;
+        const spoken=await new Promise(resolve=>{
+          let finished=false;
+          const done=ok=>{if(finished)return;finished=true;URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;if(voiceAudioCancel===cancel)voiceAudioCancel=null;resolve(ok)};
+          const cancel=()=>{a.pause();done(null)};voiceAudioCancel=cancel;
+          a.onended=()=>done(true);a.onerror=()=>done(false);a.onpause=()=>done(null);
+          a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled)agent('speaking',text);else if(!finished)cancel()}).catch(()=>done(false));
+        });
+        if(spoken===null||sequence!==voicePlaybackSequence)return null;
+        if(spoken!==true)return index?{remaining:parts.slice(index).join(' ')}:false;
       }
-      const blob=await r.blob(),url=URL.createObjectURL(blob);
-      if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence){URL.revokeObjectURL(url);return null}
-      if(st.voiceAudio)st.voiceAudio.pause();
-      const a=new Audio(url);st.voiceAudio=a;
-      return await new Promise(resolve=>{
-        let finished=false;
-        const done=ok=>{if(finished)return;finished=true;URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;if(voiceAudioCancel===cancel)voiceAudioCancel=null;resolve(ok)};
-        const cancel=()=>{a.pause();done(null)};voiceAudioCancel=cancel;
-        a.onended=()=>done(true);a.onerror=()=>done(false);a.onpause=()=>done(null);
-        a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled)agent('speaking',text);else if(!finished)cancel()}).catch(()=>done(false));
-      });
-    }catch(_){return false}
+      return true;
+    }catch(_){return sequence!==voicePlaybackSequence?null:(nextUnspoken?{remaining:parts.slice(nextUnspoken).join(' ')}:false)}
   }
   async function agentSpeak(text){
     if(!voiceRepliesEnabled||(!st.conversationOn&&!voiceInteractionStarted)||!text)return null;
@@ -193,6 +215,7 @@
       const remote=await elevenLabsSpeak(text,false,sequence);
       if(sequence!==voicePlaybackSequence)return null;
       if(remote===true||remote===null||!voiceRepliesEnabled)return remote;
+      if(remote&&typeof remote==='object'&&remote.remaining)return await speakWithDeviceVoice(remote.remaining,sequence);
       // The installed browser voice is a local, free fallback; it sends no text to a new provider.
       return await speakWithDeviceVoice(text,sequence);
     }finally{
