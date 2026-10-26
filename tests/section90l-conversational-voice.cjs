@@ -25,39 +25,40 @@ assert.match(adminApp,/recognition\.onend=\(\)=>\{recognitionActive=false;if\(co
 assert.match(adminApp,/if\(!conversationOn\|\|pending\|\|adminSpeechPending\|\|voiceSubmitted\)return/);
 
 async function monitorRejectsEchoAndDetectsForeground(){
-  let now=1000,amplitude=0.006,frame=null,interrupts=0,stops=0,closed=0,heard='';
-  const confirmations=[null,'Please stop now'];
-  const destination={connect:()=>{}};
-  const analyser={fftSize:0,smoothingTimeConstant:0,getFloatTimeDomainData:array=>array.fill(amplitude)};
+  let interrupts=0,heard='',timerId=0,started=0,aborted=0;
+  const pending=new Map();
+  const timers=new Map();
   const browser={
-    navigator:{mediaDevices:{getUserMedia:async constraints=>{
-      assert.equal(constraints.audio.echoCancellation,true);
-      return {getTracks:()=>[{stop:()=>stops++}]};
-    }}},
-    AudioContext:class{createMediaStreamSource(){return destination}createBiquadFilter(){return {type:'',frequency:{value:0},connect:()=>{}}}createAnalyser(){return analyser}close(){closed++;return Promise.resolve()}},
-    requestAnimationFrame:cb=>{frame=cb;return 1},cancelAnimationFrame:()=>{frame=null}
+    SpeechRecognition:class{},
+    setTimeout:(callback,delay)=>{const id=++timerId;timers.set(id,{callback,delay});return id},
+    clearTimeout:id=>timers.delete(id)
   };
-  const sandbox={window:browser,Date:{now:()=>now},Float32Array,Math,AbortController};
+  const sandbox={window:browser,AbortController};
   vm.runInNewContext(read('assets/js/conversation-barge-in.js'),sandbox);
-  const monitor=browser.StonefellowBargeIn.create(phrase=>{interrupts++;heard=phrase},browser,async()=>confirmations.shift());
+  const verify=signal=>new Promise(resolve=>{
+    started++;
+    pending.set(started,{resolve,signal});
+    signal.addEventListener('abort',()=>{aborted++;resolve(null)},{once:true});
+  });
+  const flush=async()=>{await new Promise(resolve=>setImmediate(resolve))};
+  const monitor=browser.StonefellowBargeIn.create(phrase=>{interrupts++;heard=phrase},browser,verify);
   assert.equal(await monitor.start(),true);
-  function tick(energy,count){amplitude=energy;for(let i=0;i<count;i++){now+=40;const callback=frame;assert.ok(callback);callback()}}
-  tick(0.006,20);
-  tick(0.12,1);tick(0.006,12);
-  assert.equal(interrupts,0,'one noise transient must not interrupt playback');
-  tick(0.16,9);
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(interrupts,0,'loud playback echo without confirmed speech must never cancel the Agent');
-  assert.equal(monitor.active,true,'monitor rearms after unconfirmed acoustic activity');
-  now+=4000;
-  tick(0.16,9);
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(interrupts,1,'verified independent user speech interrupts playback');
+  await flush();
+  assert.equal(started,1,'speech recognition must be primed without waiting for acoustic energy');
+  pending.get(1).resolve(null);await flush();
+  assert.equal(interrupts,0,'a failed or silent recognition never interrupts playback');
+  assert.equal(timers.size,1,'browser recognition automatically rearms after silence');
+  for(const {callback} of timers.values())callback();timers.clear();await flush();
+  assert.equal(started,2);
+  pending.get(2).resolve('Please stop now');await flush();
+  assert.equal(interrupts,1,'verified independent room speech interrupts playback');
   assert.equal(heard,'Please stop now');
   assert.equal(monitor.active,false);
-  assert.equal(stops,2,'microphone must be released while verifying each candidate');
-  assert.equal(closed,2,'audio context must be closed while verifying each candidate');
-  monitor.stop();assert.equal(interrupts,1,'stopped detector must not interrupt again');
+  assert.equal(timers.size,0,'no monitor timers remain after interruption');
+  await monitor.start();await flush();assert.equal(started,3);
+  monitor.stop();assert.equal(aborted,1,'manually stopping playback aborts recognition');
+  pending.get(3).resolve('Too late');await flush();
+  assert.equal(interrupts,1,'stale recognition cannot submit after playback ends');
 }
 
 async function adminConversationRestartsAndStops(){
@@ -135,5 +136,5 @@ async function publicVoiceResumesAndStaleAudioCannotPlay(){
 }
 
 Promise.resolve().then(monitorRejectsEchoAndDetectsForeground).then(adminConversationRestartsAndStops).then(publicVoiceResumesAndStaleAudioCannotPlay)
-  .then(()=>console.log('Section 90L continuous voice, barge-in, echo/noise gate, duplicate prevention, and stop: PASS'))
+  .then(()=>console.log('Section 90L continuous voice, primed barge-in, duplicate prevention, and stop: PASS'))
   .catch(error=>{console.error(error);process.exitCode=1});

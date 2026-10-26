@@ -61,6 +61,19 @@ async function verificationRequiresSpeechNotEcho(){
   assert.equal(await ended,null,'recognition ending without user content cannot interrupt');
   const unsupported=browser.StonefellowBargeIn.verifyAgentSpeech(reference,{},null);
   assert.equal(await unsupported,null,'unsupported recognition fails closed');
+  const stop=browser.StonefellowBargeIn.verifyAgentSpeech(reference+' You can say stop.',browser);
+  instances[3].emit('stop',true);
+  assert.equal(await stop,'stop','single-word stop must interrupt even if the Agent previously used that word');
+  const interim=browser.StonefellowBargeIn.verifyAgentSpeech(reference,browser);
+  instances[4].emit('stop',false);
+  instances[4].onend();
+  assert.equal(await interim,'stop','onend must preserve a short stop when Chrome never emits final');
+  const mixed=browser.StonefellowBargeIn.verifyAgentSpeech(reference,browser);
+  instances[5].onresult({results:[
+    {0:{transcript:'Let me tell you about the new song'},isFinal:true},
+    {0:{transcript:'stop'},isFinal:true}
+  ]});
+  assert.equal(await mixed,'stop','an accumulated Agent echo must not hide a later participant stop');
 }
 async function overlappingBargeTurnCannotBeOverwritten(){
   let firstResolve,secondResolve,resumes=0,listenMessages=[];
