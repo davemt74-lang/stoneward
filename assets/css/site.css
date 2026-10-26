@@ -49,10 +49,10 @@ body.has-player .chatbar{border-radius:0 0 24px 24px;border-top-color:var(--line
 .menu-details{position:relative}
 .menu-details>summary{list-style:none}
 .menu-details>summary::-webkit-details-marker{display:none}
-.menu-sheet{position:absolute;z-index:60;right:0;top:48px;width:min(320px,calc(100vw - 36px));max-height:calc(100vh - 78px);overflow-y:auto;padding:46px 22px 16px;border:1px solid var(--line);background:rgba(15,13,11,.985);backdrop-filter:blur(20px)}
+.menu-sheet{position:absolute;z-index:60;right:0;top:48px;width:min(320px,calc(100vw - 36px));height:min(680px,calc(100dvh - 72px));max-height:calc(100dvh - 72px);overflow:hidden;display:flex;flex-direction:column;box-sizing:border-box;padding:46px 14px 12px;border:1px solid var(--line);background:rgba(15,13,11,.985);backdrop-filter:blur(20px)}
 .menu-details:not([open]) .menu-sheet{display:none}
 .menu-close{position:absolute;top:7px;right:9px;width:36px;height:36px;border:0;background:transparent;color:var(--muted);font-size:1.55rem;line-height:1}
-.menu-sheet nav{display:grid}
+.menu-sheet nav{display:grid;align-content:start;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:0 8px}
 .menu-sheet nav a{display:block;text-align:left;padding:9px 9px;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font-family:var(--display-font);font-size:1.05rem;line-height:1.15;text-decoration:none}
 .menu-sheet nav #menuLogin,.menu-sheet nav #menuRegister{color:var(--ink)}
 .menu-sheet nav #menuRegister{border-left:2px solid var(--accent);padding-left:12px}
@@ -61,6 +61,11 @@ body.has-player .chatbar{border-radius:0 0 24px 24px;border-top-color:var(--line
 /* v0.9 application shell */
 .menu-sheet nav .menu-link-button{display:block;width:100%;text-align:left;padding:9px 9px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font-family:var(--display-font);font-size:1.05rem;line-height:1.15;text-decoration:none}
 .menu-identity{padding:10px 9px 8px;margin-top:5px;border-top:1px solid var(--line);display:grid;gap:2px}.menu-identity span{font-size:.54rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);line-height:1.1}.menu-identity strong{font-size:.8rem;font-weight:600;line-height:1.15}.menu-version{padding:9px 9px 0;color:#625d56;font-size:.54rem;letter-spacing:.11em;line-height:1.1;text-transform:uppercase}
+.menu-session-actions{flex:none;display:grid;border-top:1px solid var(--line2);margin-top:7px;padding:7px 8px 0;background:rgba(15,13,11,.985)}
+.menu-session-actions a{display:flex;align-items:center;min-height:40px;padding:7px 10px;color:var(--ink);font-family:var(--display-font);font-size:1.05rem;text-decoration:none;border-radius:7px}
+.menu-session-actions #menuAdmin{color:var(--accent);border:1px solid var(--accent);font-family:inherit;font-weight:700;letter-spacing:.02em}
+.menu-session-actions a:hover,.menu-session-actions a:focus-visible{background:var(--soft);outline:2px solid var(--accent);outline-offset:1px}
+.menu-sheet>.menu-version{flex:none;padding-left:16px}
 .splash-screen{position:fixed;z-index:1000;inset:0;background:#090807;color:var(--ink);display:grid;place-items:center;padding:24px}.splash-inner{width:min(560px,100%);text-align:center;display:grid;justify-items:center;gap:22px}.splash-wordmark{font-size:.78rem;font-weight:800;letter-spacing:.34em}.splash-orb{width:112px;height:112px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;box-shadow:0 0 80px rgba(202,169,109,.08)}.splash-orb span{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#d3b77d,#45382c 55%,#15110e 72%);box-shadow:0 0 32px rgba(202,169,109,.18)}.splash-inner p{margin:0;color:var(--muted);font-family:var(--display-font);font-size:clamp(1.1rem,3vw,1.45rem);line-height:1.45}.splash-inner button{min-width:120px;height:44px;border:1px solid var(--line2);background:transparent;color:var(--ink);text-transform:uppercase;letter-spacing:.16em;font-size:.66rem}.splash-inner button:hover{border-color:var(--accent);color:var(--accent)}
 
 
