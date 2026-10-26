@@ -8,28 +8,48 @@
   const app={csrf:null,templates:[],catalog:[],releases:[],shows:[],crm:{summary:{},contacts:[],community_posts:[],agent_engagements:[]},knowledge:{folders:[],files:[]},knowledgeFolder:'',users:[],packages:[],ai:{providers:{},routing:{}},site:{splash_enabled:false,splash_revision:'1',artist_homepage_enabled:false,fan_community_enabled:false},lifecycle:{email:{},billing:{},outbox:[],webhooks:[],billing_audit:[]},analytics:null,operations:null,dashboard:null,view:'dashboard',scanGroups:[],scanEntries:[],folderName:'',catalogFilter:'',missingOnly:false,releaseDraftTracks:[]};
   const canvas=$('#adminCanvas'), viewTitle=$('#viewTitle'), adminApp=$('#adminApp'), folderInput=$('#folderInput');
   let adminSpeechEnabled=localStorage.getItem('stonefellow.admin.voice.replies.v1')!=='off';
-  let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0,adminSpeechText='';
+  let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0,adminSpeechText='',adminSpeechProbePaused=false;
   let adminConversationMonitor=null,adminConversationResume=null,adminConversationEnabled=false;
   function updateAdminVoiceControl(){for(const button of [$('#adminAgentSpeechToggle'),$('#adminChatPopupVoice')]){if(!button)continue;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}}
+  function cancelAdminSpeechOutput(){
+    const synthesis=window.speechSynthesis;
+    try{synthesis?.cancel()}catch(_){}
+    try{if(synthesis?.paused)synthesis.resume?.()}catch(_){}
+  }
   function stopAdminSpeech(){
+    adminSpeechProbePaused=false;
     adminSpeechSequence++;
     adminConversationMonitor?.stop();
     adminSpeechText='';
     if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
-    try{window.speechSynthesis?.cancel()}catch(_){}
+    cancelAdminSpeechOutput();
     adminSpeechPending=false;
     if(adminSpeechActive){adminSpeechActive=false;agent('idle')}
     adminConversationResume?.();
   }
   function holdAdminSpeechForBarge(){
     if(!adminConversationEnabled||!adminSpeechPending)return;
+    adminSpeechProbePaused=false;
     // Cancel output now but retain recognition until the participant finishes.
     adminSpeechSequence++;
     if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
-    try{window.speechSynthesis?.cancel()}catch(_){}
+    cancelAdminSpeechOutput();
     adminSpeechActive=false;
     agent('listening','I heard you. Keep speaking.');
     const status=$('#adminAgentComposerStatus');if(status)status.textContent='Listening to interruption…';
+  }
+  function handleAdminVoiceActivityProbe(stage){
+    const synthesis=window.speechSynthesis;
+    if(stage==='probe'){
+      if(!adminConversationEnabled||!adminSpeechPending||!synthesis?.speaking||typeof synthesis.pause!=='function')return false;
+      synthesis.pause();adminSpeechProbePaused=true;return true;
+    }
+    if(stage==='resume'){
+      if(adminSpeechProbePaused&&adminSpeechPending)synthesis?.resume?.();
+      adminSpeechProbePaused=false;return true;
+    }
+    if(stage==='confirm'){holdAdminSpeechForBarge();return true}
+    return false;
   }
   function toggleAdminSpeech(){adminSpeechEnabled=!adminSpeechEnabled;localStorage.setItem('stonefellow.admin.voice.replies.v1',adminSpeechEnabled?'on':'off');if(!adminSpeechEnabled)stopAdminSpeech();updateAdminVoiceControl()}
   async function speakAdminReply(raw){
@@ -479,7 +499,7 @@
       if(request&&!/^(?:stop|stop speaking)$/i.test(request))void submit(request);
       else $('#adminAgentComposerStatus').textContent=request?'Agent stopped. Listening.':'Someone spoke, but the words were missed. Please continue.';
     },window,signal=>window.StonefellowBargeIn.verifyAgentSpeech(adminSpeechText,window,signal),
-    ()=>holdAdminSpeechForBarge(),state=>{
+    stage=>handleAdminVoiceActivityProbe(stage),state=>{
       if(conversationOn&&state==='microphone-monitor-unavailable')$('#adminAgentComposerStatus').textContent='Barge-in microphone unavailable. Check permission and retry.';
       if(conversationOn&&state==='microphone-monitor-suspended')$('#adminAgentComposerStatus').textContent='Microphone audio monitor suspended. Click the mic again to retry.';
       if(conversationOn&&state==='speech-recognition-unavailable')$('#adminAgentComposerStatus').textContent='Speech recognition unavailable. Voice activity can still stop the Agent.';

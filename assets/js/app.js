@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.149';
+  window.STONEFELLOW_APP_BUILD='1.3.150';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -12,6 +12,7 @@
   const voiceReplyToggle=$('#agentVoiceReplyToggle');
   let voiceRepliesEnabled=localStorage.getItem('stonefellow.voice.replies.v1')!=='off',voiceInteractionStarted=false;
   let voicePlaybackPending=false,voicePlaybackText='',speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
+  let voiceProbeAudio=null,voiceProbeSynth=false,voiceProbeMusicVolume=null;
   const conversationBargeIn=window.StonefellowBargeIn?.create(spoken=>{
     if(!st.conversationOn||!voicePlaybackPending)return;
     interruptVoicePlayback();
@@ -19,7 +20,7 @@
     if(request&&!/^(?:stop|stop speaking)$/i.test(request))void submitVoiceTurn(request);
     else showTranscript(request?'Agent stopped. I’m listening.':'I heard someone, but missed the words. Please continue.','listening');
   },window,signal=>window.StonefellowBargeIn.verifyAgentSpeech(voicePlaybackText,window,signal),
-  ()=>holdVoicePlaybackForBarge(),state=>{
+  stage=>handleVoiceActivityProbe(stage),state=>{
     if(st.conversationOn&&state==='microphone-monitor-unavailable')showTranscript('Interruption microphone unavailable. Check microphone permission; Stop speaking button remains available.','error');
     if(st.conversationOn&&state==='microphone-monitor-suspended')showTranscript('Microphone audio monitor is suspended. Click the mic again if voice interruption does not work.','error');
     if(st.conversationOn&&state==='speech-recognition-unavailable')showTranscript('Speech recognition could not stay active. Voice detection can still stop the Agent.','waiting');
@@ -109,21 +110,67 @@
   }
   function holdVoicePlaybackForBarge(){
     if(!st.conversationOn||!voicePlaybackPending)return;
+    restoreVoiceProbeMusic();
+    voiceProbeAudio=null;voiceProbeSynth=false;
     // Silence audio immediately but keep the primed recognizer alive to finish
     // the participant's sentence before submitting the next Agent turn.
     voicePlaybackSequence++;
     if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
     if(st.voiceAudio&&!st.voiceAudio.paused)st.voiceAudio.pause();
-    if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
+    if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;cancelLocalVoiceOutput();resolve(null)}
     agent('listening','I heard you. Keep speaking.');
     showTranscript('Listening to the interruption…','listening');
   }
+  function muteMusicDuringVoiceProbe(){
+    if(!audio.paused&&voiceProbeMusicVolume===null){voiceProbeMusicVolume=audio.volume;audio.volume=0}
+  }
+  function restoreVoiceProbeMusic(){
+    if(voiceProbeMusicVolume!==null){audio.volume=voiceProbeMusicVolume;voiceProbeMusicVolume=null}
+  }
+  function cancelLocalVoiceOutput(){
+    const synthesis=window.speechSynthesis;
+    try{synthesis?.cancel()}catch(_){}
+    // Some engines retain paused after cancel, silently blocking later speech.
+    try{if(synthesis?.paused)synthesis.resume?.()}catch(_){}
+  }
+  function handleVoiceActivityProbe(stage){
+    if(stage==='probe'){
+      if(!st.conversationOn||!voicePlaybackPending)return false;
+      if(st.voiceAudio&&!st.voiceAudio.paused){
+        voiceProbeAudio=st.voiceAudio;
+        muteMusicDuringVoiceProbe();
+        try{voiceProbeAudio.pause()}catch(_){voiceProbeAudio=null;restoreVoiceProbeMusic();return false}
+        return true;
+      }
+      const synthesis=window.speechSynthesis;
+      if(speechFallbackResolve&&synthesis?.speaking&&typeof synthesis.pause==='function'){
+        muteMusicDuringVoiceProbe();
+        try{synthesis.pause()}catch(_){restoreVoiceProbeMusic();return false}
+        voiceProbeSynth=true;return true;
+      }
+      return false;
+    }
+    if(stage==='resume'){
+      const pausedAudio=voiceProbeAudio,pausedSynth=voiceProbeSynth;
+      voiceProbeAudio=null;voiceProbeSynth=false;
+      restoreVoiceProbeMusic();
+      if(pausedAudio&&voicePlaybackPending&&st.voiceAudio===pausedAudio){
+        void pausedAudio.play().catch(()=>interruptVoicePlayback());
+      }
+      if(pausedSynth&&voicePlaybackPending)window.speechSynthesis?.resume?.();
+      return true;
+    }
+    if(stage==='confirm'){holdVoicePlaybackForBarge();return true}
+    return false;
+  }
   function interruptVoicePlayback(){
+    restoreVoiceProbeMusic();
+    voiceProbeAudio=null;voiceProbeSynth=false;
     voicePlaybackSequence++;
     conversationBargeIn?.stop();
     if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
     if(st.voiceAudio&&!st.voiceAudio.paused)st.voiceAudio.pause();
-    if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
+    if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;cancelLocalVoiceOutput();resolve(null)}
     voicePlaybackPending=false;
     voicePlaybackText='';
     if(agentInterrupt)agentInterrupt.hidden=true;
@@ -177,7 +224,7 @@
         utterance.onerror=()=>done(false);
         try{window.speechSynthesis.speak(utterance)}catch(_){done(false)}
       };
-      try{window.speechSynthesis.cancel();next()}catch(_){done(false)}
+      try{cancelLocalVoiceOutput();next()}catch(_){done(false)}
     });
   }
   async function elevenLabsSpeak(text,retried=false,sequence=voicePlaybackSequence){
@@ -208,7 +255,10 @@
           let finished=false;
           const done=ok=>{if(finished)return;finished=true;URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;if(voiceAudioCancel===cancel)voiceAudioCancel=null;resolve(ok)};
           const cancel=()=>{a.pause();done(null)};voiceAudioCancel=cancel;
-          a.onended=()=>done(true);a.onerror=()=>done(false);a.onpause=()=>done(null);
+          a.onended=()=>done(true);a.onerror=()=>done(false);
+          // An echo probe pauses audio temporarily; it must not resolve the
+          // whole reply as cancelled or leave the sequence permanently stale.
+          a.onpause=()=>{if(voiceProbeAudio===a||!a.paused)return;done(null)};
           a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled)agent('speaking',text);else if(!finished)cancel()}).catch(()=>done(false));
         });
         if(spoken===null||sequence!==voicePlaybackSequence)return null;
@@ -220,9 +270,11 @@
   async function agentSpeak(text){
     if(!voiceRepliesEnabled||(!st.conversationOn&&!voiceInteractionStarted)||!text)return null;
     if(voicePlaybackPending){
+      restoreVoiceProbeMusic();
+      voiceProbeAudio=null;voiceProbeSynth=false;
       conversationBargeIn?.stop();
       if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
-      if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
+      if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;cancelLocalVoiceOutput();resolve(null)}
     }
     const sequence=++voicePlaybackSequence;
     voicePlaybackPending=true;voicePlaybackText=String(text);syncConversationMusic();
@@ -241,6 +293,8 @@
       return await speakWithDeviceVoice(text,sequence);
     }finally{
       if(sequence===voicePlaybackSequence){
+        restoreVoiceProbeMusic();
+        voiceProbeAudio=null;voiceProbeSynth=false;
         conversationBargeIn?.stop();voicePlaybackPending=false;voicePlaybackText='';syncConversationMusic();
         if(agentInterrupt)agentInterrupt.hidden=true;
         agent(st.conversationOn?'listening':st.playing?'playing':'idle');

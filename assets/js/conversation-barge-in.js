@@ -1,6 +1,6 @@
 /* Shared public/Admin full-duplex speech monitor for Agent barge-in.
- * Recognition captures words; a separately prepared, echo-cancelled mic tap
- * can silence the Agent on foreground voice activity before ASR completes.
+ * Recognition captures words. Microphone activity first pauses output for an
+ * echo-tail test; only speech that continues without playback can silence it.
  */
 (() => {
   'use strict';
@@ -34,7 +34,9 @@
           // Reject complete or nearly complete matches to its actual words.
           const novelWords=words.filter(word=>!expectedWords.has(word)).length;
           const overlap=1-novelWords/words.length;
-          const explicitStop=candidate==='stop';
+          // The Agent itself might say "stop". If that word is in its reply,
+          // ASR alone cannot identify the speaker; the acoustic probe can.
+          const explicitStop=candidate==='stop'&&!expectedWords.has('stop');
           // Short participant instructions often share ordinary words with a
           // long Agent answer. Reject an exact echo, or near-complete overlap
           // only for longer phrases; never suppress "stop now" as one novel word.
@@ -57,8 +59,25 @@
     let generation=0,resourceGeneration=0,listening=false,confirmation=null,restartTimer=null;
     let stream=null,context=null,analyser=null,readyPromise=null,frame=null,activityTimer=null;
     let voiceDetected=false,consecutive=0,noiseFloor=0.008,fastFailures=0;
+    let probing=false,probeReady=false,probeConsecutive=0;
+    let probeTailTimer=null,probeDeadlineTimer=null,probeRms=0,echoBaseline=0,echoCooldownUntil=0;
     const readBuffer=new Float32Array(1024);
     const report=state=>{try{onStatus?.(state)}catch(_){}};
+    const clearProbe=()=>{
+      if(probeTailTimer!==null){browser.clearTimeout?.(probeTailTimer);probeTailTimer=null}
+      if(probeDeadlineTimer!==null){browser.clearTimeout?.(probeDeadlineTimer);probeDeadlineTimer=null}
+      probing=false;probeReady=false;probeConsecutive=0;
+    };
+    const resumeEcho=()=>{
+      if(!probing)return;
+      clearProbe();
+      // The candidate disappeared once playback paused: it was speaker echo.
+      echoBaseline=Math.max(echoBaseline,Math.min(0.25,probeRms*0.9));
+      echoCooldownUntil=Date.now()+900;
+      consecutive=0;
+      try{onVoiceActivity?.('resume')}catch(_){}
+      report('agent-echo-suppressed');
+    };
     const release=()=>{
       if(frame!==null){browser.cancelAnimationFrame?.(frame);frame=null}
       if(stream){for(const track of stream.getTracks())track.stop();stream=null}
@@ -69,6 +88,7 @@
       generation++;listening=false;
       if(restartTimer!==null){browser.clearTimeout?.(restartTimer);restartTimer=null}
       if(activityTimer!==null){browser.clearTimeout?.(activityTimer);activityTimer=null}
+      clearProbe();
       if(confirmation){confirmation.abort();confirmation=null}
       if(frame!==null){browser.cancelAnimationFrame?.(frame);frame=null}
       voiceDetected=false;consecutive=0;
@@ -116,21 +136,44 @@
       let power=0,peak=0;
       for(const point of readBuffer){power+=point*point;peak=Math.max(peak,Math.abs(point))}
       const rms=Math.sqrt(power/readBuffer.length);
-      const active=rms>Math.max(0.028,noiseFloor*2.8)&&peak>0.095;
+      if(probing){
+        if(probeReady){
+          // Reject the decaying acoustic tail of the paused speaker. A room
+          // participant must remain audible above both noise and a meaningful
+          // fraction of the pre-pause output level.
+          const independent=rms>Math.max(0.028,noiseFloor*2.8,probeRms*0.58)&&peak>0.095;
+          probeConsecutive=independent?probeConsecutive+1:0;
+          if(probeConsecutive>=3){
+            clearProbe();voiceDetected=true;
+            report('independent-voice-detected');
+            try{onVoiceActivity('confirm')}catch(_){}
+            activityTimer=browser.setTimeout?.(()=>{
+              activityTimer=null;
+              if(!listening||!voiceDetected)return;
+              stop();onInterrupt('');
+            },5000)??null;
+            return;
+          }
+        }
+        frame=browser.requestAnimationFrame?.(sample)??null;
+        return;
+      }
+      const active=rms>Math.max(0.028,noiseFloor*2.8,echoBaseline*1.55)&&peak>0.095;
       consecutive=active?consecutive+1:Math.max(0,consecutive-1);
       if(!active)noiseFloor=Math.max(0.004,Math.min(0.04,noiseFloor*0.995+rms*0.005));
-      if(consecutive>=4){
-        voiceDetected=true;
-        report('voice-activity-detected');
-        try{onVoiceActivity()}catch(_){}
-        // If ASR cannot recover the short interruption, the Agent still must
-        // stay stopped and return to listening instead of resuming its reply.
-        activityTimer=browser.setTimeout?.(()=>{
-          activityTimer=null;
-          if(!listening||!voiceDetected)return;
-          stop();onInterrupt('');
-        },5000)??null;
-        return;
+      if(echoBaseline>0&&rms>noiseFloor*2&&rms<echoBaseline*1.55)echoBaseline=echoBaseline*0.98+rms*0.02;
+      if(consecutive>=4&&Date.now()>=echoCooldownUntil){
+        consecutive=0;probeRms=rms;
+        // Never permanently stop on microphone energy alone. A loud speaker
+        // sounds identical to a person until we briefly silence that speaker.
+        let paused=false;
+        try{paused=onVoiceActivity('probe')===true}catch(_){}
+        if(!paused){echoCooldownUntil=Date.now()+350;report('acoustic-probe-unavailable')}
+        else{
+          probing=true;probeReady=false;probeConsecutive=0;
+          probeTailTimer=browser.setTimeout?.(()=>{probeTailTimer=null;if(probing)probeReady=true},180)??null;
+          probeDeadlineTimer=browser.setTimeout?.(()=>{probeDeadlineTimer=null;resumeEcho()},640)??null;
+        }
       }
       frame=browser.requestAnimationFrame?.(sample)??null;
     };
@@ -161,6 +204,7 @@
       stop();
       if(typeof confirmCandidate!=='function'||!(browser.SpeechRecognition||browser.webkitSpeechRecognition))return false;
       listening=true;voiceDetected=false;consecutive=0;noiseFloor=0.008;fastFailures=0;
+      echoBaseline=0;echoCooldownUntil=0;
       const requested=generation;
       listen();
       if(typeof onVoiceActivity==='function'){

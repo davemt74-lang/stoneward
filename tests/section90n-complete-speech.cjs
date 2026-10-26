@@ -35,7 +35,7 @@ async function browserSpeakCompletesOrInterrupts(){
     StonefellowSpeechSegments:{split},voiceRepliesEnabled:true,voicePlaybackSequence:2,speechFallbackResolve:null,
     agent:()=>{}};
   vm.createContext(context);
-  vm.runInContext(extract(publicApp,'speakWithDeviceVoice')+';globalThis.run=speakWithDeviceVoice',context);
+  vm.runInContext(extract(publicApp,'cancelLocalVoiceOutput')+';'+extract(publicApp,'speakWithDeviceVoice')+';globalThis.run=speakWithDeviceVoice',context);
   const running=context.run(full,2);
   await Promise.resolve();
   assert.equal(spoken.length,1,'first short utterance starts without cutting response');
@@ -93,7 +93,7 @@ async function adminSpeakCompletesOrInterrupts(){
     adminConversationMonitor:{start:async()=>true,stop:()=>{}},adminConversationResume:()=>{},adminConversationEnabled:true,
     agent:()=>{},$:()=>({textContent:''})};
   vm.createContext(context);
-  vm.runInContext(extract(adminApp,'stopAdminSpeech')+';'+extract(adminApp,'speakAdminReply')+';globalThis.run=speakAdminReply;globalThis.stop=stopAdminSpeech',context);
+  vm.runInContext(extract(adminApp,'cancelAdminSpeechOutput')+';'+extract(adminApp,'stopAdminSpeech')+';'+extract(adminApp,'speakAdminReply')+';globalThis.run=speakAdminReply;globalThis.stop=stopAdminSpeech',context);
   const running=context.run(full);
   await Promise.resolve();
   assert.equal(spoken.length,1);

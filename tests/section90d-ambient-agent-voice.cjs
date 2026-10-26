@@ -60,7 +60,7 @@ check('Music wake phrase protects against lyrics while natural follow-ups work',
 
 check('ElevenLabs preferred; local system voice is fallback when unavailable',async()=>{
   let localCalls=0,remoteResult=false;
-  const sandbox={st:{conversationOn:true,playing:false},voiceRepliesEnabled:true,voiceInteractionStarted:true,voicePlaybackPending:false,voicePlaybackSequence:0,recognition:null,recognitionActive:false,conversationRestartTimer:null,voiceTurnBusy:false,agentInterrupt:{hidden:false},conversationBargeIn:{start:async()=>true,stop:()=>{}},clearTimeout:()=>{},scheduleConversationListen:()=>{},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},agent:()=>{}};
+  const sandbox={st:{conversationOn:true,playing:false},voiceRepliesEnabled:true,voiceInteractionStarted:true,voicePlaybackPending:false,voicePlaybackSequence:0,recognition:null,recognitionActive:false,conversationRestartTimer:null,voiceTurnBusy:false,agentInterrupt:{hidden:false},conversationBargeIn:{start:async()=>true,stop:()=>{}},clearTimeout:()=>{},scheduleConversationListen:()=>{},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},restoreVoiceProbeMusic:()=>{},agent:()=>{}};
   vm.createContext(sandbox);
   vm.runInContext(functionSource('agentSpeak',true)+';globalThis.run=agentSpeak',sandbox);
   assert.equal(await sandbox.run('Test voice'),true);assert.equal(localCalls,1);
@@ -70,7 +70,7 @@ check('ElevenLabs preferred; local system voice is fallback when unavailable',as
 
 check('Interrupt cancels playback without disabling listening',()=>{
   let stopped=0,restarted=0,restored=0;
-  const sandbox={st:{conversationOn:true,voiceAudio:{paused:false,pause:()=>stopped++}},voicePlaybackSequence:0,voiceAudioCancel:null,conversationBargeIn:{stop:()=>{}},speechFallbackResolve:null,voicePlaybackPending:true,agentInterrupt:{hidden:false},window:{},syncConversationMusic:()=>restored++,showTranscript:()=>{},agent:()=>{},scheduleConversationListen:()=>restarted++};
+  const sandbox={st:{conversationOn:true,voiceAudio:{paused:false,pause:()=>stopped++}},voicePlaybackSequence:0,voiceAudioCancel:null,conversationBargeIn:{stop:()=>{}},speechFallbackResolve:null,voicePlaybackPending:true,agentInterrupt:{hidden:false},window:{},syncConversationMusic:()=>restored++,restoreVoiceProbeMusic:()=>{},showTranscript:()=>{},agent:()=>{},scheduleConversationListen:()=>restarted++};
   vm.createContext(sandbox);
   vm.runInContext(functionSource('interruptVoicePlayback')+';globalThis.run=interruptVoicePlayback',sandbox);
   sandbox.run();assert.equal(stopped,1);assert.equal(restarted,1);assert.equal(restored,1);
