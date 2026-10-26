@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.148';
+  window.STONEFELLOW_APP_BUILD='1.3.149';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -15,8 +15,15 @@
   const conversationBargeIn=window.StonefellowBargeIn?.create(spoken=>{
     if(!st.conversationOn||!voicePlaybackPending)return;
     interruptVoicePlayback();
-    void submitVoiceTurn(spoken);
-  },window,signal=>window.StonefellowBargeIn.verifyAgentSpeech(voicePlaybackText,window,signal));
+    const request=String(spoken||'').trim();
+    if(request&&!/^(?:stop|stop speaking)$/i.test(request))void submitVoiceTurn(request);
+    else showTranscript(request?'Agent stopped. I’m listening.':'I heard someone, but missed the words. Please continue.','listening');
+  },window,signal=>window.StonefellowBargeIn.verifyAgentSpeech(voicePlaybackText,window,signal),
+  ()=>holdVoicePlaybackForBarge(),state=>{
+    if(st.conversationOn&&state==='microphone-monitor-unavailable')showTranscript('Interruption microphone unavailable. Check microphone permission; Stop speaking button remains available.','error');
+    if(st.conversationOn&&state==='microphone-monitor-suspended')showTranscript('Microphone audio monitor is suspended. Click the mic again if voice interruption does not work.','error');
+    if(st.conversationOn&&state==='speech-recognition-unavailable')showTranscript('Speech recognition could not stay active. Voice detection can still stop the Agent.','waiting');
+  });
   const voiceTranscript=$('#voiceTranscript'),voiceTranscriptText=$('#voiceTranscriptText');
   function showTranscript(text,phase='listening'){
     if(!voiceTranscript||!voiceTranscriptText)return;
@@ -99,6 +106,17 @@
         return action.type==='next_track'?'Moving to the next song.':'Moving to the previous song.';
     }
     return null;
+  }
+  function holdVoicePlaybackForBarge(){
+    if(!st.conversationOn||!voicePlaybackPending)return;
+    // Silence audio immediately but keep the primed recognizer alive to finish
+    // the participant's sentence before submitting the next Agent turn.
+    voicePlaybackSequence++;
+    if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
+    if(st.voiceAudio&&!st.voiceAudio.paused)st.voiceAudio.pause();
+    if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
+    agent('listening','I heard you. Keep speaking.');
+    showTranscript('Listening to the interruption…','listening');
   }
   function interruptVoicePlayback(){
     voicePlaybackSequence++;
@@ -1587,7 +1605,7 @@
     if(voicePlaybackPending||['THINKING','RESPONDING','SPEAKING'].includes(status.textContent)){scheduleConversationListen(450);return}
     try{recognition.start()}catch(e){if(e.name==='InvalidStateError'){scheduleConversationListen(600);return}stopConversation();showTranscript('The microphone could not start. Click the mic to retry.','error')}
   }
-  function stopConversation(){st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;interruptVoicePlayback();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
+  function stopConversation(){st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;interruptVoicePlayback();conversationBargeIn?.close();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
   async function submitVoiceTurn(spoken){
     const turn=++voiceTurnGeneration;
     voiceTurnBusy=true;clearTimeout(conversationRestartTimer);try{recognition?.stop()}catch(_){}
@@ -1606,7 +1624,7 @@
   }
   if(R){
     recognition=new R();recognition.lang='en-US';recognition.interimResults=true;recognition.continuous=false;
-    voice.onclick=()=>{if(st.conversationOn){stopConversation();return}voiceInteractionStarted=true;st.conversationOn=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');startConversationListen()};
+    voice.onclick=()=>{if(st.conversationOn){stopConversation();return}voiceInteractionStarted=true;st.conversationOn=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');void conversationBargeIn?.prepare();startConversationListen()};
     recognition.onstart=()=>{recognitionActive=true;if(voicePlaybackPending){try{recognition.abort()}catch(_){}return}if(st.conversationOn&&!voiceTurnBusy){agent('listening','I’m listening.');showTranscript(listeningPrompt(),'listening')}};
     recognition.onresult=e=>{if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending)return;const phrases=[];let finalReceived=false;for(let i=0;i<e.results.length;i++){const result=e.results[i],value=String(result[0]?.transcript||'').trim();if(value)phrases.push(value);if(result.isFinal&&value)finalReceived=true}const spoken=phrases.join(' ').trim();if(spoken)recognitionNetworkFailures=0;showTranscript(spoken?'You: '+spoken:listeningPrompt(),finalReceived?'heard':'listening');if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)};
     recognition.onerror=e=>{
@@ -1619,6 +1637,7 @@
     recognition.onend=()=>{recognitionActive=false;if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen(recognitionNetworkFailures?Math.min(7500,600*2**recognitionNetworkFailures):320)};
     updateConversationButton();
   }else{voice.disabled=true;voice.title='Voice recognition is not supported by this browser';showTranscript('Voice recognition is not supported here. Please type your message.','error')}
+  window.addEventListener('pagehide',()=>conversationBargeIn?.close());
   if(splash){const revision=splash.dataset.revision||'1',key='stonefellow.splash.seen.'+revision;if(sessionStorage.getItem(key)==='1')splash.hidden=true;const enter=$('#splashEnter');if(enter)enter.onclick=()=>{sessionStorage.setItem(key,'1');splash.hidden=true;input?.focus()}}
   $$('.social-links [data-social]').forEach(a=>{const u=cfg.socials?.[a.dataset.social];if(u&&u!=='#'){a.href=u;a.target='_blank';a.rel='noopener'}else a.onclick=e=>e.preventDefault()});
   bind(document); loadStore(); Promise.allSettled([loadAuth(true).then(()=>Promise.allSettled([loadAgentListeningSession(),loadQueue(true)])),loadPlans(),refreshSiteData()]).finally(()=>{routeFromLocation();setTimeout(()=>loadFanEngagement(false),900)});

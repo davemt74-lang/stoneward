@@ -74,7 +74,7 @@ async function adminConversationRestartsAndStops(){
     abort(){aborts++;this.onend?.()}
   };
   const sandbox={
-    $:selector=>elements[selector],window:{SpeechRecognition:FakeRecognition,StonefellowBargeIn:{create:()=>({start:async()=>true,stop:()=>{}})},SFAdminAgentCanvas:{send:async()=>{sendCount++;return {text:'Private response'}}}},
+    $:selector=>elements[selector],window:{SpeechRecognition:FakeRecognition,StonefellowBargeIn:{create:()=>({start:async()=>true,stop:()=>{},close:()=>{},prepare:async()=>true})},SFAdminAgentCanvas:{send:async()=>{sendCount++;return {text:'Private response'}}}},
     app:{view:'dashboard'},stopAdminSpeech:()=>{},speakAdminReply:()=>{speechCount++;sandbox.adminSpeechPending=true;},agent:()=>{},say:()=>{},
     adminSpeechActive:false,adminSpeechPending:false,adminConversationEnabled:false,adminConversationMonitor:null,adminConversationResume:null,
     Math,setTimeout:(callback)=>{const id=++timerId;timers.set(id,callback);return id},clearTimeout:id=>timers.delete(id)

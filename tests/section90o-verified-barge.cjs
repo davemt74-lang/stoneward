@@ -74,6 +74,9 @@ async function verificationRequiresSpeechNotEcho(){
     {0:{transcript:'stop'},isFinal:true}
   ]});
   assert.equal(await mixed,'stop','an accumulated Agent echo must not hide a later participant stop');
+  const twoWords=browser.StonefellowBargeIn.verifyAgentSpeech(reference+' Now let us stop.',browser);
+  instances[6].emit('stop now',true);
+  assert.equal(await twoWords,'stop now','a short participant command must not be rejected for sharing Agent words');
 }
 async function overlappingBargeTurnCannotBeOverwritten(){
   let firstResolve,secondResolve,resumes=0,listenMessages=[];
@@ -100,9 +103,13 @@ async function overlappingBargeTurnCannotBeOverwritten(){
 }
 async function wiring(){
   assert.match(app,/StonefellowBargeIn\.verifyAgentSpeech\(voicePlaybackText,window,signal\)/);
-  assert.match(app,/interruptVoicePlayback\(\);\s*void submitVoiceTurn\(spoken\)/);
+  assert.match(app,/interruptVoicePlayback\(\);\s*const request=String\(spoken\|\|''\)\.trim\(\)/);
+  assert.match(app,/void submitVoiceTurn\(request\)/);
+  assert.match(app,/holdVoicePlaybackForBarge\(\)/);
   assert.match(admin,/StonefellowBargeIn\.verifyAgentSpeech\(adminSpeechText,window,signal\)/);
-  assert.match(admin,/stopAdminSpeech\(\);\s*void submit\(spoken\)/);
+  assert.match(admin,/stopAdminSpeech\(\);\s*const request=String\(spoken\|\|''\)\.trim\(\)/);
+  assert.match(admin,/void submit\(request\)/);
+  assert.match(admin,/holdAdminSpeechForBarge\(\)/);
   assert.match(admin,/async function submit\(voiceOverride=null\)/);
   assert.match(read('service-worker.js'),/conversation-barge-in\.js/);
 }
