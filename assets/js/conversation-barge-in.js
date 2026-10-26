@@ -1,6 +1,6 @@
-/* Shared local microphone activity monitor for Stonefellow conversation mode.
- * Loudness is only a candidate: it must never cancel Agent speech without
- * a separate, non-echo speech-recognition result.
+/* Shared public/Admin speech monitor for hands-free Agent barge-in.
+ * Recognition begins before playback so a short "stop" is not over before
+ * the microphone starts. Agent echo is filtered before any interruption.
  */
 (() => {
   'use strict';
@@ -10,7 +10,7 @@
     if(!Recognition||signal?.aborted)return Promise.resolve(null);
     return new Promise(resolve=>{
       const recognizer=new Recognition();
-      let settled=false;
+      let settled=false,partialIndependent=null;
       const expected=normalized(reference),expectedWords=new Set(expected.split(' ').filter(Boolean));
       const finish=value=>{
         if(settled)return;
@@ -21,96 +21,65 @@
       };
       const onAbort=()=>finish(null);
       signal?.addEventListener?.('abort',onAbort,{once:true});
-      recognizer.lang='en-US';recognizer.continuous=false;recognizer.interimResults=true;
+      recognizer.lang='en-US';recognizer.continuous=true;recognizer.interimResults=true;
       recognizer.onresult=event=>{
-        let transcript='',final=false;
+        // Treat each recognized utterance separately. A long-lived recognizer
+        // may accumulate earlier Agent echo before hearing a visitor's "stop".
         for(let i=0;i<event.results.length;i++){
           const entry=event.results[i],alternative=entry[0];
-          transcript+=' '+String(alternative?.transcript||'');
-          final=final||!!entry.isFinal;
-        }
-        const candidate=normalized(transcript),words=candidate.split(' ').filter(Boolean);
-        if(!candidate)return;
-        // Browser ASR can hear the Agent through speakers even with AEC.
-        // Never mistake verbatim/near-verbatim response audio for the user.
-        const novelWords=words.filter(word=>!expectedWords.has(word)).length;
-        const overlap=1-novelWords/words.length;
-        const echo=expected.includes(candidate)||(words.length>=2&&novelWords<2)||(words.length>=3&&overlap>=0.85);
-        if(echo)return;
-        // The final ASR boundary preserves the user's full interruption;
-        // sending an interim phrase would cut off their own sentence.
-        if(final&&(words.length>=2||novelWords===1)){
-          finish(String(transcript).trim());
+          const transcript=String(alternative?.transcript||'').trim();
+          const candidate=normalized(transcript),words=candidate.split(' ').filter(Boolean);
+          if(!candidate)continue;
+          // Browser ASR can hear the Agent through speakers even with AEC.
+          // Reject complete or nearly complete matches to its actual words.
+          const novelWords=words.filter(word=>!expectedWords.has(word)).length;
+          const overlap=1-novelWords/words.length;
+          const explicitStop=candidate==='stop';
+          const echo=!explicitStop&&(expected.includes(candidate)||(words.length>=2&&novelWords<2)||(words.length>=3&&overlap>=0.85));
+          if(echo)continue;
+          // Final results preserve the user's complete instruction. Interim
+          // results are retained only if the browser ends without a final.
+          partialIndependent=transcript;
+          if(entry.isFinal&&(words.length>=2||novelWords===1||explicitStop)){finish(transcript);return}
         }
       };
       recognizer.onerror=()=>finish(null);
-      recognizer.onend=()=>finish(null);
+      // Some browsers end recognition without an isFinal event. Retain
+      // independent words, but never an echoed Agent fragment.
+      recognizer.onend=()=>finish(partialIndependent);
       try{recognizer.start()}catch(_){finish(null)}
     });
   }
   function create(onInterrupt, browser=window, confirmCandidate=null) {
-    let generation=0, stream=null, context=null, analyser=null, frame=0, confirmation=null;
-    let listening=false, speakingSince=0, consecutive=0, noiseFloor=0.008,cooldownUntil=0;
-    const readBuffer=new Float32Array(1024);
+    let generation=0,listening=false,confirmation=null,restartTimer=null;
     const stop=()=>{
-      generation++;listening=false;consecutive=0;
+      generation++;listening=false;
+      if(restartTimer!==null){browser.clearTimeout?.(restartTimer);restartTimer=null}
       if(confirmation){confirmation.abort();confirmation=null}
-      if(frame){browser.cancelAnimationFrame?.(frame);frame=0}
-      if(stream){stream.getTracks().forEach(track=>track.stop());stream=null}
-      if(context){void context.close?.().catch?.(()=>{});context=null}
-      analyser=null;
     };
-    const sample=()=>{
-      frame=0;if(!listening||!analyser)return;
-      analyser.getFloatTimeDomainData(readBuffer);
-      let power=0,peak=0;
-      for(const x of readBuffer){power+=x*x;peak=Math.max(peak,Math.abs(x))}
-      const rms=Math.sqrt(power/readBuffer.length);
-      const now=Date.now();
-      // AEC handles speaker feedback. Require a sustained foreground voice onset
-      // to avoid reacting to clicks, quiet residual echo, and short noise bursts.
-      const foreground=now>cooldownUntil&&now-speakingSince>400&&rms>Math.max(0.035,noiseFloor*3.2)&&peak>0.11;
-      consecutive=foreground?consecutive+1:Math.max(0,consecutive-2);
-      if(!foreground)noiseFloor=Math.max(0.004,Math.min(0.045,noiseFloor*0.995+rms*0.005));
-      if(consecutive>=7){
-        stop();
-        if(typeof confirmCandidate!=='function')return;
-        const attempt=generation,controller=new AbortController();
-        confirmation=controller;
-        Promise.resolve().then(()=>confirmCandidate(controller.signal)).then(phrase=>{
-          if(controller.signal.aborted||attempt!==generation)return;
-          confirmation=null;
-          if(typeof phrase==='string'&&phrase.trim()){onInterrupt(phrase.trim());return}
-          cooldownUntil=Date.now()+3500;
-          void start();
-        }).catch(()=>{
-          if(controller.signal.aborted||attempt!==generation)return;
-          confirmation=null;cooldownUntil=Date.now()+3500;void start();
-        });
-        return;
-      }
-      frame=browser.requestAnimationFrame(sample);
+    const listen=()=>{
+      if(!listening||typeof confirmCandidate!=='function')return;
+      const attempt=generation,controller=new AbortController();
+      confirmation=controller;
+      Promise.resolve().then(()=>confirmCandidate(controller.signal)).then(phrase=>{
+        if(controller.signal.aborted||attempt!==generation||!listening)return;
+        confirmation=null;
+        if(typeof phrase==='string'&&phrase.trim()){
+          stop();onInterrupt(phrase.trim());return;
+        }
+        // Web Speech Recognition often ends after a natural silence. Keep
+        // it armed throughout the reply without a manual microphone click.
+        restartTimer=browser.setTimeout?.(()=>{restartTimer=null;listen()},250)??null;
+      }).catch(()=>{
+        if(controller.signal.aborted||attempt!==generation||!listening)return;
+        confirmation=null;
+        restartTimer=browser.setTimeout?.(()=>{restartTimer=null;listen()},750)??null;
+      });
     };
     const start=async()=>{
-      stop();const requested=++generation;
-      const AudioContextClass=browser.AudioContext||browser.webkitAudioContext;
-      if(!AudioContextClass||!browser.navigator?.mediaDevices?.getUserMedia||typeof confirmCandidate!=='function')return false;
-      let media;
-      try{media=await browser.navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false})}
-      catch(_){return false}
-      if(requested!==generation){media.getTracks().forEach(track=>track.stop());return false}
-      try{
-        const audioContext=new AudioContextClass(),source=audioContext.createMediaStreamSource(media);
-        const highPass=audioContext.createBiquadFilter();highPass.type='highpass';highPass.frequency.value=160;
-        const lowPass=audioContext.createBiquadFilter();lowPass.type='lowpass';lowPass.frequency.value=3500;
-        const detector=audioContext.createAnalyser();detector.fftSize=2048;detector.smoothingTimeConstant=0.15;
-        source.connect(highPass);highPass.connect(lowPass);lowPass.connect(detector);
-        if(requested!==generation){media.getTracks().forEach(track=>track.stop());void audioContext.close();return false}
-        stream=media;context=audioContext;analyser=detector;listening=true;
-        speakingSince=Date.now();consecutive=0;noiseFloor=0.008;
-        frame=browser.requestAnimationFrame(sample);
-        return true;
-      }catch(_){media.getTracks().forEach(track=>track.stop());return false}
+      stop();
+      if(typeof confirmCandidate!=='function'||!(browser.SpeechRecognition||browser.webkitSpeechRecognition))return false;
+      listening=true;listen();return true;
     };
     return {start,stop,get active(){return listening}};
   }
