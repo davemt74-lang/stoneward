@@ -1,3 +1,16 @@
+# Stonefellow v1.3.142 — Section 90J: Agent page awareness and exact-record navigation
+
+- The public Agent understands “what page am I on?” and “what can I do here?”, with actionable suggestions tied to the current installed view.
+- Exact named song and release requests open the published item in the existing SPA without restarting music playback or resetting chat.
+- “Open my latest release” uses verified published release dates, requiring disambiguation for same-day releases.
+- Relative requests such as “open this song” resolve against the viewed track or currently playing public track; “open this release” resolves against the validated current release.
+- Ambiguous titles, unpublished items, forged route IDs, arbitrary URLs and unsupported page names never become a deep link.
+- Admin Agent Chat accepts bounded page context and answers what the current installed Admin module supports without executing an edit or revealing private record data.
+- “Open the song editor for Exact Song Title” opens the matching Admin Catalog editor without automatically saving or publishing.
+- No schema migration. Added Section 90J PHP and JavaScript regression tests to the release gate; Section 90I and prior approval contracts remain unchanged.
+
+---
+
 # Stonefellow v1.3.141 — Section 90I: Agent page navigation
 
 - Natural-language public Agent commands can switch between installed Stonefellow pages, including Music, Releases, Shows, My Library, Agent Chat and Agent Brain.

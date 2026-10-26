@@ -16,7 +16,7 @@ $checks=[
  'Sticky footer supports multiline typing'=>str_contains($html,'<textarea id="adminChatInput" rows="1" maxlength="4000"'),
  'Textarea and submit button are accessible'=>str_contains($html,'aria-label="Message your Admin Agent"') && str_contains($html,'aria-label="Send message"'),
  'Only one canonical footer send function'=>substr_count($admin,'window.SFAdminAgentCanvas.send(message)')===1,
- 'Send uses existing authenticated Admin endpoint'=>str_contains($chat,"c.api('agent-chat.php',{message,conversation_id:conversationId})") && str_contains($endpoint,'sf_admin_require_auth($write)'),
+ 'Send uses existing authenticated Admin endpoint'=>str_contains($chat,"c.api('agent-chat.php',{message,conversation_id:conversationId,") && str_contains($chat,"client_state:{view:c.app?.view||'agent-chat'}") && str_contains($endpoint,'sf_admin_require_auth($write)'),
  'Existing Admin Agent session remains authoritative'=>str_contains($chat,"stonefellow.admin.agent.thread") && str_contains($chat,"sessionStorage.setItem('stonefellow.admin.agent.thread',conversationId)"),
  'Open chat footer uses same controller from other screens'=>str_contains($admin,"$('#openAdminAgentChat').onclick=()=>openView('agent-chat')"),
  'Single route updates unified chat layout state'=>str_contains($admin,"adminApp.classList.toggle('admin-agent-chat-active',view==='agent-chat')"),

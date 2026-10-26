@@ -16,7 +16,7 @@ if(!$write){
 if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $b=sf_request_json();
 try{
-    $answer=sf_admin_agent_reply($adminId,(string)($b['conversation_id']??''),(string)($b['message']??''));
+    $answer=sf_admin_agent_reply($adminId,(string)($b['conversation_id']??''),(string)($b['message']??''),is_array($b['client_state']??null)?$b['client_state']:[]);
     sf_json_response(['ok'=>true]+$answer);
 }catch(InvalidArgumentException $e){
     sf_json_response(['ok'=>false,'error'=>'invalid_request','message'=>'Check the message or conversation.'],422);

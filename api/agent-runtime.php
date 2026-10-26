@@ -159,6 +159,35 @@ function sf_agent_find_track(string $message,?string $activeId=null): ?array {
     if($activeId)foreach(sf_agent_public_catalog() as $t)if((string)($t['id']??'')===$activeId)return $t;
     return null;
 }
+
+/** Published releases only. A hidden draft may not become a deep-link target. */
+function sf_agent_public_releases_for_navigation(): array {
+    if(!function_exists('sf_release_rows')||!function_exists('sf_seo_public_release'))return [];
+    $visible=[];
+    foreach(sf_release_rows() as $release){
+        $id=(string)($release['id']??'');
+        if($id!==''&&sf_seo_public_release($id))$visible[]=$release;
+    }
+    return $visible;
+}
+
+function sf_agent_public_detail_target(string $message,array $client=[]): ?array {
+    $request=sf_agent_detail_request($message);if($request===null)return null;
+    $kind=$request['kind'];$records=$kind==='track'?sf_agent_public_catalog():sf_agent_public_releases_for_navigation();
+    if(!empty($request['latest'])&&$kind==='release'){
+        $matches=sf_agent_latest_release_matches($records);
+    }elseif($request['relative']){
+        $id=$kind==='track'
+            ?((string)($client['view']??'')==='track'?(string)($client['route_id']??''):(string)($client['active_track_id']??''))
+            :((string)($client['view']??'')==='release'?(string)($client['route_id']??''):'');
+        $matches=array_values(array_filter($records,static fn($r)=>(string)($r['id']??'')===$id&&$id!==''));
+    }else{$matches=sf_agent_exact_title_matches($request['title'],$records);}
+    $count=count($matches);
+    return ['status'=>$count===1?'found':($count>1?'ambiguous':'not_found'),
+        'kind'=>$kind,'requested_title'=>$request['title'],
+        'id'=>$count===1?(string)$matches[0]['id']:'',
+        'title'=>$count===1?(string)$matches[0]['title']:''];
+}
 function sf_agent_track_score(array $t,string $message): int {
     $q=strtolower($message);$score=0;$hay=strtolower(implode(' ',array_merge([(string)($t['title']??''),(string)($t['release']??'')],(array)($t['mood']??[]),(array)($t['themes']??[]))));
     foreach(array_filter(preg_split('/[^a-z0-9]+/',$q)?:[],fn($w)=>strlen($w)>2) as $w)if(str_contains($hay,$w))$score+=2;
@@ -192,6 +221,8 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
 }
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
+    if(sf_agent_page_context_request($message))return 'page_context';
+    if(sf_agent_detail_request($message)!==null)return 'page_detail';
     if(sf_agent_public_page_target($message)!==null)return 'page_navigate';
     if(preg_match('/\\b(?:remove|unsave)\\b.*\\b(?:favorite|favorites)\\b|\\b(?:unfavorite|unlike)\\b/',$q))return 'favorite_remove';
     if(preg_match('/\\b(?:add|save|mark)\\b.*\\b(?:favorite|favorites)\\b|\\bfavorite (?:this|that|the)\\b/',$q))return 'favorite_save';
@@ -257,6 +288,27 @@ function sf_agent_local_route(string $message,array $client=[]): string {
 function sf_agent_policy(string $route,string $message,array $client=[],?int $userId=null): array {
     $active=(string)($client['active_track_id']??'');$track=sf_agent_find_track($message,$active);$action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
+        case 'page_context':
+            $page=sf_agent_public_page_context($client,sf_agent_public_catalog(),sf_agent_public_releases_for_navigation());
+            $text='You are viewing '.$page['label'].'. ';
+            $tips=['track'=>'You can ask me to play or save this song, or add it to your record build.',
+                'release'=>'You can browse its tracklist or ask me to open a particular song.',
+                'music'=>'Search for a song or ask me to open a published track by name.',
+                'library'=>'Browse your saved tracks, releases, collections and playlists.',
+                'builder'=>'Add songs, arrange the two sides and save the record draft.',
+                'store'=>'Review available music and merchandise; checkout always needs your confirmation.',
+                'agent-chat'=>'Ask about music, playback, your collection or another installed page.'];
+            $text.=$tips[$page['view']]??'Ask me to open an installed page or find a published song or release.';
+            break;
+        case 'page_detail':
+            $detail=sf_agent_public_detail_target($message,$client);
+            if(($detail['status']??'')==='found'){
+                $action=['type'=>'open_view','view'=>$detail['kind'],'id'=>$detail['id']];
+                $text='Opening '.$detail['kind'].' “'.$detail['title'].'”.';
+            }elseif(($detail['status']??'')==='ambiguous'){
+                $text='There is more than one published '.($detail['kind']??'record').' with that title. Please choose it from the catalog.';
+            }else{$text='I could not find that published '.($detail['kind']??'record').'. Try its exact title in the catalog.';}
+            break;
         case 'page_navigate':
             $page=sf_agent_public_page_target($message);
             if($page!==null){
@@ -535,7 +587,7 @@ function sf_anthropic_call(array $provider,string $system,array $history,string 
  */
 function sf_agent_normalize_client_state(array $raw): array {
     $out=[];
-    $text=['active_track_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120];
+    $text=['active_track_id'=>180,'route_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120];
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
     }
@@ -554,7 +606,8 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
     // Explicit page navigation takes priority over advisory JEV classifications.
-    $route=sf_agent_public_page_target($message)!==null?'page_navigate':(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
+    $explicitContext=sf_agent_page_context_request($message)?'page_context':(sf_agent_detail_request($message)!==null?'page_detail':(sf_agent_public_page_target($message)!==null?'page_navigate':null));
+    $route=$explicitContext??(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
     sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$jev['run_id']??'','status'=>$jev['status']??($routeSource==='local'?'local_fallback':'error'),'input_tokens'=>$jev['input_tokens']??0,'output_tokens'=>$jev['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action']]);
     if(!$plan['needs_llm']){
         $text=$plan['text']!==''?$plan['text']:'Ready.';

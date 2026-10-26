@@ -1384,14 +1384,19 @@
     const message=String(text||'').trim();if(!message)return;
     busy=true;
     try{
-      const r=await c.api('agent-chat.php',{message,conversation_id:conversationId});
+      const r=await c.api('agent-chat.php',{message,conversation_id:conversationId,
+        client_state:{view:c.app?.view||'agent-chat'}});
       conversationId=r.conversation_id||conversationId;
       if(conversationId)sessionStorage.setItem('stonefellow.admin.agent.thread',conversationId);
       c.openView('agent-chat');
       const status=c.canvas.querySelector('#adminAgentChatStatus');if(status)status.textContent='';
       if(r.action?.auto_navigate===true &&
          r.action?.tool_contract?.tool_id==='admin_module_navigate' &&
-         adminModuleViews.has(r.action.view))c.openView(r.action.view);
+         adminModuleViews.has(r.action.view)){
+        if(r.action.type==='open_catalog_record' && r.action.view==='catalog' && r.action.track_id)
+          c.openCatalogTrack?.(r.action.track_id);
+        else c.openView(r.action.view);
+      }
       return r;
     }finally{busy=false;}
   }

@@ -104,3 +104,84 @@ function sf_agent_admin_page_target(string $message): ?array {
     }
     return null;
 }
+
+/** Section 90J: recognize a specific record, not just its parent page. */
+function sf_agent_detail_request(string $message): ?array {
+    $input=trim($message);
+    if(preg_match('/^(?:please\s+)?(?:open|show(?: me)?|view|pull up|take me to|go to)\s+(?:(?:the|my)\s+)?(?:latest|newest)\s+(album|release)[.!?]*$/iu',$input,$latest)){
+        return ['kind'=>'release','title'=>'latest','relative'=>false,'latest'=>true];
+    }
+    if(preg_match('/^(?:hey\s+(?:stonefellow|agent)[, ]+)?(?:please\s+)?(?:open|show(?: me)?|view|pull up|take me to|go to|navigate to)\s+(?:this|the current)\s+(song|track|album|release)[.!?]*$/iu',$input,$relative)){
+        return ['kind'=>in_array(strtolower($relative[1]),['song','track'],true)?'track':'release',
+            'title'=>'this','relative'=>true];
+    }
+    if(!preg_match('/^(?:hey\s+(?:stonefellow|agent)[, ]+)?(?:please\s+)?(?:open|show(?: me)?|view|pull up|take me to|go to|navigate to)\s+(?:(?:the|my)\s+)?(song|track|album|release)\s+(.+)$/iu',$input,$m))return null;
+    $kind=in_array(strtolower($m[1]),['song','track'],true)?'track':'release';
+    $name=trim(preg_replace('/[.!?]+$/u','',trim($m[2]))??$m[2]);
+    $name=preg_replace('/\s+(?:page|screen|details?)$/iu','',$name)??$name;
+    $name=trim($name," \t\n\r\0\x0B\"'“”‘’");
+    if($name===''||strlen($name)>180)return null;
+    return ['kind'=>$kind,'title'=>$name,'relative'=>in_array(strtolower($name),['this','this one','current','current one'],true)];
+}
+
+/** Exact normalized title matching only; no fuzzy selection of the wrong song. */
+function sf_agent_exact_title_matches(string $title,array $records): array {
+    $normalize=static function(string $value):string {
+        $value=trim(preg_replace('/\s+/u',' ',$value)??$value);
+        return function_exists('mb_strtolower')?mb_strtolower($value,'UTF-8'):strtolower($value);
+    };
+    $needle=$normalize($title);$matches=[];
+    foreach($records as $record){
+        if(!is_array($record)||!isset($record['id'],$record['title']))continue;
+        if($needle!==''&&$normalize((string)$record['title'])===$needle)$matches[]=$record;
+    }
+    return $matches;
+}
+
+function sf_agent_latest_release_matches(array $releases): array {
+    $dated=[];
+    foreach($releases as $release){
+        $date=(string)($release['release_date']??'');
+        if(!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D',$date,$m)||!checkdate((int)$m[2],(int)$m[3],(int)$m[1]))continue;
+        $dated[]=$release;
+    }
+    if(!$dated)return [];
+    usort($dated,static fn($a,$b)=>strcmp((string)$b['release_date'],(string)$a['release_date']));
+    $latest=(string)$dated[0]['release_date'];
+    return array_values(array_filter($dated,static fn($row)=>(string)$row['release_date']===$latest));
+}
+
+function sf_agent_page_context_request(string $message): bool {
+    return (bool)preg_match('/^(?:please\s+)?(?:what page am i on|where am i(?: on (?:the|this) (?:site|website))?|what can i do (?:on this page|here)|what actions (?:are available|can i take) here)[.!?]*$/iu',trim($message));
+}
+
+/** Client route data is only a hint. Names and entities are resolved server-side. */
+function sf_agent_public_page_context(array $client,array $tracks=[],array $releases=[]): array {
+    $view=(string)($client['view']??'');$id=(string)($client['route_id']??'');
+    $pages=sf_agent_public_page_destinations();
+    if(isset($pages[$view]))return ['view'=>$view,'label'=>$pages[$view]['label']];
+    if(in_array($view,['track','release'],true)&&$id!==''){
+        $pool=$view==='track'?$tracks:$releases;
+        foreach($pool as $record)if((string)($record['id']??'')===$id){
+            return ['view'=>$view,'label'=>($view==='track'?'Track':'Release').' “'.(string)$record['title'].'”'];
+        }
+    }
+    return ['view'=>'unknown','label'=>'an unrecognized page'];
+}
+
+function sf_agent_admin_page_context(array $client): array {
+    $view=(string)($client['view']??'');
+    $pages=sf_agent_admin_page_destinations();
+    if(!isset($pages[$view]))return ['view'=>'unknown','label'=>'an unrecognized Admin page'];
+    return ['view'=>$view,'label'=>$pages[$view]['label']];
+}
+
+/** An explicit request to inspect a named track in the existing Admin editor. */
+function sf_agent_admin_catalog_editor_request(string $message): ?string {
+    $input=trim($message);$title=null;
+    if(preg_match('/^(?:please\s+)?(?:open|show(?: me)?|view)\s+(?:the\s+)?(?:song|track)\s+editor\s+for\s+(.+)$/iu',$input,$m))$title=$m[1];
+    elseif(preg_match('/^(?:please\s+)?(?:open|show(?: me)?|view)\s+(?:the\s+)?(?:song|track)\s+(.+)\s+in\s+(?:the\s+)?editor[.!?]*$/iu',$input,$m))$title=$m[1];
+    if($title===null)return null;
+    $title=trim(preg_replace('/[.!?]+$/u','',$title)??$title," \t\n\r\0\x0B\"'“”‘’");
+    return $title!==''&&strlen($title)<=180?$title:null;
+}

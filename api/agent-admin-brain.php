@@ -325,13 +325,45 @@ function sf_admin_agent_brain_snapshot(int $adminId): array {
         'research_opportunities'=>sf_agent_proactive_admin_research(sf_admin_agent_operational_context())
     ];
 }
-function sf_admin_agent_reply(int $adminId,string $threadId,string $message): array {
+function sf_admin_agent_reply(int $adminId,string $threadId,string $message,array $client=[]): array {
     if($adminId<1)throw new RuntimeException('Administrator authentication required.');
     $message=trim($message);
     if($message===''||strlen($message)>4000)throw new InvalidArgumentException('Message must be 1–4000 bytes.');
     $threadId=sf_admin_agent_thread($adminId,$threadId);
     $prior=sf_admin_agent_thread_messages($adminId,$threadId);
     sf_admin_agent_save_message($adminId,$threadId,'user',$message);
+    $catalogTitle=sf_agent_admin_catalog_editor_request($message);
+    if($catalogTitle!==null){
+        $matches=sf_agent_exact_title_matches($catalogTitle,sf_catalog());
+        $contract=sf_agent_orchestration_contract('admin','navigate_admin_page');
+        $allowed=$contract['tool_id']==='admin_module_navigate' && $contract['may_read_or_navigate'];
+        $action=['type'=>'none','view'=>'agent-chat','requires_confirmation'=>false];
+        if(!$allowed)$text='Catalog navigation is not available to this Admin Agent.';
+        elseif(count($matches)===1){
+            $action=['type'=>'open_catalog_record','view'=>'catalog','track_id'=>(string)$matches[0]['id'],
+                'auto_navigate'=>true,'requires_confirmation'=>false,'tool_contract'=>$contract];
+            $text='Opening the existing catalog editor for “'.(string)$matches[0]['title'].'”. No changes have been saved.';
+        }elseif(count($matches)>1)$text='More than one catalog song has that title. Please select the correct recording in Catalog.';
+        else $text='I could not find a catalog song with that exact title. No editor was opened.';
+        sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
+        return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,
+            'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>'open_catalog_record','status'=>'read_only']];
+    }
+    if(sf_agent_page_context_request($message)){
+        $page=sf_agent_admin_page_context($client);
+        $help=['catalog'=>'You can inspect songs, filter metadata, or request a reviewed catalog edit.',
+            'crm'=>'You can inspect fan contacts and newsletter consent before preparing a campaign.',
+            'campaigns'=>'You can draft a campaign; publishing or sending requires separate approval.',
+            'media'=>'You can browse uploaded files; new uploads require you to choose a local file.',
+            'releases'=>'You can review release metadata and production readiness.',
+            'brain'=>'You can review Agent decisions, pending approvals and mission history.',
+            'agent-chat'=>'Ask me to navigate to a module, inspect operational status or prepare a reviewed action.'];
+        $text='You are viewing '.$page['label'].'. '.($help[$page['view']]??'I can navigate to installed Admin modules; changes still follow their existing approval and permission rules.');
+        $action=['type'=>'none','view'=>$page['view'],'requires_confirmation'=>false];
+        sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
+        return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,
+            'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>'page_context','status'=>'read_only']];
+    }
     $plan=sf_admin_agent_plan($message);$context=sf_admin_agent_operational_context();$missionState=sf_admin_agent_mission_summary($adminId);
     $brief=sf_admin_agent_decision_brief($context);
     $missionPlan=sf_agent_mission_plan('admin',$message,$plan['type']);
