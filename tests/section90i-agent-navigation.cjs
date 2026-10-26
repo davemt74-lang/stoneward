@@ -28,7 +28,8 @@ check('Page targets are fixed server-side, with no URL navigation',()=>{
 check('Admin automatic switches are authenticated and require navigation contract',()=>{
   assert.match(adminAgent,/r\.action\?\.auto_navigate===true/);
   assert.match(adminAgent,/r\.action\?\.tool_contract\?\.tool_id==='admin_module_navigate'/);
-  assert.match(adminAgent,/adminModuleViews\.has\(r\.action\.view\)\)c\.openView\(r\.action\.view\)/);
+  assert.match(adminAgent,/adminModuleViews\.has\(r\.action\.view\)\)\{/);
+  assert.match(adminAgent,/else c\.openView\(r\.action\.view\)/);
   assert.match(adminPhp,/sf_agent_admin_page_target\(\$message\)/);
   assert.match(adminPhp,/\$action\['auto_navigate'\]=true/);
 });
