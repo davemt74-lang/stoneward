@@ -111,9 +111,11 @@ jobs:
       - name: Install FFmpeg for actual private render certification
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
-          /usr/bin/ffmpeg -version | head -n 1
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq -o Acquire::Retries=1 -o Acquire::http::Timeout=15
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -n 1
 
       - name: v1.3 regression suites
         run: |
