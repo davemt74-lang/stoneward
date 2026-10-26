@@ -15,7 +15,7 @@ const context={
   submitRecognizedVoiceTurn:spoken=>{turns.push(spoken);context.setBusy(true)}
 };
 vm.createContext(context);
-vm.runInContext('let voiceTurnBusy=false;recognition.onresult=e=>{'+body+'};globalThis.setBusy=v=>{voiceTurnBusy=v}',context);
+vm.runInContext('let voiceTurnBusy=false,voicePlaybackPending=false;recognition.onresult=e=>{'+body+'};globalThis.setBusy=v=>{voiceTurnBusy=v};globalThis.setPlayback=v=>{voicePlaybackPending=v}',context);
 
 context.recognition.onresult({results:[{0:{transcript:'hello stone'},isFinal:false}]});
 assert.deepEqual(events.at(-1),{text:'You: hello stone',phase:'listening'});
@@ -30,6 +30,11 @@ context.recognition.onresult({results:[{0:{transcript:'hello Stonefellow'},isFin
 assert.equal(turns.length,1,'Repeated final event cannot duplicate the voice turn');
 
 context.setBusy(false);
+context.setPlayback(true);
+context.recognition.onresult({results:[{0:{transcript:'Stonefellow speaking through speakers'},isFinal:true}]});
+assert.equal(turns.length,1,'Agent playback must never become a recognized user turn');
+context.setPlayback(false);
+
 context.recognition.onresult({results:[{0:{transcript:'Can you'},isFinal:true},{0:{transcript:'play music'},isFinal:false}]});
 assert.equal(turns.at(-1),'Can you play music','Mixed final/interim frames preserve all recognized words');
-console.log('Section 90A voice transcript: 9/9 behavioral checks passed');
+console.log('Section 90A voice transcript: 10/10 behavioral checks passed');

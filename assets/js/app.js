@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.143';
+  window.STONEFELLOW_APP_BUILD='1.3.144';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -11,7 +11,10 @@
   let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupEntries=[];
   const voiceReplyToggle=$('#agentVoiceReplyToggle');
   let voiceRepliesEnabled=localStorage.getItem('stonefellow.voice.replies.v1')!=='off',voiceInteractionStarted=false;
-  let voicePlaybackPending=false,speechFallbackResolve=null,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0;
+  let voicePlaybackPending=false,speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0;
+  const conversationBargeIn=window.StonefellowBargeIn?.create(()=>{
+    if(st.conversationOn&&voicePlaybackPending)interruptVoicePlayback();
+  });
   const voiceTranscript=$('#voiceTranscript'),voiceTranscriptText=$('#voiceTranscriptText');
   function showTranscript(text,phase='listening'){
     if(!voiceTranscript||!voiceTranscriptText)return;
@@ -35,6 +38,9 @@
     }else if(musicOriginalVolume!==null){audio.volume=musicOriginalVolume;musicOriginalVolume=null}
   }
   function interruptVoicePlayback(){
+    voicePlaybackSequence++;
+    conversationBargeIn?.stop();
+    if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
     if(st.voiceAudio&&!st.voiceAudio.paused)st.voiceAudio.pause();
     if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
     voicePlaybackPending=false;
@@ -64,12 +70,12 @@
   function related(base){if(!base)return catalog[0];const keys=new Set([...base.mood,...base.themes]);return catalog.filter(t=>t.id!==base.id).map(t=>({t,s:[...t.mood,...t.themes].filter(x=>keys.has(x)).length*3-Math.abs((t.energy||3)-(base.energy||3))})).sort((a,b)=>b.s-a.s)[0]?.t||catalog.find(t=>t.id!==base.id)}
   async function api(path,body){const opts=body===undefined?{credentials:'same-origin'}:{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body)};const r=await fetch((cfg.apiBase||'api')+'/'+path,opts);let j={};try{j=await r.json();if(!j||typeof j!=='object'||Array.isArray(j))throw new Error('invalid_payload')}catch(_){const e=new Error(path==='storefront.php'?'Store service returned unreadable data (HTTP '+r.status+').':'Service returned unreadable data (HTTP '+r.status+').');e.status=r.status;throw e}if(!r.ok||j.ok===false){const e=new Error(j.message||j.errors?.join(' ')||j.error||'Store request failed.');e.payload=j;throw e}return j}
   async function loadPlans(){try{const j=await api('plans.php');st.plans=j.plans||[];return st.plans}catch(_){st.plans=[];return []}}
-  async function speakWithDeviceVoice(text){
+  async function speakWithDeviceVoice(text,sequence=voicePlaybackSequence){
     if(!window.speechSynthesis||!window.SpeechSynthesisUtterance||!voiceRepliesEnabled)return false;
     // A browser voice is only a privacy-safe fallback when the browser marks it local.
     let installed=window.speechSynthesis.getVoices().filter(voice=>voice.localService===true);
     if(!installed.length){await new Promise(resolve=>{const synth=window.speechSynthesis;const timer=setTimeout(done,900);function done(){clearTimeout(timer);synth.removeEventListener?.('voiceschanged',done);resolve()}synth.addEventListener?.('voiceschanged',done)});installed=window.speechSynthesis.getVoices().filter(voice=>voice.localService===true)}
-    if(!voiceRepliesEnabled)return false;
+    if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence)return null;
     const selected=installed.find(voice=>/^en[-_]/i.test(voice.lang))||installed[0];
     if(!selected)return false;
     return new Promise(resolve=>{
@@ -78,46 +84,63 @@
       let finished=false;
       const done=ok=>{if(finished)return;finished=true;if(speechFallbackResolve===done)speechFallbackResolve=null;resolve(ok)};
       speechFallbackResolve=done;
-      utterance.onstart=()=>{if(voiceRepliesEnabled)agent('speaking',text)};
+      utterance.onstart=()=>{if(voiceRepliesEnabled&&sequence===voicePlaybackSequence)agent('speaking',text)};
       utterance.onend=()=>done(true);
       utterance.onerror=()=>done(false);
       try{window.speechSynthesis.cancel();window.speechSynthesis.speak(utterance)}catch(_){done(false)}
     });
   }
-  async function elevenLabsSpeak(text,retried=false){
+  async function elevenLabsSpeak(text,retried=false,sequence=voicePlaybackSequence){
     if(!st.auth.authenticated)return false;
     try{
       const r=await fetch((cfg.apiBase||'api')+'/agent-voice.php',{
         method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':st.auth.csrf||''},body:JSON.stringify({text:String(text).slice(0,1800)})
       });
       if(!r.ok){
-        if(r.status===403&&!retried){let j={};try{j=await r.clone().json()}catch(_){}if(j.error==='csrf_failed'){await loadAuth(true);return elevenLabsSpeak(text,true)}}
+        if(r.status===403&&!retried){let j={};try{j=await r.clone().json()}catch(_){}if(j.error==='csrf_failed'){await loadAuth(true);return elevenLabsSpeak(text,true,sequence)}}
         return false;
       }
       const blob=await r.blob(),url=URL.createObjectURL(blob);
-      if(!voiceRepliesEnabled){URL.revokeObjectURL(url);return null}
+      if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence){URL.revokeObjectURL(url);return null}
       if(st.voiceAudio)st.voiceAudio.pause();
       const a=new Audio(url);st.voiceAudio=a;
       return await new Promise(resolve=>{
         let finished=false;
-        const done=ok=>{if(finished)return;finished=true;URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;resolve(ok)};
+        const done=ok=>{if(finished)return;finished=true;URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;if(voiceAudioCancel===cancel)voiceAudioCancel=null;resolve(ok)};
+        const cancel=()=>{a.pause();done(null)};voiceAudioCancel=cancel;
         a.onended=()=>done(true);a.onerror=()=>done(false);a.onpause=()=>done(null);
-        a.play().then(()=>{if(!finished&&voiceRepliesEnabled)agent('speaking',text)}).catch(()=>done(false));
+        a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled)agent('speaking',text);else if(!finished)cancel()}).catch(()=>done(false));
       });
     }catch(_){return false}
   }
   async function agentSpeak(text){
     if(!voiceRepliesEnabled||(!st.conversationOn&&!voiceInteractionStarted)||!text)return null;
+    if(voicePlaybackPending){
+      conversationBargeIn?.stop();
+      if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
+      if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;window.speechSynthesis?.cancel();resolve(null)}
+    }
+    const sequence=++voicePlaybackSequence;
     voicePlaybackPending=true;syncConversationMusic();
+    if(st.conversationOn){
+      clearTimeout(conversationRestartTimer);
+      try{recognition?.abort()}catch(_){}
+      recognitionActive=false;
+      void conversationBargeIn?.start();
+    }
     try{
-      const remote=await elevenLabsSpeak(text);
+      const remote=await elevenLabsSpeak(text,false,sequence);
+      if(sequence!==voicePlaybackSequence)return null;
       if(remote===true||remote===null||!voiceRepliesEnabled)return remote;
       // The installed browser voice is a local, free fallback; it sends no text to a new provider.
-      return await speakWithDeviceVoice(text);
+      return await speakWithDeviceVoice(text,sequence);
     }finally{
-      voicePlaybackPending=false;syncConversationMusic();
-      if(agentInterrupt)agentInterrupt.hidden=true;
-      agent(st.conversationOn?'listening':st.playing?'playing':'idle');
+      if(sequence===voicePlaybackSequence){
+        conversationBargeIn?.stop();voicePlaybackPending=false;syncConversationMusic();
+        if(agentInterrupt)agentInterrupt.hidden=true;
+        agent(st.conversationOn?'listening':st.playing?'playing':'idle');
+        if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen();
+      }
     }
   }
   async function executeAgentAction(a){if(!a||!a.type||a.type==='none')return;const t=a.track_id?trackById(a.track_id):null;switch(a.type){case'play_track':if(t)play(t,0,'agent');break;case'pause_player':if(!audio.paused)audio.pause();break;case'next_track':stepTrack(1);break;case'previous_track':stepTrack(-1);break;case'open_view':navigate(a.view||'home',{slug:a.slug||'',id:a.id||'',type:a.inquiry_type||''});break;case'open_search':navigate('music',{q:a.query||''});break;case'open_site_search':navigate('search',{q:a.query||'',type:a.result_type||'all'});break;case'open_library':navigate('library',{tab:a.tab||'all'});break;case'open_notifications':openNotificationDrawer();break;case'show_track':if(t){renderStory(t);setUrl('track',{id:t.id})}break;case'builder_add_track':if(t){const r=add(t,a.side||undefined);persist();navigate('builder');if(!r.ok)say(r.why==='already'?'That track is already on the build.':'That track will not fit on the requested side.')}break;case'builder_move_track':if(t&&a.side)moveBuilderTrackToSide(t.id,a.side);break;case'builder_fill':await fillBuild(a.side||'both');break;case'builder_dedupe':dedupeBuild();say('Removed duplicate tracks from the build.');break;case'builder_save':await saveBuilderDraft(false);break;case'set_favorite_track':{if(!t){say('That track is no longer publicly available.');break}const desired=a.favorite===true;const j=await secureJsonPost('personalization.php',{action:'set_favorite',item_type:'track',item_id:t.id,favorite:desired});st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;say(desired?'Saved “'+t.title+'” to your favorites.':'Removed “'+t.title+'” from your favorites.');break}case'create_playlist':{const j=await secureJsonPost('playlists.php',{action:'create',name:a.name||'Stonefellow Mix',description:'Curated by the Stonefellow agent.',visibility:a.visibility||'private',source_type:'agent',track_ids:Array.isArray(a.track_ids)?a.track_ids:[]});st.playlists={loaded:true,items:j.playlists||[]};navigate('playlist',{id:j.playlist.id});break}case'save_agent_session':{const j=await secureJsonPost('playlists.php',{action:'save_agent_session',name:a.name||'Agent Listening Session'});st.playlists={loaded:true,items:j.playlists||[]};navigate('playlist',{id:j.playlist.id});break}case'start_listening_session':{startAgentListeningSession(a.session);break}case'session_feedback':{if(a.session_id&&a.track_id){const x=await secureJsonPost('listening-sessions.php',{action:'feedback',session_id:a.session_id,track_id:a.track_id,sentiment:a.sentiment||'neutral'});st.agentSession={...st.agentSession,...(x.session||{})};await loadPersonalization(true);renderAgentSessionPanel()}break}case'end_listening_session':{if(a.session_id){const x=await secureJsonPost('listening-sessions.php',{action:'end',session_id:a.session_id});st.agentSession={...st.agentSession,...(x.session||{}),status:'ended'};clearPlaylistPlayback();renderAgentSessionPanel()}break}case'save_current_listening_session':{if(a.session_id){const x=await secureJsonPost('listening-sessions.php',{action:'save_playlist',session_id:a.session_id,name:a.name||st.agentSession.title||'Agent Listening Session'});st.playlists={loaded:true,items:x.playlists||[]};navigate('playlist',{id:x.playlist.id})}break}case'open_queue':{openQueue();break}case'queue_add_track':{if(t)await addTrackToQueue(t,'end');break}case'queue_play_next':{if(t)await addTrackToQueue(t,'next');break}case'queue_remove_track':{if(a.track_id)await removeTrackFromQueue(a.track_id);break}case'queue_clear':{await clearQueue(false);break}}}
@@ -1496,8 +1519,8 @@
   if(R){
     recognition=new R();recognition.lang='en-US';recognition.interimResults=true;recognition.continuous=false;
     voice.onclick=()=>{if(st.conversationOn){stopConversation();return}voiceInteractionStarted=true;st.conversationOn=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');startConversationListen()};
-    recognition.onstart=()=>{recognitionActive=true;if(st.conversationOn&&!voiceTurnBusy){agent('listening','I’m listening.');showTranscript(listeningPrompt(),'listening')}};
-    recognition.onresult=e=>{if(!st.conversationOn||voiceTurnBusy)return;const phrases=[];let finalReceived=false;for(let i=0;i<e.results.length;i++){const result=e.results[i],value=String(result[0]?.transcript||'').trim();if(value)phrases.push(value);if(result.isFinal&&value)finalReceived=true}const spoken=phrases.join(' ').trim();if(spoken)recognitionNetworkFailures=0;showTranscript(spoken?'You: '+spoken:listeningPrompt(),finalReceived?'heard':'listening');if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)};
+    recognition.onstart=()=>{recognitionActive=true;if(voicePlaybackPending){try{recognition.abort()}catch(_){}return}if(st.conversationOn&&!voiceTurnBusy){agent('listening','I’m listening.');showTranscript(listeningPrompt(),'listening')}};
+    recognition.onresult=e=>{if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending)return;const phrases=[];let finalReceived=false;for(let i=0;i<e.results.length;i++){const result=e.results[i],value=String(result[0]?.transcript||'').trim();if(value)phrases.push(value);if(result.isFinal&&value)finalReceived=true}const spoken=phrases.join(' ').trim();if(spoken)recognitionNetworkFailures=0;showTranscript(spoken?'You: '+spoken:listeningPrompt(),finalReceived?'heard':'listening');if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)};
     recognition.onerror=e=>{
       recognitionActive=false;
       if(e.error==='not-allowed'||e.error==='service-not-allowed'){stopConversation();showTranscript('Microphone permission denied. Enable microphone access or type your message.','error');return}

@@ -26,10 +26,12 @@ $checks=[
  'Send gate blocks simultaneous requests'=>str_contains($admin,'if(!message||pending)return;') && str_contains($chat,"if(busy)throw new Error("),
  'Request failure keeps draft for retry'=>str_contains($admin,'Message could not be sent. Your draft is still here.') && str_contains($admin,'if(input.value.trim()===message)input.value='),
  'Empty or unavailable Agent does not erase draft'=>str_contains($admin,'Admin Agent unavailable; your draft was preserved.'),
- 'Pending send disables write controls'=>str_contains($admin,'sendButton.disabled=true;voice.disabled=true;input.readOnly=true;'),
+ 'Pending send disables text writes but leaves conversation stop available'=>str_contains($admin,'sendButton.disabled=true;input.readOnly=true;')
+   &&str_contains($admin,'if(conversationOn){stopConversation();return}'),
  'Enter sends, Shift+Enter inserts newline'=>str_contains($admin,"if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing)") && str_contains($admin,'form.requestSubmit()'),
  'Voice remains integrated through footer'=>str_contains($admin,'recognition.onresult=') && str_contains($html,'id="adminVoiceButton"'),
- 'Final speech recognition event only submits once'=>str_contains($admin,'if(final&&!voiceSubmitted)'),
+ 'Final speech recognition event only submits once'=>str_contains($admin,'if(final&&transcript.trim()){voiceSubmitted=true;void submit();}')
+   &&str_contains($admin,'||voiceSubmitted)return;'),
  'Speech unsupported gracefully disables voice'=>str_contains($admin,"voice.title='Voice input is not supported by this browser'"),
  'New chat clears only the current conversation reference'=>str_contains($chat,"conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread')"),
  'New chat focuses unified footer'=>str_contains($chat,"document.querySelector('#adminChatInput')?.focus()"),
