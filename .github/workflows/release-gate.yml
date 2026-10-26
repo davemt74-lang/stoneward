@@ -115,6 +115,10 @@ jobs:
           linking-type: static
       - name: Verify FFmpeg tools
         run: |
+          # The supervised PHP renderer intentionally accepts only these local
+          # executable paths. Bind the verified CI tool-cache binaries there.
+          test -x /usr/local/bin/ffmpeg || sudo ln -s "$(command -v ffmpeg)" /usr/local/bin/ffmpeg
+          test -x /usr/local/bin/ffprobe || sudo ln -s "$(command -v ffprobe)" /usr/local/bin/ffprobe
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
