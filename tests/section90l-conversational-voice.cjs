@@ -25,7 +25,8 @@ assert.match(adminApp,/recognition\.onend=\(\)=>\{recognitionActive=false;if\(co
 assert.match(adminApp,/if\(!conversationOn\|\|pending\|\|adminSpeechPending\|\|voiceSubmitted\)return/);
 
 async function monitorRejectsEchoAndDetectsForeground(){
-  let now=1000,amplitude=0.006,frame=null,interrupts=0,stops=0,closed=0;
+  let now=1000,amplitude=0.006,frame=null,interrupts=0,stops=0,closed=0,heard='';
+  const confirmations=[null,'Please stop now'];
   const destination={connect:()=>{}};
   const analyser={fftSize:0,smoothingTimeConstant:0,getFloatTimeDomainData:array=>array.fill(amplitude)};
   const browser={
@@ -36,19 +37,26 @@ async function monitorRejectsEchoAndDetectsForeground(){
     AudioContext:class{createMediaStreamSource(){return destination}createBiquadFilter(){return {type:'',frequency:{value:0},connect:()=>{}}}createAnalyser(){return analyser}close(){closed++;return Promise.resolve()}},
     requestAnimationFrame:cb=>{frame=cb;return 1},cancelAnimationFrame:()=>{frame=null}
   };
-  const sandbox={window:browser,Date:{now:()=>now},Float32Array,Math};
+  const sandbox={window:browser,Date:{now:()=>now},Float32Array,Math,AbortController};
   vm.runInNewContext(read('assets/js/conversation-barge-in.js'),sandbox);
-  const monitor=browser.StonefellowBargeIn.create(()=>interrupts++,browser);
+  const monitor=browser.StonefellowBargeIn.create(phrase=>{interrupts++;heard=phrase},browser,async()=>confirmations.shift());
   assert.equal(await monitor.start(),true);
   function tick(energy,count){amplitude=energy;for(let i=0;i<count;i++){now+=40;const callback=frame;assert.ok(callback);callback()}}
   tick(0.006,20);
   tick(0.12,1);tick(0.006,12);
   assert.equal(interrupts,0,'one noise transient must not interrupt playback');
   tick(0.16,9);
-  assert.equal(interrupts,1,'sustained foreground voice must interrupt playback');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(interrupts,0,'loud playback echo without confirmed speech must never cancel the Agent');
+  assert.equal(monitor.active,true,'monitor rearms after unconfirmed acoustic activity');
+  now+=4000;
+  tick(0.16,9);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(interrupts,1,'verified independent user speech interrupts playback');
+  assert.equal(heard,'Please stop now');
   assert.equal(monitor.active,false);
-  assert.equal(stops,1,'microphone must be released after interruption');
-  assert.equal(closed,1,'audio context must be closed after interruption');
+  assert.equal(stops,2,'microphone must be released while verifying each candidate');
+  assert.equal(closed,2,'audio context must be closed while verifying each candidate');
   monitor.stop();assert.equal(interrupts,1,'stopped detector must not interrupt again');
 }
 
@@ -96,7 +104,7 @@ async function adminConversationRestartsAndStops(){
 async function publicVoiceResumesAndStaleAudioCannotPlay(){
   let resumes=0,stops=0;
   const context={
-    voiceTurnBusy:false,conversationRestartTimer:null,recognition:{stop:()=>stops++},
+    voiceTurnBusy:false,voiceTurnGeneration:0,conversationRestartTimer:null,recognition:{stop:()=>stops++},
     st:{conversationOn:true},showTranscript:()=>{},agent:()=>{},command:async()=>{},
     pendingReply:Promise.resolve(),musicFollowupUntil:0,Date:{now:()=>1000},
     listeningPrompt:()=> 'Listening…',scheduleConversationListen:()=>resumes++,say:async()=>{},clearTimeout:()=>{}
