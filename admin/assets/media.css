@@ -23,3 +23,16 @@
 .track-master-revisions li>div{display:grid;gap:4px;min-width:0}
 .track-master-revisions li span,.track-master-revisions li small{color:var(--muted);font-size:.72rem;overflow-wrap:anywhere}
 @media(max-width:640px){.track-master-revisions li{align-items:flex-start;flex-direction:column}}
+
+/* Section 90T: per-song Catalog intake from the Media Library. */
+.media-asset-actions{flex-wrap:wrap}
+.media-add-catalog-btn{white-space:nowrap}
+.scan-metadata-detail{margin-top:.45rem;text-align:left}
+.scan-metadata-detail summary{cursor:pointer;color:var(--muted,#969ba5);font-size:.77rem}
+.scan-metadata-detail label{display:block;font-size:.72rem;margin-top:.4rem}
+.scan-metadata-detail input{display:block;width:100%;min-width:10rem;margin-top:.2rem}
+.media-catalog-modal .media-modal-card{width:min(760px,96vw);max-height:calc(100dvh - 32px);overflow:auto}
+.media-catalog-modal .form-grid{margin-top:14px}
+.media-catalog-modal .check-field{line-height:1.5}
+.media-catalog-modal .status-line{white-space:normal;overflow-wrap:anywhere}
+@media(max-width:680px){.media-catalog-modal .media-modal-card{max-height:calc(100dvh - 16px)}.media-asset-actions button{flex:1}}

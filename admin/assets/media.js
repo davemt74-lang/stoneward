@@ -2,7 +2,7 @@
   'use strict';
   const ctx=window.STONEFELLOW_ADMIN_CONTEXT;
   if(!ctx)return;
-  const {app,api,canvas,head,say,esc,openView,reloadCore}=ctx;
+  const {app,api,canvas,head,say,esc,openView,openCatalogTrack,reloadCore}=ctx;
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const state={assets:[],category:'',query:'',trackId:'',trackLinks:[],publication:null,capabilities:{},completeness:{},dashboard:{},entityConfigs:new Map()};
   const roles={
@@ -71,6 +71,8 @@
     $('#mediaSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();state.query=e.currentTarget.value.trim();renderMediaLibrary()}};
     $$('[data-media-category]',canvas).forEach(b=>b.onclick=()=>{state.category=b.dataset.mediaCategory;renderMediaLibrary()});
     $$('[data-media-edit]',canvas).forEach(b=>b.onclick=()=>editAsset(Number(b.dataset.mediaEdit)));
+    $$('[data-media-add-catalog]',canvas).forEach(b=>b.onclick=()=>addCatalogAsset(Number(b.dataset.mediaAddCatalog)));
+    $$('[data-media-open-catalog]',canvas).forEach(b=>b.onclick=()=>openCatalogTrack(b.dataset.mediaOpenCatalog));
     $$('[data-media-delete]',canvas).forEach(b=>b.onclick=()=>deleteAsset(Number(b.dataset.mediaDelete)));
     $$('[data-media-jump]',canvas).forEach(b=>b.onclick=()=>openView(b.dataset.mediaJump));
     $$('[data-store-media]',canvas).forEach(b=>b.onclick=()=>openEntityManager('store',b.dataset.storeMedia,b.dataset.storeLabel,{roles:['product_primary','product_gallery'],publishRoles:['product_primary']}));window.SFVideoAdmin?.renderInto?.('videoHubPanel');window.SFPhotoGalleriesAdmin?.renderInto?.('photoGalleriesPanel');
@@ -84,7 +86,77 @@
   }
   function assetCard(a){
     const tags=a.technical&&a.technical.normalized_tags||{};
-    return '<article class="media-asset-card" data-asset-id="'+a.id+'"><div class="media-asset-preview">'+assetPreview(a)+'</div><div class="media-asset-main"><div class="media-asset-kicker">'+esc(String(a.category||'media').toUpperCase())+' · '+esc(sourceLabel(a))+'</div><strong>'+esc(a.title||a.original_name)+'</strong><small>'+esc(a.original_name)+'</small><p>'+esc(technicalLine(a))+'</p>'+(tags.artist||tags.album?'<p>'+esc([tags.artist,tags.album].filter(Boolean).join(' · '))+'</p>':'')+'<div class="media-asset-foot"><span>'+fmtBytes(a.size_bytes)+'</span><span>'+Number(a.link_count||0)+' use'+(Number(a.link_count||0)===1?'':'s')+'</span></div></div><div class="media-asset-actions"><button class="secondary" type="button" data-media-edit="'+a.id+'">Edit</button>'+(Number(a.link_count||0)===0?'<button class="danger" type="button" data-media-delete="'+a.id+'">Delete</button>':'')+'</div></article>';
+    const audio=a.category==='audio'&&['mp3','wav','wave'].includes(String(a.extension||'').toLowerCase());
+    const existing=audio?(app.catalog||[]).find(t=>Number(t.media_primary_asset||0)===Number(a.id)||Number(t.media_private_master_asset||0)===Number(a.id)||(t.audio||'').includes('api/media.php?id='+a.uuid)):null;
+    const catalogAction=audio?(existing?'<button class="secondary" type="button" data-media-open-catalog="'+esc(existing.id)+'">In Catalog</button>':
+      '<button class="primary media-add-catalog-btn" type="button" data-media-add-catalog="'+a.id+'">Add to Catalog</button>'):'';
+    return '<article class="media-asset-card" data-asset-id="'+a.id+'"><div class="media-asset-preview">'+assetPreview(a)+'</div><div class="media-asset-main"><div class="media-asset-kicker">'+esc(String(a.category||'media').toUpperCase())+' · '+esc(sourceLabel(a))+'</div><strong>'+esc(a.title||a.original_name)+'</strong><small>'+esc(a.original_name)+'</small><p>'+esc(technicalLine(a))+'</p>'+(tags.artist||tags.album?'<p>'+esc([tags.artist,tags.album].filter(Boolean).join(' · '))+'</p>':'')+'<div class="media-asset-foot"><span>'+fmtBytes(a.size_bytes)+'</span><span>'+Number(a.link_count||0)+' use'+(Number(a.link_count||0)===1?'':'s')+'</span></div></div><div class="media-asset-actions">'+catalogAction+'<button class="secondary" type="button" data-media-edit="'+a.id+'">Edit</button>'+(Number(a.link_count||0)===0?'<button class="danger" type="button" data-media-delete="'+a.id+'">Delete</button>':'')+'</div></article>';
+  }
+  async function addCatalogAsset(id){
+    const asset=state.assets.find(a=>Number(a.id)===id);
+    if(!asset||asset.category!=='audio')return;
+    const templates=app.templates||[];
+    if(!templates.length){say('Create a metadata template before adding a song to Catalog.');openView('templates');return;}
+    const images=await api('media.php?category=image').then(r=>r.assets||[]).catch(()=>[]);
+    const opts=templates.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+' · v'+Number(t.version||1)+'</option>').join('');
+    const artOpts='<option value="">No artwork yet</option>'+images.map(a=>'<option value="'+Number(a.id)+'">'+esc(a.title||a.original_name)+'</option>').join('');
+    const modal=document.createElement('div');modal.className='media-modal media-catalog-modal';
+    modal.innerHTML='<div class="media-modal-card"><div class="panel-title"><div><div class="eyebrow">SONG CATALOG</div><h2>Add to Catalog</h2><p>'+esc(asset.original_name)+'</p></div><button class="secondary" type="button" data-catalog-close>Close</button></div>'+
+      '<p class="hint">Assign a metadata template. Saving makes a private song draft. Auto-publish is optional and OFF by default.</p>'+
+      '<form data-catalog-intake-form class="form-grid"><label class="field span2">Metadata template<select name="template_id" required>'+opts+'</select></label>'+
+      '<label class="field span2">Song title<input name="title" required maxlength="180" value="'+esc(asset.title||asset.original_name.replace(/\.(mp3|wav|wave)$/i,''))+'"></label>'+
+      '<label class="field">Release / album<input name="release" value="Unreleased"></label>'+
+      '<label class="field">ISRC (optional)<input name="isrc" maxlength="16"></label>'+
+      '<label class="field">Artist<input name="artist_display"></label><label class="field">Words by<input name="words_by"></label>'+
+      '<label class="field">Music by<input name="music_by"></label><label class="field">Master recording owner<input name="master_owner"></label>'+
+      '<label class="field">Composition owner<input name="composition_owner"></label>'+
+      '<label class="field">Artwork (optional)<select name="artwork_asset_id">'+artOpts+'</select></label>'+
+      '<label class="field">Digital download price ($)<input type="number" name="digital_price" min="0" max="1000" step="0.01" value="2.00" required></label>'+
+      '<label class="check-field span3"><input type="checkbox" name="pod_eligible"> Available for vinyl print (requires a distinct private master)</label>'+
+      '<label class="check-field span3"><input type="checkbox" name="rights_confirmed"> I confirm I have authority to publish this recording and its metadata.</label>'+
+      '<label class="check-field span3"><input type="checkbox" name="auto_publish"> Auto-publish to public listening Catalog now</label>'+
+      '<p class="notice span3">Publishing a lone MP3/WAV exposes it as the public listening copy. Paid downloads and vinyl printing stay disabled until a different private master is assigned.</p>'+
+      '<div class="actions span3"><button class="primary" type="submit">Save song</button><button class="secondary" type="button" data-catalog-close>Cancel</button></div>'+
+      '<p class="status-line span3" data-catalog-status role="status"></p></form></div>';
+    document.body.appendChild(modal);
+    $$('[data-catalog-close]',modal).forEach(b=>b.onclick=()=>modal.remove());
+    const form=$('[data-catalog-intake-form]',modal),templateSelect=form.elements.template_id;
+    const fillTemplate=()=>{const defaults=templates.find(t=>t.id===templateSelect.value)?.defaults||{};
+      for(const field of ['artist_display','words_by','music_by','master_owner','composition_owner']){
+        const key=field==='master_owner'?'master_copyright':field==='composition_owner'?'composition_copyright':field;
+        form.elements[field].value=defaults[key]||(field==='artist_display'?defaults.performing_artist||'Stonefellow':field.includes('owner')?defaults.artist_legal||'':'');
+      }
+      form.elements.digital_price.value=Number(defaults.price??2).toFixed(2);
+    };
+    templateSelect.onchange=fillTemplate;fillTemplate();
+    form.onsubmit=async e=>{
+      e.preventDefault();const d=new FormData(form),auto=!!form.elements.auto_publish.checked,rights=!!form.elements.rights_confirmed.checked;
+      if(auto&&!rights){$('[data-catalog-status]',form).textContent='Confirm publishing rights before enabling auto-publish.';return;}
+      if(auto&&!window.confirm('Publish "'+d.get('title')+'" to the public listening player and Catalog now? If this is the only audio file, it becomes publicly streamable; paid downloads stay disabled.'))return;
+      const submit=form.querySelector('[type="submit"]'),status=$('[data-catalog-status]',form);submit.disabled=true;status.textContent='Saving private song metadata…';
+      const key=form.dataset.requestKey||(form.dataset.requestKey=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join(''));
+      try{
+        const input={action:'intake_asset',asset_id:id,request_key:key,template_id:d.get('template_id'),
+          title:d.get('title'),release:d.get('release'),isrc:d.get('isrc'),artist_display:d.get('artist_display'),
+          words_by:d.get('words_by'),music_by:d.get('music_by'),master_owner:d.get('master_owner'),
+          composition_owner:d.get('composition_owner'),artwork_asset_id:d.get('artwork_asset_id'),
+          digital_price:d.get('digital_price'),pod_eligible:form.elements.pod_eligible.checked,
+          rights_confirmed:rights,auto_publish:auto,confirmed:auto};
+        const result=await api('media-catalog.php',input);
+        if(result.publication==='published'){
+          status.textContent='Published to the public listening Catalog.';await reloadCore();modal.remove();
+          openCatalogTrack(result.track_id);say('Song published to the public Catalog.');
+        }else{
+          status.textContent=result.publication==='needs_review'?'Saved privately. Publication needs review: '+result.publication_message:'Saved as a private Song Draft. Nothing is public.';
+          if(!form.querySelector('[data-open-saved-draft]')){
+            const b=document.createElement('button');b.type='button';b.className='secondary';b.dataset.openSavedDraft='1';b.textContent='Review / Publish';
+            b.onclick=()=>window.SFAdminAgentCanvas?.openSongDraft?.(result.draft.request_key);
+            form.querySelector('.actions').appendChild(b);
+          }
+          submit.disabled=false;
+        }
+      }catch(error){status.textContent=error.message||'Could not save song.';submit.disabled=false;}
+    };
   }
   function uploadOne(file,onProgress){
     return new Promise(async(resolve,reject)=>{

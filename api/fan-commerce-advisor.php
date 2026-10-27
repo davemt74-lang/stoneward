@@ -14,6 +14,7 @@ function sf_fan_commerce_decision(?int $userId,string $songId,bool $vinyl=false)
  $owned=$signedIn&&isset(sf_fan_purchase_owned_ids($userId)[$songId]);
  $saved=$signedIn&&isset(sf_fan_purchase_saved_ids($userId)[$songId]);
  $vinylReady=!empty($track['podEligible'])&&
+  ($track['audio_publishing_mode']??'')!=='preview_only'&&
   (($track['audio_publishing_mode']??'')!=='preview_master_split'
     ||!empty($track['private_master_audio']));
  $next=$vinyl?($vinylReady?'open_builder':'open_track')

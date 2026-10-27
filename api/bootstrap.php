@@ -59,6 +59,9 @@ function sf_validate_builder(array $b, string $format, int $userId=0): array {
             $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
             if(empty($t['podEligible'])){$errors[]="Track {$t['title']} is not eligible for custom media.";continue;}
+            if(($t['audio_publishing_mode']??'')==='preview_only'){
+                $errors[]="Track {$t['title']} needs a separate private production original for vinyl.";continue;
+            }
             if(($t['audio_publishing_mode']??'')==='preview_master_split'&&empty($t['private_master_audio'])){
                 $errors[]="Track {$t['title']} does not have a privately published production original.";
                 continue;
@@ -92,6 +95,9 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
         if($type==='track'){
             $id=(string)($raw['track_id'] ?? ''); $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
+            if(array_key_exists('digital_purchase_enabled',$t)&&!$t['digital_purchase_enabled']){
+                $errors[]="Track {$t['title']} is streaming-only; a private master is required for digital sales.";continue;
+            }
             $price=(int)round(((float)($t['price'] ?? 0))*100); if($price<0)$price=0;
             $items[]=['type'=>'track','track_id'=>$id,'label'=>(string)$t['title'],'price_cents'=>$price,
                 'vinyl_print_licenses_included'=>1]; $subtotal+=$price;
@@ -109,6 +115,10 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
             if(!$ids||count($ids)>40||count($ids)!==count(array_unique($ids))
                 ||count(array_filter($ids,fn($id)=>isset($tracks[$id])))!==count($ids)){
                 $errors[]='Album track list is invalid.';continue;
+            }
+            if(count(array_filter($ids,fn($id)=>array_key_exists('digital_purchase_enabled',$tracks[$id])
+                &&!$tracks[$id]['digital_purchase_enabled']))>0){
+                $errors[]='Album includes a streaming-only song that is unavailable for digital purchase.';continue;
             }
             $price=(int)round(max(0,(float)($r['digital_price']??0))*100);
             $items[]=['type'=>'release','release_id'=>$rid,'track_ids'=>$ids,

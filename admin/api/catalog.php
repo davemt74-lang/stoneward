@@ -8,7 +8,14 @@ foreach(['title','release','lyrics','story','artwork'] as $k)if(array_key_exists
 if(array_key_exists('duration',$patch))$track['duration']=max(0,(int)$patch['duration']);
 if(array_key_exists('year',$patch))$track['year']=max(0,(int)$patch['year']);
 if(array_key_exists('price',$patch))$track['price']=max(0,(float)$patch['price']);
+if(array_key_exists('digital_purchase_enabled',$patch)){
+  if(!empty($patch['digital_purchase_enabled'])&&(($track['audio_publishing_mode']??'')==='preview_only'||empty($track['private_master_audio'])))
+    sf_json_response(['ok'=>false,'message'=>'Attach a distinct private source master before enabling paid downloads.'],422);
+  $track['digital_purchase_enabled']=sf_admin_bool($patch['digital_purchase_enabled']);
+}
 if(array_key_exists('podEligible',$patch))$track['podEligible']=sf_admin_bool($patch['podEligible']);
+if(!empty($track['podEligible'])&&($track['audio_publishing_mode']??'')==='preview_only')
+  sf_json_response(['ok'=>false,'message'=>'Vinyl printing needs a distinct private production master.'],422);
 if(array_key_exists('vinyl_license_packages',$patch))$track['vinyl_license_packages']=sf_vinyl_license_packages($patch['vinyl_license_packages']);
 if(array_key_exists('mood',$patch))$track['mood']=sf_admin_array_strings($patch['mood']);
 if(array_key_exists('themes',$patch))$track['themes']=sf_admin_array_strings($patch['themes']);
