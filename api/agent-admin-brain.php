@@ -191,6 +191,9 @@ function sf_admin_agent_plan(string $message): array {
         if(preg_match('/\b(?:albums?|releases?|singles?|eps?)\b/i',$message)
             && sf_agent_admin_release_filter($message)!=='all')
             return ['type'=>'release_inventory_read','view'=>'releases','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+        if(preg_match('/\b(?:shows?|concerts?|gigs?|performances?|tour dates?)\b/i',$message)
+            && sf_agent_admin_show_filter($message)!=='all')
+            return ['type'=>'shows_inventory_read','view'=>'shows','requires_confirmation'=>false,'execution'=>'authenticated_read'];
     }
     // Clip/timeline edits use their distinct exact-review production logic.
     if(!preg_match('/\b(?:timeline|assembly|clip|footage|storyboard|scene)\b/i',$message)){
@@ -383,6 +386,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
     $types=[
       'catalog_inventory_read'=>'Private catalog inventory is unavailable; no changes made.',
       'release_inventory_read'=>'Private releases inventory is unavailable; no changes made.',
+      'shows_inventory_read'=>'Private live-show inventory is unavailable; no changes made.',
       'production_editorial_status'=>'Private editorial production status is unavailable; no editorial action was performed.',
       'production_schedule_calendar'=>'Private production calendar is unavailable; no schedule or crew assignment changed.',
       'production_director_coverage'=>'Director coverage data is unavailable.',
@@ -420,6 +424,11 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         try{$read=sf_agent_admin_release_read(sf_admin_releases(),sf_agent_admin_release_filter($message));
             $text=sf_agent_admin_read_brief($read);}
         catch(Throwable $e){$text='Private release inventory is unavailable; no changes made.';}
+    }
+    if($plan['type']==='shows_inventory_read'){
+        try{$read=sf_agent_admin_shows_read(sf_admin_shows(),sf_agent_admin_show_filter($message),gmdate('Y-m-d'));
+            $text=sf_agent_admin_read_brief($read);}
+        catch(Throwable $e){$text='Private live-show inventory is unavailable; no changes made.';}
     }
     if($plan['type']==='navigate_admin_page'){
         $destination=sf_agent_admin_page_destinations()[$plan['view']]??null;
@@ -748,7 +757,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
-    if(in_array($plan['type'],['catalog_inventory_read','release_inventory_read'],true) && !empty($read))$action['read_evidence']=$read;
+    if(in_array($plan['type'],['catalog_inventory_read','release_inventory_read','shows_inventory_read'],true) && !empty($read))$action['read_evidence']=$read;
     $navigation=sf_agent_admin_page_target($message);
     if($navigation!==null && $navigation['view']===$plan['view'] &&
         $contract['tool_id']==='admin_module_navigate' && !$plan['requires_confirmation']){
