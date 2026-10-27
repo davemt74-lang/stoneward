@@ -22,6 +22,8 @@ assert(api.includes('sf_agent_song_intake_list((int)$me[\'id\'])')
 assert(catalog.includes('Private Catalog drafts')&&catalog.includes('data-draft-review')
   &&catalog.includes('data-draft-publish')&&catalog.includes("api('media-catalog.php',{action:'publish_draft'"),
   'Admin Catalog shows saved drafts with edit and authenticated Publish actions.');
+assert(/function renderCatalog\(\)[\s\S]*?\$\('#catalogDraftRefresh'\)\.onclick=\(\)=>loadCatalogDrafts\(\);[\s\S]*?renderCatalogRows\(\);\s*void loadCatalogDrafts\(\);/.test(catalog),
+  'Private drafts load on initial Catalog navigation without requiring a search input event.');
 assert(catalog.includes('rights_confirmed:true,confirmed:true')&&catalog.includes('window.confirm('),
   'Public publication still requires a separate explicit rights confirmation.');
 assert(gallery.includes("openView('catalog')")&&gallery.includes('Saved as a PRIVATE Catalog draft'),
