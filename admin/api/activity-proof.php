@@ -3,6 +3,8 @@ declare(strict_types=1);
 /** Read-only, entity-verified activity receipts for the Admin Agent inbox. */
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/agent-song-intake.php';
+require_once SF_ROOT.'/api/agent-actions-core.php';
+require_once SF_ROOT.'/api/agent-proof-receipts.php';
 if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $me=sf_admin_require_auth(false);
 header('Cache-Control: private, no-store');
@@ -12,11 +14,14 @@ $releases=[];foreach(sf_admin_releases() as $release)if(is_array($release)&&!emp
 $shows=[];foreach(sf_admin_shows() as $show)if(is_array($show)&&!empty($show['id']))$shows[(string)$show['id']]=$show;
 $drafts=sf_agent_song_intake_list($owner);
 $draftMap=[];foreach($drafts as $draft)$draftMap[(string)$draft['id']]=$draft;
-$events=[];$seen=[];
+$events=[];$seen=[];$auditedProposals=[];
 $productCache=[];$commerceAvailable=null;$mediaCache=[];
 foreach(sf_ops_recent_admin_audit(180) as $entry){
     if((int)($entry['admin_user_id']??0)!==$owner)continue;
     $action=(string)($entry['action']??'');$type=(string)($entry['entity_type']??'');$id=(string)($entry['entity_id']??'');
+    $details=json_decode((string)($entry['details_json']??'{}'),true);
+    $proposalId=is_array($details)?(string)($details['proposal_id']??''):'';
+    if(preg_match('/^act_[a-f0-9]{32}$/D',$proposalId))$auditedProposals[$proposalId]=true;
     $title='';$destination='';$page='';$verified=false;$state='recorded';
     if($type==='track'&&isset($catalog[$id])){
         $title=(string)$catalog[$id]['title'];$destination='catalog';$page='index.php?view=catalog&track='.rawurlencode($id);
@@ -51,8 +56,17 @@ foreach(sf_ops_recent_admin_audit(180) as $entry){
     $seen[$type.'|'.$id]=true;
     $events[]=['id'=>'audit-'.(int)$entry['id'],'action'=>$action,'title'=>$title,
         'entity_type'=>$type,'entity_id'=>$id,'state'=>$state,'verified'=>$verified,
-        'provenance'=>'admin_audit','actor'=>'Administrator',
+        'provenance'=>'admin_audit',
+        'actor'=>str_starts_with($action,'agent_')&&$proposalId!==''?'Agent tool · administrator approved':'Administrator',
         'view'=>$destination,'url'=>$page,'at'=>(string)$entry['created_at']];
+}
+// Show governed Agent proposals even before execution. A proposal/approval is
+// never evidence of a saved song, album, show or product. Completed proposals
+// already represented by an Admin audit receipt are not shown twice.
+foreach(sf_agent_action_recent($owner,50) as $proposal){
+    $id=(string)($proposal['id']??'');
+    if($id===''||isset($auditedProposals[$id]))continue;
+    $events[]=sf_agent_proof_proposal_receipt($proposal,$catalog);
 }
 // Legacy drafts without an audit receipt remain independently provable by their
 // persisted, owner-scoped source record. Never claim that an Agent published them.
@@ -67,4 +81,15 @@ foreach($drafts as $draft){
 }
 usort($events,static fn($a,$b)=>strcmp($b['at'],$a['at'])?:strcmp($b['id'],$a['id']));
 $events=array_slice($events,0,80);
-sf_json_response(['ok'=>true,'events'=>$events,'count'=>count($events),'as_of'=>gmdate('c')]);
+// Only the signed-in administrator's operational Brain decisions. Request and
+// response excerpts and JSON details are intentionally omitted; decisions are
+// context, never proof of a persisted write.
+sf_agent_brain_ensure_schema();
+$decisionsQuery=sf_db()->prepare("SELECT id,phase,route,action,provider_status,requires_confirmation,created_at
+    FROM agent_brain_decisions WHERE user_id=? AND
+      (SUBSTR(conversation_id,1,6)='admin_' OR SUBSTR(conversation_id,1,6)='agent_')
+    ORDER BY id DESC LIMIT 60");
+$decisionsQuery->execute([$owner]);
+$decisions=$decisionsQuery->fetchAll(PDO::FETCH_ASSOC);
+sf_json_response(['ok'=>true,'events'=>$events,'brain_decisions'=>$decisions,
+    'count'=>count($events),'as_of'=>gmdate('c')]);

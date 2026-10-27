@@ -105,6 +105,7 @@ function sf_agent_action_public(array $row): array {
         'payload_hash'=>(string)$row['payload_hash'],'payload'=>json_decode((string)$row['payload_json'],true)?:[],
         'result'=>json_decode((string)$row['result_json'],true)?:[],
         'created_at'=>(string)$row['created_at'],'approved_at'=>$row['approved_at']??null,
+        'executed_at'=>$row['executed_at']??null,
     ];
 }
 function sf_agent_action_get(int $adminId,string $id): ?array {
