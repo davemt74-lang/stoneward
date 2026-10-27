@@ -96,6 +96,17 @@ function sf_media_catalog_candidate(array $draft,array $preview,?array $master,?
     return $row;
 }
 
+/** Public-player preflight: show the same exact missing fields in Admin as on the writer. */
+function sf_media_catalog_missing_fields(array $draft):array {
+    $required=['title'=>'Song title','artist_display'=>'Artist name',
+        'words_by'=>'Lyrics / words credit','music_by'=>'Music / composition credit',
+        'master_owner'=>'Master recording owner','composition_owner'=>'Composition rights owner'];
+    $missing=[];
+    foreach($required as $key=>$label)
+        if(trim((string)($draft[$key]??''))==='')$missing[$key]=$label;
+    return $missing;
+}
+
 function sf_media_catalog_publish_draft(int $owner,string $key,string $expectedHash,bool $rightsConfirmed,
     ?int $previewAssetId=null,?string $directory=null):array {
     if(!$rightsConfirmed)throw new InvalidArgumentException('Confirm your authority to publish this song publicly.');
@@ -120,9 +131,8 @@ function sf_media_catalog_publish_draft(int $owner,string $key,string $expectedH
             throw new RuntimeException('Published receipt has no Catalog record.');
         }
         if(($draft['status']??'')!=='draft')throw new RuntimeException('Use the prepared Catalog review for this song.');
-        foreach(['title','artist_display','words_by','music_by','master_owner','composition_owner'] as $field)
-            if(trim((string)($draft[$field]??''))==='')
-                throw new InvalidArgumentException('Complete song title, credits and rights owners in the metadata template before public publishing.');
+        $missing=sf_media_catalog_missing_fields($draft);
+        if($missing)throw new InvalidArgumentException('Complete publication review: '.implode(', ',$missing).'.');
         $master=sf_media_catalog_authorized_asset(sf_media_asset((int)$draft['asset_id']),$owner);
         if(!hash_equals((string)$draft['asset_sha256'],(string)$master['sha256']))
             throw new RuntimeException('Private source changed after intake.');

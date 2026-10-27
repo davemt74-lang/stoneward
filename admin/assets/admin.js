@@ -329,7 +329,7 @@
   function renderCatalog(){
     const actions='<button class="secondary" data-view="uploads" type="button">Import music</button>';
     canvas.innerHTML=head('MASTER CATALOG','Catalog','Every recording and its authoritative Stonefellow metadata.',actions)+
-      `<section class="panel catalog-private-panel"><div class="panel-title"><div><h2>Private Catalog drafts</h2><p>New songs appear here immediately. Private means not yet in the public listening player.</p></div><button type="button" class="secondary" id="catalogDraftRefresh">Refresh drafts</button></div><div id="catalogDraftList" role="status">Loading saved songs…</div></section><div class="toolbar"><input id="catalogSearch" type="search" placeholder="Search title, release, ISRC…" value="${esc(app.catalogFilter)}"><button class="secondary" id="missingToggle" type="button">${app.missingOnly?'Show all':'Show metadata gaps'}</button></div><div id="catalogTable"></div>`;
+      `<div id="catalogPublishResult" role="status" aria-live="polite" hidden></div><section class="panel catalog-private-panel"><div class="panel-title"><div><h2>Private Catalog drafts</h2><p>New songs appear here immediately. Private means not yet in the public listening player.</p></div><button type="button" class="secondary" id="catalogDraftRefresh">Refresh drafts</button></div><div id="catalogDraftList" role="status">Loading saved songs…</div></section><div class="toolbar"><input id="catalogSearch" type="search" placeholder="Search title, release, ISRC…" value="${esc(app.catalogFilter)}"><button class="secondary" id="missingToggle" type="button">${app.missingOnly?'Show all':'Show metadata gaps'}</button></div><div id="catalogTable"></div>`;
     bindViewLinks();
     $('#catalogSearch').oninput=e=>{app.catalogFilter=e.target.value;renderCatalogRows()};
     $('#catalogDraftRefresh').onclick=()=>loadCatalogDrafts();
@@ -356,21 +356,81 @@
     host.innerHTML=drafts.length?'<div class="catalog-draft-list">'+drafts.map(d=>
       '<article class="catalog-draft-card" data-draft-id="'+esc(d.id)+'"><div><span class="badge warn">PRIVATE · '+esc(d.status||'draft')+'</span>'+
       '<h3>'+esc(d.title)+'</h3><p>'+esc(d.filename||'Audio source')+' · '+esc(d.template?.name||'No template')+
-      ' · '+esc((d.created_at||'').replace('T',' ').slice(0,16))+'</p></div><div class="actions">'+
-      '<button class="secondary" type="button" data-draft-review="'+esc(d.request_key)+'">Edit / Review</button>'+
-      (d.status==='draft'?'<button class="primary" type="button" data-draft-publish="'+esc(d.request_key)+'">Publish to Catalog</button>':'')+
+      ' · '+esc((d.created_at||'').replace('T',' ').slice(0,16))+'</p>'+
+      (Object.keys(d.missing_fields||{}).length?'<p class="catalog-draft-missing">Needs review: '+esc(Object.values(d.missing_fields).join(', '))+'</p>':'<p class="catalog-draft-ready">Metadata ready for publication review.</p>')+
+      '</div><div class="actions">'+
+      (d.status==='draft'?'<button class="primary" type="button" data-draft-publish="'+esc(d.request_key)+'">Review &amp; Publish</button>':
+        '<button class="secondary" type="button" data-draft-review="'+esc(d.request_key)+'">Review prepared draft</button>')+
       '</div></article>').join('')+'</div>':'<div class="empty compact">No private song drafts. Published songs appear in the table below.</div>';
     $$('[data-draft-review]',host).forEach(b=>b.onclick=()=>window.SFAdminAgentCanvas?.openSongDraft?.(b.dataset.draftReview).catch(e=>say(e.message)));
-    $$('[data-draft-publish]',host).forEach(b=>b.onclick=async()=>{
-      const d=drafts.find(x=>x.request_key===b.dataset.draftPublish);if(!d)return;
-      if(!window.confirm('I confirm I have the rights to make "'+d.title+'" PUBLIC in Stonefellow Catalog and its listening player. Publish this exact saved draft now?'))return;
-      b.disabled=true;
-      try{const result=await api('media-catalog.php',{action:'publish_draft',request_key:d.request_key,
-        expected_hash:d.payload_hash,rights_confirmed:true,confirmed:true});
-        await reloadCore();renderCatalog();say('Verified: "'+d.title+'" published to Catalog.');
-        if(result.track_id)openCatalogTrack(result.track_id);
-      }catch(error){b.disabled=false;say('Not published: '+error.message+'. Edit the private draft and retry.');}
+    $$('[data-draft-publish]',host).forEach(b=>b.onclick=()=>{
+      const d=drafts.find(x=>x.request_key===b.dataset.draftPublish);
+      if(d)openCatalogPublishReview(d);
     });
+  }
+  function openCatalogPublishReview(d){
+    document.querySelector('#catalogPublishOverlay')?.remove();
+    const previous=document.activeElement;
+    const required=[['title','Song title'],['artist_display','Artist'],['words_by','Words by'],
+      ['music_by','Music by'],['master_owner','Master recording owner'],['composition_owner','Composition rights owner']];
+    const fields=[...required,['release','Release / album']];
+    const overlay=document.createElement('div');overlay.id='catalogPublishOverlay';overlay.className='catalog-publish-backdrop';
+    overlay.innerHTML='<section class="catalog-publish-dialog" role="dialog" aria-modal="true" aria-labelledby="catalogPublishTitle">'+
+      '<div class="catalog-publish-header"><div><small>PRIVATE SONG · PUBLICATION REVIEW</small><h2 id="catalogPublishTitle">'+esc(d.title)+'</h2></div><button type="button" class="secondary" id="catalogPublishClose" aria-label="Close publication review">×</button></div>'+
+      '<p>Review the song credits and ownership below. Nothing becomes public until you confirm and select <strong>Publish song</strong>.</p>'+
+      '<p class="catalog-publish-source">Source: '+esc(d.filename||'Audio file')+' · Template: '+esc(d.template?.name||'Unassigned')+
+      ' · Digital price: $'+Number(d.digital_price||0).toFixed(2)+'</p>'+
+      (!d.has_separate_preview?'<div class="notice">This single MP3/WAV can enter the public listening player. Paid downloads and vinyl remain disabled until a separate private master is attached.</div>':'')+
+      '<form id="catalogPublishForm"><div class="catalog-publish-fields">'+fields.map(([key,label])=>
+        '<label class="field">'+esc(label)+'<input data-catalog-review="'+esc(key)+'" value="'+esc(d.review?.[key]??'')+'" maxlength="180" '+
+        (required.some(([k])=>k===key)?'required':'')+' autocomplete="off"></label>').join('')+'</div>'+
+      '<label class="check-field catalog-publish-consent"><input id="catalogPublishRights" type="checkbox" required> I confirm that I have authority to publish this recording and its composition on Stonefellow.</label>'+
+      '<p id="catalogPublishError" class="form-error" role="alert" aria-live="assertive"></p>'+
+      '<div class="actions catalog-publish-actions"><button type="button" class="secondary" id="catalogPublishCancel">Cancel</button><button class="primary" type="submit" id="catalogPublishConfirm">Publish song</button></div></form></section>';
+    document.body.appendChild(overlay);
+    const close=()=>{overlay.remove();if(previous?.isConnected)previous.focus()};
+    overlay.querySelector('#catalogPublishClose').onclick=close;
+    overlay.querySelector('#catalogPublishCancel').onclick=close;
+    overlay.onclick=e=>{if(e.target===overlay)close()};
+    overlay.onkeydown=e=>{
+      if(e.key==='Escape'){e.preventDefault();close();return}
+      if(e.key!=='Tab')return;
+      const items=Array.from(overlay.querySelectorAll('button,input')).filter(x=>!x.disabled);
+      if(!items.length)return;
+      if(e.shiftKey&&document.activeElement===items[0]){e.preventDefault();items.at(-1).focus()}
+      if(!e.shiftKey&&document.activeElement===items.at(-1)){e.preventDefault();items[0].focus()}
+    };
+    overlay.querySelector('[data-catalog-review]')?.focus();
+    overlay.querySelector('#catalogPublishForm').onsubmit=async e=>{
+      e.preventDefault();
+      const form=e.currentTarget,errors=form.querySelector('#catalogPublishError');errors.textContent='';
+      const review={};$$('[data-catalog-review]',form).forEach(input=>review[input.dataset.catalogReview]=input.value.trim());
+      const missing=required.filter(([key])=>!review[key]);
+      if(missing.length){errors.textContent='Complete these fields: '+missing.map(([,label])=>label).join(', ')+'.';
+        form.querySelector('[data-catalog-review="'+missing[0][0]+'"]')?.focus();return}
+      if(!form.querySelector('#catalogPublishRights').checked){errors.textContent='Confirm publishing rights before continuing.';return}
+      const button=form.querySelector('#catalogPublishConfirm');button.disabled=true;button.textContent='Publishing…';
+      try{
+        const result=await api('media-catalog.php',{action:'review_publish_draft',request_key:d.request_key,
+          expected_hash:d.payload_hash,review,rights_confirmed:true,confirmed:true});
+        close();
+        // Publication is committed. A refresh failure must never report a false publishing failure.
+        let refreshed=false;
+        try{const list=await api('catalog.php');app.catalog=list.catalog||[];refreshed=true}
+        catch(_){/* A visible receipt below still confirms the committed track. */}
+        renderCatalog();
+        const receipt=$('#catalogPublishResult');if(receipt){receipt.hidden=false;
+          receipt.className='catalog-publish-success';
+          receipt.innerHTML='<strong>✓ Published: '+esc(review.title)+'</strong><p>Catalog track '+esc(result.track_id)+
+            ' is now public in the listening player.'+(result.preview_only?' Listening-only; paid download and vinyl are disabled.':'')+
+            (!refreshed?' Catalog list refresh is temporarily unavailable; reload to see the track.':'')+'</p>'+
+            '<button class="secondary" type="button" id="catalogPublishOpenTrack">Open published track</button>';
+          $('#catalogPublishOpenTrack').onclick=()=>openCatalogTrack(result.track_id);}
+        say('Published "'+review.title+'" to the public Catalog.');
+      }catch(error){errors.textContent='Song was not published: '+error.message;
+        errors.scrollIntoView?.({block:'nearest'});}
+      finally{if(button.isConnected){button.disabled=false;button.textContent='Publish song'}}
+    };
   }
   function renderCatalogRows(){const host=$('#catalogTable');if(!host)return;const q=app.catalogFilter.toLowerCase().trim();let rows=app.catalog.filter(t=>{const m=t.metadata||{},hay=[t.title,t.release,m.isrc,m.words_by,m.music_by,m.pro_affiliation].join(' ').toLowerCase();if(q&&!hay.includes(q))return false;const gaps=metadataGaps(t);if(app.missingOnly==='isrc'&&!gaps.includes('ISRC'))return false;if(app.missingOnly==='writer'&&!gaps.includes('writer'))return false;if(app.missingOnly==='all'&&!gaps.length)return false;return true});if(!rows.length){host.innerHTML='<div class="empty">No catalog records match this filter.</div>';return}host.innerHTML=`<table class="data-table"><thead><tr><th>Title</th><th>Release</th><th>ISRC</th><th>Writer / PRO</th><th>Template</th><th>Status</th></tr></thead><tbody>${rows.map(t=>{const m=t.metadata||{},g=metadataGaps(t);return `<tr class="clickable" data-track-id="${esc(t.id)}"><td><strong>${esc(t.title)}</strong><div class="file-list">${time(t.duration)} · ${esc(t.audio||'')}</div></td><td>${esc(t.release||'Unreleased')}</td><td class="mono">${esc(m.isrc||'—')}</td><td>${esc(m.words_by||m.music_by||'—')}<div class="file-list">${esc(m.pro_affiliation||'No PRO')}</div></td><td>${esc(m.template?.name||'Legacy')}</td><td>${g.length?`<span class="badge warn">${esc(g.join(', '))}</span>`:'<span class="badge good">Complete</span>'}</td></tr>`}).join('')}</tbody></table>`;$$('[data-track-id]',host).forEach(r=>r.onclick=()=>renderCatalogEditor(r.dataset.trackId))}
   function vinylPackageText(packs){return (packs||[]).map(p=>String(p.licenses)+':'+(Number(p.price_cents||0)/100).toFixed(2)).join(', ')}
