@@ -148,12 +148,8 @@
           openCatalogTrack(result.track_id);say('Song published to the public Catalog.');
         }else{
           status.textContent=result.publication==='needs_review'?'Saved privately. Publication needs review: '+result.publication_message:'Saved as a private Song Draft. Nothing is public.';
-          if(!form.querySelector('[data-open-saved-draft]')){
-            const b=document.createElement('button');b.type='button';b.className='secondary';b.dataset.openSavedDraft='1';b.textContent='Review / Publish';
-            b.onclick=()=>window.SFAdminAgentCanvas?.openSongDraft?.(result.draft.request_key);
-            form.querySelector('.actions').appendChild(b);
-          }
-          submit.disabled=false;
+          await reloadCore();modal.remove();openView('catalog');
+          say('Saved as a PRIVATE Catalog draft. Open its Review / Publish controls to make it public.');
         }
       }catch(error){status.textContent=error.message||'Could not save song.';submit.disabled=false;}
     };
@@ -315,5 +311,5 @@
     const overlay=document.createElement('div');overlay.className='media-modal';const key=entityType+':'+entityId;overlay.innerHTML='<div class="media-modal-card media-entity-manager"><div class="panel-title"><div><div class="eyebrow">'+esc(entityType.toUpperCase())+' MEDIA</div><h2>'+esc(label||entityId)+'</h2><p>Upload, reuse, order and publish media through the central library.</p></div><button class="secondary" type="button" data-media-close>Close</button></div>'+entitySection(entityType,entityId,config)+'</div>';document.body.appendChild(overlay);$('[data-media-close]',overlay).onclick=()=>{state.entityConfigs.delete(key);overlay.remove()};await bindEntityMedia(entityType,entityId,config,overlay);
   }
 
-  window.SFMediaAdmin={renderMediaLibrary,trackSection,bindTrackMedia,chooseExisting,pickUploadFiles,entitySection,bindEntityMedia,openEntityManager,refreshEntityMedia};
+  window.SFMediaAdmin={renderMediaLibrary,openAsset:editAsset,trackSection,bindTrackMedia,chooseExisting,pickUploadFiles,entitySection,bindEntityMedia,openEntityManager,refreshEntityMedia};
 })();

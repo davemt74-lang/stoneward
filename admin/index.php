@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.152');
+define('SF_ADMIN_BUILD','1.3.153');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -129,6 +129,10 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
         <button id="sidebarToggle" class="mobile-menu" type="button" aria-label="Open admin menu">☰</button>
         <div><div class="eyebrow">STONEFELLOW ADMIN</div><div id="viewTitle" class="view-title">Dashboard</div></div>
         <button type="button" class="secondary" id="openAdminAgentChat">Admin Agent Chat</button>
+        <button type="button" class="admin-notifications-button" id="adminNotificationsButton" aria-label="Open Agent Brain notifications and verified activity history" aria-haspopup="dialog" title="Agent Brain · Notifications · History">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+          <span class="admin-notifications-count" id="adminNotificationsCount" hidden></span>
+        </button>
         <div class="admin-user-menu"><span><?=htmlspecialchars((string)$adminUser['display_name'],ENT_QUOTES,'UTF-8')?></span><a href="../" target="_blank" rel="noopener" class="public-link">View site ↗</a><a href="logout.php" class="public-link">Log out</a></div>
       </header>
 

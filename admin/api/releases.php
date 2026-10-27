@@ -2,8 +2,8 @@
 declare(strict_types=1); require __DIR__.'/bootstrap.php';
 if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'){sf_admin_require_auth(false);sf_json_response(['ok'=>true,'releases'=>sf_admin_releases()]);}
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
-sf_admin_require_auth(true);$b=sf_request_json();$action=(string)($b['action']??'save');$rows=sf_admin_releases();
-if($action==='delete'){$id=sf_admin_slug((string)($b['id']??''),'');$rows=array_values(array_filter($rows,fn($r)=>(string)($r['id']??'')!==$id));sf_admin_write_releases($rows);sf_json_response(['ok'=>true]);}
+$me=sf_admin_require_auth(true);$b=sf_request_json();$action=(string)($b['action']??'save');$rows=sf_admin_releases();
+if($action==='delete'){$id=sf_admin_slug((string)($b['id']??''),'');$rows=array_values(array_filter($rows,fn($r)=>(string)($r['id']??'')!==$id));sf_admin_write_releases($rows);sf_log_admin_action((int)$me['id'],'release_deleted','release',$id);sf_json_response(['ok'=>true]);}
 $raw=is_array($b['release']??null)?$b['release']:[];$title=sf_clean_text($raw['title']??'',180);if($title==='')sf_json_response(['ok'=>false,'message'=>'Release title is required.'],422);$id=sf_admin_slug((string)($raw['id']??$title),'release');$idx=null;foreach($rows as $i=>$r)if((string)($r['id']??'')===$id){$idx=$i;break;}$old=$idx===null?[]:$rows[$idx];
 $state=(string)($raw['state']??($old['state']??'draft'));if(!in_array($state,['draft','review','scheduled','published','archived'],true))$state='draft';
 $catalog=sf_catalog();$trackMap=[];foreach($catalog as $t)if(!empty($t['id']))$trackMap[(string)$t['id']]=$t;
@@ -23,4 +23,10 @@ $release=['schema'=>'stonefellow.release.v2','id'=>$id,'title'=>$title,'type'=>s
   'created_at'=>$old['created_at']??gmdate('c'),'updated_at'=>gmdate('c')];
 if($idx===null)$rows[]=$release;else$rows[$idx]=$release;sf_admin_write_releases($rows);
 if($state==='published'){foreach($catalog as &$t){if(in_array((string)($t['id']??''),$trackIds,true)){$t['release']=$title;if(empty($t['artwork'])&&!empty($release['artwork']['cover']))$t['artwork']=$release['artwork']['cover'];}}unset($t);sf_admin_write_catalog($catalog);}
+sf_log_admin_action((int)$me['id'],$idx===null?'release_created':'release_updated','release',$id,
+    ['state'=>$state,'title'=>$title,'track_count'=>count($trackIds)]);
+if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_release','release_save',
+    ['route'=>'releases','action'=>'save_release','context_profile'=>'catalog','needs_llm'=>false,
+     'requires_confirmation'=>$state==='published','status'=>'completed','request'=>'Save release '.$title,
+     'response'=>'Persisted release '.$id.' as '.$state]);
 sf_json_response(['ok'=>true,'release'=>$release]);

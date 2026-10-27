@@ -501,6 +501,11 @@ jobs:
           php -l admin/api/media-catalog.php
           php tests/section90t-media-catalog.php
           node tests/section90t-media-catalog.cjs
+          php -l admin/api/activity-proof.php
+          php -l admin/api/releases.php
+          php -l admin/api/shows.php
+          php -l admin/api/media-catalog.php
+          node tests/section90u-catalog-proof.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs
