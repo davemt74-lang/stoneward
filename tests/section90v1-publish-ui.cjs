@@ -18,6 +18,8 @@ assert(admin.includes('catalogPublishDigital')&&admin.includes('catalogPublishVi
 assert(admin.includes("uploadApi('media-upload.php',upload)")
   &&admin.includes('preview_asset_id:previewId'),
   'Review can upload the public MP3 and publish without a second page.');
+assert(admin.includes('d.payload_hash=current.payload_hash'),
+  'Failed public media preflight refreshes the saved revision for a same-dialog retry.');
 assert(endpoint.includes('preview_asset_id')&&endpoint.includes('digital_purchase_enabled')
   &&endpoint.includes("$fields['pod_eligible']"),
   'Server receives reviewed usage choices and the separate preview.');

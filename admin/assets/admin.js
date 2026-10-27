@@ -443,6 +443,14 @@
           $('#catalogPublishOpenTrack').onclick=()=>openCatalogTrack(result.track_id);}
         say('Published "'+review.title+'" to the public Catalog.');
       }catch(error){errors.textContent='Song was not published: '+error.message;
+        // Review metadata may have been saved before the public media preflight
+        // failed. Refresh its exact hash so a listening-copy retry can succeed
+        // in this same dialog without a stale-revision loop.
+        try{const snapshot=await api('media-catalog.php');
+          const current=(snapshot.drafts||[]).find(x=>x.request_key===d.request_key);
+          if(current){d.payload_hash=current.payload_hash;d.digital_purchase_enabled=current.digital_purchase_enabled;
+            d.vinyl_print_enabled=current.vinyl_print_enabled;}
+        }catch(_){errors.textContent+=' If a retry reports a changed draft, reopen this review.';}
         errors.scrollIntoView?.({block:'nearest'});}
       finally{if(button.isConnected){button.disabled=false;button.textContent='Publish song'}}
     };
