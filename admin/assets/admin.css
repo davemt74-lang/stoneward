@@ -171,3 +171,37 @@
 .director-row>div:first-child{display:grid;gap:.2rem}.director-row small{font-size:.74rem;opacity:.7}
 .director-row p{white-space:pre-wrap}.director-actions{display:flex;flex-wrap:wrap;gap:.4rem}
 @media(max-width:650px){.director-form{grid-template-columns:1fr}.director-row{flex-direction:column}}
+
+/* Section 90Y: accessible, compact Admin identity actions */
+.admin-topbar{gap:14px}
+.admin-topbar-heading{min-width:0;flex:1 1 auto}
+.admin-topbar-heading .view-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-topbar-actions{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;gap:11px;flex:0 0 auto;min-width:0}
+.admin-topbar-actions .admin-notifications-button{margin-left:0;width:40px;height:40px}
+.admin-profile-shell{position:relative;flex:0 0 auto}
+.admin-profile-toggle{min-height:44px;max-width:240px;display:flex;align-items:center;gap:10px;padding:3px 9px 3px 4px;border:1px solid var(--line2);border-radius:999px;background:#14110e;color:var(--ink)}
+.admin-profile-toggle:hover,.admin-profile-toggle[aria-expanded="true"]{border-color:var(--accent);background:#201a14}
+.admin-profile-toggle:focus-visible,.admin-notifications-button:focus-visible,.admin-profile-dropdown :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.admin-profile-avatar{width:38px;height:38px;flex:0 0 38px;border:1px solid #6f5430;border-radius:50%;object-fit:cover;background:#34291b}
+.admin-profile-toggle-name{font-size:.77rem;max-width:138px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.admin-profile-chevron{width:14px;height:14px;flex:0 0 14px;color:var(--accent);transition:transform .16s}
+.admin-profile-toggle[aria-expanded="true"] .admin-profile-chevron{transform:rotate(180deg)}
+.admin-profile-dropdown{position:absolute;top:calc(100% + 12px);right:0;width:min(320px,calc(100vw - 24px));max-height:min(620px,calc(100vh - 88px));overflow-y:auto;overscroll-behavior:contain;border:1px solid #53442e;border-radius:14px;background:#16130f;box-shadow:0 22px 70px rgba(0,0,0,.8);padding:10px;z-index:45}
+.admin-profile-identity{display:flex;gap:12px;align-items:center;padding:12px 10px 10px;min-width:0}
+.admin-profile-avatar-large{width:50px;height:50px;flex-basis:50px}
+.admin-profile-identity>div{min-width:0;display:grid;gap:2px}
+.admin-profile-identity strong{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-profile-identity small{font-size:.69rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-profile-identity span{font-size:.6rem;text-transform:uppercase;letter-spacing:.13em;color:var(--accent)}
+.admin-profile-photo-action{margin:0 10px 10px;padding:6px 0;border:0;background:none;color:var(--accent);font-size:.7rem;text-decoration:underline;text-underline-offset:3px}
+.admin-profile-photo-action:hover{color:var(--ink)}
+.admin-profile-photo-status{margin:0 8px 10px;padding:8px 10px;border-radius:6px;background:#2a2118;font-size:.7rem;line-height:1.4;color:var(--ink)}
+.admin-profile-photo-status.error{color:var(--bad)}
+.admin-profile-menu-group{border-top:1px solid var(--line);padding:8px 0;display:grid;gap:1px}
+.admin-profile-menu-group>a,.admin-profile-menu-group>button{min-height:40px;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;border:0;border-radius:7px;background:none;color:var(--ink);text-align:left;font-size:.77rem}
+.admin-profile-menu-group>a:hover,.admin-profile-menu-group>button:hover{background:#2a231b;color:var(--accent)}
+.admin-profile-menu-group a span{font-size:.75rem;color:var(--accent)}
+.admin-profile-menu-group-bottom{padding-bottom:0}
+.admin-profile-logout{color:#e2a49b!important}
+@media(max-width:760px){.admin-topbar{gap:10px}.admin-topbar>.admin-topbar-heading{flex:1 1 auto;min-width:0}.admin-topbar>.admin-topbar-actions{flex:0 0 auto}.admin-topbar-actions{gap:7px}.admin-profile-toggle{max-width:145px}.admin-profile-toggle-name{max-width:70px}}
+@media(max-width:480px){.admin-topbar{padding:0 11px}.admin-topbar-actions .admin-notifications-button{width:38px;height:38px}.admin-profile-toggle{padding:3px;border-radius:50%;width:44px;height:44px}.admin-profile-avatar{width:36px;height:36px;flex-basis:36px}.admin-profile-toggle-name,.admin-profile-chevron{display:none}.admin-profile-dropdown{right:-3px}}
