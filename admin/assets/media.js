@@ -96,9 +96,8 @@
     const asset=state.assets.find(a=>Number(a.id)===id);
     if(!asset||asset.category!=='audio')return;
     const templates=app.templates||[];
-    if(!templates.length){say('Create a metadata template before adding a song to Catalog.');openView('templates');return;}
     const images=await api('media.php?category=image').then(r=>r.assets||[]).catch(()=>[]);
-    const opts=templates.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+' · v'+Number(t.version||1)+'</option>').join('');
+    const opts='<option value="">Quick song · no template needed</option>'+templates.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+' · v'+Number(t.version||1)+'</option>').join('');
     const artOpts='<option value="">No artwork yet</option>'+images.map(a=>'<option value="'+Number(a.id)+'">'+esc(a.title||a.original_name)+'</option>').join('');
     const modal=document.createElement('div');modal.className='media-modal media-catalog-modal';
     modal.innerHTML='<div class="media-modal-card"><div class="panel-title"><div><div class="eyebrow">SONG CATALOG</div><h2>Add to Catalog</h2><p>'+esc(asset.original_name)+'</p></div><button class="secondary" type="button" data-catalog-close>Close</button></div>'+
@@ -116,7 +115,7 @@
       '<label class="check-field span3"><input type="checkbox" name="pod_eligible"> Available for vinyl print (requires a distinct private master)</label>'+
       '<label class="check-field span3"><input type="checkbox" name="rights_confirmed"> I confirm I have authority to publish this recording and its metadata.</label>'+
       '<label class="check-field span3"><input type="checkbox" name="auto_publish"> Auto-publish to public listening Catalog now</label>'+
-      '<p class="notice span3">Choose streaming, downloads and vinyl independently. If a private master is needed, Stonefellow will create a lower-bitrate MP3 listening copy when server conversion is available; otherwise add a separate public listening MP3 in Catalog review.</p>'+
+      '<p class="notice span3">Choose streaming, downloads and vinyl. Stonefellow will protect any private master and prepare a separate listening MP3 automatically when possible, including on shared hosting. WAV masters may require a public MP3 upload in Catalog review.</p>'+
       '<div class="actions span3"><button class="primary" type="submit">Save song</button><button class="secondary" type="button" data-catalog-close>Cancel</button></div>'+
       '<p class="status-line span3" data-catalog-status role="status"></p></form></div>';
     document.body.appendChild(modal);
@@ -137,7 +136,7 @@
       const submit=form.querySelector('[type="submit"]'),status=$('[data-catalog-status]',form);submit.disabled=true;status.textContent='Saving private song metadata…';
       const key=form.dataset.requestKey||(form.dataset.requestKey=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join(''));
       try{
-        const input={action:'intake_asset',asset_id:id,request_key:key,template_id:d.get('template_id'),
+        const input={action:'intake_asset',simple_upload:!d.get('template_id'),asset_id:id,request_key:key,template_id:d.get('template_id'),
           title:d.get('title'),release:d.get('release'),isrc:d.get('isrc'),artist_display:d.get('artist_display'),
           words_by:d.get('words_by'),music_by:d.get('music_by'),master_owner:d.get('master_owner'),
           composition_owner:d.get('composition_owner'),artwork_asset_id:d.get('artwork_asset_id'),
