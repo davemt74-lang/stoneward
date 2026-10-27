@@ -51,9 +51,11 @@
         '<article class="admin-chat-popup-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+
         (m.role==='assistant'?'Stonefellow Admin Agent':'You')+'</strong><p>'+esc(m.content||'')+'</p></article>'
       ).join(''):'<p class="admin-chat-popup-empty">Your Admin conversation will appear here. Use the bar below to ask your Agent.</p>';
-      const proof=document.createElement('section');proof.className='admin-proof-preview';proof.id='adminChatPopupProof';
-      proof.innerHTML='<h3>Checking saved work…</h3>';transcript.appendChild(proof);
-      void loadProofsInto(proof,3);
+      if(typeof document.createElement==='function'&&typeof transcript.appendChild==='function'){
+        const proof=document.createElement('section');proof.className='admin-proof-preview';proof.id='adminChatPopupProof';
+        proof.innerHTML='<h3>Checking saved work…</h3>';transcript.appendChild(proof);
+        void loadProofsInto(proof,3);
+      }
       transcript.scrollTo?.({top:transcript.scrollHeight,behavior:'instant'});
       const state=document.querySelector('#adminChatPopupState');if(state)state.textContent='PRIVATE CONVERSATION';
     }catch(error){
