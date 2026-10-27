@@ -9,7 +9,13 @@ function sf_track_media_master_reference(array $track):string {
 }
 function sf_track_media_publish_master(string $trackId,int $linkId):array {
     sf_media_ensure_schema();
-    $catalog=sf_catalog();$idx=null;
+    // Use a fresh, exact catalog revision for this write. The static catalog
+    // cache may be older than a concurrent Admin edit in another request.
+    $sourceBytes=file_get_contents(SF_ROOT.'/data/catalog.json');
+    $catalog=$sourceBytes===false?null:json_decode($sourceBytes,true);
+    if(!is_array($catalog))throw new RuntimeException('Catalog source unavailable.');
+    $expectedHash=hash('sha256',$sourceBytes);
+    $idx=null;
     foreach($catalog as $i=>$track)if((string)($track['id']??'')===$trackId){$idx=$i;break;}
     if($idx===null)throw new RuntimeException('Song does not exist.');
     $q=sf_db()->prepare("SELECT l.*,a.uuid,a.category,a.extension,a.size_bytes FROM media_links l JOIN media_assets a ON a.id=l.asset_id WHERE l.id=? AND l.entity_type='track' AND l.entity_id=?");
@@ -38,7 +44,7 @@ function sf_track_media_publish_master(string $trackId,int $linkId):array {
     $catalog[$idx]['media_private_master_asset']=$id;
     $catalog[$idx]['audio_publishing_mode']='preview_master_split';
     if(!function_exists('sf_admin_write_catalog'))throw new RuntimeException('Catalog writer unavailable.');
-    sf_admin_write_catalog($catalog);
+    sf_admin_write_catalog($catalog,$expectedHash);
     return ['track'=>$catalog[$idx],'previous_master'=>$previous,'asset'=>sf_media_asset($id),'unchanged'=>false];
 }
 function sf_track_media_publication_status(string $trackId):array {
@@ -50,6 +56,8 @@ function sf_track_media_publication_status(string $trackId):array {
     if($master!==''&&function_exists('sf_fan_owned_media_ready'))$ready=sf_fan_owned_media_ready($master);
     return ['mode'=>(string)($track['audio_publishing_mode']??'legacy'),
         'public_preview'=>$preview!=='' && str_starts_with($preview,'api/media.php?id='),
+        'master_asset_id'=>(int)($track['media_private_master_asset']??0),
+        'master_reference'=>$master,
         'private_master'=>$master!=='','download_ready'=>$ready,
         'hint'=>!$master?'Choose a separate private MP3/WAV original.':(!$ready?'Private master missing or unavailable.':'Original validated for owned downloads.')];
 }

@@ -111,9 +111,9 @@
   }
   async function deleteAsset(id){if(!confirm('Permanently delete this unused media asset and its stored file?'))return;try{await api('media.php',{action:'delete_asset',id});say('Media asset deleted.');renderMediaLibrary()}catch(e){alert(e.message)}}
 
-  function trackSection(){return '<div class="track-media-toolbar"><button class="primary" type="button" data-track-media-upload="audio_candidate">Upload audio</button><button class="secondary" type="button" data-track-media-upload="artwork">Upload artwork</button><button class="secondary" type="button" data-track-media-upload="photo">Upload photos</button><button class="secondary" type="button" data-track-media-upload="video">Upload video</button><button class="secondary" type="button" data-track-media-upload="document">Upload documents</button><button class="secondary" type="button" data-track-media-upload="archive">Upload archive media</button><button class="secondary" type="button" id="trackMediaChoose">Choose from Library</button></div><div class="media-publishing-hint">Use separate Media Library files for the public preview and the private purchased original. Your existing uploader and media attachments are used.</div><div id="trackPublicationStatus" class="media-publication-status" role="status"></div><div id="trackMediaStatus" class="status-line"></div><div id="trackMediaGroups" class="track-media-groups"><div class="empty compact">Loading attached media…</div></div>'}
+  function trackSection(){return '<div class="track-media-toolbar"><button class="primary" type="button" data-track-media-upload="audio_candidate">Upload audio</button><button class="secondary" type="button" id="trackReplaceSourceAudio">Replace source audio</button><button class="secondary" type="button" data-track-media-upload="artwork">Upload artwork</button><button class="secondary" type="button" data-track-media-upload="photo">Upload photos</button><button class="secondary" type="button" data-track-media-upload="video">Upload video</button><button class="secondary" type="button" data-track-media-upload="document">Upload documents</button><button class="secondary" type="button" data-track-media-upload="archive">Upload archive media</button><button class="secondary" type="button" id="trackMediaChoose">Choose from Library</button></div><div class="media-publishing-hint">Use separate Media Library files for the public preview and the private purchased original. Your existing uploader and media attachments are used.</div><div id="trackMasterHistory" class="track-master-history"></div><div id="trackPublicationStatus" class="media-publication-status" role="status"></div><div id="trackMediaStatus" class="status-line"></div><div id="trackMediaGroups" class="track-media-groups"><div class="empty compact">Loading attached media…</div></div>'}
   async function bindTrackMedia(trackId){
-    state.trackId=trackId;$$('[data-track-media-upload]',canvas).forEach(b=>b.onclick=()=>pickUploadFiles('track',trackId,b.dataset.trackMediaUpload));const choose=$('#trackMediaChoose',canvas);if(choose)choose.onclick=()=>chooseExisting('track',trackId,'archive');await refreshTrackMedia(trackId);
+    state.trackId=trackId;$$('[data-track-media-upload]',canvas).forEach(b=>b.onclick=()=>pickUploadFiles('track',trackId,b.dataset.trackMediaUpload));const choose=$('#trackMediaChoose',canvas);if(choose)choose.onclick=()=>chooseExisting('track',trackId,'archive');const replace=$('#trackReplaceSourceAudio',canvas);if(replace)replace.onclick=()=>replaceSourceAudio(trackId);await refreshTrackMedia(trackId);
   }
   async function refreshTrackMedia(trackId){
     try{const j=await api('media.php?entity_type=track&entity_id='+encodeURIComponent(trackId));state.trackLinks=j.links||[];state.publication=j.publication||{};state.capabilities=j.capabilities||state.capabilities;renderTrackGroups(trackId)}catch(e){const s=$('#trackMediaStatus',canvas);if(s)s.textContent=e.message}
@@ -124,7 +124,56 @@
     const host=$('#trackMediaGroups',canvas);if(!host)return;const groups=[
       ['primary_audio','Primary audio'],['master_audio','Masters'],['preview_audio','Previews'],['download_audio','Downloads'],['alternate_audio','Alternate audio'],['audio_candidate','Audio candidates'],['artwork','Artwork'],['primary_artwork','Primary artwork'],['photo','Photos'],['video','Video'],['document','Documents'],['archive','Archive']
     ];const seen=new Set();host.innerHTML=groups.map(([role,label])=>{const rows=state.trackLinks.filter(x=>x.role===role);if(!rows.length)return'';seen.add(role);return '<section class="track-media-group" data-media-role-group="'+role+'"><div class="panel-title"><h4>'+label+'</h4><span>'+rows.length+'</span></div><div class="track-media-list">'+rows.map(linkCard).join('')+'</div></section>'}).join('')||'<div class="empty compact">No media attached yet. Upload a file or choose one from the Media Library.</div>';
-    bindTrackCards(trackId);
+    bindTrackCards(trackId);renderMasterHistory(trackId);
+  }
+  function renderMasterHistory(trackId){
+    const host=$('#trackMasterHistory',canvas);if(!host)return;
+    const masters=state.trackLinks.filter(x=>x.role==='master_audio')
+      .sort((a,b)=>Number(a.id)-Number(b.id));
+    const current=Number(state.publication?.master_asset_id||0);
+    const ref=String(state.publication?.master_reference||'');
+    host.innerHTML='<h4>Source audio revision history</h4><p class="hint">Every previous private master is retained. Changing the current master keeps this song’s Catalog ID, listening counts, purchases and store history.</p>'+
+      (masters.length?'<ol class="track-master-revisions">'+masters.map((m,i)=>{
+        const active=current?current===Number(m.asset_id):ref.includes('id='+m.uuid);
+        const note=String(m.link?.revision_note||'');
+        return '<li><div><strong>Revision '+(i+1)+(active?' · Current source':' · Retained master')+'</strong>'+
+          '<span>'+esc(m.original_name)+' · '+esc((m.created_at||'').slice(0,19).replace('T',' '))+'</span>'+
+          (note?'<small>'+esc(note)+'</small>':'')+'</div>'+
+          (!active?'<button class="secondary" data-master-restore="'+Number(m.id)+'" type="button">Restore this revision</button>':'<span class="badge good">Current</span>')+'</li>';
+      }).join('')+'</ol>':'<p class="hint">No source masters assigned yet. Upload an original or replace the source to create the first revision.</p>');
+    $$('[data-master-restore]',host).forEach(b=>b.onclick=()=>publishPrivateMaster(Number(b.dataset.masterRestore),trackId));
+  }
+  function replaceSourceAudio(trackId){
+    const overlay=document.createElement('div');overlay.className='media-modal';
+    overlay.innerHTML='<div class="media-modal-card"><div class="panel-title"><div><div class="eyebrow">SOURCE REVISION</div><h2>Replace source audio</h2></div><button class="secondary" type="button" data-replace-close>Close</button></div>'+
+      '<p>Upload an MP3 or WAV as the new <strong>private master</strong>. The public listening preview will not change, and older masters will stay in revision history. Play and store statistics remain on the same song.</p>'+
+      '<form data-source-revision-form><label class="field">Replacement source audio<input type="file" accept=".mp3,.wav,.wave,audio/mpeg,audio/wav" required name="master"></label>'+
+      '<label class="field">Revision notes (optional)<textarea name="revision_note" maxlength="500" placeholder="For example: New mix, remastered vocal, corrected ending"></textarea></label>'+
+      '<label class="check-field"><input type="checkbox" required name="confirmed"> Set this as the current private master while retaining the earlier revisions</label>'+
+      '<div class="actions"><button class="primary" type="submit">Upload and confirm replacement</button><button type="button" class="secondary" data-replace-close>Cancel</button></div><p class="status-line" role="status" data-source-revision-status></p></form></div>';
+    document.body.appendChild(overlay);
+    $$('[data-replace-close]',overlay).forEach(b=>b.onclick=()=>overlay.remove());
+    $('[data-source-revision-form]',overlay).onsubmit=async event=>{
+      event.preventDefault();const form=event.currentTarget,files=form.elements.master.files,file=files?.[0];
+      if(!file||!(/\.(mp3|wav|wave)$/i.test(file.name))||file.size<1)return;
+      const note=String(new FormData(form).get('revision_note')||'').trim();
+      const submit=form.querySelector('[type="submit"]'),status=$('[data-source-revision-status]',form);
+      submit.disabled=true;
+      try{
+        status.textContent='Uploading private source '+file.name+'…';
+        const asset=await uploadOne(file,p=>status.textContent='Uploading private source · '+Math.round(p*100)+'%');
+        if(asset.category!=='audio')throw new Error('A valid MP3/WAV source is required.');
+        const attached=await api('media.php',{action:'attach',entity_type:'track',entity_id:trackId,
+          role:'audio_candidate',asset_id:Number(asset.id),public_visible:false,download_allowed:false,
+          revision_note:note});
+        const linked=(attached.links||[]).find(x=>Number(x.asset_id)===Number(asset.id)&&x.role==='audio_candidate');
+        if(!linked)throw new Error('Source was stored privately but the revision attachment was not verified. Review media before retrying.');
+        status.textContent='Verifying replacement and keeping previous masters…';
+        await api('media.php',{action:'publish_track_master',track_id:trackId,link_id:Number(linked.id),confirmed:true});
+        overlay.remove();await reloadCore();await refreshTrackMedia(trackId);
+        say('Private source revision saved. Existing song statistics and earlier masters are retained.');
+      }catch(error){status.textContent=error.message||'Replacement did not finish. Uploaded candidates remain private.';submit.disabled=false;}
+    };
   }
   function linkCard(l){
     const preview=l.category==='image'?'<img src="'+esc(mediaUrl(l,l.variants&&l.variants.thumb?'thumb':'original'))+'" alt="">':l.category==='audio'&&l.role!=='master_audio'?'<audio controls preload="metadata" src="'+esc(mediaUrl(l))+'"></audio>':'<div class="media-type-icon">'+esc(l.category==='video'?'▶':l.category==='document'?'DOC':'FILE')+'</div>';
@@ -136,8 +185,8 @@
     $$('[data-link-download]',canvas).forEach(x=>x.onchange=()=>updateLink(Number(x.dataset.linkDownload),{download_allowed:x.checked,public_visible:x.checked||undefined}));
     $$('[data-link-featured]',canvas).forEach(x=>x.onchange=()=>updateLink(Number(x.dataset.linkFeatured),{featured:x.checked}));
     $$('[data-media-detach]',canvas).forEach(b=>b.onclick=()=>detachLink(Number(b.dataset.mediaDetach),trackId));
-    $('[data-media-primary-audio]',canvas).forEach(b=>b.onclick=()=>publishPrimaryAudio(Number(b.dataset.mediaPrimaryAudio),trackId));
-    $('[data-media-private-master]',canvas).forEach(b=>b.onclick=()=>publishPrivateMaster(Number(b.dataset.mediaPrivateMaster),trackId));
+    $$('[data-media-primary-audio]',canvas).forEach(b=>b.onclick=()=>publishPrimaryAudio(Number(b.dataset.mediaPrimaryAudio),trackId));
+    $$('[data-media-private-master]',canvas).forEach(b=>b.onclick=()=>publishPrivateMaster(Number(b.dataset.mediaPrivateMaster),trackId));
     $$('[data-media-primary-art]',canvas).forEach(b=>b.onclick=()=>publishPrimaryArtwork(Number(b.dataset.mediaPrimaryArt),trackId));
     $$('[data-media-edit-inline]',canvas).forEach(b=>{const link=state.trackLinks.find(x=>Number(x.id)===Number(b.dataset.mediaEditInline));b.onclick=()=>link&&editTrackAsset(link)});
     $$('.track-media-card',canvas).forEach(card=>{card.ondragstart=e=>e.dataTransfer.setData('media/link',card.dataset.mediaLink);card.ondragover=e=>e.preventDefault();card.ondrop=e=>reorderDrop(e,trackId,card)});

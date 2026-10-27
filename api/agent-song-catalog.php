@@ -43,7 +43,17 @@ function sf_agent_song_catalog_candidate(array $draft,array $master,array $previ
     }
     $sourceFingerprint=hash('sha256',$draft['request_key'].'|'.$draft['payload_hash'].'|'
         .$preview['sha256'].'|'.$cover['sha256']);
-    $metadata=[
+    $sourceTemplate=is_array($draft['template_metadata']??null)?$draft['template_metadata']:[];
+    // Only whitelisted public metadata leaves the private import snapshot.
+    $metadata=[];
+    foreach(['pro_affiliation','ipi_cae','publisher','publisher_pro','publisher_ipi',
+        'producer','co_producer','recording_engineer','mixing_engineer',
+        'mastering_engineer','studio','recording_location','label',
+        'catalog_number','language','subgenre'] as $field)
+        if(isset($sourceTemplate[$field]))$metadata[$field]=$sourceTemplate[$field];
+    if(isset($sourceTemplate['template'])&&is_array($sourceTemplate['template']))
+        $metadata['template']=$sourceTemplate['template'];
+    $metadata+= [
         'words_by'=>(string)$draft['words_by'],'music_by'=>(string)$draft['music_by'],
         'performing_artist'=>(string)$draft['artist_display'],
         'composition_copyright'=>(string)$draft['composition_owner'],
@@ -59,12 +69,16 @@ function sf_agent_song_catalog_candidate(array $draft,array $master,array $previ
         'duration'=>max(1,(int)round((float)$preview['duration_seconds'])),
         'year'=>(int)($draft['year']??0),
         'audio'=>'api/media.php?id='.rawurlencode((string)$preview['uuid']),
+        'private_master_audio'=>'api/media.php?id='.rawurlencode((string)$master['uuid']),
         'artwork'=>'api/media.php?id='.rawurlencode((string)$cover['uuid']).'&variant=large',
         'state'=>'published','public_visible'=>true,'agent_discoverable'=>true,
-        'mood'=>[],'themes'=>[],'energy'=>3,'price'=>2,'podEligible'=>false,
+        'mood'=>[],'themes'=>[],'energy'=>3,
+        'price'=>max(0,(float)($sourceTemplate['price']??2)),
+        'podEligible'=>!empty($draft['pod_eligible']),
         'story'=>'','lyrics'=>'','credits'=>sf_admin_public_credits($metadata),
         'metadata'=>$metadata,'audio_publishing_mode'=>'preview_master_split',
         'media_primary_asset'=>(int)$preview['id'],
+        'media_private_master_asset'=>(int)$master['id'],
         'media_primary_artwork_asset'=>(int)$cover['id'],
         'created_at'=>gmdate('c')
     ];
