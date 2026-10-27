@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const admin=fs.readFileSync(path.join(root,'admin/assets/agent-canvas.js'),'utf8');
+const endpoint=fs.readFileSync(path.join(root,'admin/api/agent-tools.php'),'utf8');
+assert.match(admin,/c\.api\('agent-tools\.php\?audit=1'\)\.catch\(\(\)=>null\)/,'Admin Brain fetches optional diagnostic safely');
+assert.match(admin,/Agent capability coverage/,'Admin Brain shows coverage alongside actual missions');
+assert.match(admin,/Navigation is not record-level access/,'Admin UI distinguishes navigation from record access');
+assert.match(admin,/Coverage diagnostic unavailable; no operational access inferred/,'Unavailable audit does not claim access');
+assert.match(endpoint,/sf_admin_require_auth\(false\)/,'Only Admin can retrieve the diagnostic');
+assert.match(endpoint,/\(\$_GET\['audit'\]\?\?''\)==='1'/,'Coverage is explicitly opt in');
+console.log('Section 91B1: Admin capability coverage UI and boundary PASS');

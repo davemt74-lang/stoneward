@@ -1569,6 +1569,10 @@
     close.focus();
     try{
       const result=await c.api('agent-chat.php'),brain=result.brain||lastBrain||{};
+      // Optional, authenticated 91B1 read-only audit. An unavailable audit
+      // must not prevent Admin from reviewing actual missions and evidence.
+      const coverageResult=await c.api('agent-tools.php?audit=1').catch(()=>null);
+      const coverage=coverageResult?.integration_coverage||null;
       lastBrain=brain;
       const editorial=brain.editorial_production||{},editorialRows=Array.isArray(editorial.assemblies)?editorial.assemblies.slice(0,8):[];
       const editorialList=editorialRows.map(a=>'<li>Assembly #'+Number(a.assembly_id)+' · rev '+
@@ -1592,6 +1596,12 @@
         '<ul class="admin-brain-list">'+(editorial.available?(editorialList||'<li>No saved private assemblies.</li>'):
            '<li>Editor-only production evidence.</li>')+'</ul>'+
         '<button type="button" class="secondary" id="brainProductionOpen">Show production calendar in chat</button>'+
+        '<h3>Agent capability coverage</h3><p>'+(coverage?.checks_passed?
+          Number(coverage.registered_tools)+' registered tools · '+Number(coverage.registered_skills)+' skill definitions · '+
+          Number(coverage.admin_navigation_only_count)+' module navigation routes · '+
+          Number((coverage.reviewed_action_eligible||[]).length)+' reviewed proposal paths.':
+          'Coverage diagnostic unavailable; no operational access inferred.')+
+        ' Navigation is not record-level access. Registered actions still require their destination permissions and confirmations.</p>'+
         '<h3>Permitted tools</h3><ul class="admin-brain-list">'+safeTools+'</ul>';
       drawer.querySelector('#brainCommerceOpen').onclick=()=>{closeBrain();c.openView('commerce-ops');};
       drawer.querySelector('#brainProductionOpen').onclick=()=>{closeBrain();send('production calendar').catch(e=>c.say(e.message));};

@@ -1,4 +1,8 @@
-# Stonefellow v1.3.160 — Section 91A: Conversational voice reliability
+# Stonefellow v1.3.161 — Section 91B1: Agent integration coverage audit
+
+Section 91B1 adds an authenticated, read-only Agent capability coverage diagnostic (`admin/api/agent-tools.php?audit=1`). It inventories live tool and skill contracts, distinguishes the 23 Admin navigation-only intents from genuine data operations, and enumerates the five existing exact-reviewed proposal paths. The coverage audit never grants execution, changes permissions, invokes a model or modifies data. Its regression tests are part of the full release gate. The full operational-control integrations remain scoped to 91B2–91B5.
+
+## Previous release: Stonefellow v1.3.160 — Section 91A: Conversational voice reliability
 
 - Public and Admin speech monitoring now requires both independently transcribed participant words and continuing microphone speech after the Agent output is silenced. The Agent's own voice level alone cannot repeatedly pause or stop a reply.
 - Browser speech playback retries a transient canceled/interrupted chunk once, and does not skip to the next chunk if playback ends during a temporary echo probe. Normal listening resumes only after all spoken chunks end or playback is explicitly stopped.
