@@ -20,6 +20,8 @@ assert(ui.includes('window.confirm(\'Save "\'')&&ui.includes('data-g-status=')&&
 assert(!ui.includes("api('finalize.php'")&&!ui.includes('id="importBatch"'),'Scan UI no longer calls public batch finalization.');
 assert(ui.includes("api('scan-private.php'")&&ui.includes("result.publication!=='not_published'"),'UI checks the private server receipt.');
 assert(ui.includes('data-g-vinyl=')&&ui.includes('podEligible:false'),'Vinyl printing defaults off and can be opted into per song.');
+assert(ui.includes('fileOpts(g.masterUid)')&&ui.includes('fileOpts(g.previewUid)'),
+  'Visible master and preview dropdown selections match the actual per-song upload choices.');
 assert(ui.includes('window.SFAdminAgentCanvas?.openSongDraft')&&agent.includes('async function openSongDraft'),'Uploaded songs open the existing Admin song review flow.');
 assert(legacy.includes("if(empty($body['confirmed_publication']))"),'Legacy public batch endpoint requires explicit publication confirmation.');
 assert(endpoint.includes("sf_admin_require_auth(true)")&&endpoint.includes("owner_id")&&uploads.includes("'owner_id'=>(int)$me['id']"),'Private intake enforces owner and file binding.');

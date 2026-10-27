@@ -11,10 +11,18 @@ function sf_track_media_publish_master(string $trackId,int $linkId):array {
     sf_media_ensure_schema();
     // Use a fresh, exact catalog revision for this write. The static catalog
     // cache may be older than a concurrent Admin edit in another request.
-    $sourceBytes=file_get_contents(SF_ROOT.'/data/catalog.json');
-    $catalog=$sourceBytes===false?null:json_decode($sourceBytes,true);
-    if(!is_array($catalog))throw new RuntimeException('Catalog source unavailable.');
-    $expectedHash=hash('sha256',$sourceBytes);
+    $sourceBytes=@file_get_contents(SF_ROOT.'/data/catalog.json');
+    // Existing Media Library integrations can provide a catalog directly,
+    // without a catalog.json file (for example isolated SQLite fixtures).
+    // A persisted catalog always receives an exact content-hash guard.
+    if($sourceBytes===false){
+        $catalog=sf_catalog();
+        $expectedHash=null;
+    }else{
+        $catalog=json_decode($sourceBytes,true);
+        $expectedHash=hash('sha256',$sourceBytes);
+    }
+    if(!is_array($catalog)||!$catalog)throw new RuntimeException('Catalog source unavailable.');
     $idx=null;
     foreach($catalog as $i=>$track)if((string)($track['id']??'')===$trackId){$idx=$i;break;}
     if($idx===null)throw new RuntimeException('Song does not exist.');
