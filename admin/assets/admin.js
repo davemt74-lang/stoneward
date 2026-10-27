@@ -372,16 +372,99 @@
   async function deleteTemplate(id){if(!confirm('Delete this metadata template? Existing catalog records keep their copied metadata.'))return;await api('templates.php',{action:'delete',id});await reloadCore();say('Template deleted.');renderTemplates()}
 
   function renderCatalog(){
-    const actions='<button class="secondary" data-view="uploads" type="button">Import music</button>';
+    const actions='<button class="primary" id="catalogQuickUpload" type="button">Upload Song</button><button class="secondary" data-view="uploads" type="button">Import music</button>';
     canvas.innerHTML=head('MASTER CATALOG','Catalog','Every recording and its authoritative Stonefellow metadata.',actions)+
       `<div id="catalogPublishResult" role="status" aria-live="polite" hidden></div><section class="panel catalog-private-panel"><div class="panel-title"><div><h2>Private Catalog drafts</h2><p>New songs appear here immediately. Private means not yet in the public listening player.</p></div><button type="button" class="secondary" id="catalogDraftRefresh">Refresh drafts</button></div><div id="catalogDraftList" role="status">Loading saved songs…</div></section><div class="toolbar"><input id="catalogSearch" type="search" placeholder="Search title, release, ISRC…" value="${esc(app.catalogFilter)}"><button class="secondary" id="missingToggle" type="button">${app.missingOnly?'Show all':'Show metadata gaps'}</button></div><div id="catalogTable"></div>`;
     bindViewLinks();
+    $('#catalogQuickUpload').onclick=openCatalogQuickUpload;
     $('#catalogSearch').oninput=e=>{app.catalogFilter=e.target.value;renderCatalogRows()};
     $('#catalogDraftRefresh').onclick=()=>loadCatalogDrafts();
     $('#missingToggle').onclick=()=>{app.missingOnly=app.missingOnly?'':'all';renderCatalog()};
     renderCatalogRows();
     void loadCatalogDrafts();
     void api('catalog.php').then(j=>{if(app.view!=='catalog'||!$('#catalogTable'))return;app.catalog=j.catalog||[];renderCatalogRows()}).catch(e=>say('Catalog refresh unavailable: '+e.message));
+  }
+  function openCatalogQuickUpload(){
+    document.querySelector('#catalogQuickOverlay')?.remove();
+    const previous=document.activeElement;
+    const overlay=document.createElement('div');overlay.id='catalogQuickOverlay';overlay.className='catalog-publish-backdrop';
+    overlay.innerHTML='<section class="catalog-publish-dialog" role="dialog" aria-modal="true" aria-labelledby="catalogQuickTitle">'+
+      '<div class="catalog-publish-header"><div><small>SONG CATALOG</small><h2 id="catalogQuickTitle">Upload a song</h2></div><button type="button" class="secondary" data-quick-close aria-label="Close">×</button></div>'+
+      '<p>Upload your recording, choose how it will be used, and publish. You can save it privately instead.</p>'+
+      '<form id="catalogQuickForm"><label class="field catalog-publish-copy">Song file · MP3 or WAV<input type="file" name="audio" accept=".mp3,.wav,audio/mpeg,audio/wav" required></label>'+
+      '<div class="catalog-publish-fields"><label class="field">Song title<input name="title" maxlength="180" required></label>'+
+      '<label class="field">Artist<input name="artist_display" maxlength="180" value="Stonefellow" required></label>'+
+      '<label class="field">Release / album<input name="release" maxlength="180" value="Unreleased"></label>'+
+      '<label class="field">ISRC (optional)<input name="isrc" maxlength="16"></label></div>'+
+      '<label class="check-field catalog-quick-credit-toggle"><input type="checkbox" id="catalogQuickSameCredits"> Use the artist name for songwriting credits and ownership (only if accurate)</label>'+
+      '<div class="catalog-publish-fields"><label class="field">Words by<input name="words_by" maxlength="180" required></label>'+
+      '<label class="field">Music by<input name="music_by" maxlength="180" required></label>'+
+      '<label class="field">Master recording owner<input name="master_owner" maxlength="180" required></label>'+
+      '<label class="field">Composition rights owner<input name="composition_owner" maxlength="180" required></label></div>'+
+      '<div class="catalog-publish-usage"><strong>How should this song be used?</strong>'+
+      '<label class="check-field"><input type="checkbox" name="streaming" checked> Publish to the public streaming player</label>'+
+      '<label class="check-field"><input type="checkbox" name="digital_purchase_enabled"> Offer digital downloads</label>'+
+      '<label class="check-field"><input type="checkbox" name="pod_eligible"> Available for vinyl printing</label>'+
+      '<label class="field">Digital download price ($)<input type="number" name="digital_price" min="0" max="1000" step="0.01" value="2.00"></label>'+
+      '<small>For downloads or vinyl, the original remains private. Stonefellow prepares a separate streaming copy automatically when possible.</small></div>'+
+      '<label class="check-field catalog-publish-consent"><input type="checkbox" name="rights_confirmed" required> I confirm I have the necessary rights to use this recording as selected.</label>'+
+      '<p class="form-error" id="catalogQuickError" role="alert" aria-live="assertive"></p>'+
+      '<p class="status-line" id="catalogQuickStatus" role="status" aria-live="polite"></p>'+
+      '<div class="actions catalog-publish-actions"><button type="button" class="secondary" data-quick-close>Cancel</button><button class="primary" type="submit" id="catalogQuickSubmit">Publish song</button></div></form></section>';
+    document.body.appendChild(overlay);
+    const close=()=>{overlay.remove();previous?.isConnected&&previous.focus?.()};
+    $$('[data-quick-close]',overlay).forEach(b=>b.onclick=close);
+    overlay.onclick=e=>{if(e.target===overlay)close()};
+    overlay.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();close()}};
+    const form=$('#catalogQuickForm',overlay),streaming=form.elements.streaming;
+    const sync=()=>{const enabled=streaming.checked;for(const name of ['digital_purchase_enabled','pod_eligible']){
+        form.elements[name].disabled=!enabled;if(!enabled)form.elements[name].checked=false;}
+      $('#catalogQuickSubmit',form).textContent=enabled?'Publish song':'Save private song';};
+    streaming.onchange=sync;sync();
+    const fillCredits=()=>{if(!$('#catalogQuickSameCredits',form).checked)return;
+      for(const name of ['words_by','music_by','master_owner','composition_owner'])form.elements[name].value=form.elements.artist_display.value.trim();};
+    $('#catalogQuickSameCredits',form).onchange=fillCredits;
+    form.elements.artist_display.oninput=fillCredits;
+    form.elements.audio.onchange=()=>{const file=form.elements.audio.files?.[0];
+      if(file&&!form.elements.title.value.trim())form.elements.title.value=file.name.replace(/\.(mp3|wav)$/i,'').replace(/[_-]+/g,' ').trim();};
+    form.onsubmit=async e=>{
+      e.preventDefault();const errors=$('#catalogQuickError',form),status=$('#catalogQuickStatus',form),button=$('#catalogQuickSubmit',form);
+      errors.textContent='';const audio=form.elements.audio.files?.[0];if(!audio)return;
+      if(!/\.(mp3|wav)$/i.test(audio.name)){errors.textContent='Upload an MP3 or WAV song.';return}
+      if(!form.elements.rights_confirmed.checked){errors.textContent='Confirm your publishing rights.';return}
+      button.disabled=true;
+      try{
+        status.textContent='Uploading song…';
+        const fd=new FormData();fd.append('file',audio,audio.name);
+        const uploaded=await uploadApi('media-upload.php',fd);
+        if(!Number(uploaded.asset?.id))throw new Error('The upload did not produce a verified song asset.');
+        status.textContent=streaming.checked?'Saving song and publishing…':'Saving private song…';
+        const values=Object.fromEntries(['title','release','artist_display','words_by','music_by','master_owner','composition_owner','isrc','digital_price']
+          .map(name=>[name,String(form.elements[name].value||'').trim()]));
+        const key=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
+        const result=await api('media-catalog.php',{action:'intake_asset',simple_upload:true,asset_id:Number(uploaded.asset.id),
+          request_key:key,...values,digital_purchase_enabled:form.elements.digital_purchase_enabled.checked,
+          pod_eligible:form.elements.pod_eligible.checked,rights_confirmed:true,
+          auto_publish:streaming.checked,confirmed:streaming.checked});
+        close();openView('catalog');
+        if(result.publication==='published'){
+          try{const fresh=await api('catalog.php');app.catalog=fresh.catalog||[];renderCatalogRows()}catch(_){}
+          const receipt=$('#catalogPublishResult');if(receipt){receipt.hidden=false;receipt.className='catalog-publish-success';
+            receipt.innerHTML='<strong>✓ Published: '+esc(values.title)+'</strong><p>This song is available in the public listening player.</p>'+
+              '<button class="secondary" type="button" id="catalogQuickOpenTrack">Open published track</button>';
+            $('#catalogQuickOpenTrack').onclick=()=>openCatalogTrack(result.track_id);}
+          say('Published '+values.title+' to the public Catalog.');
+        }else{
+          await loadCatalogDrafts();
+          const draft=(app.catalogDrafts||[]).find(item=>item.request_key===result.draft?.request_key);
+          if(streaming.checked&&draft){openCatalogPublishReview(draft);
+            const error=$('#catalogPublishError');if(error)error.textContent='Publication needs review: '+(result.publication_message||'Please review the saved song.');}
+          else say('Song saved privately. You can publish it from Catalog later.');
+        }
+      }catch(error){errors.textContent=error.message||'Song upload could not finish.';status.textContent='Your recording has not been confirmed as published.';}
+      finally{if(button.isConnected){button.disabled=false;sync()}}
+    };
+    form.elements.audio.focus();
   }
   function metadataGaps(t){const m=t.metadata||{};const gaps=[];if(!m.isrc)gaps.push('ISRC');if(!m.words_by&&!m.music_by)gaps.push('writer');if(!m.pro_affiliation)gaps.push('PRO');return gaps}
   async function loadCatalogDrafts(){
@@ -432,7 +515,7 @@
       '<div class="catalog-publish-usage"><label class="check-field"><input type="checkbox" checked disabled> Public listening player (streaming)</label>'+
       '<label class="check-field"><input id="catalogPublishDigital" type="checkbox" '+(d.digital_purchase_enabled?'checked':'')+'> Enable digital downloads ($'+Number(d.digital_price||0).toFixed(2)+')</label>'+
       '<label class="check-field"><input id="catalogPublishVinyl" type="checkbox" '+(d.vinyl_print_enabled?'checked':'')+'> Available for vinyl print</label></div>'+
-      '<label class="field catalog-publish-copy">Public listening MP3 (optional)<input id="catalogPublishListening" type="file" accept=".mp3,audio/mpeg"><small>Upload a separate MP3 if you have one. If the selected source is a protected master, the server will first try to create a lower-bitrate listening MP3 automatically.</small></label>'+
+      '<label class="field catalog-publish-copy">Public listening MP3 (optional)<input id="catalogPublishListening" type="file" accept=".mp3,audio/mpeg"><small>Normally no second upload is needed: protected MP3 masters get a separate metadata-clean listening copy, even without FFmpeg. Protected WAV masters need server conversion or a separate listening MP3.</small></label>'+
       '<label class="check-field catalog-publish-consent"><input id="catalogPublishRights" type="checkbox" required> I confirm that I have authority to publish this recording and its composition on Stonefellow.</label>'+
       '<p id="catalogPublishError" class="form-error" role="alert" aria-live="assertive"></p>'+
       '<div class="actions catalog-publish-actions"><button type="button" class="secondary" id="catalogPublishCancel">Cancel</button><button class="primary" type="submit" id="catalogPublishConfirm">Publish song</button></div></form></section>';

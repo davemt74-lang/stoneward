@@ -111,6 +111,10 @@ try{
                 'status'=>$existing['status'],'title'=>$existing['title']]]);
     }
     $template=sf_admin_template((string)($body['template_id']??''));
+    // A single-song upload should not require creating a metadata template.
+    // The same reviewed writer and privacy guards still handle publication.
+    if(!$template&&!empty($body['simple_upload'])&&empty($body['template_id']))
+        $template=['id'=>'quick-song','name'=>'Single song upload','version'=>1,'defaults'=>[]];
     if(!$template)throw new InvalidArgumentException('Select an existing song metadata template.');
     $artworkId=(int)($body['artwork_asset_id']??0);
     $artwork=$artworkId>0?sf_media_catalog_authorized_asset(sf_media_asset($artworkId),$owner,'image'):null;

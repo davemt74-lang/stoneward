@@ -108,7 +108,91 @@ function sf_media_catalog_missing_fields(array $draft):array {
     return $missing;
 }
 
-/** Transcode a protected source into a new, lower-bitrate public listening MP3. */
+/**
+ * Hosting-safe MP3 listening copy: strip private ID3 metadata without exposing
+ * the original file, even when the host has no FFmpeg executable. MP3 frames
+ * retain their original bitrate; this is a metadata-free remux, not a transcode.
+ */
+function sf_media_catalog_remux_mp3_preview(array $master,int $owner,string $key):array {
+    $master=sf_media_catalog_authorized_asset($master,$owner);
+    if($owner<1||!preg_match('/^[a-f0-9]{32}$/D',$key))
+        throw new InvalidArgumentException('A verified, administrator-owned song is required.');
+    if(strtolower((string)($master['extension']??''))!=='mp3')
+        throw new RuntimeException('A WAV master needs a separate public listening MP3 when server conversion is unavailable.');
+    $source=SF_ROOT.'/'.ltrim((string)$master['stored_path'],'/');
+    $size=filesize($source);
+    if($size===false||$size<1024)throw new RuntimeException('The MP3 source is too small for a listening copy.');
+    $in=fopen($source,'rb');
+    if(!$in)throw new RuntimeException('Could not read the private MP3.');
+    try{
+        $header=fread($in,10);$start=0;
+        if(strlen($header)===10&&substr($header,0,3)==='ID3'){
+            for($i=6;$i<10;$i++)if((ord($header[$i])&128)!==0)
+                throw new RuntimeException('The MP3 has invalid ID3 metadata. Upload a separate listening MP3.');
+            $start=10+((ord($header[6])&127)<<21)+((ord($header[7])&127)<<14)
+                +((ord($header[8])&127)<<7)+(ord($header[9])&127);
+            if((ord($header[5])&16)!==0)$start+=10; // ID3v2.4 footer
+        }
+        if($start>$size-1024)throw new RuntimeException('The MP3 has no verified audio frames.');
+        // A small bounded scan tolerates padding between the ID3 tag and audio.
+        fseek($in,$start);$sample=fread($in,min(65536,$size-$start));
+        $offset=null;
+        for($i=0,$n=strlen($sample)-4;$i<$n;$i++){
+            if(ord($sample[$i])!==255||(ord($sample[$i+1])&224)!==224)continue;
+            $version=(ord($sample[$i+1])>>3)&3;
+            $layer=(ord($sample[$i+1])>>1)&3;
+            $bitrate=(ord($sample[$i+2])>>4)&15;
+            $rate=(ord($sample[$i+2])>>2)&3;
+            if($version!==1&&$layer!==0&&$bitrate>0&&$bitrate<15&&$rate!==3){$offset=$start+$i;break;}
+        }
+        if($offset===null)throw new RuntimeException('Could not verify MP3 audio frames. Upload a separate listening MP3.');
+        $end=$size;
+        if($end>=128){fseek($in,$end-128);if(fread($in,3)==='TAG')$end-=128;}
+        // Reject trailing APEv2 metadata rather than risk publishing private tags.
+        if($end>=32){fseek($in,$end-32);$footer=fread($in,32);
+            if(substr($footer,0,8)==='APETAGEX'){
+                $tagSize=unpack('V',substr($footer,12,4))[1]??0;
+                if($tagSize<32||$tagSize>$end-$offset-1024)
+                    throw new RuntimeException('Unsupported MP3 footer. Upload a separate listening MP3.');
+                $end-=$tagSize;
+            }
+        }
+        if($end-$offset<1024)throw new RuntimeException('No usable MP3 frames remain after removing private tags.');
+        $token=hash('sha256',$master['sha256'].'|'.$owner.'|'.$key.'|tagless-public-mp3-v1');
+        $relative='storage/media/listening/'.substr($token,0,2).'/'.$token.'.mp3';
+        $target=SF_ROOT.'/'.$relative;
+        if(!is_dir(dirname($target))&&!mkdir(dirname($target),0770,true)&&!is_dir(dirname($target)))
+            throw new RuntimeException('Could not create private listening-copy storage.');
+        if(!is_file($target)){
+            $tmp=$target.'.'.bin2hex(random_bytes(8)).'.tmp';
+            $out=fopen($tmp,'wb');
+            if(!$out)throw new RuntimeException('Could not write listening MP3.');
+            try{
+                // A new, innocuous ID3 tag ensures a distinct asset checksum
+                // while the original artist/owner/notes tags are never copied.
+                $value="\x03Stonefellow public listening copy\x00".$token;
+                $frame='TXXX'.pack('N',strlen($value))."\x00\x00".$value;
+                $len=strlen($frame);
+                $sync=chr(($len>>21)&127).chr(($len>>14)&127).chr(($len>>7)&127).chr($len&127);
+                if(fwrite($out,"ID3\x03\x00\x00".$sync.$frame)!==10+$len)
+                    throw new RuntimeException('Could not write listening MP3 metadata.');
+                fseek($in,$offset);
+                if(stream_copy_to_stream($in,$out,$end-$offset)!==$end-$offset)
+                    throw new RuntimeException('Could not copy verified listening MP3 frames.');
+            }catch(Throwable $error){fclose($out);@unlink($tmp);throw $error;}
+            fclose($out);chmod($tmp,0600);
+            if(!rename($tmp,$target)){@unlink($tmp);throw new RuntimeException('Could not save listening MP3.');}
+        }
+    }finally{fclose($in);}
+    $preview=sf_media_register_existing_file($relative,'Stonefellow listening copy.mp3',$owner);
+    if((int)$preview['id']===(int)$master['id']
+        ||hash_equals((string)$preview['sha256'],(string)$master['sha256'])
+        ||sf_media_protected_master_asset((int)$preview['id']))
+        throw new RuntimeException('The listening copy must remain separate from the private master.');
+    return sf_media_catalog_authorized_asset($preview,$owner);
+}
+
+/** Transcode a protected source into a lower-bitrate MP3, or remux MP3 safely. */
 function sf_media_catalog_transcoded_preview(array $master,int $owner,string $key):array {
     $master=sf_media_catalog_authorized_asset($master,$owner);
     if($owner<1||!preg_match('/^[a-f0-9]{32}$/D',$key))
@@ -117,7 +201,7 @@ function sf_media_catalog_transcoded_preview(array $master,int $owner,string $ke
     foreach(['/usr/bin/ffmpeg','/usr/local/bin/ffmpeg'] as $binary)
         if(is_file($binary)&&is_executable($binary)){$ffmpeg=$binary;break;}
     if($ffmpeg===''||!function_exists('proc_open')||in_array('proc_open',array_map('trim',explode(',',(string)ini_get('disable_functions'))),true))
-        throw new RuntimeException('This private master needs a public listening MP3. Automatic conversion is unavailable on this server; upload a separate listening MP3 in this same review.');
+        return sf_media_catalog_remux_mp3_preview($master,$owner,$key);
     $token=hash('sha256',$master['sha256'].'|'.$owner.'|'.$key.'|public-mp3-128k-v1');
     $relative='storage/media/listening/'.substr($token,0,2).'/'.$token.'.mp3';
     $target=SF_ROOT.'/'.$relative;$source=SF_ROOT.'/'.ltrim((string)$master['stored_path'],'/');
@@ -131,10 +215,10 @@ function sf_media_catalog_transcoded_preview(array $master,int $owner,string $ke
             '-ar','44100','-ac','2','-b:a','128k','-f','mp3',$tmp];
         $pipes=[];$process=@proc_open($command,[0=>['pipe','r'],1=>['file','/dev/null','w'],
             2=>['file','/dev/null','w']],$pipes);
-        if(!is_resource($process))throw new RuntimeException('Could not convert this private master. Upload a separate listening MP3.');
+        if(!is_resource($process))return sf_media_catalog_remux_mp3_preview($master,$owner,$key);
         fclose($pipes[0]);$exit=proc_close($process);
         if($exit!==0||!is_file($tmp)||(filesize($tmp)?:0)<1000){@unlink($tmp);
-            throw new RuntimeException('MP3 conversion failed. Upload a separate listening MP3 in this review.');}
+            return sf_media_catalog_remux_mp3_preview($master,$owner,$key);}
         chmod($tmp,0600);
         if(!rename($tmp,$target)){@unlink($tmp);throw new RuntimeException('Could not store converted listening audio.');}
     }
