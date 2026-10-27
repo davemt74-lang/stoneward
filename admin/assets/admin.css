@@ -7,6 +7,11 @@
 .brain-table td{vertical-align:top}.brain-excerpt{max-width:360px;white-space:normal;line-height:1.45}.brain-table .file-list{max-width:360px;white-space:normal;margin-top:4px}
 
 .admin-user-menu{display:flex;align-items:center;gap:14px}.admin-user-menu>span{font-size:.68rem;color:var(--muted);white-space:nowrap}
+.admin-notifications-button{position:relative;margin-left:auto;flex:0 0 auto;width:44px;height:44px;display:grid;place-items:center;background:transparent;border:1px solid var(--line2);border-radius:50%;color:var(--accent)}
+.admin-notifications-button:hover,.admin-notifications-button:focus-visible{border-color:var(--accent);background:var(--panel2)}
+.admin-notifications-count{position:absolute;right:-5px;top:-7px;min-width:18px;height:18px;padding:0 4px;display:grid;place-items:center;background:var(--bad);border-radius:999px;color:#0a0908;font-size:.6rem;font-weight:800}
+.catalog-private-panel{margin-bottom:18px}.catalog-draft-list{display:grid;gap:9px}.catalog-draft-card{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px;border:1px solid var(--line2);background:var(--panel2)}.catalog-draft-card h3{margin:9px 0 3px;font:400 1.1rem Georgia,serif}.catalog-draft-card p{margin:0;color:var(--muted);font-size:.7rem}.catalog-draft-card .actions{flex-wrap:wrap}
+@media(max-width:760px){.admin-notifications-button{margin-left:auto}.catalog-draft-card{align-items:flex-start;flex-direction:column}.catalog-draft-card .actions{width:100%}}
 
 /* v1.2 listening analytics + production operations */
 .provider-health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}

@@ -113,6 +113,9 @@ try {
             'template_id'=>$template['id'],'asset_count'=>count($assets),
             'visibility'=>'private'
         ]);
+    if($result['created'])sf_log_admin_action($owner,'folder_scan_private_draft_created',
+        'song_draft',(string)$result['draft']['id'],['asset_id'=>(int)$master['id'],
+            'template_id'=>$template['id'],'visibility'=>'private']);
     sf_json_response(['ok'=>true,'created'=>$result['created'],
         'draft'=>['id'=>$result['draft']['id'],'request_key'=>$result['draft']['request_key'],
             'payload_hash'=>$result['draft']['payload_hash'],

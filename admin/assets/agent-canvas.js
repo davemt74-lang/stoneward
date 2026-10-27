@@ -5,6 +5,33 @@
   let busy=false,lastBrain=null,previousFocus=null,songIntake=null,popupSequence=0;
   const ctx=()=>window.STONEFELLOW_ADMIN_CONTEXT;
   const esc=s=>ctx()?.esc?.(String(s??''))||'';
+  const proofLabel=action=>String(action||'record_saved').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  function proofCard(e){
+    if(!e||!e.title)return '';
+    const verified=e.verified===true,url=String(e.url||'');
+    const safeUrl=/^index\.php\?view=(?:catalog|releases|shows|products|media|operations)(?:&[a-z]+=[A-Za-z0-9_.%\-]+)?$/.test(url)?url:'';
+    return '<article class="admin-proof-card"><div class="admin-proof-meta"><span class="'+(verified?'admin-proof-verified':'admin-proof-recorded')+'">'+
+      (verified?'✓ Verified saved record':'Audit recorded · entity not verified')+'</span><time>'+esc((e.at||'').replace('T',' ').slice(0,19))+'</time></div>'+
+      '<strong>'+esc(e.title)+'</strong><p>'+esc(proofLabel(e.action))+' · '+esc(e.state||'')+' · '+esc(e.entity_type||'')+
+      (e.entity_id?' #'+esc(e.entity_id):'')+'</p>'+
+      (safeUrl?'<a class="secondary" href="'+esc(safeUrl)+'">'+(verified?'Open proof in Admin':'Review audit in Operations')+'</a>':'')+'</article>';
+  }
+  function proofHtml(items,limit=8){return Array.isArray(items)&&items.length?
+    '<div class="admin-proof-list">'+items.slice(0,limit).map(proofCard).join('')+'</div>':
+    '<p class="hint">No recorded actions yet. Completed work will appear after its saved record is confirmed.</p>'}
+  async function loadProofsInto(target,limit=4){
+    if(!target)return;
+    try{const r=await ctx().api('activity-proof.php');
+      if(target.isConnected)target.innerHTML='<h3>Verified activity &amp; proof</h3>'+proofHtml((r.events||[]).filter(e=>e.verified===true),limit);
+    }catch(_){if(target.isConnected)target.textContent='Action history could not be loaded.';}
+  }
+  function refreshProofCards(){
+    const main=document.querySelector('#adminAgentProofCards');
+    if(main?.isConnected)void loadProofsInto(main,5);
+    const popup=document.querySelector('#adminChatPopupProof');
+    if(popup?.isConnected&&!document.querySelector('#adminChatPopup')?.hidden)
+      void loadProofsInto(popup,3);
+  }
   async function load(){
     const c=ctx();if(!c)throw new Error('Admin workspace not available.');
     try{return await c.api('agent-chat.php'+(conversationId?'?conversation_id='+encodeURIComponent(conversationId):''));}
@@ -24,6 +51,9 @@
         '<article class="admin-chat-popup-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+
         (m.role==='assistant'?'Stonefellow Admin Agent':'You')+'</strong><p>'+esc(m.content||'')+'</p></article>'
       ).join(''):'<p class="admin-chat-popup-empty">Your Admin conversation will appear here. Use the bar below to ask your Agent.</p>';
+      const proof=document.createElement('section');proof.className='admin-proof-preview';proof.id='adminChatPopupProof';
+      proof.innerHTML='<h3>Checking saved work…</h3>';transcript.appendChild(proof);
+      void loadProofsInto(proof,3);
       transcript.scrollTo?.({top:transcript.scrollHeight,behavior:'instant'});
       const state=document.querySelector('#adminChatPopupState');if(state)state.textContent='PRIVATE CONVERSATION';
     }catch(error){
@@ -1418,6 +1448,7 @@
       '<header class="admin-agent-chat-heading"><div><small>ADMIN AGENT · OPERATIONS</small><p>Private Admin Brain · Commerce, CRM, Artist World production and operational research</p></div>'+
       '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentSpeechToggle" aria-pressed="true" title="Toggle on-device speech for Admin Agent replies">Voice on</button><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
       '<div class="admin-agent-song-drafts" id="adminAgentSongDrafts" aria-label="Saved private song drafts"></div>'+
+      '<section class="admin-proof-preview" id="adminAgentProofCards"><h3>Checking saved work…</h3></section>'+
       '<section class="admin-agent-chat-thread" aria-label="Admin Agent conversation">'+
       '<div class="admin-agent-transcript" id="adminAgentTranscript" role="log" aria-live="polite" aria-relevant="additions text"><p>Loading your conversation…</p></div></section>'+
       '<p class="admin-agent-chat-status" id="adminAgentChatStatus" role="status"></p>'+
@@ -1437,6 +1468,7 @@
       bindActions(transcript);
       if(songIntake)showSongIntake();
       loadSongDrafts();
+      void loadProofsInto(root.querySelector('#adminAgentProofCards'),5);
       // Section 90E: the document owns Agent Chat scrolling. The composer is fixed.
       requestAnimationFrame(()=>{
         if(root.isConnected&&document.body.contains(root))window.scrollTo({top:document.documentElement.scrollHeight,behavior:'auto'});
@@ -1476,16 +1508,39 @@
     if(previousFocus&&previousFocus.isConnected)previousFocus.focus();
     previousFocus=null;
   }
-  async function showBrain(){
+  async function showBrain(initialTab='brain'){
     const c=ctx();if(!c)return;
     closeBrain();
     previousFocus=document.activeElement;
     const overlay=document.createElement('div');overlay.id='adminAgentBrainBackdrop';overlay.className='admin-brain-backdrop';
     const drawer=document.createElement('aside');drawer.id='adminAgentBrainDrawer';drawer.className='admin-brain-drawer';
     drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-label','Administrator Agent Brain');
-    drawer.innerHTML='<div class="admin-brain-header"><div><small>STONEFELLOW</small><h2>Admin Agent Brain</h2></div><button type="button" id="closeAdminBrain" aria-label="Close Admin Brain">×</button></div><p>Operational decisions, tool authority, exact approvals and mission recovery. Customer private conversations are not exposed.</p><div id="adminBrainMissionContent" role="status">Loading mission state…</div>';
+    drawer.innerHTML='<div class="admin-brain-header"><div><small>STONEFELLOW</small><h2>Notifications &amp; Agent Brain</h2></div><button type="button" id="closeAdminBrain" aria-label="Close Admin Brain">×</button></div>'+
+      '<div class="admin-brain-tabs" role="tablist" aria-label="Agent activity sections">'+
+      '<button type="button" role="tab" data-brain-tab="activity">Notifications</button><button type="button" role="tab" data-brain-tab="brain">Agent Brain</button><button type="button" role="tab" data-brain-tab="history">History</button></div>'+
+      '<section id="adminBrainActivityPanel" role="tabpanel"><p>Latest recorded work, checked against saved records.</p><div id="adminBrainActivityContent" role="status">Loading notifications…</div></section>'+
+      '<section id="adminBrainCorePanel" role="tabpanel"><p>Operational decisions, tool authority, exact approvals and mission recovery. Customer private conversations are not exposed.</p><div id="adminBrainMissionContent" role="status">Loading mission state…</div></section>'+
+      '<section id="adminBrainHistoryPanel" role="tabpanel"><p>Chronological action audit. Verified cards link directly to the saved record; unverified entries are labeled as audit-only.</p><div id="adminBrainHistoryContent" role="status">Loading history…</div></section>';
     document.body.append(overlay,drawer);
     const close=drawer.querySelector('#closeAdminBrain');close.onclick=closeBrain;overlay.onclick=closeBrain;
+    const showTab=tab=>{
+      const active=['activity','brain','history'].includes(tab)?tab:'brain';
+      drawer.querySelectorAll('[data-brain-tab]').forEach(b=>{const selected=b.dataset.brainTab===active;
+        b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});
+      for(const [key,id] of Object.entries({activity:'adminBrainActivityPanel',brain:'adminBrainCorePanel',history:'adminBrainHistoryPanel'}))
+        drawer.querySelector('#'+id).hidden=key!==active;
+    };
+    drawer.querySelectorAll('[data-brain-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.brainTab));
+    showTab(initialTab);
+    void c.api('activity-proof.php').then(result=>{
+      if(!drawer.isConnected)return;
+      const events=result.events||[];
+      drawer.querySelector('#adminBrainActivityContent').innerHTML=proofHtml(events.filter(e=>e.verified===true),8);
+      drawer.querySelector('#adminBrainHistoryContent').innerHTML=proofHtml(events,80);
+    }).catch(error=>{if(!drawer.isConnected)return;
+      drawer.querySelector('#adminBrainActivityContent').textContent='Notifications unavailable: '+error.message;
+      drawer.querySelector('#adminBrainHistoryContent').textContent='History unavailable: '+error.message;
+    });
     drawer.addEventListener('keydown',e=>{
       if(e.key==='Escape'){e.preventDefault();closeBrain();return;}
       if(e.key==='Tab'){
@@ -1528,5 +1583,5 @@
       drawer.querySelector('#adminBrainDetailedHistory').onclick=()=>{closeBrain();window.SFAgentCampaigns?.showHistory?.();};
     }catch(e){const p=drawer.querySelector('#adminBrainMissionContent');if(p)p.textContent='Operational Brain data is unavailable.';}
   }
-  window.SFAdminAgentCanvas={render,send,showBrain,togglePopup,isPopupOpen,refreshPopup,newThread,openSongDraft};
+  window.SFAdminAgentCanvas={render,send,showBrain,togglePopup,isPopupOpen,refreshPopup,refreshProofCards,newThread,openSongDraft};
 })();

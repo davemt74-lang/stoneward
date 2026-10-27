@@ -6,13 +6,13 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'){
     sf_json_response(['ok'=>true,'shows'=>sf_admin_shows()]);
 }
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
-sf_admin_require_auth(true);
+$me=sf_admin_require_auth(true);
 $b=sf_request_json();$action=(string)($b['action']??'save');$rows=sf_admin_shows();
 
 if($action==='delete'){
     $id=sf_admin_slug((string)($b['id']??''),'');
     $rows=array_values(array_filter($rows,fn($s)=>(string)($s['id']??'')!==$id));
-    sf_admin_write_shows($rows);sf_json_response(['ok'=>true]);
+    sf_admin_write_shows($rows);sf_log_admin_action((int)$me['id'],'live_show_deleted','show',$id);sf_json_response(['ok'=>true]);
 }
 
 $raw=is_array($b['show']??null)?$b['show']:[];
@@ -38,4 +38,11 @@ $show=[
  'media'=>$media,'created_at'=>$old['created_at']??gmdate('c'),'updated_at'=>gmdate('c')
 ];
 if($idx===null)$rows[]=$show;else$rows[$idx]=$show;
-sf_admin_write_shows($rows);sf_json_response(['ok'=>true,'show'=>$show]);
+sf_admin_write_shows($rows);
+sf_log_admin_action((int)$me['id'],$idx===null?'live_show_created':'live_show_updated','show',$id,
+    ['venue'=>$venue,'date'=>$date,'status'=>$status]);
+if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_show','show_save',
+    ['route'=>'shows','action'=>'save_show','context_profile'=>'live_events','needs_llm'=>false,
+     'requires_confirmation'=>!empty($show['public_visible']),'status'=>'completed',
+     'request'=>'Save live show '.$venue,'response'=>'Persisted show '.$id.' as '.$status]);
+sf_json_response(['ok'=>true,'show'=>$show]);
