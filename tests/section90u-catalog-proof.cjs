@@ -40,7 +40,7 @@ assert(agent.includes('data-brain-tab="activity"')&&agent.includes('data-brain-t
   &&agent.includes('data-brain-tab="history"'),
   'Header slide-out has Notifications, Agent Brain and History tabs.');
 assert(agent.includes('function proofCard(')&&agent.includes('function loadProofsInto(')
-  &&agent.includes('id="adminAgentProofCards"')&&agent.includes('adminChatPopupProof'),
+  &&agent.includes("receiptPanel.id='adminAgentProofCards'")&&agent.includes('adminChatPopupProof'),
   'Main Admin Agent chat and popup show independently loaded proof cards.');
 assert(proof.includes('sf_admin_require_auth(false)')&&proof.includes('sf_ops_recent_admin_audit(180)')
   &&proof.includes("(int)($entry['admin_user_id']??0)!==$owner"),

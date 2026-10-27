@@ -13,6 +13,11 @@
 .admin-proof-list{display:grid;gap:10px;margin:14px 0}.admin-proof-card{padding:13px;background:#201c17;border:1px solid #5d5042;border-radius:7px;overflow-wrap:anywhere}
 .admin-proof-card strong{display:block;font-size:.82rem}.admin-proof-card p{color:#bcb2a1;font-size:.72rem;line-height:1.45;margin:6px 0}.admin-proof-meta{display:flex;gap:9px;align-items:center;flex-wrap:wrap;color:#ab9e8d;font-size:.63rem;margin-bottom:6px}.admin-proof-card .secondary{display:inline-block;margin-top:7px;min-height:34px;font-size:.67rem;padding:7px 10px}
 .admin-proof-verified{color:#a8ca90}.admin-proof-recorded{color:#e3bd77}.admin-proof-preview{margin-top:15px;border-top:1px solid #6c5845;padding-top:14px}.admin-proof-preview h3{margin:0 0 5px}
+.admin-proof-actor{color:#caa96d;font-size:.68rem;margin:0 0 7px}.admin-proof-inline{align-self:stretch;width:100%;max-width:100%;margin:9px 0 0;padding:14px;border:1px solid #65513b;border-radius:12px;background:#15120e;box-sizing:border-box}
+.admin-proof-inline h3{font-size:.85rem;margin:0}.admin-proof-inline .admin-proof-list{grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));margin:12px 0 0}
+.admin-chat-popup .admin-proof-inline{padding:10px}.admin-chat-popup .admin-proof-inline .admin-proof-list{grid-template-columns:minmax(0,1fr)}
+.admin-brain-decision-list{list-style:none;padding:0;margin:10px 0;display:grid;gap:8px}.admin-brain-decision-list li{border:1px solid #584a38;border-radius:8px;padding:10px 12px;font-size:.72rem;line-height:1.45;overflow-wrap:anywhere}
+.admin-brain-decision-list time{color:#b7a78f}.admin-brain-decision-list span{color:#c9ad7b}
 .admin-brain-header button {min-width:44px;min-height:44px;}
 .admin-brain-list {padding-left:22px;display:grid;gap:10px;}
 .admin-brain-list li {overflow-wrap:anywhere;}

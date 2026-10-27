@@ -9,20 +9,29 @@
   function proofCard(e){
     if(!e||!e.title)return '';
     const verified=e.verified===true,url=String(e.url||'');
-    const safeUrl=/^index\.php\?view=(?:catalog|releases|shows|products|media|operations)(?:&[a-z]+=[A-Za-z0-9_.%\-]+)?$/.test(url)?url:'';
+    const safeUrl=/^index\.php\?view=(?:catalog|releases|shows|products|media|operations|brain)(?:&[a-z]+=[A-Za-z0-9_.%\-]+)?$/.test(url)?url:'';
+    const proposed=e.provenance==='agent_action_proposal';
     return '<article class="admin-proof-card"><div class="admin-proof-meta"><span class="'+(verified?'admin-proof-verified':'admin-proof-recorded')+'">'+
-      (verified?'✓ Verified saved record':'Audit recorded · entity not verified')+'</span><time>'+esc((e.at||'').replace('T',' ').slice(0,19))+'</time></div>'+
+      (verified?'✓ Verified saved record':proposed?'Agent action · not verified as a saved record':'Audit recorded · entity not verified')+'</span><time>'+esc((e.at||'').replace('T',' ').slice(0,19))+'</time></div>'+
+      '<div class="admin-proof-actor">'+esc(e.actor||'Administrator')+'</div>'+
       '<strong>'+esc(e.title)+'</strong><p>'+esc(proofLabel(e.action))+' · '+esc(e.state||'')+' · '+esc(e.entity_type||'')+
       (e.entity_id?' #'+esc(e.entity_id):'')+'</p>'+
-      (safeUrl?'<a class="secondary" href="'+esc(safeUrl)+'">'+(verified?'Open proof in Admin':'Review audit in Operations')+'</a>':'')+'</article>';
+      (safeUrl?'<a class="secondary" href="'+esc(safeUrl)+'">'+(verified?'Open verified record':proposed?'Review Agent action':'Review audit in Operations')+'</a>':'')+'</article>';
   }
   function proofHtml(items,limit=8){return Array.isArray(items)&&items.length?
     '<div class="admin-proof-list">'+items.slice(0,limit).map(proofCard).join('')+'</div>':
     '<p class="hint">No recorded actions yet. Completed work will appear after its saved record is confirmed.</p>'}
+  function brainDecisionHtml(items){
+    return Array.isArray(items)&&items.length?'<ol class="admin-brain-decision-list">'+items.map(d=>
+      '<li><time>'+esc((d.created_at||'').replace('T',' ').slice(0,19))+'</time> <strong>'+esc(proofLabel(d.phase||'decision'))+'</strong> · '+
+      esc(d.route||d.action||'Agent')+' <span>'+esc(d.provider_status||'recorded')+'</span>'+
+      (Number(d.requires_confirmation)?' · Approval required':'')+'</li>').join('')+'</ol>':
+      '<p class="hint">No Admin Agent decisions recorded yet.</p>';
+  }
   async function loadProofsInto(target,limit=4){
     if(!target)return;
     try{const r=await ctx().api('activity-proof.php');
-      if(target.isConnected)target.innerHTML='<h3>Verified activity &amp; proof</h3>'+proofHtml((r.events||[]).filter(e=>e.verified===true),limit);
+      if(target.isConnected)target.innerHTML='<h3>Saved work &amp; Agent action receipts</h3>'+proofHtml(r.events||[],limit);
     }catch(_){if(target.isConnected)target.textContent='Action history could not be loaded.';}
   }
   function refreshProofCards(){
@@ -52,7 +61,7 @@
         (m.role==='assistant'?'Stonefellow Admin Agent':'You')+'</strong><p>'+esc(m.content||'')+'</p></article>'
       ).join(''):'<p class="admin-chat-popup-empty">Your Admin conversation will appear here. Use the bar below to ask your Agent.</p>';
       if(typeof document.createElement==='function'&&typeof transcript.appendChild==='function'){
-        const proof=document.createElement('section');proof.className='admin-proof-preview';proof.id='adminChatPopupProof';
+        const proof=document.createElement('section');proof.className='admin-proof-inline';proof.id='adminChatPopupProof';
         proof.innerHTML='<h3>Checking saved work…</h3>';transcript.appendChild(proof);
         void loadProofsInto(proof,3);
       }
@@ -1450,7 +1459,6 @@
       '<header class="admin-agent-chat-heading"><div><small>ADMIN AGENT · OPERATIONS</small><p>Private Admin Brain · Commerce, CRM, Artist World production and operational research</p></div>'+
       '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentSpeechToggle" aria-pressed="true" title="Toggle on-device speech for Admin Agent replies">Voice on</button><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
       '<div class="admin-agent-song-drafts" id="adminAgentSongDrafts" aria-label="Saved private song drafts"></div>'+
-      '<section class="admin-proof-preview" id="adminAgentProofCards"><h3>Checking saved work…</h3></section>'+
       '<section class="admin-agent-chat-thread" aria-label="Admin Agent conversation">'+
       '<div class="admin-agent-transcript" id="adminAgentTranscript" role="log" aria-live="polite" aria-relevant="additions text"><p>Loading your conversation…</p></div></section>'+
       '<p class="admin-agent-chat-status" id="adminAgentChatStatus" role="status"></p>'+
@@ -1467,10 +1475,13 @@
       window.SFAdminAgentCanvas.commerceMessages=items;
       transcript.innerHTML=items.length?items.map(messageHtml).join(''):
         '<div class="admin-agent-welcome"><h2>What can I help with?</h2><p>Ask for a song upload, production calendar, overdue tasks, crew schedule, approvals or assembly #123. Review everything in chat.</p><button type="button" data-agent-song-start class="secondary">Upload a new song</button></div>';
+      const receiptPanel=document.createElement('section');receiptPanel.className='admin-proof-inline';
+      receiptPanel.id='adminAgentProofCards';receiptPanel.setAttribute('aria-label','Saved work and Agent action receipts');
+      receiptPanel.innerHTML='<h3>Checking saved work…</h3>';transcript.appendChild(receiptPanel);
       bindActions(transcript);
       if(songIntake)showSongIntake();
       loadSongDrafts();
-      void loadProofsInto(root.querySelector('#adminAgentProofCards'),5);
+      void loadProofsInto(receiptPanel,5);
       // Section 90E: the document owns Agent Chat scrolling. The composer is fixed.
       requestAnimationFrame(()=>{
         if(root.isConnected&&document.body.contains(root))window.scrollTo({top:document.documentElement.scrollHeight,behavior:'auto'});
@@ -1538,7 +1549,9 @@
       if(!drawer.isConnected)return;
       const events=result.events||[];
       drawer.querySelector('#adminBrainActivityContent').innerHTML=proofHtml(events.filter(e=>e.verified===true),8);
-      drawer.querySelector('#adminBrainHistoryContent').innerHTML=proofHtml(events,80);
+      drawer.querySelector('#adminBrainHistoryContent').innerHTML='<h3>Saved record receipts &amp; reviewed proposals</h3>'+
+        proofHtml(events,80)+'<h3>Agent Brain decision timeline</h3><p>Read-only decisions and routing; these entries do not prove an action was saved.</p>'+
+        brainDecisionHtml(result.brain_decisions||[]);
     }).catch(error=>{if(!drawer.isConnected)return;
       drawer.querySelector('#adminBrainActivityContent').textContent='Notifications unavailable: '+error.message;
       drawer.querySelector('#adminBrainHistoryContent').textContent='History unavailable: '+error.message;
