@@ -51,6 +51,7 @@ function sf_agent_song_intake_normalize(array $raw,array $asset,int $adminId,?ar
       'artwork_sha256'=>$artworkId>0?(string)($artworkAsset['sha256']??''):'',
       'isrc'=>$isrc,'release_date'=>$date,
       'explicit'=>filter_var($raw['explicit']??false,FILTER_VALIDATE_BOOLEAN),
+      'pod_eligible'=>filter_var($raw['pod_eligible']??false,FILTER_VALIDATE_BOOLEAN),
     ];
     if($record['release']==='')$record['release']='Unreleased';
     return $record;
@@ -191,6 +192,10 @@ function sf_agent_song_intake_update(int $adminId,array $record,string $expected
         if((int)($record['asset_id']??0)!==(int)($existing['asset_id']??0)
             ||($record['asset_sha256']??'')!==($existing['asset_sha256']??''))
             throw new RuntimeException('A draft recording cannot be replaced. Start a new song intake.');
+        // Folder-scan snapshots come from a server-validated template. Preserve
+        // them across Agent edits; never let client edits replace the snapshot.
+        foreach(['template_metadata','imported_asset_ids','candidate_preview_asset_id'] as $field)
+            if(array_key_exists($field,$existing))$record[$field]=$existing[$field];
         $hash=hash('sha256',json_encode($record,JSON_THROW_ON_ERROR));
         if(hash_equals((string)($existing['payload_hash']??''),$hash))return ['draft'=>$existing,'updated'=>false];
         if(!hash_equals((string)($existing['payload_hash']??''),$expectedHash))

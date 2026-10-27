@@ -15,7 +15,7 @@ else{
   if(!move_uploaded_file($tmp,$abs))throw new RuntimeException('Could not store uploaded file.');
   $stored='storage/media/originals/'.$trackKey.'/'.$safe;$index['files'][$hash]=['sha256'=>$hash,'stored_path'=>$stored,'size'=>$size,'extension'=>$ext,'first_seen_at'=>gmdate('c')];sf_admin_write_media_index($index);
 }
-$uploadId='UP-'.strtoupper(bin2hex(random_bytes(6)));$record=['schema'=>'stonefellow.upload.v1','id'=>$uploadId,'batch_id'=>$batch,'track_key'=>$trackKey,'original_name'=>$name,'relative_path'=>sf_clean_text($_POST['relative_path']??$name,500),'extension'=>$ext,'size'=>$size,'sha256'=>$hash,'stored_path'=>$stored,'duplicate'=>$duplicate,'created_at'=>gmdate('c')];
+$uploadId='UP-'.strtoupper(bin2hex(random_bytes(6)));$record=['schema'=>'stonefellow.upload.v1','id'=>$uploadId,'owner_id'=>(int)$me['id'],'batch_id'=>$batch,'track_key'=>$trackKey,'original_name'=>$name,'relative_path'=>sf_clean_text($_POST['relative_path']??$name,500),'extension'=>$ext,'size'=>$size,'sha256'=>$hash,'stored_path'=>$stored,'duplicate'=>$duplicate,'created_at'=>gmdate('c')];
 $dir=SF_ROOT.'/storage/imports/'.$batch.'/uploads';if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir))throw new RuntimeException('Cannot create import storage.');sf_write_json($dir.'/'.$uploadId.'.json',$record);
 sf_log_admin_action((int)$me['id'],'song_source_uploaded','import_upload',$uploadId,
  ['name'=>$name,'track_key'=>$trackKey,'batch_id'=>$batch,'duplicate'=>$duplicate,'size'=>$size]);

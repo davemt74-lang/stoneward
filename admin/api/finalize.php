@@ -2,6 +2,9 @@
 declare(strict_types=1); require __DIR__.'/bootstrap.php'; $me=sf_admin_require_auth(true);
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $body=sf_request_json();$batch=sf_admin_slug((string)($body['batch_id']??''),'');$templateId=sf_admin_slug((string)($body['template_id']??''),'');$release=sf_clean_text($body['release']??'Unreleased',180);$tracks=is_array($body['tracks']??null)?$body['tracks']:[];
+// Legacy catalog finalization is a PUBLICATION operation, never private intake.
+// The folder-scan UI now uses scan-private.php and cannot reach this path.
+if(empty($body['confirmed_publication']))sf_json_response(['ok'=>false,'message'=>'Public catalog import requires a separate explicit publication approval. Use private song intake for folder scans.'],409);
 if($batch===''||$templateId==='')sf_json_response(['ok'=>false,'message'=>'Batch and metadata template are required.'],422);$template=sf_admin_template($templateId);if(!$template)sf_json_response(['ok'=>false,'message'=>'Metadata template was not found.'],404);if(!$tracks)sf_json_response(['ok'=>false,'message'=>'There are no tracks to import.'],422);
 $catalog=sf_catalog();$errors=[];$imported=[];$existingIsrc=[];foreach($catalog as $t){$x=(string)($t['metadata']['isrc']??'');if($x!=='')$existingIsrc[$x]=(string)($t['id']??'');}
 $uploadDir=SF_ROOT.'/storage/imports/'.$batch.'/uploads';
