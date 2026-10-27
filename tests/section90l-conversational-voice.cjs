@@ -25,15 +25,26 @@ assert.match(adminApp,/recognition\.onend=\(\)=>\{recognitionActive=false;if\(co
 assert.match(adminApp,/if\(!conversationOn\|\|pending\|\|adminSpeechPending\|\|voiceSubmitted\)return/);
 
 async function monitorRejectsEchoAndDetectsForeground(){
-  let interrupts=0,heard='',timerId=0,started=0,aborted=0;
+  let interrupts=0,heard='',timerId=0,frameId=0,started=0,aborted=0,energy=0.004,paused=false;
   const pending=new Map();
-  const timers=new Map();
+  const timers=new Map(),frames=new Map();
+  const analyser={getFloatTimeDomainData:buffer=>buffer.fill(energy)};
+  class AudioContext{
+    constructor(){this.state='running'}
+    createMediaStreamSource(){return {connect(){}}}
+    createBiquadFilter(){return {frequency:{value:0},connect(){}}}
+    createAnalyser(){return analyser}
+    close(){return Promise.resolve()}
+  }
   const browser={
-    SpeechRecognition:class{},
+    SpeechRecognition:class{},AudioContext,
+    navigator:{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[{stop(){}}]})}},
     setTimeout:(callback,delay)=>{const id=++timerId;timers.set(id,{callback,delay});return id},
-    clearTimeout:id=>timers.delete(id)
+    clearTimeout:id=>timers.delete(id),
+    requestAnimationFrame:callback=>{const id=++frameId;frames.set(id,callback);return id},
+    cancelAnimationFrame:id=>frames.delete(id)
   };
-  const sandbox={window:browser,AbortController};
+  const sandbox={window:browser,AbortController,Float32Array};
   vm.runInNewContext(read('assets/js/conversation-barge-in.js'),sandbox);
   const verify=signal=>new Promise(resolve=>{
     started++;
@@ -41,23 +52,37 @@ async function monitorRejectsEchoAndDetectsForeground(){
     signal.addEventListener('abort',()=>{aborted++;resolve(null)},{once:true});
   });
   const flush=async()=>{await new Promise(resolve=>setImmediate(resolve))};
-  const monitor=browser.StonefellowBargeIn.create(phrase=>{interrupts++;heard=phrase},browser,verify);
+  const tick=delay=>{const timer=[...timers].find(([,value])=>value.delay===delay);assert.ok(timer,'expected '+delay+'ms timer');timers.delete(timer[0]);timer[1].callback()};
+  const pump=(amplitude,count)=>{energy=amplitude;for(let i=0;i<count;i++){
+    const frame=frames.entries().next().value;assert.ok(frame,'VAD is sampling');frames.delete(frame[0]);frame[1]();
+  }};
+  const monitor=browser.StonefellowBargeIn.create(phrase=>{interrupts++;heard=phrase},browser,verify,stage=>{
+    if(stage==='paused')return paused;
+    if(stage==='probe'){paused=true;return true}
+    if(stage==='resume')paused=false;
+    return true;
+  });
   assert.equal(await monitor.start(),true);
   await flush();
   assert.equal(started,1,'speech recognition must be primed without waiting for acoustic energy');
   pending.get(1).resolve(null);await flush();
   assert.equal(interrupts,0,'a failed or silent recognition never interrupts playback');
-  assert.equal(timers.size,1,'browser recognition automatically rearms after silence');
-  for(const {callback} of timers.values())callback();timers.clear();await flush();
+  tick(250);await flush();
   assert.equal(started,2);
   pending.get(2).resolve('Please stop now');await flush();
-  assert.equal(interrupts,1,'verified independent room speech interrupts playback');
+  assert.equal(interrupts,0,'ASR by itself cannot interrupt the ongoing Agent response');
+  pump(0.2,4);tick(180);pump(0.2,3);
+  assert.equal(interrupts,0,'echo probe cannot replay words heard before its pause');
+  tick(250);await flush();assert.equal(started,3);
+  pending.get(3).resolve('Please stop now');await flush();
+  assert.equal(interrupts,1,'only physically confirmed room speech interrupts playback');
   assert.equal(heard,'Please stop now');
   assert.equal(monitor.active,false);
   assert.equal(timers.size,0,'no monitor timers remain after interruption');
-  await monitor.start();await flush();assert.equal(started,3);
-  monitor.stop();assert.equal(aborted,1,'manually stopping playback aborts recognition');
-  pending.get(3).resolve('Too late');await flush();
+  await monitor.start();await flush();assert.equal(started,4);
+  const beforeStop=aborted;
+  monitor.stop();assert.equal(aborted,beforeStop+1,'manually stopping playback aborts recognition');
+  pending.get(4).resolve('Too late');await flush();
   assert.equal(interrupts,1,'stale recognition cannot submit after playback ends');
 }
 

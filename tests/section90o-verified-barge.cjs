@@ -63,7 +63,11 @@ async function verificationRequiresSpeechNotEcho(){
   assert.equal(await unsupported,null,'unsupported recognition fails closed');
   const stop=browser.StonefellowBargeIn.verifyAgentSpeech(reference+' You can say stop.',browser);
   instances[3].emit('stop',true);
-  assert.equal(await stop,'stop','single-word stop must interrupt even if the Agent previously used that word');
+  let stopResolved=false;stop.then(()=>{stopResolved=true});
+  await Promise.resolve();
+  assert.equal(stopResolved,false,'Agent saying stop must not impersonate a participant');
+  instances[3].onend();
+  assert.equal(await stop,null,'an unverified echo of stop is discarded');
   const interim=browser.StonefellowBargeIn.verifyAgentSpeech(reference,browser);
   instances[4].emit('stop',false);
   instances[4].onend();

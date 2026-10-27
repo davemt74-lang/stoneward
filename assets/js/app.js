@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.156';
+  window.STONEFELLOW_APP_BUILD='1.3.157';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -134,6 +134,10 @@
     try{if(synthesis?.paused)synthesis.resume?.()}catch(_){}
   }
   function handleVoiceActivityProbe(stage){
+    if(stage==='paused'){
+      if(voiceProbeAudio)return voiceProbeAudio.paused===true;
+      return voiceProbeSynth&&window.speechSynthesis?.paused===true;
+    }
     if(stage==='probe'){
       if(!st.conversationOn||!voicePlaybackPending)return false;
       if(st.voiceAudio&&!st.voiceAudio.paused){
