@@ -50,6 +50,8 @@ try{
     assert90z((int)$preview['id']!==(int)$master['id']
         &&!hash_equals($preview['sha256'],$master['sha256']),
         'Fallback creates a separate asset, never reuses the protected master.');
+    assert90z((float)$preview['duration_seconds']>0.5,
+        'Fallback listening MP3 remains recognized as playable audio.');
     assert90z(str_starts_with($copy,'ID3')&&!str_contains($copy,'DO-NOT-PUBLISH-PRIVATE-TAG'),
         'Fallback strips original private ID3 title/owner metadata.');
     assert90z((int)sf_media_catalog_remux_mp3_preview($master,7,$key)['id']===(int)$preview['id'],

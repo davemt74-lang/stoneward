@@ -170,7 +170,9 @@ function sf_media_catalog_remux_mp3_preview(array $master,int $owner,string $key
             try{
                 // A new, innocuous ID3 tag ensures a distinct asset checksum
                 // while the original artist/owner/notes tags are never copied.
-                $value="\x03Stonefellow public listening copy\x00".$token;
+                // ID3v2.3 TXXX text encoding 0 is portable ISO-8859-1;
+                // the field contains ASCII only, so every MP3 tag reader can parse it.
+                $value="\x00Stonefellow public listening copy\x00".$token;
                 $frame='TXXX'.pack('N',strlen($value))."\x00\x00".$value;
                 $len=strlen($frame);
                 $sync=chr(($len>>21)&127).chr(($len>>14)&127).chr(($len>>7)&127).chr($len&127);
