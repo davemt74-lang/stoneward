@@ -73,16 +73,21 @@ try {
         'private_master_sha256'=>(string)$master['sha256'],
         'private_candidate_preview_sha256'=>(string)$preview['sha256']
     ]);
+    if(array_key_exists('digital_price',$track)){
+        $price=filter_var($track['digital_price'],FILTER_VALIDATE_FLOAT);
+        if($price===false||$price<0||$price>1000)throw new InvalidArgumentException('Digital price must be between $0 and $1,000.');
+        $metadata['price']=round((float)$price,2);
+    }
     $record=sf_agent_song_intake_normalize([
         'request_key'=>$key,'title'=>$title,
         'release'=>sf_clean_text($body['release']??'Unreleased',180),
         'genre'=>$metadata['genre']??'',
         'year'=>(int)($metadata['release_year']??0),
-        'words_by'=>$metadata['words_by']??'',
-        'music_by'=>$metadata['music_by']??'',
-        'artist_display'=>$metadata['performing_artist']?:($metadata['artist_display']?:'Stonefellow'),
-        'master_owner'=>$metadata['master_copyright']?:($metadata['artist_legal']??''),
-        'composition_owner'=>$metadata['composition_copyright']?:($metadata['artist_legal']??''),
+        'words_by'=>($track['words_by']??'')?:($metadata['words_by']??''),
+        'music_by'=>($track['music_by']??'')?:($metadata['music_by']??''),
+        'artist_display'=>($track['artist_display']??'')?:($metadata['performing_artist']?:($metadata['artist_display']?:'Stonefellow')),
+        'master_owner'=>($track['master_owner']??'')?:($metadata['master_copyright']?:($metadata['artist_legal']??'')),
+        'composition_owner'=>($track['composition_owner']??'')?:($metadata['composition_copyright']?:($metadata['artist_legal']??'')),
         'isrc'=>$isrc,'release_date'=>$metadata['release_date']??'',
         'explicit'=>$metadata['explicit']??false,
         'pod_eligible'=>!empty($track['pod_eligible']),
@@ -110,6 +115,7 @@ try {
         ]);
     sf_json_response(['ok'=>true,'created'=>$result['created'],
         'draft'=>['id'=>$result['draft']['id'],'request_key'=>$result['draft']['request_key'],
+            'payload_hash'=>$result['draft']['payload_hash'],
             'title'=>$result['draft']['title'],'status'=>$persistedStatus,
             'template'=>$metadata['template'],'file_count'=>count($assets)],
         'publication'=>'not_published']);

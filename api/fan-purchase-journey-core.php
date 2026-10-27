@@ -41,6 +41,7 @@ function sf_fan_purchase_paths(?int $uid,string $path='start_here',int $limit=8)
   if(!$track)continue;
   $isOwned=isset($owned[$id]);
   $vinylEligible=!empty($track['podEligible'])&&
+   ($track['audio_publishing_mode']??'')!=='preview_only'&&
    (($track['audio_publishing_mode']??'')!=='preview_master_split'
      ||!empty($track['private_master_audio']));
   $eligible[]=$item+[

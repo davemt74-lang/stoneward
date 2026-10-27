@@ -74,6 +74,7 @@ function sf_kunaki_media_job_assets(array $job,array $order,array $catalog,
     foreach(['A','B'] as $side)foreach((array)($builder['sides'][$side]['tracks']??[]) as $n=>$line){
         $id=(string)($line['id']??'');$catalogRow=$catalog[$id]??null;
         if(!is_array($catalogRow)||empty($catalogRow['podEligible'])
+           ||($catalogRow['audio_publishing_mode']??'')==='preview_only'
            ||(string)($catalogRow['audio']??'')==='')throw new RuntimeException('Required catalog master unavailable.');
         $productionMaster=(string)($catalogRow['private_master_audio']??'');
         if($productionMaster===''&&($catalogRow['audio_publishing_mode']??'')!=='preview_master_split')

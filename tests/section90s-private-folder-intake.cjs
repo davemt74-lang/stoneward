@@ -16,7 +16,7 @@ const revisions=read('api/track-media-publishing.php');
 const adminMedia=read('admin/api/media.php');
 
 assert(ui.includes('data-g-upload=')&&ui.includes('uploadPrivateSong(group('),'Every scanned song has its own upload action.');
-assert(ui.includes('window.confirm(\'Save "\'')&&ui.includes('data-g-status=')&&ui.includes('data-g-progress='),'Every song gets a separate upload confirmation, receipt and progress.');
+assert(ui.includes('window.confirm(\'Add "\'')&&ui.includes('data-g-status=')&&ui.includes('data-g-progress='),'Every song gets a separate upload confirmation, receipt and progress.');
 assert(!ui.includes("api('finalize.php'")&&!ui.includes('id="importBatch"'),'Scan UI no longer calls public batch finalization.');
 assert(ui.includes("api('scan-private.php'")&&ui.includes("result.publication!=='not_published'"),'UI checks the private server receipt.');
 assert(ui.includes('data-g-vinyl=')&&ui.includes('podEligible:false'),'Vinyl printing defaults off and can be opted into per song.');
