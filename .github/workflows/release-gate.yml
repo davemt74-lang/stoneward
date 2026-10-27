@@ -512,6 +512,7 @@ jobs:
           node tests/section90v1-publish-ui.cjs
           php tests/section90w-agent-proof-receipts.php
           node tests/section90w-inline-action-proof.cjs
+          node tests/section90y-admin-profile-menu.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs

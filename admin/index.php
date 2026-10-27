@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.157');
+define('SF_ADMIN_BUILD','1.3.158');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -127,12 +127,40 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
     <div class="workspace">
       <header class="admin-topbar">
         <button id="sidebarToggle" class="mobile-menu" type="button" aria-label="Open admin menu">☰</button>
-        <div><div class="eyebrow">STONEFELLOW ADMIN</div><div id="viewTitle" class="view-title">Dashboard</div></div>
-        <button type="button" class="admin-notifications-button" id="adminNotificationsButton" aria-label="Open Agent Brain notifications and verified activity history" aria-haspopup="dialog" title="Agent Brain · Notifications · History">
-          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
-          <span class="admin-notifications-count" id="adminNotificationsCount" hidden></span>
-        </button>
-        <div class="admin-user-menu"><span><?=htmlspecialchars((string)$adminUser['display_name'],ENT_QUOTES,'UTF-8')?></span><a href="../" target="_blank" rel="noopener" class="public-link">View site ↗</a><a href="logout.php" class="public-link">Log out</a></div>
+        <div class="admin-topbar-heading"><div class="eyebrow">STONEFELLOW ADMIN</div><div id="viewTitle" class="view-title">Dashboard</div></div>
+        <div class="admin-topbar-actions">
+          <button type="button" class="admin-notifications-button" id="adminNotificationsButton" aria-label="Open Agent Brain notifications and verified activity history" aria-haspopup="dialog" title="Agent Brain · Notifications · History">
+            <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+            <span class="admin-notifications-count" id="adminNotificationsCount" hidden></span>
+          </button>
+          <div class="admin-profile-shell" id="adminProfileShell">
+            <button id="adminProfileToggle" class="admin-profile-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="adminProfileDropdown" aria-label="Open account menu for <?=htmlspecialchars((string)$adminUser['display_name'],ENT_QUOTES,'UTF-8')?>">
+              <img class="admin-profile-avatar" id="adminHeaderAvatar" src="api/profile-photo.php" width="38" height="38" alt="">
+              <span class="admin-profile-toggle-name"><?=htmlspecialchars((string)$adminUser['display_name'],ENT_QUOTES,'UTF-8')?></span>
+              <svg class="admin-profile-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m5 7 5 5 5-5"/></svg>
+            </button>
+            <div id="adminProfileDropdown" class="admin-profile-dropdown" aria-label="Account and Admin menu" hidden>
+              <div class="admin-profile-identity">
+                <img class="admin-profile-avatar admin-profile-avatar-large" id="adminProfileAvatar" src="api/profile-photo.php" width="50" height="50" alt="Your profile picture">
+                <div><strong><?=htmlspecialchars((string)$adminUser['display_name'],ENT_QUOTES,'UTF-8')?></strong><small><?=htmlspecialchars((string)$adminUser['email'],ENT_QUOTES,'UTF-8')?></small><span>Administrator</span></div>
+              </div>
+              <button id="adminProfileChangePhoto" type="button" class="admin-profile-photo-action">Change profile photo</button>
+              <input id="adminProfilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden aria-label="Upload profile photo">
+              <p id="adminProfilePhotoStatus" class="admin-profile-photo-status" role="status" aria-live="polite" hidden></p>
+              <div class="admin-profile-menu-group">
+                <a href="../?view=account" target="_blank" rel="noopener">My Account &amp; Profile <span aria-hidden="true">↗</span></a>
+                <button type="button" data-profile-view="settings">Admin Settings</button>
+                <button type="button" data-profile-view="users">Users &amp; Access</button>
+                <button type="button" data-profile-view="brain">Agent Brain &amp; History</button>
+                <button type="button" data-profile-view="operations">Operations &amp; Health</button>
+              </div>
+              <div class="admin-profile-menu-group admin-profile-menu-group-bottom">
+                <a href="../" target="_blank" rel="noopener">View Public Site <span aria-hidden="true">↗</span></a>
+                <a href="logout.php" class="admin-profile-logout">Log Out</a>
+              </div>
+            </div>
+          </div>
+        </div>
       </header>
 
       <main id="adminCanvas" class="admin-canvas" aria-live="polite"></main>

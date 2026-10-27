@@ -139,8 +139,53 @@
       badge.hidden=count===0;badge.textContent=count>9?'9+':String(count);
     }catch(_){const badge=$('#adminNotificationsCount');if(badge)badge.hidden=true}
   }
+  function bindAdminProfileMenu(){
+    const shell=$('#adminProfileShell'),toggle=$('#adminProfileToggle'),menu=$('#adminProfileDropdown');
+    const photoButton=$('#adminProfileChangePhoto'),photoInput=$('#adminProfilePhotoInput'),photoStatus=$('#adminProfilePhotoStatus');
+    if(!shell||!toggle||!menu)return;
+    const close=(restoreFocus=false)=>{
+      if(menu.hidden)return;
+      menu.hidden=true;toggle.setAttribute('aria-expanded','false');
+      if(restoreFocus)toggle.focus();
+    };
+    toggle.addEventListener('click',()=>{
+      const opening=menu.hidden;
+      menu.hidden=!opening;
+      toggle.setAttribute('aria-expanded',String(opening));
+    });
+    document.addEventListener('pointerdown',event=>{if(!shell.contains(event.target))close()});
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!menu.hidden){event.preventDefault();close(true)}});
+    menu.addEventListener('click',event=>{
+      const view=event.target.closest('button[data-profile-view]');
+      if(view){openView(view.dataset.profileView);close(true);return}
+      if(event.target.closest('a'))close();
+    });
+    photoButton?.addEventListener('click',()=>photoInput?.click());
+    photoInput?.addEventListener('change',async()=>{
+      const photo=photoInput.files?.[0];
+      photoInput.value='';
+      if(!photo)return;
+      const message=(value,error=false)=>{
+        if(!photoStatus)return;
+        photoStatus.hidden=false;photoStatus.textContent=value;photoStatus.classList.toggle('error',error);
+      };
+      if(!['image/jpeg','image/png','image/webp'].includes(photo.type)||photo.size>2*1024*1024||photo.size<1){
+        message('Choose a JPEG, PNG or WebP photo smaller than 2 MB.',true);return;
+      }
+      photoButton.disabled=true;message('Uploading your profile photo…');
+      try{
+        const data=new FormData();data.append('photo',photo);
+        const result=await uploadApi('profile-photo.php',data);
+        const url=String(result.avatar_url||'api/profile-photo.php?v='+Date.now());
+        for(const avatar of [$('#adminHeaderAvatar'),$('#adminProfileAvatar')])if(avatar)avatar.src=url;
+        message('Profile photo updated.');
+      }catch(error){message(error?.message||'Profile photo upload failed.',true)}
+      finally{photoButton.disabled=false}
+    });
+  }
   function bindShell(){
     if(shellBound)return;shellBound=true;
+    bindAdminProfileMenu();
     $('#adminNav').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b)openView(b.dataset.view)});
     $('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');
     $('#adminNotificationsButton').onclick=()=>{
