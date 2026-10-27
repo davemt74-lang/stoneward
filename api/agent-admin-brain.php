@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-orchestration.php';
 require_once __DIR__.'/agent-public-artist-context.php';
 require_once __DIR__.'/agent-catalog-actions.php';
+require_once __DIR__.'/agent-admin-reads.php';
 require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-admin-intelligence.php';
 require_once __DIR__.'/fan-discovery-paths.php';
@@ -181,6 +182,16 @@ function sf_admin_agent_plan(string $message): array {
         return ['type'=>'prepare_journey','view'=>'automations','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
     if(sf_agent_catalog_parse_edit($message)!==null)
         return ['type'=>'edit_catalog_metadata','view'=>'catalog','requires_confirmation'=>true,'execution'=>'proposal_or_navigation_only'];
+    // Real, bounded record reads take precedence over generic module navigation,
+    // but ordinary "open catalog" / "show my releases" still navigate.
+    if(preg_match('/\b(?:show|list|which|what|find|count|how many|review)\b/i',$message)){
+        if(preg_match('/\b(?:songs?|tracks?|catalog)\b/i',$message)
+            && sf_agent_admin_catalog_filter($message)!=='all')
+            return ['type'=>'catalog_inventory_read','view'=>'catalog','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+        if(preg_match('/\b(?:albums?|releases?|singles?|eps?)\b/i',$message)
+            && sf_agent_admin_release_filter($message)!=='all')
+            return ['type'=>'release_inventory_read','view'=>'releases','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+    }
     // Clip/timeline edits use their distinct exact-review production logic.
     if(!preg_match('/\b(?:timeline|assembly|clip|footage|storyboard|scene)\b/i',$message)){
         foreach(sf_admin_agent_module_routes() as $intent=>$route){
@@ -370,6 +381,8 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
     if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
         $missionPlan=sf_agent_mission_plan_save('admin',$adminId,$threadId,$message,$missionPlan);}
     $types=[
+      'catalog_inventory_read'=>'Private catalog inventory is unavailable; no changes made.',
+      'release_inventory_read'=>'Private releases inventory is unavailable; no changes made.',
       'production_editorial_status'=>'Private editorial production status is unavailable; no editorial action was performed.',
       'production_schedule_calendar'=>'Private production calendar is unavailable; no schedule or crew assignment changed.',
       'production_director_coverage'=>'Director coverage data is unavailable.',
@@ -398,6 +411,16 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
     ];
     $module=sf_admin_agent_module_routes()[$plan['type']]??null;
     $text=$module!==null?(string)$module['reply']:($types[$plan['type']]??$types['research']);
+    if($plan['type']==='catalog_inventory_read'){
+        try{$read=sf_agent_admin_catalog_read(sf_catalog(),sf_agent_admin_catalog_filter($message));
+            $text=sf_agent_admin_read_brief($read);}
+        catch(Throwable $e){$text='Private catalog inventory is unavailable; no changes made.';}
+    }
+    if($plan['type']==='release_inventory_read'){
+        try{$read=sf_agent_admin_release_read(sf_admin_releases(),sf_agent_admin_release_filter($message));
+            $text=sf_agent_admin_read_brief($read);}
+        catch(Throwable $e){$text='Private release inventory is unavailable; no changes made.';}
+    }
     if($plan['type']==='navigate_admin_page'){
         $destination=sf_agent_admin_page_destinations()[$plan['view']]??null;
         $text=$destination!==null?'Opening '.$destination['label'].'.':'That Admin destination is unavailable.';
@@ -725,6 +748,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
+    if(in_array($plan['type'],['catalog_inventory_read','release_inventory_read'],true) && !empty($read))$action['read_evidence']=$read;
     $navigation=sf_agent_admin_page_target($message);
     if($navigation!==null && $navigation['view']===$plan['view'] &&
         $contract['tool_id']==='admin_module_navigate' && !$plan['requires_confirmation']){

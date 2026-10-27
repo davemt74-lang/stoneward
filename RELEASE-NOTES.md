@@ -1,4 +1,8 @@
-# Stonefellow v1.3.161 — Section 91B1: Agent integration coverage audit
+# Stonefellow v1.3.162 — Section 91B2A: Authorized catalog and release status reads
+
+The Admin Agent now resolves unpublished/private tracks, missing ISRC/writer information, pending releases and scheduled releases against Stonefellow's existing source data. Responses are bounded and read-only, omit private media/lyrics/notes, and never forward the private inventory to an external LLM. Both tools are Admin-scoped in the existing skill/registry system; normal navigation, approval gates and the 91B1 coverage audit are preserved. Section 91B2A adds deterministic fixture/role tests to the full release gate. No database migration or VP3/Gelato change.
+
+## Previous release: Stonefellow v1.3.161 — Section 91B1: Agent integration coverage audit
 
 Section 91B1 adds an authenticated, read-only Agent capability coverage diagnostic (`admin/api/agent-tools.php?audit=1`). It inventories live tool and skill contracts, distinguishes the 23 Admin navigation-only intents from genuine data operations, and enumerates the five existing exact-reviewed proposal paths. The coverage audit never grants execution, changes permissions, invokes a model or modifies data. Its regression tests are part of the full release gate. The full operational-control integrations remain scoped to 91B2–91B5.
 

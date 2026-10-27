@@ -3,7 +3,8 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.161',
+  'stonefellow'=>'1.3.162',
+  'admin_agent_catalog_release_reads'=>'bounded-authenticated-private-source-results-no-provider-export',
   'agent_integration_coverage'=>'authenticated-read-only-live-tool-skill-module-audit-no-execution-grant',
   'conversational_voice_reliability'=>'transcript-acoustic-confirmation-retry-truncated-speech-public-admin',
   'catalog_single_publish_flow'=>'streaming-digital-vinyl-explicit-uses-protected-master-transcoded-preview',

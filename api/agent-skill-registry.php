@@ -13,6 +13,8 @@ function sf_agent_skill_definitions(): array {
       'catalog_discovery'=>['label'=>'Find published music','contexts'=>['public','customer','admin'],'tool'=>'public_catalog_search','intents'=>['public_catalog_search']],
       'published_site_search'=>['label'=>'Search published site','contexts'=>['public','customer','admin'],'tool'=>'public_site_search','intents'=>['public_site_search']],
       'published_artist_facts'=>['label'=>'Research published Stonefellow music and artist information','contexts'=>['public','customer','admin'],'tool'=>'public_artist_facts','intents'=>['public_artist_research']],
+      'admin_catalog_status'=>['label'=>'Read actual Admin catalog visibility and missing metadata','contexts'=>['admin'],'tool'=>'admin_catalog_inventory','intents'=>['catalog_inventory_read']],
+      'admin_release_status'=>['label'=>'Read actual Admin release states and scheduled entries','contexts'=>['admin'],'tool'=>'admin_release_inventory','intents'=>['release_inventory_read']],
       'public_recommendations'=>['label'=>'Recommend published tracks','contexts'=>['public','customer','admin'],'tool'=>'recommend_public_track','intents'=>['player_recommend']],
       'playback_queue'=>['label'=>'Manage local playback queue','contexts'=>['public','customer','admin'],'tool'=>'queue_track','intents'=>['queue_track']],
       'public_page_navigation'=>['label'=>'Switch to an installed Stonefellow page or published record, and identify the current view','contexts'=>['public','customer'],'tool'=>'public_page_navigate','intents'=>['page_navigate','page_detail','page_context']],
