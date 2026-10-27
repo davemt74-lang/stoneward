@@ -29,6 +29,10 @@ if(($_SERVER['REQUEST_METHOD']??'')==='GET'){
             'source_asset_id'=>(int)$draft['asset_id'],
             'has_separate_preview'=>!empty($draft['candidate_preview_asset_id']),
             'digital_price'=>(float)($draft['template_metadata']['price']??0),
+            'digital_purchase_enabled'=>!empty($draft['digital_purchase_enabled']),
+            'vinyl_print_enabled'=>!empty($draft['pod_eligible']),
+            'requires_listening_copy'=>sf_media_protected_master_asset((int)$draft['asset_id'])
+                &&empty($draft['candidate_preview_asset_id']),
             'missing_fields'=>sf_media_catalog_missing_fields($draft),
             'review'=>array_intersect_key($draft,array_flip(['title','release','artist_display',
                 'words_by','music_by','master_owner','composition_owner','genre','year','isrc',
@@ -72,6 +76,7 @@ try{
             'composition_owner','genre','year','isrc','release_date','explicit','pod_eligible'];
         $fields=$draft;
         foreach($editable as $field)if(array_key_exists($field,$review))$fields[$field]=$review[$field];
+        $fields['pod_eligible']=!empty($body['pod_eligible']);
         $fields['rights_confirmed']=true;
         $audio=sf_media_catalog_authorized_asset(sf_media_asset((int)$draft['asset_id']),$owner);
         $audio['created_by']=$owner; // Legacy site-owned audio is governed by this Admin.
@@ -81,10 +86,13 @@ try{
             $artwork['created_by']=$owner;
         }
         $normalized=sf_agent_song_intake_normalize($fields,$audio,$owner,$artwork);
+        $normalized['digital_purchase_enabled']=!empty($body['digital_purchase_enabled']);
         $missing=sf_media_catalog_missing_fields($normalized);
         if($missing)throw new InvalidArgumentException('Complete the highlighted song details: '.implode(', ',$missing).'.');
         $saved=sf_agent_song_intake_update($owner,$normalized,$revision);
-        $published=sf_media_catalog_publish_draft($owner,$key,(string)$saved['draft']['payload_hash'],true);
+        $previewId=(int)($body['preview_asset_id']??0);
+        $published=sf_media_catalog_publish_draft($owner,$key,(string)$saved['draft']['payload_hash'],true,
+            $previewId>0?$previewId:null);
         sf_media_catalog_record_success($owner,$published,'catalog_review');
         sf_json_response(['ok'=>true]+$published);
     }

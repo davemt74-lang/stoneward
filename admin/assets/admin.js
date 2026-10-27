@@ -142,7 +142,6 @@
     if(shellBound)return;shellBound=true;
     $('#adminNav').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b)openView(b.dataset.view)});
     $('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');
-    $('#openAdminAgentChat').onclick=()=>window.SFAdminAgentCanvas?.togglePopup?.();
     $('#adminNotificationsButton').onclick=()=>{
       try{localStorage.setItem('stonefellow.admin.activity.seen',new Date().toISOString())}catch(_){/* storage optional */}
       const count=$('#adminNotificationsCount');if(count){count.hidden=true;count.textContent=''}
@@ -380,10 +379,14 @@
       '<p>Review the song credits and ownership below. Nothing becomes public until you confirm and select <strong>Publish song</strong>.</p>'+
       '<p class="catalog-publish-source">Source: '+esc(d.filename||'Audio file')+' · Template: '+esc(d.template?.name||'Unassigned')+
       ' · Digital price: $'+Number(d.digital_price||0).toFixed(2)+'</p>'+
-      (!d.has_separate_preview?'<div class="notice">This single MP3/WAV can enter the public listening player. Paid downloads and vinyl remain disabled until a separate private master is attached.</div>':'')+
+      '<div class="notice">Choose how this song is used. Public listening is enabled when you publish; digital sales and vinyl are optional. The source master stays private when either is selected.</div>'+
       '<form id="catalogPublishForm"><div class="catalog-publish-fields">'+fields.map(([key,label])=>
         '<label class="field">'+esc(label)+'<input data-catalog-review="'+esc(key)+'" value="'+esc(d.review?.[key]??'')+'" maxlength="180" '+
         (required.some(([k])=>k===key)?'required':'')+' autocomplete="off"></label>').join('')+'</div>'+
+      '<div class="catalog-publish-usage"><label class="check-field"><input type="checkbox" checked disabled> Public listening player (streaming)</label>'+
+      '<label class="check-field"><input id="catalogPublishDigital" type="checkbox" '+(d.digital_purchase_enabled?'checked':'')+'> Enable digital downloads ($'+Number(d.digital_price||0).toFixed(2)+')</label>'+
+      '<label class="check-field"><input id="catalogPublishVinyl" type="checkbox" '+(d.vinyl_print_enabled?'checked':'')+'> Available for vinyl print</label></div>'+
+      '<label class="field catalog-publish-copy">Public listening MP3 (optional)<input id="catalogPublishListening" type="file" accept=".mp3,audio/mpeg"><small>Upload a separate MP3 if you have one. If the selected source is a protected master, the server will first try to create a lower-bitrate listening MP3 automatically.</small></label>'+
       '<label class="check-field catalog-publish-consent"><input id="catalogPublishRights" type="checkbox" required> I confirm that I have authority to publish this recording and its composition on Stonefellow.</label>'+
       '<p id="catalogPublishError" class="form-error" role="alert" aria-live="assertive"></p>'+
       '<div class="actions catalog-publish-actions"><button type="button" class="secondary" id="catalogPublishCancel">Cancel</button><button class="primary" type="submit" id="catalogPublishConfirm">Publish song</button></div></form></section>';
@@ -411,8 +414,20 @@
       if(!form.querySelector('#catalogPublishRights').checked){errors.textContent='Confirm publishing rights before continuing.';return}
       const button=form.querySelector('#catalogPublishConfirm');button.disabled=true;button.textContent='Publishing…';
       try{
+        let previewId=0;const listeningFile=form.querySelector('#catalogPublishListening').files?.[0];
+        if(listeningFile){
+          if(!/\.mp3$/i.test(listeningFile.name))throw new Error('A separate listening copy must be an MP3 file.');
+          button.textContent='Uploading listening MP3…';
+          const upload=new FormData();upload.append('file',listeningFile,listeningFile.name);
+          const result=await uploadApi('media-upload.php',upload);previewId=Number(result.asset?.id||0);
+          if(!previewId)throw new Error('Listening MP3 upload did not return a verified media asset.');
+          button.textContent='Publishing…';
+        }
         const result=await api('media-catalog.php',{action:'review_publish_draft',request_key:d.request_key,
-          expected_hash:d.payload_hash,review,rights_confirmed:true,confirmed:true});
+          expected_hash:d.payload_hash,review,preview_asset_id:previewId,
+          digital_purchase_enabled:form.querySelector('#catalogPublishDigital').checked,
+          pod_eligible:form.querySelector('#catalogPublishVinyl').checked,
+          rights_confirmed:true,confirmed:true});
         close();
         // Publication is committed. A refresh failure must never report a false publishing failure.
         let refreshed=false;
@@ -422,7 +437,7 @@
         const receipt=$('#catalogPublishResult');if(receipt){receipt.hidden=false;
           receipt.className='catalog-publish-success';
           receipt.innerHTML='<strong>✓ Published: '+esc(review.title)+'</strong><p>Catalog track '+esc(result.track_id)+
-            ' is now public in the listening player.'+(result.preview_only?' Listening-only; paid download and vinyl are disabled.':'')+
+            ' is now public in the listening player.'+(result.preview_only?' Listening-only; paid downloads and vinyl require a separate private master.':'')+
             (!refreshed?' Catalog list refresh is temporarily unavailable; reload to see the track.':'')+'</p>'+
             '<button class="secondary" type="button" id="catalogPublishOpenTrack">Open published track</button>';
           $('#catalogPublishOpenTrack').onclick=()=>openCatalogTrack(result.track_id);}

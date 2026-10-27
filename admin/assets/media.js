@@ -112,10 +112,11 @@
       '<label class="field">Composition owner<input name="composition_owner"></label>'+
       '<label class="field">Artwork (optional)<select name="artwork_asset_id">'+artOpts+'</select></label>'+
       '<label class="field">Digital download price ($)<input type="number" name="digital_price" min="0" max="1000" step="0.01" value="2.00" required></label>'+
+      '<label class="check-field span3"><input type="checkbox" name="digital_purchase_enabled"> Enable paid digital downloads</label>'+
       '<label class="check-field span3"><input type="checkbox" name="pod_eligible"> Available for vinyl print (requires a distinct private master)</label>'+
       '<label class="check-field span3"><input type="checkbox" name="rights_confirmed"> I confirm I have authority to publish this recording and its metadata.</label>'+
       '<label class="check-field span3"><input type="checkbox" name="auto_publish"> Auto-publish to public listening Catalog now</label>'+
-      '<p class="notice span3">Publishing a lone MP3/WAV exposes it as the public listening copy. Paid downloads and vinyl printing stay disabled until a different private master is assigned.</p>'+
+      '<p class="notice span3">Choose streaming, downloads and vinyl independently. If a private master is needed, Stonefellow will create a lower-bitrate MP3 listening copy when server conversion is available; otherwise add a separate public listening MP3 in Catalog review.</p>'+
       '<div class="actions span3"><button class="primary" type="submit">Save song</button><button class="secondary" type="button" data-catalog-close>Cancel</button></div>'+
       '<p class="status-line span3" data-catalog-status role="status"></p></form></div>';
     document.body.appendChild(modal);
@@ -140,7 +141,8 @@
           title:d.get('title'),release:d.get('release'),isrc:d.get('isrc'),artist_display:d.get('artist_display'),
           words_by:d.get('words_by'),music_by:d.get('music_by'),master_owner:d.get('master_owner'),
           composition_owner:d.get('composition_owner'),artwork_asset_id:d.get('artwork_asset_id'),
-          digital_price:d.get('digital_price'),pod_eligible:form.elements.pod_eligible.checked,
+          digital_price:d.get('digital_price'),digital_purchase_enabled:form.elements.digital_purchase_enabled.checked,
+          pod_eligible:form.elements.pod_eligible.checked,
           rights_confirmed:rights,auto_publish:auto,confirmed:auto};
         const result=await api('media-catalog.php',input);
         if(result.publication==='published'){

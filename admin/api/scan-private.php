@@ -97,6 +97,7 @@ try {
     // Preserve the *entire* template snapshot privately for later review. The
     // publication code selects only public-safe fields after explicit approval.
     $record['template_metadata']=$metadata;
+    $record['digital_purchase_enabled']=!empty($track['digital_purchase_enabled']);
     $record['imported_asset_ids']=array_values(array_unique(array_map('intval',array_column($assets,'id'))));
     $record['candidate_preview_asset_id']=((int)$preview['id']!==(int)$master['id']
         &&(string)$preview['sha256']!==(string)$master['sha256']
