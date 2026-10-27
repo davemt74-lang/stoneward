@@ -1,4 +1,8 @@
-# Stonefellow v1.3.162 — Section 91B2A: Authorized catalog and release status reads
+# Stonefellow v1.3.163 — Section 91B2B: Real Admin live-show reads
+
+Admin Agent Chat now reads actual saved Shows + Live records for upcoming scheduled performances, postponed shows, and cancellations. Responses include bounded venue/city/date/status fields only; private archive notes, media and ticket URLs never enter the reply or external model. Added Admin-only `admin_show_inventory` tool/skill and pure-source regression cases. Existing catalog/release reads, navigation and all permission controls remain intact. No schema change or VP3/Gelato work.
+
+## Previous release: Stonefellow v1.3.162 — Section 91B2A: Authorized catalog and release status reads
 
 The Admin Agent now resolves unpublished/private tracks, missing ISRC/writer information, pending releases and scheduled releases against Stonefellow's existing source data. Responses are bounded and read-only, omit private media/lyrics/notes, and never forward the private inventory to an external LLM. Both tools are Admin-scoped in the existing skill/registry system; normal navigation, approval gates and the 91B1 coverage audit are preserved. Section 91B2A adds deterministic fixture/role tests to the full release gate. No database migration or VP3/Gelato change.
 
