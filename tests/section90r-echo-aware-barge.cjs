@@ -33,10 +33,12 @@ function publicPlaybackProbe(){
     vm.runInContext(extract(source,name),context);
   }
   assert.equal(context.handleVoiceActivityProbe('probe'),true);
+  assert.equal(context.handleVoiceActivityProbe('paused'),true,'public playback pause is acknowledged before probing speech');
   assert.equal(agentAudio.paused,true);
   assert.equal(song.volume,0,'music must also be muted during the echo test');
   assert.equal(context.voicePlaybackSequence,7,'a provisional pause must not invalidate TTS');
   assert.equal(context.handleVoiceActivityProbe('resume'),true);
+  assert.equal(context.handleVoiceActivityProbe('paused'),false,'resumed playback must not be mistaken for muted audio');
   assert.equal(agentAudio.paused,false,'echo-only test resumes the same audio');
   assert.equal(song.volume,0.16,'music volume is restored');
   assert.deepEqual(events,['tts-pause','tts-resume']);
@@ -59,9 +61,11 @@ function adminSpeechProbe(){
   vm.createContext(context);
   for(const name of ['cancelAdminSpeechOutput','holdAdminSpeechForBarge','handleAdminVoiceActivityProbe'])vm.runInContext(extract(source,name),context);
   assert.equal(context.handleAdminVoiceActivityProbe('probe'),true);
+  assert.equal(context.handleAdminVoiceActivityProbe('paused'),true,'Admin playback pause is confirmed by the browser');
   assert.equal(synth.paused,true);
   assert.equal(context.adminSpeechSequence,3);
   context.handleAdminVoiceActivityProbe('resume');
+  assert.equal(context.handleAdminVoiceActivityProbe('paused'),false);
   assert.deepEqual(events,['pause','resume'],'Agent echo must not cancel Admin output');
   context.handleAdminVoiceActivityProbe('probe');
   context.handleAdminVoiceActivityProbe('confirm');

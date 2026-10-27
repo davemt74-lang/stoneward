@@ -59,14 +59,14 @@
     let generation=0,resourceGeneration=0,listening=false,confirmation=null,restartTimer=null;
     let stream=null,context=null,analyser=null,readyPromise=null,frame=null,activityTimer=null;
     let voiceDetected=false,consecutive=0,noiseFloor=0.008,fastFailures=0;
-    let probing=false,probeReady=false,probeConsecutive=0;
+    let probing=false,probeReady=false,probeConsecutive=0,pendingPhrase='';
     let probeTailTimer=null,probeDeadlineTimer=null,probeRms=0,echoBaseline=0,echoCooldownUntil=0;
     const readBuffer=new Float32Array(1024);
     const report=state=>{try{onStatus?.(state)}catch(_){}};
     const clearProbe=()=>{
       if(probeTailTimer!==null){browser.clearTimeout?.(probeTailTimer);probeTailTimer=null}
       if(probeDeadlineTimer!==null){browser.clearTimeout?.(probeDeadlineTimer);probeDeadlineTimer=null}
-      probing=false;probeReady=false;probeConsecutive=0;
+      probing=false;probeReady=false;probeConsecutive=0;pendingPhrase='';
     };
     const resumeEcho=()=>{
       if(!probing)return;
@@ -138,15 +138,22 @@
       const rms=Math.sqrt(power/readBuffer.length);
       if(probing){
         if(probeReady){
+          // A browser can report a successful pause request before it has
+          // actually stopped output. Never classify that output as a visitor.
+          let reallyPaused=false;
+          try{reallyPaused=onVoiceActivity('paused')===true}catch(_){}
+          if(!reallyPaused){resumeEcho();frame=browser.requestAnimationFrame?.(sample)??null;return}
           // Reject the decaying acoustic tail of the paused speaker. A room
           // participant must remain audible above both noise and a meaningful
           // fraction of the pre-pause output level.
           const independent=rms>Math.max(0.028,noiseFloor*2.8,probeRms*0.58)&&peak>0.095;
           probeConsecutive=independent?probeConsecutive+1:0;
           if(probeConsecutive>=3){
+            const confirmedPhrase=pendingPhrase;
             clearProbe();voiceDetected=true;
             report('independent-voice-detected');
             try{onVoiceActivity('confirm')}catch(_){}
+            if(confirmedPhrase){stop();onInterrupt(confirmedPhrase);return}
             activityTimer=browser.setTimeout?.(()=>{
               activityTimer=null;
               if(!listening||!voiceDetected)return;
@@ -163,7 +170,7 @@
       if(!active)noiseFloor=Math.max(0.004,Math.min(0.04,noiseFloor*0.995+rms*0.005));
       if(echoBaseline>0&&rms>noiseFloor*2&&rms<echoBaseline*1.55)echoBaseline=echoBaseline*0.98+rms*0.02;
       if(consecutive>=4&&Date.now()>=echoCooldownUntil){
-        consecutive=0;probeRms=rms;
+        consecutive=0;probeRms=rms;pendingPhrase='';
         // Never permanently stop on microphone energy alone. A loud speaker
         // sounds identical to a person until we briefly silence that speaker.
         let paused=false;
@@ -186,7 +193,13 @@
         if(controller.signal.aborted||attempt!==generation||!listening)return;
         confirmation=null;
         if(typeof phrase==='string'&&phrase.trim()){
-          stop();onInterrupt(phrase.trim());return;
+          // ASR hears speaker output as well as humans, and may invent novel
+          // words even when the transcript does not resemble the reply. ASR
+          // *alone* must never cut off playback. Hold words captured during
+          // the silenced probe; release them only after independent speech
+          // has physically persisted while output was paused.
+          if(voiceDetected){stop();onInterrupt(phrase.trim());return}
+          if(probing)pendingPhrase=phrase.trim();
         }
         fastFailures=Date.now()-startedAt<400?fastFailures+1:0;
         if(fastFailures===3)report('speech-recognition-unavailable');
@@ -202,14 +215,15 @@
     };
     const start=async()=>{
       stop();
-      if(typeof confirmCandidate!=='function'||!(browser.SpeechRecognition||browser.webkitSpeechRecognition))return false;
+      if(typeof confirmCandidate!=='function'||typeof onVoiceActivity!=='function'||!(browser.SpeechRecognition||browser.webkitSpeechRecognition))return false;
       listening=true;voiceDetected=false;consecutive=0;noiseFloor=0.008;fastFailures=0;
       echoBaseline=0;echoCooldownUntil=0;
       const requested=generation;
-      listen();
-      if(typeof onVoiceActivity==='function'){
-        const ready=await prepare();
-        if(ready&&listening&&requested===generation&&frame===null)frame=browser.requestAnimationFrame?.(sample)??null;
+      const ready=await prepare();
+      if(!ready){if(listening&&requested===generation)stop();return false}
+      if(listening&&requested===generation){
+        listen();
+        if(frame===null)frame=browser.requestAnimationFrame?.(sample)??null;
       }
       return listening;
     };

@@ -60,7 +60,7 @@ async function voiceSilencesAgentAfterEchoProbe(){
   const barge=f.browser.StonefellowBargeIn.create(
     phrase=>events.push(['turn',phrase]),f.browser,
     signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('The album has a new song.',f.browser,signal),
-    stage=>{events.push([stage]);return true});
+    stage=>{if(stage!=='paused')events.push([stage]);return true});
   assert.equal(await barge.prepare(),true,'mic tap is acquired before voice output');
   assert.equal(await barge.start(),true);
   await f.flush();
@@ -88,7 +88,7 @@ async function failedRecognitionNeverResumesAgent(){
   const barge=f.browser.StonefellowBargeIn.create(
     phrase=>events.push(['turn',phrase]),f.browser,
     signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('Let me explain this album.',f.browser,signal),
-    stage=>{events.push([stage]);return true});
+    stage=>{if(stage!=='paused')events.push([stage]);return true});
   await barge.start();await f.flush();
   f.pump(0.15,4);assert.deepEqual(events,[['probe']]);
   assert.equal(f.advance(180),true);
@@ -110,7 +110,7 @@ async function agentEchoCannotCancelItsOwnReply(){
   const barge=f.browser.StonefellowBargeIn.create(
     phrase=>events.push(['turn',phrase]),f.browser,
     signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('The album has a new song.',f.browser,signal),
-    stage=>{events.push([stage]);return true});
+    stage=>{if(stage!=='paused')events.push([stage]);return true});
   await barge.start();await f.flush();
   f.pump(0.16,4);
   assert.deepEqual(events,[['probe']]);
@@ -138,11 +138,79 @@ async function stopDuringProbeIsNotReplayed(){
   const barge=f.browser.StonefellowBargeIn.create(
     phrase=>events.push(['turn',phrase]),f.browser,
     signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('I will explain the recording.',f.browser,signal),
-    stage=>{events.push([stage]);return true});
+    stage=>{if(stage!=='paused')events.push([stage]);return true});
   await barge.start();await f.flush();f.pump(0.2,4);
   f.recognizers[0].emit('stop');await f.flush();
-  assert.deepEqual(events,[['probe'],['turn','stop']],'short stop must be accepted while audio is paused');
+  assert.deepEqual(events,[['probe']],'even an ASR stop must wait for physical voice confirmation');
+  assert.equal(f.advance(180),true);
+  f.pump(0.2,3);
+  assert.deepEqual(events,[['probe'],['confirm'],['turn','stop']],'confirmed participant stop is accepted after speaker is muted');
   assert.equal(f.advance(640),false,'no echo-probe resume may restart an interrupted reply');
+  barge.close();
+}
+
+async function misheardAgentSpeechCannotEndPlayback(){
+  const f=createFixture(),events=[];
+  const barge=f.browser.StonefellowBargeIn.create(
+    phrase=>events.push(['turn',phrase]),f.browser,
+    signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('Here is the whole story of the album.',f.browser,signal),
+    stage=>{if(stage!=='paused')events.push([stage]);return true});
+  await barge.start();await f.flush();
+  f.recognizers[0].emit('stop',true);await f.flush();
+  assert.deepEqual(events,[],'a plausible ASR word cannot stop an ongoing reply without a speaker probe');
+  assert.equal(barge.active,true);
+  assert.equal(f.advance(250),true,'recognition can rearm after ignoring unverified words');
+  await f.flush();
+  f.recognizers[1].emit('play my favorite record',true);await f.flush();
+  f.pump(0.004,12);
+  assert.deepEqual(events,[],'even a fully novel echoed command cannot terminate speech alone');
+  assert.equal(barge.active,true);
+  barge.close();
+}
+
+async function misheardEchoDuringProbeIsDiscarded(){
+  const f=createFixture(),events=[];
+  const barge=f.browser.StonefellowBargeIn.create(
+    phrase=>events.push(['turn',phrase]),f.browser,
+    signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('The song will keep playing.',f.browser,signal),
+    stage=>{if(stage!=='paused')events.push([stage]);return true});
+  await barge.start();await f.flush();f.pump(0.17,4);
+  f.recognizers[0].emit('skip to the next song',true);await f.flush();
+  assert.deepEqual(events,[['probe']]);
+  assert.equal(f.advance(180),true);
+  f.pump(0.004,12);
+  assert.equal(f.advance(640),true);
+  assert.deepEqual(events,[['probe'],['resume']],'echo-detected words are discarded on speaker resume');
+  f.elapse(1000);f.pump(0.3,4);
+  assert.equal(f.advance(180),true);f.pump(0.3,3);
+  assert.deepEqual(events,[['probe'],['resume'],['probe'],['confirm']]);
+  assert.equal(f.advance(5000),true);
+  assert.deepEqual(events.at(-1),['turn',''],'the discarded echo must not be submitted as the later visitor');
+  barge.close();
+}
+
+async function pauseNotAcknowledgedIsNotAnInterrupt(){
+  const f=createFixture(),events=[];
+  const barge=f.browser.StonefellowBargeIn.create(
+    phrase=>events.push(['turn',phrase]),f.browser,
+    signal=>f.browser.StonefellowBargeIn.verifyAgentSpeech('This reply is still speaking.',f.browser,signal),
+    stage=>{if(stage!=='paused')events.push([stage]);return stage!=='paused'});
+  await barge.start();await f.flush();f.pump(0.2,4);
+  assert.equal(f.advance(180),true);
+  f.pump(0.2,10);
+  assert.deepEqual(events,[['probe'],['resume']],'an ineffective pause cannot turn agent audio into a visitor');
+  assert.equal(barge.active,true);
+  barge.close();
+}
+
+async function unavailableMicFailsClosed(){
+  const f=createFixture(),events=[];
+  f.browser.navigator.mediaDevices.getUserMedia=async()=>{throw Error('denied')};
+  const barge=f.browser.StonefellowBargeIn.create(
+    phrase=>events.push(phrase),f.browser,()=>Promise.resolve('stop'),()=>true);
+  assert.equal(await barge.start(),false,'unavailable acoustic validation cannot arm unverified barge-in');
+  assert.equal(f.recognizers.length,0,'never start an unguarded ASR monitor');
+  assert.deepEqual(events,[]);
   barge.close();
 }
 
@@ -204,7 +272,11 @@ Promise.resolve().then(voiceSilencesAgentAfterEchoProbe)
   .then(failedRecognitionNeverResumesAgent)
   .then(agentEchoCannotCancelItsOwnReply)
   .then(stopDuringProbeIsNotReplayed)
+  .then(misheardAgentSpeechCannotEndPlayback)
+  .then(misheardEchoDuringProbeIsDiscarded)
+  .then(pauseNotAcknowledgedIsNotAnInterrupt)
+  .then(unavailableMicFailsClosed)
   .then(prepareAfterCloseCannotReopenMic)
   .then(playbackHoldsAreWiredWithoutKillingRecognition)
-  .then(()=>console.log('Section 90Q live voice: echo probing, independent voice, ASR fallback, and mic lifecycle PASS'))
+  .then(()=>console.log('Section 90Q live voice: public/Admin pause, misheard echo, real interruption, and mic lifecycle PASS'))
   .catch(error=>{console.error(error);process.exitCode=1});

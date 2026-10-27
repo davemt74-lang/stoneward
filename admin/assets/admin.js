@@ -40,6 +40,7 @@
   }
   function handleAdminVoiceActivityProbe(stage){
     const synthesis=window.speechSynthesis;
+    if(stage==='paused')return adminSpeechProbePaused&&synthesis?.paused===true;
     if(stage==='probe'){
       if(!adminConversationEnabled||!adminSpeechPending||!synthesis?.speaking||typeof synthesis.pause!=='function')return false;
       synthesis.pause();adminSpeechProbePaused=true;return true;
