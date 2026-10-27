@@ -25,8 +25,11 @@ assert(scanner.includes('data-g-template=')&&scanner.includes('data-g-price=')&&
   'Every scanned song owns its template, sale price, rights, and publishing choice.');
 assert(scanner.includes('autoPublish:false')&&scanner.includes('podEligible:false')&&scanner.includes("api('scan-private.php'"),
   'Folder import never assumes publicity or vinyl availability.');
-assert(scanner.includes("api('media-catalog.php',{action:'publish_draft'")&&gallery.includes("api('media-catalog.php',input)"),
-  'Both Media Library and folder import reach the same public Catalog publishing action.');
+assert(scanner.includes("api('media-catalog.php',{action:'review_publish_draft'")
+  &&intake.includes("if($action==='review_publish_draft')")
+  &&intake.includes('sf_media_catalog_publish_draft($owner,$key,')
+  &&gallery.includes("api('media-catalog.php',input)"),
+  'Both Media Library and folder intake use the same authoritative Catalog writer after review.');
 assert(privateScan.includes("$metadata['price']=round")&&privateScan.includes("'payload_hash'=>$result['draft']['payload_hash']"),
   'Folder draft retains validated price and exact revision for optional publication.');
 assert(intake.includes('sf_admin_require_auth(true)')&&intake.includes("empty($body['confirmed'])")
