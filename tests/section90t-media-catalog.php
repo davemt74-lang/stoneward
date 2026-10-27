@@ -14,6 +14,7 @@ $draft=[
     'words_by'=>'David','music_by'=>'David','artist_display'=>'Stonefellow',
     'master_owner'=>'David','composition_owner'=>'David','genre'=>'Rock',
     'isrc'=>'','release_date'=>'','explicit'=>false,'pod_eligible'=>true,
+    'digital_purchase_enabled'=>true,
     'template_metadata'=>['template'=>['id'=>'studio','version'=>2],
         'price'=>3.5,'label'=>'Stonefellow']
 ];

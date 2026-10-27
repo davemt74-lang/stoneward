@@ -52,6 +52,7 @@ function sf_media_catalog_intake_record(int $owner,array $input,array $asset,arr
         'artwork_asset_id'=>(int)($artwork['id']??0)
     ],$owned,$owner,$artworkOwned);
     $record['template_metadata']=$metadata;
+    $record['digital_purchase_enabled']=!empty($input['digital_purchase_enabled']);
     $record['imported_asset_ids']=[(int)$asset['id']];
     $record['candidate_preview_asset_id']=0;
     return $record;
@@ -84,7 +85,7 @@ function sf_media_catalog_candidate(array $draft,array $preview,?array $master,?
         'artwork'=>$artwork?'api/media.php?id='.rawurlencode((string)$artwork['uuid']).'&variant=large':'',
         'state'=>'published','public_visible'=>true,'agent_discoverable'=>true,
         'mood'=>[],'themes'=>[],'energy'=>3,'price'=>max(0,(float)($source['price']??2)),
-        'digital_purchase_enabled'=>$split,
+        'digital_purchase_enabled'=>$split&&!empty($draft['digital_purchase_enabled']),
         'podEligible'=>$split&&!empty($draft['pod_eligible']),
         'story'=>'','lyrics'=>'','credits'=>sf_admin_public_credits($metadata),'metadata'=>$metadata,
         'audio_publishing_mode'=>$split?'preview_master_split':'preview_only',
@@ -105,6 +106,44 @@ function sf_media_catalog_missing_fields(array $draft):array {
     foreach($required as $key=>$label)
         if(trim((string)($draft[$key]??''))==='')$missing[$key]=$label;
     return $missing;
+}
+
+/** Transcode a protected source into a new, lower-bitrate public listening MP3. */
+function sf_media_catalog_transcoded_preview(array $master,int $owner,string $key):array {
+    $master=sf_media_catalog_authorized_asset($master,$owner);
+    if($owner<1||!preg_match('/^[a-f0-9]{32}$/D',$key))
+        throw new InvalidArgumentException('A verified, owned song is required.');
+    $ffmpeg='';
+    foreach(['/usr/bin/ffmpeg','/usr/local/bin/ffmpeg'] as $binary)
+        if(is_file($binary)&&is_executable($binary)){$ffmpeg=$binary;break;}
+    if($ffmpeg===''||!function_exists('proc_open')||in_array('proc_open',array_map('trim',explode(',',(string)ini_get('disable_functions'))),true))
+        throw new RuntimeException('This private master needs a public listening MP3. Automatic conversion is unavailable on this server; upload a separate listening MP3 in this same review.');
+    $token=hash('sha256',$master['sha256'].'|'.$owner.'|'.$key.'|public-mp3-128k-v1');
+    $relative='storage/media/listening/'.substr($token,0,2).'/'.$token.'.mp3';
+    $target=SF_ROOT.'/'.$relative;$source=SF_ROOT.'/'.ltrim((string)$master['stored_path'],'/');
+    $dir=dirname($target);
+    if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir))
+        throw new RuntimeException('Could not create listening-copy storage.');
+    if(!is_file($target)){
+        $tmp=$target.'.'.bin2hex(random_bytes(8)).'.mp3';
+        $command=[$ffmpeg,'-nostdin','-hide_banner','-loglevel','error','-i',$source,
+            '-map','0:a:0','-map_metadata','-1','-vn','-codec:a','libmp3lame',
+            '-ar','44100','-ac','2','-b:a','128k','-f','mp3',$tmp];
+        $pipes=[];$process=@proc_open($command,[0=>['pipe','r'],1=>['file','/dev/null','w'],
+            2=>['file','/dev/null','w']],$pipes);
+        if(!is_resource($process))throw new RuntimeException('Could not convert this private master. Upload a separate listening MP3.');
+        fclose($pipes[0]);$exit=proc_close($process);
+        if($exit!==0||!is_file($tmp)||(filesize($tmp)?:0)<1000){@unlink($tmp);
+            throw new RuntimeException('MP3 conversion failed. Upload a separate listening MP3 in this review.');}
+        chmod($tmp,0600);
+        if(!rename($tmp,$target)){@unlink($tmp);throw new RuntimeException('Could not store converted listening audio.');}
+    }
+    $preview=sf_media_register_existing_file($relative,'Stonefellow listening copy.mp3',$owner);
+    if((int)$preview['id']===(int)$master['id']
+        ||hash_equals((string)$preview['sha256'],(string)$master['sha256'])
+        ||sf_media_protected_master_asset((int)$preview['id']))
+        throw new RuntimeException('Converted listening copy is not safely separate from the private source.');
+    return sf_media_catalog_authorized_asset($preview,$owner);
 }
 
 function sf_media_catalog_publish_draft(int $owner,string $key,string $expectedHash,bool $rightsConfirmed,
@@ -140,8 +179,18 @@ function sf_media_catalog_publish_draft(int $owner,string $key,string $expectedH
         if($candidateId<1)$candidateId=(int)$master['id'];
         $allowedIds=array_map('intval',(array)($draft['imported_asset_ids']??[]));
         $allowedIds[]=(int)$master['id'];
-        if(!in_array($candidateId,$allowedIds,true))throw new InvalidArgumentException('Listening audio must belong to this song intake.');
+        // An administrator may explicitly supply a newly uploaded listening
+        // MP3 in the same review. Site-wide/legacy media cannot be substituted.
+        if(!in_array($candidateId,$allowedIds,true)){
+            $chosen=sf_media_asset($candidateId);
+            if($previewAssetId!==$candidateId||!$chosen||(int)($chosen['created_by']??0)!==$owner)
+                throw new InvalidArgumentException('Upload a listening MP3 owned by this administrator.');
+        }
         $preview=sf_media_catalog_authorized_asset(sf_media_asset($candidateId),$owner);
+        if((int)$preview['id']===(int)$master['id']
+            &&(sf_media_protected_master_asset((int)$master['id'])
+                ||!empty($draft['digital_purchase_enabled'])||!empty($draft['pod_eligible'])))
+            $preview=sf_media_catalog_transcoded_preview($master,$owner,$key);
         $split=(int)$preview['id']!==(int)$master['id'];
         if($split&&hash_equals((string)$preview['sha256'],(string)$master['sha256']))
             throw new RuntimeException('Separate listening preview must differ from the private original.');

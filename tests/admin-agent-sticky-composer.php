@@ -18,8 +18,9 @@ $checks=[
  'Only one canonical footer send function'=>substr_count($admin,'window.SFAdminAgentCanvas.send(message)')===1,
  'Send uses existing authenticated Admin endpoint'=>str_contains($chat,"c.api('agent-chat.php',{message,conversation_id:conversationId,") && str_contains($chat,"client_state:{view:c.app?.view||'agent-chat'}") && str_contains($endpoint,'sf_admin_require_auth($write)'),
  'Existing Admin Agent session remains authoritative'=>str_contains($chat,"stonefellow.admin.agent.thread") && str_contains($chat,"sessionStorage.setItem('stonefellow.admin.agent.thread',conversationId)"),
- 'Open chat footer uses the same Agent session without replacing the current Admin page'=>str_contains($admin,"$('#openAdminAgentChat').onclick=()=>window.SFAdminAgentCanvas?.togglePopup?.()")
-   &&str_contains($admin,"$('#adminChatPopupFull').onclick=()=>openView('agent-chat')"),
+ 'Open chat footer uses the same Agent session without replacing the current Admin page'=>str_contains($admin,"$('#adminChatPopupToggle').onclick=()=>window.SFAdminAgentCanvas?.togglePopup?.()")
+   &&str_contains($admin,"$('#adminChatPopupFull').onclick=()=>openView('agent-chat')")
+   &&!str_contains($html,'id="openAdminAgentChat"'),
  'Single route updates unified chat layout state'=>str_contains($admin,"adminApp.classList.toggle('admin-agent-chat-active',view==='agent-chat')"),
  'No second Agent executor or direct publish'=>!str_contains($chat,'sf_campaign_send_email_node(') && !str_contains($chat,'sf_agent_action_execute('),
  'Footer prevents default form double-submit'=>str_contains($admin,"form.addEventListener('submit',e=>{e.preventDefault();void submit();})"),

@@ -508,6 +508,8 @@ jobs:
           node tests/section90u-catalog-proof.cjs
           php tests/section90v-catalog-publish.php
           node tests/section90v-catalog-publish.cjs
+          php tests/section90v1-protected-master-publish.php
+          node tests/section90v1-publish-ui.cjs
           node tests/section90a-ci-ephemeral-credentials.cjs
           php tests/section90b-admin-module-routes.php
           node tests/section90b-admin-module-client.cjs

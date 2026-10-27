@@ -7,7 +7,9 @@ $layout=(string)file_get_contents($root.'/admin/index.php');
 $style=(string)file_get_contents($root.'/admin/assets/agent-canvas.css');
 $api=(string)file_get_contents($root.'/admin/api/agent-chat.php');
 $checks=[
- 'Admin Agent topbar entry preserves original sidebar density'=>str_contains($layout,'id="openAdminAgentChat"')&&str_contains($admin,"$('#openAdminAgentChat').onclick"),
+ 'Admin Agent uses footer chat without a duplicate header button'=>!str_contains($layout,'id="openAdminAgentChat"')
+    &&!str_contains($admin,"$('#openAdminAgentChat').onclick")
+    &&str_contains($layout,'id="adminChatPopupToggle"'),
  'Admin Agent canvas module loaded'=>str_contains($layout,'assets/agent-canvas.js'),
  'Admin Agent CSS loaded'=>str_contains($layout,'assets/agent-canvas.css'),
  'Existing openView routes into Agent canvas'=>str_contains($admin,"'agent-chat':()=>window.SFAdminAgentCanvas?.render?.()"),

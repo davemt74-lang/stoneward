@@ -3,7 +3,8 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.154',
+  'stonefellow'=>'1.3.155',
+  'catalog_single_publish_flow'=>'streaming-digital-vinyl-explicit-uses-protected-master-transcoded-preview',
   'folder_scan_private_intake'=>'per-song-confirmation-template-snapshot-vinyl-opt-in',
   'source_audio_revisions'=>'private-master-history-stable-catalog-identity',
   'public_controller'=>'stonefellow-v120.php',
