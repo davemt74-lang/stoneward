@@ -10,13 +10,14 @@
   let adminSpeechEnabled=localStorage.getItem('stonefellow.admin.voice.replies.v1')!=='off';
   let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0,adminSpeechText='',adminSpeechProbePaused=false;
   let adminConversationMonitor=null,adminConversationResume=null,adminConversationEnabled=false;
+  function syncAdminSpeechStop(){const button=$('#adminAgentSpeechStop');if(button)button.hidden=!adminSpeechPending;}
   function updateAdminVoiceControl(){for(const button of [$('#adminAgentSpeechToggle'),$('#adminChatPopupVoice')]){if(!button)continue;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}}
   function cancelAdminSpeechOutput(){
     const synthesis=window.speechSynthesis;
     try{synthesis?.cancel()}catch(_){}
     try{if(synthesis?.paused)synthesis.resume?.()}catch(_){}
   }
-  function stopAdminSpeech(){
+  function stopAdminSpeech(resumeConversation=true){
     adminSpeechProbePaused=false;
     adminSpeechSequence++;
     adminConversationMonitor?.stop();
@@ -24,8 +25,9 @@
     if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
     cancelAdminSpeechOutput();
     adminSpeechPending=false;
+    syncAdminSpeechStop();
     if(adminSpeechActive){adminSpeechActive=false;agent('idle')}
-    adminConversationResume?.();
+    if(resumeConversation)adminConversationResume?.();
   }
   function holdAdminSpeechForBarge(){
     if(!adminConversationEnabled||!adminSpeechPending)return;
@@ -57,7 +59,8 @@
     if(!adminSpeechEnabled){adminConversationResume?.();return}
     const requested=++adminSpeechSequence;
     adminSpeechPending=true;
-    const unavailable=()=>{if(requested===adminSpeechSequence){adminSpeechPending=false;adminConversationResume?.()}};
+    syncAdminSpeechStop();
+    const unavailable=()=>{if(requested===adminSpeechSequence){adminSpeechPending=false;syncAdminSpeechStop();adminConversationResume?.()}};
     const synthesis=window.speechSynthesis,Utterance=window.SpeechSynthesisUtterance;
     if(!synthesis||!Utterance){$('#adminAgentComposerStatus').textContent='Spoken replies need browser speech support. Chat still works.';unavailable();return}
     let voices=synthesis.getVoices().filter(voice=>voice.localService===true);
@@ -68,24 +71,46 @@
     const text=String(raw||'').replace(/```[\s\S]*?```/g,' ').replace(/\[[^\]]+\]\([^)]*\)/g,' ').replace(/[#*_`>]+/g,' ').trim();
     if(!text){unavailable();return}
     const parts=globalThis.StonefellowSpeechSegments?.split?.(text,180)||[text];
-    stopAdminSpeech();
+    stopAdminSpeech(false);
     const playingSequence=adminSpeechSequence;
     adminSpeechText=text;
     adminSpeechPending=true;
+    syncAdminSpeechStop();
     if(adminConversationEnabled)void adminConversationMonitor?.start();
     return new Promise(resolve=>{
-      let done=false,index=0;
-      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;adminSpeechText='';adminConversationMonitor?.stop();agent('idle');adminConversationResume?.()}resolve(ok)};
+      let done=false,index=0,retries=0;
+      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;syncAdminSpeechStop();adminSpeechText='';adminConversationMonitor?.stop();agent('idle');if(ok===false){const status=$('#adminAgentComposerStatus');if(status)status.textContent='Spoken reply ended early. The full response is still available in chat.'}adminConversationResume?.()}resolve(ok)};
       adminSpeechResolve=finish;
+      const retry=()=>{
+        if(retries++>=1){finish(false);return}
+        const resume=()=>{
+          if(done)return;
+          if(playingSequence!==adminSpeechSequence||!adminSpeechEnabled){finish(false);return}
+          if(adminSpeechProbePaused){setTimeout(resume,80);return}
+          cancelAdminSpeechOutput();next();
+        };
+        setTimeout(resume,150);
+      };
       const next=()=>{
         if(done)return;
         if(!adminSpeechEnabled||playingSequence!==adminSpeechSequence){finish(false);return}
         if(index>=parts.length){finish(true);return}
-        const utterance=new Utterance(parts[index++]);utterance.voice=voice;utterance.lang=voice.lang||'en-US';utterance.rate=1;
-        utterance.onstart=()=>{if(!done&&playingSequence===adminSpeechSequence){adminSpeechActive=true;agent('speaking',text)}};
-        utterance.onend=next;
-        utterance.onerror=()=>finish(false);
-        try{synthesis.speak(utterance)}catch(_){finish(false)}
+        const utterance=new Utterance(parts[index]);utterance.voice=voice;utterance.lang=voice.lang||'en-US';utterance.rate=1;
+        let settled=false,started=false;
+        utterance.onstart=()=>{started=true;if(!done&&playingSequence===adminSpeechSequence){adminSpeechActive=true;agent('speaking',text)}};
+        utterance.onend=()=>{
+          if(settled||done)return;settled=true;
+          if(playingSequence!==adminSpeechSequence){finish(false);return}
+          if(!started||adminSpeechProbePaused){retry();return}
+          index++;retries=0;next();
+        };
+        utterance.onerror=event=>{
+          if(settled||done)return;settled=true;
+          if(playingSequence!==adminSpeechSequence){finish(false);return}
+          if(adminSpeechProbePaused||['interrupted','canceled','audio-busy'].includes(event?.error)){retry();return}
+          finish(false);
+        };
+        try{synthesis.speak(utterance)}catch(_){retry()}
       };
       next();
     });
@@ -786,9 +811,10 @@
     stage=>handleAdminVoiceActivityProbe(stage),state=>{
       if(conversationOn&&state==='microphone-monitor-unavailable')$('#adminAgentComposerStatus').textContent='Barge-in microphone unavailable. Check permission and retry.';
       if(conversationOn&&state==='microphone-monitor-suspended')$('#adminAgentComposerStatus').textContent='Microphone audio monitor suspended. Click the mic again to retry.';
-      if(conversationOn&&state==='speech-recognition-unavailable')$('#adminAgentComposerStatus').textContent='Speech recognition unavailable. Voice activity can still stop the Agent.';
-    });
+      if(conversationOn&&state==='speech-recognition-unavailable')$('#adminAgentComposerStatus').textContent='Speech recognition unavailable. Use Stop speaking if you need to interrupt the Agent.';
+    },{requireTranscript:true});
     const resize=()=>{input.style.height='auto';input.style.height=Math.min(160,Math.max(44,input.scrollHeight))+'px';};
+    const stopSpeech=$('#adminAgentSpeechStop');if(stopSpeech)stopSpeech.onclick=()=>{stopAdminSpeech();$('#adminAgentComposerStatus').textContent='Agent stopped. Conversation remains ready.';};
     input.addEventListener('input',resize);
     input.addEventListener('keydown',e=>{
       if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();if(!pending)form.requestSubmit();}

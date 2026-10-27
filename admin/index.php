@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.159');
+define('SF_ADMIN_BUILD','1.3.160');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -185,6 +185,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
           <button type="button" id="adminChatPopupToggle" class="chat-button" aria-label="Open Admin Agent conversation" aria-expanded="false" aria-controls="adminChatPopup">▤</button>
           <label class="sr-only" for="adminChatInput">Ask Stonefellow Admin</label>
           <textarea id="adminChatInput" rows="1" maxlength="4000" placeholder="Message your Admin Agent…" aria-label="Message your Admin Agent"></textarea>
+          <button id="adminAgentSpeechStop" type="button" class="chat-button" hidden aria-label="Stop Admin Agent speech and resume listening" title="Stop speaking · listen">■</button>
           <button id="adminVoiceButton" type="button" class="chat-button" aria-label="Voice input">◉</button>
           <button type="submit" class="chat-button send" aria-label="Send message">↑</button>
         </form>

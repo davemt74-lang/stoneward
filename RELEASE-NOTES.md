@@ -1,3 +1,14 @@
+# Stonefellow v1.3.160 — Section 91A: Conversational voice reliability
+
+- Public and Admin speech monitoring now requires both independently transcribed participant words and continuing microphone speech after the Agent output is silenced. The Agent's own voice level alone cannot repeatedly pause or stop a reply.
+- Browser speech playback retries a transient canceled/interrupted chunk once, and does not skip to the next chunk if playback ends during a temporary echo probe. Normal listening resumes only after all spoken chunks end or playback is explicitly stopped.
+- ElevenLabs segments no longer treat a delayed audio pause event as the end of a reply. Music continues with the existing ducking and echo-check rules.
+- Added an accessible Stop speaking button in the Admin chat bar while an answer is playing; the public Stop speaking button remains available.
+- If speech recognition becomes unavailable, automatic interruption fails safely instead of mistaking the Agent for a person. The visible/manual stop controls remain available. No new database migration or external voice disclosure.
+- Acceptance and repeatable regression checks: `tests/section91a-voice-completion.cjs`.
+
+---
+
 # Stonefellow v1.3.142 — Section 90J: Agent page awareness and exact-record navigation
 
 - The public Agent understands “what page am I on?” and “what can I do here?”, with actionable suggestions tied to the current installed view.

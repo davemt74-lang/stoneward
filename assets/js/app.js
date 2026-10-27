@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.159';
+  window.STONEFELLOW_APP_BUILD='1.3.160';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -23,8 +23,8 @@
   stage=>handleVoiceActivityProbe(stage),state=>{
     if(st.conversationOn&&state==='microphone-monitor-unavailable')showTranscript('Interruption microphone unavailable. Check microphone permission; Stop speaking button remains available.','error');
     if(st.conversationOn&&state==='microphone-monitor-suspended')showTranscript('Microphone audio monitor is suspended. Click the mic again if voice interruption does not work.','error');
-    if(st.conversationOn&&state==='speech-recognition-unavailable')showTranscript('Speech recognition could not stay active. Voice detection can still stop the Agent.','waiting');
-  });
+    if(st.conversationOn&&state==='speech-recognition-unavailable')showTranscript('Speech recognition is unavailable. Use Stop speaking if you need to interrupt the Agent.','waiting');
+  },{requireTranscript:true});
   const voiceTranscript=$('#voiceTranscript'),voiceTranscriptText=$('#voiceTranscriptText');
   function showTranscript(text,phase='listening'){
     if(!voiceTranscript||!voiceTranscriptText)return;
@@ -214,19 +214,42 @@
     const parts=globalThis.StonefellowSpeechSegments?.split?.(text,180)||[String(text)];
     if(!parts.length)return true;
     return new Promise(resolve=>{
-      let finished=false,index=0;
+      let finished=false,index=0,retries=0;
       const done=ok=>{if(finished)return;finished=true;if(speechFallbackResolve===done)speechFallbackResolve=null;resolve(ok)};
       speechFallbackResolve=done;
+      const retry=()=>{
+        if(retries++>=1){done(false);return}
+        const resume=()=>{
+          if(finished)return;
+          if(sequence!==voicePlaybackSequence||!voiceRepliesEnabled){done(null);return}
+          // Some speech engines emit an early end/error when the echo probe
+          // pauses a chunk. Never advance the text until the probe has ended.
+          if(voiceProbeSynth){setTimeout(resume,80);return}
+          cancelLocalVoiceOutput();next();
+        };
+        setTimeout(resume,150);
+      };
       const next=()=>{
         if(finished)return;
         if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence){done(null);return}
         if(index>=parts.length){done(true);return}
-        const utterance=new window.SpeechSynthesisUtterance(parts[index++]);
+        const utterance=new window.SpeechSynthesisUtterance(parts[index]);
         utterance.voice=selected;utterance.lang=selected.lang||'en-US';utterance.rate=1;
-        utterance.onstart=()=>{if(!finished&&sequence===voicePlaybackSequence)agent('speaking',text)};
-        utterance.onend=next;
-        utterance.onerror=()=>done(false);
-        try{window.speechSynthesis.speak(utterance)}catch(_){done(false)}
+        let settled=false,started=false;
+        utterance.onstart=()=>{started=true;if(!finished&&sequence===voicePlaybackSequence)agent('speaking',text)};
+        utterance.onend=()=>{
+          if(settled||finished)return;settled=true;
+          if(sequence!==voicePlaybackSequence){done(null);return}
+          if(!started||voiceProbeSynth){retry();return}
+          index++;retries=0;next();
+        };
+        utterance.onerror=event=>{
+          if(settled||finished)return;settled=true;
+          if(sequence!==voicePlaybackSequence){done(null);return}
+          if(voiceProbeSynth||['interrupted','canceled','audio-busy'].includes(event?.error)){retry();return}
+          done(false);
+        };
+        try{window.speechSynthesis.speak(utterance)}catch(_){retry()}
       };
       try{cancelLocalVoiceOutput();next()}catch(_){done(false)}
     });
@@ -262,7 +285,9 @@
           a.onended=()=>done(true);a.onerror=()=>done(false);
           // An echo probe pauses audio temporarily; it must not resolve the
           // whole reply as cancelled or leave the sequence permanently stale.
-          a.onpause=()=>{if(voiceProbeAudio===a||!a.paused)return;done(null)};
+          // A reversible echo-check pause can dispatch its onpause event
+          // after playback has resumed. Only explicit cancel() may settle
+          // the reply as interrupted; a delayed pause event must not end it.
           a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled)agent('speaking',text);else if(!finished)cancel()}).catch(()=>done(false));
         });
         if(spoken===null||sequence!==voicePlaybackSequence)return null;

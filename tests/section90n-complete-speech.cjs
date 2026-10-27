@@ -32,7 +32,7 @@ async function browserSpeakCompletesOrInterrupts(){
   const pending=[],spoken=[];
   const synth={cancel:()=>{},getVoices:()=>[{lang:'en-US',localService:true}],speak:utterance=>{spoken.push(utterance.text);pending.push(utterance)}};
   const context={window:{speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text}}},
-    StonefellowSpeechSegments:{split},voiceRepliesEnabled:true,voicePlaybackSequence:2,speechFallbackResolve:null,
+    StonefellowSpeechSegments:{split},voiceRepliesEnabled:true,voicePlaybackSequence:2,speechFallbackResolve:null,voiceProbeSynth:false,
     agent:()=>{}};
   vm.createContext(context);
   vm.runInContext(extract(publicApp,'cancelLocalVoiceOutput')+';'+extract(publicApp,'speakWithDeviceVoice')+';globalThis.run=speakWithDeviceVoice',context);
@@ -88,7 +88,7 @@ async function adminSpeakCompletesOrInterrupts(){
   const pending=[],spoken=[];
   const synth={cancel:()=>{},getVoices:()=>[{lang:'en-US',localService:true}],speak:utterance=>{pending.push(utterance);spoken.push(utterance.text)}};
   const context={window:{speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text}}},
-    StonefellowSpeechSegments:{split},adminSpeechEnabled:true,adminSpeechActive:false,
+    StonefellowSpeechSegments:{split},adminSpeechEnabled:true,adminSpeechActive:false,adminSpeechProbePaused:false,syncAdminSpeechStop:()=>{},
     adminSpeechResolve:null,adminSpeechPending:false,adminSpeechSequence:0,
     adminConversationMonitor:{start:async()=>true,stop:()=>{}},adminConversationResume:()=>{},adminConversationEnabled:true,
     agent:()=>{},$:()=>({textContent:''})};
