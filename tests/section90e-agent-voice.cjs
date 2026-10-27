@@ -40,7 +40,7 @@ async function testAdminPrivateVoice(){
   const local={lang:'en-US',localService:true},remote={lang:'en-US',localService:false};
   const spoken=[],states=[];
   const synthesis={getVoices:()=>[remote,local],cancel:()=>{},speak:utterance=>{spoken.push(utterance);utterance.onstart();utterance.onend()}};
-  const sandbox={window:{speechSynthesis:synthesis,SpeechSynthesisUtterance:function(text){this.text=text}},adminSpeechEnabled:true,adminSpeechActive:false,adminSpeechPending:false,adminSpeechSequence:0,adminSpeechResolve:null,adminConversationMonitor:null,adminConversationResume:null,adminConversationEnabled:false,agent:mode=>states.push(mode),$:()=>({textContent:''}),setTimeout};
+  const sandbox={window:{speechSynthesis:synthesis,SpeechSynthesisUtterance:function(text){this.text=text}},adminSpeechEnabled:true,adminSpeechActive:false,adminSpeechProbePaused:false,adminSpeechPending:false,adminSpeechSequence:0,adminSpeechResolve:null,adminConversationMonitor:null,adminConversationResume:null,adminConversationEnabled:false,syncAdminSpeechStop:()=>{},agent:mode=>states.push(mode),$:()=>({textContent:''}),setTimeout};
   vm.createContext(sandbox);
   vm.runInContext(extract(adminApp,'cancelAdminSpeechOutput')+';'+extract(adminApp,'stopAdminSpeech')+';'+extract(adminApp,'speakAdminReply')+';globalThis.speakTest=speakAdminReply',sandbox);
   assert.equal(await sandbox.speakTest('Private CRM reply'),true);

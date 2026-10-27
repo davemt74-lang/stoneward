@@ -97,6 +97,8 @@
 }
 @media(max-width:760px){.admin-chat-popup{left:50%;bottom:92px;width:calc(100vw - 24px);height:min(53dvh,490px)}.admin-chat-popup-head{padding:9px 10px}.admin-chat-popup-messages{padding:11px}.admin-app.admin-chat-popup-open .admin-floating-agent{bottom:min(calc(100dvh - 93px),calc(108px + min(53dvh,490px)))}}
 @media(max-width:420px){.admin-agent-chat-heading p{font-size:.7rem}.admin-agent-chat-controls{width:100%}.admin-agent-chat-controls .secondary{flex:1}.admin-chat-footer .admin-chatbar{grid-template-columns:42px minmax(0,1fr) 42px 42px}.admin-chat-popup-actions button{font-size:.65rem;padding:5px 6px}.admin-chat-popup-head strong{font-size:.78rem}}
+.admin-chat-footer .admin-chatbar:has(#adminAgentSpeechStop:not([hidden])){grid-template-columns:42px minmax(0,1fr) 42px 42px 42px}
+.admin-chat-footer #adminAgentSpeechStop{color:#ffad9c;background:rgba(171,62,48,.14);font-size:1rem}
 @media(prefers-reduced-motion:reduce){.admin-floating-agent,.admin-floating-agent .admin-floating-ring,.admin-floating-agent .admin-floating-mouth{animation:none!important;transition:none!important}}
 
 /* G4M — production schedule and governed approvals live in the chat transcript */

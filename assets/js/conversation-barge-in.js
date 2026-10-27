@@ -55,11 +55,16 @@
       try{recognizer.start()}catch(_){finish(null)}
     });
   }
-  function create(onInterrupt, browser=window, confirmCandidate=null, onVoiceActivity=null, onStatus=null) {
+  function create(onInterrupt, browser=window, confirmCandidate=null, onVoiceActivity=null, onStatus=null, options={}) {
+    // Browser ASR and speaker acoustics must agree before interrupting a
+    // production reply. Otherwise the Agent's own voice can trigger a probe
+    // on every loud syllable, and some speech engines abort when paused.
+    const requireTranscript=options?.requireTranscript===true;
     let generation=0,resourceGeneration=0,listening=false,confirmation=null,restartTimer=null;
     let stream=null,context=null,analyser=null,readyPromise=null,frame=null,activityTimer=null;
     let voiceDetected=false,consecutive=0,noiseFloor=0.008,fastFailures=0;
     let probing=false,probeReady=false,probeConsecutive=0,pendingPhrase='';
+    let candidatePhrase='',candidateAt=0;
     let probeTailTimer=null,probeDeadlineTimer=null,probeRms=0,echoBaseline=0,echoCooldownUntil=0;
     const readBuffer=new Float32Array(1024);
     const report=state=>{try{onStatus?.(state)}catch(_){}};
@@ -71,6 +76,7 @@
     const resumeEcho=()=>{
       if(!probing)return;
       clearProbe();
+      candidatePhrase='';candidateAt=0;
       // The candidate disappeared once playback paused: it was speaker echo.
       echoBaseline=Math.max(echoBaseline,Math.min(0.25,probeRms*0.9));
       echoCooldownUntil=Date.now()+900;
@@ -89,6 +95,7 @@
       if(restartTimer!==null){browser.clearTimeout?.(restartTimer);restartTimer=null}
       if(activityTimer!==null){browser.clearTimeout?.(activityTimer);activityTimer=null}
       clearProbe();
+      candidatePhrase='';candidateAt=0;
       if(confirmation){confirmation.abort();confirmation=null}
       if(frame!==null){browser.cancelAnimationFrame?.(frame);frame=null}
       voiceDetected=false;consecutive=0;
@@ -166,10 +173,17 @@
         return;
       }
       const active=rms>Math.max(0.028,noiseFloor*2.8,echoBaseline*1.55)&&peak>0.095;
-      consecutive=active?consecutive+1:Math.max(0,consecutive-1);
+      consecutive=active?Math.min(4,consecutive+1):Math.max(0,consecutive-1);
       if(!active)noiseFloor=Math.max(0.004,Math.min(0.04,noiseFloor*0.995+rms*0.005));
       if(echoBaseline>0&&rms>noiseFloor*2&&rms<echoBaseline*1.55)echoBaseline=echoBaseline*0.98+rms*0.02;
       if(consecutive>=4&&Date.now()>=echoCooldownUntil){
+        // In transcript-verified mode speaker volume *alone* is not grounds
+        // to pause output. Keep sampling until independent words arrive.
+        if(requireTranscript&&(!candidatePhrase||Date.now()-candidateAt>2400)){
+          candidatePhrase='';candidateAt=0;
+          frame=browser.requestAnimationFrame?.(sample)??null;
+          return;
+        }
         consecutive=0;probeRms=rms;pendingPhrase='';
         // Never permanently stop on microphone energy alone. A loud speaker
         // sounds identical to a person until we briefly silence that speaker.
@@ -178,6 +192,7 @@
         if(!paused){echoCooldownUntil=Date.now()+350;report('acoustic-probe-unavailable')}
         else{
           probing=true;probeReady=false;probeConsecutive=0;
+          if(requireTranscript)pendingPhrase=candidatePhrase;
           probeTailTimer=browser.setTimeout?.(()=>{probeTailTimer=null;if(probing)probeReady=true},180)??null;
           probeDeadlineTimer=browser.setTimeout?.(()=>{probeDeadlineTimer=null;resumeEcho()},640)??null;
         }
@@ -199,6 +214,7 @@
           // the silenced probe; release them only after independent speech
           // has physically persisted while output was paused.
           if(voiceDetected){stop();onInterrupt(phrase.trim());return}
+          candidatePhrase=phrase.trim();candidateAt=Date.now();
           if(probing)pendingPhrase=phrase.trim();
         }
         fastFailures=Date.now()-startedAt<400?fastFailures+1:0;
