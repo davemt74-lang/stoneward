@@ -1,4 +1,8 @@
-# Stonefellow v1.3.163 — Section 91B2B: Real Admin live-show reads
+# Stonefellow v1.3.164 — Section 91B2C: Knowledge Base and Media Library reads
+
+Admin Agent Chat can read bounded inventories of its existing Knowledge Base documents, Media Library assets, and media-to-record attachments. New Admin-only read contracts return document names/visibility, media categories/usage, and attachment roles/visibility. Document contents, notes, storage paths, hashes and private media internals do not enter responses. Navigation and exact-review permissions remain unchanged; no files are published, deleted or modified by the Agent. Added Section 91B2C regression tests to the release gate. No database migration, new external provider, VP3 or Gelato change.
+
+## Previous release: Stonefellow v1.3.163 — Section 91B2B: Real Admin live-show reads
 
 Admin Agent Chat now reads actual saved Shows + Live records for upcoming scheduled performances, postponed shows, and cancellations. Responses include bounded venue/city/date/status fields only; private archive notes, media and ticket URLs never enter the reply or external model. Added Admin-only `admin_show_inventory` tool/skill and pure-source regression cases. Existing catalog/release reads, navigation and all permission controls remain intact. No schema change or VP3/Gelato work.
 
