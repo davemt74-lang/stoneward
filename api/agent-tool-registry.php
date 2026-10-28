@@ -35,6 +35,7 @@ function sf_agent_tool_registry(): array {
         'agent_song_catalog_publish'=>['label'=>'Publish one separately approved catalog track with a distinct MP3 listening preview','kind'=>'consequential','scope'=>'admin','owner'=>'admin/api/agent-song-catalog.php','handler'=>'publish_track','confirmation'=>true,'execution'=>'governed_admin_api'],
         'catalog_metadata_update'=>['label'=>'Review and save an existing song title, genre, story or year','kind'=>'write','scope'=>'admin','owner'=>'api/agent-catalog-actions.php','handler'=>'sf_agent_catalog_apply_snapshot','confirmation'=>true,'execution'=>'governed_admin_api'],
         'knowledge_note_update'=>['label'=>'Review and save one private Knowledge Base document description','kind'=>'write','scope'=>'admin','owner'=>'api/agent-knowledge-actions.php','handler'=>'sf_agent_knowledge_save_approved_note','confirmation'=>true,'execution'=>'governed_admin_api'],
+        'media_caption_update'=>['label'=>'Review and save one Media Library asset caption','kind'=>'write','scope'=>'admin','owner'=>'api/agent-media-actions.php','handler'=>'sf_agent_media_save_approved_caption','confirmation'=>true,'execution'=>'governed_admin_api'],
         'automation_draft_save'=>['label'=>'Save reviewed lifecycle journey draft','kind'=>'write','scope'=>'admin','owner'=>'api/automation-core.php','handler'=>'sf_automation_save','confirmation'=>true,'execution'=>'governed_admin_api'],
         'campaign_draft_save'=>['label'=>'Save campaign draft','kind'=>'write','scope'=>'admin','owner'=>'api/campaign-core.php','handler'=>'sf_campaign_save','confirmation'=>true,'execution'=>'governed_admin_api'],
         'campaign_publish'=>['label'=>'Publish a campaign','kind'=>'consequential','scope'=>'admin','owner'=>'admin/api/campaigns.php','handler'=>'save','confirmation'=>true,'execution'=>'governed_admin_api'],
@@ -69,6 +70,6 @@ function sf_agent_tool_allowed(string $toolId,string $role,bool $confirmed=false
  * Sending, publishing, purchasing and deletes remain in owner-controlled UI.
  */
 function sf_agent_tool_executable(string $toolId,string $role,bool $confirmed=false): bool {
-    if(!in_array($toolId,['campaign_draft_save','automation_draft_save','commerce_followup_add','stem_automation_update','catalog_metadata_update','knowledge_note_update'],true))return false;
+    if(!in_array($toolId,['campaign_draft_save','automation_draft_save','commerce_followup_add','stem_automation_update','catalog_metadata_update','knowledge_note_update','media_caption_update'],true))return false;
     return sf_agent_tool_allowed($toolId,$role,$confirmed);
 }

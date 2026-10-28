@@ -1,4 +1,8 @@
-# Stonefellow v1.3.165 — Section 91B3A: Exact-reviewed Knowledge Base notes
+# Stonefellow v1.3.166 — Section 91B3B: Exact-reviewed Media Library captions
+
+Admin Agent Chat can now prepare a caption edit for one exact Media Library asset ID. The owner sees the old/new caption, asset name, total attachment count and number of public links before staging a server-normalized, hash-bound proposal. A separate typed `APPROVE` and save step uses the existing action ledger. The SQL destination update is guarded against concurrent asset changes and verifies the saved caption; attachment relationships and their visibility are never modified. A caption on an already public asset may change visible text on every public use, which the modal explicitly warns about. No upload, delete, publication, billing or outside services are authorized.
+
+## Previous release: Stonefellow v1.3.165 — Section 91B3A: Exact-reviewed Knowledge Base notes
 
 Admin Agent Chat can now propose a change to the private description/notes on one exact, uniquely identified Knowledge Base file. The existing owner-scoped proposal ledger provides an immutable snapshot, SHA-256 review, typed APPROVE, separate execution and no-retry recovery. The new editor review modal verifies the proposed previous/new value; stale Knowledge Base versions refuse the edit. Only `notes` may change: file contents, file storage, Agent visibility and sharing remain untouched. No model writes directly; this increment grants no media attachment writes, publishing, deletion, outbound messages or billing. No database migration.
 
