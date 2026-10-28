@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/agent-tool-registry.php';
 require_once __DIR__.'/agent-catalog-actions.php';
+require_once __DIR__.'/agent-knowledge-actions.php';
 /**
  * Section 44B–F: durable, review-first governed campaign draft operations.
  * Proposal IDs are server-created; authenticated admin identity is server-side.
@@ -127,7 +128,7 @@ function sf_agent_action_recent(int $adminId,int $limit=25): array {
 function sf_agent_action_prepare(int $adminId,string $requestKey,string $toolId,array $raw): array {
     if($adminId<1||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$requestKey))throw new InvalidArgumentException('Invalid request idempotency key.');
     if(!sf_agent_tool_executable($toolId,'admin',true))throw new InvalidArgumentException('Action is not available for governed preparation.');
-    $payload=match($toolId){'catalog_metadata_update'=>sf_agent_catalog_normalize_edit($raw),'stem_automation_update'=>sf_agent_action_normalize_stem_automation($raw),'automation_draft_save'=>sf_agent_action_normalize_automation($raw),'commerce_followup_add'=>sf_agent_action_normalize_commerce_followup($raw),default=>sf_agent_action_normalize_campaign($raw)};$hash=sf_agent_action_hash($toolId,$payload);
+    $payload=match($toolId){'catalog_metadata_update'=>sf_agent_catalog_normalize_edit($raw),'knowledge_note_update'=>sf_agent_action_normalize_knowledge_note($raw),'stem_automation_update'=>sf_agent_action_normalize_stem_automation($raw),'automation_draft_save'=>sf_agent_action_normalize_automation($raw),'commerce_followup_add'=>sf_agent_action_normalize_commerce_followup($raw),default=>sf_agent_action_normalize_campaign($raw)};$hash=sf_agent_action_hash($toolId,$payload);
     $payloadJson=json_encode($payload,JSON_THROW_ON_ERROR);
     if(strlen($payloadJson)>131072)throw new InvalidArgumentException('Campaign proposal exceeds the permitted size.');
     sf_agent_actions_ensure_schema();$db=sf_db();
@@ -234,6 +235,8 @@ function sf_agent_action_execute(int $adminId,string $id): array {
             $public=['track_id'=>$draft['track_id'],'field'=>$draft['field'],
                 'previous'=>$draft['previous'],'value'=>$draft['value'],
                 'revision'=>$applied['revision'],'status'=>'metadata_saved'];
+        }elseif($p['tool_id']==='knowledge_note_update'){
+            $public=sf_agent_knowledge_save_approved_note((array)$p['payload']);
         }elseif($p['tool_id']==='stem_automation_update'){
             require_once __DIR__.'/stem-agent-bridge.php';
             $draft=sf_agent_action_normalize_stem_automation((array)$p['payload']);

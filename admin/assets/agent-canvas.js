@@ -710,6 +710,11 @@
         next='<button type="button" class="primary" data-agent-catalog-review="'+esc(action.request_key)+'">Review and save catalog change</button>';
       }else next='<button type="button" class="secondary" data-admin-agent-action="catalog">Open Catalog</button>';
     }
+    else if(m.role==='assistant'&&action.type==='edit_knowledge_note'){
+      if(action.draft&&action.request_key){
+        next='<button type="button" class="primary" data-agent-knowledge-review="'+esc(action.request_key)+'">Review Knowledge Base note</button>';
+      }else next='<button type="button" class="secondary" data-admin-agent-action="knowledge">Open Knowledge Base</button>';
+    }
     else if(m.role==='assistant'&&['crm_report','journey_report'].includes(action.type))next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Review '+esc(action.view)+'</button>';
     const brief=Array.isArray(action.insights)?action.insights.slice(0,3):[];
     const stages=action.mission_plan && Array.isArray(action.mission_plan.steps)?action.mission_plan.steps.slice(0,4):[];
@@ -1071,6 +1076,11 @@
       const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(row=>
         String(row.action?.request_key)===button.dataset.agentCatalogReview);
       if(entry?.action?.draft)window.SFAgentCatalogReview?.open?.(entry.action);
+    });
+    root.querySelectorAll('[data-agent-knowledge-review]').forEach(button=>button.onclick=()=>{
+      const entry=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(row=>
+        String(row.action?.request_key)===button.dataset.agentKnowledgeReview);
+      if(entry?.action?.draft)window.SFAgentKnowledgeReview?.open?.(entry.action);
     });
     root.querySelectorAll('[data-agent-copy-reply]').forEach(button=>button.onclick=async()=>{
       const msg=(window.SFAdminAgentCanvas?.commerceMessages||[]).find(row=>Number(row.id)===Number(button.dataset.agentCopyReply));
