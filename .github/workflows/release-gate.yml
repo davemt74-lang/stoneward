@@ -503,6 +503,7 @@ jobs:
           php -l api/agent-admin-reads.php
           php tests/section91b2a-agent-private-reads.php
           php tests/section91b2b-agent-show-reads.php
+          php tests/section91b2c-agent-knowledge-media-reads.php
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
           php -l api/media-catalog-intake.php

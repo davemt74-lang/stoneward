@@ -185,6 +185,13 @@ function sf_admin_agent_plan(string $message): array {
     // Real, bounded record reads take precedence over generic module navigation,
     // but ordinary "open catalog" / "show my releases" still navigate.
     if(preg_match('/\b(?:show|list|which|what|find|count|how many|review)\b/i',$message)){
+        if(preg_match('/\b(?:attachments?|linked media|media links?)\b/i',$message))
+            return ['type'=>'media_attachment_read','view'=>'media','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+        if(preg_match('/\b(?:knowledge base|knowledge files?|knowledge documents?|documents?|reference files?)\b/i',$message)
+            && !preg_match('/\b(?:find|open|visit|navigate to)\s+(?:the |my )?knowledge base\b/i',$message))
+            return ['type'=>'knowledge_inventory_read','view'=>'knowledge','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+        if(preg_match('/\b(?:media library|media assets?|media files?|uploaded (?:audio|images?|videos?|files?)|unused (?:audio|images?|videos?|media))\b/i',$message))
+            return ['type'=>'media_inventory_read','view'=>'media','requires_confirmation'=>false,'execution'=>'authenticated_read'];
         if(preg_match('/\b(?:songs?|tracks?|catalog)\b/i',$message)
             && sf_agent_admin_catalog_filter($message)!=='all')
             return ['type'=>'catalog_inventory_read','view'=>'catalog','requires_confirmation'=>false,'execution'=>'authenticated_read'];
@@ -387,6 +394,9 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
       'catalog_inventory_read'=>'Private catalog inventory is unavailable; no changes made.',
       'release_inventory_read'=>'Private releases inventory is unavailable; no changes made.',
       'shows_inventory_read'=>'Private live-show inventory is unavailable; no changes made.',
+      'knowledge_inventory_read'=>'Private Knowledge Base inventory is unavailable; no changes made.',
+      'media_inventory_read'=>'Private Media Library inventory is unavailable; no changes made.',
+      'media_attachment_read'=>'Private media attachments are unavailable; no changes made.',
       'production_editorial_status'=>'Private editorial production status is unavailable; no editorial action was performed.',
       'production_schedule_calendar'=>'Private production calendar is unavailable; no schedule or crew assignment changed.',
       'production_director_coverage'=>'Director coverage data is unavailable.',
@@ -429,6 +439,21 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         try{$read=sf_agent_admin_shows_read(sf_admin_shows(),sf_agent_admin_show_filter($message),gmdate('Y-m-d'));
             $text=sf_agent_admin_read_brief($read);}
         catch(Throwable $e){$text='Private live-show inventory is unavailable; no changes made.';}
+    }
+    if($plan['type']==='knowledge_inventory_read'){
+        try{$read=sf_agent_admin_knowledge_read(sf_admin_knowledge_index(),sf_agent_admin_knowledge_filter($message));
+            $text=sf_agent_admin_read_brief($read);}
+        catch(Throwable $e){$text='Private Knowledge Base inventory is unavailable; no changes made.';}
+    }
+    if($plan['type']==='media_inventory_read'){
+        try{$read=sf_agent_admin_media_source(sf_agent_admin_media_filter($message));
+            $text=sf_agent_admin_read_brief($read);}
+        catch(Throwable $e){$text='Private Media Library inventory is unavailable; no changes made.';}
+    }
+    if($plan['type']==='media_attachment_read'){
+        try{$read=sf_agent_admin_attachment_source(sf_agent_admin_attachment_filter($message));
+            $text=sf_agent_admin_read_brief($read);}
+        catch(Throwable $e){$text='Private media attachments are unavailable; no changes made.';}
     }
     if($plan['type']==='navigate_admin_page'){
         $destination=sf_agent_admin_page_destinations()[$plan['view']]??null;
@@ -757,7 +782,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
-    if(in_array($plan['type'],['catalog_inventory_read','release_inventory_read','shows_inventory_read'],true) && !empty($read))$action['read_evidence']=$read;
+    if(in_array($plan['type'],['catalog_inventory_read','release_inventory_read','shows_inventory_read','knowledge_inventory_read','media_inventory_read','media_attachment_read'],true) && !empty($read))$action['read_evidence']=$read;
     $navigation=sf_agent_admin_page_target($message);
     if($navigation!==null && $navigation['view']===$plan['view'] &&
         $contract['tool_id']==='admin_module_navigate' && !$plan['requires_confirmation']){
