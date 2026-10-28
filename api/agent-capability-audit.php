@@ -96,7 +96,7 @@ function sf_agent_capability_audit(?array $snapshot=null): array {
                 }
                 $executable=sf_agent_tool_executable((string)$id,$role,true);
                 if($executable) {
-                    if($role!=='admin' || !in_array($id,['campaign_draft_save','automation_draft_save','commerce_followup_add','stem_automation_update','catalog_metadata_update'],true)) {
+                    if($role!=='admin' || !in_array($id,['campaign_draft_save','automation_draft_save','commerce_followup_add','stem_automation_update','catalog_metadata_update','knowledge_note_update'],true)) {
                         $report['unapproved_executors'][]=$role.':'.$id.':confirmed';
                     } else {
                         $report['approved_proposal_executors'][]=$id;
@@ -105,7 +105,7 @@ function sf_agent_capability_audit(?array $snapshot=null): array {
             }
         }
         sort($report['approved_proposal_executors']);
-        if($report['approved_proposal_executors']!==['automation_draft_save','campaign_draft_save','catalog_metadata_update','commerce_followup_add','stem_automation_update']) {
+        if($report['approved_proposal_executors']!==['automation_draft_save','campaign_draft_save','catalog_metadata_update','commerce_followup_add','knowledge_note_update','stem_automation_update']) {
             $report['unapproved_executors'][]='approved_proposal_allowlist_mismatch';
         }
         if(sf_agent_tool_allowed('unknown','admin',true)

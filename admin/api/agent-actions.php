@@ -5,6 +5,7 @@ require_once SF_ROOT.'/api/agent-tool-registry.php';
 function sf_admin_agent_action_audit(string $tool): array {
     return match($tool){
         'catalog_metadata_update'=>['agent_catalog','catalog_metadata'],
+        'knowledge_note_update'=>['agent_knowledge','knowledge_note'],
         'stem_automation_update'=>['agent_stem','stem_automation'],
         'commerce_followup_add'=>['agent_commerce','commerce_followup'],
         'automation_draft_save'=>['agent_campaign','journey_draft'],
@@ -55,7 +56,7 @@ try{
         // Replaying a completed request must not duplicate the Admin event trail.
         if($previous['status']!=='completed'){
             [$scope,$route]=sf_admin_agent_action_audit($proposal['tool_id']);
-            $entityId=$proposal['result']['track_id']??($proposal['result']['order_id']??($proposal['result']['automation_id']??($proposal['result']['campaign_id']??null)));
+            $entityId=$proposal['result']['file_id']??($proposal['result']['track_id']??($proposal['result']['order_id']??($proposal['result']['automation_id']??($proposal['result']['campaign_id']??null))));
             sf_agent_brain_log($uid,$scope,'action_result',['route'=>$route,'action'=>$proposal['tool_id'],'status'=>$proposal['status'],'proposal_id'=>$proposal['id'],'entity_id'=>$entityId,'requires_confirmation'=>true]);
             if($proposal['tool_id']==='stem_automation_update'){
                 sf_log_admin_action($uid,'agent_stem_automation_saved','track',
@@ -65,6 +66,10 @@ try{
                 sf_log_admin_action($uid,'agent_catalog_metadata_updated','track',
                     (string)($proposal['result']['track_id']??''),
                     ['proposal_id'=>$proposal['id'],'changed_field'=>$proposal['result']['field']??'']);
+            }elseif($proposal['tool_id']==='knowledge_note_update'){
+                sf_log_admin_action($uid,'agent_knowledge_note_updated','knowledge_file',
+                    (string)($proposal['result']['file_id']??''),
+                    ['proposal_id'=>$proposal['id'],'changed_field'=>'notes']);
             }else{
             $isJourney=$proposal['tool_id']==='automation_draft_save';
             $isCommerce=$proposal['tool_id']==='commerce_followup_add';

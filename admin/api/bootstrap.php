@@ -193,7 +193,22 @@ function sf_admin_knowledge_index(): array {
     if(!is_array($d)) return ['schema'=>'stonefellow.knowledge.v1','folders'=>[],'files'=>[]];
     $d['folders']=array_values((array)($d['folders']??[])); $d['files']=array_values((array)($d['files']??[])); return $d;
 }
-function sf_admin_write_knowledge(array $d): void { sf_write_json(SF_ADMIN_KNOWLEDGE_INDEX,$d); }
+function sf_admin_write_knowledge(array $d,?string $expectedContentHash=null): void {
+    $path=SF_ADMIN_KNOWLEDGE_INDEX;$dir=dirname($path);
+    if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir))throw new RuntimeException('Knowledge storage unavailable.');
+    $lock=fopen($path.'.writer.lock','c+');
+    if(!$lock)throw new RuntimeException('Knowledge writer lock unavailable.');
+    try{
+        if(!flock($lock,LOCK_EX))throw new RuntimeException('Knowledge writer lock could not be acquired.');
+        if($expectedContentHash!==null){
+            $raw=is_file($path)?file_get_contents($path):'';
+            if(!is_string($raw)||!preg_match('/^[a-f0-9]{64}$/D',$expectedContentHash)
+                ||!hash_equals($expectedContentHash,hash('sha256',$raw)))
+                throw new RuntimeException('Knowledge Base changed after approval. No edit was saved.');
+        }
+        sf_write_json($path,$d);
+    }finally{flock($lock,LOCK_UN);fclose($lock);}
+}
 function sf_admin_safe_file_name(string $name): string {
     $name=preg_replace('/[^A-Za-z0-9._ -]+/','_',basename($name)) ?? 'file';
     return substr(trim($name),0,180) ?: 'file';

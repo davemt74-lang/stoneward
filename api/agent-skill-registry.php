@@ -42,6 +42,7 @@ function sf_agent_skill_definitions(): array {
         'payments_manager','fulfillment_manager','pod_manager','customer_lifecycle'
       ]],
       'admin_catalog_metadata'=>['label'=>'Prepare exact reviewed music catalog metadata edits','contexts'=>['admin'],'tool'=>'catalog_metadata_update','intents'=>['edit_catalog_metadata']],
+      'admin_knowledge_note_review'=>['label'=>'Prepare an exact reviewed Knowledge Base internal description edit','contexts'=>['admin'],'tool'=>'knowledge_note_update','intents'=>['edit_knowledge_note']],
       'admin_song_draft_intake'=>['label'=>'Guide an administrator through reviewed, unpublished song intake','contexts'=>['admin'],'tool'=>'agent_song_draft_save','intents'=>['save_song_draft']],
       'admin_song_catalog_preflight'=>['label'=>'Review rights and artwork, then approve private song catalog preparation','contexts'=>['admin'],'tool'=>'agent_song_catalog_prepare','intents'=>['prepare_song_catalog']],
       'admin_song_catalog_publish'=>['label'=>'Review and explicitly publish one catalog track using separate listening audio','contexts'=>['admin'],'tool'=>'agent_song_catalog_publish','intents'=>['publish_song_catalog']],

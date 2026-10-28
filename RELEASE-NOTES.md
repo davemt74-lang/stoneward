@@ -1,4 +1,8 @@
-# Stonefellow v1.3.164 — Section 91B2C: Knowledge Base and Media Library reads
+# Stonefellow v1.3.165 — Section 91B3A: Exact-reviewed Knowledge Base notes
+
+Admin Agent Chat can now propose a change to the private description/notes on one exact, uniquely identified Knowledge Base file. The existing owner-scoped proposal ledger provides an immutable snapshot, SHA-256 review, typed APPROVE, separate execution and no-retry recovery. The new editor review modal verifies the proposed previous/new value; stale Knowledge Base versions refuse the edit. Only `notes` may change: file contents, file storage, Agent visibility and sharing remain untouched. No model writes directly; this increment grants no media attachment writes, publishing, deletion, outbound messages or billing. No database migration.
+
+## Previous release: Stonefellow v1.3.164 — Section 91B2C: Knowledge Base and Media Library reads
 
 Admin Agent Chat can read bounded inventories of its existing Knowledge Base documents, Media Library assets, and media-to-record attachments. New Admin-only read contracts return document names/visibility, media categories/usage, and attachment roles/visibility. Document contents, notes, storage paths, hashes and private media internals do not enter responses. Navigation and exact-review permissions remain unchanged; no files are published, deleted or modified by the Agent. Added Section 91B2C regression tests to the release gate. No database migration, new external provider, VP3 or Gelato change.
 
