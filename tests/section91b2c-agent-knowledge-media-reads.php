@@ -53,7 +53,7 @@ foreach([
     'Which attachments are on tracks?'=>'media_attachment_read',
     'Show media attachments'=>'media_attachment_read'
 ] as $input=>$intent)$check(sf_admin_agent_plan($input)['type']===$intent,'Admin chat routes '.$input);
-$check(sf_admin_agent_plan('Open Knowledge Manager')['type']==='knowledge_manager','Knowledge Manager navigation unchanged');
+$check(sf_admin_agent_plan('Open Knowledge Base')['type']==='knowledge_manager','Knowledge Base navigation unchanged');
 $check(sf_admin_agent_plan('Open Media Library')['type']==='media_library','Media Library navigation unchanged');
 $check(sf_admin_agent_plan('Show upcoming concerts')['type']==='shows_inventory_read','Prior show-calendar read unchanged');
 foreach(['knowledge_inventory_read'=>'admin_knowledge_inventory','media_inventory_read'=>'admin_media_inventory','media_attachment_read'=>'admin_media_attachment_inventory'] as $intent=>$tool){
