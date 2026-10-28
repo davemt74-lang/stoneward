@@ -138,18 +138,19 @@
   async function showHistory(){
     const data=await api('agent-actions.php');
     const history=document.createElement('dialog');
-    history.setAttribute('aria-label','Reviewed Agent campaign and lifecycle journey actions');
+    history.setAttribute('aria-label','Reviewed Admin Agent actions and receipts');
     history.className='agent-history-dialog';
     const rows=(data.proposals||[]).map(p=>{
-      const name=esc(p.payload?.name||(p.tool_id==='knowledge_note_update'?'Knowledge note · '+(p.payload?.file_name||'document'):(p.tool_id==='stem_automation_update'?'Stem automation · '+(p.payload?.track_id||'song'):'Reviewed draft')));
+      const name=esc(p.payload?.name||(p.tool_id==='media_caption_update'?'Media caption · #'+(p.payload?.asset_id||'asset'):(p.tool_id==='knowledge_note_update'?'Knowledge note · '+(p.payload?.file_name||'document'):(p.tool_id==='stem_automation_update'?'Stem automation · '+(p.payload?.track_id||'song'):'Reviewed draft'))));
       const status=esc(p.status||'unknown');
       const when=esc(p.created_at||'');
-      const completed=Number(p.result?.campaign_id||0),completedJourney=Number(p.result?.automation_id||0),completedStem=String(p.result?.track_id||''),completedKnowledge=String(p.result?.file_id||'');
+      const completed=Number(p.result?.campaign_id||0),completedJourney=Number(p.result?.automation_id||0),completedStem=String(p.result?.track_id||''),completedKnowledge=String(p.result?.file_id||''),completedMedia=Number(p.result?.asset_id||0);
       let action='Awaiting review';
       if(completed)action='<button type="button" data-agent-campaign-id="'+completed+'">Open campaign</button>';
       else if(completedJourney)action='<button type="button" data-agent-journey-id="'+completedJourney+'">Open journey</button>';
       else if(completedStem)action='<button type="button" data-agent-stem-song="'+esc(completedStem)+'">Open Stem Studio</button>';
       else if(completedKnowledge)action='<button type="button" data-agent-open-knowledge>Open Knowledge Base</button>';
+      else if(completedMedia)action='<button type="button" data-agent-open-media>Open Media Library</button>';
       else if(p.status==='proposed'||p.status==='approved')action='<button type="button" data-agent-cancel-id="'+esc(p.id)+'">Cancel pending</button>';
       else if(p.status==='review_required'||p.status==='executing')action='<button type="button" data-agent-reconcile-id="'+esc(p.id)+'">Mark reviewed (no retry)</button>';
       else if(p.status==='reviewed_no_retry')action='Manually reviewed; no automatic retry.';
@@ -173,6 +174,9 @@
     });
     history.querySelectorAll('[data-agent-open-knowledge]').forEach(button=>button.onclick=()=>{
       history.close();openView('knowledge');
+    });
+    history.querySelectorAll('[data-agent-open-media]').forEach(button=>button.onclick=()=>{
+      history.close();openView('media');
     });
     async function recover(button,action,keyword){
       const id=action==='cancel'?button.dataset.agentCancelId:button.dataset.agentReconcileId;
