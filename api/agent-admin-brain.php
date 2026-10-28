@@ -187,7 +187,8 @@ function sf_admin_agent_plan(string $message): array {
     if(preg_match('/\b(?:show|list|which|what|find|count|how many|review)\b/i',$message)){
         if(preg_match('/\b(?:attachments?|linked media|media links?)\b/i',$message))
             return ['type'=>'media_attachment_read','view'=>'media','requires_confirmation'=>false,'execution'=>'authenticated_read'];
-        if(preg_match('/\b(?:knowledge base|knowledge files?|knowledge documents?|documents?|reference files?)\b/i',$message))
+        if(preg_match('/\b(?:knowledge base|knowledge files?|knowledge documents?|documents?|reference files?)\b/i',$message)
+            && !preg_match('/\b(?:find|open|visit|navigate to)\s+(?:the |my )?knowledge base\b/i',$message))
             return ['type'=>'knowledge_inventory_read','view'=>'knowledge','requires_confirmation'=>false,'execution'=>'authenticated_read'];
         if(preg_match('/\b(?:media library|media assets?|media files?|uploaded (?:audio|images?|videos?|files?)|unused (?:audio|images?|videos?|media))\b/i',$message))
             return ['type'=>'media_inventory_read','view'=>'media','requires_confirmation'=>false,'execution'=>'authenticated_read'];
