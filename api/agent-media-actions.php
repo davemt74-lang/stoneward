@@ -77,8 +77,9 @@ function sf_agent_action_normalize_media_caption(array $raw):array {
 function sf_agent_media_save_approved_caption(array $payload):array {
     $id=(int)($payload['asset_id']??0);if($id<1)throw new InvalidArgumentException('Asset ID missing.');
     sf_media_ensure_schema();$db=sf_db();
-    if((string)(sf_db_config()['driver']??'')==='sqlite')$db->exec('BEGIN IMMEDIATE');
-    else $db->beginTransaction();
+    // PDO must own transaction state for both SQLite fixture and production
+    // MySQL so commit/rollback are reliable; the conditional UPDATE is CAS.
+    $db->beginTransaction();
     try{
         $sql='SELECT * FROM media_assets WHERE id=?';
         if((string)(sf_db_config()['driver']??'')!=='sqlite')$sql.=' FOR UPDATE';
