@@ -10,6 +10,7 @@ $db->exec('INSERT INTO users(id) VALUES(1),(2)');
 function sf_db():PDO{global $db;return $db;}
 function sf_db_config():array{return ['driver'=>'sqlite'];}
 function sf_clean_text(mixed $v,int $max=120):string{return substr(trim((string)$v),0,$max);}
+require dirname(__DIR__).'/api/media-core.php';
 require dirname(__DIR__).'/api/agent-actions-core.php';
 require dirname(__DIR__).'/api/agent-orchestration.php';
 sf_media_ensure_schema();

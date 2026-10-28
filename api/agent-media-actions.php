@@ -1,7 +1,9 @@
 <?php
 declare(strict_types=1);
-/** Section 91B3B: exact-approved Media Library caption edits, no attachment writes. */
-require_once __DIR__.'/media-core.php';
+/** Section 91B3B: exact-approved Media Library caption edits, no attachment writes.
+ * Production callers already load media-core through the normal API bootstrap;
+ * isolated suites may substitute the media handlers without eager loading it.
+ */
 
 function sf_agent_media_parse_caption(string $message):?array {
     if(!preg_match('/\A(?:please\s+)?(?:set|update|change)\s+(?:the\s+)?caption\s+(?:for|on)\s+(?:media\s+)?asset\s+#?([1-9][0-9]{0,11})\s+to\s+(.{1,500})\z/isu',trim($message),$m))return null;
