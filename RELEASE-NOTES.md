@@ -1,4 +1,8 @@
-# Stonefellow v1.3.166 — Section 91B3B: Exact-reviewed Media Library captions
+# Stonefellow v1.3.167 — Section 91B3C: Reviewed image accessibility alt text
+
+Admin Agent Chat now prepares one-image `alt_text` improvements by exact Media Library ID. Public use and total attachment counts are shown before an exact hash-bound proposal; a typed `APPROVE` and a separate Save step are both required. The transaction compares the current image and attachment revisions, changes only the image accessibility description, and verifies the saved value. Audio/video, files, captions, links, publication, customer actions, billing and deletion remain outside this scope. No database migration.
+
+## Previous release: Stonefellow v1.3.166 — Section 91B3B: Exact-reviewed Media Library captions
 
 Admin Agent Chat can now prepare a caption edit for one exact Media Library asset ID. The owner sees the old/new caption, asset name, total attachment count and number of public links before staging a server-normalized, hash-bound proposal. A separate typed `APPROVE` and save step uses the existing action ledger. The SQL destination update is guarded against concurrent asset changes and verifies the saved caption; attachment relationships and their visibility are never modified. A caption on an already public asset may change visible text on every public use, which the modal explicitly warns about. No upload, delete, publication, billing or outside services are authorized.
 
