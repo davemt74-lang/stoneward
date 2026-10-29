@@ -27,6 +27,7 @@ check('Generic music command retains server semantics',()=>assert.equal(skill.re
 check('Current-song reference retains explicit deictic semantics',()=>assert.equal(skill.resolvePublished('play this song',songs,former).action.track_id,'subtle-surrender'));
 check('Duplicate titles cannot silently select an arbitrary release',()=>assert.equal(skill.resolvePublished('play Two Hands Up',[{id:'a',title:'Two Hands Up'},{id:'b',title:'Two Hands Up'}],former).action.type,'none'));
 check('Word boundaries avoid partial title hijacking',()=>assert.equal(skill.resolvePublished('play Two Hands Upgrade',songs,former).action.type,'none'));
+check('Partial catalog titles cannot hijack a longer unmatched request',()=>assert.equal(skill.resolvePublished('play Genius 7 Humankind',[...songs,{id:'genius',title:'Genius'},{id:'humankind',title:'Humankind'}],former).action.type,'none'));
 check('Shared validator still rejects arbitrary action',()=>assert.equal(skill.validate({type:'open_remote_audio',url:'https://example.org/test.mp3'}),null));
 const app=read('assets/js/app.js'),php=read('api/agent-runtime.php');
 check('Public chat consults published track identity before dispatch',()=>assert.match(app,/verifiedNamedPlayerAction\(text,j\.action\)/));

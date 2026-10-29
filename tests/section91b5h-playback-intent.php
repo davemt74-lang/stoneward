@@ -31,4 +31,6 @@ $check(sf_agent_named_playback_plan('this song',$songs,'subtle-surrender')['acti
 $duplicates=[['id'=>'one','title'=>'Two Hands Up'],['id'=>'two','title'=>'Two Hands Up']];
 $check(sf_agent_named_playback_plan('two hands up',$duplicates,'one')['action']['type']==='none','Duplicate song titles ask for release clarification');
 $check(sf_agent_match_track_title('play unrelated song',$songs)===null,'Unknown titles do not match partial words');
+$unrelatedNamed=sf_agent_named_playback_plan('genius 7 humankind',array_merge($songs,[['id'=>'genius','title'=>'Genius'],['id'=>'humankind','title'=>'Humankind']]),'subtle-surrender');
+$check($unrelatedNamed['action']['type']==='none','Partial catalog titles cannot hijack an unmatched named request');
 echo "Section 91B5H: $passed deterministic command, catalog and identity assertions passed\n";

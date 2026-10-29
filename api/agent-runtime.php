@@ -163,12 +163,12 @@ function sf_agent_find_track(string $message,?string $activeId=null): ?array {
 function sf_agent_track_words(string $text): string {
     return trim(preg_replace('/\s+/u',' ',strtolower(preg_replace('/[^a-z0-9]+/i',' ',$text)??$text))??'');
 }
-function sf_agent_track_matches(string $query,array $catalog): array {
+function sf_agent_track_matches(string $query,array $catalog,bool $exact=false): array {
     $words=sf_agent_track_words($query);if($words==='')return [];
     $matches=[];$longest=0;
     foreach($catalog as $track){
         $title=sf_agent_track_words((string)($track['title']??''));
-        if($title===''||!str_contains(' '.$words.' ',' '.$title.' '))continue;
+        if($title===''||($exact?$title!==$words:!str_contains(' '.$words.' ',' '.$title.' ')))continue;
         $len=strlen($title);
         if($len>$longest){$matches=[];$longest=$len;}
         if($len===$longest)$matches[(string)($track['id']??count($matches))]=$track;
@@ -199,7 +199,7 @@ function sf_agent_named_playback_query(string $message): ?string {
 /** Returned action is browser-local. Only exact published-catalog title identity may cause playback. */
 function sf_agent_named_playback_plan(string $query,array $catalog,?string $activeId=null): array {
     $deictic=in_array($query,['it','this','this one','that','that one','current','current song','current track','this song','this track'],true);
-    $matches=$deictic?array_values(array_filter($catalog,fn($t)=>(string)($t['id']??'')===$activeId)):sf_agent_track_matches($query,$catalog);
+    $matches=$deictic?array_values(array_filter($catalog,fn($t)=>(string)($t['id']??'')===$activeId)):sf_agent_track_matches($query,$catalog,true);
     if(count($matches)>1)return ['action'=>['type'=>'none'],'text'=>'More than one published song matches “'.$query.'.” Please specify the release.','track'=>null];
     if(!$matches)return ['action'=>['type'=>'none'],'text'=>'I could not identify a published song matching “'.$query.'.” I have not changed what is playing.','track'=>null];
     $track=$matches[0];

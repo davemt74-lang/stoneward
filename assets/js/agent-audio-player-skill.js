@@ -57,7 +57,7 @@
     if(['it','this','this one','that','that one','current','current song','current track','this song','this track'].includes(query))return {action:serverAction};
     const candidates=(Array.isArray(tracks)?tracks:[]).filter(track=>{
       const title=normalize(track?.title);
-      return title&&(' '+query+' ').includes(' '+title+' ');
+      return title&&title===query;
     });
     const longest=Math.max(0,...candidates.map(track=>normalize(track.title).length));
     const matches=candidates.filter(track=>normalize(track.title).length===longest);
