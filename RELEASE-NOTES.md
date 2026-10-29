@@ -1,3 +1,11 @@
+# Stonefellow v1.3.173 — Section 91B6B: Unified Admin + Commerce Agent Reads
+
+- Admin Agent Chat now offers a configured-LLM-first route proposal for ticketing, merchandise, vinyl/POD, membership, commerce, catalog and management requests. Every model-selected route must match the server's immutable Admin skill registry and is limited to authenticated read/navigation contracts.
+- The LLM receives only allowlisted generic intent words, never raw Admin messages, customer names, email addresses, order IDs, account credentials, prior private conversation, product records, or financial details. If a request is too sensitive or the provider is unavailable, local policy handles the request without sending it externally.
+- New authenticated, aggregate read tools report real ticket offers/reservations/check-ins; merchandise listings/stock/units; vinyl-classified listings/POD handoff counts; and member counts. Private guest lists, addresses, orders and receipts stay in their existing authenticated Admin screens.
+- Admin chat presents contextual action buttons for each read to inspect its authoritative records. Existing human-reviewed campaign drafts, order follow-ups, catalog edits and other privileged operations remain on their exact approval workflows; no model-generated charges, refunds, stock adjustments, publication, ticket check-ins or messages are executed.
+- Regression tests exercise the allowlist, provider minimization, customer/Admin isolation, immutable approval boundaries and offline fallback. No schema migration is added. Live model quality and real production inventory still need testing on the deployed Admin site.
+
 # Stonefellow v1.3.172 — Section 91B6A: LLM-First Agent Orchestration
 
 - The configured conversational LLM now interprets public-agent intent before legacy command routing. Server-side policy still defines allowed actions, and unavailable provider calls fall back to the previous deterministic routes.

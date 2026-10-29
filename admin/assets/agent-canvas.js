@@ -716,6 +716,9 @@
     else if(m.role==='assistant'&&action.type==='production_timeline_media')next=timelineMediaHtml(action.media_preview);
     else if(m.role==='assistant'&&action.type==='review_actions')next='<button type="button" data-admin-agent-action="brain" class="secondary">Inspect action approvals</button>';
     else if(m.role==='assistant'&&action.type==='commerce_report')next='<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Open Commerce Operations</button>';
+    else if(m.role==='assistant'&&['ticketing_inventory_read','merch_inventory_read','vinyl_inventory_read','membership_inventory_read'].includes(action.type) && adminModuleViews.has(action.view)){
+      next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Inspect '+esc(adminModuleLabels[action.view]||'Admin records')+'</button>';
+    }
     else if(m.role==='assistant'&&action.type==='draft_commerce_reply'){
       next=(action.reply_draft&&Number(m.id)>0?'<button type="button" class="secondary" data-agent-copy-reply="'+Number(m.id)+'">Copy unsent reply draft</button>':'')+
         '<button type="button" data-admin-agent-action="commerce-ops" class="secondary">Review actual order</button>';
