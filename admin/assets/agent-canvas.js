@@ -715,9 +715,9 @@
         next='<button type="button" class="primary" data-agent-knowledge-review="'+esc(action.request_key)+'">Review Knowledge Base note</button>';
       }else next='<button type="button" class="secondary" data-admin-agent-action="knowledge">Open Knowledge Base</button>';
     }
-    else if(m.role==='assistant'&&action.type==='edit_media_caption'){
+    else if(m.role==='assistant'&&['edit_media_caption','edit_media_alt_text'].includes(action.type)){
       if(action.draft&&action.request_key){
-        next='<button type="button" class="primary" data-agent-media-review="'+esc(action.request_key)+'">Review Media Library caption</button>';
+        next='<button type="button" class="primary" data-agent-media-review="'+esc(action.request_key)+'">Review Media Library '+(action.type==='edit_media_alt_text'?'image alt text':'caption')+'</button>';
       }else next='<button type="button" class="secondary" data-admin-agent-action="media">Open Media Library</button>';
     }
     else if(m.role==='assistant'&&['crm_report','journey_report'].includes(action.type))next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Review '+esc(action.view)+'</button>';
