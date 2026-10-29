@@ -1,3 +1,11 @@
+# Stonefellow v1.3.170 — Section 91B5: Unified Agent Audio Player Skill
+
+Section 91B5 unifies the browser-owned public and Admin music control contracts under one discoverable Agent skill. The central Agent Tool Registry now describes its seven local operations (play, pause, resume, next, previous, status, volume) without granting server-side execution authority. The public signed-in chat executes server-approved structured actions through the shared skill, and Admin accepts spoken or typed local player commands through the same validator and parser. Failures from browser autoplay and missing/unplayable songs remain user-visible. Audio continues to play from published same-origin previews; private masters and remote media URLs never enter the Admin player. Existing ducking, speech guards, barge-in, queue, guided listening and voice fallbacks are retained. Section 91B5 introduces no schema migration.
+
+Release verification: both public and Admin PHP/JS capability tests, existing Section 89–91 browser suites, PHP and full GitHub Release Gate; live HostGator microphone and browser-autoplay acceptance remains user testing. See `docs/section91b5-audio-player-skill.md`.
+
+---
+
 # Stonefellow v1.3.169 — Section 91B4: Speech-state echo protection and Admin music controls
 
 Public and Admin Agent speech now has an explicit output lifecycle with a post-speech acoustic-tail cooldown before normal microphone recognition can resume. During real Agent speech the dedicated verified barge-in recognizer remains available, but normal dictation cannot consume the Agent's output; the silence probe allows additional echo decay before accepting independent voices. The public catalog player retains its existing Agent tools. Admin now has a compact same-origin catalog-preview music player controlled by voice/text commands for play, pause, resume, next/previous, status, mute and volume, with Agent-speech ducking and temporary silence during acoustic probes. Private audio masters and external audio URLs are not played. Browser autoplay restrictions can still require an initial manual Play. No database migration.

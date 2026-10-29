@@ -1,8 +1,8 @@
-/* Stonefellow 1.3.169: version-exact, network-first static assets.
+/* Stonefellow 1.3.170: version-exact, network-first static assets.
    Cache-first with ignoreSearch was serving stale app.js with new CSS after deployment. */
-const BUILD='1.3.169';
-const CACHE='stonefellow-static-v1.3.169';
-const SHELL=['offline.html','assets/css/site.css','assets/css/turntable-builder.css','assets/css/artist-world.css','assets/js/turntable-parts.js','assets/js/conversation-barge-in.js','assets/js/speech-segments.js','assets/js/app.js','assets/js/build-integrity.js','assets/js/artist-home-renderer.js','assets/js/library.js','assets/js/owned-music.js','assets/js/agent-brain.js','assets/js/agent-chat-canvas.js','assets/icons/stonefellow-pwa.svg'];
+const BUILD='1.3.170';
+const CACHE='stonefellow-static-v1.3.170';
+const SHELL=['offline.html','assets/css/site.css','assets/css/turntable-builder.css','assets/css/artist-world.css','assets/js/turntable-parts.js','assets/js/conversation-barge-in.js','assets/js/speech-segments.js','assets/js/agent-audio-player-skill.js','assets/js/app.js','assets/js/build-integrity.js','assets/js/artist-home-renderer.js','assets/js/library.js','assets/js/owned-music.js','assets/js/agent-brain.js','assets/js/agent-chat-canvas.js','assets/icons/stonefellow-pwa.svg'];
 const scope=()=>self.registration.scope;
 const abs=p=>new URL(p,scope()).href;
 const shellUrl=p=>(p.startsWith('assets/css/')||p.startsWith('assets/js/'))?abs(p)+'?v='+BUILD:abs(p);
@@ -20,7 +20,7 @@ function isStatic(url){
   if(url.origin!==self.location.origin)return false;
   const path=url.pathname;
   return ['/assets/css/site.css','/assets/css/turntable-builder.css','/assets/css/artist-world.css',
-    '/assets/js/app.js','/assets/js/conversation-barge-in.js','/assets/js/speech-segments.js','/assets/js/build-integrity.js','/assets/js/turntable-parts.js',
+    '/assets/js/app.js','/assets/js/conversation-barge-in.js','/assets/js/speech-segments.js','/assets/js/agent-audio-player-skill.js','/assets/js/build-integrity.js','/assets/js/turntable-parts.js',
     '/assets/js/artist-home-renderer.js','/assets/js/library.js','/assets/js/owned-music.js',
     '/assets/js/agent-brain.js','/assets/js/agent-chat-canvas.js'].some(p=>path.endsWith(p))
     ||path.includes('/assets/icons/');

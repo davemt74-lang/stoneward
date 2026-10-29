@@ -513,6 +513,8 @@ jobs:
           php tests/section91b3d-reviewed-private-media-link.php
           node tests/section91b3d-reviewed-private-media-ui.cjs
           node tests/section91b4-voice-music.cjs
+          php tests/section91b5-audio-player-skill.php
+          node tests/section91b5-audio-player-skill.cjs
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
           php -l api/media-catalog-intake.php

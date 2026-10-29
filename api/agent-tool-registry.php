@@ -16,6 +16,13 @@ function sf_agent_tool_registry(): array {
         'admin_media_inventory'=>['label'=>'Inspect bounded private Media Library asset categories and usage','kind'=>'read','scope'=>'admin','owner'=>'api/agent-admin-reads.php','handler'=>'sf_agent_admin_media_source','confirmation'=>false,'execution'=>'server'],
         'admin_media_attachment_inventory'=>['label'=>'Inspect bounded media attachments and entity relationships','kind'=>'read','scope'=>'admin','owner'=>'api/agent-admin-reads.php','handler'=>'sf_agent_admin_attachment_source','confirmation'=>false,'execution'=>'server'],
         'recommend_public_track'=>['label'=>'Public track recommendation','kind'=>'read','scope'=>'fan','owner'=>'api/agent-runtime.php','handler'=>'sf_agent_recommend_track','confirmation'=>false,'execution'=>'server'],
+        'audio_player_transport'=>[
+            'label'=>'Local Stonefellow audio player transport and status',
+            'kind'=>'local_action','scope'=>'fan','owner'=>'assets/js/agent-audio-player-skill.js',
+            'handler'=>'dispatch','confirmation'=>false,'execution'=>'browser',
+            'capabilities'=>['play_track','pause_player','resume_player','next_track','previous_track','player_status','set_player_volume'],
+            'contract'=>'stonefellow.audio-player.v1',
+        ],
         'favorite_track'=>['label'=>'Favorite a track','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/personalization.php','handler'=>'set_favorite','confirmation'=>true,'execution'=>'authenticated_api'],
         'create_playlist'=>['label'=>'Create a playlist','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/playlists.php','handler'=>'create','confirmation'=>true,'execution'=>'authenticated_api'],
         'queue_track'=>['label'=>'Change player queue','kind'=>'local_action','scope'=>'fan','owner'=>'assets/js/app.js','handler'=>'executeAgentAction','confirmation'=>false,'execution'=>'browser'],
