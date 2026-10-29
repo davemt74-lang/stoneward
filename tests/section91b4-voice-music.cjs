@@ -88,7 +88,7 @@ async function run(){
   check('Both sides wait for speaker echo to fade',()=>{assert.match(publicApp,/echoTailMs:320,echoDeadlineMs:930/);assert.match(adminApp,/echoTailMs:320,echoDeadlineMs:930/)});
   check('Admin voice sends music commands to local playback not to remote actions',()=>assert.match(adminApp,/await adminMusic\?\.handle\(message\)/));
   check('Admin playback is wired to a real audio element',()=>{const shell=read('admin/index.php');assert.match(shell,/id="adminAgentMusicAudio"/);assert.match(shell,/agent-music-controller\.js/)});
-  check('Public Agent retains its existing real player executor',()=>{assert.match(publicApp,/publicAudioSkill\?\.dispatch\(j\.action\)/);assert.match(publicApp,/await executePlayerAgentAction\(j\.action\)/)});
+  check('Public Agent retains its existing real player executor behind identity validation',()=>{assert.match(publicApp,/publicAudioSkill\?\.dispatch\(verified\.action\)/);assert.match(publicApp,/await executePlayerAgentAction\(verified\.action\)/)});
   process.stdout.write('Section 91B4 voice/music: '+passed+' behavior and integration checks passed\n');
 }
 run().catch(err=>{console.error(err);process.exit(1)});
