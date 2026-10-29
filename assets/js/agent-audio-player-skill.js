@@ -24,10 +24,13 @@
     if(amount)return {type:'set_player_volume',mode:'set',percent:Math.max(0,Math.min(100,Number(amount[1])))};
     const direction=words.match(/^(?:(?:turn|raise|lower) )?(?:the )?(?:music |player )?volume (up|down)$/);
     if(direction)return {type:'set_player_volume',mode:'adjust',percent:direction[1]==='up'?10:-10};
-    const requested=words.match(/^(?:play|put on|start|listen to)(?: the)?\s+(.+)$/);
+    const requested=words.match(/^(?:play|put on|start|listen to)(?: the)?\s+(.+)$/)
+      ||words.match(/^(?:change|switch) (?:the |this )?(?:songs?|tracks?|music) (?:to )?(.+)$/)
+      ||words.match(/^switch to (.+)$/);
     if(!requested)return null;
     const query=requested[1].replace(/^(?:song|track|music)\s+(?:called\s+|named\s+)?/,'').trim();
-    return {type:'play_track',query:['music','song','track','some music','something','something new'].includes(query)?'':query};
+    if(/^(?:(?:a|an|the) )?(?:album|release|playlist|listening session)(?:\s|$)/.test(query))return null;
+    return {type:'play_track',query:['music','song','track','some music','something','something new','me something','me a song'].includes(query)?'':query};
   }
   function validate(raw){
     if(!raw||typeof raw!=='object'||!allowed.has(raw.type))return null;
@@ -45,6 +48,25 @@
       }
     }
     return action;
+  }
+  /** The published player, not the language model, verifies named-song identity. */
+  function resolvePublished(message,tracks,serverAction){
+    const requested=command(message);
+    if(requested?.type!=='play_track'||!requested.query)return {action:serverAction};
+    const query=normalize(requested.query);
+    if(['it','this','this one','that','that one','current','current song','current track','this song','this track'].includes(query))return {action:serverAction};
+    const candidates=(Array.isArray(tracks)?tracks:[]).filter(track=>{
+      const title=normalize(track?.title);
+      return title&&title===query;
+    });
+    const longest=Math.max(0,...candidates.map(track=>normalize(track.title).length));
+    const matches=candidates.filter(track=>normalize(track.title).length===longest);
+    if(matches.length===1&&typeof matches[0].id==='string'&&matches[0].id!==''){
+      return {action:{type:'play_track',track_id:matches[0].id}};
+    }
+    return {action:{type:'none'},text:matches.length>1
+      ?'More than one published song matches “'+requested.query+'.” Which release did you mean?'
+      :'I could not find a published song matching “'+requested.query+'.” I have not changed what is playing.'};
   }
   function create({invoke,getState=()=>({})}={}){
     if(typeof invoke!=='function')throw new Error('Audio Player Skill needs a local player adapter.');
@@ -69,5 +91,5 @@
     async function handle(text){const parsed=command(text);return parsed?dispatch(parsed):null}
     return {dispatch,handle,state,capabilities:CAPABILITIES};
   }
-  window.StonefellowAgentAudioSkill=Object.freeze({version:'stonefellow.audio-player.v1',capabilities:CAPABILITIES,command,validate,create});
+  window.StonefellowAgentAudioSkill=Object.freeze({version:'stonefellow.audio-player.v1',capabilities:CAPABILITIES,command,validate,resolvePublished,create});
 })();

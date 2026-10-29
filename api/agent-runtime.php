@@ -153,11 +153,57 @@ function sf_agent_save_message(int $userId,string $conversationId,string $role,s
 }
 
 function sf_agent_find_track(string $message,?string $activeId=null): ?array {
-    $n=strtolower(preg_replace('/[^a-z0-9 ]+/i',' ', $message)??$message);$best=null;$bestLen=0;
-    foreach(sf_agent_public_catalog() as $t){$title=strtolower(trim((string)($t['title']??'')));if($title!==''&&str_contains($n,$title)&&strlen($title)>$bestLen){$best=$t;$bestLen=strlen($title);}}
+    $best=sf_agent_match_track_title($message,sf_agent_public_catalog());
     if($best)return $best;
     if($activeId)foreach(sf_agent_public_catalog() as $t)if((string)($t['id']??'')===$activeId)return $t;
     return null;
+}
+
+/** Normalize catalog titles and voice transcripts the same way. Never fuzzy-play an unrelated song. */
+function sf_agent_track_words(string $text): string {
+    return trim(preg_replace('/\s+/u',' ',strtolower(preg_replace('/[^a-z0-9]+/i',' ',$text)??$text))??'');
+}
+function sf_agent_track_matches(string $query,array $catalog,bool $exact=false): array {
+    $words=sf_agent_track_words($query);if($words==='')return [];
+    $matches=[];$longest=0;
+    foreach($catalog as $track){
+        $title=sf_agent_track_words((string)($track['title']??''));
+        if($title===''||($exact?$title!==$words:!str_contains(' '.$words.' ',' '.$title.' ')))continue;
+        $len=strlen($title);
+        if($len>$longest){$matches=[];$longest=$len;}
+        if($len===$longest)$matches[(string)($track['id']??count($matches))]=$track;
+    }
+    return array_values($matches);
+}
+function sf_agent_match_track_title(string $query,array $catalog): ?array {
+    $matches=sf_agent_track_matches($query,$catalog);
+    return count($matches)===1?$matches[0]:null;
+}
+
+/** Explicit, named player requests are actions even when a catalog match is absent. */
+function sf_agent_named_playback_query(string $message): ?string {
+    $q=sf_agent_track_words($message);
+    $q=preg_replace('/^(?:(?:hey|hi|ok|okay) )?stone ?fellow /','',$q)??$q;
+    $q=preg_replace('/^please /','',$q)??$q;
+    if(preg_match('/^(?:change|switch) (?:the |this )?(?:songs?|tracks?|music) (?:to )?(.+)$/',$q,$m)
+        || preg_match('/^switch to (.+)$/',$q,$m)
+        || preg_match('/^(?:play|put on|listen to|start) (.+)$/',$q,$m)){
+        $query=trim(preg_replace('/^(?:(?:the|this) )?(?:song|track|music) (?:called |named )?|^(?:the )?(?:song|track) /','',$m[1])??$m[1]);
+        // Generic playback and discovery requests retain their existing routes.
+        if($query===''||in_array($query,['music','some music','something','something new','me something','me a song','the album','album','release','a listening session'],true))return null;
+        if(preg_match('/^(?:(?:a|an|the) )?(?:album|release|playlist|listening session)\b/',$query))return null;
+        return $query;
+    }
+    return null;
+}
+/** Returned action is browser-local. Only exact published-catalog title identity may cause playback. */
+function sf_agent_named_playback_plan(string $query,array $catalog,?string $activeId=null): array {
+    $deictic=in_array($query,['it','this','this one','that','that one','current','current song','current track','this song','this track'],true);
+    $matches=$deictic?array_values(array_filter($catalog,fn($t)=>(string)($t['id']??'')===$activeId)):sf_agent_track_matches($query,$catalog,true);
+    if(count($matches)>1)return ['action'=>['type'=>'none'],'text'=>'More than one published song matches “'.$query.'.” Please specify the release.','track'=>null];
+    if(!$matches)return ['action'=>['type'=>'none'],'text'=>'I could not identify a published song matching “'.$query.'.” I have not changed what is playing.','track'=>null];
+    $track=$matches[0];
+    return ['action'=>['type'=>'play_track','track_id'=>(string)$track['id']],'text'=>'I will load “'.(string)($track['title']??'').'.”','track'=>$track];
 }
 
 /** Published releases only. A hidden draft may not become a deep-link target. */
@@ -229,6 +275,7 @@ function sf_agent_explicit_player_route(string $message): ?string {
     if(preg_match('/\b(?:pause|stop)\s*(?:the\s+)?(?:music|song|track|player|playback|it|this)?\s*[.!?]*$/',$q))return 'player_pause';
     if(preg_match('/\b(?:next (?:song|track)|skip (?:this |the )?(?:song|track)|skip it|skip)\s*[.!?]*$/',$q))return 'player_next';
     if(preg_match('/\b(?:previous (?:song|track)|last (?:song|track)|go back (?:a|one) (?:song|track)|play (?:the )?previous (?:song|track))\s*[.!?]*$/',$q))return 'player_previous';
+    if(sf_agent_named_playback_query($message)!==null)return 'player_play_named';
     return null;
 }
 function sf_agent_player_volume_action(string $message): array {
@@ -353,8 +400,9 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             break;
 
         case 'player_play_named':
-            if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='Playing “'.($track['title']??'').'.”';}
-            else {$route='player_recommend';$track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}}
+            $requested=sf_agent_named_playback_query($message);
+            $plan=sf_agent_named_playback_plan($requested??'',sf_agent_public_catalog(),$active);
+            $action=$plan['action'];$text=$plan['text'];$track=$plan['track'];
             break;
         case 'player_recommend':
             $track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;

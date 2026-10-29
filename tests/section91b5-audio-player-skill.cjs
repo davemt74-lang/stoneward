@@ -57,8 +57,8 @@ async function main(){
   check('Public page loads the shared skill before app.js',()=>assert.ok(publicShell.indexOf('agent-audio-player-skill.js')<publicShell.indexOf('assets/js/app.js')));
   check('Admin loads the shared skill before its player adapter',()=>assert.ok(adminShell.indexOf('agent-audio-player-skill.js')<adminShell.indexOf('agent-music-controller.js')));
   const publicApp=read('assets/js/app.js'),adminPlayer=read('admin/assets/agent-music-controller.js');
-  check('Public authenticated agent dispatches returned action through shared skill',()=>assert.match(publicApp,/publicAudioSkill\?\.dispatch\(j\.action\)/));
-  check('Public retains real player result fallback',()=>assert.match(publicApp,/sharedPlayerResult\?\.text\?\?await executePlayerAgentAction\(j\.action\)/));
+  check('Public authenticated agent verifies song identity before shared dispatch',()=>assert.match(publicApp,/publicAudioSkill\?\.dispatch\(verified\.action\)/));
+  check('Public retains real player result fallback',()=>assert.match(publicApp,/sharedPlayerResult\?\.text\?\?await executePlayerAgentAction\(verified\.action\)/));
   check('Admin adapter routes normal music phrases through shared skill',()=>assert.match(adminPlayer,/sharedSkill\?\.handle\(message\)/));
   check('Admin adapter implements every canonical action',()=>{for(const action of skill.capabilities)assert.ok(adminPlayer.includes("case '"+action+"'"),action)});
   check('Admin source guard rejects remote, private and unplayable track URLs',()=>{assert.match(adminPlayer,/reference\.origin===new URL\(baseUrl\)\.origin/);assert.match(adminPlayer,/track\?\.audio/)});

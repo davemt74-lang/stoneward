@@ -17,15 +17,15 @@ function extract(name){
 }
 async function run(){
   const events=[];let failToPlay=false;
-  const audio={paused:false,volume:0.8,duration:200,currentTime:75,
+  const audio={paused:false,volume:0.8,duration:200,currentTime:75,src:'assets/night-drive.mp3',
     play:async()=>{if(failToPlay)throw Error('autoplay rejected');audio.paused=false},
     pause:()=>{audio.paused=true}};
   const st={track:{id:'song-1',title:'Night Drive',release:'Moonlight',duration:200},playing:true,conversationOn:false};
   const sandbox={audio,st,musicOriginalVolume:null,voicePlaybackPending:false,lastAudibleVolume:0.7,
     recordListen:type=>events.push(type),updateFooterPlayer:()=>events.push('render'),
     stepTrack:delta=>events.push('step:'+delta),
-    play:async track=>{st.track=track;return !failToPlay},
-    trackById:id=>id==='song-2'?{id,title:'Northern Sky'}:null,
+    play:async track=>{st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;return !failToPlay},
+    trackById:id=>id==='song-2'?{id,title:'Northern Sky',audio:'assets/northern-sky.mp3'}:null,
     time:seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`};
   vm.createContext(sandbox);
   const code=['syncConversationMusic','playerVolume','setPlayerVolume','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
@@ -65,8 +65,8 @@ async function run(){
   assert.match(await sandbox.run({type:'resume_player'}),/no song loaded/);
   assert.equal(await sandbox.run({type:'open_view'}),null,'unrelated Agent actions still use existing dispatcher');
   assert.match(app,/\.\.\.playerState\(\)/,'voice and typed Agent receive current playback state');
-  assert.match(app,/const sharedPlayerResult=await publicAudioSkill\?\.dispatch\(j\.action\)/,'same Agent action response executes through the shared local player');
-  assert.match(app,/sharedPlayerResult\?\.text\?\?await executePlayerAgentAction\(j\.action\)/,'existing local player remains a safe fallback');
+  assert.match(app,/const sharedPlayerResult=await publicAudioSkill\?\.dispatch\(verified\.action\)/,'named player action is verified before reaching shared local player');
+  assert.match(app,/sharedPlayerResult\?\.text\?\?await executePlayerAgentAction\(verified\.action\)/,'existing local player remains a safe fallback');
   assert.match(app,/getVolume:\(\)=>playerVolume\(\),setVolume:value=>setPlayerVolume\(value\)/,'turntable and Agent share one volume handler');
   console.log('Section 90M player conversation: 24 behavior and integration assertions passed');
 }
