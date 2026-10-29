@@ -25,7 +25,7 @@ $check(sf_agent_match_track_title('play Two-Hands Up!',$songs)['id']==='two-hand
 $change=sf_agent_named_playback_plan('two hands up',$songs,'subtle-surrender');
 $check(($change['action']['type']??'')==='play_track'&&($change['action']['track_id']??'')==='two-hands-up','Requested track wins over prior playing track');
 $unknown=sf_agent_named_playback_plan('genius 7 humankind',$songs,'subtle-surrender');
-$check(($unknown['action']['type']??'')==='none' && ($unknown['track']??false)===null,'Unmatched request never replays the active song');
+$check(($unknown['action']['type']??'')==='none' && array_key_exists('track',$unknown) && $unknown['track']===null,'Unmatched request never replays the active song');
 $check(str_contains($unknown['text'],'not changed'),'Unmatched request explicitly reports no playback change');
 $check(sf_agent_named_playback_plan('this song',$songs,'subtle-surrender')['action']['track_id']==='subtle-surrender','Explicit deictic reference may use currently selected track');
 $duplicates=[['id'=>'one','title'=>'Two Hands Up'],['id'=>'two','title'=>'Two Hands Up']];
