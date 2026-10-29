@@ -19,10 +19,12 @@ assert.match(read('stonefellow-v120.php'),/conversation-barge-in\.js/);
 assert.match(read('admin/index.php'),/conversation-barge-in\.js/);
 assert.match(read('service-worker.js'),/conversation-barge-in\.js/);
 assert.match(publicApp,/sequence!==voicePlaybackSequence/);
-assert.match(publicApp,/if\(!st\.conversationOn\|\|voiceTurnBusy\|\|voicePlaybackPending\)return/);
+assert.match(publicApp,/if\(!st\.conversationOn\|\|voiceTurnBusy\|\|voicePlaybackPending\|\|/);
+assert.match(publicApp,/voiceSpeechGuard\?\.blocked/);
 assert.match(publicApp,/conversationBargeIn\?\.stop\(\)/);
 assert.match(adminApp,/recognition\.onend=\(\)=>\{recognitionActive=false;if\(conversationOn/);
-assert.match(adminApp,/if\(!conversationOn\|\|pending\|\|adminSpeechPending\|\|voiceSubmitted\)return/);
+assert.match(adminApp,/if\(!conversationOn\|\|pending\|\|adminSpeechPending\|\|/);
+assert.match(adminApp,/adminSpeechGuard\?\.blocked/);
 
 async function monitorRejectsEchoAndDetectsForeground(){
   let interrupts=0,heard='',timerId=0,frameId=0,started=0,aborted=0,energy=0.004,paused=false;

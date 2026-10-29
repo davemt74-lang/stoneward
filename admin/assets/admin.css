@@ -205,3 +205,11 @@
 .admin-profile-logout{color:#e2a49b!important}
 @media(max-width:760px){.admin-topbar{gap:10px}.admin-topbar>.admin-topbar-heading{flex:1 1 auto;min-width:0}.admin-topbar>.admin-topbar-actions{flex:0 0 auto}.admin-topbar-actions{gap:7px}.admin-profile-toggle{max-width:145px}.admin-profile-toggle-name{max-width:70px}}
 @media(max-width:480px){.admin-topbar{padding:0 11px}.admin-topbar-actions .admin-notifications-button{width:38px;height:38px}.admin-profile-toggle{padding:3px;border-radius:50%;width:44px;height:44px}.admin-profile-avatar{width:36px;height:36px;flex-basis:36px}.admin-profile-toggle-name,.admin-profile-chevron{display:none}.admin-profile-dropdown{right:-3px}}
+/* Section 91B4: one compact, persistent Admin music transport above the Agent bar. */
+.admin-agent-music-bar:not([hidden]){display:flex;align-items:center;gap:8px;min-width:0;padding:5px 10px;border:1px solid var(--line);border-radius:7px;background:#211c17;color:var(--ink)}
+.admin-agent-music-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.73rem}
+.admin-agent-music-bar button{flex:0 0 auto;border:1px solid var(--line);border-radius:5px;background:transparent;color:var(--ink);min-width:32px;height:30px;cursor:pointer;font-size:.71rem}
+.admin-agent-music-bar button:hover{color:var(--accent);border-color:var(--accent)}
+.admin-agent-music-volume{display:flex;gap:5px;align-items:center;flex:0 0 auto;font-size:.65rem}
+.admin-agent-music-volume input{width:86px;accent-color:var(--accent)}
+@media(max-width:560px){.admin-agent-music-bar:not([hidden]){gap:4px;padding:4px}.admin-agent-music-title{font-size:.67rem}.admin-agent-music-volume{font-size:0}.admin-agent-music-volume input{width:50px}.admin-agent-music-bar button{min-width:28px}}

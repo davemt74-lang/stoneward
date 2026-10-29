@@ -10,6 +10,23 @@
   let adminSpeechEnabled=localStorage.getItem('stonefellow.admin.voice.replies.v1')!=='off';
   let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0,adminSpeechText='',adminSpeechProbePaused=false;
   let adminConversationMonitor=null,adminConversationResume=null,adminConversationEnabled=false;
+  const adminSpeechGuard=window.StonefellowBargeIn?.createSpeechGuard({cooldownMs:1100});
+  const adminMusic=window.StonefellowAdminMusic?.create({
+    audio:$('#adminAgentMusicAudio'),tracks:()=>app.catalog,baseUrl:window.location.href,
+    onState(state){
+      const bar=$('#adminAgentMusicBar'),title=$('#adminAgentMusicTitle'),toggle=$('#adminAgentMusicToggle'),volume=$('#adminAgentMusicVolume');
+      if(bar)bar.hidden=!state.has_track;
+      if(title)title.textContent=state.has_track?(state.playing?'♫ ':'Ⅱ ')+state.title:'No song loaded';
+      if(toggle){toggle.textContent=state.playing?'Ⅱ':'▶';toggle.setAttribute('aria-label',state.playing?'Pause Stonefellow music':'Play Stonefellow music')}
+      if(volume)volume.value=String(state.volume_percent);
+    }
+  });
+  const syncAdminMusicDucking=()=>adminMusic?.duck(adminSpeechPending,adminConversationEnabled,adminSpeechProbePaused);
+  const musicToggle=$('#adminAgentMusicToggle'),musicPrev=$('#adminAgentMusicPrevious'),musicNext=$('#adminAgentMusicNext'),musicVolume=$('#adminAgentMusicVolume');
+  if(musicToggle)musicToggle.onclick=()=>{void (adminMusic?.state().playing?adminMusic.pause():adminMusic?.resume())};
+  if(musicPrev)musicPrev.onclick=()=>{void adminMusic?.step(-1)};
+  if(musicNext)musicNext.onclick=()=>{void adminMusic?.step(1)};
+  if(musicVolume)musicVolume.oninput=()=>adminMusic?.setVolume(Number(musicVolume.value));
   function syncAdminSpeechStop(){const button=$('#adminAgentSpeechStop');if(button)button.hidden=!adminSpeechPending;}
   function updateAdminVoiceControl(){for(const button of [$('#adminAgentSpeechToggle'),$('#adminChatPopupVoice')]){if(!button)continue;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}}
   function cancelAdminSpeechOutput(){
@@ -25,6 +42,8 @@
     if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
     cancelAdminSpeechOutput();
     adminSpeechPending=false;
+    if(typeof adminSpeechGuard!=='undefined')adminSpeechGuard?.finish();
+    if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
     syncAdminSpeechStop();
     if(adminSpeechActive){adminSpeechActive=false;agent('idle')}
     if(resumeConversation)adminConversationResume?.();
@@ -37,6 +56,7 @@
     if(adminSpeechResolve){const finish=adminSpeechResolve;adminSpeechResolve=null;finish(false)}
     cancelAdminSpeechOutput();
     adminSpeechActive=false;
+    if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
     agent('listening','I heard you. Keep speaking.');
     const status=$('#adminAgentComposerStatus');if(status)status.textContent='Listening to interruption…';
   }
@@ -45,11 +65,11 @@
     if(stage==='paused')return adminSpeechProbePaused&&synthesis?.paused===true;
     if(stage==='probe'){
       if(!adminConversationEnabled||!adminSpeechPending||!synthesis?.speaking||typeof synthesis.pause!=='function')return false;
-      synthesis.pause();adminSpeechProbePaused=true;return true;
+      synthesis.pause();adminSpeechProbePaused=true;if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();return true;
     }
     if(stage==='resume'){
       if(adminSpeechProbePaused&&adminSpeechPending)synthesis?.resume?.();
-      adminSpeechProbePaused=false;return true;
+      adminSpeechProbePaused=false;if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();return true;
     }
     if(stage==='confirm'){holdAdminSpeechForBarge();return true}
     return false;
@@ -59,8 +79,9 @@
     if(!adminSpeechEnabled){adminConversationResume?.();return}
     const requested=++adminSpeechSequence;
     adminSpeechPending=true;
+    if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
     syncAdminSpeechStop();
-    const unavailable=()=>{if(requested===adminSpeechSequence){adminSpeechPending=false;syncAdminSpeechStop();adminConversationResume?.()}};
+    const unavailable=()=>{if(requested===adminSpeechSequence){adminSpeechPending=false;if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();syncAdminSpeechStop();adminConversationResume?.()}};
     const synthesis=window.speechSynthesis,Utterance=window.SpeechSynthesisUtterance;
     if(!synthesis||!Utterance){$('#adminAgentComposerStatus').textContent='Spoken replies need browser speech support. Chat still works.';unavailable();return}
     let voices=synthesis.getVoices().filter(voice=>voice.localService===true);
@@ -74,12 +95,14 @@
     stopAdminSpeech(false);
     const playingSequence=adminSpeechSequence;
     adminSpeechText=text;
+    if(typeof adminSpeechGuard!=='undefined')adminSpeechGuard?.begin(text);
     adminSpeechPending=true;
+    if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
     syncAdminSpeechStop();
     if(adminConversationEnabled)void adminConversationMonitor?.start();
     return new Promise(resolve=>{
       let done=false,index=0,retries=0;
-      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;syncAdminSpeechStop();adminSpeechText='';adminConversationMonitor?.stop();agent('idle');if(ok===false){const status=$('#adminAgentComposerStatus');if(status)status.textContent='Spoken reply ended early. The full response is still available in chat.'}adminConversationResume?.()}resolve(ok)};
+      const finish=ok=>{if(done)return;done=true;if(adminSpeechResolve===finish)adminSpeechResolve=null;if(playingSequence===adminSpeechSequence){adminSpeechActive=false;adminSpeechPending=false;if(typeof adminSpeechGuard!=='undefined')adminSpeechGuard?.finish();if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();syncAdminSpeechStop();adminSpeechText='';adminConversationMonitor?.stop();agent('idle');if(ok===false){const status=$('#adminAgentComposerStatus');if(status)status.textContent='Spoken reply ended early. The full response is still available in chat.'}adminConversationResume?.()}resolve(ok)};
       adminSpeechResolve=finish;
       const retry=()=>{
         if(retries++>=1){finish(false);return}
@@ -97,7 +120,7 @@
         if(index>=parts.length){finish(true);return}
         const utterance=new Utterance(parts[index]);utterance.voice=voice;utterance.lang=voice.lang||'en-US';utterance.rate=1;
         let settled=false,started=false;
-        utterance.onstart=()=>{started=true;if(!done&&playingSequence===adminSpeechSequence){adminSpeechActive=true;agent('speaking',text)}};
+        utterance.onstart=()=>{started=true;if(!done&&playingSequence===adminSpeechSequence){adminSpeechActive=true;if(typeof adminSpeechGuard!=='undefined')adminSpeechGuard?.audible();agent('speaking',text)}};
         utterance.onend=()=>{
           if(settled||done)return;settled=true;
           if(playingSequence!==adminSpeechSequence){finish(false);return}
@@ -784,16 +807,19 @@
     const scheduleListen=(delay=320)=>{
       clearTimeout(restartTimer);
       if(!conversationOn||pending||adminSpeechPending||!recognition)return;
-      restartTimer=setTimeout(startListen,delay);
+      const remain=typeof adminSpeechGuard!=='undefined'?(adminSpeechGuard?.remaining()??0):0;
+      restartTimer=setTimeout(startListen,Math.max(delay,Number.isFinite(remain)?remain:450));
     };
     function startListen(){
       if(!conversationOn||pending||adminSpeechPending||recognitionActive||!recognition)return;
+      if(typeof adminSpeechGuard!=='undefined'&&adminSpeechGuard?.blocked){scheduleListen(450);return}
       voiceSubmitted=false;
       try{recognition.start()}
       catch(e){if(e.name==='InvalidStateError'){scheduleListen(600);return}stopConversation();$('#adminAgentComposerStatus').textContent='The microphone could not start. Click to retry.'}
     }
     function stopConversation(){
       conversationOn=false;adminConversationEnabled=false;clearTimeout(restartTimer);
+      if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
       try{recognition?.abort()}catch(_){}recognitionActive=false;
       stopAdminSpeech();adminConversationMonitor?.close();updateVoiceButton();agent('idle','Conversation mode is off.');
       $('#adminAgentComposerStatus').textContent='Conversation mode is off.';
@@ -812,7 +838,7 @@
       if(conversationOn&&state==='microphone-monitor-unavailable')$('#adminAgentComposerStatus').textContent='Barge-in microphone unavailable. Check permission and retry.';
       if(conversationOn&&state==='microphone-monitor-suspended')$('#adminAgentComposerStatus').textContent='Microphone audio monitor suspended. Click the mic again to retry.';
       if(conversationOn&&state==='speech-recognition-unavailable')$('#adminAgentComposerStatus').textContent='Speech recognition unavailable. Use Stop speaking if you need to interrupt the Agent.';
-    },{requireTranscript:true});
+    },{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930});
     const resize=()=>{input.style.height='auto';input.style.height=Math.min(160,Math.max(44,input.scrollHeight))+'px';};
     const stopSpeech=$('#adminAgentSpeechStop');if(stopSpeech)stopSpeech.onclick=()=>{stopAdminSpeech();$('#adminAgentComposerStatus').textContent='Agent stopped. Conversation remains ready.';};
     input.addEventListener('input',resize);
@@ -830,8 +856,12 @@
       status.textContent='Sending message…';
       form.setAttribute('aria-busy','true');
       try{
-        const response=await (app.view==='agent-chat'?window.SFAdminAgentCanvas.send(message):window.SFAdminAgentCanvas.send(message,{preserveView:true}));
+        const localMusicReply=typeof adminMusic!=='undefined'?await adminMusic?.handle(message):null;
+        const response=typeof localMusicReply==='string'
+          ? {text:localMusicReply,local_music:true}
+          : await (app.view==='agent-chat'?window.SFAdminAgentCanvas.send(message):window.SFAdminAgentCanvas.send(message,{preserveView:true}));
         if(!response)throw new Error('Agent reply was not confirmed.');
+        if(response.local_music){window.SFAdminAgentCanvas?.recordLocalPlayerTurn?.(message,response.text);agent('responding',response.text)}
         // Do not erase a draft typed or dictated during a pending request.
         if(input.value.trim()===message)input.value='';
         resize();status.textContent='Message sent.';
@@ -852,18 +882,18 @@
       voice.onclick=()=>{
         if(conversationOn){stopConversation();return}
         if(pending)return;
-        stopAdminSpeech();conversationOn=true;adminConversationEnabled=true;networkFailures=0;updateVoiceButton();
+        stopAdminSpeech();conversationOn=true;adminConversationEnabled=true;networkFailures=0;updateVoiceButton();if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
         agent('listening','I’m listening.');$('#adminAgentComposerStatus').textContent='Conversation active · speak naturally.';
         void adminConversationMonitor?.prepare();
         startListen();
       };
       recognition.onstart=()=>{
         recognitionActive=true;
-        if(!conversationOn||pending||adminSpeechPending){try{recognition.abort()}catch(_){}return}
+        if(!conversationOn||pending||adminSpeechPending||(typeof adminSpeechGuard!=='undefined'&&adminSpeechGuard?.blocked)){try{recognition.abort()}catch(_){}return}
         agent('listening','I’m listening.');
       };
       recognition.onresult=e=>{
-        if(!conversationOn||pending||adminSpeechPending||voiceSubmitted)return;
+        if(!conversationOn||pending||adminSpeechPending||(typeof adminSpeechGuard!=='undefined'&&adminSpeechGuard?.blocked)||voiceSubmitted)return;
         let transcript='';let final=false;
         for(let i=0;i<e.results.length;i++){
           transcript+=e.results[i][0].transcript;

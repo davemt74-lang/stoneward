@@ -88,6 +88,7 @@ async function publicSpeechCompletesEveryChunk(){
   const context={
     window:{speechSynthesis:synth,SpeechSynthesisUtterance:Utterance},
     voiceRepliesEnabled:true,voicePlaybackSequence:5,voiceProbeSynth:false,speechFallbackResolve:null,
+    voiceSpeechGuard:{audible:()=>true},
     globalThis:{StonefellowSpeechSegments:{split:()=>['First segment.','Second segment.','Last segment.']}},
     setTimeout:callback=>{timers.push(callback);return timers.length},agent:()=>{},
     cancelLocalVoiceOutput:()=>synth.cancel(),
@@ -128,6 +129,7 @@ async function adminSpeechCompletesEveryChunk(){
     adminConversationEnabled:true,
     adminConversationMonitor:{start:()=>Promise.resolve(true),stop:()=>states.push('monitor-stop')},
     adminConversationResume:()=>restarted.push('listen'),
+    adminSpeechGuard:{begin:()=>1,audible:()=>true,finish:()=>true},syncAdminMusicDucking:()=>{},
     globalThis:{StonefellowSpeechSegments:{split:()=>['First instruction.','Then second instruction.']}},
     $:()=>composer,agent:state=>states.push(state),
     syncAdminSpeechStop:()=>{},
