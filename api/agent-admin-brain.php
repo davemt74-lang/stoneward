@@ -26,6 +26,7 @@ require_once __DIR__.'/story-production-search-core.php';
 require_once __DIR__.'/story-director-core.php';
 require_once __DIR__.'/story-agent-brain-bridge.php';
 require_once __DIR__.'/agent-navigation.php';
+require_once __DIR__.'/agent-admin-llm-router.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -213,6 +214,18 @@ function sf_admin_agent_plan(string $message): array {
             && sf_agent_admin_show_filter($message)!=='all')
             return ['type'=>'shows_inventory_read','view'=>'shows','requires_confirmation'=>false,'execution'=>'authenticated_read'];
     }
+    // Conservative local fallback when the configured LLM is offline. Only
+    // aggregate reads are inferred; all writes still require their exact parser.
+    if(preg_match('/\b(?:how many|count|totals?|stats?|statistics|status|inventory|sales|stock)\b/i',$message)){
+        if(preg_match('/\b(?:ticket|tickets|ticketing|rsvp|reservations?|guest list|vip offer)\b/i',$message))
+            return ['type'=>'ticketing_inventory_read','view'=>'ticketing','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+        if(preg_match('/\b(?:vinyl|records?|pressing|pod handoffs?)\b/i',$message))
+            return ['type'=>'vinyl_inventory_read','view'=>'pod','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+        if(preg_match('/\b(?:merch|merchandise|products?)\b/i',$message))
+            return ['type'=>'merch_inventory_read','view'=>'products','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+        if(preg_match('/\b(?:memberships?|vip members?)\b/i',$message))
+            return ['type'=>'membership_inventory_read','view'=>'membership','requires_confirmation'=>false,'execution'=>'authenticated_read'];
+    }
     // Clip/timeline edits use their distinct exact-review production logic.
     if(!preg_match('/\b(?:timeline|assembly|clip|footage|storyboard|scene)\b/i',$message)){
         foreach(sf_admin_agent_module_routes() as $intent=>$route){
@@ -396,7 +409,17 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,
             'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>'page_context','status'=>'read_only']];
     }
-    $plan=sf_admin_agent_plan($message);$context=sf_admin_agent_operational_context();$missionState=sf_admin_agent_mission_summary($adminId);
+    $plan=sf_admin_agent_plan($message);
+    $planSource='local_policy';
+    $proposal=sf_admin_agent_llm_plan($message,$plan);
+    if($proposal!==null){
+        $contract=sf_agent_orchestration_contract('admin',$proposal['type']);
+        $preserveRead=(($plan['execution']??'')==='authenticated_read' && ($proposal['type']??'')!==$plan['type']);
+        if(!$preserveRead && $contract['may_read_or_navigate'] && !$contract['requires_exact_approval']){
+            $plan=$proposal;$planSource='llm_proposal+server_policy';
+        }
+    }
+    $context=sf_admin_agent_operational_context();$missionState=sf_admin_agent_mission_summary($adminId);
     $brief=sf_admin_agent_decision_brief($context);
     $missionPlan=sf_agent_mission_plan('admin',$message,$plan['type']);
     if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
@@ -433,6 +456,10 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
       'attach_private_media'=>'I can prepare a reviewed private image attachment. Say: Attach media asset 123 as artwork to song SONG-ID, or Attach media asset 123 as cover to release RELEASE-ID. This never publishes or replaces artwork.',
       'draft_commerce_reply'=>'To draft an unsent customer-service response, type: Draft reply for order SF-ORDER-ID about shipping, refunds, payment, or digital access. A human must inspect and send any reply manually.',
       'commerce_report'=>(empty($context['commerce_available'])?'Commerce data is temporarily unavailable. Open Commerce Operations to inspect current orders.':'Commerce queue: '.(int)($context['commerce_attention']??0).' customer orders need attention, including '.(int)($context['commerce_summary']['payment_attention']??0).' payment exceptions, '.(int)($context['commerce_summary']['refund_attention']??0).' pending refunds and '.(int)($context['commerce_summary']['fulfillment_pending']??0).' awaiting fulfillment. Open Commerce Operations to review each order.'),
+      'ticketing_inventory_read'=>'Ticketing totals are currently unavailable. Open Tickets + VIP for review.',
+      'merch_inventory_read'=>'Merchandise totals are currently unavailable. Open Merch & Products for review.',
+      'vinyl_inventory_read'=>'Vinyl/POD totals are currently unavailable. Open POD Handoffs for review.',
+      'membership_inventory_read'=>'Membership totals are currently unavailable. Open Membership + VIP for review.',
       'review_actions'=>'You have '.array_sum($missionState['counts']).' recent Agent missions, including '.(int)($missionState['counts']['review_required']??0).' requiring review and '.(int)($missionState['counts']['completed']??0).' completed. Open Agent actions for exact proposals, approved results, and interrupted work. Never automatically retry uncertain operations.',
       'crm_report'=>'Current CRM summary: '.$context['crm_contacts'].' contacts and '.$context['newsletter_opted_in'].' opted-in newsletter subscribers. Open CRM for eligible audience and campaign review.',
       'journey_report'=>sf_fan_journey_agent_message((array)($context['fan_journey_signals']??[])).' '.sf_87d_admin_agent_message((array)($context['verified_fan_conversion']??[])).' Existing lifecycle automation runs in 30 days: '.(int)($context['journey_counts']['journeys_started']??0).' started, '.(int)($context['journey_counts']['journeys_failed']??0).' failed.',
@@ -440,6 +467,14 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
     ];
     $module=sf_admin_agent_module_routes()[$plan['type']]??null;
     $text=$module!==null?(string)$module['reply']:($types[$plan['type']]??$types['research']);
+    if(in_array($plan['type'],['ticketing_inventory_read','merch_inventory_read','vinyl_inventory_read','membership_inventory_read'],true)){
+        try{
+            $contract=sf_agent_orchestration_contract('admin',$plan['type']);
+            if(!$contract['may_read_or_navigate'])throw new RuntimeException('Admin read tool is not authorized.');
+            $commerceRead=sf_admin_agent_commerce_read($plan['type']);
+            $text=$commerceRead['brief'];
+        }catch(Throwable $e){/* Never claim a missing or unauthorized read succeeded. */}
+    }
     if($plan['type']==='catalog_inventory_read'){
         try{$read=sf_agent_admin_catalog_read(sf_catalog(),sf_agent_admin_catalog_filter($message));
             $text=sf_agent_admin_read_brief($read);}
@@ -843,6 +878,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
     if(in_array($plan['type'],['catalog_inventory_read','release_inventory_read','shows_inventory_read','knowledge_inventory_read','media_inventory_read','media_attachment_read'],true) && !empty($read))$action['read_evidence']=$read;
+    if(!empty($commerceRead))$action['read_evidence']=$commerceRead;
     $navigation=sf_agent_admin_page_target($message);
     if($navigation!==null && $navigation['view']===$plan['view'] &&
         $contract['tool_id']==='admin_module_navigate' && !$plan['requires_confirmation']){
@@ -896,5 +932,5 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         $action['request_key']='media_link_'.bin2hex(random_bytes(16));
     }
     sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
-    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'mission_plan'=>$missionPlan,'insights'=>$brief,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'status'=>'review_or_read_only']];
+    return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,'context'=>$context,'missions'=>$missionState['missions'],'mission_plan'=>$missionPlan,'insights'=>$brief,'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>$plan['type'],'source'=>$planSource,'status'=>'review_or_read_only']];
 }

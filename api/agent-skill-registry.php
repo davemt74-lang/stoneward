@@ -33,6 +33,10 @@ function sf_agent_skill_definitions(): array {
       'admin_stem_mix_review'=>['label'=>'Review private REAPER Stem Studio, diagnose production evidence and suggest governed improvements','contexts'=>['admin'],'tool'=>'stem_mix_inspect','intents'=>['stem_mix_review','stem_production_review']],
       'admin_stem_automation'=>['label'=>'Prepare governed mix automation with exact approval','contexts'=>['admin'],'tool'=>'stem_automation_update','intents'=>['stem_automation_update']],
       'admin_commerce_insights'=>['label'=>'Review store commerce exceptions','contexts'=>['admin'],'tool'=>'commerce_aggregate','intents'=>['commerce_report']],
+      'admin_ticket_counts'=>['label'=>'Read ticket offer and attendee counts','contexts'=>['admin'],'tool'=>'admin_ticket_inventory','intents'=>['ticketing_inventory_read']],
+      'admin_merch_counts'=>['label'=>'Read merchandise stock and sales counts','contexts'=>['admin'],'tool'=>'admin_merch_inventory','intents'=>['merch_inventory_read']],
+      'admin_vinyl_counts'=>['label'=>'Read vinyl listing and POD handoff counts','contexts'=>['admin'],'tool'=>'admin_vinyl_inventory','intents'=>['vinyl_inventory_read']],
+      'admin_membership_counts'=>['label'=>'Read membership subscription aggregate counts','contexts'=>['admin'],'tool'=>'admin_membership_inventory','intents'=>['membership_inventory_read']],
       'admin_commerce_followup'=>['label'=>'Prepare reviewed customer follow-up','contexts'=>['admin'],'tool'=>'commerce_followup_add','intents'=>['prepare_commerce_followup']],
       'admin_crm_insights'=>['label'=>'Review CRM aggregates','contexts'=>['admin'],'tool'=>'crm_aggregate','intents'=>['crm_report']],
       'admin_module_navigation'=>['label'=>'Find and open authorized Admin workspaces, including private audio upload','contexts'=>['admin'],'tool'=>'admin_module_navigate','intents'=>[
