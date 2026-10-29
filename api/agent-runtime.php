@@ -188,7 +188,7 @@ function sf_agent_named_playback_query(string $message): ?string {
     if(preg_match('/^(?:change|switch) (?:the |this )?(?:songs?|tracks?|music) (?:to )?(.+)$/',$q,$m)
         || preg_match('/^switch to (.+)$/',$q,$m)
         || preg_match('/^(?:play|put on|listen to|start) (.+)$/',$q,$m)){
-        $query=trim(preg_replace('/^(?:(?:the|this) )?(?:song|track|music) (?:called |named )?|^(?:the )?(?:song|track) )/','',$m[1])??$m[1]);
+        $query=trim(preg_replace('/^(?:(?:the|this) )?(?:song|track|music) (?:called |named )?|^(?:the )?(?:song|track) /','',$m[1])??$m[1]);
         // Generic playback and discovery requests retain their existing routes.
         if($query===''||in_array($query,['music','some music','something','something new','me something','me a song','the album','album','release','a listening session'],true))return null;
         if(preg_match('/^(?:(?:a|an|the) )?(?:album|release|playlist|listening session)\b/',$query))return null;
