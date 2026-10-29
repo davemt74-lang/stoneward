@@ -12,7 +12,7 @@ const checks={
   'Accessible open and close buttons':page.includes('id="agentChatToggle"')&&page.includes('aria-controls="agentChatPopup"')&&page.includes('id="agentChatClose"'),
   'Continuous visual companion':page.includes('class="agent-face"')&&page.includes('</main>\n  <!-- Keep the floating companion outside')&&css.includes('body.artist-home-active>.agent-stage')&&css.includes('companion-float'),
   'Voice indicator reflects actual microphone startup':app.includes("agent('connecting','Starting the microphone…')")&&app.includes('recognition.onstart=()=>{recognitionActive=true;'),
-  'Final transcription routes once through canonical command':app.includes('if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending)return;')&&app.includes('if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)')&&app.includes('void submitVoiceTurn(words)'),
+  'Final transcription routes once through canonical command':app.includes("if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked))return;")&&app.includes('if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)')&&app.includes('void submitVoiceTurn(words)'),
   'Interim transcript has a dedicated accessible surface':page.includes('id="voiceTranscript"')&&page.includes('role="status" aria-live="polite"')&&app.includes("showTranscript(spoken?'You: '+spoken"),
   'Speech recognition never overwrites the typed chat draft':!app.includes('input.value=transcript.trim()')&&app.includes('const phrases=[];let finalReceived=false;'),
   'Player does not displace the chat popup from the chat bar':css.includes('body.has-player .agent-chat-popup{bottom:calc(100% + 12px)}'),
