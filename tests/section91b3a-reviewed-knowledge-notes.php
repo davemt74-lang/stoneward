@@ -53,7 +53,7 @@ $check($contract['tool_id']==='knowledge_note_update'&&$contract['may_prepare_re
 $check(!sf_agent_orchestration_contract('customer','edit_knowledge_note')['registered']
     &&!sf_agent_orchestration_contract('public','edit_knowledge_note')['registered'],'Fan and public discovery denied');
 $coverage=sf_agent_integration_coverage(sf_admin_agent_module_routes());
-$check($coverage['checks_passed']&&count($coverage['reviewed_action_eligible'])===8,'Existing audited allowlist contains exactly eight reviewed executors');
+$check($coverage['checks_passed']&&count($coverage['reviewed_action_eligible'])===9,'Existing audited allowlist contains exactly nine reviewed executors');
 $ledger=(string)file_get_contents(dirname(__DIR__).'/api/agent-actions-core.php');
 $check(str_contains($ledger,"'knowledge_note_update'=>sf_agent_action_normalize_knowledge_note")
     &&str_contains($ledger,'sf_agent_knowledge_save_approved_note((array)$p[\'payload\'])'),'Ledger validates input and saves only after approval claim');

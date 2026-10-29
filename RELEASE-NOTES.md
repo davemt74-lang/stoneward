@@ -1,4 +1,8 @@
-# Stonefellow v1.3.167 — Section 91B3C: Reviewed image accessibility alt text
+# Stonefellow v1.3.168 — Section 91B3D: Reviewed private image attachments
+
+Admin Agent Chat can attach an existing image asset by numeric ID to an exact song or release as a private artwork/cover candidate. The existing source JSON and media-link tables are read with revision fingerprints, and an Admin must prepare a canonical proposal, type `APPROVE`, and separately click Save. The save runs in one SQL transaction, refuses duplicate/stale relationships, and verifies the new link is private, unfeatured and not downloadable. Existing published artwork remains unchanged. No media file, publishing, billing, sending, deletion or visibility change. No database migration.
+
+## Previous release: Stonefellow v1.3.167 — Section 91B3C: Reviewed image accessibility alt text
 
 Admin Agent Chat now prepares one-image `alt_text` improvements by exact Media Library ID. Public use and total attachment counts are shown before an exact hash-bound proposal; a typed `APPROVE` and a separate Save step are both required. The transaction compares the current image and attachment revisions, changes only the image accessibility description, and verifies the saved value. Audio/video, files, captions, links, publication, customer actions, billing and deletion remain outside this scope. No database migration.
 

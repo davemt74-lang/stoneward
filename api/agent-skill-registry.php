@@ -45,6 +45,7 @@ function sf_agent_skill_definitions(): array {
       'admin_knowledge_note_review'=>['label'=>'Prepare an exact reviewed Knowledge Base internal description edit','contexts'=>['admin'],'tool'=>'knowledge_note_update','intents'=>['edit_knowledge_note']],
       'admin_media_caption_review'=>['label'=>'Prepare an exact reviewed Media Library caption edit','contexts'=>['admin'],'tool'=>'media_caption_update','intents'=>['edit_media_caption']],
       'admin_media_alt_text_review'=>['label'=>'Prepare exact reviewed accessibility text for one image','contexts'=>['admin'],'tool'=>'media_alt_text_update','intents'=>['edit_media_alt_text']],
+      'admin_media_attachment_review'=>['label'=>'Prepare a private image attachment for one verified song or release','contexts'=>['admin'],'tool'=>'media_private_link_add','intents'=>['attach_private_media']],
       'admin_song_draft_intake'=>['label'=>'Guide an administrator through reviewed, unpublished song intake','contexts'=>['admin'],'tool'=>'agent_song_draft_save','intents'=>['save_song_draft']],
       'admin_song_catalog_preflight'=>['label'=>'Review rights and artwork, then approve private song catalog preparation','contexts'=>['admin'],'tool'=>'agent_song_catalog_prepare','intents'=>['prepare_song_catalog']],
       'admin_song_catalog_publish'=>['label'=>'Review and explicitly publish one catalog track using separate listening audio','contexts'=>['admin'],'tool'=>'agent_song_catalog_publish','intents'=>['publish_song_catalog']],

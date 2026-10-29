@@ -141,7 +141,7 @@
     history.setAttribute('aria-label','Reviewed Admin Agent actions and receipts');
     history.className='agent-history-dialog';
     const rows=(data.proposals||[]).map(p=>{
-      const name=esc(p.payload?.name||(p.tool_id==='media_alt_text_update'?'Image alt text · #'+(p.payload?.asset_id||'asset'):(p.tool_id==='media_caption_update'?'Media caption · #'+(p.payload?.asset_id||'asset'):(p.tool_id==='knowledge_note_update'?'Knowledge note · '+(p.payload?.file_name||'document'):(p.tool_id==='stem_automation_update'?'Stem automation · '+(p.payload?.track_id||'song'):'Reviewed draft')))));
+      const name=esc(p.payload?.name||(p.tool_id==='media_private_link_add'?'Private artwork · #'+(p.payload?.asset_id||'asset')+' → '+(p.payload?.entity_type||'record')+' '+(p.payload?.entity_id||''):(p.tool_id==='media_alt_text_update'?'Image alt text · #'+(p.payload?.asset_id||'asset'):(p.tool_id==='media_caption_update'?'Media caption · #'+(p.payload?.asset_id||'asset'):(p.tool_id==='knowledge_note_update'?'Knowledge note · '+(p.payload?.file_name||'document'):(p.tool_id==='stem_automation_update'?'Stem automation · '+(p.payload?.track_id||'song'):'Reviewed draft'))))));
       const status=esc(p.status||'unknown');
       const when=esc(p.created_at||'');
       const completed=Number(p.result?.campaign_id||0),completedJourney=Number(p.result?.automation_id||0),completedStem=String(p.result?.track_id||''),completedKnowledge=String(p.result?.file_id||''),completedMedia=Number(p.result?.asset_id||0);

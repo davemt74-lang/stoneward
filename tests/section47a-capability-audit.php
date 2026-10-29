@@ -9,7 +9,7 @@ $checks=[
  'Existing registered tools discovered'=>$a['registered']===count($registry) && $a['registered']>=15,
  'Real contracts, owners, paths and role matrix pass'=>$a['checks_passed']===true,
  'Fan and Admin scopes inventoried'=>($a['by_scope']['admin']??0)>0 && ($a['by_scope']['signed_in_fan']??0)>0,
- 'Eight approved review-first actions, never direct execution'=>$a['approved_proposal_executors']===['automation_draft_save','campaign_draft_save','catalog_metadata_update','commerce_followup_add','knowledge_note_update','media_alt_text_update','media_caption_update','stem_automation_update'] && !$a['unapproved_executors'],
+ 'Nine approved review-first actions, never direct execution'=>$a['approved_proposal_executors']===['automation_draft_save','campaign_draft_save','catalog_metadata_update','commerce_followup_add','knowledge_note_update','media_alt_text_update','media_caption_update','media_private_link_add','stem_automation_update'] && !$a['unapproved_executors'],
  'Guest excluded from signed-in and admin tools'=>!in_array('favorite_track',array_column(sf_agent_tool_inventory('guest'),'id'),true)
     && !in_array('crm_aggregate',array_column(sf_agent_tool_inventory('guest'),'id'),true),
  'Fan excluded from admin tools'=>!in_array('crm_aggregate',array_column(sf_agent_tool_inventory('fan'),'id'),true)
