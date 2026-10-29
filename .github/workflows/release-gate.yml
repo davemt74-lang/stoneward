@@ -512,6 +512,7 @@ jobs:
           node tests/section91b3c-reviewed-image-alt-ui.cjs
           php tests/section91b3d-reviewed-private-media-link.php
           node tests/section91b3d-reviewed-private-media-ui.cjs
+          node tests/section91b4-voice-music.cjs
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
           php -l api/media-catalog-intake.php

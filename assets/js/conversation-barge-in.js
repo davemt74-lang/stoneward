@@ -5,6 +5,24 @@
 (() => {
   'use strict';
   const normalized=text=>String(text||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();
+  // The normal speech recognizer must never consume the Agent's audio or its
+  // acoustic tail. This state is independent of transcript echo heuristics.
+  function createSpeechGuard(options={}) {
+    const now=typeof options.now==='function'?options.now:()=>Date.now();
+    const cooldownMs=Math.max(500,Math.min(2000,Number(options.cooldownMs)||1100));
+    let generation=0,phase='idle',quietUntil=0,reference='';
+    const remaining=()=>phase==='preparing'||phase==='speaking'?Infinity:Math.max(0,quietUntil-now());
+    return {
+      begin(text=''){generation++;phase='preparing';quietUntil=0;reference=String(text);return generation},
+      audible(token=generation){if(token!==generation||phase==='idle')return false;phase='speaking';return true},
+      finish(token=generation){if(token!==generation||phase==='idle'||phase==='cooldown')return false;phase='cooldown';quietUntil=now()+cooldownMs;return true},
+      remaining,
+      get blocked(){return remaining()>0},
+      get phase(){if(phase==='cooldown'&&remaining()===0)phase='idle';return phase},
+      get generation(){return generation},
+      get reference(){return reference}
+    };
+  }
   function verifyAgentSpeech(reference, browser=window, signal=null) {
     const Recognition=browser.SpeechRecognition||browser.webkitSpeechRecognition;
     if(!Recognition||signal?.aborted)return Promise.resolve(null);
@@ -60,6 +78,8 @@
     // production reply. Otherwise the Agent's own voice can trigger a probe
     // on every loud syllable, and some speech engines abort when paused.
     const requireTranscript=options?.requireTranscript===true;
+    const echoTailMs=Math.max(180,Math.min(600,Number(options?.echoTailMs)||180));
+    const echoDeadlineMs=Math.max(echoTailMs+300,Math.min(1500,Number(options?.echoDeadlineMs)||640));
     let generation=0,resourceGeneration=0,listening=false,confirmation=null,restartTimer=null;
     let stream=null,context=null,analyser=null,readyPromise=null,frame=null,activityTimer=null;
     let voiceDetected=false,consecutive=0,noiseFloor=0.008,fastFailures=0;
@@ -193,8 +213,8 @@
         else{
           probing=true;probeReady=false;probeConsecutive=0;
           if(requireTranscript)pendingPhrase=candidatePhrase;
-          probeTailTimer=browser.setTimeout?.(()=>{probeTailTimer=null;if(probing)probeReady=true},180)??null;
-          probeDeadlineTimer=browser.setTimeout?.(()=>{probeDeadlineTimer=null;resumeEcho()},640)??null;
+          probeTailTimer=browser.setTimeout?.(()=>{probeTailTimer=null;if(probing)probeReady=true},echoTailMs)??null;
+          probeDeadlineTimer=browser.setTimeout?.(()=>{probeDeadlineTimer=null;resumeEcho()},echoDeadlineMs)??null;
         }
       }
       frame=browser.requestAnimationFrame?.(sample)??null;
@@ -245,5 +265,5 @@
     };
     return {start,stop,close,prepare,get active(){return listening},get microphoneReady(){return !!analyser}};
   }
-  window.StonefellowBargeIn={create,verifyAgentSpeech};
+  window.StonefellowBargeIn={create,verifyAgentSpeech,createSpeechGuard};
 })();

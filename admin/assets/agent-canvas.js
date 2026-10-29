@@ -3,6 +3,7 @@
   /** One Admin chat canvas + slide-out Brain; same server-owned mission ledger. */
   let conversationId=sessionStorage.getItem('stonefellow.admin.agent.thread')||'';
   let busy=false,lastBrain=null,previousFocus=null,songIntake=null,popupSequence=0;
+  let localPlayerTurns=[];
   const ctx=()=>window.STONEFELLOW_ADMIN_CONTEXT;
   const esc=s=>ctx()?.esc?.(String(s??''))||'';
   const proofLabel=action=>String(action||'record_saved').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -47,6 +48,23 @@
     catch(e){if(conversationId){conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');return c.api('agent-chat.php');}throw e;}
   }
   function isPopupOpen(){const popup=document.querySelector('#adminChatPopup');return !!popup&&!popup.hidden;}
+  const localPlayerMarkup=()=>localPlayerTurns.map(entry=>
+    '<article class="admin-chat-popup-message '+(entry.role==='assistant'?'agent':'human')+'"><strong>'+
+    (entry.role==='assistant'?'Stonefellow · local player':'You')+'</strong><p>'+esc(entry.text)+'</p></article>'
+  ).join('');
+  function recordLocalPlayerTurn(message,reply){
+    localPlayerTurns.push({role:'user',text:String(message)},{role:'assistant',text:String(reply)});
+    localPlayerTurns=localPlayerTurns.slice(-24);
+    const transcript=document.querySelector('#adminChatPopupMessages');
+    if(isPopupOpen()&&transcript){
+      const empty=transcript.querySelector('.admin-chat-popup-empty');if(empty)empty.remove();
+      transcript.insertAdjacentHTML('beforeend',localPlayerTurns.slice(-2).map(entry=>
+        '<article class="admin-chat-popup-message '+(entry.role==='assistant'?'agent':'human')+'"><strong>'+
+        (entry.role==='assistant'?'Stonefellow · local player':'You')+'</strong><p>'+esc(entry.text)+'</p></article>'
+      ).join(''));
+      transcript.scrollTo?.({top:transcript.scrollHeight,behavior:'instant'});
+    }
+  }
   async function refreshPopup(){
     const popup=document.querySelector('#adminChatPopup'),transcript=document.querySelector('#adminChatPopupMessages');
     if(!popup||popup.hidden||!transcript)return;
@@ -56,10 +74,11 @@
       const response=await load();
       if(sequence!==popupSequence||popup.hidden)return;
       const messages=Array.isArray(response.messages)?response.messages:[];
-      transcript.innerHTML=messages.length?messages.map(m=>
+      transcript.innerHTML=(messages.length?messages.map(m=>
         '<article class="admin-chat-popup-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+
         (m.role==='assistant'?'Stonefellow Admin Agent':'You')+'</strong><p>'+esc(m.content||'')+'</p></article>'
-      ).join(''):'<p class="admin-chat-popup-empty">Your Admin conversation will appear here. Use the bar below to ask your Agent.</p>';
+      ).join(''):'')+localPlayerMarkup();
+      if(!transcript.innerHTML)transcript.innerHTML='<p class="admin-chat-popup-empty">Your Admin conversation will appear here. Use the bar below to ask your Agent.</p>';
       if(typeof document.createElement==='function'&&typeof transcript.appendChild==='function'){
         const proof=document.createElement('section');proof.className='admin-proof-inline';proof.id='adminChatPopupProof';
         proof.innerHTML='<h3>Checking saved work…</h3>';transcript.appendChild(proof);
@@ -86,6 +105,7 @@
   }
   function newThread(){
     conversationId='';sessionStorage.removeItem('stonefellow.admin.agent.thread');
+    localPlayerTurns=[];
     if(isPopupOpen()){
       popupSequence++;
       const transcript=document.querySelector('#adminChatPopupMessages');
@@ -1638,5 +1658,5 @@
       drawer.querySelector('#adminBrainDetailedHistory').onclick=()=>{closeBrain();window.SFAgentCampaigns?.showHistory?.();};
     }catch(e){const p=drawer.querySelector('#adminBrainMissionContent');if(p)p.textContent='Operational Brain data is unavailable.';}
   }
-  window.SFAdminAgentCanvas={render,send,showBrain,togglePopup,isPopupOpen,refreshPopup,refreshProofCards,newThread,openSongDraft};
+  window.SFAdminAgentCanvas={render,send,showBrain,togglePopup,isPopupOpen,refreshPopup,recordLocalPlayerTurn,refreshProofCards,newThread,openSongDraft};
 })();

@@ -1,4 +1,8 @@
-# Stonefellow v1.3.168 — Section 91B3D: Reviewed private image attachments
+# Stonefellow v1.3.169 — Section 91B4: Speech-state echo protection and Admin music controls
+
+Public and Admin Agent speech now has an explicit output lifecycle with a post-speech acoustic-tail cooldown before normal microphone recognition can resume. During real Agent speech the dedicated verified barge-in recognizer remains available, but normal dictation cannot consume the Agent's output; the silence probe allows additional echo decay before accepting independent voices. The public catalog player retains its existing Agent tools. Admin now has a compact same-origin catalog-preview music player controlled by voice/text commands for play, pause, resume, next/previous, status, mute and volume, with Agent-speech ducking and temporary silence during acoustic probes. Private audio masters and external audio URLs are not played. Browser autoplay restrictions can still require an initial manual Play. No database migration.
+
+## Previous release: Stonefellow v1.3.168 — Section 91B3D: Reviewed private image attachments
 
 Admin Agent Chat can attach an existing image asset by numeric ID to an exact song or release as a private artwork/cover candidate. The existing source JSON and media-link tables are read with revision fingerprints, and an Admin must prepare a canonical proposal, type `APPROVE`, and separately click Save. The save runs in one SQL transaction, refuses duplicate/stale relationships, and verifies the new link is private, unfeatured and not downloadable. Existing published artwork remains unchanged. No media file, publishing, billing, sending, deletion or visibility change. No database migration.
 

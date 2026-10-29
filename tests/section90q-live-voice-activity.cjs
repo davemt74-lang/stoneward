@@ -254,6 +254,7 @@ async function playbackHoldsAreWiredWithoutKillingRecognition(){
   const adminContext={
     adminConversationEnabled:true,adminSpeechPending:true,adminSpeechSequence:8,
     adminSpeechActive:true,adminSpeechResolve:()=>{},
+    syncAdminMusicDucking:()=>{},
     window:{speechSynthesis:{cancel:()=>adminCancelled++}},
     cancelAdminSpeechOutput:()=>adminCancelled++,
     adminConversationMonitor:{stop:()=>adminStopped++},

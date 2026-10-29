@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.168');
+define('SF_ADMIN_BUILD','1.3.169');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -180,6 +180,14 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
       </aside>
 
       <footer class="admin-chat-footer" aria-label="Admin Agent sticky composer">
+        <div id="adminAgentMusicBar" class="admin-agent-music-bar" aria-label="Admin Agent music player" hidden>
+          <span id="adminAgentMusicTitle" class="admin-agent-music-title">No song loaded</span>
+          <button id="adminAgentMusicPrevious" type="button" aria-label="Previous Stonefellow song" title="Previous song">◀◀</button>
+          <button id="adminAgentMusicToggle" type="button" aria-label="Pause Stonefellow music">Ⅱ</button>
+          <button id="adminAgentMusicNext" type="button" aria-label="Next Stonefellow song" title="Next song">▶▶</button>
+          <label class="admin-agent-music-volume">Volume <input id="adminAgentMusicVolume" type="range" min="0" max="100" value="70" aria-label="Admin music volume"></label>
+        </div>
+        <audio id="adminAgentMusicAudio" preload="none"></audio>
         <div class="agent-strip"><button id="adminOrb" type="button" class="admin-orb" aria-label="Stonefellow Admin Agent"></button><span id="agentStatus">IDLE</span><p id="agentMessage">Ask me to scan a folder, create a metadata template, find missing ISRCs, or show the catalog.</p></div>
         <form id="adminChatForm" class="admin-chatbar" autocomplete="off">
           <button type="button" id="adminChatPopupToggle" class="chat-button" aria-label="Open Admin Agent conversation" aria-expanded="false" aria-controls="adminChatPopup">▤</button>
@@ -211,6 +219,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/sidebar-accordion.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="../assets/js/conversation-barge-in.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="../assets/js/speech-segments.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/agent-music-controller.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>&amp;e5=1"></script>
   <script src="assets/stripe-connect.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/commerce-ops.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
