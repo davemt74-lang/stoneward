@@ -18,7 +18,7 @@ $assert(!$coverage['missing_skill_bindings'] && !$coverage['invalid_skill_bindin
 $assert($coverage['admin_navigation_only_count']===count(sf_admin_agent_module_routes()) && $coverage['admin_navigation_only_count']===23,'All 23 module routes inventoried');
 $assert(!$coverage['invalid_module_contracts'],'All module routes resolve to bounded navigation');
 $assert(count(array_filter($coverage['admin_module_routes'],static fn($row)=>$row['conversation_integration']!=='navigation_only' || $row['record_read_verified'] || $row['record_write_verified']))===0,'Navigation is never reported as CRUD');
-$assert(count($coverage['reviewed_action_eligible'])===7,'Seven explicitly allowlisted reviewed executors, no unapproved writes');
+$assert(count($coverage['reviewed_action_eligible'])===8,'Eight explicitly allowlisted reviewed executors, no unapproved writes');
 $assert($index['catalog_metadata_update']['classification']==='reviewed_action_eligible' && $index['catalog_metadata_update']['requires_confirmation'],'Catalog metadata remains exact-review write');
 $assert($index['campaign_send_email']['classification']==='owner_workflow_only' && !$index['campaign_send_email']['may_prepare_reviewed_proposal'],'Campaign sending stays owner-controlled');
 $assert($index['agent_song_catalog_publish']['classification']==='owner_workflow_only' && !$index['agent_song_catalog_publish']['may_prepare_reviewed_proposal'],'Song publication is not promoted to generic executor');
