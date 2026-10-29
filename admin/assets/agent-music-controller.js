@@ -40,7 +40,37 @@
       return play(next);
     };
     const status=()=>current?'“'+current.title+'” is '+(audio.paused?'paused':'playing')+'. Music volume is '+Math.round(level*100)+' percent.':'No song is loaded in the Admin player.';
+    const sharedSkill=window.StonefellowAgentAudioSkill?.create({
+      getState:state,
+      invoke:async action=>{
+        switch(action.type){
+          case 'player_status':return status();
+          case 'pause_player':return pause();
+          case 'resume_player':return resume();
+          case 'next_track':return step(1);
+          case 'previous_track':return step(-1);
+          case 'set_player_volume':{
+            const target=action.mode==='mute'?0:action.mode==='unmute'?Math.round(lastAudible*100):
+              action.mode==='adjust'?Math.round(level*100)+action.percent:action.percent;
+            const actual=setVolume(target);
+            return actual===null?'I could not change the music volume.':'Music volume is '+actual+' percent.';
+          }
+          case 'play_track':{
+            const available=catalog();
+            const query=norm(action.query||'');
+            const matching=action.track_id?available.find(t=>t.id===action.track_id):
+              !query?available[0]:available.find(t=>norm(t.title)===query)||available.find(t=>norm(t.title).includes(query));
+            return matching?play(matching):'I could not find a playable Stonefellow song'+(query?' named “'+query+'”':'')+'.';
+          }
+        }
+        return null;
+      }
+    });
     async function handle(message){
+      // All standard audio commands share the same parsed contract as the
+      // public Agent. Preserve old Admin phrases as a safe compatibility path.
+      const sharedReply=await sharedSkill?.handle(message);
+      if(sharedReply)return sharedReply.text;
       const cleaned=norm(message).replace(/^(?:hey|hi|okay|ok)?\s*stone\s*fellow\s*/, '').replace(/^please\s+/,'');
       if(!cleaned)return null;
       if(/^(?:what(?: s| is)? (?:playing|the current song)|what song is (?:this|playing)|player status|music status)$/.test(cleaned))return status();
@@ -69,7 +99,7 @@
     audio.addEventListener?.('play',publish);
     audio.addEventListener?.('pause',publish);
     publish();
-    return {handle,play,pause,resume,step,status,state,duck,setVolume,get current(){return current}};
+    return {handle,dispatch:action=>sharedSkill?.dispatch(action),play,pause,resume,step,status,state,duck,setVolume,get current(){return current}};
   }
   window.StonefellowAdminMusic={create};
 })();
