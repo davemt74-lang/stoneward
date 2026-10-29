@@ -50,10 +50,20 @@
     return action;
   }
   /** The published player, not the language model, verifies named-song identity. */
-  function resolvePublished(message,tracks,serverAction){
+  function resolvePublished(message,tracks,serverAction,resolution){
     const requested=command(message);
     if(requested?.type!=='play_track'||!requested.query)return {action:serverAction};
     const query=normalize(requested.query);
+    // The LLM may interpret an imperfect voice transcript, but only the
+    // server can attest that the chosen ID belongs to its published catalog.
+    // Confirm the same ID and title in this browser's live player catalog.
+    if(resolution?.method==='llm_catalog'&&resolution.status==='verified'
+      &&serverAction?.type==='play_track'&&serverAction.track_id===resolution.track_id){
+      const verified=(Array.isArray(tracks)?tracks:[]).filter(track=>
+        track?.id===resolution.track_id&&track?.title===resolution.title);
+      if(verified.length===1)return {action:{type:'play_track',track_id:verified[0].id}};
+      return {action:{type:'none'},text:'That published song is not available in this player. I have not changed playback.'};
+    }
     if(['it','this','this one','that','that one','current','current song','current track','this song','this track'].includes(query))return {action:serverAction};
     const candidates=(Array.isArray(tracks)?tracks:[]).filter(track=>{
       const title=normalize(track?.title);

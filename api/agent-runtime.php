@@ -6,6 +6,7 @@ require_once __DIR__.'/agent-customer-context.php';
 require_once __DIR__.'/fan-discovery-paths.php';
 require_once __DIR__.'/fan-commerce-advisor.php';
 require_once __DIR__.'/agent-navigation.php';
+require_once __DIR__.'/agent-llm-orchestrator.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -675,20 +676,39 @@ function sf_agent_normalize_client_state(array $raw): array {
 function sf_agent_reply(array $user,string $conversationId,string $message,array $client=[]): array {
     sf_entitlements_ensure_schema();$client=sf_agent_normalize_client_state($client);$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
     $client['_authorized_admin']=$isAdmin;
-    $decisionUsage=0;$routeSource='local';$jev=null;
+    $decisionUsage=0;$routeSource='local';$jev=null;$llmIntent=null;
+    // Conversational LLM interprets the intent first. Only the server policy
+    // can translate that interpretation into an authorized action.
+    if($isAdmin||sf_can_use_ai($user,256)['ok']){
+        try{
+            $llmIntent=sf_agent_orchestrator_llm($message,$client,$history,sf_agent_public_catalog(),$isAdmin);
+            if($llmIntent){
+                $routeSource='llm';$decisionUsage=max(0,(int)$llmIntent['input_tokens']+(int)$llmIntent['output_tokens']);
+                if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$llmIntent,'agent-llm-intent');
+            }
+        }catch(Throwable $e){$llmIntent=null;}
+    }
     $explicitPlayer=sf_agent_explicit_player_route($message);
-    if($explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
+    if($llmIntent===null&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
-    // Explicit page navigation takes priority over advisory JEV classifications.
+    // Existing parsed routes remain an availability fallback, not an LLM bypass.
     $explicitContext=sf_agent_page_context_request($message)?'page_context':(sf_agent_detail_request($message)!==null?'page_detail':(sf_agent_public_page_target($message)!==null?'page_navigate':null));
-    $route=$explicitContext??$explicitPlayer??(string)($jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
-    sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$jev['run_id']??'','status'=>$jev['status']??($routeSource==='local'?'local_fallback':'error'),'input_tokens'=>$jev['input_tokens']??0,'output_tokens'=>$jev['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action']]);
+    $route=(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
+    $audioResolution=null;
+    if($route==='player_play_named'&&($llmIntent['resolution']??'')==='llm_catalog'&&is_array($llmIntent['verified_track']??null)){
+        $track=$llmIntent['verified_track'];$id=(string)$track['id'];
+        $plan['action']=['type'=>'play_track','track_id'=>$id];$plan['action_name']='play_track';$plan['track']=$track;
+        $plan['text']='I will load “'.(string)$track['title'].'.”';
+        $audioResolution=['method'=>'llm_catalog','status'=>'verified','track_id'=>$id,'title'=>(string)$track['title']];
+    }
+    $routingMeta=$llmIntent??$jev??[];
+    sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$routingMeta['run_id']??'','status'=>$routeSource,'input_tokens'=>$routingMeta['input_tokens']??0,'output_tokens'=>$routingMeta['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action'],'audio_resolution'=>$audioResolution]);
     if(!$plan['needs_llm']){
         $text=$plan['text']!==''?$plan['text']:'Ready.';
-        sf_agent_save_message($userId,$conversationId,'assistant',$text,['provider'=>$routeSource==='jev'?'jev+policy':'stonefellow-policy','model'=>$jev['model']??'policy']);
+        sf_agent_save_message($userId,$conversationId,'assistant',$text,['provider'=>$routeSource.'+policy','model'=>$routingMeta['model']??'policy']);
         sf_log_user_activity($userId,'agent_interaction','Agent: '.$plan['route'],'agent',$conversationId,['action'=>$plan['action_name'],'needs_llm'=>false]);
-        return ['text'=>$text,'provider'=>$routeSource==='jev'?'jev+policy':'stonefellow-policy','model'=>$jev['model']??'policy','input_tokens'=>(int)($jev['input_tokens']??0),'output_tokens'=>(int)($jev['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
+        return ['text'=>$text,'provider'=>$routeSource.'+policy','model'=>$routingMeta['model']??'policy','input_tokens'=>(int)($routingMeta['input_tokens']??0),'output_tokens'=>(int)($routingMeta['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'audio_resolution'=>$audioResolution,'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
     }
     $context=sf_agent_context($message,$plan['context_profile'],$userId);
     $playingTrack=sf_agent_find_track('',(string)($client['active_track_id']??''));

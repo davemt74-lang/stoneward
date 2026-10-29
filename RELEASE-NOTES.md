@@ -1,3 +1,12 @@
+# Stonefellow v1.3.172 — Section 91B6A: LLM-First Agent Orchestration
+
+- The configured conversational LLM now interprets public-agent intent before legacy command routing. Server-side policy still defines allowed actions, and unavailable provider calls fall back to the previous deterministic routes.
+- Bounded recent dialogue, current page/player state, permission-filtered tool descriptions, and published catalog title/ID candidates provide context for music, ticketing, merchandise, vinyl, account, and navigation requests. Credential and payment data are not included.
+- Spoken “Genius of on human kind” can resolve to the published “Genius of Unhumankind” by LLM selection plus server-side phonetic identity validation; the browser independently verifies the published track ID/title receipt before playback.
+- The LLM cannot execute arbitrary tools, private recordings, purchases, publication, or other consequential operations. Existing user confirmation and application permission gates remain authoritative.
+- New PHP and browser regression suites cover catalog identity, misheard speech, unavailable/ambiguous IDs, public/Admin route boundaries, tool descriptions, and safe player dispatch.
+- This section establishes the shared intent bridge; Admin-specific orchestration and richer multi-step commerce tool execution remain follow-on work, not claimed complete here.
+
 # Stonefellow v1.3.171 — Section 91B5H: Verified Named Playback Hotfix
 
 Section 91B5H corrects two live public Agent failures: "change songs two hands up" did not dispatch playback, and "play genius 7 humankind" falsely reported the already-playing song. The server now classifies natural named-playback commands before advisory model routing, resolves only exact published song identity, and cannot substitute the current track for an unmatched named request. The public browser independently checks the named track ID against its published catalog before dispatch, and verifies actual player state before claiming playback. Unknown/ambiguous titles leave the existing song unchanged with an honest reply. New PHP and JavaScript regression suites cover both exact live reports, player identity, and no server-side permission expansion. No schema migration is required.
