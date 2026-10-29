@@ -518,6 +518,9 @@ jobs:
           node tests/section91b5-audio-player-skill.cjs
           php tests/section91b5h-playback-intent.php
           node tests/section91b5h-playback-intent.cjs
+          php -l api/agent-llm-orchestrator.php
+          php tests/section91b6-llm-agent-orchestrator.php
+          node tests/section91b6-llm-agent-orchestrator.cjs
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
           php -l api/media-catalog-intake.php
