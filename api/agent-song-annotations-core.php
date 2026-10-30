@@ -101,3 +101,15 @@ function sf_song_annotation_delete(int $userId,int $id): bool {
     $q=sf_db()->prepare('DELETE FROM agent_song_annotations WHERE user_id=? AND id=?');
     $q->execute([$userId,$id]);return $q->rowCount()===1;
 }
+/** Only listener-authored fields may change; the captured draft and offsets are immutable. */
+function sf_song_annotation_update(int $userId,int $id,array $payload): bool {
+    if($userId<1||$id<1)return false;
+    sf_song_annotation_require_consent($userId);
+    sf_song_annotations_ensure_schema();
+    $corrected=sf_song_annotation_text($payload['corrected_transcript']??null,4200,'Edited lyric draft',true);
+    $note=sf_song_annotation_text($payload['annotation']??'',1800,'Personal annotation');
+    $q=sf_db()->prepare('UPDATE agent_song_annotations SET transcript_corrected=?,user_note=?,analysis_report=?,analysis_question=?,analysis_mode=?,updated_at=? WHERE user_id=? AND id=?');
+    // A report about an earlier version cannot be relabeled as analysis of the edit.
+    $q->execute([$corrected,$note,'','','',gmdate('c'),$userId,$id]);
+    return $q->rowCount()===1;
+}

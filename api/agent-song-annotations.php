@@ -23,6 +23,11 @@ try{
         if(!$id)throw new InvalidArgumentException('A valid annotation ID is required.');
         sf_json_response(['ok'=>true,'deleted'=>sf_song_annotation_delete($userId,(int)$id)]);
     }
+    if($action==='update'){
+        $id=filter_var($request['id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        if(!$id)throw new InvalidArgumentException('A valid annotation ID is required.');
+        sf_json_response(['ok'=>true,'updated'=>sf_song_annotation_update($userId,(int)$id,$request)]);
+    }
     sf_json_response(['ok'=>false,'error'=>'unsupported_action'],422);
 }catch(InvalidArgumentException $e){
     sf_json_response(['ok'=>false,'error'=>'invalid_song_annotation','message'=>$e->getMessage()],422);
