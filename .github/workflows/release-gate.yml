@@ -534,6 +534,10 @@ jobs:
           php -l api/agent-song-transcribe.php
           php tests/section91b8b-song-transcription.php
           node tests/section91b8b-song-transcription.cjs
+          php -l api/agent-song-analyze-core.php
+          php -l api/agent-song-analyze.php
+          php tests/section91b8c-lyric-analysis.php
+          node tests/section91b8c-lyric-analysis.cjs
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
           php -l api/media-catalog-intake.php

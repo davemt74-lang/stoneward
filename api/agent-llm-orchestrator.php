@@ -8,7 +8,7 @@ require_once __DIR__.'/agent-tool-registry.php';
  */
 function sf_agent_orchestrator_routes(bool $admin): array {
     $routes=explode(' ',
-        'general_conversation song_capture_start song_capture_stop song_capture_status song_capture_transcribe player_play_named player_play_from_release player_recommend home_suggestion listening_session_start '.
+        'general_conversation song_capture_start song_capture_stop song_capture_status song_capture_transcribe song_capture_analyze player_play_named player_play_from_release player_recommend home_suggestion listening_session_start '.
         'listening_session_release listening_session_guided_release player_pause player_resume player_volume '.
         'player_status player_next player_previous favorite_save favorite_remove queue_open queue_add '.
         'queue_play_next queue_remove queue_clear page_context page_detail page_navigate site_search '.
@@ -93,7 +93,7 @@ function sf_agent_orchestrator_llm(string $message,array $client,array $history,
     }
     $system='You are the Stonefellow Agent intent orchestrator. Choose ONE action route from the allowed routes. '.
         'Interpret natural language, ASR errors and prior conversation; do not require exact song-title spelling. '.
-        'Song capture means capturing the CURRENTLY PLAYING audio section. Use song_capture_start to begin recording a verse, chorus or section; song_capture_stop to finish, and song_capture_transcribe ONLY when the user explicitly asks to transcribe a previously captured clip. Never confuse this with a music listening playlist session. '.
+        'Song capture means capturing the CURRENTLY PLAYING audio section. Use song_capture_start to begin recording a verse, chorus or section; song_capture_stop to finish; song_capture_transcribe when explicitly asked to transcribe the clip; song_capture_analyze ONLY when a lyric draft is available and the user asks for analysis, interpretation, research, translation or a report about that section. Never confuse this with a music listening playlist session. '.
         'For player_play_named, return the exact published catalog track_id only if one song is clearly intended. '.
         'For a request to choose any song from a named album or release (including a follow-up about that album), choose player_play_from_release and return release_title. Do not treat the album name as a song title. '.
         'If ambiguous or unavailable return empty track_id. NEVER pick the already playing song as a fallback. '.
@@ -104,7 +104,7 @@ function sf_agent_orchestrator_llm(string $message,array $client,array $history,
         'ALLOWED ROUTES: '.implode(', ',$routes).'\n'.
         'AVAILABLE AUTHORIZED TOOL PURPOSES (descriptions only; not direct execution): '.json_encode($toolInventory,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE).'\n'.
         'PUBLISHED CATALOG IDs AND TITLES: '.json_encode($published,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
-    $state='Current page: '.(string)($client['view']??'home').'; active track: '.(string)($client['active_track_id']??'').'.';
+    $state='Current page: '.(string)($client['view']??'home').'; active track: '.(string)($client['active_track_id']??'').'; captured lyric draft available: '.(!empty($client['song_lyric_draft_available'])?'yes':'no').'.';
     $transcript=[];foreach(array_slice($history,-4) as $line)$transcript[]=['role'=>(string)($line['role']??'user'),'content'=>substr((string)($line['content']??''),0,240)];
     foreach(sf_ai_llm_candidates('chat') as $provider){
         try{
