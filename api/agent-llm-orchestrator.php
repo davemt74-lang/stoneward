@@ -8,7 +8,7 @@ require_once __DIR__.'/agent-tool-registry.php';
  */
 function sf_agent_orchestrator_routes(bool $admin): array {
     $routes=explode(' ',
-        'general_conversation player_play_named player_play_from_release player_recommend home_suggestion listening_session_start '.
+        'general_conversation song_capture_start song_capture_stop song_capture_status player_play_named player_play_from_release player_recommend home_suggestion listening_session_start '.
         'listening_session_release listening_session_guided_release player_pause player_resume player_volume '.
         'player_status player_next player_previous favorite_save favorite_remove queue_open queue_add '.
         'queue_play_next queue_remove queue_clear page_context page_detail page_navigate site_search '.
@@ -93,6 +93,7 @@ function sf_agent_orchestrator_llm(string $message,array $client,array $history,
     }
     $system='You are the Stonefellow Agent intent orchestrator. Choose ONE action route from the allowed routes. '.
         'Interpret natural language, ASR errors and prior conversation; do not require exact song-title spelling. '.
+        'Song capture means capturing the CURRENTLY PLAYING audio section to transcribe later. Use song_capture_start for requests to listen to, capture or transcribe a verse, chorus or music section; song_capture_stop when the user finishes capturing. Never confuse this with a music listening playlist session. '.
         'For player_play_named, return the exact published catalog track_id only if one song is clearly intended. '.
         'For a request to choose any song from a named album or release (including a follow-up about that album), choose player_play_from_release and return release_title. Do not treat the album name as a song title. '.
         'If ambiguous or unavailable return empty track_id. NEVER pick the already playing song as a fallback. '.

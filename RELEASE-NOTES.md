@@ -1,3 +1,14 @@
+# Stonefellow v1.3.175 — Section 91B8A: Song-Segment Capture
+
+- Authenticated public Agent starts and stops an explicitly requested song-section capture from the actual browser audio player, with song identity and precise playback-range timestamps. The microphone and playlist listening sessions are separate.
+- MediaRecorder capture stays only in the tab's memory, max 90 seconds/20 MiB; stop/seek/track-change cleanup avoids silently mixing song sections. Unsupported browsers report the limitation and do not claim to have captured audio.
+- The animated agent visibly marks song capture. No audio is uploaded or sent to a language model in this phase. Transcription, analysis, review, and persistent lyric memory follow in Section 91B8B–E.
+- This build has no schema migration and retains the existing browser-owned audio transport, opt-in history, and LLM catalog playback protections. See `docs/section91b8a-song-capture.md`.
+
+# Stonefellow v1.3.174 — Section 91B7: Album Playback + Listening-Time Intelligence
+
+- Spoken album selection now resolves published release tracks with typo tolerance and verifies the player action; existing UTC listening events inform consented time-of-day preferences in music-related agent conversations.
+
 # Stonefellow v1.3.173 — Section 91B6B: Unified Admin + Commerce Agent Reads
 
 - Admin Agent Chat now offers a configured-LLM-first route proposal for ticketing, merchandise, vinyl/POD, membership, commerce, catalog and management requests. Every model-selected route must match the server's immutable Admin skill registry and is limited to authenticated read/navigation contracts.
