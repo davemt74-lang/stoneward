@@ -276,7 +276,7 @@ function sf_agent_explicit_song_capture_route(string $message,array $client=[]):
     $q=preg_replace('/^(?:(?:hey|hi|ok|okay)\s+)?stone\s*-?\s*fellow[,.:!?\s]*/i','',$q)??$q;
     // A completed player clip requires a second, explicit command before any
     // audio leaves the device. This is never the live microphone transcript.
-    if((!empty($client['song_capture_available'])||preg_match('/\b(?:captured|recorded|heard|last|just)\b/i',$q))
+    if((!empty($client['song_capture_available'])||preg_match('/\b(?:captured|recorded|heard|hear|last|just)\b/i',$q))
         &&(preg_match('/\b(?:transcribe|transcription|write\s+down|show\s+me|tell\s+me|what\s+were|what\s+did\s+you\s+hear)\b.*\b(?:captured|recorded|heard|last|just|lyrics|words|section|verse|chorus|clip)\b/i',$q)
         ||preg_match('/\b(?:what\s+did\s+you\s+hear|transcribe\s+(?:it|that|what\s+you\s+heard)|get\s+the\s+lyrics\s+from\s+(?:that|the)\s+(?:clip|section))\b/i',$q)))
         return 'song_capture_transcribe';
