@@ -21,7 +21,7 @@ function sf_speech_engine_pilot_config(): array {
     $id=sf_ai_meta_get('ai.speech_engine_id','');
     $enabled=sf_ai_meta_get('ai.speech_engine_enabled','0')==='1';
     $provider=sf_ai_provider_public('elevenlabs');
-    $ready=$enabled&&preg_match('/^seng_[A-Za-z0-9_-]{8,96}$/',$id)===1&&$provider['enabled']&&$provider['key_configured'];
+    $ready=$enabled&&preg_match('/^seng_[A-Za-z0-9_-]{8,96}$/',$id)===1&&$provider['enabled']&&$provider['key_configured']&&sf_ai_meta_get('ai.voice_provider','elevenlabs')==='elevenlabs';
     return ['pilot_enabled'=>$enabled,'engine_id'=>$id,'provider_configured'=>$provider['enabled']&&$provider['key_configured'],'ready'=>$ready];
 }
 

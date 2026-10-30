@@ -28,6 +28,9 @@ $check(sf_speech_engine_save_choice(2,'speech_engine')==='speech_engine','Signed
 $check(sf_speech_engine_user_choice(3)==='legacy','Other account remains on original engine');
 $check(sf_speech_engine_public_state(2)['selected_engine']==='speech_engine'&&sf_speech_engine_public_state(2)['effective_engine']==='legacy','Preference does not route audio before authenticated transport');
 $check(sf_speech_engine_save_choice(2,'legacy')==='legacy','Per-account rollback is immediate and explicit');
+$meta['ai.voice_provider']='none';
+$check(sf_speech_engine_public_state(2)['pilot_available']===false,'Admin voice-provider off switch also disables the pilot');
+$meta['ai.voice_provider']='elevenlabs';
 $provider=['enabled'=>false,'key_configured'=>false];
 $check(sf_speech_engine_public_state(2)['pilot_available']===false,'Disabling credential blocks new pilot opt-ins');
 $check(!array_key_exists('api_key',sf_speech_engine_public_state(2)),'Public account data contains no API key');
