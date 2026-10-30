@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.179';
+  window.STONEFELLOW_APP_BUILD='1.3.180';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -235,20 +235,57 @@
           time(note.start_ms/1000)+'–'+time(note.end_ms/1000)+'. The draft remains unverified and is not shared with future AI conversations automatically.';
       }catch(e){return 'I could not save the private lyric note. '+e.message;}
     }
+    if((m=q.match(/^share\s+(full\s+)?(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)\s+(?:with\s+)?(?:my\s+)?agent\s+brain[.!?]*$/i))){
+      const scope=m[1]?'full':'summary',id=Number(m[2]);
+      if(!Number.isSafeInteger(id)||id<1)return 'Choose a valid saved annotation number.';
+      const warning=scope==='full'
+        ?'Share note #'+id+' FULLY with your signed-in Stonefellow Agent Brain? Relevant future chat questions may send your unverified lyric draft, personal note and report excerpts to the configured AI provider. The Agent may discuss or speak about them. Nothing is shared with public profile visitors. You can revoke this later.'
+        :'Share note #'+id+' SUMMARY with your signed-in Stonefellow Agent Brain? Relevant future chat questions may send your personal note or interpretive report excerpt (not your raw lyrics) to the configured AI provider. Public profile visitors cannot access it. You can revoke this later.';
+      if(!window.confirm(warning))return 'Sharing cancelled. Your note is still private.';
+      try{const result=await secureJsonPost('agent-song-annotations.php',{action:'share',id,scope});
+        return result.sharing?'Note #'+id+' is now shared with your signed-in Agent Brain at '+scope+' scope. It remains an unverified/interpretive source; unrelated conversations and public profile agents do not receive it.':'That note was not found in your private account.';
+      }catch(e){return 'I could not change that note’s sharing scope. '+e.message;}
+    }
+    if((m=q.match(/^(?:stop\s+sharing|unshare|make\s+private|keep\s+private)\s+(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)[.!?]*$/i))){
+      const id=Number(m[1]);if(!Number.isSafeInteger(id)||id<1)return 'Choose a valid saved annotation number.';
+      try{const result=await secureJsonPost('agent-song-annotations.php',{action:'share',id,scope:'private'});
+        if(!result.sharing)return 'That note was not found in your private account.';
+        // Rotate this browser's conversation so old turns with paraphrases do
+        // not automatically remain in the next request's recent history.
+        st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');
+        return 'Sharing revoked for note #'+id+'. A fresh conversation will be used for future chat. Earlier replies and provider processing cannot be retroactively erased; use Agent privacy controls to clear saved conversation history.';
+      }catch(e){return 'I could not revoke sharing for that note. '+e.message;}
+    }
+    if((m=q.match(/^(?:show|review|list)\s+(?:my\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)\s+(?:sharing\s+)?history[.!?]*$/i))){
+      try{const result=await api('agent-song-annotations.php?history_id='+encodeURIComponent(m[1]));
+        const history=result.share_history||[];
+        return {text:'I displayed your private sharing history in chat.',privateDisplay:history.length?
+          'Agent Brain sharing history for note #'+m[1]+':\n'+history.map(e=>e.changed_at+' | '+e.previous_scope+' → '+e.new_scope).join('\n'):
+          'No sharing changes found for that note in your account.'};
+      }catch(e){return 'I could not load that sharing history. '+e.message;}
+    }
+    if(/^(?:which|what)\s+(?:of\s+my\s+)?(?:lyric\s+)?(?:notes|annotations)\s+(?:are\s+)?shared\s+(?:with\s+)?(?:my\s+)?agent\s+brain[.!?]*$/i.test(q)){
+      try{const result=await api('agent-song-annotations.php');
+        const notes=(result.annotations||[]).filter(n=>n.agent_share_scope&&n.agent_share_scope!=='private');
+        return {text:'I displayed your shared-note status privately in chat.',privateDisplay:notes.length?
+          notes.map(n=>'#'+n.id+' “'+n.title+'” | '+n.agent_share_scope+' | shared '+n.agent_shared_at).join('\n'):
+          'No private lyric notes are currently shared with Agent Brain.'};
+      }catch(e){return 'I could not inspect your shared notes. '+e.message;}
+    }
     if(/^(?:show|list|review|open|read)(?:\s+me)?\s+(?:my\s+)?(?:saved\s+|private\s+)?(?:lyric|lyrics|song|transcript)?\s*(?:notes|annotations|drafts)(?:\s+(?:please|again))?[.!?]*$/i.test(q)){
       try{const result=await api('agent-song-annotations.php');const notes=result.annotations||[];
         if(!notes.length)return 'You have no saved private lyric annotations.';
         const detail='Your private song annotations (not sent to the AI provider):\n'+notes.slice(0,10).map(n=>
           '#'+n.id+' “'+n.title+'” '+time(n.start_ms/1000)+'–'+time(n.end_ms/1000)+' | '+
-          (n.transcript_corrected?'listener-edited draft':'unverified machine draft')+' | '+n.captured_at).join('\n')+
-          '\nSay “show lyric note #ID” to review the text, or “delete lyric note #ID” to remove it.';
+          (n.transcript_corrected?'listener-edited draft':'unverified machine draft')+' | '+n.captured_at+' | Agent Brain: '+(n.agent_share_scope||'private')).join('\n')+
+          '\nSay “share lyric note #ID with Agent Brain” (summary), “share full lyric note #ID with Agent Brain” (draft included), “stop sharing lyric note #ID”, or “delete lyric note #ID”.';
         return {text:'I listed your private lyric annotations in chat. I will not read the private details aloud.',privateDisplay:detail};
       }catch(e){return 'I could not load your private lyric notes. '+e.message;}
     }
     if((m=q.match(/^(?:show|read|review|open)\s+(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)[.!?]*$/i))){
       try{const result=await api('agent-song-annotations.php');const n=(result.annotations||[]).find(n=>Number(n.id)===Number(m[1]));
         if(!n)return 'That annotation is not in your private notes.';
-        const detail='PRIVATE LYRIC NOTE #'+n.id+' — “'+n.title+'” ('+time(n.start_ms/1000)+'–'+time(n.end_ms/1000)+')\n'+
+        const detail='PRIVATE LYRIC NOTE #'+n.id+' — “'+n.title+'” ('+time(n.start_ms/1000)+'–'+time(n.end_ms/1000)+')\nAgent Brain scope: '+(n.agent_share_scope||'private')+'\n'+
           'Original unverified machine draft:\n'+n.transcript_draft+'\n'+
           (n.transcript_corrected?'Listener-edited, still-unverified draft:\n'+n.transcript_corrected+'\n':'')+
           (n.user_note?'Personal note:\n'+n.user_note+'\n':'')+
@@ -259,13 +296,15 @@
     if((m=q.match(/^(?:edit|correct|update)\s+(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)\s+(?:to|as|:)\s+([\s\S]+)$/i))){
       const corrected=m[2].trim();if(corrected.length<3||corrected.length>4200)return 'The corrected draft must be between 3 and 4,200 characters.';
       try{const result=await secureJsonPost('agent-song-annotations.php',{action:'update',id:Number(m[1]),corrected_transcript:corrected});
-        return result.updated?'Updated your private note #'+Number(m[1])+'. The original machine draft remains unchanged; the older AI report was cleared because it described a different draft.':'That note does not belong to your account or no change was made.';
+        if(result.updated){st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');}
+        return result.updated?'Updated your private note #'+Number(m[1])+'. The original machine draft remains unchanged; the older AI report was cleared, and previous Agent Brain sharing was revoked.':'That note does not belong to your account or no change was made.';
       }catch(e){return 'I could not update that private annotation. '+e.message;}
     }
     if((m=q.match(/^(?:delete|remove|erase)\s+(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)[.!?]*$/i))){
       const id=Number(m[1]);if(!Number.isSafeInteger(id)||id<1)return 'Choose a valid private annotation number.';
       if(!window.confirm('Permanently delete your private lyric annotation #'+id+'?'))return 'Deletion cancelled. Your note is unchanged.';
       try{const result=await secureJsonPost('agent-song-annotations.php',{action:'delete',id});
+        if(result.deleted){st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');}
         return result.deleted?'Deleted private annotation #'+id+'.':'That note was already removed or does not belong to your account.';
       }catch(e){return 'I could not delete that private annotation. '+e.message;}
     }

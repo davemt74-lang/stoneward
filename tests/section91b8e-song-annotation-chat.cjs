@@ -8,7 +8,8 @@ let passes=0;const check=(name,fn)=>{fn();passes++;console.log('91B8E PASS: '+na
 const capture={track_id:'one',start_ms:10000,end_ms:24000,captured_at:'2026-10-29T10:12:35Z'};
 const draft={...capture,title:'First Track',text:'Unverified guess',review_status:'unverified'};
 const post=[],notes=[],scope={songCaptureSkill:{getCapture:()=>capture},songLyricDraft:draft,
-  songLyricCorrected:'',songLyricReport:null,songPersonalNote:'',st:{track:{id:'one'}},
+  songLyricCorrected:'',songLyricReport:null,songPersonalNote:'',st:{track:{id:'one'},conversationId:'old'},
+  localStorage:{removeItem:()=>{}},
   window:{confirm:()=>false},time:s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'),
   secureJsonPost:async(path,payload)=>{post.push({path,payload});if(payload.action==='save')return {annotation:{id:3,title:'First Track',start_ms:10000,end_ms:24000}};
     if(payload.action==='update')return {updated:true};return {deleted:true}},

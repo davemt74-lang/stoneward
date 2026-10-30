@@ -10,6 +10,11 @@ $userId=(int)$user['id'];
 header('Cache-Control: no-store, private');
 try{
     if($method==='GET'){
+        if(isset($_GET['history_id'])){
+            $id=filter_var($_GET['history_id'],FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+            if(!$id)throw new InvalidArgumentException('A valid annotation ID is required.');
+            sf_json_response(['ok'=>true,'share_history'=>sf_song_annotation_share_history($userId,(int)$id)]);
+        }
         sf_json_response(['ok'=>true,'annotations'=>sf_song_annotation_list($userId)]);
     }
     $request=sf_request_json();
@@ -27,6 +32,13 @@ try{
         $id=filter_var($request['id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
         if(!$id)throw new InvalidArgumentException('A valid annotation ID is required.');
         sf_json_response(['ok'=>true,'updated'=>sf_song_annotation_update($userId,(int)$id,$request)]);
+    }
+    if($action==='share'){
+        $id=filter_var($request['id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        $scope=$request['scope']??null;
+        if(!$id||!is_string($scope))throw new InvalidArgumentException('Valid note and sharing scope required.');
+        $entry=sf_song_annotation_set_share_scope($userId,(int)$id,$scope);
+        sf_json_response(['ok'=>true,'sharing'=>$entry]);
     }
     sf_json_response(['ok'=>false,'error'=>'unsupported_action'],422);
 }catch(InvalidArgumentException $e){
