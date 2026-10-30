@@ -689,6 +689,16 @@ function sf_migration_definitions(): array {
                 sf_production_deadline_schema();
             },
         ],
+        [
+            'id'=>'2026-10-30-060',
+            'app_version'=>'1.3.178',
+            'description'=>'Private per-listener song-section transcription and analysis annotations',
+            'revision'=>'1',
+            'apply'=>function(): void {
+                require_once SF_ROOT.'/api/agent-song-annotations-core.php';
+                sf_song_annotations_ensure_schema();
+            },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
