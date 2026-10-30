@@ -23,5 +23,5 @@ putenv('SF_SPEECH_GATEWAY_HEALTH_URL');
 $diagnostics=sf_speech_engine_diagnostics();
 $check(!$diagnostics['ready_for_live_test']&&!$diagnostics['provider_token_verified'],'Disabled pilot never calls provider on health test');
 $api=(string)file_get_contents(dirname(__DIR__).'/admin/api/ai-providers.php');
-$check(str_contains($api,"sf_admin_require_auth($write)")&&str_contains($api,"if($action==='test_speech_engine')"),'Admin diagnostic endpoint remains authenticated and CSRF protected');
+$check(str_contains($api,'sf_admin_require_auth($write)')&&str_contains($api,'if($action===\'test_speech_engine\')'),'Admin diagnostic endpoint remains authenticated and CSRF protected');
 echo "Section 91B9C: $count readiness and SSRF assertions passed\n";
