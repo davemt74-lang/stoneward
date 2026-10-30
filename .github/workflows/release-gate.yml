@@ -522,6 +522,9 @@ jobs:
           php tests/section91b6-llm-agent-orchestrator.php
           node tests/section91b6-llm-agent-orchestrator.cjs
           php tests/section91b6b-admin-commerce-llm.php
+          php -l api/agent-listening-insights.php
+          php tests/section91b7-album-time-insights.php
+          node tests/section91b7-album-time-insights.cjs
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
           php -l api/media-catalog-intake.php
