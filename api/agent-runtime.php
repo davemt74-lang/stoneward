@@ -274,6 +274,10 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
 function sf_agent_explicit_song_capture_route(string $message,array $client=[]): ?string {
     $q=strtolower(trim(preg_replace('/\s+/u',' ',$message)??$message));
     $q=preg_replace('/^(?:(?:hey|hi|ok|okay)\s+)?stone\s*-?\s*fellow[,.:!?\s]*/i','',$q)??$q;
+    if(!empty($client['song_lyric_draft_available'])&&(
+        preg_match('/\b(?:analy[sz]e|analysis|explain|interpret|research|report|summari[sz]e|translate|meaning|symbolism|themes?)\b.*\b(?:verse|chorus|lyrics?|transcript(?:ion)?|song|excerpt|line|words|section|that|it)\b/i',$q)
+        ||preg_match('/\b(?:what\s+does\s+(?:(?:that|this|the)\s+(?:line|verse|lyric|section)|that|this|it)\s+mean|what\s+do\s+(?:those|these|the)\s+lyrics\s+mean|what\s+is\s+that\s+verse\s+about|tell\s+me\s+more\s+about\s+that\s+(?:verse|lyric|section))\b/i',$q)
+    ))return 'song_capture_analyze';
     // A completed player clip requires a second, explicit command before any
     // audio leaves the device. This is never the live microphone transcript.
     if((!empty($client['song_capture_available'])||preg_match('/\b(?:captured|recorded|heard|hear|last|just)\b/i',$q))
@@ -381,10 +385,14 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
     // They must not require a catalog lookup or a private DB read just to
     // start, stop, or submit a captured section; the upload endpoint later
     // checks the published catalog independently before provider processing.
-    $captureAction=in_array($route,['song_capture_start','song_capture_stop','song_capture_status','song_capture_transcribe'],true);
+    $captureAction=in_array($route,['song_capture_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'],true);
     $track=$captureAction?null:sf_agent_find_track($message,$active);
     $action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
+        case 'song_capture_analyze':
+            if(empty($client['song_lyric_draft_available']))$text='First capture and transcribe a song section. Then I can analyze or research the lyrics you heard.';
+            else{$action=['type'=>'song_capture_analyze','question'=>sf_clean_text($message,700)];$text='Analyzing the captured lyric draft using approved song context.';}
+            break;
         case 'song_capture_transcribe':
             if(!empty($client['song_capture_active']))$text='Stop the song capture first, then I can transcribe the section you just heard.';
             elseif(empty($client['song_capture_available']))$text='There is no finished song section to transcribe. Ask me to listen to a verse first.';
@@ -715,7 +723,7 @@ function sf_agent_normalize_client_state(array $raw): array {
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
     }
-    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'song_capture_active'=>1,'song_capture_available'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
+    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'song_capture_active'=>1,'song_capture_available'=>1,'song_lyric_draft_available'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
     foreach($numbers as $key=>$max){
         if(isset($raw[$key])&&is_numeric($raw[$key]))$out[$key]=max(0,min($max,(int)$raw[$key]));
     }

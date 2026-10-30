@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.176';
+  window.STONEFELLOW_APP_BUILD='1.3.177';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -62,7 +62,7 @@
   function playerState(){
     const duration=Number.isFinite(audio.duration)?Math.max(0,Math.floor(audio.duration)):0;
     const position=Number.isFinite(audio.currentTime)?Math.max(0,Math.floor(audio.currentTime)):0;
-    return {player_is_playing:!!st.track&&!audio.paused?1:0,song_capture_active:songCaptureSkill?.status().active?1:0,song_capture_available:songCaptureSkill?.getCapture()?1:0,player_volume_percent:Math.round(playerVolume()*100),player_position_seconds:Math.min(86400,position),player_duration_seconds:Math.min(86400,duration)};
+    return {player_is_playing:!!st.track&&!audio.paused?1:0,song_capture_active:songCaptureSkill?.status().active?1:0,song_capture_available:songCaptureSkill?.getCapture()?1:0,song_lyric_draft_available:songLyricDraft?1:0,player_volume_percent:Math.round(playerVolume()*100),player_position_seconds:Math.min(86400,position),player_duration_seconds:Math.min(86400,duration)};
   }
   function describePlayer(){
     if(!st.track)return 'No song is loaded in the Stonefellow player.';
@@ -123,12 +123,14 @@
     audio,getTrack:()=>st.track,
     onChange:capture=>{
       document.body.classList.toggle('song-capture-active',capture.active);
-      if(capture.active)songLyricDraft=null;
+      if(capture.active||!capture.last){songLyricDraft=null;songLyricReport=null;}
       if(capture.active)agent('recording','Capturing this song section… say “stop listening” to finish.');
     }
   });
   let songTranscriptionBusy=false;
   let songLyricDraft=null;
+  let songAnalysisBusy=false;
+  let songLyricReport=null;
   async function transcribeLastCapturedSong(retried=false){
     const captured=songCaptureSkill?.getCapture();
     if(!captured)return 'There is no completed song section. Ask me to listen to a verse, then say stop listening.';
@@ -163,12 +165,36 @@
     }catch(e){return 'I could not transcribe the section. '+e.message+' The captured audio is still in this browser, so you can retry.'}
     finally{songTranscriptionBusy=false}
   }
+  async function analyzeLastSongDraft(question){
+    const captured=songCaptureSkill?.getCapture(),draft=songLyricDraft;
+    if(!captured||!draft||draft.track_id!==captured.track_id||draft.start_ms!==captured.start_ms||draft.end_ms!==captured.end_ms)
+      return 'Please capture and transcribe a song section before asking me to analyze it.';
+    if(songAnalysisBusy)return 'I am already analyzing that lyric section. One moment.';
+    songAnalysisBusy=true;
+    try{
+      popupEntry('notice','Analyzing the unverified lyric draft. Your requested excerpt and consented listening-history summary may be sent to your configured AI provider.');
+      const payload={track_id:draft.track_id,start_ms:draft.start_ms,end_ms:draft.end_ms,
+        captured_at:draft.captured_at,transcript:draft.text,question:String(question||'').slice(0,700),
+        timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
+      const response=await secureJsonPost('agent-song-analyze.php',payload);
+      if(songCaptureSkill?.getCapture()!==captured||songLyricDraft!==draft)
+        return 'Playback or the lyric draft changed during analysis. I discarded the outdated report.';
+      const report=response.analysis;
+      if(!report||!report.report||report.track_id!==draft.track_id)throw new Error('No grounded analysis report was returned.');
+      songLyricReport=Object.freeze({...report});
+      const range=Math.round(report.start_ms/1000)+'–'+Math.round(report.end_ms/1000)+'s';
+      return 'Lyric analysis for “'+report.title+'” ('+range+'), using an unverified transcript:\n\n'+report.report+
+        '\n\nSource note: interpretation from an unverified lyric draft and available Stonefellow records; no live web sources were searched.';
+    }catch(e){return 'I could not finish the lyric analysis. '+e.message+' Your captured draft is still available for another request.'}
+    finally{songAnalysisBusy=false;}
+  }
   async function executeSongCaptureAction(action){
-    if(!action||!['song_capture_start','song_capture_stop','song_capture_status','song_capture_transcribe'].includes(action.type))return null;
+    if(!action||!['song_capture_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'].includes(action.type))return null;
     if(!songCaptureSkill)return 'Song-section audio capture is unavailable. Playback was not changed.';
     if(action.type==='song_capture_start')return songCaptureSkill.begin().text;
     if(action.type==='song_capture_stop')return (await songCaptureSkill.stop()).text;
     if(action.type==='song_capture_transcribe')return await transcribeLastCapturedSong();
+    if(action.type==='song_capture_analyze')return await analyzeLastSongDraft(action.question);
     const snapshot=songCaptureSkill.status();
     if(snapshot.active)return 'I am capturing the current song from '+Math.round(snapshot.start_ms/1000)+' seconds. Say “stop listening” to finish.';
     return snapshot.last?'The last song section is captured and ready for transcription.':'There is no song-section capture in progress.';
