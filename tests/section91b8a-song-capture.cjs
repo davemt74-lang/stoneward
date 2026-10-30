@@ -75,9 +75,10 @@ async function main(){
     assert.ok(php.indexOf('agent-song-capture-skill.js')>0);
     assert.ok(php.indexOf('agent-song-capture-skill.js')<php.indexOf('assets/js/app.js'));
   });
-  check('Release headers, service worker and browser agree on version 1.3.175',()=>{
+  check('Release headers, service worker and browser agree on current version',()=>{
+    const current=fs.readFileSync(path.join(root,'version.php'),'utf8').match(/'stonefellow'\s*=>\s*'([^']+)'/)[1];
     for(const file of ['.htaccess','stonefellow-v120.php','version.php','service-worker.js','admin/index.php','assets/js/app.js']){
-      assert.match(fs.readFileSync(path.join(root,file),'utf8'),/1\.3\.175/,file);
+      assert.ok(fs.readFileSync(path.join(root,file),'utf8').includes(current),file);
     }
   });
   process.stdout.write(`Section 91B8A: ${passed} JavaScript capture assertions passed\n`);
