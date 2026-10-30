@@ -12,7 +12,7 @@
     const anchor=canvas?.querySelector('#aiRoutingForm');
     if(!anchor||canvas.querySelector('[data-admin-speech-engine]'))return;
     const block=document.createElement('section');block.className='panel';block.dataset.adminSpeechEngine='';
-    block.innerHTML='<div class="panel-title"><div><h2>ElevenLabs Speech Engine pilot</h2><p>Reuses the encrypted ElevenLabs API key above. The current voice runtime remains the default.</p></div></div><form data-speech-pilot-form class="form-grid"><label class="field span2">Speech Engine ID<input name="engine_id" placeholder="seng_…" maxlength="101" autocomplete="off"></label><label class="check-field span2"><input name="enabled" type="checkbox">Allow account-level pilot opt-in</label><div class="actions span3"><button type="submit" class="secondary">Save pilot settings</button></div><p class="hint span3" data-pilot-status role="status" aria-live="polite">Loading…</p></form>';
+    block.innerHTML='<div class="panel-title"><div><h2>ElevenLabs Speech Engine pilot</h2><p>Reuses the encrypted ElevenLabs API key above. The current voice runtime remains the default.</p></div></div><form data-speech-pilot-form class="form-grid"><label class="field span2">Speech Engine ID<input name="engine_id" placeholder="seng_…" maxlength="101" autocomplete="off"></label><label class="check-field span2"><input name="enabled" type="checkbox">Allow account-level pilot opt-in</label><div class="actions span3"><button type="submit" class="secondary">Save pilot settings</button><button type="button" class="secondary" data-pilot-test>Test provider and gateway</button></div><p class="hint span3" data-pilot-status role="status" aria-live="polite">Loading…</p></form>';
     anchor.closest('section')?.after(block);
     const form=block.querySelector('form'),status=block.querySelector('[data-pilot-status]');const current=++revision;
     try{
@@ -26,6 +26,15 @@
         const auth=await json('auth.php');
         const data=await json('ai-providers.php',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf||''},body:JSON.stringify({action:'save_speech_engine',engine_id:form.elements.engine_id.value,enabled:form.elements.enabled.checked})});
         status.textContent=data.speech_engine?.ready?'Pilot enabled. Account members may connect with WebRTC after the gateway is deployed.':'Pilot saved, currently unavailable.';
+      }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+    });
+    block.querySelector('[data-pilot-test]').addEventListener('click',async event=>{
+      const button=event.currentTarget;button.disabled=true;status.textContent='Checking the saved ElevenLabs credential and private gateway…';
+      try{
+        const auth=await json('auth.php');
+        const data=await json('ai-providers.php',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf||''},body:JSON.stringify({action:'test_speech_engine'})});
+        const diag=data.diagnostics||{},gateway=diag.gateway||{};
+        status.textContent='Provider token: '+(diag.provider_token_verified?'verified':'failed or not ready')+' · Gateway: '+(!gateway.configured?'health URL not configured':gateway.signed?'reachable, signed bridge enabled':'unavailable or bridge disabled')+' · '+(diag.ready_for_live_test?'Ready for a manual microphone test.':'Complete the missing setup before testing.');
       }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
     });
   }
