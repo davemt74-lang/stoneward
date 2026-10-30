@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once dirname(__DIR__).'/api/bootstrap.php';
 require_once dirname(__DIR__).'/api/agent-runtime.php';
 $passed=0;
 $check=static function(bool $condition,string $label)use(&$passed):void{
