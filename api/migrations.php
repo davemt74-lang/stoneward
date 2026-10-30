@@ -709,6 +709,16 @@ function sf_migration_definitions(): array {
                 sf_song_annotations_ensure_schema();
             },
         ],
+        [
+            'id'=>'2026-10-30-062',
+            'app_version'=>'1.3.181',
+            'description'=>'Private per-account Speech Engine pilot preference and opt-in switch',
+            'revision'=>'1',
+            'apply'=>function(): void {
+                require_once SF_ROOT.'/api/speech-engine-core.php';
+                sf_speech_engine_ensure_schema();
+            },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {

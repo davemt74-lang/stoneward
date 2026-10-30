@@ -10,6 +10,8 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/site"
 git -C "$root" archive --format=tar HEAD | tar -xf - -C "$stage/site"
 rm -rf "$stage/site/.github" "$stage/site/tests" "$stage/site/scripts"
+# The separate ElevenLabs Node gateway must not be published under the PHP web root.
+rm -rf "$stage/site/speech-gateway"
 rm -f "$stage/site/.gitignore" "$stage/site/.gitattributes"
 # Discard older static release claims; stamp the actual archive source commit.
 rm -f "$stage/site/AUDIT-REPORT.md" "$stage/site/RELEASE-NOTES.md" \
