@@ -65,7 +65,7 @@ $full=sf_song_annotation_set_share_scope(1,$id,'full');
 $ctx=sf_song_annotation_agent_context(1,'What does this verse mean?','published-1');
 $check(($full['scope']??'')==='full'&&str_contains($ctx,'Listener edited secret lyric'),
     'Separate full-scope authorization permits relevant edited draft context');
-$check(str_contains($ctx,'user_edited_unverified')&&str_contains($ctx,'untrusted'),
+$check(str_contains($ctx,'listener_edited_unverified')&&str_contains($ctx,'untrusted'),
     'Model context labels edited drafts as unverified and untrusted data');
 $consent[1]=false;
 $check(sf_song_annotation_agent_context(1,'What do my lyric notes mean?')==='',
