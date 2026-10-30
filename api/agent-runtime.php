@@ -276,7 +276,7 @@ function sf_agent_explicit_song_capture_route(string $message,array $client=[]):
     $q=preg_replace('/^(?:(?:hey|hi|ok|okay)\s+)?stone\s*-?\s*fellow[,.:!?\s]*/i','',$q)??$q;
     if(preg_match('/\b(?:stop|finish|end|complete)\s+(?:song\s+|audio\s+)?(?:listening|captur(?:e|ing)|transcrib(?:e|ing)|recording)(?:\s+(?:this|the)\s+(?:song|verse|chorus|section))?\b/i',$q))return 'song_capture_stop';
     if(!empty($client['song_capture_active'])&&preg_match('/^(?:(?:okay|ok|right|alright)[,.! ]*)?(?:that(?:\s+is|\x27s)?\s+enough|done|stop|finished)(?:[.! ]*)$/i',$q))return 'song_capture_stop';
-    if(preg_match('/\b(?:are\s+you\s+)?(?:still\s+)?(?:listening|capturing|recording)\s+(?:this\s+)?(?:song|music|audio|verse|chorus|section)\b/i',$q))return 'song_capture_status';
+    if(preg_match('/\b(?:are\s+you\s+)?(?:still\s+)?(?:listening|capturing|recording)\s+(?:to\s+)?(?:this\s+)?(?:song|music|audio|verse|chorus|section)\b/i',$q))return 'song_capture_status';
     if(preg_match('/\b(?:listen\s+(?:to|in\s+on)|capture|record|transcribe)\s+(?:this\s+|the\s+|to\s+the\s+)?(?:next\s+|current\s+)?(?:verse|chorus|bridge|lyrics|section|part\s+of\s+(?:this\s+)?song|song\s+section|music\s+section)\b/i',$q))return 'song_capture_start';
     if(preg_match('/\b(?:start|begin|turn\s+on|activate)\s+(?:song\s+|audio\s+|lyric\s+)?(?:listening|capture|transcription|recording)\s+mode\b/i',$q))return 'song_capture_start';
     return null;

@@ -14,6 +14,7 @@ $check(sf_agent_explicit_song_capture_route('Stop listening')==='song_capture_st
 $check(sf_agent_explicit_song_capture_route('Okay, that is enough',['song_capture_active'=>1])==='song_capture_stop','Active capture recognizes conversational finish');
 $check(sf_agent_explicit_song_capture_route('That is enough',['song_capture_active'=>0])===null,'No accidental capture stop when inactive');
 $check(sf_agent_explicit_song_capture_route('Are you listening to this verse?')==='song_capture_status','Capture status query');
+$check(sf_agent_explicit_song_capture_route('Are you still listening to this chorus?')==='song_capture_status','Status query with continuous listening phrase');
 $check(sf_agent_explicit_song_capture_route('Play something from Happier Than Hay')===null,'Normal album playback is not capture');
 $check(sf_agent_explicit_song_capture_route('Start a listening session')===null,'Playlist listening sessions stay separate');
 $check(sf_agent_explicit_song_capture_route('Stop the music')===null,'Stop music is not stop song capture');
