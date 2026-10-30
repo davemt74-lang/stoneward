@@ -55,9 +55,9 @@ function sf_speech_engine_save_choice(int $userId,string $engine): string {
 
 function sf_speech_engine_public_state(int $userId): array {
     $pilot=sf_speech_engine_pilot_config();$choice=sf_speech_engine_user_choice($userId);
-    // 91B9A stores the preference only. Never imply the live microphone has
-    // switched before the account-bound 91B9B WebRTC transport is installed.
-    return ['selected_engine'=>$choice,'effective_engine'=>'legacy',
+    // The account selects its own runtime; provider/gateway connection errors
+    // leave the original voice path selectable without mutating the preference.
+    return ['selected_engine'=>$choice,'effective_engine'=>$choice==='speech_engine'&&$pilot['ready']?'speech_engine':'legacy',
         'pilot_available'=>$pilot['ready'],'provider_configured'=>$pilot['provider_configured'],
         'pilot_enabled'=>$pilot['pilot_enabled']];
 }

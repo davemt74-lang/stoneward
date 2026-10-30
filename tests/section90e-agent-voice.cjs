@@ -28,13 +28,13 @@ assert.match(adminCanvas,/toggleAdminSpeech/);
 assert.match(adminApp,/if\(response\.text\)void speakAdminReply\(response\.text\)/);
 assert.match(read('admin/assets/agent-canvas.css'),/\[data-mode="speaking"\]/);
 
-async function testTypedReply(enabled){
+async function testTypedReply(enabled,pilotActive=false){
   let spoken=0;
-  const sandbox={st:{conversationOn:false,playing:false},voiceRepliesEnabled:enabled,voiceInteractionStarted:true,Promise,setTimeout:(fn)=>{fn();return 1},agent:()=>{},popupEntry:()=>{},agentSpeak:async()=>{spoken++;return true}};
+  const sandbox={st:{conversationOn:false,playing:false},voiceRepliesEnabled:enabled,voiceInteractionStarted:true,speechPilotActive:pilotActive,Promise,setTimeout:(fn)=>{fn();return 1},agent:()=>{},popupEntry:()=>{},agentSpeak:async()=>{spoken++;return true}};
   vm.createContext(sandbox);
   vm.runInContext('let pendingReply;'+extract(publicApp,'say')+';globalThis.sayTest=say',sandbox);
   await sandbox.sayTest('Reply to typed prompt');
-  assert.equal(spoken,enabled?1:0,'typed replies must honor the Voice On/Off setting');
+  assert.equal(spoken,enabled&&!pilotActive?1:0,'typed replies must honor Voice On/Off and avoid double TTS during Speech Engine playback');
 }
 async function testAdminPrivateVoice(){
   const local={lang:'en-US',localService:true},remote={lang:'en-US',localService:false};
@@ -51,6 +51,6 @@ async function testAdminPrivateVoice(){
   await sandbox.speakTest('Muted reply');
   assert.equal(spoken.length,1,'Admin voice off must suppress playback');
 }
-Promise.all([testTypedReply(true),testTypedReply(false),testAdminPrivateVoice()]).then(()=>{
+Promise.all([testTypedReply(true),testTypedReply(false),testTypedReply(true,true),testAdminPrivateVoice()]).then(()=>{
   console.log('Section 90E typed prompt voice, mute, Admin local-only speech and companion states: PASS');
 }).catch(error=>{console.error(error);process.exitCode=1});

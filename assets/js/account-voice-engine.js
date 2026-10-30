@@ -14,7 +14,7 @@
       const auth=await json('api/auth.php');
       const result=await json(endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf||''},body:JSON.stringify({action:'set_preference',engine})});
       select.value=result.speech_engine.selected_engine;
-      status.textContent=engine==='legacy'?'Original voice engine selected.':'Speech Engine pilot preference saved. Activation awaits the secure voice transport in Section 91B9B.';
+      status.textContent=engine==='legacy'?'Original voice engine selected.':'Speech Engine pilot selected. Click the microphone to connect; the separate gateway must be running.';
     }catch(error){status.textContent=error.message;select.value=select.dataset.previous||'legacy';}
     finally{select.disabled=false;}
   }
@@ -35,7 +35,7 @@
       select.value=data.selected_engine;
       select.dataset.previous=select.value;
       if(!data.pilot_available){select.querySelector('option[value="speech_engine"]').disabled=true;status.textContent='Speech Engine pilot is not yet enabled by Admin. Your original voice controls remain available.';}
-      else status.textContent=data.selected_engine==='speech_engine'?'Pilot preference saved. The original microphone still runs until the new transport is activated.':'Original conversational voice is active. Speech Engine is available as an opt-in pilot.';
+      else status.textContent=data.selected_engine==='speech_engine'?'Speech Engine selected. The microphone starts a secure WebRTC session when clicked.':'Original conversational voice is active. Speech Engine is available as an opt-in pilot.';
       select.disabled=false;
       select.addEventListener('change',async()=>{const previous=select.dataset.previous;await save(select.value,status,select);select.dataset.previous=select.value||previous;});
     }catch(error){status.textContent=error.message;}

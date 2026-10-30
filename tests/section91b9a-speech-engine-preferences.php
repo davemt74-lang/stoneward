@@ -26,7 +26,7 @@ $pilot=sf_speech_engine_save_pilot_config('seng_abcdef1234',true);
 $check($pilot['ready']===true&&$pilot['engine_id']==='seng_abcdef1234','Admin can enable registered engine using existing provider');
 $check(sf_speech_engine_save_choice(2,'speech_engine')==='speech_engine','Signed-in account can opt in');
 $check(sf_speech_engine_user_choice(3)==='legacy','Other account remains on original engine');
-$check(sf_speech_engine_public_state(2)['selected_engine']==='speech_engine'&&sf_speech_engine_public_state(2)['effective_engine']==='legacy','Preference does not route audio before authenticated transport');
+$check(sf_speech_engine_public_state(2)['selected_engine']==='speech_engine'&&sf_speech_engine_public_state(2)['effective_engine']==='speech_engine','Configured account can select the authenticated Speech Engine pilot');
 $check(sf_speech_engine_save_choice(2,'legacy')==='legacy','Per-account rollback is immediate and explicit');
 $meta['ai.voice_provider']='none';
 $check(sf_speech_engine_public_state(2)['pilot_available']===false,'Admin voice-provider off switch also disables the pilot');

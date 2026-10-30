@@ -3,12 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "build:client": "esbuild browser-entry.mjs --bundle --format=iife --platform=browser --target=es2022 --minify --outfile=../assets/js/speech-engine-conversation.js"
   },
   "dependencies": {
+    "@elevenlabs/client": "1.32.1",
     "@elevenlabs/elevenlabs-js": "2.75.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }

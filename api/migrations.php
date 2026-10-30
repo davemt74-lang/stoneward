@@ -719,6 +719,16 @@ function sf_migration_definitions(): array {
                 sf_speech_engine_ensure_schema();
             },
         ],
+        [
+            'id'=>'2026-10-30-063',
+            'app_version'=>'1.3.182',
+            'description'=>'Short-lived owner-bound Speech Engine WebRTC sessions and signed gateway replay guard',
+            'revision'=>'1',
+            'apply'=>function(): void {
+                require_once SF_ROOT.'/api/speech-engine-session-core.php';
+                sf_speech_session_schema();
+            },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
