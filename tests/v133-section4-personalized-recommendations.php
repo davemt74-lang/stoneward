@@ -13,7 +13,7 @@ ok(str_contains($core,"'reasons'=>array_slice("),'recommendations include transp
 ok(str_contains($core,'function sf_personalization_recommendations'),'recommendation payload exists');
 ok(str_contains($core,"'recommendations'=>sf_personalization_recommendations("),'personalization state exposes recommendations');
 ok(str_contains($agent,'sf_personalization_recommendation_profile($userId)'),'agent recommendations use the listener profile');
-ok(str_contains($agent,'sf_agent_recommend_track($message,$active,$userId)'),'recommend route passes the current user');
+ok(str_contains($agent,'sf_agent_recommend_track($message,$active,$userId,')||str_contains($agent,'sf_agent_recommend_track($message,$active,$userId)'),'recommend route passes the current user');
 ok(str_contains($playlists,'sf_personalization_rank_catalog(sf_catalog(),$profile'),'agent playlist curation shares personalized ranking');
 ok(str_contains($playlists,'?int $userId=null'),'playlist recommendation helper remains backwards compatible');
 ok(str_contains($js,'function recommendationCard(')&&str_contains($js,'Recommended for you'),'home recommendation UI exists');
