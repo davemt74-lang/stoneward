@@ -699,6 +699,16 @@ function sf_migration_definitions(): array {
                 sf_song_annotations_ensure_schema();
             },
         ],
+        [
+            'id'=>'2026-10-30-061',
+            'app_version'=>'1.3.180',
+            'description'=>'Per-note Agent Brain sharing consent, revocation, and private audit events',
+            'revision'=>'1',
+            'apply'=>function(): void {
+                require_once SF_ROOT.'/api/agent-song-annotations-core.php';
+                sf_song_annotations_ensure_schema();
+            },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {
