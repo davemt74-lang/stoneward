@@ -10,6 +10,7 @@ const admin=read('admin/assets/speech-engine-pilot.js');
 const app=read('assets/js/app.js');
 const gateway=read('speech-gateway/server.mjs');
 check(account.includes('#dynamicCanvas .auth-module'),'Account selector mounts into actual public canvas');
+check(account.includes("page.querySelector('.account-header')||page.querySelector('#profileForm')"),'Login and recovery screens cannot receive signed-in voice settings');
 check(account.includes("json('api/auth.php')")&&account.includes('X-CSRF-Token'),'Account opt-in uses same-origin auth and CSRF');
 check(account.includes('pilot_available')&&account.includes('disabled=true'),'Unavailable pilot is disabled');
 check(account.includes('speech_engine')&&account.includes('legacy'),'Both voice engines have explicit choices');

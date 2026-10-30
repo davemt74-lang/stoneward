@@ -20,7 +20,7 @@
   }
   async function mount() {
     const page=document.querySelector('#dynamicCanvas .auth-module');
-    if(!page||page.querySelector('[data-account-speech-engine]'))return;
+    if(!page||!(page.querySelector('.account-header')||page.querySelector('#profileForm'))||page.querySelector('[data-account-speech-engine]'))return;
     const block=document.createElement('section');
     block.className='account-orders';block.dataset.accountSpeechEngine='';
     block.innerHTML='<div class="module-kicker">VOICE CONTROLS</div><p class="player-note">Select how your signed-in Stonefellow Agent will handle conversations. Existing ElevenLabs credentials remain in Admin; no key is stored here.</p><label class="field">Conversation engine <select data-voice-engine-choice disabled><option value="legacy">Original conversational voice (default)</option><option value="speech_engine">ElevenLabs Speech Engine pilot</option></select></label><p class="player-note" role="status" aria-live="polite" data-voice-engine-status>Loading voice options…</p>';
