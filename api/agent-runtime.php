@@ -7,6 +7,7 @@ require_once __DIR__.'/fan-discovery-paths.php';
 require_once __DIR__.'/fan-commerce-advisor.php';
 require_once __DIR__.'/agent-navigation.php';
 require_once __DIR__.'/agent-llm-orchestrator.php';
+require_once __DIR__.'/agent-listening-insights.php';
 
 function sf_http_json(string $url,array $headers,array $payload,int $timeout=45): array {
     $body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -240,7 +241,7 @@ function sf_agent_track_score(array $t,string $message): int {
     foreach(array_filter(preg_split('/[^a-z0-9]+/',$q)?:[],fn($w)=>strlen($w)>2) as $w)if(str_contains($hay,$w))$score+=2;
     $energy=(int)($t['energy']??3);if(preg_match('/quiet|mellow|soft|calm|reflective/',$q)&&$energy<=2)$score+=8;if(preg_match('/dark|heavy|loud|electric|intense/',$q)&&$energy>=4)$score+=8;if(preg_match('/drive|road|driving/',$q)&&str_contains($hay,'driv'))$score+=8;return $score;
 }
-function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $userId=null): ?array {
+function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $userId=null,string $timezone='UTC'): ?array {
     $catalog=sf_agent_public_catalog();$exclude=$excludeId?[$excludeId]:[];
     $path=sf_fan_discovery_path_from_message($message);
     if($path!==null){
@@ -253,12 +254,15 @@ function sf_agent_recommend_track(string $message,?string $excludeId=null,?int $
         return null;
     }
     $preferenceTerms=$userId!==null?sf_agent_customer_preference_terms($userId):[];
+    $timeInsights=$userId?sf_agent_listening_insights($userId,$timezone):[];
+    $daypartCounts=(array)($timeInsights['daypart_counts'][$timeInsights['daypart']??'']??[]);
+    $timeAffinity=static fn($t):float=>min(10.,3.*(float)($daypartCounts[(string)($t['id']??'')]??0));
     if($userId&&function_exists('sf_personalization_recommendation_profile')){
         $profile=sf_personalization_recommendation_profile($userId);$ranked=sf_personalization_rank_catalog($catalog,$profile,20,$exclude);
-        $rows=[];foreach($ranked as $r){$t=null;foreach($catalog as $candidate)if((string)($candidate['id']??'')===(string)$r['track_id']){$t=$candidate;break;}if(!$t)continue;$rows[]=['t'=>$t,'s'=>(float)$r['score']+sf_agent_track_score($t,$message)*4+sf_agent_customer_track_affinity_score($t,$preferenceTerms)];}
+        $rows=[];foreach($ranked as $r){$t=null;foreach($catalog as $candidate)if((string)($candidate['id']??'')===(string)$r['track_id']){$t=$candidate;break;}if(!$t)continue;$rows[]=['t'=>$t,'s'=>(float)$r['score']+sf_agent_track_score($t,$message)*4+sf_agent_customer_track_affinity_score($t,$preferenceTerms)+$timeAffinity($t)];}
         if($rows){usort($rows,fn($a,$b)=>$b['s']<=>$a['s']);return $rows[0]['t']??null;}
     }
-    $rows=[];foreach($catalog as $t){if($excludeId&&($t['id']??'')===$excludeId)continue;$rows[]=['t'=>$t,'s'=>sf_agent_track_score($t,$message)+sf_agent_customer_track_affinity_score($t,$preferenceTerms)];}
+    $rows=[];foreach($catalog as $t){if($excludeId&&($t['id']??'')===$excludeId)continue;$rows[]=['t'=>$t,'s'=>sf_agent_track_score($t,$message)+sf_agent_customer_track_affinity_score($t,$preferenceTerms)+$timeAffinity($t)];}
     usort($rows,fn($a,$b)=>$b['s']<=>$a['s']);return $rows[0]['t']??null;
 }
 function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mix'): string {
@@ -276,6 +280,7 @@ function sf_agent_explicit_player_route(string $message): ?string {
     if(preg_match('/\b(?:pause|stop)\s*(?:the\s+)?(?:music|song|track|player|playback|it|this)?\s*[.!?]*$/',$q))return 'player_pause';
     if(preg_match('/\b(?:next (?:song|track)|skip (?:this |the )?(?:song|track)|skip it|skip)\s*[.!?]*$/',$q))return 'player_next';
     if(preg_match('/\b(?:previous (?:song|track)|last (?:song|track)|go back (?:a|one) (?:song|track)|play (?:the )?previous (?:song|track))\s*[.!?]*$/',$q))return 'player_previous';
+    if(sf_agent_release_request($message)!==null)return 'player_play_from_release';
     if(sf_agent_named_playback_query($message)!==null)return 'player_play_named';
     return null;
 }
@@ -400,13 +405,17 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             }
             break;
 
+        case 'player_play_from_release':
+            $request=sf_agent_release_request($message,$client);
+            $album=sf_agent_release_play_plan((string)($request['title']??''),sf_agent_public_catalog(),$active,[],!empty($request['different']));
+            $action=$album['action'];$text=$album['text'];$track=$album['track'];break;
         case 'player_play_named':
             $requested=sf_agent_named_playback_query($message);
             $plan=sf_agent_named_playback_plan($requested??'',sf_agent_public_catalog(),$active);
             $action=$plan['action'];$text=$plan['text'];$track=$plan['track'];
             break;
         case 'player_recommend':
-            $track=sf_agent_recommend_track($message,$active,$userId);if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;
+            $track=sf_agent_recommend_track($message,$active,$userId,(string)($client['timezone']??'UTC'));if($track){$action=['type'=>'play_track','track_id'=>(string)$track['id']];$text='I’d start with “'.($track['title']??'').'.”';}$profile='recommendation';break;
         case 'admin_campaign_overview':
             if(empty($client['_authorized_admin'])){
                 $route='campaign_offer';$action=['type'=>'open_view','view'=>'campaigns'];$text='See current public offers and campaigns.';$profile='commerce';
@@ -662,7 +671,7 @@ function sf_anthropic_call(array $provider,string $system,array $history,string 
  */
 function sf_agent_normalize_client_state(array $raw): array {
     $out=[];
-    $text=['active_track_id'=>180,'route_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120];
+    $text=['active_track_id'=>180,'route_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120,'timezone'=>70,'active_release_title'=>180];
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
     }
@@ -676,6 +685,7 @@ function sf_agent_normalize_client_state(array $raw): array {
 function sf_agent_reply(array $user,string $conversationId,string $message,array $client=[]): array {
     sf_entitlements_ensure_schema();$client=sf_agent_normalize_client_state($client);$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
     $client['_authorized_admin']=$isAdmin;
+    $timeInsights=sf_agent_listening_insights($userId,(string)($client['timezone']??'UTC'));
     $decisionUsage=0;$routeSource='local';$jev=null;$llmIntent=null;
     // Conversational LLM interprets the intent first. Only the server policy
     // can translate that interpretation into an authorized action.
@@ -689,13 +699,21 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         }catch(Throwable $e){$llmIntent=null;}
     }
     $explicitPlayer=sf_agent_explicit_player_route($message);
+    $albumRequest=sf_agent_release_request($message,$client,$history);
+    if(!$albumRequest&&($llmIntent['route']??'')==='player_play_from_release'&&!empty($llmIntent['album_query']))
+        $albumRequest=['title'=>(string)$llmIntent['album_query'],'different'=>false];
     if($llmIntent===null&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
     // Existing parsed routes remain an availability fallback, not an LLM bypass.
     $explicitContext=sf_agent_page_context_request($message)?'page_context':(sf_agent_detail_request($message)!==null?'page_detail':(sf_agent_public_page_target($message)!==null?'page_navigate':null));
-    $route=(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client));if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';$plan=sf_agent_policy($route,$message,$client,$userId);
+    $route=$albumRequest?'player_play_from_release':(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client));
+    if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';
+    $plan=$albumRequest?sf_agent_release_play_plan((string)$albumRequest['title'],sf_agent_public_catalog(),(string)($client['active_track_id']??''),$timeInsights,!empty($albumRequest['different'])):sf_agent_policy($route,$message,$client,$userId);
     $audioResolution=null;
+    if($albumRequest&&($plan['action']['type']??'')==='play_track'&&is_array($plan['track']??null)){
+        $selected=$plan['track'];$audioResolution=['method'=>'release_catalog','status'=>'verified','track_id'=>(string)$selected['id'],'title'=>(string)($selected['title']??''),'release'=>(string)($selected['release']??'')];
+    }
     if($route==='player_play_named'&&($llmIntent['resolution']??'')==='llm_catalog'&&is_array($llmIntent['verified_track']??null)){
         $track=$llmIntent['verified_track'];$id=(string)$track['id'];
         $plan['action']=['type'=>'play_track','track_id'=>$id];$plan['action_name']='play_track';$plan['track']=$track;
@@ -711,6 +729,10 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         return ['text'=>$text,'provider'=>$routeSource.'+policy','model'=>$routingMeta['model']??'policy','input_tokens'=>(int)($routingMeta['input_tokens']??0),'output_tokens'=>(int)($routingMeta['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'audio_resolution'=>$audioResolution,'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
     }
     $context=sf_agent_context($message,$plan['context_profile'],$userId);
+    if(preg_match('/\b(?:music|song|track|album|release|listen|play|recommend|favorite|favourite|mood|morning|evening|night)\b/i',$message)||$plan['context_profile']==='recommendation'){
+        $listeningContext=sf_agent_listening_context($timeInsights);
+        if($listeningContext!=='')$context.="\n\n".$listeningContext;
+    }
     $playingTrack=sf_agent_find_track('',(string)($client['active_track_id']??''));
     if($playingTrack){$context.="\n\nBROWSER PLAYER (transient state reported by the signed-in page, not an authorization source): ".($client['player_is_playing']??0?'playing':'paused').'; current published song '.(string)$playingTrack['title'].'; release '.(string)($playingTrack['release']??'').'; position '.(int)($client['player_position_seconds']??0).' seconds of '.(int)($client['player_duration_seconds']??0).' seconds; player volume '.(int)($client['player_volume_percent']??0).' percent.';}
     $personalMemory=sf_agent_customer_memory_context($userId);if($personalMemory!=='')$context.="\n\n".$personalMemory;$estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');

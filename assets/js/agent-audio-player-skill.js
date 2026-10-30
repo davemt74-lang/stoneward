@@ -51,6 +51,17 @@
   }
   /** The published player, not the language model, verifies named-song identity. */
   function resolvePublished(message,tracks,serverAction,resolution){
+    // Album recommendations are server-selected, but the current browser must
+    // independently confirm the exact published track and release before play.
+    if(resolution?.method==='release_catalog'){
+      const verified=(Array.isArray(tracks)?tracks:[]).filter(track=>
+        track?.id===resolution.track_id&&track?.title===resolution.title&&
+        track?.release===resolution.release&&!!track?.audio);
+      if(resolution.status==='verified'&&serverAction?.type==='play_track'&&
+        serverAction.track_id===resolution.track_id&&verified.length===1)
+        return {action:{type:'play_track',track_id:verified[0].id}};
+      return {action:{type:'none'},text:'The selected album track is not available in this player. I have not changed playback.'};
+    }
     const requested=command(message);
     if(requested?.type!=='play_track'||!requested.query)return {action:serverAction};
     const query=normalize(requested.query);
