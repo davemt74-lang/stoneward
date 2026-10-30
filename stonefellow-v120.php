@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.174');
+define('SF_BUILD', '1.3.175');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -61,6 +61,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php foreach((array)$seo['json_ld'] as $structured): ?>  <script type="application/ld+json" data-seo-jsonld="1"><?=json_encode($structured,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script>
 <?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/agent-song-capture.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/turntable-builder.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/artist-world.css?v=<?=rawurlencode(SF_BUILD)?>">
   <style id="stonefellowTheme"><?=sf_theme_css($activeTheme)?></style>
@@ -263,6 +264,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/conversation-barge-in.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/speech-segments.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-audio-player-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/agent-song-capture-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/build-integrity.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/accessibility.js?v=<?=rawurlencode(SF_BUILD)?>"></script>

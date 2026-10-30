@@ -271,6 +271,16 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
     return $fallback;
 }
 /** Transport instructions are resolved locally before advisory model routing. */
+function sf_agent_explicit_song_capture_route(string $message,array $client=[]): ?string {
+    $q=strtolower(trim(preg_replace('/\s+/u',' ',$message)??$message));
+    $q=preg_replace('/^(?:(?:hey|hi|ok|okay)\s+)?stone\s*-?\s*fellow[,.:!?\s]*/i','',$q)??$q;
+    if(preg_match('/\b(?:stop|finish|end|complete)\s+(?:song\s+|audio\s+)?(?:listening|captur(?:e|ing)|transcrib(?:e|ing)|recording)(?:\s+(?:this|the)\s+(?:song|verse|chorus|section))?\b/i',$q))return 'song_capture_stop';
+    if(!empty($client['song_capture_active'])&&preg_match('/^(?:(?:okay|ok|right|alright)[,.! ]*)?(?:that(?:\s+is|\x27s)?\s+enough|done|stop|finished)(?:[.! ]*)$/i',$q))return 'song_capture_stop';
+    if(preg_match('/\b(?:are\s+you\s+)?(?:still\s+)?(?:listening|capturing|recording)\s+(?:this\s+)?(?:song|music|audio|verse|chorus|section)\b/i',$q))return 'song_capture_status';
+    if(preg_match('/\b(?:listen\s+(?:to|in\s+on)|capture|record|transcribe)\s+(?:this\s+|the\s+|to\s+the\s+)?(?:next\s+|current\s+)?(?:verse|chorus|bridge|lyrics|section|part\s+of\s+(?:this\s+)?song|song\s+section|music\s+section)\b/i',$q))return 'song_capture_start';
+    if(preg_match('/\b(?:start|begin|turn\s+on|activate)\s+(?:song\s+|audio\s+|lyric\s+)?(?:listening|capture|transcription|recording)\s+mode\b/i',$q))return 'song_capture_start';
+    return null;
+}
 function sf_agent_explicit_player_route(string $message): ?string {
     $q=strtolower(trim($message));
     if(preg_match('/\b(?:unmute|un-mute|turn (?:the )?(?:sound|volume) back on)\b/',$q))return 'player_volume';
@@ -296,6 +306,7 @@ function sf_agent_player_volume_action(string $message): array {
 }
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
+    if(($captureRoute=sf_agent_explicit_song_capture_route($message,$client))!==null)return $captureRoute;
     if(sf_agent_page_context_request($message))return 'page_context';
     if(sf_agent_detail_request($message)!==null)return 'page_detail';
     if(sf_agent_public_page_target($message)!==null)return 'page_navigate';
@@ -361,6 +372,17 @@ function sf_agent_local_route(string $message,array $client=[]): string {
 function sf_agent_policy(string $route,string $message,array $client=[],?int $userId=null): array {
     $active=(string)($client['active_track_id']??'');$track=sf_agent_find_track($message,$active);$action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
+        case 'song_capture_start':
+            if($active===''||empty($client['player_is_playing']))$text='Play a published song first, then ask me to listen to a verse or section.';
+            elseif(!empty($client['song_capture_active']))$text='I am already listening to this song section.';
+            else{$action=['type'=>'song_capture_start'];$text='I will capture the current song section using the player audio. Say stop listening to finish.';}
+            break;
+        case 'song_capture_stop':
+            if(!empty($client['song_capture_active'])){$action=['type'=>'song_capture_stop'];$text='Stopping song capture.';}
+            else $text='There is no song-section capture in progress.';
+            break;
+        case 'song_capture_status':
+            $action=['type'=>'song_capture_status'];$text='Checking song capture status.';break;
         case 'page_context':
             $page=sf_agent_public_page_context($client,sf_agent_public_catalog(),sf_agent_public_releases_for_navigation());
             $text='You are viewing '.$page['label'].'. ';
@@ -675,7 +697,7 @@ function sf_agent_normalize_client_state(array $raw): array {
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
     }
-    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
+    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'song_capture_active'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
     foreach($numbers as $key=>$max){
         if(isset($raw[$key])&&is_numeric($raw[$key]))$out[$key]=max(0,min($max,(int)$raw[$key]));
     }
@@ -685,11 +707,15 @@ function sf_agent_normalize_client_state(array $raw): array {
 function sf_agent_reply(array $user,string $conversationId,string $message,array $client=[]): array {
     sf_entitlements_ensure_schema();$client=sf_agent_normalize_client_state($client);$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
     $client['_authorized_admin']=$isAdmin;
-    $timeInsights=sf_agent_listening_insights($userId,(string)($client['timezone']??'UTC'));
+    $explicitCapture=sf_agent_explicit_song_capture_route($message,$client);
+    $timeInsights=$explicitCapture===null?sf_agent_listening_insights($userId,(string)($client['timezone']??'UTC')):[];
     $decisionUsage=0;$routeSource='local';$jev=null;$llmIntent=null;
+    // A user-initiated capture is time-sensitive. The server's exact allowlist
+    // dispatches it immediately; do not wait for an advisory model request
+    // while the verse continues playing.
     // Conversational LLM interprets the intent first. Only the server policy
     // can translate that interpretation into an authorized action.
-    if($isAdmin||sf_can_use_ai($user,256)['ok']){
+    if($explicitCapture===null&&($isAdmin||sf_can_use_ai($user,256)['ok'])){
         try{
             $llmIntent=sf_agent_orchestrator_llm($message,$client,$history,sf_agent_public_catalog(),$isAdmin);
             if($llmIntent){
@@ -702,12 +728,12 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     $albumRequest=sf_agent_release_request($message,$client,$history);
     if(!$albumRequest&&($llmIntent['route']??'')==='player_play_from_release'&&!empty($llmIntent['album_query']))
         $albumRequest=['title'=>(string)$llmIntent['album_query'],'different'=>false];
-    if($llmIntent===null&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
+    if($llmIntent===null&&$explicitCapture===null&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
     // Existing parsed routes remain an availability fallback, not an LLM bypass.
     $explicitContext=sf_agent_page_context_request($message)?'page_context':(sf_agent_detail_request($message)!==null?'page_detail':(sf_agent_public_page_target($message)!==null?'page_navigate':null));
-    $route=$albumRequest?'player_play_from_release':(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client));
+    $route=$explicitCapture??($albumRequest?'player_play_from_release':(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client)));
     if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';
     $plan=$albumRequest?sf_agent_release_play_plan((string)$albumRequest['title'],sf_agent_public_catalog(),(string)($client['active_track_id']??''),$timeInsights,!empty($albumRequest['different'])):sf_agent_policy($route,$message,$client,$userId);
     $audioResolution=null;

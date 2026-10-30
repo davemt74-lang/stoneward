@@ -51,6 +51,10 @@
   }
   /** The published player, not the language model, verifies named-song identity. */
   function resolvePublished(message,tracks,serverAction,resolution){
+    // Song-section capture is not a track search, even when a spoken command
+    // begins with 'listen to this verse'. Leave its server-approved action intact.
+    if(['song_capture_start','song_capture_stop','song_capture_status'].includes(serverAction?.type))
+      return {action:serverAction};
     // Album recommendations are server-selected, but the current browser must
     // independently confirm the exact published track and release before play.
     if(resolution?.method==='release_catalog'){
