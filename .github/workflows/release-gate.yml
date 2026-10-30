@@ -530,6 +530,10 @@ jobs:
           php tests/section91b8a-song-capture.php
           node --check assets/js/agent-song-capture-skill.js
           node tests/section91b8a-song-capture.cjs
+          php -l api/agent-song-transcribe-core.php
+          php -l api/agent-song-transcribe.php
+          php tests/section91b8b-song-transcription.php
+          node tests/section91b8b-song-transcription.cjs
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
           php -l api/media-catalog-intake.php

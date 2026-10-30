@@ -75,6 +75,9 @@
       };
       try { recorder.start(1000); }
       catch (_) { session.stream?.getTracks?.().forEach(t => t.stop()); return { ok: false, text: 'The browser could not start song capture.' }; }
+      // A fresh capture invalidates the previously heard excerpt; never
+      // submit stale lyrics after starting a new verse.
+      lastCapture = null;
       active = session;
       session.timer = setTimeout(() => { void stop('time_limit'); }, maxMs);
       onChange(status());
