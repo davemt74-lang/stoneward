@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.178';
+  window.STONEFELLOW_APP_BUILD='1.3.179';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -123,7 +123,7 @@
     audio,getTrack:()=>st.track,
     onChange:capture=>{
       document.body.classList.toggle('song-capture-active',capture.active);
-      if(capture.active||!capture.last){songLyricDraft=null;songLyricReport=null;}
+      if(capture.active||!capture.last){songLyricDraft=null;songLyricReport=null;songLyricCorrected='';songPersonalNote='';}
       if(capture.active)agent('recording','Capturing this song section… say “stop listening” to finish.');
     }
   });
@@ -131,6 +131,8 @@
   let songLyricDraft=null;
   let songAnalysisBusy=false;
   let songLyricReport=null;
+  let songLyricCorrected='';
+  let songPersonalNote='';
   async function transcribeLastCapturedSong(retried=false){
     const captured=songCaptureSkill?.getCapture();
     if(!captured)return 'There is no completed song section. Ask me to listen to a verse, then say stop listening.';
@@ -159,6 +161,7 @@
       const draft=payload.transcript;
       if(!draft||draft.review_status!=='unverified'||!draft.text)throw new Error('No usable transcription draft was returned.');
       songLyricDraft=Object.freeze({...draft});
+      songLyricCorrected='';songPersonalNote='';songLyricReport=null;
       const range=Math.round(draft.start_ms/1000)+'–'+Math.round(draft.end_ms/1000)+'s';
       popupEntry('notice','UNVERIFIED LYRIC DRAFT — “'+draft.title+'” ('+range+')\n'+draft.text+'\n\nThese words are an automated estimate, not reviewed or confirmed lyrics.');
       return 'I captured a draft transcript for “'+draft.title+'” at '+range+'. The lyrics are shown in the chat as unverified. You can correct any words before asking me for an analysis.';
@@ -174,7 +177,7 @@
     try{
       popupEntry('notice','Analyzing the unverified lyric draft. Your requested excerpt and consented listening-history summary may be sent to your configured AI provider.');
       const payload={track_id:draft.track_id,start_ms:draft.start_ms,end_ms:draft.end_ms,
-        captured_at:draft.captured_at,transcript:draft.text,question:String(question||'').slice(0,700),
+        captured_at:draft.captured_at,transcript:songLyricCorrected||draft.text,question:String(question||'').slice(0,700),
         timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
       const response=await secureJsonPost('agent-song-analyze.php',payload);
       if(songCaptureSkill?.getCapture()!==captured||songLyricDraft!==draft)
@@ -198,6 +201,75 @@
     const snapshot=songCaptureSkill.status();
     if(snapshot.active)return 'I am capturing the current song from '+Math.round(snapshot.start_ms/1000)+' seconds. Say “stop listening” to finish.';
     return snapshot.last?'The last song section is captured and ready for transcription.':'There is no song-section capture in progress.';
+  }
+  // Private annotation commands are intercepted before agent-chat.php so
+  // corrected lyrics and personal notes never enter a routine LLM prompt.
+  // Both typed and spoken turns use liveAgent(), so their behavior is identical.
+  function currentSongDraft(){
+    const capture=songCaptureSkill?.getCapture(),draft=songLyricDraft;
+    return capture&&draft&&st.track?.id===draft.track_id&&
+      capture.track_id===draft.track_id&&capture.start_ms===draft.start_ms&&
+      capture.end_ms===draft.end_ms?draft:null;
+  }
+  async function executePrivateAnnotationCommand(message){
+    const q=String(message||'').trim();let m;
+    if((m=q.match(/^(?:correct|edit|replace|change|fix)\s+(?:the\s+)?(?:lyrics?|transcript|draft|words)\s+(?:to|as|with|:)\s+([\s\S]+)$/i))){
+      if(!currentSongDraft())return 'Capture and transcribe the current song section before correcting its draft.';
+      const edit=m[1].trim();if(edit.length<3||edit.length>4200)return 'Corrected lyrics must be between 3 and 4,200 characters.';
+      songLyricCorrected=edit;songLyricReport=null;
+      return 'Updated the listener-edited, still-unverified draft in this browser. The original machine draft is preserved. Say “save this lyric note” to keep it privately.';
+    }
+    if((m=q.match(/^(?:add|write|set)\s+(?:a\s+)?(?:personal\s+)?note\s+(?:about\s+)?(?:this\s+)?(?:section|verse|lyric|draft)?\s*(?:to|as|:)\s+([\s\S]+)$/i))){
+      if(!currentSongDraft())return 'Capture and transcribe a song section before adding a personal note.';
+      if(m[1].trim().length>1800)return 'Personal notes are limited to 1,800 characters.';
+      songPersonalNote=m[1].trim();return 'Your personal note is attached to this draft in the browser. Say “save this lyric note” to keep it privately.';
+    }
+    if(/^(?:save|remember|keep)\s+(?:this|that|the|my|current)\s+(?:lyric|lyrics|verse|song section|transcript|draft|annotation|note|analysis|report)(?:\s+(?:note|draft|report))?[.!?]*$/i.test(q)){
+      const draft=currentSongDraft();if(!draft)return 'There is no current, transcribed song section to save. No note was created.';
+      const payload={action:'save',track_id:draft.track_id,start_ms:draft.start_ms,end_ms:draft.end_ms,
+        captured_at:draft.captured_at,transcript:draft.text,corrected_transcript:songLyricCorrected,
+        annotation:songPersonalNote,question:songLyricReport?.question||'',
+        report:songLyricReport?.report||'',mode:songLyricReport?.mode||''};
+      try{const result=await secureJsonPost('agent-song-annotations.php',payload);
+        const note=result.annotation;return 'Saved private lyric note #'+note.id+' for “'+note.title+'” at '+
+          time(note.start_ms/1000)+'–'+time(note.end_ms/1000)+'. The draft remains unverified and is not shared with future AI conversations automatically.';
+      }catch(e){return 'I could not save the private lyric note. '+e.message;}
+    }
+    if(/^(?:show|list|review|open|read)(?:\s+me)?\s+(?:my\s+)?(?:saved\s+|private\s+)?(?:lyric|lyrics|song|transcript)?\s*(?:notes|annotations|drafts)(?:\s+(?:please|again))?[.!?]*$/i.test(q)){
+      try{const result=await api('agent-song-annotations.php');const notes=result.annotations||[];
+        if(!notes.length)return 'You have no saved private lyric annotations.';
+        const detail='Your private song annotations (not sent to the AI provider):\n'+notes.slice(0,10).map(n=>
+          '#'+n.id+' “'+n.title+'” '+time(n.start_ms/1000)+'–'+time(n.end_ms/1000)+' | '+
+          (n.transcript_corrected?'listener-edited draft':'unverified machine draft')+' | '+n.captured_at).join('\n')+
+          '\nSay “show lyric note #ID” to review the text, or “delete lyric note #ID” to remove it.';
+        return {text:'I listed your private lyric annotations in chat. I will not read the private details aloud.',privateDisplay:detail};
+      }catch(e){return 'I could not load your private lyric notes. '+e.message;}
+    }
+    if((m=q.match(/^(?:show|read|review|open)\s+(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)[.!?]*$/i))){
+      try{const result=await api('agent-song-annotations.php');const n=(result.annotations||[]).find(n=>Number(n.id)===Number(m[1]));
+        if(!n)return 'That annotation is not in your private notes.';
+        const detail='PRIVATE LYRIC NOTE #'+n.id+' — “'+n.title+'” ('+time(n.start_ms/1000)+'–'+time(n.end_ms/1000)+')\n'+
+          'Original unverified machine draft:\n'+n.transcript_draft+'\n'+
+          (n.transcript_corrected?'Listener-edited, still-unverified draft:\n'+n.transcript_corrected+'\n':'')+
+          (n.user_note?'Personal note:\n'+n.user_note+'\n':'')+
+          (n.analysis_report?'Interpretive report about the earlier draft (not verified facts):\n'+n.analysis_report:'');
+        return {text:'Private lyric note #'+n.id+' is shown in chat. I will not read its contents aloud.',privateDisplay:detail};
+      }catch(e){return 'I could not review that private annotation. '+e.message;}
+    }
+    if((m=q.match(/^(?:edit|correct|update)\s+(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)\s+(?:to|as|:)\s+([\s\S]+)$/i))){
+      const corrected=m[2].trim();if(corrected.length<3||corrected.length>4200)return 'The corrected draft must be between 3 and 4,200 characters.';
+      try{const result=await secureJsonPost('agent-song-annotations.php',{action:'update',id:Number(m[1]),corrected_transcript:corrected});
+        return result.updated?'Updated your private note #'+Number(m[1])+'. The original machine draft remains unchanged; the older AI report was cleared because it described a different draft.':'That note does not belong to your account or no change was made.';
+      }catch(e){return 'I could not update that private annotation. '+e.message;}
+    }
+    if((m=q.match(/^(?:delete|remove|erase)\s+(?:my\s+)?(?:saved\s+)?(?:lyric\s+)?(?:note|annotation)\s*#?(\d+)[.!?]*$/i))){
+      const id=Number(m[1]);if(!Number.isSafeInteger(id)||id<1)return 'Choose a valid private annotation number.';
+      if(!window.confirm('Permanently delete your private lyric annotation #'+id+'?'))return 'Deletion cancelled. Your note is unchanged.';
+      try{const result=await secureJsonPost('agent-song-annotations.php',{action:'delete',id});
+        return result.deleted?'Deleted private annotation #'+id+'.':'That note was already removed or does not belong to your account.';
+      }catch(e){return 'I could not delete that private annotation. '+e.message;}
+    }
+    return null;
   }
   // LLM-resolved titles must carry a server-issued published-catalog receipt,
   // verified against the browser's actual player catalog before execution.
@@ -703,6 +775,13 @@
     }
     agent('thinking','Thinking…');
     try{
+      const privateResult=await executePrivateAnnotationCommand(text);
+      if(privateResult!==null){
+        if(typeof privateResult==='object'&&privateResult.privateDisplay){
+          popupEntry('notice',privateResult.privateDisplay);await say(privateResult.text);
+        }else await say(privateResult);
+        return;
+      }
       const u=new URL(location.href);
       const view=history.state?.view||window.STONEFELLOW_INITIAL_ROUTE?.view||u.searchParams.get('view')||(String(u.pathname).replace(/\/+$/,'').endsWith('/search')?'search':'home');
       const client_state={

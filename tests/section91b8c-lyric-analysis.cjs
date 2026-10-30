@@ -15,7 +15,7 @@ const draft={track_id:'track-1',start_ms:12100,end_ms:27700,captured_at:'2026-10
   text:'Recognized but unverified words',title:'Genius of Unhumankind',review_status:'unverified'};
 const requests=[];const messages=[];
 let available=capture,mode='ok';
-const context={songAnalysisBusy:false,songLyricReport:null,songLyricDraft:draft,
+const context={songAnalysisBusy:false,songLyricReport:null,songLyricDraft:draft,songLyricCorrected:'',
   songCaptureSkill:{getCapture:()=>available},Intl,
   popupEntry:(role,text)=>messages.push({role,text}),
   secureJsonPost:async(api,payload)=>{requests.push({api,payload});if(mode==='fail')throw Error('Provider unavailable');
