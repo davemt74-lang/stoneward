@@ -376,7 +376,14 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     return 'general_conversation';
 }
 function sf_agent_policy(string $route,string $message,array $client=[],?int $userId=null): array {
-    $active=(string)($client['active_track_id']??'');$track=sf_agent_find_track($message,$active);$action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
+    $active=(string)($client['active_track_id']??'');
+    // Player-owned capture actions operate on the browser's reported state.
+    // They must not require a catalog lookup or a private DB read just to
+    // start, stop, or submit a captured section; the upload endpoint later
+    // checks the published catalog independently before provider processing.
+    $captureAction=in_array($route,['song_capture_start','song_capture_stop','song_capture_status','song_capture_transcribe'],true);
+    $track=$captureAction?null:sf_agent_find_track($message,$active);
+    $action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
         case 'song_capture_transcribe':
             if(!empty($client['song_capture_active']))$text='Stop the song capture first, then I can transcribe the section you just heard.';
