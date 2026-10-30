@@ -18,14 +18,14 @@
     try{
       const data=await json('ai-providers.php');if(current!==revision||!block.isConnected)return;
       const config=data.speech_engine||{};form.elements.engine_id.value=config.engine_id||'';form.elements.enabled.checked=!!config.pilot_enabled;
-      status.textContent=config.ready?'Pilot selection configured. Live WebRTC and WebSocket transport will be connected in 91B9B.':'Pilot disabled or missing its existing ElevenLabs provider credentials / Engine ID.';
+      status.textContent=config.ready?'Pilot configured. Confirm your separate gateway is online before testing WebRTC sessions.':'Pilot disabled or missing its existing ElevenLabs provider credentials / Engine ID.';
     }catch(error){status.textContent=error.message;}
     form.addEventListener('submit',async event=>{
       event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;status.textContent='Saving…';
       try{
         const auth=await json('auth.php');
         const data=await json('ai-providers.php',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf||''},body:JSON.stringify({action:'save_speech_engine',engine_id:form.elements.engine_id.value,enabled:form.elements.enabled.checked})});
-        status.textContent=data.speech_engine?.ready?'Pilot preference enabled. The existing microphone remains active until the 91B9B transport is certified.':'Pilot saved, currently unavailable.';
+        status.textContent=data.speech_engine?.ready?'Pilot enabled. Account members may connect with WebRTC after the gateway is deployed.':'Pilot saved, currently unavailable.';
       }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
     });
   }
