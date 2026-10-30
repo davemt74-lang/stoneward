@@ -65,7 +65,7 @@ async function run(){
   assert.match(await sandbox.run({type:'resume_player'}),/no song loaded/);
   assert.equal(await sandbox.run({type:'open_view'}),null,'unrelated Agent actions still use existing dispatcher');
   assert.match(app,/\.\.\.playerState\(\)/,'voice and typed Agent receive current playback state');
-  assert.match(app,/const sharedPlayerResult=await publicAudioSkill\?\.dispatch\(verified\.action\)/,'named player action is verified before reaching shared local player');
+  assert.match(app,/const sharedPlayerResult=captureResult===null\?await publicAudioSkill\?\.dispatch\(verified\.action\):null/,'capture dispatch stays separate while named player action remains verified before reaching the local player');
   assert.match(app,/sharedPlayerResult\?\.text\?\?await executePlayerAgentAction\(verified\.action\)/,'existing local player remains a safe fallback');
   assert.match(app,/getVolume:\(\)=>playerVolume\(\),setVolume:value=>setPlayerVolume\(value\)/,'turntable and Agent share one volume handler');
   console.log('Section 90M player conversation: 24 behavior and integration assertions passed');
