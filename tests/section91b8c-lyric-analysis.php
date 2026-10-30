@@ -26,7 +26,7 @@ $reject=static function(array $payload,array $tracks)use($check):void{
 };
 $reject($post,[]);
 $reject(array_replace($post,['track_id'=>'private-track']),$catalog);
-$reject(array_replace($post,['end_ms'=>'93000']),$catalog);
+$reject(array_replace($post,['end_ms'=>'103000']),$catalog);
 $reject(array_replace($post,['transcript'=>'']),$catalog);
 $reject(array_replace($post,['transcript'=>['not','lyrics']]),$catalog);
 $reject(array_replace($post,['transcript'=>str_repeat('x',16001)]),$catalog);
