@@ -22,6 +22,12 @@ SF_SPEECH_BRIDGE_SECRET=[same-unique-bridge-secret-as-PHP]
 ```
 
 Also set `SF_SPEECH_BRIDGE_SECRET` on the PHP server to the same random value.
+For the Admin connection test, set `SF_SPEECH_GATEWAY_HEALTH_URL` on the PHP
+server to the publicly reachable `https://.../health` endpoint of the gateway
+(or `http://127.0.0.1:PORT/health` for local development). This URL is an
+optional server configuration value, not an Account or browser input. The test
+checks reachability and whether the gateway says its signed bridge is enabled;
+it does not establish a live microphone session or prove end-to-end connectivity.
 Never commit this value, expose it in a public config response, or set it in
 browser JavaScript. The API key saved in Admin > AI Providers remains the
 PHP site's source for short-lived provider conversation tokens; the private
