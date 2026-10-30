@@ -21,4 +21,5 @@ check(gateway.includes("account_bridge:'disabled'")&&gateway.includes('session.s
 check(!gateway.includes('disableAuth: true'),'Gateway never bypasses provider JWT verification');
 check(read('stonefellow-v120.php').includes('account-voice-engine.js'),'Public selector is loaded');
 check(read('admin/index.php').includes('speech-engine-pilot.js'),'Admin pilot panel is loaded');
+check(read('scripts/release-zip.sh').includes('"$stage/site/speech-gateway"'),'Public deployment ZIP excludes separate Node gateway source');
 console.log(`Section 91B9A: ${passes} UI and fail-closed contract assertions passed`);

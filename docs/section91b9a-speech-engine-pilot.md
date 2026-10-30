@@ -22,6 +22,8 @@
 5. No API keys, raw transcripts, or user identity appear in health responses.
 6. The gateway lives outside shared PHP hosting and runs on a separately managed
    Node host behind a TLS reverse proxy.
+7. `scripts/release-zip.sh` excludes `speech-gateway/` from the public PHP ZIP;
+   the Node runtime will be packaged and deployed separately.
 
 ## Next: 91B9B
 
