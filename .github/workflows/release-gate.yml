@@ -551,6 +551,8 @@ jobs:
           php tests/section91b8e-song-annotation-chat.php
           node tests/section91b8e-song-annotation-chat.cjs
           node tests/section91b11a-song-experience.cjs
+          php tests/section91b11b-live-lyrics.php
+          node tests/section91b11b-live-lyrics.cjs
           php tests/section91b8f-selective-song-memory.php
           node tests/section91b8f-selective-song-memory.cjs
           php tests/section91b9a-speech-engine-preferences.php

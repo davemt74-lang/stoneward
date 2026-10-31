@@ -567,6 +567,10 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .song-experience-card h3{font-size:1.13rem;margin:0 0 3px;line-height:1.25}
 .song-experience-meta{font-size:.76rem;color:var(--muted);margin:0 0 8px}
 .song-experience-phase{display:inline-block;font-size:.78rem;font-weight:700;border:1px solid var(--line2);border-radius:20px;padding:5px 10px;margin:0 0 12px;color:var(--accent)}
+.song-experience-phase.song-experience-live{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent)}
+.song-experience-phase.song-experience-live::before{content:'●';display:inline-block;margin-right:7px;animation:sf-song-live-pulse 2s ease-in-out infinite}
+@keyframes sf-song-live-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){.song-experience-phase.song-experience-live::before{animation:none}}
 .song-experience-transcript,.song-experience-report{background:rgba(var(--surface-rgb),.75);border:1px solid var(--line);border-radius:12px;padding:13px;margin:0 0 12px}
 .song-experience-card h4{font-size:.87rem;margin:0 0 8px}
 .song-experience-copy{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;font-size:.91rem;margin:0 0 8px}

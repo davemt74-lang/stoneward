@@ -1,4 +1,4 @@
-/* Section 91B11A — A single, browser-private song transcript and analysis card
+/* Section 91B11B — A single, browser-private song transcript and analysis card
  * used by the floating conversation and the full My Agent Chat canvas.
  * No provider calls or persistence are initiated by rendering this component.
  */
@@ -31,15 +31,20 @@
       analyzing: 'Preparing your requested interpretation…', report: 'Analysis ready',
       discarded: 'Capture ended without a usable excerpt'
     };
-    const phase = el('p', 'song-experience-phase', phaseLabels[state.phase] || 'Session captured');
+    const phase = el('p', 'song-experience-phase'+(state.live_enabled?' song-experience-live':''),
+      state.phase==='capturing'&&state.live_enabled ? 'Listening · provisional live lyrics' :
+        phaseLabels[state.phase] || 'Session captured');
     phase.setAttribute('role', 'status');
     card.append(eyebrow, heading, meta, phase);
     if (state.transcript) {
       const panel = el('section', 'song-experience-transcript');
-      panel.append(el('h4', '', state.corrected ? 'Listener-edited draft · unverified' : 'Automated lyric draft · unverified'));
+      panel.append(el('h4', '', state.corrected ? 'Listener-edited draft · unverified' :
+        state.canAnalyze?'Automated lyric draft · unverified':'Live lyric preview · provisional, unverified'));
       panel.append(el('p', 'song-experience-copy', state.corrected || state.transcript));
       if (state.corrected) panel.append(el('small', '', 'Original machine draft retained in this session.'));
       panel.append(el('small', '', 'Automated words can be wrong. Nothing is saved to Agent Brain automatically.'));
+      if (state.live_enabled) panel.append(el('small', '',
+        (Number(state.segments_completed)||0)+' section(s) transcribed. The final full-clip pass will replace these provisional words.'));
       card.append(panel);
     }
     for (const [index, report] of (state.reports || []).entries()) {
@@ -50,6 +55,7 @@
       card.append(panel);
     }
     if (state.message) card.append(el('p', 'song-experience-note', state.message));
+    if (state.live_error) card.append(el('p', 'song-experience-note', state.live_error));
     const actions = el('div', 'song-experience-actions');
     const button = (label, action, disabled = false) => {
       const b = el('button', '', label);
@@ -57,7 +63,14 @@
       b.addEventListener('click', () => onAction?.(action));
       actions.append(b);
     };
-    if (state.phase === 'capturing') button('Stop listening', 'stop');
+    if (state.phase === 'capturing') {
+      button('Stop listening', 'stop');
+      if (!state.live_enabled) {
+        button('Start live transcription', 'live');
+        card.append(el('small', 'song-experience-consent',
+          'Optional: live transcription uploads short player-audio clips to your configured transcription provider and uses active tokens. Ordinary listening stays local.'));
+      }
+    }
     if (state.phase === 'captured') button('Transcribe excerpt', 'transcribe');
     if (state.transcript && !['transcribing', 'analyzing', 'discarded'].includes(state.phase)) {
       button(state.reports?.length ? 'Analyze again' : 'Analyze excerpt', 'analyze', !state.canAnalyze);

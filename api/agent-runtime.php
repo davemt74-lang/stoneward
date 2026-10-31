@@ -274,6 +274,9 @@ function sf_agent_playlist_name(string $message,string $fallback='Stonefellow Mi
 function sf_agent_explicit_song_capture_route(string $message,array $client=[]): ?string {
     $q=strtolower(trim(preg_replace('/\s+/u',' ',$message)??$message));
     $q=preg_replace('/^(?:(?:hey|hi|ok|okay)\s+)?stone\s*-?\s*fellow[,.:!?\s]*/i','',$q)??$q;
+    // Live transcription is a distinct, user-authorized network action.
+    // Check before ordinary 'transcribe this verse', which stays local.
+    if(preg_match('/\b(?:live|real[- ]?time)\s+(?:song\s+|audio\s+|lyric\s+)?(?:transcription|transcribing|captions|lyrics)\b|\btranscrib(?:e|ing)\s+(?:the\s+)?(?:song\s+|lyrics?\s+)?(?:live|in\s+real[- ]?time)\b|\b(?:start|enable|show|turn\s+on)\s+(?:the\s+)?(?:live|real[- ]?time)\s+(?:captions|lyrics|transcription)\b/i',$q))return 'song_capture_live_start';
     if(!empty($client['song_lyric_draft_available'])&&(
         preg_match('/\b(?:analy[sz]e|analysis|explain|interpret|research|report|summari[sz]e|translate|meaning|symbolism|themes?)\b.*\b(?:verse|chorus|lyrics?|transcript(?:ion)?|song|excerpt|line|words|section|that|it)\b/i',$q)
         ||preg_match('/\b(?:what\s+does\s+(?:(?:that|this|the)\s+(?:line|verse|lyric|section)|that|this|it)\s+mean|what\s+do\s+(?:those|these|the)\s+lyrics\s+mean|what\s+is\s+that\s+verse\s+about|tell\s+me\s+more\s+about\s+that\s+(?:verse|lyric|section))\b/i',$q)
@@ -385,10 +388,21 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
     // They must not require a catalog lookup or a private DB read just to
     // start, stop, or submit a captured section; the upload endpoint later
     // checks the published catalog independently before provider processing.
-    $captureAction=in_array($route,['song_capture_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'],true);
+    $captureAction=in_array($route,['song_capture_start','song_capture_live_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'],true);
     $track=$captureAction?null:sf_agent_find_track($message,$active);
     $action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
+        case 'song_capture_live_start':
+            // A model-selected route cannot itself authorize a metered audio
+            // upload. The user's words must explicitly request live captions.
+            if(sf_agent_explicit_song_capture_route($message,$client)!=='song_capture_live_start'||
+                (!preg_match('/\b(?:start|begin|enable|activate|turn\s+on|show|display|transcrib\w*|give|write)\b/i',$message)
+                  &&!preg_match('/^\s*(?:live|real[- ]?time)\s+(?:lyric\s+|song\s+|audio\s+)?(?:captions|lyrics|transcription)\s*[.!?]*\s*$/i',$message)))
+                $text='Say “start live transcription” to authorize metered live lyric captions.';
+            elseif($active===''||empty($client['player_is_playing']))$text='Play a published song first, then ask for live lyrics.';
+            elseif(!empty($client['song_capture_live_enabled']))$text='Live lyric transcription is already active.';
+            else{$action=['type'=>'song_capture_live_start'];$text='Enabling metered live transcription of the current player audio. Provisional lyrics will appear in chat.';}
+            break;
         case 'song_capture_analyze':
             if(empty($client['song_lyric_draft_available']))$text='First capture and transcribe a song section. Then I can analyze or research the lyrics you heard.';
             else{$action=['type'=>'song_capture_analyze','question'=>sf_clean_text($message,700)];$text='Analyzing the captured lyric draft using approved song context.';}
@@ -723,7 +737,7 @@ function sf_agent_normalize_client_state(array $raw): array {
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
     }
-    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'song_capture_active'=>1,'song_capture_available'=>1,'song_lyric_draft_available'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
+    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'song_capture_active'=>1,'song_capture_live_enabled'=>1,'song_capture_available'=>1,'song_lyric_draft_available'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
     foreach($numbers as $key=>$max){
         if(isset($raw[$key])&&is_numeric($raw[$key]))$out[$key]=max(0,min($max,(int)$raw[$key]));
     }
