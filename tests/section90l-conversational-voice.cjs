@@ -103,6 +103,9 @@ async function adminConversationRestartsAndStops(){
   const sandbox={
     $:selector=>elements[selector],window:{SpeechRecognition:FakeRecognition,StonefellowBargeIn:{create:()=>({start:async()=>true,stop:()=>{},close:()=>{},prepare:async()=>true})},SFAdminAgentCanvas:{send:async()=>{sendCount++;return {text:'Private response'}}}},
     app:{view:'dashboard'},stopAdminSpeech:()=>{},speakAdminReply:()=>{speechCount++;sandbox.adminSpeechPending=true;},agent:()=>{},say:()=>{},
+    // Exercise the continuous conversation path with the optional startup
+    // greeting disabled; 91B10C covers the permission-gated greeting itself.
+    adminSpeechEnabled:true,localStorage:{getItem:()=> 'off'},
     adminSpeechActive:false,adminSpeechPending:false,adminConversationEnabled:false,adminConversationMonitor:null,adminConversationResume:null,
     Math,setTimeout:(callback)=>{const id=++timerId;timers.set(id,callback);return id},clearTimeout:id=>timers.delete(id)
   };
