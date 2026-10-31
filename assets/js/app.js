@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.187';
+  window.STONEFELLOW_APP_BUILD='1.3.188';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -120,12 +120,26 @@
   });
   // Deliberately separate from playlist listening sessions and microphone
   // speech recognition. No audio is sent to a server in Section 91B8A.
+  let songExperience=null;
   const songCaptureSkill=window.StonefellowSongCapture?.create({
     audio,getTrack:()=>st.track,
     onChange:capture=>{
       document.body.classList.toggle('song-capture-active',capture.active);
       if(capture.active||!capture.last){songLyricDraft=null;songLyricReport=null;songLyricCorrected='';songPersonalNote='';}
-      if(capture.active)agent('recording','Capturing this song section… say “stop listening” to finish.');
+      if(capture.active){
+        songExperience={phase:'capturing',title:st.track?.title||'Song section',
+          track_id:capture.track_id,start_ms:capture.start_ms,end_ms:null,
+          transcript:'',corrected:'',reports:[],saved_note_id:null,message:''};
+        agent('recording','Capturing this song section… say “stop listening” to finish.');
+        updateSongExperience({},true);
+      }else if(capture.last){
+        songExperience=songExperience||{reports:[],transcript:'',corrected:''};
+        updateSongExperience({phase:'captured',title:capture.last.title,
+          track_id:capture.last.track_id,start_ms:capture.last.start_ms,
+          end_ms:capture.last.end_ms,message:'Audio captured in this browser. Transcription is optional and requires your next action.'},true);
+      }else if(songExperience?.phase==='capturing'){
+        updateSongExperience({phase:'discarded',message:'The capture was discarded after playback changed. Start listening again to capture a fresh excerpt.'});
+      }
     }
   });
   let songTranscriptionBusy=false;
@@ -134,6 +148,45 @@
   let songLyricReport=null;
   let songLyricCorrected='';
   let songPersonalNote='';
+  // The player, popup chat and full My Agent Chat canvas all render this one
+  // in-memory session. Nothing is copied to localStorage or Agent Brain.
+  function updateSongExperience(changes={},open=false){
+    if(!songExperience)return;
+    Object.assign(songExperience,changes);
+    renderPopupEntries();
+    window.SFCustomerAgentChat?.onSongExperience?.();
+    if(open)void openChatPopup();
+  }
+  async function songExperienceAction(action,question=''){
+    if(action==='open'){
+      closeChatPopup();
+      await navigate('agent-chat');
+      return;
+    }
+    if(!songExperience)return;
+    if(action==='ask'&&!String(question).trim())return;
+    const userText={stop:'Stop listening',transcribe:'Transcribe this song section',
+      analyze:'Analyze this captured lyric section',save:'Save this lyric note'}[action]||String(question).trim();
+    popupEntry('user',userText);
+    let response;
+    if(action==='stop')response=await executeSongCaptureAction({type:'song_capture_stop'});
+    else if(action==='transcribe')response=await transcribeLastCapturedSong();
+    else if(action==='analyze'||action==='ask')response=await analyzeLastSongDraft(
+      action==='ask'?String(question).trim():'Analyze the lyrical themes, interpretations and references in this excerpt.');
+    else if(action==='save')response=await executePrivateAnnotationCommand('save this lyric note');
+    else return;
+    // The full report is independently visible in the card. Keep spoken chat
+    // replies short so speech does not read a multi-page analysis over music.
+    const success=(action==='analyze'||action==='ask')&&String(response).startsWith('Lyric analysis for ');
+    await say(success&&songExperience?.phase==='report'?
+      'Your lyric analysis is ready in the song report. You can read it here, open My Agent Chat or ask another question.':response);
+  }
+  window.StonefellowSongExperience=Object.freeze({
+    mount:target=>window.SFSongExperienceUI?.mount(target,songExperience&&{
+      ...songExperience,canAnalyze:!!currentSongDraft()
+    },songExperienceAction),
+    active:()=>!!songExperience
+  });
   async function transcribeLastCapturedSong(retried=false){
     const captured=songCaptureSkill?.getCapture();
     if(!captured)return 'There is no completed song section. Ask me to listen to a verse, then say stop listening.';
@@ -148,6 +201,7 @@
       form.set('captured_at',captured.captured_at);
       const extension=captured.mime_type?.includes('mp4')?'m4a':'webm';
       form.set('clip',captured.blob,'song-section.'+extension);
+      updateSongExperience({phase:'transcribing',message:'Transcription is in progress. You can keep playing music.'},true);
       popupEntry('notice','Transcribing the explicitly captured song section with the configured OpenAI audio provider…');
       const response=await fetch((cfg.apiBase||'api')+'/agent-song-transcribe.php',{
         method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':st.auth.csrf||''},body:form
@@ -158,15 +212,18 @@
         return await transcribeLastCapturedSong(true);
       }
       if(!response.ok||payload.ok!==true)throw new Error(payload.message||'Transcription was not completed.');
-      if(songCaptureSkill.getCapture()!==captured)return 'The song changed while transcription was processing. The older draft was discarded.';
+      if(songCaptureSkill.getCapture()!==captured){updateSongExperience({phase:'discarded',message:'The captured excerpt changed during transcription; the older result was discarded.'});return 'The song changed while transcription was processing. The older draft was discarded.';}
       const draft=payload.transcript;
       if(!draft||draft.review_status!=='unverified'||!draft.text)throw new Error('No usable transcription draft was returned.');
       songLyricDraft=Object.freeze({...draft});
       songLyricCorrected='';songPersonalNote='';songLyricReport=null;
+      updateSongExperience({phase:'draft',title:draft.title,start_ms:draft.start_ms,
+        end_ms:draft.end_ms,transcript:draft.text,corrected:'',reports:[],
+        saved_note_id:null,message:'Review these estimated words, then select Analyze excerpt or ask a question. Analysis does not start automatically.'},true);
       const range=Math.round(draft.start_ms/1000)+'–'+Math.round(draft.end_ms/1000)+'s';
       popupEntry('notice','UNVERIFIED LYRIC DRAFT — “'+draft.title+'” ('+range+')\n'+draft.text+'\n\nThese words are an automated estimate, not reviewed or confirmed lyrics.');
       return 'I captured a draft transcript for “'+draft.title+'” at '+range+'. The lyrics are shown in the chat as unverified. You can correct any words before asking me for an analysis.';
-    }catch(e){return 'I could not transcribe the section. '+e.message+' The captured audio is still in this browser, so you can retry.'}
+    }catch(e){updateSongExperience({phase:'captured',message:'Transcription failed: '+e.message+' The captured audio remains available for another attempt.'});return 'I could not transcribe the section. '+e.message+' The captured audio is still in this browser, so you can retry.'}
     finally{songTranscriptionBusy=false}
   }
   async function analyzeLastSongDraft(question){
@@ -176,20 +233,25 @@
     if(songAnalysisBusy)return 'I am already analyzing that lyric section. One moment.';
     songAnalysisBusy=true;
     try{
+      updateSongExperience({phase:'analyzing',message:'Your requested interpretation is processing. The unverified draft stays visible.'},true);
       popupEntry('notice','Analyzing the unverified lyric draft. Your requested excerpt and consented listening-history summary may be sent to your configured AI provider.');
       const payload={track_id:draft.track_id,start_ms:draft.start_ms,end_ms:draft.end_ms,
         captured_at:draft.captured_at,transcript:songLyricCorrected||draft.text,question:String(question||'').slice(0,700),
         timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
       const response=await secureJsonPost('agent-song-analyze.php',payload);
-      if(songCaptureSkill?.getCapture()!==captured||songLyricDraft!==draft)
+      if(songCaptureSkill?.getCapture()!==captured||songLyricDraft!==draft){
+        updateSongExperience({phase:'discarded',message:'Playback or the lyric draft changed. An outdated analysis was discarded.'});
         return 'Playback or the lyric draft changed during analysis. I discarded the outdated report.';
+      }
       const report=response.analysis;
       if(!report||!report.report||report.track_id!==draft.track_id)throw new Error('No grounded analysis report was returned.');
       songLyricReport=Object.freeze({...report});
+      updateSongExperience({phase:'report',reports:[...(songExperience?.reports||[]),
+        {question:payload.question,text:report.report}],message:'The analysis is available here and in My Agent Chat. Ask another question to extend the report.'},true);
       const range=Math.round(report.start_ms/1000)+'–'+Math.round(report.end_ms/1000)+'s';
       return 'Lyric analysis for “'+report.title+'” ('+range+'), using an unverified transcript:\n\n'+report.report+
         '\n\nSource note: interpretation from an unverified lyric draft and available Stonefellow records; no live web sources were searched.';
-    }catch(e){return 'I could not finish the lyric analysis. '+e.message+' Your captured draft is still available for another request.'}
+    }catch(e){updateSongExperience({phase:songExperience?.reports?.length?'report':'draft',message:'Analysis failed: '+e.message+'. The transcript remains available for another request.'});return 'I could not finish the lyric analysis. '+e.message+' Your captured draft is still available for another request.'}
     finally{songAnalysisBusy=false;}
   }
   async function executeSongCaptureAction(action){
@@ -218,6 +280,8 @@
       if(!currentSongDraft())return 'Capture and transcribe the current song section before correcting its draft.';
       const edit=m[1].trim();if(edit.length<3||edit.length>4200)return 'Corrected lyrics must be between 3 and 4,200 characters.';
       songLyricCorrected=edit;songLyricReport=null;
+      updateSongExperience({phase:'draft',corrected:edit,reports:[],saved_note_id:null,
+        message:'Your listener-edited draft is still unverified. The earlier analysis was cleared; ask again to analyze this version.'});
       return 'Updated the listener-edited, still-unverified draft in this browser. The original machine draft is preserved. Say “save this lyric note” to keep it privately.';
     }
     if((m=q.match(/^(?:add|write|set)\s+(?:a\s+)?(?:personal\s+)?note\s+(?:about\s+)?(?:this\s+)?(?:section|verse|lyric|draft)?\s*(?:to|as|:)\s+([\s\S]+)$/i))){
@@ -232,7 +296,9 @@
         annotation:songPersonalNote,question:songLyricReport?.question||'',
         report:songLyricReport?.report||'',mode:songLyricReport?.mode||''};
       try{const result=await secureJsonPost('agent-song-annotations.php',payload);
-        const note=result.annotation;return 'Saved private lyric note #'+note.id+' for “'+note.title+'” at '+
+        const note=result.annotation;
+        updateSongExperience({saved_note_id:note.id,message:'Private note #'+note.id+' saved. It has not been shared with Agent Brain.'});
+        return 'Saved private lyric note #'+note.id+' for “'+note.title+'” at '+
           time(note.start_ms/1000)+'–'+time(note.end_ms/1000)+'. The draft remains unverified and is not shared with future AI conversations automatically.';
       }catch(e){return 'I could not save the private lyric note. '+e.message;}
     }
@@ -407,7 +473,30 @@
   const words=s=>new Set(norm(s).split(' ').filter(w=>w.length>2));
   const money=c=>new Intl.NumberFormat('en-US',{style:'currency',currency:st.store?.currency||'USD'}).format((Number(c)||0)/100);
   function agent(mode,text){orb.className='agent-orb'+(mode&&mode!=='idle'?' '+mode:'');status.textContent=(mode||'idle').toUpperCase();if(chatPopupState)chatPopupState.textContent=status.textContent;if(text)msg.textContent=text;if(agentInterrupt)agentInterrupt.hidden=mode!=='speaking'}
-  function renderPopupEntries(){if(!chatPopupMessages)return;chatPopupMessages.replaceChildren();if(!popupEntries.length){const empty=document.createElement('p');empty.className='agent-chat-empty';empty.textContent='Your conversation will appear here. Use the bar below to type or speak.';chatPopupMessages.appendChild(empty);return}for(const entry of popupEntries.slice(-60)){const row=document.createElement('article'),who=document.createElement('strong'),body=document.createElement('p');row.className='agent-chat-popup-entry '+(entry.role==='user'?'from-user':entry.role==='notice'?'notice':'from-agent');who.textContent=entry.role==='user'?'You':entry.role==='notice'?'Voice status':'Stonefellow Agent';body.textContent=entry.text;row.append(who,body);chatPopupMessages.appendChild(row)}chatPopupMessages.scrollTop=chatPopupMessages.scrollHeight}
+  function renderPopupEntries(){
+    if(!chatPopupMessages)return;
+    const pendingQuestion=chatPopupMessages.querySelector('.song-experience-followup input')?.value||'';
+    chatPopupMessages.replaceChildren();
+    if(!popupEntries.length&&!songExperience){
+      const empty=document.createElement('p');empty.className='agent-chat-empty';
+      empty.textContent='Your conversation will appear here. Use the bar below to type or speak.';
+      chatPopupMessages.appendChild(empty);return;
+    }
+    for(const entry of popupEntries.slice(-60)){
+      const row=document.createElement('article'),who=document.createElement('strong'),body=document.createElement('p');
+      row.className='agent-chat-popup-entry '+(entry.role==='user'?'from-user':entry.role==='notice'?'notice':'from-agent');
+      who.textContent=entry.role==='user'?'You':entry.role==='notice'?'Session update':'Stonefellow Agent';
+      body.textContent=entry.text;row.append(who,body);chatPopupMessages.appendChild(row);
+    }
+    if(songExperience){
+      const host=document.createElement('div');host.className='song-experience-in-chat';
+      window.StonefellowSongExperience?.mount(host);
+      if(pendingQuestion&&host.querySelector('.song-experience-followup input'))
+        host.querySelector('.song-experience-followup input').value=pendingQuestion;
+      chatPopupMessages.appendChild(host);
+    }
+    chatPopupMessages.scrollTop=chatPopupMessages.scrollHeight;
+  }
   function popupEntry(role,text){if(!text)return;popupEntries.push({role,text:String(text)});popupEntries=popupEntries.slice(-60);renderPopupEntries()}
   async function openChatPopup(){if(!chatPopup)return;closeQuickMenu();chatPopup.hidden=false;document.body.classList.add('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','true');chatToggle?.setAttribute('aria-label','Close Agent Chat');chatToggle.title='Close Agent Chat';orb?.setAttribute('aria-expanded','true');orb?.setAttribute('aria-label','Close Agent Chat');if(popupHistoryLoaded)return;popupHistoryLoaded=true;await loadAuth();if(!st.auth.authenticated){popupHistoryLoaded=false;return}try{const cid=st.conversationId;const response=await api('agent-brain.php'+(cid?'?conversation_id='+encodeURIComponent(cid):''));const messages=response.brain?.messages||response.messages||[];const historical=messages.filter(m=>['user','assistant'].includes(m.role)).slice(-40).map(m=>({role:m.role==='user'?'user':'assistant',text:String(m.content||'')}));const live=popupEntries.slice();let overlap=0;for(let n=Math.min(historical.length,live.length);n>0;n--){if(historical.slice(-n).every((m,i)=>m.role===live[i].role&&m.text===live[i].text)){overlap=n;break}}popupEntries=historical.concat(live.slice(overlap)).slice(-60);renderPopupEntries()}catch(_){popupHistoryLoaded=false;/* A history outage must not stop new chat turns. */}}
   function closeChatPopup(){if(!chatPopup)return;chatPopup.hidden=true;document.body.classList.remove('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','false');chatToggle?.setAttribute('aria-label','Open Agent Chat');chatToggle.title='Open Agent Chat';orb?.setAttribute('aria-expanded','false');orb?.setAttribute('aria-label','Open Agent Chat')}

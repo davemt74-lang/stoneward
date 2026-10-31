@@ -67,6 +67,7 @@ jobs:
           node --check assets/js/artist-home-renderer.js
           node --check assets/js/agent-brain.js
           node --check assets/js/agent-chat-canvas.js
+          node --check assets/js/agent-song-experience-ui.js
           node --check assets/js/library.js
           node --check assets/js/owned-music.js
           node tests/section85a-owned-ui.cjs
@@ -544,6 +545,7 @@ jobs:
           node tests/section91b8d-private-song-annotations.cjs
           php tests/section91b8e-song-annotation-chat.php
           node tests/section91b8e-song-annotation-chat.cjs
+          node tests/section91b11a-song-experience.cjs
           php tests/section91b8f-selective-song-memory.php
           node tests/section91b8f-selective-song-memory.cjs
           php tests/section91b9a-speech-engine-preferences.php

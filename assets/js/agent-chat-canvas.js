@@ -28,6 +28,7 @@
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h2>My Agent Chat</h2><div><button type="button" id="newAgentThread" class="text-control">New chat</button> <button type="button" id="openMyAgentBrain" class="text-control">My Agent Brain</button></div></div>'+
       '<p>This private conversation is connected to your Stonefellow music companion, playlists, saved preferences and current player. Admin cannot read your messages in operational reports.</p>'+
       '<label>Conversation <select id="agentThreadSelect"><option value="">New conversation</option>'+threadOptions+'</select></label>'+
+      '<section id="agentSongExperienceCanvas" class="agent-song-experience-canvas" aria-label="Current song transcript and analysis" hidden></section>'+
       '<div class="agent-message-history" id="agentConversationMessages" role="log" aria-live="polite" aria-label="Agent conversation" style="max-height:55vh;overflow-y:auto;margin:14px 0">'+
       (messages.length?messages.map(m=>'<article class="agent-chat-bubble" style="padding:12px;margin:8px 0;border:1px solid #5e4e3c;border-radius:10px"><strong>'+(m.role==='assistant'?'Stonefellow Agent':'You')+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(m.content||'')+'</p>'+(m.role==='assistant'&&Number(m.id)>0?'<div class="agent-response-feedback"><button type="button" class="text-control" data-agent-rating="helpful" data-agent-message-id="'+Number(m.id)+'">Helpful</button><button type="button" class="text-control" data-agent-rating="not_helpful" data-agent-message-id="'+Number(m.id)+'">Not helpful</button></div>':'')+'</article>').join(''):'<p>Start a conversation with your Agent below.</p>')+'</div>'+
       '<section class="privacy-panel"><h3>Recent governed mission steps</h3><p>These are recent plans across your private conversations. Opening a tool is not approval to save changes.</p><ul>'+(missionCards||'<li>No saved plans yet.</li>')+'</ul><div class="auth-actions"><button type="button" data-agent-navigate="music" class="text-control">Explore published music</button><button type="button" data-agent-navigate="library" class="text-control">Review my playlists</button><button type="button" data-agent-navigate="agent-brain" class="text-control">Review Agent Brain</button></div></section>'+ 
@@ -60,8 +61,13 @@
       catch(err){btn.disabled=false;one('#myAgentCanvasStatus').textContent='Could not send the message.';}
     };
     active={canvas,refresh:()=>render({canvas,api,esc,post,send,conversationId,navigate})};
+    syncSongExperience();
   }
-  window.SFCustomerAgentChat={render,async onReply(){
+  function syncSongExperience(){
+    const host=active?.canvas?.querySelector('#agentSongExperienceCanvas');
+    if(host)window.StonefellowSongExperience?.mount(host);
+  }
+  window.SFCustomerAgentChat={render,onSongExperience:syncSongExperience,async onReply(){
     if(active&&active.canvas.isConnected&&active.canvas.querySelector('#myAgentCanvasForm')){
       try{await active.refresh();}catch(e){/* preserve existing chat on a network failure */}
     }

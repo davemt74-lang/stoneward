@@ -19,6 +19,7 @@ const context={songTranscriptionBusy:false,songLyricDraft:null,st:{auth:{csrf:'c
   songCaptureSkill:{getCapture:()=>available},
   cfg:{apiBase:'api'},FormData,Blob,
   loadAuth:async()=>{authRefreshes++;context.st.auth.csrf='new-csrf'},
+  updateSongExperience:()=>{},
   popupEntry:(role,text)=>notices.push({role,text}),
   fetch:async(url,config)=>{requests.push({url,config});return mode==='fail'
     ?{status:503,ok:false,json:async()=>({ok:false,message:'Provider not enabled.'})}
