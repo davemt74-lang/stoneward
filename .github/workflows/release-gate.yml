@@ -554,6 +554,7 @@ jobs:
           node tests/section91b9c-speech-engine-readiness.cjs
           php tests/section91b9d-voice-actions.php
           node tests/section91b9d-voice-actions.cjs
+          node tests/section91b10a-conversation-lifecycle.cjs
           node --test speech-gateway/tests/gateway.test.mjs
           php tests/section90s-private-folder-intake.php
           node tests/section90s-private-folder-intake.cjs
