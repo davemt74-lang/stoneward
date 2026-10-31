@@ -812,7 +812,7 @@
     const form=$('#adminChatForm'),input=$('#adminChatInput'),voice=$('#adminVoiceButton');
     const sendButton=form.querySelector('button[type="submit"]');
     let pending=false,recognition=null,voiceSubmitted=false,conversationOn=false,recognitionActive=false;
-    let restartTimer=null,networkFailures=0;
+    let restartTimer=null,networkFailures=0,voiceGreetingArmed=false,voiceGreetingDelivered=false;
     const updateVoiceButton=()=>{
       voice.classList.toggle('active',conversationOn);
       voice.setAttribute('aria-pressed',String(conversationOn));
@@ -832,8 +832,21 @@
       try{recognition.start()}
       catch(e){if(e.name==='InvalidStateError'){scheduleListen(600);return}stopConversation();$('#adminAgentComposerStatus').textContent='The microphone could not start. Click to retry.'}
     }
+    function greetAdminAfterMicrophoneReady(){
+      if(!voiceGreetingArmed)return false;
+      voiceGreetingArmed=false;
+      if(voiceGreetingDelivered||!adminSpeechEnabled||localStorage.getItem('stonefellow.voice.greeting.v1')==='off')return false;
+      voiceGreetingDelivered=true;
+      const greeting='Hello. Your Admin Agent is ready. What would you like to work on?';
+      $('#adminAgentComposerStatus').textContent=greeting;
+      try{recognition?.abort()}catch(_){}
+      recognitionActive=false;
+      // Private Admin replies remain on-device; do not invoke an external TTS provider.
+      void speakAdminReply(greeting);
+      return true;
+    }
     function stopConversation(){
-      conversationOn=false;adminConversationEnabled=false;clearTimeout(restartTimer);
+      conversationOn=false;adminConversationEnabled=false;voiceGreetingArmed=false;clearTimeout(restartTimer);
       if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
       try{recognition?.abort()}catch(_){}recognitionActive=false;
       stopAdminSpeech();adminConversationMonitor?.close();updateVoiceButton();agent('idle','Conversation mode is off.');
@@ -897,7 +910,7 @@
       voice.onclick=()=>{
         if(conversationOn){stopConversation();return}
         if(pending)return;
-        stopAdminSpeech();conversationOn=true;adminConversationEnabled=true;networkFailures=0;updateVoiceButton();if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
+        stopAdminSpeech();conversationOn=true;adminConversationEnabled=true;voiceGreetingArmed=true;networkFailures=0;updateVoiceButton();if(typeof syncAdminMusicDucking==='function')syncAdminMusicDucking();
         agent('listening','I’m listening.');$('#adminAgentComposerStatus').textContent='Conversation active · speak naturally.';
         void adminConversationMonitor?.prepare();
         startListen();
@@ -905,6 +918,7 @@
       recognition.onstart=()=>{
         recognitionActive=true;
         if(!conversationOn||pending||adminSpeechPending||(typeof adminSpeechGuard!=='undefined'&&adminSpeechGuard?.blocked)){try{recognition.abort()}catch(_){}return}
+        if(greetAdminAfterMicrophoneReady())return;
         agent('listening','I’m listening.');
       };
       recognition.onresult=e=>{

@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const endpoint='api/speech-engine.php';
+  const greetingKey='stonefellow.voice.greeting.v1';
   let requestId=0;
   async function json(url,options={}) {
     const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
@@ -23,11 +24,14 @@
     if(!page||!(page.querySelector('.account-header')||page.querySelector('#profileForm'))||page.querySelector('[data-account-speech-engine]'))return;
     const block=document.createElement('section');
     block.className='account-orders';block.dataset.accountSpeechEngine='';
-    block.innerHTML='<div class="module-kicker">VOICE CONTROLS</div><p class="player-note">Select how your signed-in Stonefellow Agent will handle conversations. Existing ElevenLabs credentials remain in Admin; no key is stored here.</p><label class="field">Conversation engine <select data-voice-engine-choice disabled><option value="legacy">Original conversational voice (default)</option><option value="speech_engine">ElevenLabs Speech Engine pilot</option></select></label><p class="player-note" role="status" aria-live="polite" data-voice-engine-status>Loading voice options…</p>';
+    block.innerHTML='<div class="module-kicker">VOICE CONTROLS</div><p class="player-note">Select how your signed-in Stonefellow Agent will handle conversations. Existing ElevenLabs credentials remain in Admin; no key is stored here.</p><label class="field">Conversation engine <select data-voice-engine-choice disabled><option value="legacy">Original conversational voice (default)</option><option value="speech_engine">ElevenLabs Speech Engine pilot</option></select></label><label class="field"><input type="checkbox" data-voice-greeting-choice> Greet me when the microphone is ready</label><p class="player-note">The original voice engine greets once per page after microphone access succeeds, never on page load. Requires spoken replies to be on. The Speech Engine pilot manages its own greetings.</p><p class="player-note" role="status" aria-live="polite" data-voice-engine-status>Loading voice options…</p>';
     const before=page.querySelector('.fan-preferences')||page.querySelector('.notification-preferences');
     if(before)before.before(block);else page.append(block);
     const status=block.querySelector('[data-voice-engine-status]');
     const select=block.querySelector('[data-voice-engine-choice]');
+    const greeting=block.querySelector('[data-voice-greeting-choice]');
+    greeting.checked=localStorage.getItem(greetingKey)!=='off';
+    greeting.addEventListener('change',()=>localStorage.setItem(greetingKey,greeting.checked?'on':'off'));
     const current=++requestId;
     try {
       const data=(await json(endpoint)).speech_engine;
