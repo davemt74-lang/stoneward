@@ -559,6 +559,29 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .agent-chat-popup-entry.from-user{align-self:flex-end;background:rgba(140,119,86,.17);border-bottom-left-radius:14px;border-bottom-right-radius:4px}
 .agent-chat-popup-entry.notice{align-self:center;max-width:100%;background:transparent;border-style:dashed;border-radius:10px;color:var(--muted)}
 .agent-chat-popup-entry strong{display:block;font-size:.68rem;letter-spacing:.07em;margin-bottom:5px;color:var(--muted)}.agent-chat-popup-entry p{white-space:pre-wrap;line-height:1.55;font-size:.88rem;margin:0}
+.song-experience-in-chat{width:100%;min-width:0;align-self:stretch}
+.agent-song-experience-canvas{width:100%;margin:18px 0}
+.agent-song-experience-canvas[hidden]{display:none}
+.song-experience-card{width:100%;min-width:0;background:var(--soft);border:1px solid var(--line2);border-radius:16px;padding:16px;color:var(--ink);overflow-wrap:anywhere}
+.song-experience-kicker{font-size:.66rem;font-weight:750;letter-spacing:.14em;color:var(--accent);margin-bottom:4px}
+.song-experience-card h3{font-size:1.13rem;margin:0 0 3px;line-height:1.25}
+.song-experience-meta{font-size:.76rem;color:var(--muted);margin:0 0 8px}
+.song-experience-phase{display:inline-block;font-size:.78rem;font-weight:700;border:1px solid var(--line2);border-radius:20px;padding:5px 10px;margin:0 0 12px;color:var(--accent)}
+.song-experience-transcript,.song-experience-report{background:rgba(var(--surface-rgb),.75);border:1px solid var(--line);border-radius:12px;padding:13px;margin:0 0 12px}
+.song-experience-card h4{font-size:.87rem;margin:0 0 8px}
+.song-experience-copy{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;font-size:.91rem;margin:0 0 8px}
+.song-experience-card small{font-size:.72rem;color:var(--muted);display:block;line-height:1.45;margin-top:5px}
+.song-experience-note{font-size:.8rem;color:var(--muted);line-height:1.5;margin:3px 0 11px}
+.song-experience-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.song-experience-actions button,.song-experience-followup button{min-height:38px;border:1px solid var(--accent);border-radius:9px;background:var(--accent);color:var(--bg);padding:7px 11px;cursor:pointer;font-size:.79rem;font-weight:700}
+.song-experience-actions button:disabled{opacity:.45;cursor:default}
+.song-experience-actions button:last-of-type{background:transparent;color:var(--accent)}
+.song-experience-wait{align-self:center;color:var(--muted);font-size:.77rem}
+.song-experience-followup{display:flex;align-items:end;gap:8px;margin:12px 0 0;flex-wrap:wrap}
+.song-experience-followup label{flex:1 1 240px;min-width:0;font-size:.78rem;color:var(--muted)}
+.song-experience-followup input{width:100%;min-width:0;min-height:40px;margin-top:5px;padding:9px 10px;background:var(--surface);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-size:.85rem}
+.song-experience-consent{margin:8px 0 0}
+@media(max-width:720px){.song-experience-card{padding:12px}.song-experience-actions button{flex:1 1 auto}.song-experience-followup button{width:100%}}
 body.has-player .agent-chat-popup{bottom:calc(100% + 12px)}
 
 /* The companion remains present on the artist homepage and while the popup is open. */

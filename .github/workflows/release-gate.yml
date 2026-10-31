@@ -67,6 +67,7 @@ jobs:
           node --check assets/js/artist-home-renderer.js
           node --check assets/js/agent-brain.js
           node --check assets/js/agent-chat-canvas.js
+          node --check assets/js/agent-song-experience-ui.js
           node --check assets/js/library.js
           node --check assets/js/owned-music.js
           node tests/section85a-owned-ui.cjs
@@ -110,11 +111,16 @@ jobs:
           node --check admin/assets/gallery.js
           node --check admin/assets/inquiries.js
 
-      - name: Set up portable FFmpeg for actual private render certification
-        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
-        with:
-          ffmpeg-version: '6.0.1'
-          linking-type: static
+      - name: Ensure FFmpeg is available for actual private render certification
+        run: |
+          set -euo pipefail
+          # Ubuntu runners normally include FFmpeg. Install it through the OS
+          # package manager only if absent; the former setup action's README
+          # version parser breaks on newer hosted Node runners.
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
       - name: Verify FFmpeg tools
         run: |
           # The supervised PHP renderer intentionally accepts only these local
@@ -544,6 +550,7 @@ jobs:
           node tests/section91b8d-private-song-annotations.cjs
           php tests/section91b8e-song-annotation-chat.php
           node tests/section91b8e-song-annotation-chat.cjs
+          node tests/section91b11a-song-experience.cjs
           php tests/section91b8f-selective-song-memory.php
           node tests/section91b8f-selective-song-memory.cjs
           php tests/section91b9a-speech-engine-preferences.php

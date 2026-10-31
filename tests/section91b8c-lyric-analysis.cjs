@@ -18,6 +18,7 @@ let available=capture,mode='ok';
 const context={songAnalysisBusy:false,songLyricReport:null,songLyricDraft:draft,songLyricCorrected:'',
   songCaptureSkill:{getCapture:()=>available},Intl,
   popupEntry:(role,text)=>messages.push({role,text}),
+  updateSongExperience:()=>{},songExperience:{reports:[]},
   secureJsonPost:async(api,payload)=>{requests.push({api,payload});if(mode==='fail')throw Error('Provider unavailable');
     return {ok:true,analysis:{track_id:'track-1',title:'Genius of Unhumankind',start_ms:12100,end_ms:27700,
       report:'The metaphor could be read in two ways.',draft_status:'unverified_user_supplied'}};
