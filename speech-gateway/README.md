@@ -47,4 +47,6 @@ be enabled. Each voice session requires a signed-in owner claim, and an unbound
 or expired session gets no private Agent Brain access. The existing original
 voice engine stays selectable and is the default. The voice pilot uses the
 normal authenticated agent response policy and stores transcript turns under
-its own conversation ID. Player/navigation actions remain deferred in the pilot.
+its own conversation ID. Low-risk, authorized player and public navigation
+actions are delivered once to the owning browser with short expiration.
+Account writes, purchases and other sensitive actions remain deferred.

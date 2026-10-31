@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/speech-engine-session-core.php';
+require_once __DIR__.'/speech-engine-actions-core.php';
 require_once __DIR__.'/agent-runtime.php';
 
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
@@ -24,6 +25,7 @@ try {
         sf_json_response(['ok'=>true,'registered'=>true]);
     }
     if($action==='close'){
+        sf_speech_clear_actions($cid);
         sf_speech_close_conversation($cid);
         sf_json_response(['ok'=>true,'closed'=>true]);
     }
@@ -33,11 +35,12 @@ try {
         $message=sf_clean_text($body['message']??'',4000);
         if($message==='')sf_json_response(['ok'=>false,'error'=>'empty_turn'],422);
         // Same policy and persisted Agent Brain path as authenticated text chat.
-        // Client-side player/navigation actions remain disabled in the pilot.
+        // The gateway does not receive client action payloads or credentials.
         $reply=sf_agent_reply($user,'voice_'.substr(hash('sha256',$cid),0,38),$message,['voice_source'=>'speech_engine_pilot']);
         $actionType=(string)($reply['action']['type']??'none');
-        if($actionType!=='none')sf_json_response(['ok'=>true,'text'=>'I understood the request. Please use the original chat for playback or page actions until the new voice controls are certified.','action_deferred'=>true]);
-        sf_json_response(['ok'=>true,'text'=>(string)($reply['text']??'Please try again.')]);
+        $queued=sf_speech_queue_action((int)$user['id'],$cid,$reply,$message);
+        if($actionType!=='none'&&!$queued)sf_json_response(['ok'=>true,'text'=>'I understood the request, but this action needs the original chat or additional confirmation. I have not performed it.','action_deferred'=>true]);
+        sf_json_response(['ok'=>true,'text'=>(string)($reply['text']??'Please try again.'),'action_queued'=>$queued]);
     }
     sf_json_response(['ok'=>false,'error'=>'unsupported_action'],422);
 }catch(Throwable $e){

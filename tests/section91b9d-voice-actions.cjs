@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const app=read('assets/js/app.js'),client=read('speech-gateway/browser-entry.mjs'),core=read('api/speech-engine-actions-core.php'),bridge=read('api/speech-engine-bridge.php');
+let count=0;const check=(ok,label)=>{assert.ok(ok,label);console.log('91B9D PASS:',label);count++;};
+check(client.includes("post('take_action'")&&client.includes('active.getId()'),'Browser uses same-origin signed-in POST to claim its own conversation action');
+check(client.includes('if(active!==current)return null'),'Stale or disconnected voice session cannot dispatch an old action');
+check(app.includes('dispatchAgentBrowserAction(text,j.action,j.audio_resolution)'),'Typed chat uses shared verified action dispatch');
+check(app.includes("dispatchAgentBrowserAction(String(envelope.message||''),envelope.action,envelope.audio_resolution,false)"),'Speech Engine uses identical catalog and player dispatch without song capture');
+check(app.includes('if(!user)void deliverSpeechEngineAction()'),'Action is claimed after provider speaks, not on an arbitrary transcript');
+check(app.includes('if(!speechPilotActive||!envelope?.action)return'),'Stopping the microphone stops pending action delivery');
+check(core.includes('sf_speech_public_action')&&core.includes('requires_confirmation'),'Server allowlist explicitly rejects confirmation-required actions');
+check(!core.includes("'builder_save'")&&!core.includes("'set_favorite_track'")&&!core.includes("'purchase'"),'No account, commerce or builder write is on the voice allowlist');
+check(core.includes('sf_speech_bound_user')&&core.includes('DELETE FROM speech_engine_pending_actions WHERE id=?'),'One-use queue is owner-bound and deletes consumed rows');
+check(bridge.includes('sf_speech_queue_action')&&bridge.includes('sf_speech_clear_actions'),'Signed bridge queues owner action and destroys it on close');
+check(read('scripts/release-zip.sh').includes('"$stage/site/speech-gateway"'),'Node gateway remains separate from HostGator deployment');
+console.log('Section 91B9D: '+count+' browser and authorization contract checks passed');

@@ -32,6 +32,15 @@ const pilot={
     catch{return false;}
   },
   get active(){return !!current||starting;},
+  async takeAction(){
+    const active=current;
+    if(!active)return null;
+    const conversationId=active.getId();
+    if(!conversationId)return null;
+    const result=await post('take_action',{conversation_id:conversationId});
+    if(active!==current)return null;
+    return result.action_envelope||null;
+  },
   async start(handlers={}){
     if(current||starting)return;
     starting=true;
