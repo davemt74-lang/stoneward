@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.189');
+define('SF_BUILD', '1.3.190');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -62,6 +62,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/agent-song-capture.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/public-agent-canvas.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/turntable-builder.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/artist-world.css?v=<?=rawurlencode(SF_BUILD)?>">
   <style id="stonefellowTheme"><?=sf_theme_css($activeTheme)?></style>
@@ -93,7 +94,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <div class="menu-sheet">
         <button class="menu-close" id="menuClose" type="button" aria-label="Close menu">×</button>
         <nav>
-          <a href="./" data-view="home"><?=!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent'?></a>
+          <a href="./" data-view="home"><?=($siteSettings['homepage_template']??'classic')==='agent_canvas'?'Agent Canvas':(!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent')?></a>
           <a href="world" data-view="world">Artist World</a>
           <a href="music" data-view="music">Music</a>
           <a href="search" data-view="search">Search</a>
@@ -248,7 +249,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
     </div>
   </footer>
 
-  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_THEME_PREVIEW=<?=json_encode($themePreview)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['artistHomepageEnabled'=>(bool)($siteSettings['artist_homepage_enabled']??false),'fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text'],'appearance'=>['mode'=>$activeTheme['mode'],'preset'=>$activeTheme['preset'],'density'=>$activeTheme['density'],'corner_style'=>$activeTheme['corner_style'],'max_width'=>$activeTheme['max_width']],'media'=>['logo'=>$siteSettings['media_logo']??'','hero'=>$siteSettings['media_hero']??'','social_share'=>$siteSettings['media_social_share']??'','app_icon'=>$siteSettings['media_app_icon']??'','artist_photo'=>$siteSettings['media_artist_photo']??'']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
+  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_THEME_PREVIEW=<?=json_encode($themePreview)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['artistHomepageEnabled'=>(bool)($siteSettings['artist_homepage_enabled']??false),'homepageTemplate'=>$siteSettings['homepage_template']??'classic','fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text'],'appearance'=>['mode'=>$activeTheme['mode'],'preset'=>$activeTheme['preset'],'density'=>$activeTheme['density'],'corner_style'=>$activeTheme['corner_style'],'max_width'=>$activeTheme['max_width']],'media'=>['logo'=>$siteSettings['media_logo']??'','hero'=>$siteSettings['media_hero']??'','social_share'=>$siteSettings['media_social_share']??'','app_icon'=>$siteSettings['media_app_icon']??'','artist_photo'=>$siteSettings['media_artist_photo']??'']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
   <script>window.STONEFELLOW_INITIAL_ROUTE=<?=json_encode($initialRoute,JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?>;</script>
   <script src="assets/js/config.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script>if(window.STONEFELLOW_CONFIG){window.STONEFELLOW_CONFIG.socials=window.STONEFELLOW_CONFIG.socials||{};for(const [k,v] of Object.entries(window.STONEFELLOW_SITE.socials||{})){if(v)window.STONEFELLOW_CONFIG.socials[k]=v;}}</script>
@@ -258,6 +259,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/library.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-brain.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-song-experience-ui.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/public-agent-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-chat-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/artist-home-renderer.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/turntable-parts.js?v=<?=rawurlencode(SF_BUILD)?>"></script>

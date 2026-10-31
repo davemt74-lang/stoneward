@@ -38,6 +38,7 @@ function sf_site_settings(): array {
     return [
         'splash_enabled'=>sf_meta_get('site.splash_enabled','0')==='1',
         'artist_homepage_enabled'=>sf_meta_get('site.artist_homepage_enabled','0')==='1',
+        'homepage_template'=>sf_meta_get('site.homepage_template','classic')==='agent_canvas'?'agent_canvas':'classic',
         'splash_revision'=>sf_meta_get('site.splash_revision','1'),
         'fan_community_enabled'=>sf_meta_get('site.fan_community_enabled','0')==='1',
         'announcement_enabled'=>sf_meta_get('site.announcement_enabled','0')==='1',
@@ -67,6 +68,11 @@ function sf_site_settings_update(array $data): array {
         sf_meta_set('site.splash_revision',(string)time());
     }
     foreach(['artist_homepage_enabled','fan_community_enabled','announcement_enabled','maintenance_enabled'] as $key) if(array_key_exists($key,$data)) sf_meta_set('site.'.$key,!empty($data[$key])?'1':'0');
+    if(array_key_exists('homepage_template',$data)){
+        $template=(string)$data['homepage_template'];
+        if(!in_array($template,['classic','agent_canvas'],true)) throw new InvalidArgumentException('Invalid homepage template.');
+        sf_meta_set('site.homepage_template',$template);
+    }
     foreach(['announcement_text','maintenance_message','seo_title','seo_description'] as $key) if(array_key_exists($key,$data)) sf_meta_set('site.'.$key,sf_clean_text($data[$key],$key==='seo_description'||$key==='maintenance_message'?500:180));
     foreach(['social_instagram','social_youtube','social_bandcamp','social_spotify'] as $key) if(array_key_exists($key,$data)){$url=trim((string)$data[$key]);if($url!==''&&(!filter_var($url,FILTER_VALIDATE_URL)||!in_array(strtolower((string)parse_url($url,PHP_URL_SCHEME)),['http','https'],true)))throw new InvalidArgumentException('Social links must use a valid http/https URL.');sf_meta_set('site.'.$key,substr($url,0,500));}
     foreach(['privacy_text','terms_text'] as $key) if(array_key_exists($key,$data)) sf_meta_set('site.'.$key,substr(trim((string)$data[$key]),0,20000));

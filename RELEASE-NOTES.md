@@ -1,3 +1,10 @@
+# Stonefellow v1.3.190 — Section 91B12A: Public Agent Canvas Template
+
+- Added an opt-in **Interactive Agent Canvas** public landing-page layout under Admin → Settings. Existing home/Artist Homepage behavior remains the default until selected.
+- The public Home view now features the approved particle-built moving orb, cursor-tracking eyes, animated mesh/network background, music/activity visualization, draggable roaming agent, mobile layout, and orb-to-canvas expand animation. The original site header, player, and sticky chat composer remain authoritative and unchanged.
+- Integrated the existing browser-owned lyric capture and transcription experience into a glass session panel that floats with the agent. The live session, unverified transcript, report, explicit provider-consent controls, and follow-up actions are the same component used by Agent Chat. There is no simulated capture and no automatic private-data upload.
+- The new module unmounts on navigation, respects reduced motion, retains standard Agent Chat and published music routes, and is included in the version-exact service-worker shell. No database migration is required; a validated metadata setting chooses the layout.
+
 # Stonefellow v1.3.175 — Section 91B8A: Song-Segment Capture
 
 - Authenticated public Agent starts and stops an explicitly requested song-section capture from the actual browser audio player, with song identity and precise playback-range timestamps. The microphone and playlist listening sessions are separate.
