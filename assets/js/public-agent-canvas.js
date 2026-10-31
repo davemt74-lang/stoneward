@@ -28,10 +28,13 @@
           <button type="button" data-agent-action="chat">Chat with Agent</button>
           <button type="button" data-agent-action="capture" hidden>Capture song lyrics</button>
         </div>
-        <aside class="sf-agent-panel" hidden aria-label="Active song lyric capture and analysis">
-          <div class="sf-agent-panel-head"><span>LYRIC / CAPTURE · AGENT PROCESS</span><button type="button" data-agent-action="close-panel" aria-label="Hide session panel">×</button></div>
-          <div class="sf-agent-session"></div>
-        </aside>
+        <div class="sf-agent-dock-stack">
+          <div class="sf-agent-player-dock" hidden aria-label="Current music player"></div>
+          <aside class="sf-agent-panel" hidden aria-label="Active song lyric capture and analysis">
+            <div class="sf-agent-panel-head"><span>LYRIC / CAPTURE · AGENT PROCESS</span><button type="button" data-agent-action="close-panel" aria-label="Hide session panel">×</button></div>
+            <div class="sf-agent-session"></div>
+          </aside>
+        </div>
       </div>
       <section class="sf-agent-workspace" aria-label="Expanded Agent Canvas" aria-hidden="true" inert>
         <div class="sf-agent-workspace-inner">
@@ -60,6 +63,7 @@
     const face = by(root, '.sf-agent-points');
     const workspace = by(root, '.sf-agent-workspace');
     const panel = by(root, '.sf-agent-panel');
+    const playerDock = by(root, '.sf-agent-player-dock');
     const smallSession = by(root, '.sf-agent-session');
     const bigSession = by(root, '.sf-agent-expanded-session');
     const contexts = [mesh, cloud, face].map(c => c.getContext('2d'));
@@ -82,8 +86,21 @@
     const on = (node,event,fn,opts) => { node?.addEventListener(event,fn,opts); return () => node?.removeEventListener(event,fn,opts); };
     const cleanup = [];
     const audio = options.audio || null;
+    // Reparent the ONE authoritative player; its existing controls, audio and
+    // event listeners remain intact. Return it to the footer on unmount.
+    const player = options.player || null;
+    const originalPlayerParent = player?.parentNode || null;
+    const originalPlayerNext = player?.nextSibling || null;
+    if (player && originalPlayerParent) playerDock.appendChild(player);
+    function syncPlayer() {
+      playerDock.hidden = !player || player.hidden;
+      updateDock();
+    }
+    const playerObserver = player && typeof MutationObserver === 'function'
+      ? new MutationObserver(syncPlayer) : null;
+    playerObserver?.observe(player, {attributes:true,attributeFilter:['hidden']});
     function state(next,label) {
-      const map={playing:'music',recording:'recording',listening:'listening',thinking:'thinking',speaking:'speaking',music:'music'};
+      const map={playing:'music',recording:'recording',listening:'listening',thinking:'thinking',speaking:'speaking',responding:'speaking',music:'music'};
       mode=map[next] || 'idle';
       if(mode==='recording')remotePanelDismissed=false;
       floater.dataset.mode=mode;
@@ -92,7 +109,7 @@
     }
     function session() {
       const active=!!window.StonefellowSongExperience?.active?.();
-      if (!active) { panel.hidden=true; smallSession.replaceChildren(); bigSession.replaceChildren(); return; }
+      if (!active) { panel.hidden=true; smallSession.replaceChildren(); bigSession.replaceChildren(); updateDock(); return; }
       if (!remotePanelDismissed) panel.hidden=false;
       window.StonefellowSongExperience.mount(smallSession);
       window.StonefellowSongExperience.mount(bigSession);
@@ -100,7 +117,7 @@
       for (const control of root.querySelectorAll('[data-agent-action="capture"]')) control.hidden=!(audio && audio.src && !audio.paused)||!!options.isCapturing?.();
     }
     function updateDock() {
-      if (panel.hidden) return;
+      if (panel.hidden && playerDock.hidden) return;
       if (root.clientWidth<721) {floater.dataset.side='below';floater.dataset.vertical='below';return;}
       floater.dataset.side=floater.offsetLeft>root.clientWidth*.52?'left':'right';
       floater.dataset.vertical=floater.offsetTop>root.clientHeight*.54?'above':'below';
@@ -119,7 +136,7 @@
     }
     function wander(time) {
       if (motionOff||dragging||workspace.classList.contains('open'))return;
-      if (!panel.hidden&&root.clientWidth<721) {
+      if ((!panel.hidden || !playerDock.hidden)&&root.clientWidth<721) {
         position(root.clientWidth*.5+Math.sin(time*.0005)*14,Math.min(root.clientHeight*.32,210));return;
       }
       if(!roam.start){roam.fromX=floater.offsetLeft||root.clientWidth*.64;roam.fromY=floater.offsetTop||root.clientHeight*.46;const n=nextSpot();roam.toX=n.x;roam.toY=n.y;roam.start=time;}
@@ -253,14 +270,14 @@
       if(action==='chat')options.onOpenChat?.();
       if(action==='capture')options.onStartCapture?.();
       if(action==='music'){closeWorkspace();options.onNavigate?.('music');}
-      if(action==='close-panel'){panel.hidden=true;remotePanelDismissed=true;}
+      if(action==='close-panel'){panel.hidden=true;remotePanelDismissed=true;updateDock();}
       if(action==='close-workspace')closeWorkspace();
     }
     cleanup.push(on(root,'click',handleAction));
     cleanup.push(on(sphere,'click',()=>{if(!suppressClick)openWorkspace();suppressClick=false;}));
     cleanup.push(on(floater,'pointerdown',e=>{
-      if(e.target.closest('button')&&e.target!==sphere)return;
-      if(e.target.closest('.sf-agent-panel'))return;
+      if(e.target.closest('.sf-agent-dock-stack'))return;
+      if(e.target.closest('button,input')&&e.target!==sphere)return;
       dragging={id:e.pointerId,x:e.clientX,y:e.clientY,left:floater.offsetLeft,top:floater.offsetTop,moved:false};
       floater.setPointerCapture?.(e.pointerId);floater.classList.add('dragging');
     }));
@@ -283,16 +300,20 @@
     cleanup.push(on(window,'resize',resize));
     const resizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(resize):null;
     resizeObserver?.observe(root);
-    resize();state(audio&&!audio.paused?'music':'idle');session();
+    resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);faceDraw(0);}
-    current={root,state,session,destroy(){
+    current={root,state,session,syncPlayer,destroy(){
       destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);
-      resizeObserver?.disconnect();cleanup.forEach(fn=>fn());
+      resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
+      if(player && originalPlayerParent){
+        const before = originalPlayerNext?.parentNode===originalPlayerParent ? originalPlayerNext : null;
+        originalPlayerParent.insertBefore(player,before);
+      }
       root.remove();
     }};
     return true;
   }
   function unmount(){if(current){current.destroy();current=null;}}
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),active:()=>!!current});
 })();

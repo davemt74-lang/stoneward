@@ -17,6 +17,11 @@ function sf_theme_font_options(): array {
 }
 function sf_theme_presets(): array {
     return [
+      'agent_mesh'=>[
+        'label'=>'Agent Mesh','mode'=>'dark','display_font'=>'modern','body_font'=>'system','corner_style'=>'soft','density'=>'comfortable','max_width'=>1120,
+        'dark'=>['bg'=>'#080d19','surface'=>'#101b30','surface_alt'=>'#172640','ink'=>'#eaf3ff','muted'=>'#aabdd8','accent'=>'#8ad4ff','accent_text'=>'#071427','danger'=>'#ff91a8'],
+        'light'=>['bg'=>'#eef5ff','surface'=>'#ffffff','surface_alt'=>'#dceafa','ink'=>'#15233a','muted'=>'#53647e','accent'=>'#2557a5','accent_text'=>'#ffffff','danger'=>'#a9324e'],
+      ],
       'desert'=>[
         'label'=>'Desert','mode'=>'dark','display_font'=>'editorial','body_font'=>'system','corner_style'=>'soft','density'=>'comfortable','max_width'=>1080,
         'dark'=>['bg'=>'#090807','surface'=>'#12100e','surface_alt'=>'#1a1612','ink'=>'#f2eee8','muted'=>'#a59e94','accent'=>'#c9a96e','accent_text'=>'#090807','danger'=>'#d68a7f'],
@@ -39,7 +44,7 @@ function sf_theme_presets(): array {
       ],
     ];
 }
-function sf_theme_default(): array { $p=sf_theme_presets();return ['preset'=>'desert']+$p['desert']; }
+function sf_theme_default(): array { $p=sf_theme_presets();return ['preset'=>'agent_mesh']+$p['agent_mesh']; }
 function sf_theme_hex(string $v,string $label='Color'): string {
     $v=strtolower(trim($v));if(!preg_match('/^#[0-9a-f]{6}$/',$v))throw new InvalidArgumentException($label.' must be a six-digit hex color.');return $v;
 }
