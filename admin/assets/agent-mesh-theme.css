@@ -1,0 +1,91 @@
+/* Section 91B12B — unified Stonefellow Admin Agent Mesh palette.
+   Loaded last to modernize the legacy brown surfaces without changing layout. */
+:root {
+  --bg:#080d19;
+  --panel:#101b30;
+  --panel2:#172640;
+  --ink:#eaf3ff;
+  --muted:#aabdd8;
+  --line:#273956;
+  --line2:#405b80;
+  --accent:#8ad4ff;
+  --bad:#ff91a8;
+  --good:#83ddc2;
+}
+html { background:var(--bg); color-scheme:dark; }
+body {
+  background:
+    radial-gradient(ellipse at 76% 10%,rgba(100,146,255,.16),transparent 40%),
+    radial-gradient(ellipse at 22% 75%,rgba(119,100,216,.10),transparent 48%),
+    linear-gradient(90deg,rgba(138,212,255,.045) 1px,transparent 1px),
+    linear-gradient(0deg,rgba(138,212,255,.038) 1px,transparent 1px),
+    linear-gradient(145deg,#111a32,var(--bg) 65%);
+  background-size:auto,auto,64px 64px,64px 64px,auto;
+  background-attachment:fixed;
+}
+.sidebar {
+  background:linear-gradient(155deg,rgba(18,32,56,.98),rgba(7,13,27,.98) 75%);
+  border-color:var(--line);
+  box-shadow:9px 0 45px rgba(0,4,14,.24);
+}
+.sidebar-brand a { color:#edf7ff; text-shadow:0 0 22px rgba(138,212,255,.18); }
+.sidebar-brand span,.sidebar-foot { color:var(--muted); }
+.sidebar nav button span { color:#758eaf; }
+.sidebar nav button.active {
+  background:linear-gradient(90deg,rgba(74,128,216,.24),rgba(53,86,147,.06));
+  border-left-color:var(--accent);
+  color:var(--ink);
+}
+.sidebar nav button:hover,.sidebar nav button:focus-visible,
+#adminNav .admin-nav-summary:hover { background:rgba(106,159,234,.13); color:var(--ink); }
+#adminNav .admin-nav-summary { color:#bad1ee; }
+#adminNav .admin-nav-chevron { color:var(--accent); }
+.admin-topbar {
+  background:rgba(10,19,37,.84);
+  border-bottom-color:var(--line);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+}
+.auth-screen { background:radial-gradient(ellipse at 63% 30%,rgba(96,139,240,.22),transparent 48%),var(--bg); }
+.auth-card,.catalog-publish-dialog,.admin-unified-form-shell {
+  background:var(--panel);
+  border-color:var(--line2);
+  box-shadow:0 22px 80px rgba(2,7,20,.45);
+}
+.auth-card input,.field input,.field select,.field textarea,.table-input,
+.toolbar input,.toolbar select,.crm-search input {
+  background:#0c1729;
+  color:var(--ink);
+  border-color:var(--line2);
+}
+.quick-card,.template-card,.dashboard-kpi,.dashboard-top-tracks button,
+.dashboard-brain-card,.provider-health-card,.conversion-card,.engagement-grid>div,
+.catalog-draft-card,.knowledge-file,.theme-palette,.homepage-section-card {
+  background:rgba(16,29,51,.88);
+  border-color:var(--line);
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(1,5,16,.13);
+}
+.quick-card:hover,.template-card:hover,.dashboard-top-tracks button:hover,
+.dashboard-brain-card:hover { border-color:var(--accent); background:rgba(24,44,77,.94); }
+.data-table tr.clickable:hover,.dashboard-feed-row:hover { background:rgba(56,97,160,.13); }
+.primary { background:var(--accent); border-color:var(--accent); color:#071427; }
+.secondary:hover,.small-button:hover { background:rgba(138,212,255,.12); }
+.chat-button.send { background:var(--accent); color:#071427; }
+.chat-button.active { background:rgba(138,212,255,.14); color:var(--accent); }
+.admin-orb {
+  background:radial-gradient(circle at 35% 24%,#e0faff 0 7%,#8ad4ff 26%,#6379ce 50%,#101a34 82%);
+  box-shadow:0 0 16px rgba(138,212,255,.22);
+}
+.admin-orb.listening { box-shadow:0 0 0 5px rgba(138,212,255,.13),0 0 19px rgba(138,212,255,.28); }
+.admin-chat-footer { background:linear-gradient(180deg,rgba(8,13,25,0),rgba(8,13,25,.94) 32%,#080d19 75%); }
+.admin-chatbar { background:rgba(15,28,48,.93); border-color:var(--line2); backdrop-filter:blur(22px); box-shadow:0 16px 45px rgba(1,7,20,.35); }
+.notice { background:rgba(16,30,54,.75); color:var(--muted); }
+:where(button,a,input,textarea,select,summary):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media(max-width:760px){
+  .sidebar { box-shadow:16px 0 50px rgba(0,4,14,.56); }
+  .admin-topbar { background:rgba(10,19,37,.95); }
+}
+@media(prefers-reduced-transparency:reduce){
+  .admin-topbar,.admin-chatbar { backdrop-filter:none; background:var(--panel); }
+}

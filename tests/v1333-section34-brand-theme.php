@@ -6,7 +6,7 @@ if(!function_exists('sf_clean_text')){function sf_clean_text(mixed $v,int $max=1
 require $root.'/api/theme-core.php';
 
 $presets=sf_theme_presets();
-ok34(array_keys($presets)===['desert','midnight','paper','monochrome'],'theme system exposes four curated Stonefellow presets');
+ok34(array_keys($presets)===['agent_mesh','desert','midnight','paper','monochrome'],'theme system exposes the new Agent Mesh default plus four curated Stonefellow presets');
 foreach($presets as $name=>$preset){$probe=['preset'=>$name]+$preset;$probe['mode']='system';$r=sf_theme_readiness($probe);ok34($r['ready']&&$r['score']===100,'preset '.$name.' passes dark and light contrast readiness');}
 $badHex=sf_theme_default();$badHex['dark']['bg']='red';$thrown=false;try{sf_theme_normalize($badHex);}catch(InvalidArgumentException $e){$thrown=true;}ok34($thrown,'non-hex theme colors are rejected');
 $badFont=sf_theme_default();$badFont['display_font']='https://evil.example/font.woff2';$thrown=false;try{sf_theme_normalize($badFont);}catch(InvalidArgumentException $e){$thrown=true;}ok34($thrown,'remote or arbitrary display fonts are rejected');

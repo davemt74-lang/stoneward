@@ -111,17 +111,21 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
     setAttribute(k,v){this.attributes[k]=v;}
     removeAttribute(k){delete this.attributes[k];}
     setPointerCapture(){}
+    appendChild(node){this.children=this.children||[];if(node.parentNode){node.parentNode.children=node.parentNode.children.filter(child=>child!==node);}this.children.push(node);node.parentNode=this;}
+    insertBefore(node,other){this.children=this.children||[];if(node.parentNode){node.parentNode.children=node.parentNode.children.filter(child=>child!==node);}const index=other?this.children.indexOf(other):-1;if(index===-1)this.children.push(node);else this.children.splice(index,0,node);node.parentNode=this;}
     replaceChildren(){this.cleared=true;}
     remove(){this.removed=true;}
   }
   const selectors=['.sf-agent-landing','.sf-agent-floater','.sf-agent-visual','.sf-agent-sphere','.sf-agent-state',
     '.sf-agent-mesh','.sf-agent-cloud','.sf-agent-points','.sf-agent-workspace','.sf-agent-panel',
-    '.sf-agent-session','.sf-agent-expanded-session'];
+    '.sf-agent-session','.sf-agent-expanded-session','.sf-agent-player-dock'];
   const elements={};for(const key of selectors)elements[key]=new Element(key);
   elements['.sf-agent-landing'].clientWidth=950;elements['.sf-agent-landing'].clientHeight=650;
   const rootElement=elements['.sf-agent-landing'];
   const target=new Element('target');target.querySelector=selector=>selector==='.sf-agent-landing'?rootElement:null;
   const audio=new Element('audio');const captureButtons=[new Element('capture1'),new Element('capture2')];
+  const footer=new Element('footer'),player=new Element('player'),composer=new Element('composer');
+  footer.appendChild(player);footer.appendChild(composer);player.nextSibling=composer;
   let captureInvoked=0,chatInvoked=0,mountCalls=0,capturing=false;
   const window={matchMedia:()=>({matches:true}),addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type),
     setTimeout:()=>1,clearTimeout(){},devicePixelRatio:1,
@@ -130,7 +134,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
     requestAnimationFrame:()=>1,cancelAnimationFrame(){},performance:{now:()=>1000}};
   vm.runInNewContext(moduleSource,scope);
   check('Initial UI mounts with a real capture/report card in both agent and workspace',()=>{
-    assert.equal(window.SFPublicAgentCanvas.mount(target,{audio,isCapturing:()=>capturing,
+    assert.equal(window.SFPublicAgentCanvas.mount(target,{audio,player,isCapturing:()=>capturing,
       onStartCapture:()=>captureInvoked++,onOpenChat:()=>chatInvoked++}),true);
     assert.equal(window.SFPublicAgentCanvas.active(),true);
     assert.equal(elements['.sf-agent-panel'].hidden,false);
@@ -146,7 +150,15 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   fireAction('close-panel');assert.equal(elements['.sf-agent-panel'].hidden,true);
   window.SFPublicAgentCanvas.setState('recording');window.SFPublicAgentCanvas.syncSongExperience();
   assert.equal(elements['.sf-agent-panel'].hidden,false);
+  assert.equal(player.parentNode,elements['.sf-agent-player-dock']);
+  assert.equal(elements['.sf-agent-player-dock'].hidden,false);
+  player.hidden=true;window.SFPublicAgentCanvas.syncPlayer();
+  assert.equal(elements['.sf-agent-player-dock'].hidden,true);
+  player.hidden=false;window.SFPublicAgentCanvas.syncPlayer();
+  assert.equal(elements['.sf-agent-player-dock'].hidden,false);
   window.SFPublicAgentCanvas.unmount();
+  assert.equal(player.parentNode,footer);
+  assert.deepEqual(footer.children,[player,composer]);
   assert.equal(window.SFPublicAgentCanvas.active(),false);
   assert.equal(rootElement.removed,true);
 });

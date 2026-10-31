@@ -556,6 +556,8 @@ jobs:
           node tests/section91b11b-live-lyrics.cjs
           php tests/section91b12a-public-agent-canvas.php
           node tests/section91b12a-public-agent-canvas.cjs
+          node tests/section91b12b-orb-player.cjs
+          node tests/section91b12b-agent-mesh-theme.cjs
           php tests/section91b8f-selective-song-memory.php
           node tests/section91b8f-selective-song-memory.cjs
           php tests/section91b9a-speech-engine-preferences.php

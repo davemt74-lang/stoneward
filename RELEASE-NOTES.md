@@ -1,3 +1,11 @@
+# Stonefellow v1.3.191 — Section 91B12B: Orb-Attached Player and Quiet Agent Replies
+
+- The opt-in Agent Canvas now uses a transparent site header so its mesh background reads through to the top of the page; the classic template retains its header styling.
+- Music player controls, track identity, seek and queue are displayed in a compact translucent pod that travels with the orb alongside the existing lyric-capture, transcription and analysis pod. The existing `#footerPlayer` is reparented, not duplicated, and returns to the unchanged chat footer when leaving Agent Canvas.
+- Automatic lyric-transcription and analysis progress no longer opens the chat popup on Agent Canvas. Chat remains available explicitly; the same capture and report are visible in the orb panel and expanded Agent Canvas. The speaking face state matches the original agent's responding lifecycle.
+- Mobile layout reserves room for the floating player and lyric cards. The authoritative media element, permissions and transcript privacy boundary are unchanged. No database migration is required.
+- The whole public shell gains token-based blue/indigo mesh backgrounds, glass chat/navigation surfaces and cool agent accents; Admin gets a matching last-loaded blue UI skin. A new contrast-checked **Agent Mesh** preset is the default for fresh or reset themes and is selectable in the existing Theme editor. Existing custom/published themes are preserved until the owner explicitly changes them.
+
 # Stonefellow v1.3.190 — Section 91B12A: Public Agent Canvas Template
 
 - Added an opt-in **Interactive Agent Canvas** public landing-page layout under Admin → Settings. Existing home/Artist Homepage behavior remains the default until selected.
