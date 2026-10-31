@@ -1510,14 +1510,13 @@
     c.canvas.innerHTML=
       '<div class="admin-agent-chat" id="adminAgentChat">'+
       '<header class="admin-agent-chat-heading"><div><small>ADMIN AGENT · OPERATIONS</small><p>Private Admin Brain · Commerce, CRM, Artist World production and operational research</p></div>'+
-      '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentSpeechToggle" aria-pressed="true" title="Toggle on-device speech for Admin Agent replies">Voice on</button><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
+      '<div class="admin-agent-chat-controls"><button type="button" class="secondary" id="adminAgentOpenBrain">Agent Brain ↗</button><button type="button" class="secondary" id="adminAgentNewThread">New chat</button></div></header>'+
       '<div class="admin-agent-song-drafts" id="adminAgentSongDrafts" aria-label="Saved private song drafts"></div>'+
       '<section class="admin-agent-chat-thread" aria-label="Admin Agent conversation">'+
       '<div class="admin-agent-transcript" id="adminAgentTranscript" role="log" aria-live="polite" aria-relevant="additions text"><p>Loading your conversation…</p></div></section>'+
       '<p class="admin-agent-chat-status" id="adminAgentChatStatus" role="status"></p>'+
       '</div>';
     const root=c.canvas.querySelector('#adminAgentChat');
-    root.querySelector('#adminAgentSpeechToggle').onclick=()=>c.toggleAdminSpeech?.();
     c.updateAdminVoiceControl?.();
     root.querySelector('#adminAgentOpenBrain').onclick=showBrain;
     root.querySelector('#adminAgentNewThread').onclick=()=>{newThread();document.querySelector('#adminChatInput')?.focus();};

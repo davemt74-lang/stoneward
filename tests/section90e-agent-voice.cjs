@@ -23,8 +23,8 @@ assert.match(publicApp,/voiceInteractionStarted=true;command\(input\.value\)/);
 assert.match(publicApp,/voiceRepliesEnabled=localStorage\.getItem\('stonefellow\.voice\.replies\.v1'\)!=='off'/);
 assert.match(publicApp,/if\(voiceReplyToggle\)voiceReplyToggle\.onclick=/);
 assert.match(publicApp,/if\(\(st\.conversationOn\|\|voicePlaybackPending\)\&\&!audio\.paused\)/);
-assert.match(adminCanvas,/id="adminAgentSpeechToggle"/);
-assert.match(adminCanvas,/toggleAdminSpeech/);
+assert.doesNotMatch(adminCanvas,/id="adminAgentSpeechToggle"/,'full Admin chat must not render a duplicate voice-output toggle');
+assert.match(read('admin/index.php'),/id="adminChatPopupVoice"/,'the shared Admin voice toggle remains accessible in the chat popup');
 assert.match(adminApp,/if\(response\.text\)void speakAdminReply\(response\.text\)/);
 assert.match(read('admin/assets/agent-canvas.css'),/\[data-mode="speaking"\]/);
 
