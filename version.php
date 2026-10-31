@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.184',
+  'stonefellow'=>'1.3.185',
   'agent_song_analysis'=>'91B8C: per-request-llm-interpretation-grounded-public-song-context-consented-listening-summary-unverified-lyrics',
   'agent_song_transcription'=>'91B8B: explicit-player-clip-transcription-unverified-draft-private-browser-memory',
   'agent_album_time_insights'=>'91B7: published-release-selection-consented-timezone-daypart-listening-context',
