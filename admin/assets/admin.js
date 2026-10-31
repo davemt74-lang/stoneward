@@ -7,7 +7,12 @@
   const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80)||'track';
   const app={csrf:null,templates:[],catalog:[],releases:[],shows:[],crm:{summary:{},contacts:[],community_posts:[],agent_engagements:[]},knowledge:{folders:[],files:[]},knowledgeFolder:'',users:[],packages:[],ai:{providers:{},routing:{}},site:{splash_enabled:false,splash_revision:'1',artist_homepage_enabled:false,fan_community_enabled:false},lifecycle:{email:{},billing:{},outbox:[],webhooks:[],billing_audit:[]},analytics:null,operations:null,dashboard:null,view:'dashboard',scanGroups:[],scanEntries:[],folderName:'',scanTemplate:'',scanRelease:'Unreleased',catalogFilter:'',missingOnly:false,releaseDraftTracks:[]};
   const canvas=$('#adminCanvas'), viewTitle=$('#viewTitle'), adminApp=$('#adminApp'), folderInput=$('#folderInput');
-  let adminSpeechEnabled=localStorage.getItem('stonefellow.admin.voice.replies.v1')!=='off';
+  // Public and Admin share one owner voice-output preference. Preserve an
+  // existing Admin choice only when the shared preference has never been set.
+  const sharedVoicePreference=localStorage.getItem('stonefellow.voice.replies.v1');
+  const legacyAdminVoicePreference=localStorage.getItem('stonefellow.admin.voice.replies.v1');
+  let adminSpeechEnabled=(sharedVoicePreference??legacyAdminVoicePreference)!=='off';
+  if(sharedVoicePreference===null&&legacyAdminVoicePreference!==null)localStorage.setItem('stonefellow.voice.replies.v1',legacyAdminVoicePreference);
   let adminSpeechActive=false,adminSpeechResolve=null,adminSpeechPending=false,adminSpeechSequence=0,adminSpeechText='',adminSpeechProbePaused=false;
   let adminConversationMonitor=null,adminConversationResume=null,adminConversationEnabled=false;
   const adminSpeechGuard=window.StonefellowBargeIn?.createSpeechGuard({cooldownMs:1100});
@@ -28,7 +33,7 @@
   if(musicNext)musicNext.onclick=()=>{void adminMusic?.step(1)};
   if(musicVolume)musicVolume.oninput=()=>adminMusic?.setVolume(Number(musicVolume.value));
   function syncAdminSpeechStop(){const button=$('#adminAgentSpeechStop');if(button)button.hidden=!adminSpeechPending;}
-  function updateAdminVoiceControl(){for(const button of [$('#adminAgentSpeechToggle'),$('#adminChatPopupVoice')]){if(!button)continue;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}}
+  function updateAdminVoiceControl(){const button=$('#adminChatPopupVoice');if(!button)return;button.textContent=adminSpeechEnabled?'Voice on':'Voice off';button.setAttribute('aria-pressed',String(adminSpeechEnabled));button.title='On-device speech only · private Admin replies are not sent to an additional voice provider';}
   function cancelAdminSpeechOutput(){
     const synthesis=window.speechSynthesis;
     try{synthesis?.cancel()}catch(_){}
@@ -74,7 +79,17 @@
     if(stage==='confirm'){holdAdminSpeechForBarge();return true}
     return false;
   }
-  function toggleAdminSpeech(){adminSpeechEnabled=!adminSpeechEnabled;localStorage.setItem('stonefellow.admin.voice.replies.v1',adminSpeechEnabled?'on':'off');if(!adminSpeechEnabled)stopAdminSpeech();updateAdminVoiceControl()}
+  function setAdminSpeechEnabled(enabled,persist=true){
+    if(adminSpeechEnabled===enabled)return;
+    adminSpeechEnabled=enabled;
+    if(persist)localStorage.setItem('stonefellow.voice.replies.v1',enabled?'on':'off');
+    if(!enabled)stopAdminSpeech();
+    updateAdminVoiceControl();
+  }
+  function toggleAdminSpeech(){setAdminSpeechEnabled(!adminSpeechEnabled)}
+  window.addEventListener?.('storage',event=>{
+    if(event.key==='stonefellow.voice.replies.v1')setAdminSpeechEnabled(event.newValue!=='off',false);
+  });
   async function speakAdminReply(raw){
     if(!adminSpeechEnabled){adminConversationResume?.();return}
     const requested=++adminSpeechSequence;
