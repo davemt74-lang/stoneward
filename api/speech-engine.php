@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/speech-engine-core.php';
 require_once __DIR__.'/speech-engine-session-core.php';
+require_once __DIR__.'/speech-engine-actions-core.php';
 
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $u=sf_require_user(false,$method!=='GET');
@@ -27,6 +28,10 @@ try {
     if($action==='bind'){
         sf_speech_bind_account($uid,(string)($body['conversation_id']??''),(string)($body['bind_token']??''));
         sf_json_response(['ok'=>true,'bound'=>true]);
+    }
+    if($action==='take_action'){
+        $envelope=sf_speech_take_action($uid,(string)($body['conversation_id']??''));
+        sf_json_response(['ok'=>true,'action_envelope'=>$envelope]);
     }
     throw new InvalidArgumentException('Unsupported voice engine action.');
 }catch(InvalidArgumentException $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}

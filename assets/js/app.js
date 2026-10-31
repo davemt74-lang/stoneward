@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.183';
+  window.STONEFELLOW_APP_BUILD='1.3.184';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),canvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -314,6 +314,17 @@
   // verified against the browser's actual player catalog before execution.
   function verifiedNamedPlayerAction(message,serverAction,resolution){
     return window.StonefellowAgentAudioSkill?.resolvePublished(message,catalog,serverAction,resolution)||{action:serverAction};
+  }
+  // Both typed chat and Speech Engine actions use the same published-catalog
+  // receipt verification and browser-owned player/navigation dispatch.
+  async function dispatchAgentBrowserAction(message,action,resolution,allowSongCapture=true){
+    const verified=verifiedNamedPlayerAction(message,action,resolution);
+    if(verified.text)return verified.text;
+    const captured=allowSongCapture?await executeSongCaptureAction(verified.action):null;
+    const shared=captured===null?await publicAudioSkill?.dispatch(verified.action):null;
+    const playerResult=captured??shared?.text??await executePlayerAgentAction(verified.action);
+    if(playerResult===null)await executeAgentAction(verified.action);
+    return playerResult;
   }
   function holdVoicePlaybackForBarge(){
     if(!st.conversationOn||!voicePlaybackPending)return;
@@ -842,12 +853,7 @@
       const j=await secureJsonPost('agent-chat.php',{message:text,conversation_id:st.conversationId,client_state});
       st.conversationId=j.conversation_id||st.conversationId;
       if(st.conversationId)localStorage.setItem('stonefellow.agent.conversation',st.conversationId);
-      const verified=verifiedNamedPlayerAction(text,j.action,j.audio_resolution);
-      if(verified.text){await say(verified.text);return}
-      const captureResult=await executeSongCaptureAction(verified.action);
-      const sharedPlayerResult=captureResult===null?await publicAudioSkill?.dispatch(verified.action):null;
-      const playerResult=captureResult??sharedPlayerResult?.text??await executePlayerAgentAction(verified.action);
-      if(playerResult===null)await executeAgentAction(verified.action);
+      const playerResult=await dispatchAgentBrowserAction(text,j.action,j.audio_resolution);
       await say(playerResult??(String(j.text||'').trim()||'The Agent received your message but returned no reply. Please try again.'));
     }catch(e){
       if(e.payload?.error==='active_tokens_required'){
@@ -1971,13 +1977,22 @@
       try{await window.StonefellowSpeechEngine.start({
         onStatus(value){if(value==='disconnected'){speechPilotActive=false;st.conversationOn=false;updateConversationButton();agent('idle','Voice connection ended.');showTranscript('Speech Engine disconnected. Click the microphone to reconnect.','waiting');return}if(value==='ready'){agent('listening','Speech Engine connected.');showTranscript('Listening · Speech Engine pilot','listening')}},
         onMode(mode){if(!speechPilotActive)return;agent(mode==='speaking'?'speaking':'listening');showTranscript(mode==='speaking'?'Stonefellow is speaking…':'Listening · Speech Engine pilot',mode==='speaking'?'responding':'listening')},
-        onMessage(data){const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding')},
+        onMessage(data){const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');if(!user)void deliverSpeechEngineAction()},
         onError(message){popupEntry('notice',String(message));showTranscript(String(message),'error')}
       });}catch(error){speechPilotActive=false;st.conversationOn=false;updateConversationButton();agent('idle','Speech Engine unavailable.');showTranscript(error.message||'Speech Engine could not connect. Select the original voice engine in Account Settings to use fallback.','error')}
       return;
     }
     if(!recognition){showTranscript('Voice recognition is unavailable here. Select Speech Engine in Account Settings or type a message.','error');return}
     voiceInteractionStarted=true;st.conversationOn=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');void conversationBargeIn?.prepare();startConversationListen();
+  }
+  async function deliverSpeechEngineAction(){
+    if(!speechPilotActive||!window.StonefellowSpeechEngine?.active)return;
+    try{
+      const envelope=await window.StonefellowSpeechEngine.takeAction();
+      if(!speechPilotActive||!envelope?.action)return;
+      const result=await dispatchAgentBrowserAction(String(envelope.message||''),envelope.action,envelope.audio_resolution,false);
+      if(result)popupEntry('notice',String(result));
+    }catch(error){if(speechPilotActive)popupEntry('notice','Voice action could not complete: '+String(error.message||'Unknown error'))}
   }
   voice.onclick=()=>{void handleVoiceClick()};
   if(R){

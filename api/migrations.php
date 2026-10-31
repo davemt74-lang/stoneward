@@ -729,6 +729,16 @@ function sf_migration_definitions(): array {
                 sf_speech_session_schema();
             },
         ],
+        [
+            'id'=>'2026-10-31-064',
+            'app_version'=>'1.3.184',
+            'description'=>'Owner-scoped, single-use Speech Engine player and navigation handoff',
+            'revision'=>'1',
+            'apply'=>function():void {
+                require_once SF_ROOT.'/api/speech-engine-actions-core.php';
+                sf_speech_action_schema();
+            },
+        ],
     ];
 }
 function sf_migration_checksum(array $m): string {

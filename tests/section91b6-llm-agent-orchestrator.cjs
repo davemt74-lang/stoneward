@@ -26,7 +26,7 @@ const agent=read('api/agent-llm-orchestrator.php');
 const app=read('assets/js/app.js');
 check('Conversational LLM is called before local player routing',()=>assert.ok(php.indexOf('sf_agent_orchestrator_llm($message')<php.indexOf('$explicitPlayer=sf_agent_explicit_player_route($message);')));
 check('Server emits verified receipt only for authorized catalog resolution',()=>assert.match(php,/audioResolution=\['method'=>'llm_catalog','status'=>'verified'/));
-check('Public JS requires fresh server receipt and actual catalog entry',()=>assert.match(app,/verifiedNamedPlayerAction\(text,j\.action,j\.audio_resolution\)/));
+check('Public JS requires fresh server receipt and actual catalog entry',()=>assert.match(app,/dispatchAgentBrowserAction\(text,j\.action,j\.audio_resolution\)/)&&assert.match(app,/verifiedNamedPlayerAction\(message,action,resolution\)/));
 check('Tool descriptions are permission-filtered for Admin and fans',()=>assert.match(agent,/sf_agent_tool_inventory\(\$admin\?'admin':'fan'\)/));
 check('Consequential operations remain confirmation gated in prompt',()=>assert.match(agent,/Purchase, ticket reservation, vinyl ordering/));
 process.stdout.write('Section 91B6: '+passed+' LLM orchestration and audio bridge checks passed\n');

@@ -30,7 +30,7 @@ check('Word boundaries avoid partial title hijacking',()=>assert.equal(skill.res
 check('Partial catalog titles cannot hijack a longer unmatched request',()=>assert.equal(skill.resolvePublished('play Genius 7 Humankind',[...songs,{id:'genius',title:'Genius'},{id:'humankind',title:'Humankind'}],former).action.type,'none'));
 check('Shared validator still rejects arbitrary action',()=>assert.equal(skill.validate({type:'open_remote_audio',url:'https://example.org/test.mp3'}),null));
 const app=read('assets/js/app.js'),php=read('api/agent-runtime.php');
-check('Public chat consults published track identity before dispatch',()=>assert.match(app,/verifiedNamedPlayerAction\(text,j\.action,j\.audio_resolution\)/));
+check('Public chat consults published track identity before dispatch',()=>assert.match(app,/dispatchAgentBrowserAction\(text,j\.action,j\.audio_resolution\)/)&&assert.match(app,/verifiedNamedPlayerAction\(message,action,resolution\)/));
 check('Public browser confirms real playing state and track ID',()=>assert.match(app,/started&&st\.track\?\.id===track\.id&&!audio\.paused&&!!audio\.src/));
 check('Server planner requires named published track plan',()=>assert.match(php,/sf_agent_named_playback_plan\(\$requested\?\?''\,sf_agent_public_catalog\(\),\$active\)/));
 check('Server explicit router handles named play before the language model',()=>assert.match(php,/if\(sf_agent_named_playback_query\(\$message\)!==null\)return 'player_play_named'/));
