@@ -3,7 +3,8 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.199',
+  'stonefellow'=>'1.3.200',
+  'direct_song_listening'=>'91B13H: local-explicit-listen-stop-interpret-actions-independent-of-agent-chat-provider',
   'agent_lyric_interpretation'=>'91B13E: listener-reviewed-lyric-draft-native-edit-sources-as-metadata-llm-interpretation-only-in-agent-voice',
   'quick_links_canvas'=>'91B12E: unboxed-one-row-mesh-overlay-small-links-leds-and-meters',
   'agent_song_analysis'=>'91B8C: per-request-llm-interpretation-grounded-public-song-context-consented-listening-summary-unverified-lyrics',
@@ -16,7 +17,7 @@ echo json_encode([
   'admin_agent_catalog_release_reads'=>'bounded-authenticated-private-source-results-no-provider-export',
   'agent_integration_coverage'=>'authenticated-read-only-live-tool-skill-module-audit-no-execution-grant',
   'conversational_voice_reliability'=>'transcript-acoustic-confirmation-retry-truncated-speech-public-admin',
-  'conversation_volume_ducking'=>'91B13F: audible-agent-speech-or-active-recognition-only-user-volume-preserved',
+  'conversation_volume_ducking'=>'91B13H: audible-agent-speech-and-wake-gated-mic-duck-with-short-chunk-hold',
   'notification_contextual_actions'=>'91B13G: typed-notification-resume-queue-existing-or-new-playlist-agent-chat-cta',
   'catalog_single_publish_flow'=>'streaming-digital-vinyl-explicit-uses-protected-master-transcoded-preview',
   'folder_scan_private_intake'=>'per-song-confirmation-template-snapshot-vinyl-opt-in',
