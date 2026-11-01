@@ -107,8 +107,16 @@ async function run(){
   check('Small speech gaps do not repeatedly restore and re-duck music',()=>{
     assert.match(app,/voiceSpeechReleaseTimer=setTimeout/);
     assert.match(app,/speechPilotReleaseTimer=setTimeout/);
-    assert.match(app,/setSpeechPilotSpeaking\(mode==='speaking'\)/);
+    assert.match(app,/setSpeechPilotSpeaking\(speaking\)/);
+    assert.match(app,/StonefellowSpeechEngine\?\.setInputMuted\?\.\(speaking\)/);
     new vm.Script(app);
+  });
+  check('Speech Engine microphone is muted during output and released after the echo tail',()=>{
+    const sdk=fs.readFileSync(path.join(__dirname,'../assets/js/speech-engine-conversation.js'),'utf8');
+    assert.match(sdk,/by\.setInputMuted=function\(muted\)/);
+    assert.match(sdk,/session\.setMicMuted\(true\)/);
+    assert.match(sdk,/session===Rt\)session\.setMicMuted\(false\)/);
+    assert.match(sdk,/\},500\)/);
   });
   console.log('Section 91B13H: '+checks+' local listening and acoustic isolation assertions passed');
 }
