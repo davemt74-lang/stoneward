@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.201';
+  window.STONEFELLOW_APP_BUILD='1.3.202';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate=site.homepageTemplate==='agent_canvas'?'agent_canvas':'classic',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -36,6 +36,7 @@
     voiceTranscript.hidden=!value;
     voiceTranscript.dataset.phase=phase;
     voiceTranscriptText.textContent=value;
+    window.SFPublicAgentCanvas?.syncTranscript?.();
   }
   function syncAgentDockLayout(){
     if(!chatFooter)return;
@@ -602,7 +603,7 @@
     for(const entry of popupEntries.slice(-60)){
       const row=document.createElement('article'),who=document.createElement('strong'),body=document.createElement('p');
       row.className='agent-chat-popup-entry '+(entry.role==='user'?'from-user':entry.role==='notice'?'notice':'from-agent');
-      who.textContent=entry.role==='user'?'You':entry.role==='notice'?'Session update':'Stonefellow Agent';
+      who.textContent=entry.role==='user'?'You':entry.role==='notice'?'Session update':'Stonefellow';
       body.textContent=entry.text;row.append(who,body);chatPopupMessages.appendChild(row);
     }
     if(songExperience){
@@ -614,7 +615,7 @@
     }
     chatPopupMessages.scrollTop=chatPopupMessages.scrollHeight;
   }
-  function popupEntry(role,text){if(!text)return;popupEntries.push({role,text:String(text)});popupEntries=popupEntries.slice(-60);renderPopupEntries()}
+  function popupEntry(role,text){if(!text)return;popupEntries.push({role,text:String(text)});popupEntries=popupEntries.slice(-60);renderPopupEntries();window.SFPublicAgentCanvas?.showConversation?.(role,String(text))}
   async function openChatPopup(){if(!chatPopup)return;closeQuickMenu();chatPopup.hidden=false;document.body.classList.add('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','true');chatToggle?.setAttribute('aria-label','Close Agent Chat');chatToggle.title='Close Agent Chat';orb?.setAttribute('aria-expanded','true');orb?.setAttribute('aria-label','Close Agent Chat');if(popupHistoryLoaded)return;popupHistoryLoaded=true;await loadAuth();if(!st.auth.authenticated){popupHistoryLoaded=false;return}try{const cid=st.conversationId;const response=await api('agent-brain.php'+(cid?'?conversation_id='+encodeURIComponent(cid):''));const messages=response.brain?.messages||response.messages||[];const historical=messages.filter(m=>['user','assistant'].includes(m.role)).slice(-40).map(m=>({role:m.role==='user'?'user':'assistant',text:String(m.content||'')}));const live=popupEntries.slice();let overlap=0;for(let n=Math.min(historical.length,live.length);n>0;n--){if(historical.slice(-n).every((m,i)=>m.role===live[i].role&&m.text===live[i].text)){overlap=n;break}}popupEntries=historical.concat(live.slice(overlap)).slice(-60);renderPopupEntries()}catch(_){popupHistoryLoaded=false;/* A history outage must not stop new chat turns. */}}
   function closeChatPopup(){if(!chatPopup)return;chatPopup.hidden=true;document.body.classList.remove('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','false');chatToggle?.setAttribute('aria-label','Open Agent Chat');chatToggle.title='Open Agent Chat';orb?.setAttribute('aria-expanded','false');orb?.setAttribute('aria-label','Open Agent Chat')}
   function say(text,cb){const answer=String(text||'');agent('thinking','…');popupEntry('assistant',answer);if(st.conversationOn)showTranscript('Stonefellow: '+answer.slice(0,240),'responding');const work=new Promise(resolve=>setTimeout(resolve,120)).then(async()=>{agent('responding',answer);if(cb)cb();if(!speechPilotActive&&voiceRepliesEnabled&&(st.conversationOn||voiceInteractionStarted)&&(await agentSpeak(answer))===false){const note='The reply is available in text, but speech playback is unavailable on this device.';popupEntry('notice',note);agent('idle',note)}if(st.conversationOn&&!speechPilotActive&&!voiceRepliesEnabled&&!voiceTurnBusy){agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}else if(!st.conversationOn)agent(st.playing?'playing':'idle');});pendingReply=work.catch(()=>{agent('idle',answer)});return pendingReply}
@@ -1389,6 +1390,7 @@
     const mounted=window.SFPublicAgentCanvas.mount(mainCanvas,{
       audio,
       player:footerPlayer,
+      initialConversation:popupEntries.at(-1)||null,
       isCapturing:()=>!!(songCaptureSkill?.status()?.active||songListeningSkill?.status()?.active),
       onOpenChat:()=>{void openChatPopup();input?.focus();},
       onNavigate:view=>void navigate(view),
@@ -1418,7 +1420,7 @@
     window.SFPublicAgentCanvas?.unmount?.();
     document.body.classList.remove('sf-agent-canvas-active');
     if(homepageTemplate==='agent_canvas'&&await renderAgentCanvas())return;
-    if(artistHomepageEnabled&&await renderArtistHomepage())return;document.body.classList.remove('artist-home-active','artist-home-chat-hidden');canvas.innerHTML='';starters.hidden=false;agent(st.playing?'playing':'idle','Hey. I’m the Stonefellow agent. I can play you something, tell you about the music, help you make your own record, or sell you the music directly.');
+    if(artistHomepageEnabled&&await renderArtistHomepage())return;document.body.classList.remove('artist-home-active','artist-home-chat-hidden');canvas.innerHTML='';starters.hidden=false;agent(st.playing?'playing':'idle','Hey, I’m Stonefellow. I can play you something, tell you about the music, help you make your own record, or sell you the music directly.');
     if(!st.auth.authenticated){canvas.innerHTML=newsletterSignupHtml(false);bindNewsletterForms(canvas);return;}
     await loadPersonalization();const home=await loadHome(true);
     if(!home){const rec=st.personalization.recommendations||{},items=Array.isArray(rec.items)?rec.items:[];canvas.innerHTML=items.length?`<article class="module recommendation-module"><div class="module-kicker">FOR YOU</div><div class="recommendation-heading"><div><h2>Recommended for you</h2><p class="player-note">${esc(rec.summary||'Based on your Stonefellow listening.')}</p></div><button class="text-control" type="button" data-command="recommend something for me">Ask the agent</button></div><div class="recommendation-grid">${items.slice(0,6).map(recommendationCard).join('')}</div></article>`:'';bindRecommendationCards(canvas);bind(canvas);return}
@@ -2415,7 +2417,7 @@
     // a muted session, or a browser where the user disabled greetings.
     if(voiceGreetingDelivered||!voiceRepliesEnabled||localStorage.getItem('stonefellow.voice.greeting.v1')==='off')return false;
     voiceGreetingDelivered=true;
-    const greeting='Hello. I’m ready when you are. What would you like to do?';
+    const greeting='Hi, I’m Stonefellow. What would you like to explore?';
     popupEntry('assistant',greeting);
     showTranscript('Stonefellow: '+greeting,'responding');
     void agentSpeak(greeting);

@@ -827,3 +827,80 @@ body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .topbar .wordmark{
     padding-top:3px;padding-bottom:3px;
   }
 }
+
+/* 91B14B — Ember must tint the entire shell, not only the orb. */
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"]{
+  --accent:#ffe9be;--accent-rgb:255,233,190;--accent-text:#24170f;
+  --ink:#fff8e9;--ink-rgb:255,248,233;--muted:#ead2ae;
+  --line:#ac805a88;--line2:#f0cb998c;--soft:#533c2d;
+  --surface:#21191b;--surface2:#302322;--surface-rgb:33,25,27;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .topbar{
+  border-bottom-color:#ffe3ae44!important;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .notification-button,
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .menu-button{
+  color:#fff1d4;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .notification-button:hover,
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .menu-button:hover{
+  color:#ffe5a8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .notification-badge{
+  background:#ffdf9f;color:#24170f;border-color:#34251c;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar,
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .agent-chat-popup{
+  border-color:#f1c99691!important;
+  background:linear-gradient(105deg,#1b1519d9,#2d1c19df)!important;
+  box-shadow:0 9px 35px #0b060789;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar input{
+  color:#fff7e8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar input::placeholder{
+  color:#c9b59a;opacity:1;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar .chat-action,
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chat-quick-menu button{
+  color:#ffe9be;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar .chat-action.send{
+  color:#24170f;background:#ffe6b0;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar .chat-action.mic{
+  color:#ffe7b4;background:#47352ec2;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar .chat-action.mic.active{
+  color:#24170f;background:#ffe4a9;box-shadow:0 0 15px #ffe0a852;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar .chat-action.plus[aria-expanded="true"],
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chatbar .chat-action.chat-toggle[aria-expanded="true"]{
+  color:#24170f;background:#ffe5ae;border-color:#ffdea3;box-shadow:0 0 17px #ffe2ad55;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .social-links a{
+  color:#ead4b4!important;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .social-links a:hover{
+  color:#fff1d2!important;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .agent-chat-popup-head,
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .agent-chat-popup-entry{
+  border-color:#d3a67c66;color:#fff8e8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .agent-chat-popup button:focus-visible,
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chat-composer-shell .chat-action:focus-visible{
+  outline-color:#ffe5b1;
+}
+/* Footer transcript remains the standard style on non-canvas pages.
+   When mounted in the orb its compact appearance comes from canvas CSS. */
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .voice-transcript{
+  border-color:#e8b77e88;background:#261b1fdc;color:#fff8e8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .voice-transcript-dot{
+  background:#ffe8ba;box-shadow:0 0 0 4px #ffe8ba27;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .voice-transcript[data-phase="heard"] .voice-transcript-dot,
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .voice-transcript[data-phase="responding"] .voice-transcript-dot{
+  background:#ffe8ba;box-shadow:0 0 0 4px #ffe8ba27;
+}
