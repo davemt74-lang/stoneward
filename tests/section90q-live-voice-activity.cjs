@@ -227,7 +227,7 @@ async function prepareAfterCloseCannotReopenMic(){
 
 async function playbackHoldsAreWiredWithoutKillingRecognition(){
   const app=read('assets/js/app.js'),admin=read('admin/assets/admin.js');
-  assert.match(app,/conversationBargeIn\?\.prepare\(\)/,'public microphone gesture must prepare the detector');
+  assert.doesNotMatch(app,/conversationBargeIn\?\.prepare\(\)/,'public canvas must not pre-open an acoustic monitor that hears its own speech');
   assert.match(admin,/adminConversationMonitor\?\.prepare\(\)/,'Admin microphone gesture must prepare the detector');
   assert.match(app,/conversationBargeIn\?\.close\(\)/,'public conversation shutdown releases mic');
   assert.match(admin,/adminConversationMonitor\?\.close\(\)/,'Admin conversation shutdown releases mic');

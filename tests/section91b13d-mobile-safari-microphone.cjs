@@ -42,10 +42,10 @@ check('iPhone original recognition starts synchronously and alone',()=>{
   h.context.clickMic();
   assert.deepEqual(h.counts(),{originalStarts:1,monitorPrepare:0,speechStarts:0,remoteLookups:0,stopCount:0});
 });
-check('Desktop original recognition retains interruption monitor',()=>{
+check('Desktop original recognition does not open a redundant interruption microphone',()=>{
   const h=voiceHarness(false,'legacy');
   h.context.clickMic();
-  assert.deepEqual(h.counts(),{originalStarts:1,monitorPrepare:1,speechStarts:0,remoteLookups:0,stopCount:0});
+  assert.deepEqual(h.counts(),{originalStarts:1,monitorPrepare:0,speechStarts:0,remoteLookups:0,stopCount:0});
 });
 check('iPhone Speech Engine starts before any online preference lookup',()=>{
   const h=voiceHarness(true,'speech_engine');
@@ -68,9 +68,10 @@ check('Account preference is warmed ahead of mic clicks',()=>{
   assert.match(page,/sf_speech_engine_public_state/);
   assert.doesNotMatch(app,/await window\.StonefellowSpeechEngine\?\.isSelected/);
 });
-check('iPhone does not start a competing microphone during Agent speech',()=>{
-  assert.match(app,/if\(!isIOSVoiceBrowser\)void conversationBargeIn\?\.start\(\)/);
-  assert.match(app,/if\(!isIOSVoiceBrowser\)void conversationBargeIn\?\.prepare\(\)/);
+check('Neither iPhone nor desktop starts competing microphone monitoring during Agent speech',()=>{
+  assert.doesNotMatch(app,/conversationBargeIn\?\.start\(\)/);
+  assert.doesNotMatch(app,/conversationBargeIn\?\.prepare\(\)/);
+  assert.match(app,/conversationBargeIn\?\.stop\(\)/);
 });
 function speechError(error,ios){
   let errorText='',stops=0;
