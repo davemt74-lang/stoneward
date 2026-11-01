@@ -61,7 +61,8 @@ test('Builder stays standalone and native left page panel is never an iframe',()
   assert.doesNotMatch(canvas,/<iframe/);
 });
 test('Release markers are version-synchronized',()=>{
-  const version='1.3.201';
+  const version=shell.match(/define\('SF_BUILD',\s*'([0-9.]+)'\)/)?.[1]||'';
+  assert.match(version,/^1\.3\.\d+$/);
   for(const name of ['stonefellow-v120.php','admin/index.php','.htaccess','version.php','service-worker.js','assets/js/app.js','assets/css/turntable-builder.css'])
     assert.ok(read(name).includes(version),name);
 });

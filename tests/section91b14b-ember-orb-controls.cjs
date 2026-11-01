@@ -94,7 +94,8 @@ check('Builder stays a standalone page; no iframe navigation was introduced',()=
   assert.doesNotMatch(canvas,/<iframe/);
 });
 check('All build markers are in sync and browser scripts parse',()=>{
-  const version='1.3.202';
+  const version=shell.match(/define\('SF_BUILD',\s*'([0-9.]+)'\)/)?.[1]||'';
+  assert.match(version,/^1\.3\.\d+$/);
   for(const file of ['stonefellow-v120.php','admin/index.php','.htaccess','version.php','service-worker.js','assets/js/app.js','assets/css/turntable-builder.css'])assert.ok(read(file).includes(version),file);
   new vm.Script(canvas);new vm.Script(app);
 });
