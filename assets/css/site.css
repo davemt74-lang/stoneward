@@ -647,23 +647,23 @@ body:not(.sf-agent-canvas-active){
 
 /* 91B12E — quick links float directly over the mesh, never in a boxed modal. */
 .chat-quick-menu{
-  position:fixed;left:clamp(12px,2.4vw,46px);right:clamp(12px,2.4vw,46px);
-  top:clamp(94px,11.4vh,112px);bottom:auto;transform:none;z-index:81;
-  display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;
-  gap:clamp(6px,.9vw,15px);width:auto;max-height:none;overflow-x:auto;overflow-y:hidden;
-  padding:6px 3px 17px;border:0;border-radius:0;
+  position:fixed;left:clamp(12px,2.4vw,34px);right:auto;
+  top:clamp(89px,11vh,112px);bottom:auto;transform:none;z-index:81;
+  display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;
+  gap:4px;width:min(225px,calc(100vw - 28px));max-height:calc(100dvh - 230px);
+  overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  padding:6px 10px 10px 3px;border:0;border-radius:0;
   background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
-  scrollbar-width:none;scroll-snap-type:x proximity;overscroll-behavior-x:contain;
+  scrollbar-width:thin;scrollbar-color:#70c1e266 transparent;
 }
-.chat-quick-menu::-webkit-scrollbar{display:none}
 .chat-quick-menu[hidden]{display:none!important}
 .chat-quick-menu::before,.chat-quick-menu::after{content:none}
 .chat-quick-menu button{
-  position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  position:relative;display:inline-flex;align-items:center;justify-content:flex-start;flex:0 0 auto;width:100%;
   min-height:34px;padding:7px 11px 8px 18px;margin:0;border:0;border-bottom:1px solid #80caff6b;
   border-radius:0;background:transparent;color:#c7e8ff;
-  text-align:center;font:700 11px/1.25 ui-monospace,SFMono-Regular,Consolas,monospace;
-  letter-spacing:.035em;white-space:nowrap;cursor:pointer;scroll-snap-align:start;
+  text-align:left;font:700 11px/1.25 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:.035em;white-space:normal;cursor:pointer;
   text-shadow:0 0 12px #6bbfff50;transition:color .18s,border-color .18s,text-shadow .18s;
 }
 .chat-quick-menu button::before{
@@ -684,7 +684,7 @@ body:not(.sf-agent-canvas-active){
 @keyframes sfQuickLed{0%,100%{opacity:.25}45%,70%{opacity:1}}
 @keyframes sfQuickMeter{0%,100%{opacity:.17;transform:scaleX(.17)}60%{opacity:.93;transform:scaleX(.85)}}
 @media(max-width:720px){
-  .chat-quick-menu{top:82px;left:10px;right:10px;gap:10px;padding-bottom:14px}
+  .chat-quick-menu{top:78px;left:10px;right:auto;width:min(205px,calc(100vw - 20px));max-height:calc(100dvh - 170px);gap:3px;padding-bottom:10px}
   .chat-quick-menu button{font-size:10px;min-height:36px;padding:7px 11px 7px 17px}
 }
 @media(prefers-reduced-motion:reduce){

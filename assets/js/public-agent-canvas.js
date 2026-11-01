@@ -10,6 +10,15 @@
   const html = `
     <section class="sf-agent-landing" aria-label="Stonefellow interactive Agent Canvas">
       <canvas class="sf-agent-mesh" aria-hidden="true"></canvas>
+      <aside class="sf-agent-page-rail" hidden inert aria-label="Stonefellow native page panel">
+        <header class="sf-agent-page-head">
+          <div><small>STONEFELLOW / LIVE WORKSPACE</small><strong class="sf-agent-page-title">PAGE</strong></div>
+          <button type="button" data-agent-action="close-page" aria-label="Close page panel">×</button>
+        </header>
+        <div class="sf-agent-page-viewport" tabindex="0" aria-label="Page content">
+          <div id="sfAgentNativePage" class="sf-agent-page-content"></div>
+        </div>
+      </aside>
       <div class="sf-agent-floater" data-mode="idle" aria-label="Floating Stonefellow agent; drag to move">
         <div class="sf-agent-visual">
           <div class="sf-agent-aura" aria-hidden="true"></div>
@@ -66,6 +75,10 @@
     const cloud = by(root, '.sf-agent-cloud');
     const face = by(root, '.sf-agent-points');
     const workspace = by(root, '.sf-agent-workspace');
+    const pageRail = by(root, '.sf-agent-page-rail');
+    const pageTitle = by(root, '.sf-agent-page-title');
+    const pageViewport = by(root, '.sf-agent-page-viewport');
+    const pageHost = by(root, '.sf-agent-page-content');
     const panel = by(root, '.sf-agent-panel');
     const playerDock = by(root, '.sf-agent-player-dock');
     const playerReveal = by(root, '.sf-agent-player-reveal');
@@ -311,6 +324,22 @@
       workspaceTimer=window.setTimeout(()=>workspace.classList.remove('growing'),850);
       sphere.focus({preventScroll:true});
     }
+    const pageLabels={builder:'CREATE RECORD',playlist:'PLAYLIST',shows:'TOUR DATES',show:'LIVE SHOW',store:'MERCH STORE',membership:'MEMBERSHIP + VIP',tickets:'TICKETS + VIP',community:'FAN COMMUNITY',newsletter:'NEWSLETTER',music:'MUSIC LIBRARY',releases:'RELEASES',track:'SONG DETAILS',release:'RELEASE DETAILS',cart:'CART',account:'ACCOUNT',login:'SIGN IN',register:'CREATE ACCOUNT'};
+    function openPage(view){
+      pageTitle.textContent=pageLabels[view]||String(view||'PAGE').replaceAll('-',' ').toUpperCase();
+      pageHost.replaceChildren();
+      pageViewport.scrollTop=0;
+      pageRail.hidden=false;
+      pageRail.removeAttribute('inert');
+      root.classList.add('has-native-page');
+      return pageHost;
+    }
+    function closePage(){
+      pageRail.hidden=true;
+      pageRail.setAttribute('inert','');
+      pageHost.replaceChildren();
+      root.classList.remove('has-native-page');
+    }
     function handleAction(event){
       const button=event.target.closest?.('[data-agent-action]');if(!button)return;
       const action=button.dataset.agentAction;
@@ -322,6 +351,7 @@
       if(action==='music'){closeWorkspace();options.onNavigate?.('music');}
       if(action==='close-panel'){panel.hidden=true;remotePanelDismissed=true;updateDock();}
       if(action==='close-workspace')closeWorkspace();
+       if(action==='close-page'){closePage();options.onClosePage?.();}
     }
     cleanup.push(on(root,'click',handleAction));
     cleanup.push(on(playerDock,'pointerenter',pausePlayerHide));
@@ -366,7 +396,7 @@
     resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();showPlayer();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);faceDraw(0);}
-    current={root,state,session,syncPlayer,destroy(){
+    current={root,state,session,syncPlayer,openPage,closePage,destroy(){
       destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);pausePlayerHide();
       resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
       if(player && originalPlayerParent){
@@ -379,5 +409,5 @@
     return true;
   }
   function unmount(){if(current){current.destroy();current=null;}}
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
 })();
