@@ -81,7 +81,7 @@ function speechError(error,ios){
   const context={
     recognition:{},recognitionActive:true,st:{conversationOn:true},voiceTurnBusy:false,
     isIOSVoiceBrowser:ios,
-    stopConversation(){stops++},showTranscript(text){errorText=text},
+    stopConversation(){stops++},setVoiceInputActive(){},showTranscript(text){errorText=text},
     scheduleConversationListen(){},recognitionNetworkFailures:0,Math
   };
   vm.createContext(context);
