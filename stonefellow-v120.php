@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.202');
+define('SF_BUILD', '1.3.203');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -105,6 +105,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
             <button type="button" data-sf-atmosphere="ember" aria-pressed="false" title="Cinematic sunset">Ember</button>
             <button type="button" data-sf-atmosphere="mesh" aria-pressed="false" title="Blue mesh">Mesh</button>
             <button type="button" data-sf-atmosphere="violet" aria-pressed="false" title="Violet signal">Violet</button>
+            <button type="button" data-sf-atmosphere="lunar" aria-pressed="false" title="Moonlit mountain horizon">Lunar</button>
           </div>
         </div>
         <nav>

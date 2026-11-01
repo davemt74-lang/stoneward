@@ -71,7 +71,7 @@ for(const options of [{armed:false},{delivered:true},{enabled:false},{preference
   assert.equal(t.microphone.aborts,0);
 }
 
-assert.match(publicApp,/voiceGreetingArmed=true;recognitionNetworkFailures=0/,'only a click-initiated public conversation arms the greeting');
+assert.match(publicApp,/voiceGreetingArmed=true;iosVoiceNeedsGesture=false;iosProcessedFinalIndex=-1;recognitionNetworkFailures=0/,'only a click-initiated public conversation arms the greeting');
 assert.match(publicApp,/recognition\.onstart=\(\)=>\{[^\n]*greetAfterMicrophoneReady\(\)/,'public mic onstart triggers greeting after permission');
 assert.match(publicApp,/function stopConversation\(\)\{voiceGreetingArmed=false/,'stopping disarms the public greeting');
 assert.match(adminApp,/voiceGreetingArmed=true;networkFailures=0/,'Admin arming is click-initiated');

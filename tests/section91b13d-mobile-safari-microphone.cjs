@@ -24,7 +24,9 @@ function voiceHarness(ios,engine){
   const context={
     isIOSVoiceBrowser:ios,voiceEngineKey:'stonefellow.voice.engine.v1.7',
     localStorage:{getItem:key=>key==='stonefellow.voice.engine.v1.7'?engine:null},
-    st:{conversationOn:false},voiceInteractionStarted:false,speechPilotActive:false,voiceGreetingArmed:false,recognitionNetworkFailures:0,
+    st:{conversationOn:false},voiceInteractionStarted:false,speechPilotActive:false,voiceGreetingArmed:false,
+    iosVoiceNeedsGesture:false,iosProcessedFinalIndex:-1,voiceTurnBusy:false,voicePlaybackPending:false,
+    voiceSpeechGuard:{blocked:false},recognitionNetworkFailures:0,
     window:{STONEFELLOW_VOICE_ENGINE_BOOTSTRAP:engine,StonefellowSpeechEngine:{
       async isSelected(){remoteLookups++;throw Error('This must not run in the click handler')},
       start(){speechStarts++;return Promise.resolve()}
@@ -59,6 +61,14 @@ check('Second tap stops conversation',()=>{
   h.context.st.conversationOn=true;h.context.clickMic();
   assert.equal(h.counts().stopCount,1);
   assert.equal(h.counts().originalStarts,0);
+});
+check('An iPhone session that ended can only resume on an explicit tap',()=>{
+  const h=voiceHarness(true,'legacy');
+  h.context.st.conversationOn=true;h.context.iosVoiceNeedsGesture=true;
+  h.context.clickMic();
+  assert.equal(h.counts().stopCount,0);
+  assert.equal(h.counts().originalStarts,1);
+  assert.equal(h.context.iosVoiceNeedsGesture,false);
 });
 check('Account preference is warmed ahead of mic clicks',()=>{
   assert.match(settings,/loadEnginePreference\(\)\.catch\(\(\)=>\{\}\)/);

@@ -33,6 +33,9 @@
             <button type="button" data-agent-action="capture" data-orbit-action="record" data-tip="Record Clip" aria-label="Record a song clip">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.1" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="3.8" fill="currentColor"/></svg>
             </button>
+            <button type="button" data-agent-action="show-player" data-orbit-action="player" data-tip="Music Player" aria-label="Show music player">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="17.5" cy="16" r="2.5" fill="currentColor"/></svg>
+            </button>
             <button type="button" data-agent-action="stop-listening" data-orbit-action="stop" data-tip="Stop listening" aria-label="Stop lyric listening" hidden>
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/></svg>
             </button>
@@ -52,7 +55,7 @@
           <div id="sfAgentPlayerDock" class="sf-agent-player-dock" aria-label="Agent music player">
             <div class="sf-agent-player-ready">MUSIC / PLAYER READY</div>
           </div>
-          <button type="button" class="sf-agent-player-reveal" data-agent-action="show-player" aria-controls="sfAgentPlayerDock" hidden>♫ Show player</button>
+          <button type="button" class="sf-agent-chat-start" data-agent-action="start-chat" aria-label="Start voice chat with Stonefellow">◉ Start Chat</button>
         </div>
         <aside class="sf-agent-panel" hidden aria-label="Active song lyric capture and analysis">
           <div class="sf-agent-panel-head"><span>LYRIC / CAPTURE · AGENT PROCESS</span><button type="button" data-agent-action="close-panel" aria-label="Hide session panel">×</button></div>
@@ -95,7 +98,7 @@
     const pageHost = by(root, '.sf-agent-page-content');
     const panel = by(root, '.sf-agent-panel');
     const playerDock = by(root, '.sf-agent-player-dock');
-    const playerReveal = by(root, '.sf-agent-player-reveal');
+    const chatStart = by(root, '.sf-agent-chat-start');
     const smallSession = by(root, '.sf-agent-session');
     const bigSession = by(root, '.sf-agent-expanded-session');
     const contexts = [mesh, cloud, face].map(c => c.getContext('2d'));
@@ -112,7 +115,8 @@
     const presets=Object.freeze({
       ember:{label:'Ember',rgb:[255,183,110],mesh:false},
       mesh:{label:'Blue Mesh',rgb:[139,204,255],mesh:true},
-      violet:{label:'Violet Signal',rgb:[205,170,255],mesh:true}
+      violet:{label:'Violet Signal',rgb:[205,170,255],mesh:true},
+      lunar:{label:'Moonlit Horizon',rgb:[219,228,244],mesh:false}
     });
     const atmosphereKey='stonefellow.agent.atmosphere.v1';
     let atmosphere='ember';
@@ -164,7 +168,6 @@
     }
     function showPlayer(){
       playerDock.classList.remove('is-collapsed');
-      playerReveal.hidden=true;
       schedulePlayerHide();
     }
     function hidePlayer(){
@@ -173,15 +176,23 @@
         playerDock.contains?.(document.activeElement)||workspace.classList.contains('open');
       if(interacting){schedulePlayerHide();return;}
       playerDock.classList.add('is-collapsed');
-      playerReveal.hidden=false;
       pausePlayerHide();
     }
     function syncPlayer() {
       const loaded=!!player && !player.hidden;
       const changed=loaded!==playerDock.classList.contains('has-track');
       playerDock.classList[loaded?'add':'remove']('has-track');
+      playerDock.hidden=!loaded;
       if(changed)showPlayer();
+      if(!loaded)pausePlayerHide();
+      syncListeningButtons();
       updateDock();
+    }
+    function syncVoice(){
+      if(!chatStart)return;
+      const active=!!options.isConversationActive?.()&&!options.needsVoiceGesture?.();
+      chatStart.hidden=active;
+      chatStart.textContent=options.needsVoiceGesture?.()?'◉ Resume Chat':'◉ Start Chat';
     }
     const playerObserver = player && typeof MutationObserver === 'function'
       ? new MutationObserver(syncPlayer) : null;
@@ -215,6 +226,7 @@
         button.title=!playable?'Play a Stonefellow song to use this tool.':action==='listen-interpret'?'Listen & Interpret':'Record Clip';
       }
       for(const button of root.querySelectorAll('[data-agent-action="stop-listening"]'))button.hidden=!capturing;
+      for(const button of root.querySelectorAll('[data-orbit-action="player"]'))button.hidden=!player||player.hidden;
       positionOrbitTools();
     }
     function session() {
@@ -293,11 +305,12 @@
       const w=mesh.clientWidth||dim.w,h=mesh.clientHeight||dim.h,m=motionOff?0:t*.00023;
       ctx.clearRect(0,0,w,h);
       if(!presets[atmosphere].mesh){
-        // The photographed space is the environment. A few warm sparks
-        // add life without painting a blue grid over the artwork.
+        // Photographic atmospheres preserve the scene without a drawn grid.
+        // Ember has warm sparks; Lunar has sparse silver moonlit dust.
+        const lunar=atmosphere==='lunar';
         for(const star of stars.slice(0,44)){
-          const alpha=Math.max(.08,.13+.16*Math.sin(m*3+star.phase));
-          ctx.fillStyle='rgba(255,184,110,'+alpha+')';
+          const alpha=Math.max(.04,(lunar?0.07:0.13)+(lunar?0.09:0.16)*Math.sin(m*3+star.phase));
+          ctx.fillStyle=(lunar?'rgba(222,233,247,':'rgba(255,184,110,')+alpha+')';
           ctx.beginPath();ctx.arc(star.x*w,star.y*h,star.r*.65,0,Math.PI*2);ctx.fill();
         }
         return;
@@ -436,6 +449,7 @@
       const button=event.target.closest?.('[data-agent-action]');if(!button)return;
       const action=button.dataset.agentAction;
       if(action==='chat')options.onOpenChat?.();
+      if(action==='start-chat')options.onStartChat?.();
       if(action==='capture')options.onStartCapture?.();
       if(action==='listen-interpret')options.onListenInterpret?.();
       if(action==='stop-listening')options.onStopListening?.();
@@ -488,10 +502,10 @@
     resizeObserver?.observe(root);
     let selectedAtmosphere='ember';try{selectedAtmosphere=window.localStorage?.getItem(atmosphereKey)||'ember'}catch(_){}
     applyAtmosphere(selectedAtmosphere,false);
-    resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();showPlayer();
+    resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();syncVoice();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);orbDraw(0);}
-    current={root,state,session,syncPlayer,openPage,closePage,syncTranscript,showConversation,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
+    current={root,state,session,syncPlayer,syncVoice,openPage,closePage,syncTranscript,showConversation,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
       destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);pausePlayerHide();
       resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
       if(player && originalPlayerParent){
@@ -511,10 +525,10 @@
   function unmount(){if(current){current.destroy();current=null;}}
   function applyCommand(text){
     const value=String(text||'').trim().toLowerCase();
-    const match=value.match(/^(?:(?:stonefellow|agent)[, ]+)?(?:set|switch|change|use)(?: the)? (?:agent )?(?:atmosphere|environment|theme)(?: (?:to|as))? (ember|blue mesh|mesh|violet signal|violet)[.!]?$/);
+    const match=value.match(/^(?:(?:stonefellow|agent)[, ]+)?(?:set|switch|change|use)(?: the)? (?:agent )?(?:atmosphere|environment|theme)(?: (?:to|as))? (ember|blue mesh|mesh|violet signal|violet|lunar|moonlit horizon|moonlight)[.!]?$/);
     if(!match)return null;
-    const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':match[1];
+    const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':['moonlit horizon','moonlight'].includes(match[1])?'lunar':match[1];
     return current?.setAtmosphere(named)||null;
   }
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
 })();

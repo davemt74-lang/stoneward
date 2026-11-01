@@ -62,7 +62,7 @@ check('Music wake phrase protects against lyrics and speaker echo even during fo
 
 check('ElevenLabs preferred; local system voice is fallback when unavailable',async()=>{
   let localCalls=0,remoteResult=false;
-  const sandbox={st:{conversationOn:true,playing:false},voiceRepliesEnabled:true,voiceInteractionStarted:true,voicePlaybackPending:false,voicePlaybackSequence:0,recognition:null,recognitionActive:false,conversationRestartTimer:null,voiceTurnBusy:false,isIOSVoiceBrowser:false,agentInterrupt:{hidden:false},conversationBargeIn:{start:async()=>true,stop:()=>{}},clearTimeout:()=>{},scheduleConversationListen:()=>{},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},setVoiceInputActive:()=>{},setVoiceSpeechAudible:()=>{},restoreVoiceProbeMusic:()=>{},agent:()=>{}};
+  const sandbox={st:{conversationOn:true,playing:false},voiceRepliesEnabled:true,voiceInteractionStarted:true,voicePlaybackPending:false,voicePlaybackSequence:0,recognition:null,recognitionActive:false,conversationRestartTimer:null,voiceTurnBusy:false,isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,agentInterrupt:{hidden:false},conversationBargeIn:{start:async()=>true,stop:()=>{}},clearTimeout:()=>{},scheduleConversationListen:()=>{},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},setVoiceInputActive:()=>{},setVoiceSpeechAudible:()=>{},restoreVoiceProbeMusic:()=>{},agent:()=>{}};
   vm.createContext(sandbox);
   vm.runInContext(functionSource('agentSpeak',true)+';globalThis.run=agentSpeak',sandbox);
   assert.equal(await sandbox.run('Test voice'),true);assert.equal(localCalls,1);
