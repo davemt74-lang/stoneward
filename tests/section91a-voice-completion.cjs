@@ -91,7 +91,7 @@ async function publicSpeechCompletesEveryChunk(){
     voiceSpeechGuard:{audible:()=>true},
     globalThis:{StonefellowSpeechSegments:{split:()=>['First segment.','Second segment.','Last segment.']}},
     setTimeout:callback=>{timers.push(callback);return timers.length},agent:()=>{},
-    cancelLocalVoiceOutput:()=>synth.cancel(),
+    setVoiceSpeechAudible:()=>{},cancelLocalVoiceOutput:()=>synth.cancel(),
   };
   vm.createContext(context);
   vm.runInContext(extract(publicApp,'speakWithDeviceVoice'),context);
