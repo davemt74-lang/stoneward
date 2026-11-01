@@ -43,13 +43,13 @@ check('No writer notes means an explicitly labeled reading, never invented inten
     transcript:'Sky',canAnalyze:true,reports:[{text:'Tentative reading',sources:[]}]},()=>{});
   assert.match(target.textContent,/No song-specific published songwriter notes were matched/);
 });
-check('Quick links occupy one mesh-overlay row without panel, title, or redundant actions',()=>{
+check('Quick links form a vertical mesh-overlay rail without modal, title, or redundant actions',()=>{
   const html=read('stonefellow-v120.php'),css=read('assets/css/site.css');
   const menu=html.match(/<nav id="chatQuickMenu"[\s\S]+?<\/nav>/)?.[0]||'';
   assert.ok(menu);
   assert.doesNotMatch(menu,/Explore & create|sf-quick-grid|modal|dialog|control deck|chatQuickClose/);
   for(const label of ['Create Record','Create Playlist','Tour Dates','Merch Store','Membership','Tickets','Newsletter'])assert.ok(menu.includes(label),label);
-  assert.match(css,/\.chat-quick-menu\{[\s\S]*?display:flex;[\s\S]*?flex-wrap:nowrap/);
+  assert.match(css,/\.chat-quick-menu\{[\s\S]*?display:flex;flex-direction:column;[\s\S]*?overflow-y:auto/);
   assert.match(css,/\.chat-quick-menu\{[\s\S]*?background:transparent;box-shadow:none/);
   assert.match(css,/\.chat-quick-menu button::before/);
   assert.match(css,/\.chat-quick-menu button::after/);
