@@ -28,11 +28,11 @@
     const phaseLabels = {
       capturing: 'Listening now', captured: 'Captured · ready to transcribe',
       transcribing: 'Creating an unverified lyric draft…', draft: 'Unverified transcript ready',
-      analyzing: 'Preparing your requested interpretation…', report: 'Analysis ready',
+      analyzing: 'Reviewing lyrics and Stonefellow song notes…', report: 'Lyric interpretation ready',
       discarded: 'Capture ended without a usable excerpt'
     };
     const phase = el('p', 'song-experience-phase'+(state.live_enabled?' song-experience-live':''),
-      state.phase==='capturing'&&state.live_enabled ? 'Listening · provisional live lyrics' :
+      state.phase==='capturing'&&state.live_enabled ? (state.auto_interpret?'Listening · live lyrics → interpretation on Stop':'Listening · provisional live lyrics') :
         phaseLabels[state.phase] || 'Session captured');
     phase.setAttribute('role', 'status');
     card.append(eyebrow, heading, meta, phase);
@@ -49,8 +49,11 @@
     }
     for (const [index, report] of (state.reports || []).entries()) {
       const panel = el('section', 'song-experience-report');
-      panel.append(el('h4', '', 'Analysis ' + (index + 1) + (report.question ? ' · ' + report.question : '')));
+      panel.append(el('h4', '', 'Lyric interpretation ' + (index + 1) + (report.question ? ' · ' + report.question : '')));
       panel.append(el('p', 'song-experience-copy', report.text));
+      if (Array.isArray(report.sources) && report.sources.length)
+        panel.append(el('small', 'song-experience-sources', 'Songwriter context: ' + report.sources.join(' · ')));
+      else panel.append(el('small', 'song-experience-sources', 'No song-specific published songwriter notes were matched; any suggestions about intent are interpretation.'));
       panel.append(el('small', '', 'Interpretation of an unverified draft and approved Stonefellow context. No live web sources were searched.'));
       card.append(panel);
     }
@@ -67,13 +70,13 @@
       button('Stop listening', 'stop');
       if (!state.live_enabled) {
         button('Start live transcription', 'live');
-        card.append(el('small', 'song-experience-consent',
+        if (!state.auto_interpret) card.append(el('small', 'song-experience-consent',
           'Optional: live transcription uploads short player-audio clips to your configured transcription provider and uses active tokens. Ordinary listening stays local.'));
       }
     }
     if (state.phase === 'captured') button('Transcribe excerpt', 'transcribe');
     if (state.transcript && !['transcribing', 'analyzing', 'discarded'].includes(state.phase)) {
-      button(state.reports?.length ? 'Analyze again' : 'Analyze excerpt', 'analyze', !state.canAnalyze);
+      button(state.reports?.length ? 'Interpret again' : 'Interpret lyrics', 'analyze', !state.canAnalyze);
       button(state.saved_note_id ? 'Saved privately #' + state.saved_note_id : 'Save private note', 'save', !state.canAnalyze || !!state.saved_note_id);
     }
     if (state.phase === 'transcribing' || state.phase === 'analyzing') {
@@ -96,7 +99,7 @@
         if (question) onAction?.('ask', question);
       });
       card.append(form);
-      card.append(el('small', 'song-experience-consent', 'Analyze / Ask Agent sends this excerpt and your question to your configured AI provider only when you select it.'));
+      card.append(el('small', 'song-experience-consent', 'Interpret / Ask Agent sends the unverified excerpt and question to your configured AI provider. Listen & Interpret authorizes this once when selected; follow-up requests remain manual.'));
     }
     target.append(card);
   }

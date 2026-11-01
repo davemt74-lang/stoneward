@@ -50,7 +50,7 @@ check('Unverified lyrics are rendered literally, labeled and not automatically a
   assert.equal(host.all('script').length,0);
   assert.match(host.textContent,/Nothing is saved to Agent Brain automatically/);
   assert.equal(actions.length,0);
-  host.all('button').find(b=>b.textContent==='Analyze excerpt').listeners.click();
+  host.all('button').find(b=>b.textContent==='Interpret lyrics').listeners.click();
   assert.deepEqual(actions,[['analyze']]);
 });
 check('A new question is an explicit follow-up analysis request',()=>{
@@ -65,16 +65,16 @@ check('Multiple full reports remain readable in the same chat card',()=>{
     {question:'First interpretation',text:'Interpretation one.\nEvidence and context.'},
     {question:'What about the ending?',text:'Interpretation two.'}
   ]},onAction);
-  assert.match(host.textContent,/Analysis 1 · First interpretation/);
+  assert.match(host.textContent,/Lyric interpretation 1 · First interpretation/);
   assert.match(host.textContent,/Evidence and context/);
-  assert.match(host.textContent,/Analysis 2 · What about the ending\?/);
+  assert.match(host.textContent,/Lyric interpretation 2 · What about the ending\?/);
   assert.match(host.textContent,/No live web sources were searched/);
   assert.match(host.textContent,/Open My Agent Chat/);
 });
 check('Track changes keep old text visible but disable stale analysis',()=>{
   mount(host,{...base,phase:'report',transcript,canAnalyze:false,reports:[{text:'Prior report'}]},onAction);
   assert.match(host.textContent,/Prior report/);
-  assert.equal(host.all('button').find(b=>b.textContent==='Analyze again').disabled,true);
+  assert.equal(host.all('button').find(b=>b.textContent==='Interpret again').disabled,true);
   assert.equal(host.all('form').length,0);
 });
 check('Private saves are explicit and show the note number',()=>{

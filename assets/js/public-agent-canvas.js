@@ -24,6 +24,11 @@
         </div>
         <div class="sf-agent-state" role="status">AGENT READY</div>
         <p class="sf-agent-hint">DRAG TO MOVE · CLICK TO EXPAND</p>
+        <div class="sf-agent-listen-actions" aria-label="Song listening and recording tools">
+          <button type="button" class="sf-agent-listen-primary" data-agent-action="listen-interpret"><strong>Listen &amp; Interpret</strong><small>LIVE LYRICS + SONGWRITER CONTEXT</small></button>
+          <button type="button" data-agent-action="capture"><strong>Record Clip</strong><small>LOCAL AUDIO EXCERPT</small></button>
+          <button type="button" data-agent-action="stop-listening" hidden><strong>Stop listening</strong><small>FINISH CURRENT SECTION</small></button>
+        </div>
         <div class="sf-agent-dock-stack">
           <div id="sfAgentPlayerDock" class="sf-agent-player-dock" aria-label="Agent music player">
             <div class="sf-agent-player-ready">MUSIC / PLAYER READY</div>
@@ -42,7 +47,7 @@
             <h2>What shall we explore?</h2>
             <p>The agent can bring music, lyrics, analysis and conversation into this space. Your current session stays here when you expand the canvas.</p>
             <div class="sf-agent-expanded-session"></div>
-            <div class="sf-agent-tools"><button type="button" data-agent-action="chat">Open Agent Chat</button><button type="button" data-agent-action="music">Explore music</button><button type="button" data-agent-action="capture" hidden>Capture song lyrics</button></div>
+            <div class="sf-agent-tools"><button type="button" data-agent-action="chat">Open Agent Chat</button><button type="button" data-agent-action="music">Explore music</button><button type="button" data-agent-action="listen-interpret">Listen &amp; Interpret</button><button type="button" data-agent-action="capture">Record Clip</button><button type="button" data-agent-action="stop-listening" hidden>Stop listening</button></div>
           </div>
         </div>
       </section>
@@ -131,7 +136,17 @@
       if(mode==='recording')remotePanelDismissed=false;
       floater.dataset.mode=mode;
       status.textContent=label || ({idle:'AGENT READY',music:'MUSIC PLAYING',listening:'LISTENING',thinking:'THINKING',speaking:'RESPONDING',recording:'CAPTURING LYRICS'}[mode]);
-      for (const control of root.querySelectorAll('[data-agent-action="capture"]')) control.hidden=!(audio && audio.src && !audio.paused)||!!options.isCapturing?.();
+      syncListeningButtons();
+    }
+    function syncListeningButtons() {
+      const capturing=!!options.isCapturing?.();
+      const playable=!!(audio && (audio.currentSrc || audio.src) && !audio.paused);
+      for(const action of ['listen-interpret','capture'])for(const button of root.querySelectorAll(`[data-agent-action="${action}"]`)){
+        button.hidden=capturing;
+        button.disabled=!playable;
+        button.title=!playable?'Play a Stonefellow song to use this tool.':'';
+      }
+      for(const button of root.querySelectorAll('[data-agent-action="stop-listening"]'))button.hidden=!capturing;
     }
     function session() {
       const active=!!window.StonefellowSongExperience?.active?.();
@@ -140,7 +155,7 @@
       window.StonefellowSongExperience.mount(smallSession);
       window.StonefellowSongExperience.mount(bigSession);
       updateDock();
-      for (const control of root.querySelectorAll('[data-agent-action="capture"]')) control.hidden=!(audio && audio.src && !audio.paused)||!!options.isCapturing?.();
+      syncListeningButtons();
     }
     function updateDock() {
       const half=floater.offsetWidth*.5;
@@ -301,6 +316,8 @@
       const action=button.dataset.agentAction;
       if(action==='chat')options.onOpenChat?.();
       if(action==='capture')options.onStartCapture?.();
+      if(action==='listen-interpret')options.onListenInterpret?.();
+      if(action==='stop-listening')options.onStopListening?.();
       if(action==='show-player')showPlayer();
       if(action==='music'){closeWorkspace();options.onNavigate?.('music');}
       if(action==='close-panel'){panel.hidden=true;remotePanelDismissed=true;updateDock();}

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.193');
+define('SF_BUILD', '1.3.194');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -214,25 +214,18 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button id="playerClose" class="player-close" type="button" aria-label="Close player">×</button>
       <audio id="persistentAudio" preload="metadata"></audio>
     </div>
-    <div id="chatQuickMenu" class="chat-quick-menu" role="dialog" aria-labelledby="chatQuickMenuTitle" hidden>
-      <div class="sf-quick-head">
-        <div class="sf-quick-heading"><span class="sf-quick-kicker">STONEFELLOW / CONTROL DECK <span class="sf-quick-live" aria-hidden="true"></span></span><strong id="chatQuickMenuTitle">Explore &amp; create</strong><span class="sf-quick-summary">Choose your next experience</span></div>
-        <button id="chatQuickClose" class="sf-quick-close" type="button" aria-label="Close quick actions">×</button>
-      </div>
-      <div class="sf-quick-grid">
-      <button type="button" data-quick-action="record"><small aria-hidden="true">01 / MAKE</small><strong>Create Record</strong><span>Build vinyl or cassette</span></button>
-      <button type="button" data-quick-action="playlist"><small aria-hidden="true">02 / LISTEN</small><strong>Create Playlist</strong><span>Start a saved playlist</span></button>
-      <button type="button" data-quick-action="shows"><small aria-hidden="true">03 / LIVE</small><strong>Tour Dates</strong><span>Shows & live archive</span></button>
-      <button type="button" data-quick-action="store"><small aria-hidden="true">04 / SHOP</small><strong>Merch Store</strong><span>Music & custom physical releases</span></button>
-      <button type="button" data-quick-action="membership"><small aria-hidden="true">05 / ACCESS</small><strong>Membership + VIP</strong><span>Benefits, exclusives & early access</span></button>
-      <button type="button" data-quick-action="tickets"><small aria-hidden="true">06 / EVENTS</small><strong>Tickets + VIP</strong><span>RSVPs, presales & guest access</span></button>
+    <nav id="chatQuickMenu" class="chat-quick-menu" hidden aria-label="Stonefellow quick links">
+      <button type="button" data-quick-action="record">Create Record</button>
+      <button type="button" data-quick-action="playlist">Create Playlist</button>
+      <button type="button" data-quick-action="shows">Tour Dates</button>
+      <button type="button" data-quick-action="store">Merch Store</button>
+      <button type="button" data-quick-action="membership">Membership + VIP</button>
+      <button type="button" data-quick-action="tickets">Tickets + VIP</button>
 <?php if(!empty($siteSettings['fan_community_enabled'])): ?>
-      <button type="button" data-quick-action="community"><small aria-hidden="true">07 / CONNECT</small><strong>Fan Community</strong><span>Join the fan feed</span></button>
+      <button type="button" data-quick-action="community">Fan Community</button>
 <?php endif; ?>
-      <button type="button" data-quick-action="newsletter"><small aria-hidden="true">08 / UPDATES</small><strong>Newsletter</strong><span>Join Stonefellow email updates</span></button>
-      </div>
-      <div class="sf-quick-foot"><span>CONNECTED EXPERIENCE</span><span>SF // ACTION HUB</span></div>
-    </div>
+      <button type="button" data-quick-action="newsletter">Newsletter</button>
+    </nav>
     <div class="chat-composer-shell">
       <div id="voiceTranscript" class="voice-transcript" role="status" aria-live="polite" hidden><span class="voice-transcript-dot" aria-hidden="true"></span><span id="voiceTranscriptText"></span></div>
       <section id="agentChatPopup" class="agent-chat-popup" aria-label="Stonefellow conversation" hidden>
