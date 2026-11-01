@@ -96,6 +96,8 @@ async function run(){
   check('Public recognition waits for a recognized wake phrase while music plays',()=>{
     assert.match(app,/recognition\.onspeechstart=\(\)=>\{if\(shouldDuckConversationInput\(\)\)setVoiceInputActive\(true\)/);
     assert.match(app,/if\(spoken&&!finalReceived\)setVoiceInputActive\(shouldDuckConversationInput\(spoken\)\)/);
+    assert.match(app,/if\(st\.playing&&!audio\.paused&&!woke\)/);
+    assert.match(app,/say “Stonefellow” to talk over music/);
     assert.match(app,/\{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930\}/);
     assert.match(app,/songExperience\.listening_mode==='recognition'\?'listening':'recording'/);
   });

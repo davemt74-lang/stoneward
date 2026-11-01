@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.199';
+  window.STONEFELLOW_APP_BUILD='1.3.200';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate=site.homepageTemplate==='agent_canvas'?'agent_canvas':'classic',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -2397,7 +2397,7 @@
     return true;
   }
   function updateConversationButton(){voice.classList.toggle('active',st.conversationOn);voice.setAttribute('aria-pressed',String(st.conversationOn));voice.setAttribute('aria-label',st.conversationOn?'End conversation':'Start conversation');voice.title=st.conversationOn?'Conversation active · click to stop':'Start hands-free conversation'}
-  function listeningPrompt(){return st.playing&&!audio.paused&&Date.now()>musicFollowupUntil?'Listening · say “Stonefellow” to talk over music.':'Listening · speak naturally.'}
+  function listeningPrompt(){return st.playing&&!audio.paused?'Listening · say “Stonefellow” to talk over music.':'Listening · speak naturally.'}
   function greetAfterMicrophoneReady(){
     if(!voiceGreetingArmed)return false;
     voiceGreetingArmed=false;
@@ -2435,7 +2435,7 @@
   }
   function submitRecognizedVoiceTurn(spoken){
     const woke=musicWakePhrase.test(spoken),words=spoken.replace(musicWakePhrase,'').trim();
-    if(st.playing&&!audio.paused&&Date.now()>musicFollowupUntil&&!woke){
+    if(st.playing&&!audio.paused&&!woke){
       showTranscript('Music is playing. Say “Stonefellow” followed by your question.','listening');
       return;
     }
