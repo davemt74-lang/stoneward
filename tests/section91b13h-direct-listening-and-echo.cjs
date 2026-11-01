@@ -100,6 +100,7 @@ async function run(){
     assert.match(app,/say “Stonefellow” to talk over music/);
     assert.match(app,/\{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930\}/);
     assert.match(app,/songExperience\.listening_mode==='recognition'\?'listening':'recording'/);
+    assert.match(app,/if\(directSongListeningCommand\(text\)\)\{await liveAgent\(text\);return\}await loadAuth\(\)/);
   });
   check('Small speech gaps do not repeatedly restore and re-duck music',()=>{
     assert.match(app,/voiceSpeechReleaseTimer=setTimeout/);
