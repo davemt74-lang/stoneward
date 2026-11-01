@@ -45,7 +45,7 @@ check('Music is ducked, remains playing and original loudness is restored',()=>{
   assert.equal(sandbox.musicOriginalVolume,null);
 });
 
-check('Music wake phrase protects against lyrics while natural follow-ups work',()=>{
+check('Music wake phrase protects against lyrics and speaker echo even during follow-ups',()=>{
   const phrase=app.match(/^  const musicWakePhrase=(.*);$/m)?.[1];
   assert.ok(phrase);
   const turns=[],hints=[];
@@ -54,7 +54,8 @@ check('Music wake phrase protects against lyrics while natural follow-ups work',
   vm.runInContext('const musicWakePhrase='+phrase+';let musicFollowupUntil=0;'+functionSource('submitRecognizedVoiceTurn')+';globalThis.run=submitRecognizedVoiceTurn;globalThis.followup=until=>{musicFollowupUntil=until}',sandbox);
   sandbox.run('I keep singing this line');assert.equal(turns.length,0);assert.match(hints.at(-1),/Stonefellow/);
   sandbox.run('Hey Stonefellow, what track is playing?');assert.deepEqual(turns,['what track is playing?']);
-  sandbox.followup(118000);sandbox.run('Who wrote it?');assert.deepEqual(turns,['what track is playing?','Who wrote it?']);
+  sandbox.followup(118000);sandbox.run('Who wrote it?');assert.deepEqual(turns,['what track is playing?']);
+  sandbox.run('Stonefellow who wrote it?');assert.deepEqual(turns,['what track is playing?','who wrote it?']);
   sandbox.followup(0);sandbox.run('Stonefellow');assert.equal(turns.length,2);assert.match(hints.at(-1),/listening/);
   sandbox.audio.paused=true;sandbox.run('Play something else');assert.equal(turns.at(-1),'Play something else');
 });
