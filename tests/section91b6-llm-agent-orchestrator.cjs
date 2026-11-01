@@ -24,7 +24,11 @@ check('No model/catalog change to non-song UI action',()=>assert.equal(skill.res
 const php=read('api/agent-runtime.php');
 const agent=read('api/agent-llm-orchestrator.php');
 const app=read('assets/js/app.js');
-check('Conversational LLM is called before local player routing',()=>assert.ok(php.indexOf('sf_agent_orchestrator_llm($message')<php.indexOf('$explicitPlayer=sf_agent_explicit_player_route($message);')));
+check('Conversational LLM handles nuanced music intent; exact transport bypasses latency',()=>{
+  assert.match(php,/if\(\$explicitCapture===null&&!\$catalogListRequest&&!\$randomPlaylist&&!\$quickTransport&&/);
+  assert.match(php,/\$llmIntent=sf_agent_orchestrator_llm\(/);
+  assert.match(php,/elseif\(\$quickTransport\)\$route=/);
+});
 check('Server emits verified receipt only for authorized catalog resolution',()=>assert.match(php,/audioResolution=\['method'=>'llm_catalog','status'=>'verified'/));
 check('Public JS requires fresh server receipt and actual catalog entry',()=>assert.match(app,/dispatchAgentBrowserAction\(text,j\.action,j\.audio_resolution\)/)&&assert.match(app,/verifiedNamedPlayerAction\(message,action,resolution\)/));
 check('Tool descriptions are permission-filtered for Admin and fans',()=>assert.match(agent,/sf_agent_tool_inventory\(\$admin\?'admin':'fan'\)/));
