@@ -8,8 +8,9 @@ const app=read('assets/js/app.js'),settings=read('assets/js/account-voice-engine
 let passed=0;
 function check(label,run){run();passed++;console.log('91B13D PASS '+label)}
 function extract(source,name){
-  const start=source.indexOf('function '+name+'(');
-  assert.ok(start>=0,name+' present');
+  const functionAt=source.indexOf('function '+name+'(');
+  assert.ok(functionAt>=0,name+' present');
+  const start=source.slice(functionAt-6,functionAt)==='async '?functionAt-6:functionAt;
   const begin=source.indexOf('{',start);
   let depth=0;
   for(let i=begin;i<source.length;i++){
