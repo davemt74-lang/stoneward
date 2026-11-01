@@ -57,18 +57,18 @@ test('No new capture backend, network calls, or permission changes are introduce
   assert.match(js,/options\.onStartCapture\?\.\(\)/);
   new vm.Script(js,{filename:'public-agent-canvas.js'});
 });
-test('Quick actions are unboxed, single-row mesh overlays with animated signals',()=>{
+test('Quick actions are unboxed, vertical mesh overlays with animated signals',()=>{
   assert.match(php,/<nav id="chatQuickMenu" class="chat-quick-menu" hidden aria-label="Stonefellow quick links"/);
   assert.doesNotMatch(php,/id="chatQuickClose"|id="chatQuickMenuTitle"/);
-  assert.match(siteCss,/\.chat-quick-menu\{[\s\S]*?position:fixed;left:clamp\(12px,2\.4vw,46px\);right:clamp\(12px,2\.4vw,46px\)/);
-  assert.match(siteCss,/\.chat-quick-menu\{[\s\S]*?flex-wrap:nowrap/);
+  assert.match(siteCss,/\.chat-quick-menu\{[\s\S]*?position:fixed;left:clamp\(12px,2\.4vw,34px\);right:auto/);
+  assert.match(siteCss,/\.chat-quick-menu\{[\s\S]*?flex-direction:column;[\s\S]*?flex-wrap:nowrap/);
   assert.match(siteCss,/\.chat-quick-menu\{[\s\S]*?background:transparent;box-shadow:none/);
   assert.match(siteCss,/\.chat-quick-menu button::after/);
   assert.match(siteCss,/@keyframes sfQuickLed/);
   assert.match(siteCss,/@keyframes sfQuickMeter/);
   assert.match(siteCss,/@media\(prefers-reduced-motion:reduce\)/);
 });
-test('Every public quick link remains wired and + toggles the row',()=>{
+test('Every public quick link remains wired and + toggles the vertical rail',()=>{
   for(const action of ['record','playlist','shows','store','membership','tickets','newsletter']){
     assert.match(php,new RegExp(`data-quick-action="${action}"`));
     assert.match(appJs,new RegExp(`action==='${action}'`));
