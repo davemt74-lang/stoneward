@@ -67,7 +67,8 @@ check('Detection, interim transcript, end, errors and stop all have activity hoo
   assert.match(src,/if\(finalReceived\)setVoiceInputActive\(false\)/);
   assert.match(src,/recognition\.onend=\(\)=>\{recognitionActive=false;setVoiceInputActive\(false\)/);
   assert.match(src,/recognition\.onerror=e=>\{\s*recognitionActive=false;setVoiceInputActive\(false\)/);
-  assert.match(src,/setSpeechPilotSpeaking\(mode==='speaking'\)/);
+  assert.match(src,/setSpeechPilotSpeaking\(speaking\)/);
+  assert.match(src,/StonefellowSpeechEngine\?\.setInputMuted\?\.\(speaking\)/);
   assert.match(src,/utterance\.onstart=\(\)=>\{started=true;[^\n]*setVoiceSpeechAudible\(true\)/);
   assert.match(src,/a\.play\(\)\.then\(\(\)=>\{[^\n]*setVoiceSpeechAudible\(true\)/);
   assert.doesNotMatch(src,/if\(\(st\.conversationOn\|\|voicePlaybackPending\)&&!audio\.paused\)/);
