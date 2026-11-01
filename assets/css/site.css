@@ -573,6 +573,20 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 @media(prefers-reduced-motion:reduce){.song-experience-phase.song-experience-live::before{animation:none}}
 .song-experience-transcript,.song-experience-report{background:rgba(var(--surface-rgb),.75);border:1px solid var(--line);border-radius:12px;padding:13px;margin:0 0 12px}
 .song-experience-card h4{font-size:.87rem;margin:0 0 8px}
+.song-experience-transcript-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.song-experience-transcript-heading h4{margin:0;min-width:0}
+.song-experience-edit-icon{display:inline-grid;place-items:center;flex:0 0 28px;width:28px;height:28px;padding:0;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);border-radius:9px;color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent);font-size:1.12rem;cursor:pointer;box-shadow:0 0 12px color-mix(in srgb,var(--accent) 12%,transparent)}
+.song-experience-edit-icon:hover,.song-experience-edit-icon:focus-visible{outline:2px solid var(--accent);outline-offset:1px;background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.song-experience-lyric-editor{display:grid;gap:8px;margin-bottom:9px}
+.song-experience-lyric-editor label{display:grid;gap:5px;color:var(--muted);font-size:.75rem}
+.song-experience-edit-textarea{display:block;width:100%;min-height:112px;max-width:100%;box-sizing:border-box;padding:10px 11px;color:var(--ink);background:var(--surface);border:1px solid var(--accent);border-radius:9px;font:inherit;font-size:.89rem;line-height:1.5;resize:vertical}
+.song-experience-edit-actions{display:flex;gap:7px;flex-wrap:wrap}
+.song-experience-edit-actions button{min-height:34px;padding:6px 10px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--bg);font-size:.75rem;font-weight:700;cursor:pointer}
+.song-experience-edit-actions button:last-child{background:transparent;color:var(--accent)}
+.song-experience-edit-error{color:var(--danger,var(--accent))!important}
+.song-experience-provenance{margin-top:9px;border-top:1px solid var(--line);padding-top:7px}
+.song-experience-provenance summary{color:var(--muted);font-size:.72rem;cursor:pointer}
+.song-experience-provenance[open] summary{color:var(--accent)}
 .song-experience-copy{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;font-size:.91rem;margin:0 0 8px}
 .song-experience-card small{font-size:.72rem;color:var(--muted);display:block;line-height:1.45;margin-top:5px}
 .song-experience-note{font-size:.8rem;color:var(--muted);line-height:1.5;margin:3px 0 11px}

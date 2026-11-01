@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.198';
+  window.STONEFELLOW_APP_BUILD='1.3.199';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate=site.homepageTemplate==='agent_canvas'?'agent_canvas':'classic',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -14,6 +14,7 @@
   const voiceReplyToggle=$('#agentVoiceReplyToggle');
   let voiceRepliesEnabled=localStorage.getItem('stonefellow.voice.replies.v1')!=='off',voiceInteractionStarted=false,speechPilotActive=false;
   let voicePlaybackPending=false,voicePlaybackText='',speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
+  let voiceInputActive=false,voiceSpeechAudible=false,speechPilotAgentSpeaking=false;
   let voiceProbeAudio=null,voiceProbeSynth=false,voiceProbeMusicVolume=null;
   const voiceSpeechGuard=window.StonefellowBargeIn?.createSpeechGuard({cooldownMs:1100});
   const conversationBargeIn=window.StonefellowBargeIn?.create(spoken=>{
@@ -44,12 +45,17 @@
   }
   if(window.ResizeObserver&&chatFooter){const dockObserver=new ResizeObserver(syncAgentDockLayout);dockObserver.observe(chatFooter);if(chatPopup)dockObserver.observe(chatPopup)}
   window.addEventListener('resize',syncAgentDockLayout);
+  // Armed microphone, silent recognition and TTS preparation must NOT change
+  // the listener's music. Duck only during real voice input or audible speech.
   function syncConversationMusic(){
-    if((st.conversationOn||voicePlaybackPending)&&!audio.paused){
+    const agentSpeaking=voiceSpeechAudible||speechPilotAgentSpeaking;
+    if((agentSpeaking||voiceInputActive)&&!audio.paused){
       if(musicOriginalVolume===null)musicOriginalVolume=audio.volume;
-      audio.volume=Math.min(musicOriginalVolume,voicePlaybackPending?0.16:0.4);
+      audio.volume=Math.min(musicOriginalVolume,agentSpeaking?0.16:0.4);
     }else if(musicOriginalVolume!==null){audio.volume=musicOriginalVolume;musicOriginalVolume=null}
   }
+  function setVoiceInputActive(active){voiceInputActive=!!active;syncConversationMusic()}
+  function setVoiceSpeechAudible(active){voiceSpeechAudible=!!active;syncConversationMusic()}
   // The user-facing level is independent of automatic conversation ducking.
   function playerVolume(){return musicOriginalVolume===null?audio.volume:musicOriginalVolume}
   function setPlayerVolume(value){
@@ -176,10 +182,13 @@
       updateSongExperience({phase:'draft',live_enabled:false,end_ms:draft.end_ms,
         transcript:draft.text,corrected:'',reports:[],saved_note_id:null,
         message:'Unverified browser-recognized lyrics are ready. No song clip was created or saved.'},true);
-      popupEntry('notice','UNVERIFIED LIVE LYRIC DRAFT — “'+draft.title+'”\n'+draft.text+
-        '\n\nThese words came from live player-track recognition; they are not verified songwriter lyrics.');
-      if(songExperience.auto_interpret)return await analyzeLastSongDraft(
-        'Interpret the themes, symbolism and emotions of this excerpt. Compare your interpretation with documented songwriter intent and published song notes. Clearly distinguish recorded facts from plausible readings.');
+      // Stop first shows the draft to the listener. Even when the original
+      // command was Listen & Interpret, never submit estimated words before
+      // the listener has a chance to correct them with the pencil control.
+      if(songExperience.auto_interpret){
+        updateSongExperience({message:'Review these words or tap the pencil to correct them, then select Review & interpret lyrics.'},true);
+        return 'Lyric draft ready. Review or correct the words, then select Review & interpret lyrics.';
+      }
       return 'An unverified lyric transcript is ready for “'+draft.title+'.” Select Interpret lyrics when ready.';
     }
   });
@@ -215,6 +224,14 @@
     }
     if(!songExperience)return;
     if(action==='ask'&&!String(question).trim())return;
+    if(action==='edit'){
+      // UI corrections use the same browser-private path as typed or spoken
+      // "correct lyrics to …" commands. The corrected words never enter a
+      // routine Agent chat request or get saved to Brain automatically.
+      const result=await executePrivateAnnotationCommand('correct lyrics to '+String(question||''));
+      if(!result.startsWith('Updated the listener-edited'))updateSongExperience({message:result});
+      return;
+    }
     const userText={stop:'Stop listening',live:'Transcribe live',transcribe:'Transcribe this song section',
       analyze:'Analyze this captured lyric section',save:'Save this lyric note'}[action]||String(question).trim();
     popupEntry('user',userText);
@@ -226,11 +243,11 @@
       action==='ask'?String(question).trim():'Interpret lyrical themes, symbols and emotions in this excerpt using documented songwriter thoughts and approved Stonefellow song notes. Distinguish source-backed facts from your own reading.');
     else if(action==='save')response=await executePrivateAnnotationCommand('save this lyric note');
     else return;
-    // The full report is independently visible in the card. Keep spoken chat
-    // replies short so speech does not read a multi-page analysis over music.
-    const success=(action==='analyze'||action==='ask')&&String(response).startsWith('Lyric analysis for ');
-    await say(success&&songExperience?.phase==='report'?
-      'Your lyric analysis is ready in the song report. You can read it here, open My Agent Chat or ask another question.':response);
+    // Only completed LLM interpretation text reaches the Agent's chat/voice
+    // response. Capture, source and review status stay in the sidecar.
+    if((action==='analyze'||action==='ask')&&songLyricReport?.report===response)
+      await say(response);
+    else updateSongExperience({message:response});
   }
   window.StonefellowSongExperience=Object.freeze({
     mount:target=>window.SFSongExperienceUI?.mount(target,songExperience&&{
@@ -253,7 +270,6 @@
       const extension=captured.mime_type?.includes('mp4')?'m4a':'webm';
       form.set('clip',captured.blob,'song-section.'+extension);
       updateSongExperience({phase:'transcribing',message:'Transcription is in progress. You can keep playing music.'},true);
-      popupEntry('notice','Transcribing the explicitly captured song section with the configured OpenAI audio provider…');
       const response=await fetch((cfg.apiBase||'api')+'/agent-song-transcribe.php',{
         method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':st.auth.csrf||''},body:form
       });
@@ -270,14 +286,13 @@
       songLyricCorrected='';songPersonalNote='';songLyricReport=null;
       updateSongExperience({phase:'draft',title:draft.title,start_ms:draft.start_ms,
         end_ms:draft.end_ms,transcript:draft.text,corrected:'',reports:[],
-        saved_note_id:null,message:interpretAfter?'Transcription is ready. Preparing the songwriter-aware interpretation…':'Review these estimated words, then select Interpret lyrics or ask a question. A clip-only recording does not automatically invoke AI.'},true);
+        saved_note_id:null,message:interpretAfter?'Review the lyric draft before interpretation.':'Review these estimated words, then select Interpret lyrics or ask a question. A clip-only recording does not automatically invoke AI.'},true);
       const range=Math.round(draft.start_ms/1000)+'–'+Math.round(draft.end_ms/1000)+'s';
-      popupEntry('notice','UNVERIFIED LYRIC DRAFT — “'+draft.title+'” ('+range+')\n'+draft.text+'\n\nThese words are an automated estimate, not reviewed or confirmed lyrics.');
       if(interpretAfter){
-        updateSongExperience({message:'Lyric draft ready. Reviewing documented songwriter notes and approved Stonefellow context for interpretation…'},true);
-        return await analyzeLastSongDraft('Interpret the themes, symbolism and emotions of this excerpt. Compare your interpretation with documented songwriter intent and published song notes. Clearly distinguish recorded facts from plausible readings.');
+        updateSongExperience({auto_interpret:true,message:'Review these estimated words, use the pencil to correct them if needed, then select Review & interpret lyrics.'},true);
+        return 'The lyric draft is ready for your review. Correct any words before selecting Review & interpret lyrics.';
       }
-      return 'I captured a draft transcript for “'+draft.title+'” at '+range+'. The lyrics are shown in the chat as unverified. You can correct any words before asking me for an analysis.';
+      return 'I captured a draft transcript for “'+draft.title+'” at '+range+'. The lyrics are shown in the listening panel as unverified. You can correct any words before asking me for an analysis.';
     }catch(e){updateSongExperience({phase:'captured',message:'Transcription failed: '+e.message+' The captured audio remains available for another attempt.'});return 'I could not transcribe the section. '+e.message+' The captured audio is still in this browser, so you can retry.'}
     finally{songTranscriptionBusy=false}
   }
@@ -289,12 +304,13 @@
     songAnalysisBusy=true;
     try{
       updateSongExperience({phase:'analyzing',message:'Your requested interpretation is processing. The unverified draft stays visible.'},true);
-      popupEntry('notice','Analyzing the unverified lyric draft. Your requested excerpt and consented listening-history summary may be sent to your configured AI provider.');
       const payload={track_id:draft.track_id,start_ms:draft.start_ms,end_ms:draft.end_ms,
-        captured_at:draft.captured_at,transcript:songLyricCorrected||draft.text,question:String(question||'').slice(0,700),
+        captured_at:draft.captured_at,transcript:songLyricCorrected||draft.text,
+        listener_edited:!!songLyricCorrected,question:String(question||'').slice(0,700),
         timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
       const response=await secureJsonPost('agent-song-analyze.php',payload);
-      if(currentSongSource()!==captured||songLyricDraft!==draft){
+      if(currentSongSource()!==captured||songLyricDraft!==draft||
+          (songLyricCorrected||draft.text)!==payload.transcript){
         updateSongExperience({phase:'discarded',message:'Playback or the lyric draft changed. An outdated analysis was discarded.'});
         return 'Playback or the lyric draft changed during analysis. I discarded the outdated report.';
       }
@@ -302,10 +318,11 @@
       if(!report||!report.report||report.track_id!==draft.track_id)throw new Error('No grounded analysis report was returned.');
       songLyricReport=Object.freeze({...report});
       updateSongExperience({phase:'report',reports:[...(songExperience?.reports||[]),
-        {question:payload.question,text:report.report,sources:report.writer_sources||[]}],message:'The interpretation is available here and in My Agent Chat. Ask another question to extend the report.'},true);
-      const range=Math.round(report.start_ms/1000)+'–'+Math.round(report.end_ms/1000)+'s';
-      return 'Lyric analysis for “'+report.title+'” ('+range+'), using an unverified transcript:\n\n'+report.report+
-        '\n\nSource note: interpretation from an unverified lyric draft and available Stonefellow records; no live web sources were searched.';
+        {question:payload.question,text:report.report,sources:report.writer_sources||[],
+          listener_edited:!!report.listener_edited}],message:'The lyric interpretation is ready. Credits, source labels and scope notes remain in the expandable metadata panel.'},true);
+      // Voice/chat receives the actual lyric interpretation only. Structured
+      // report metadata remains attached to this session in the sidecar.
+      return report.report;
     }catch(e){updateSongExperience({phase:songExperience?.reports?.length?'report':'draft',message:'Analysis failed: '+e.message+'. The transcript remains available for another request.'});return 'I could not finish the lyric analysis. '+e.message+' Your captured draft is still available for another request.'}
     finally{songAnalysisBusy=false;}
   }
@@ -537,6 +554,7 @@
     if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;cancelLocalVoiceOutput();resolve(null)}
     voicePlaybackPending=false;
     voicePlaybackText='';
+    setVoiceSpeechAudible(false);
     if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();
     if(agentInterrupt)agentInterrupt.hidden=true;
     syncConversationMusic();
@@ -599,7 +617,7 @@
     if(!parts.length)return true;
     return new Promise(resolve=>{
       let finished=false,index=0,retries=0;
-      const done=ok=>{if(finished)return;finished=true;if(speechFallbackResolve===done)speechFallbackResolve=null;resolve(ok)};
+      const done=ok=>{if(finished)return;finished=true;setVoiceSpeechAudible(false);if(speechFallbackResolve===done)speechFallbackResolve=null;resolve(ok)};
       speechFallbackResolve=done;
       const retry=()=>{
         if(retries++>=1){done(false);return}
@@ -620,16 +638,18 @@
         const utterance=new window.SpeechSynthesisUtterance(parts[index]);
         utterance.voice=selected;utterance.lang=selected.lang||'en-US';utterance.rate=1;
         let settled=false,started=false;
-        utterance.onstart=()=>{started=true;if(!finished&&sequence===voicePlaybackSequence){if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.audible();agent('speaking',text)}};
+        utterance.onstart=()=>{started=true;if(!finished&&sequence===voicePlaybackSequence){setVoiceSpeechAudible(true);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.audible();agent('speaking',text)}};
         utterance.onend=()=>{
           if(settled||finished)return;settled=true;
           if(sequence!==voicePlaybackSequence){done(null);return}
+          setVoiceSpeechAudible(false);
           if(!started||voiceProbeSynth){retry();return}
           index++;retries=0;next();
         };
         utterance.onerror=event=>{
           if(settled||finished)return;settled=true;
           if(sequence!==voicePlaybackSequence){done(null);return}
+          setVoiceSpeechAudible(false);
           if(voiceProbeSynth||['interrupted','canceled','audio-busy'].includes(event?.error)){retry();return}
           done(false);
         };
@@ -664,7 +684,7 @@
         const a=new Audio(url);st.voiceAudio=a;
         const spoken=await new Promise(resolve=>{
           let finished=false;
-          const done=ok=>{if(finished)return;finished=true;URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;if(voiceAudioCancel===cancel)voiceAudioCancel=null;resolve(ok)};
+          const done=ok=>{if(finished)return;finished=true;if(sequence===voicePlaybackSequence)setVoiceSpeechAudible(false);URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;if(voiceAudioCancel===cancel)voiceAudioCancel=null;resolve(ok)};
           const cancel=()=>{a.pause();done(null)};voiceAudioCancel=cancel;
           a.onended=()=>done(true);a.onerror=()=>done(false);
           // An echo probe pauses audio temporarily; it must not resolve the
@@ -672,7 +692,7 @@
           // A reversible echo-check pause can dispatch its onpause event
           // after playback has resumed. Only explicit cancel() may settle
           // the reply as interrupted; a delayed pause event must not end it.
-          a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled){if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.audible();agent('speaking',text)}else if(!finished)cancel()}).catch(()=>done(false));
+          a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled){setVoiceSpeechAudible(true);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.audible();agent('speaking',text)}else if(!finished)cancel()}).catch(()=>done(false));
         });
         if(spoken===null||sequence!==voicePlaybackSequence)return null;
         if(spoken!==true)return index?{remaining:parts.slice(index).join(' ')}:false;
@@ -691,7 +711,7 @@
     }
     const sequence=++voicePlaybackSequence;
     if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.begin(text);
-    voicePlaybackPending=true;voicePlaybackText=String(text);syncConversationMusic();
+    voicePlaybackPending=true;voicePlaybackText=String(text);setVoiceInputActive(false);
     if(st.conversationOn){
       clearTimeout(conversationRestartTimer);
       try{recognition?.abort()}catch(_){}
@@ -709,7 +729,7 @@
       if(sequence===voicePlaybackSequence){
         restoreVoiceProbeMusic();
         voiceProbeAudio=null;voiceProbeSynth=false;
-        conversationBargeIn?.stop();voicePlaybackPending=false;voicePlaybackText='';if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();syncConversationMusic();
+        conversationBargeIn?.stop();voicePlaybackPending=false;voicePlaybackText='';setVoiceSpeechAudible(false);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();syncConversationMusic();
         if(agentInterrupt)agentInterrupt.hidden=true;
         agent(st.conversationOn?'listening':st.playing?'playing':'idle');
         if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen();
@@ -1222,11 +1242,11 @@
       },
       onListenInterpret:async()=>{
         const reply=await executeSongCaptureAction({type:'song_capture_live_start',interpret_on_stop:true});
-        if(reply){popupEntry('notice',String(reply));if(!window.StonefellowSongExperience?.active?.())agent('idle',String(reply));}
+        if(reply&&!window.StonefellowSongExperience?.active?.())popupEntry('notice',String(reply));
       },
       onStopListening:async()=>{
         const reply=await executeSongCaptureAction({type:'song_capture_stop'});
-        if(reply)popupEntry('notice',String(reply));
+        if(reply&&!window.StonefellowSongExperience?.active?.())popupEntry('notice',String(reply));
       },
       onStartCapture:async()=>{
         const reply=await executeSongCaptureAction({type:'song_capture_start'});
@@ -2240,10 +2260,10 @@
     if(voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked)||['THINKING','RESPONDING','SPEAKING'].includes(status.textContent)){scheduleConversationListen(450);return}
     try{recognition.start()}catch(e){if(e.name==='InvalidStateError'){scheduleConversationListen(600);return}stopConversation();showTranscript(isIOSVoiceBrowser?'Safari could not start speech recognition. Reopen Safari and tap the mic again; ensure Siri is enabled in iPhone Settings.':'The microphone could not start. Click the mic to retry.','error')}
   }
-  function stopConversation(){voiceGreetingArmed=false;if(speechPilotActive){speechPilotActive=false;void window.StonefellowSpeechEngine?.stop();}st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;interruptVoicePlayback();conversationBargeIn?.close();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
+  function stopConversation(){voiceGreetingArmed=false;if(speechPilotActive){speechPilotActive=false;void window.StonefellowSpeechEngine?.stop();}st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;setVoiceInputActive(false);speechPilotAgentSpeaking=false;interruptVoicePlayback();conversationBargeIn?.close();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
   async function submitVoiceTurn(spoken){
     const turn=++voiceTurnGeneration;
-    voiceTurnBusy=true;clearTimeout(conversationRestartTimer);try{recognition?.stop()}catch(_){}
+    voiceTurnBusy=true;clearTimeout(conversationRestartTimer);setVoiceInputActive(false);try{recognition?.stop()}catch(_){}
     showTranscript('You: '+spoken,'heard');agent('thinking','Thinking…');
     try{await command(spoken);await pendingReply}catch(e){await say('I could not process that message. '+e.message)}
     finally{if(turn===voiceTurnGeneration){voiceTurnBusy=false;if(st.conversationOn){musicFollowupUntil=Date.now()+18000;agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}}}
@@ -2264,11 +2284,11 @@
     if((window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP||localStorage.getItem(voiceEngineKey))==='speech_engine'){
       voiceInteractionStarted=true;speechPilotActive=true;st.conversationOn=true;updateConversationButton();showTranscript('Connecting ElevenLabs Speech Engine…','connecting');agent('connecting','Connecting…');
       try{await window.StonefellowSpeechEngine.start({
-        onStatus(value){if(value==='disconnected'){speechPilotActive=false;st.conversationOn=false;updateConversationButton();agent('idle','Voice connection ended.');showTranscript('Speech Engine disconnected. Click the microphone to reconnect.','waiting');return}if(value==='ready'){agent('listening','Speech Engine connected.');showTranscript('Listening · Speech Engine pilot','listening')}},
-        onMode(mode){if(!speechPilotActive)return;agent(mode==='speaking'?'speaking':'listening');showTranscript(mode==='speaking'?'Stonefellow is speaking…':'Listening · Speech Engine pilot',mode==='speaking'?'responding':'listening')},
+        onStatus(value){if(value==='disconnected'){speechPilotActive=false;st.conversationOn=false;speechPilotAgentSpeaking=false;syncConversationMusic();updateConversationButton();agent('idle','Voice connection ended.');showTranscript('Speech Engine disconnected. Click the microphone to reconnect.','waiting');return}if(value==='ready'){agent('listening','Speech Engine connected.');showTranscript('Listening · Speech Engine pilot','listening')}},
+        onMode(mode){if(!speechPilotActive)return;speechPilotAgentSpeaking=mode==='speaking';syncConversationMusic();agent(mode==='speaking'?'speaking':'listening');showTranscript(mode==='speaking'?'Stonefellow is speaking…':'Listening · Speech Engine pilot',mode==='speaking'?'responding':'listening')},
         onMessage(data){const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');if(!user)void deliverSpeechEngineAction()},
         onError(message){popupEntry('notice',String(message));showTranscript(String(message),'error')}
-      });}catch(error){speechPilotActive=false;st.conversationOn=false;updateConversationButton();agent('idle','Speech Engine unavailable.');showTranscript(error.message||'Speech Engine could not connect. Select the original voice engine in Account Settings to use fallback.','error')}
+      });}catch(error){speechPilotActive=false;st.conversationOn=false;speechPilotAgentSpeaking=false;syncConversationMusic();updateConversationButton();agent('idle','Speech Engine unavailable.');showTranscript(error.message||'Speech Engine could not connect. Select the original voice engine in Account Settings to use fallback.','error')}
       return;
     }
     if(!recognition){showTranscript('Voice recognition is unavailable here. Select Speech Engine in Account Settings or type a message.','error');return}
@@ -2286,10 +2306,12 @@
   voice.onclick=()=>{void handleVoiceClick()};
   if(R){
     recognition=new R();recognition.lang='en-US';recognition.interimResults=true;recognition.continuous=false;
-    recognition.onstart=()=>{recognitionActive=true;if(voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked)){try{recognition.abort()}catch(_){}return}if(st.conversationOn&&!voiceTurnBusy){if(greetAfterMicrophoneReady())return;agent('listening','I’m listening.');showTranscript(listeningPrompt(),'listening')}};
-    recognition.onresult=e=>{if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked))return;const phrases=[];let finalReceived=false;for(let i=0;i<e.results.length;i++){const result=e.results[i],value=String(result[0]?.transcript||'').trim();if(value)phrases.push(value);if(result.isFinal&&value)finalReceived=true}const spoken=phrases.join(' ').trim();if(spoken)recognitionNetworkFailures=0;showTranscript(spoken?'You: '+spoken:listeningPrompt(),finalReceived?'heard':'listening');if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)};
+    recognition.onstart=()=>{recognitionActive=true;setVoiceInputActive(false);if(voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked)){try{recognition.abort()}catch(_){}return}if(st.conversationOn&&!voiceTurnBusy){if(greetAfterMicrophoneReady())return;agent('listening','I’m listening.');showTranscript(listeningPrompt(),'listening')}};
+    recognition.onspeechstart=()=>{if(st.conversationOn&&!voiceTurnBusy&&!voicePlaybackPending)setVoiceInputActive(true)};
+    recognition.onspeechend=()=>setVoiceInputActive(false);
+    recognition.onresult=e=>{if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked))return;const phrases=[];let finalReceived=false;for(let i=0;i<e.results.length;i++){const result=e.results[i],value=String(result[0]?.transcript||'').trim();if(value)phrases.push(value);if(result.isFinal&&value)finalReceived=true}const spoken=phrases.join(' ').trim();if(spoken)recognitionNetworkFailures=0;if(spoken&&!finalReceived)setVoiceInputActive(true);if(finalReceived)setVoiceInputActive(false);showTranscript(spoken?'You: '+spoken:listeningPrompt(),finalReceived?'heard':'listening');if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)};
     recognition.onerror=e=>{
-      recognitionActive=false;
+      recognitionActive=false;setVoiceInputActive(false);
       if(e.error==='service-not-allowed'){
         stopConversation();showTranscript(isIOSVoiceBrowser?'Safari speech recognition is unavailable. Microphone access may already be allowed. Enable Siri in iPhone Settings, then reopen Safari and tap the mic.':'The browser blocked its speech recognition service. Try another voice engine or type your message.','error');return
       }
@@ -2300,7 +2322,7 @@
       if(e.error==='network'){recognitionNetworkFailures=Math.min(5,recognitionNetworkFailures+1);showTranscript('Speech recognition connection interrupted. Retrying…','waiting');scheduleConversationListen(Math.min(7500,600*2**recognitionNetworkFailures));return}
       if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen(e.error==='no-speech'?500:750);
     };
-    recognition.onend=()=>{recognitionActive=false;if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen(recognitionNetworkFailures?Math.min(7500,600*2**recognitionNetworkFailures):320)};
+    recognition.onend=()=>{recognitionActive=false;setVoiceInputActive(false);if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen(recognitionNetworkFailures?Math.min(7500,600*2**recognitionNetworkFailures):320)};
     updateConversationButton();
   }else{voice.title='Original voice recognition is unavailable; Speech Engine pilot may be available in Account Settings';showTranscript('Original voice recognition is not supported here. You can still use chat or an enabled Speech Engine pilot.','waiting')}
   window.addEventListener('pagehide',()=>conversationBargeIn?.close());

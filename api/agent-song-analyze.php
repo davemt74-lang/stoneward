@@ -20,15 +20,16 @@ try{
         function_exists('sf_songbook_public_payload')?(array)(sf_songbook_public_payload($request['track_id'])??[]):[]);
     $listening=sf_agent_listening_context(sf_agent_listening_insights($userId,$request['timezone']));
     $system=sf_song_analysis_system($request,$context,$listening,$writer['text']);
-    $estimate=max(120,(int)ceil((strlen($system)+strlen($request['question']))/4)+800);
+    $userPrompt=sf_song_analysis_user_prompt($request);
+    $estimate=max(120,(int)ceil((strlen($system)+strlen($userPrompt))/4)+1500);
     $allow=sf_can_use_ai($user,$estimate);
     if(!$allow['ok'])sf_json_response(['ok'=>false,'error'=>'active_tokens_required','message'=>'More Active Tokens are required for this lyric analysis.'],402);
     $providerError=false;
     foreach(sf_ai_llm_candidates('chat') as $provider){
         try{
             $response=$provider['provider']==='openai'
-                ?sf_openai_call($provider,$system,[],$request['question'],700)
-                :sf_anthropic_call($provider,$system,[],$request['question'],700);
+                ?sf_openai_call($provider,$system,[],$userPrompt,1300)
+                :sf_anthropic_call($provider,$system,[],$userPrompt,1300);
             $report=sf_song_analysis_report($request,$response,$writer['sources']);
             $used=max(1,(int)($response['input_tokens']??0)+(int)($response['output_tokens']??0));
             $balance=sf_consume_ai($user,$used,$response,'song-section-analysis');
