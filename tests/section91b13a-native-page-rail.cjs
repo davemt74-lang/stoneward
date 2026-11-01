@@ -12,12 +12,15 @@ const site=read('assets/css/site.css');
 const shell=read('stonefellow-v120.php');
 let checks=0;
 function check(name,fn){fn();checks++;console.log('91B13A PASS '+name);}
-check('Create Record retains native builder route and original action callbacks',()=>{
+check('Create Record opens the full builder page outside the native sidebar',()=>{
   assert.match(shell,/<button[^>]+data-quick-action="record"[^>]*>Create Record<\/button>/);
   assert.match(app,/if\(action==='record'\)\{navigate\('builder'\);return\}/);
   assert.match(app,/else if\(view==='builder'\)\{window\.scrollTo\(0,0\);renderBuilder\(\)\}/);
-  assert.match(app,/const nativePanel=view!=='home'&&homepageTemplate==='agent_canvas'&&window\.SFPublicAgentCanvas\?\.active\?\.\(\)/);
+  assert.match(app,/if\(view==='builder'&&window\.SFPublicAgentCanvas\?\.active\?\.\(\)\)/);
+  assert.match(app,/window\.SFPublicAgentCanvas\.unmount\(\)/);
+  assert.match(app,/const nativePanel=view!=='home'&&view!=='builder'&&homepageTemplate==='agent_canvas'/);
   assert.match(app,/canvas=nativePanel\?\(window\.SFPublicAgentCanvas\.openPage\?\.\(view\)\|\|mainCanvas\):mainCanvas/);
+  assert.match(app,/view!=='home'&&view!=='builder'&&\!window\.SFPublicAgentCanvas\?\.active\?\.\(\)/);
 });
 check('Panel renders into original application views, never iframe or external fetch shell',()=>{
   assert.match(agent,/<aside class="sf-agent-page-rail" hidden inert/);
