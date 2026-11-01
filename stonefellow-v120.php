@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.197');
+define('SF_BUILD', '1.3.198');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -14,6 +14,12 @@ if(!sf_installed()){
     exit;
 }
 $currentUser=sf_current_user();
+$voiceEngineBootstrap='legacy';
+if($currentUser){
+    require_once __DIR__.'/api/speech-engine-core.php';
+    try{$voiceState=sf_speech_engine_public_state((int)$currentUser['id']);$voiceEngineBootstrap=(string)($voiceState['effective_engine']??'legacy');}
+    catch(Throwable $e){$voiceEngineBootstrap='legacy';}
+}
 $siteSettings=sf_site_settings();$themePreview=!empty($_GET['theme_preview'])&&(($currentUser['role']??'')==='admin');$activeTheme=$themePreview?sf_theme_draft():sf_theme_published();$themeMeta=sf_theme_meta_colors($activeTheme);
 $configuredBase=rtrim(sf_public_base_url(),'/');
 $scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
@@ -249,7 +255,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
     </div>
   </footer>
 
-  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_THEME_PREVIEW=<?=json_encode($themePreview)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['artistHomepageEnabled'=>(bool)($siteSettings['artist_homepage_enabled']??false),'homepageTemplate'=>$siteSettings['homepage_template']??'classic','fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text'],'appearance'=>['mode'=>$activeTheme['mode'],'preset'=>$activeTheme['preset'],'density'=>$activeTheme['density'],'corner_style'=>$activeTheme['corner_style'],'max_width'=>$activeTheme['max_width']],'media'=>['logo'=>$siteSettings['media_logo']??'','hero'=>$siteSettings['media_hero']??'','social_share'=>$siteSettings['media_social_share']??'','app_icon'=>$siteSettings['media_app_icon']??'','artist_photo'=>$siteSettings['media_artist_photo']??'']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
+  <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_THEME_PREVIEW=<?=json_encode($themePreview)?>;window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP=<?=json_encode($voiceEngineBootstrap)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['artistHomepageEnabled'=>(bool)($siteSettings['artist_homepage_enabled']??false),'homepageTemplate'=>$siteSettings['homepage_template']??'classic','fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text'],'appearance'=>['mode'=>$activeTheme['mode'],'preset'=>$activeTheme['preset'],'density'=>$activeTheme['density'],'corner_style'=>$activeTheme['corner_style'],'max_width'=>$activeTheme['max_width']],'media'=>['logo'=>$siteSettings['media_logo']??'','hero'=>$siteSettings['media_hero']??'','social_share'=>$siteSettings['media_social_share']??'','app_icon'=>$siteSettings['media_app_icon']??'','artist_photo'=>$siteSettings['media_artist_photo']??'']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
   <script>window.STONEFELLOW_INITIAL_ROUTE=<?=json_encode($initialRoute,JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?>;</script>
   <script src="assets/js/config.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script>if(window.STONEFELLOW_CONFIG){window.STONEFELLOW_CONFIG.socials=window.STONEFELLOW_CONFIG.socials||{};for(const [k,v] of Object.entries(window.STONEFELLOW_SITE.socials||{})){if(v)window.STONEFELLOW_CONFIG.socials[k]=v;}}</script>

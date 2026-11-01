@@ -2,6 +2,14 @@
   'use strict';
   const endpoint='api/speech-engine.php';
   const greetingKey='stonefellow.voice.greeting.v1';
+  const engineKey='stonefellow.voice.engine.v1.'+String(window.STONEFELLOW_AUTH_BOOTSTRAP?.user?.id||'guest');
+  let preferenceRequest=null;
+  function rememberEngine(preference){
+    const engine=preference?.pilot_available&&preference?.selected_engine==='speech_engine'?'speech_engine':'legacy';
+    window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP=engine;
+    localStorage.setItem(engineKey,engine);
+    return engine;
+  }
   let requestId=0;
   async function json(url,options={}) {
     const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
@@ -9,12 +17,18 @@
     if(!response.ok||data.ok===false)throw new Error(data.message||'Voice settings unavailable.');
     return data;
   }
+  function loadEnginePreference(){
+    if(!preferenceRequest)preferenceRequest=json(endpoint).then(data=>{rememberEngine(data.speech_engine);return data}).catch(error=>{preferenceRequest=null;throw error});
+    return preferenceRequest;
+  }
   async function save(engine,status,select) {
     select.disabled=true;
     try {
       const auth=await json('api/auth.php');
       const result=await json(endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf||''},body:JSON.stringify({action:'set_preference',engine})});
       select.value=result.speech_engine.selected_engine;
+      rememberEngine(result.speech_engine);
+      preferenceRequest=Promise.resolve(result);
       status.textContent=engine==='legacy'?'Original voice engine selected.':'Speech Engine pilot selected. Click the microphone to connect; the separate gateway must be running.';
     }catch(error){status.textContent=error.message;select.value=select.dataset.previous||'legacy';}
     finally{select.disabled=false;}
@@ -34,7 +48,7 @@
     greeting.addEventListener('change',()=>localStorage.setItem(greetingKey,greeting.checked?'on':'off'));
     const current=++requestId;
     try {
-      const data=(await json(endpoint)).speech_engine;
+      const data=(await loadEnginePreference()).speech_engine;
       if(current!==requestId||!block.isConnected)return;
       select.value=data.selected_engine;
       select.dataset.previous=select.value;
@@ -44,6 +58,9 @@
       select.addEventListener('change',async()=>{const previous=select.dataset.previous;await save(select.value,status,select);select.dataset.previous=select.value||previous;});
     }catch(error){status.textContent=error.message;}
   }
+  // Warm the preference before the first microphone tap. Never wait for this
+  // network request inside the gesture-bound Safari capture path.
+  if(window.STONEFELLOW_AUTH_BOOTSTRAP?.authenticated)void loadEnginePreference().catch(()=>{});
   document.addEventListener('stonefellow:navigation',event=>{if(event.detail?.view==='account')void mount();});
   // Account may re-render after saving preferences without a navigation event.
   const observer=new MutationObserver(()=>{if(document.querySelector('#dynamicCanvas .auth-module:not(:has([data-account-speech-engine]))'))void mount();});
