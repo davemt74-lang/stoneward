@@ -740,7 +740,7 @@
       clearTimeout(conversationRestartTimer);
       try{recognition?.abort()}catch(_){}
       recognitionActive=false;
-      if(!isIOSVoiceBrowser)void conversationBargeIn?.start();
+      // The playback microphone must stay suspended while the Agent speaks.\n      // Acoustic barge-in can hear the Agent's speakers, repeatedly pause TTS,\n      // and mute/unmute music during verification. Stop speaking is the explicit interrupt.
     }
     try{
       const remote=await elevenLabsSpeak(text,false,sequence);

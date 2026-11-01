@@ -98,7 +98,7 @@ async function run(){
     assert.match(app,/if\(spoken&&!finalReceived\)setVoiceInputActive\(shouldDuckConversationInput\(spoken\)\)/);
     assert.match(app,/if\(st\.playing&&!audio\.paused&&!woke\)/);
     assert.match(app,/say “Stonefellow” to talk over music/);
-    assert.match(app,/\{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930\}/);
+    assert.match(app,/\{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930\}/);\n    assert.doesNotMatch(app,/conversationBargeIn\?\.start\(\)/,'The Agent must not start an acoustic monitor while its own voice is audible');\n    assert.match(app,/conversationBargeIn\?\.stop\(\)/);
     assert.match(app,/songExperience\.listening_mode==='recognition'\?'listening':'recording'/);
     assert.match(app,/if\(directSongListeningCommand\(text\)\)\{await liveAgent\(text\);return\}await loadAuth\(\)/);
   });
