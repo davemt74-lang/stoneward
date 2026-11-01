@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.197';
+  window.STONEFELLOW_APP_BUILD='1.3.198';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate=site.homepageTemplate==='agent_canvas'?'agent_canvas':'classic',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -696,7 +696,7 @@
       clearTimeout(conversationRestartTimer);
       try{recognition?.abort()}catch(_){}
       recognitionActive=false;
-      void conversationBargeIn?.start();
+      if(!isIOSVoiceBrowser)void conversationBargeIn?.start();
     }
     try{
       const remote=await elevenLabsSpeak(text,false,sequence);
@@ -2206,6 +2206,10 @@
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&chatPopup&&!chatPopup.hidden){closeChatPopup();chatToggle?.focus();return}const tag=String(e.target?.tagName||'').toLowerCase(),editing=['input','textarea','select'].includes(tag)||e.target?.isContentEditable;if((e.key==='/'&&!editing)||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();if(new URL(location.href).searchParams.get('view')!=='search'&&!String(location.pathname).replace(/\/+$/,'').endsWith('/search'))navigate('search',{});else $('#siteSearchInput',canvas)?.focus()}});
   window.addEventListener('popstate',routeFromLocation);
   const R=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const isIOSVoiceBrowser=/iPad|iPhone|iPod/i.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const voiceEngineKey='stonefellow.voice.engine.v1.'+String(window.STONEFELLOW_AUTH_BOOTSTRAP?.user?.id||'guest');
+  // iOS Safari's SpeechRecognition owns the microphone. Do not open another
+  // getUserMedia/AudioContext stream concurrently for barge-in monitoring.
   const musicWakePhrase=/^(?:(?:hey|hi|okay|ok)\s+)?stone[\s-]?fellow(?:\s*[,.:!?]\s*|\s+|$)/i;
   function updateConversationButton(){voice.classList.toggle('active',st.conversationOn);voice.setAttribute('aria-pressed',String(st.conversationOn));voice.setAttribute('aria-label',st.conversationOn?'End conversation':'Start conversation');voice.title=st.conversationOn?'Conversation active · click to stop':'Start hands-free conversation'}
   function listeningPrompt(){return st.playing&&!audio.paused&&Date.now()>musicFollowupUntil?'Listening · say “Stonefellow” to talk over music.':'Listening · speak naturally.'}
@@ -2234,7 +2238,7 @@
   function startConversationListen(){
     if(!st.conversationOn||!recognition||recognitionActive||voiceTurnBusy)return;
     if(voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked)||['THINKING','RESPONDING','SPEAKING'].includes(status.textContent)){scheduleConversationListen(450);return}
-    try{recognition.start()}catch(e){if(e.name==='InvalidStateError'){scheduleConversationListen(600);return}stopConversation();showTranscript('The microphone could not start. Click the mic to retry.','error')}
+    try{recognition.start()}catch(e){if(e.name==='InvalidStateError'){scheduleConversationListen(600);return}stopConversation();showTranscript(isIOSVoiceBrowser?'Safari could not start speech recognition. Reopen Safari and tap the mic again; ensure Siri is enabled in iPhone Settings.':'The microphone could not start. Click the mic to retry.','error')}
   }
   function stopConversation(){voiceGreetingArmed=false;if(speechPilotActive){speechPilotActive=false;void window.StonefellowSpeechEngine?.stop();}st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;interruptVoicePlayback();conversationBargeIn?.close();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
   async function submitVoiceTurn(spoken){
@@ -2255,7 +2259,9 @@
   }
   async function handleVoiceClick(){
     if(st.conversationOn){stopConversation();return}
-    if(await window.StonefellowSpeechEngine?.isSelected?.()){
+    // Read the last server-synced preference without awaiting network I/O.
+    // On iOS WebKit, SpeechRecognition/startSession must begin in the tap turn.
+    if((window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP||localStorage.getItem(voiceEngineKey))==='speech_engine'){
       voiceInteractionStarted=true;speechPilotActive=true;st.conversationOn=true;updateConversationButton();showTranscript('Connecting ElevenLabs Speech Engine…','connecting');agent('connecting','Connecting…');
       try{await window.StonefellowSpeechEngine.start({
         onStatus(value){if(value==='disconnected'){speechPilotActive=false;st.conversationOn=false;updateConversationButton();agent('idle','Voice connection ended.');showTranscript('Speech Engine disconnected. Click the microphone to reconnect.','waiting');return}if(value==='ready'){agent('listening','Speech Engine connected.');showTranscript('Listening · Speech Engine pilot','listening')}},
@@ -2266,7 +2272,7 @@
       return;
     }
     if(!recognition){showTranscript('Voice recognition is unavailable here. Select Speech Engine in Account Settings or type a message.','error');return}
-    voiceInteractionStarted=true;st.conversationOn=true;voiceGreetingArmed=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');void conversationBargeIn?.prepare();startConversationListen();
+    voiceInteractionStarted=true;st.conversationOn=true;voiceGreetingArmed=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');if(!isIOSVoiceBrowser)void conversationBargeIn?.prepare();startConversationListen();
   }
   async function deliverSpeechEngineAction(){
     if(!speechPilotActive||!window.StonefellowSpeechEngine?.active)return;
@@ -2284,8 +2290,13 @@
     recognition.onresult=e=>{if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked))return;const phrases=[];let finalReceived=false;for(let i=0;i<e.results.length;i++){const result=e.results[i],value=String(result[0]?.transcript||'').trim();if(value)phrases.push(value);if(result.isFinal&&value)finalReceived=true}const spoken=phrases.join(' ').trim();if(spoken)recognitionNetworkFailures=0;showTranscript(spoken?'You: '+spoken:listeningPrompt(),finalReceived?'heard':'listening');if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken)};
     recognition.onerror=e=>{
       recognitionActive=false;
-      if(e.error==='not-allowed'||e.error==='service-not-allowed'){stopConversation();showTranscript('Microphone permission denied. Enable microphone access or type your message.','error');return}
-      if(e.error==='audio-capture'){stopConversation();showTranscript('No microphone was detected. Check your audio input and retry.','error');return}
+      if(e.error==='service-not-allowed'){
+        stopConversation();showTranscript(isIOSVoiceBrowser?'Safari speech recognition is unavailable. Microphone access may already be allowed. Enable Siri in iPhone Settings, then reopen Safari and tap the mic.':'The browser blocked its speech recognition service. Try another voice engine or type your message.','error');return
+      }
+      if(e.error==='not-allowed'){
+        stopConversation();showTranscript(isIOSVoiceBrowser?'Safari blocked speech recognition. This does not necessarily mean your website microphone permission is denied. Reopen Safari and tap the mic; check Siri is enabled in iPhone Settings.':'Speech input was blocked. Check browser site permissions and retry.','error');return
+      }
+      if(e.error==='audio-capture'){stopConversation();showTranscript(isIOSVoiceBrowser?'Safari could not capture microphone audio. Close other apps using the microphone, reopen Safari, and retry.':'No microphone was detected. Check your audio input and retry.','error');return}
       if(e.error==='network'){recognitionNetworkFailures=Math.min(5,recognitionNetworkFailures+1);showTranscript('Speech recognition connection interrupted. Retrying…','waiting');scheduleConversationListen(Math.min(7500,600*2**recognitionNetworkFailures));return}
       if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen(e.error==='no-speech'?500:750);
     };
