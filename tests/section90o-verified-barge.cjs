@@ -92,7 +92,7 @@ async function overlappingBargeTurnCannotBeOverwritten(){
     }),
     pendingReply:Promise.resolve(),showTranscript:()=>{},
     agent:(state)=>listenMessages.push(state),Date:{now:()=>1000},
-    listeningPrompt:()=> 'Listening',scheduleConversationListen:()=>resumes++,say:async()=>{}
+    listeningPrompt:()=> 'Listening',scheduleConversationListen:()=>resumes++,say:async()=>{},setVoiceInputActive:()=>{}
   };
   vm.createContext(context);
   vm.runInContext(extract(app,'submitVoiceTurn')+';globalThis.submit=submitVoiceTurn',context);

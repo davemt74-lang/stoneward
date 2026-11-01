@@ -65,10 +65,13 @@ check('Multiple full reports remain readable in the same chat card',()=>{
     {question:'First interpretation',text:'Interpretation one.\nEvidence and context.'},
     {question:'What about the ending?',text:'Interpretation two.'}
   ]},onAction);
-  assert.match(host.textContent,/Lyric interpretation 1 · First interpretation/);
+  assert.match(host.textContent,/Lyric interpretation 1/);
+  assert.match(host.textContent,/Question: First interpretation/);
   assert.match(host.textContent,/Evidence and context/);
-  assert.match(host.textContent,/Lyric interpretation 2 · What about the ending\?/);
-  assert.match(host.textContent,/No live web sources were searched/);
+  assert.match(host.textContent,/Lyric interpretation 2/);
+  assert.match(host.textContent,/Question: What about the ending\?/);
+  assert.match(host.textContent,/no live web sources were searched/);
+  assert.equal(host.all('details').length,2,'source metadata remains collapsed by default');
   assert.match(host.textContent,/Open My Agent Chat/);
 });
 check('Track changes keep old text visible but disable stale analysis',()=>{

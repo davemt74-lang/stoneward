@@ -13,12 +13,12 @@ check('Analysis action is owned by the authenticated browser agent',()=>assert.o
 const capture={track_id:'track-1',start_ms:12100,end_ms:27700};
 const draft={track_id:'track-1',start_ms:12100,end_ms:27700,captured_at:'2026-10-30T10:12:35Z',
   text:'Recognized but unverified words',title:'Genius of Unhumankind',review_status:'unverified'};
-const requests=[];const messages=[];
+const requests=[];const messages=[];const experienceUpdates=[];
 let available=capture,mode='ok';
 const context={songAnalysisBusy:false,songLyricReport:null,songLyricDraft:draft,songLyricCorrected:'',
   songCaptureSkill:{getCapture:()=>available},currentSongSource:()=>available,Intl,
   popupEntry:(role,text)=>messages.push({role,text}),
-  updateSongExperience:()=>{},songExperience:{reports:[]},
+  updateSongExperience:(state)=>experienceUpdates.push(state),songExperience:{reports:[]},
   secureJsonPost:async(api,payload)=>{requests.push({api,payload});if(mode==='fail')throw Error('Provider unavailable');
     return {ok:true,analysis:{track_id:'track-1',title:'Genius of Unhumankind',start_ms:12100,end_ms:27700,
       report:'The metaphor could be read in two ways.',draft_status:'unverified_user_supplied'}};
@@ -29,8 +29,12 @@ vm.runInContext(app.slice(start,end)+'\nthis.analyze=analyzeLastSongDraft;this.g
 async function main(){
   check('No background provider request occurs',()=>assert.equal(requests.length,0));
   const response=await context.analyze('Explain the word choice in this verse');
-  check('Explicit analysis returns source-qualified report',()=>{
-    assert.match(response,/metaphor/i);assert.match(response,/unverified transcript/i);assert.match(response,/no live web sources/i);
+  check('Explicit analysis returns only lyrical interpretation without spoken metadata',()=>{
+    assert.match(response,/metaphor/i);
+    assert.doesNotMatch(response,/unverified transcript|no live web sources|credit|timestamp/i);
+    assert.equal(response,'The metaphor could be read in two ways.');
+    assert.equal(experienceUpdates.at(-1).phase,'report');
+    assert.equal(experienceUpdates.at(-1).reports[0].text,response);
   });
   check('Only opted-in draft, song time range and request are sent',()=>{
     assert.equal(requests.length,1);assert.equal(requests[0].api,'agent-song-analyze.php');

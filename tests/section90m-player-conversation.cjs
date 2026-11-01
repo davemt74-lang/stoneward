@@ -21,7 +21,7 @@ async function run(){
     play:async()=>{if(failToPlay)throw Error('autoplay rejected');audio.paused=false},
     pause:()=>{audio.paused=true}};
   const st={track:{id:'song-1',title:'Night Drive',release:'Moonlight',duration:200},playing:true,conversationOn:false};
-  const sandbox={audio,st,musicOriginalVolume:null,voicePlaybackPending:false,lastAudibleVolume:0.7,
+  const sandbox={audio,st,musicOriginalVolume:null,voicePlaybackPending:false,voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,lastAudibleVolume:0.7,
     recordListen:type=>events.push(type),updateFooterPlayer:()=>events.push('render'),
     stepTrack:delta=>events.push('step:'+delta),
     play:async track=>{st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;return !failToPlay},
@@ -35,18 +35,19 @@ async function run(){
   assert.equal(audio.volume,0.3);
   sandbox.st.conversationOn=true;
   sandbox.syncConversationMusic();
-  assert.equal(audio.volume,0.3,'passive ducking never raises user volume');
+  assert.equal(audio.volume,0.3,'arming the mic never changes the user volume');
   assert.equal(await sandbox.run({type:'set_player_volume',mode:'set',percent:80}),'Stonefellow player volume is now 80 percent.');
-  assert.equal(audio.volume,0.4,'active conversation stays ducked');
-  sandbox.voicePlaybackPending=true;
-  sandbox.syncConversationMusic();
-  assert.equal(audio.volume,0.16,'Agent speech ducks further');
+  assert.equal(audio.volume,0.8,'silent microphone mode leaves music untouched');
+  sandbox.voiceInputActive=true;sandbox.syncConversationMusic();
+  assert.equal(audio.volume,0.4,'active transcription ducks music');
+  sandbox.voiceSpeechAudible=true;sandbox.syncConversationMusic();
+  assert.equal(audio.volume,0.16,'audible Agent speech ducks further');
   assert.equal(await sandbox.run({type:'set_player_volume',mode:'adjust',percent:-10}),'Stonefellow player volume is now 70 percent.');
   assert.equal(audio.volume,0.16,'ducking preserved after volume command');
   assert.equal(await sandbox.run({type:'set_player_volume',mode:'mute'}),'Stonefellow player volume is now 0 percent.');
   assert.equal(audio.volume,0);
   assert.equal(await sandbox.run({type:'set_player_volume',mode:'unmute'}),'Stonefellow player volume is now 70 percent.');
-  sandbox.st.conversationOn=false;sandbox.voicePlaybackPending=false;sandbox.syncConversationMusic();
+  sandbox.st.conversationOn=false;sandbox.voicePlaybackPending=false;sandbox.voiceInputActive=false;sandbox.voiceSpeechAudible=false;sandbox.syncConversationMusic();
   assert.ok(Math.abs(audio.volume-0.7)<1e-9,'unducking restores updated user volume, not stale level');
   assert.equal(await sandbox.run({type:'pause_player'}),'Paused “Night Drive.”');
   assert.equal(st.playing,false);

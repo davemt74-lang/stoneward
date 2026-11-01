@@ -138,7 +138,7 @@ async function publicVoiceResumesAndStaleAudioCannotPlay(){
     voiceTurnBusy:false,voiceTurnGeneration:0,conversationRestartTimer:null,recognition:{stop:()=>stops++},
     st:{conversationOn:true},showTranscript:()=>{},agent:()=>{},command:async()=>{},
     pendingReply:Promise.resolve(),musicFollowupUntil:0,Date:{now:()=>1000},
-    listeningPrompt:()=> 'Listening…',scheduleConversationListen:()=>resumes++,say:async()=>{},clearTimeout:()=>{}
+    listeningPrompt:()=> 'Listening…',scheduleConversationListen:()=>resumes++,say:async()=>{},clearTimeout:()=>{},setVoiceInputActive:()=>{}
   };
   vm.createContext(context);
   vm.runInContext(extract(publicApp,'submitVoiceTurn')+';globalThis.run=submitVoiceTurn',context);

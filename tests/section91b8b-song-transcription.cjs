@@ -13,13 +13,13 @@ check('Transcription method exists in the browser-owned agent path',()=>assert.o
 const source=app.slice(start,end);
 const captured={track_id:'published-1',title:'Genius of Unhumankind',mime_type:'audio/webm',
   start_ms:12100,end_ms:27700,captured_at:'2026-10-30T10:12:35.000Z',blob:new Blob(['fake audio'],{type:'audio/webm'})};
-const notices=[];const requests=[];
+const notices=[];const requests=[];const experienceUpdates=[];
 let stored=null,available=captured,authRefreshes=0,mode='ok';
 const context={songTranscriptionBusy:false,songLyricDraft:null,st:{auth:{csrf:'csrf-demo'}},
   songCaptureSkill:{getCapture:()=>available},
   cfg:{apiBase:'api'},FormData,Blob,
   loadAuth:async()=>{authRefreshes++;context.st.auth.csrf='new-csrf'},
-  updateSongExperience:()=>{},
+  updateSongExperience:(state)=>experienceUpdates.push(state),
   popupEntry:(role,text)=>notices.push({role,text}),
   fetch:async(url,config)=>{requests.push({url,config});return mode==='fail'
     ?{status:503,ok:false,json:async()=>({ok:false,message:'Provider not enabled.'})}
@@ -45,7 +45,10 @@ async function main(){
   check('Draft text and offset metadata remain in memory',()=>{
     stored=context.currentDraft();assert.equal(stored.text,'First line\nSecond line');
     assert.equal(stored.end_ms,27700);assert.equal(stored.review_status,'unverified');
-    assert.match(notices.at(-1).text,/UNVERIFIED LYRIC DRAFT/);
+    assert.equal(experienceUpdates.at(-1).phase,'draft');
+    assert.equal(experienceUpdates.at(-1).transcript,'First line\nSecond line');
+    assert.match(experienceUpdates.at(-1).message,/Review these estimated words/);
+    assert.equal(notices.length,0,'Lyric metadata is not announced in voice/chat');
   });
   mode='fail';const failed=await context.transcribe();
   check('Provider failure retains captured audio for retry',()=>{

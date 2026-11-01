@@ -7,10 +7,11 @@ const vm=require('node:vm');
 const app=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
 const body=app.match(/recognition\.onresult=e=>\{([\s\S]*?)\};\n    recognition\.onerror=/)?.[1];
 assert.ok(body,'Recognition result handler must be available for behavioral testing');
-const events=[],turns=[];
+const events=[],turns=[],micActivity=[];
 const context={
   st:{conversationOn:true},recognition:{},input:{value:'Unsent typed message'},
   showTranscript:(text,phase)=>events.push({text,phase}),
+  setVoiceInputActive:active=>micActivity.push(active),
   listeningPrompt:()=> 'Listening…',
   submitRecognizedVoiceTurn:spoken=>{turns.push(spoken);context.setBusy(true)}
 };
@@ -21,9 +22,11 @@ context.recognition.onresult({results:[{0:{transcript:'hello stone'},isFinal:fal
 assert.deepEqual(events.at(-1),{text:'You: hello stone',phase:'listening'});
 assert.equal(context.input.value,'Unsent typed message','Interim voice must not overwrite a typed draft');
 assert.equal(turns.length,0,'Interim recognition must not submit a turn');
+assert.equal(micActivity.at(-1),true,'Interim words temporarily duck music during active recognition');
 
 context.recognition.onresult({results:[{0:{transcript:'hello Stonefellow'},isFinal:true}]});
 assert.deepEqual(turns,['hello Stonefellow'],'Final recognition submits exactly once');
+assert.equal(micActivity.at(-1),false,'Final words restore music before reply handling');
 assert.equal(context.input.value,'Unsent typed message','Final voice must preserve the typed draft');
 assert.deepEqual(events.at(-1),{text:'You: hello Stonefellow',phase:'heard'});
 context.recognition.onresult({results:[{0:{transcript:'hello Stonefellow'},isFinal:true}]});

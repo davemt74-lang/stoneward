@@ -33,7 +33,7 @@ async function browserSpeakCompletesOrInterrupts(){
   const synth={cancel:()=>{},getVoices:()=>[{lang:'en-US',localService:true}],speak:utterance=>{spoken.push(utterance.text);pending.push(utterance)}};
   const context={window:{speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text}}},
     StonefellowSpeechSegments:{split},voiceRepliesEnabled:true,voicePlaybackSequence:2,speechFallbackResolve:null,voiceProbeSynth:false,
-    agent:()=>{}};
+    agent:()=>{},setVoiceSpeechAudible:()=>{}};
   vm.createContext(context);
   vm.runInContext(extract(publicApp,'cancelLocalVoiceOutput')+';'+extract(publicApp,'speakWithDeviceVoice')+';globalThis.run=speakWithDeviceVoice',context);
   const running=context.run(full,2);
@@ -64,7 +64,7 @@ async function elevenLabsCompletesAndDoesNotReplayOnPartialFailure(){
         return requests.length===2&&failSecond?{ok:false,status:503}:{ok:true,blob:async()=>({})}},
       URL:{createObjectURL:()=> 'blob:voice-'+requests.length,revokeObjectURL:url=>revoked.push(url)},
       Audio:class{constructor(url){this.url=url}play(){played.push(this.url);queueMicrotask(()=>this.onended?.());return Promise.resolve()}pause(){this.onpause?.()}},
-      agent:()=>{}};
+      agent:()=>{},setVoiceSpeechAudible:()=>{}};
     vm.createContext(context);
     vm.runInContext(extract(publicApp,'elevenLabsSpeak')+';globalThis.run=elevenLabsSpeak',context);
     const result=await context.run(full,false,4);

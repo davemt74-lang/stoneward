@@ -21,10 +21,10 @@ const scope={window:{},document:{createElement:tag=>new Element(tag)}};
 vm.runInNewContext(read('assets/js/agent-song-experience-ui.js'),scope);
 const mount=scope.window.SFSongExperienceUI.mount;
 const target=new Element('div');
-check('An opted-in live session advertises the interpretation after Stop',()=>{
+check('An opted-in live session advertises review before interpretation',()=>{
   mount(target,{title:'Earth Girl',phase:'capturing',start_ms:2500,end_ms:null,
     live_enabled:true,auto_interpret:true,reports:[]},()=>{});
-  assert.match(target.textContent,/live lyrics → interpretation on Stop/);
+  assert.match(target.textContent,/live lyrics → review before interpretation/);
   assert.match(target.textContent,/Stop listening/);
   assert.doesNotMatch(target.textContent,/Start live transcription/);
 });
@@ -41,7 +41,7 @@ check('Interpretation exposes approved writer-source provenance and unverified l
 check('No writer notes means an explicitly labeled reading, never invented intentions',()=>{
   mount(target,{title:'Earth Girl',phase:'report',start_ms:0,end_ms:2000,
     transcript:'Sky',canAnalyze:true,reports:[{text:'Tentative reading',sources:[]}]},()=>{});
-  assert.match(target.textContent,/No song-specific published songwriter notes were matched/);
+  assert.match(target.textContent,/No song-specific published songwriter notes matched/);
 });
 check('Quick links form a vertical mesh-overlay rail without modal, title, or redundant actions',()=>{
   const html=read('stonefellow-v120.php'),css=read('assets/css/site.css');
@@ -66,7 +66,8 @@ check('Listen & Interpret and Record Clip are independent orb actions',()=>{
   assert.match(app,/song_capture_start/);
   assert.match(app,/songListeningSkill\.begin\(\)/);
   assert.match(app,/songListeningReceipt=result\.receipt/);
-  assert.match(app,/if\(songExperience\.auto_interpret\)return await analyzeLastSongDraft/);
+  assert.match(app,/if\(songExperience\.auto_interpret\)\{/);
+  assert.match(app,/Review or correct the words/);
   assert.match(app,/if\(action\.type==='song_capture_start'\)\{/);
 });
 check('The selected auto-interpretation does not persist or publish a recording',()=>{
