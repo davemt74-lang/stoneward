@@ -7,7 +7,7 @@ assert.ok(start>0&&end>start,'Private annotation commands exist before LLM dispa
 let passes=0;const check=(name,fn)=>{fn();passes++;console.log('91B8E PASS: '+name)};
 const capture={track_id:'one',start_ms:10000,end_ms:24000,captured_at:'2026-10-29T10:12:35Z'};
 const draft={...capture,title:'First Track',text:'Unverified guess',review_status:'unverified'};
-const post=[],notes=[],scope={songCaptureSkill:{getCapture:()=>capture},songLyricDraft:draft,
+const post=[],notes=[],scope={songCaptureSkill:{getCapture:()=>capture},currentSongSource:()=>capture,songLyricDraft:draft,
   songLyricCorrected:'',songLyricReport:null,songPersonalNote:'',st:{track:{id:'one'},conversationId:'old'},
   updateSongExperience:()=>{},
   localStorage:{removeItem:()=>{}},
