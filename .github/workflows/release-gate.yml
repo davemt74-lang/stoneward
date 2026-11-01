@@ -562,6 +562,7 @@ jobs:
           node tests/section91b12d-sidecar-autohide.cjs
           node tests/section91b12e-lyric-interpretation.cjs
           node tests/section91b13a-native-page-rail.cjs
+          node tests/section91b13b-player-track-listening.cjs
           php tests/section91b12e-lyric-interpretation.php
           php tests/section91b8f-selective-song-memory.php
           node tests/section91b8f-selective-song-memory.cjs

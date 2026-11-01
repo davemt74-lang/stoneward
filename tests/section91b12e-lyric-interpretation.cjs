@@ -64,14 +64,18 @@ check('Listen & Interpret and Record Clip are independent orb actions',()=>{
   assert.match(app,/song_capture_live_start',interpret_on_stop:true/);
   assert.match(app,/onStartCapture:async\(\)=>/);
   assert.match(app,/song_capture_start/);
-  assert.match(app,/transcribeLastCapturedSong\(false,songInterpretAfterTranscribe\)/);
-  assert.match(app,/if\(interpretAfter\)\{/);
-  assert.match(app,/await analyzeLastSongDraft/);
+  assert.match(app,/songListeningSkill\.begin\(\)/);
+  assert.match(app,/songListeningReceipt=result\.receipt/);
+  assert.match(app,/if\(songExperience\.auto_interpret\)return await analyzeLastSongDraft/);
+  assert.match(app,/if\(action\.type==='song_capture_start'\)\{/);
 });
 check('The selected auto-interpretation does not persist or publish a recording',()=>{
   const app=read('assets/js/app.js'),ui=read('assets/js/agent-song-experience-ui.js');
-  assert.match(app,/function resetSongLiveSession\(/);
-  assert.match(app,/songInterpretAfterTranscribe=false/);
+  const route=app.slice(app.indexOf("if(action.type==='song_capture_live_start'){"),
+    app.indexOf("if(action.type==='song_capture_stop'&&songListeningSkill"));
+  assert.match(route,/songListeningSkill\.begin\(\)/);
+  assert.doesNotMatch(route,/songCaptureSkill\.begin\(\)|enableLive\(|agent-song-transcribe\.php/);
+  assert.doesNotMatch(app,/uploadSongLiveSegment|enqueueSongLiveSegment/);
   assert.doesNotMatch(ui,/localStorage|sessionStorage|indexedDB|fetch\s*\(|XMLHttpRequest/);
   new vm.Script(read('assets/js/public-agent-canvas.js'));
   new vm.Script(read('assets/js/app.js'));
