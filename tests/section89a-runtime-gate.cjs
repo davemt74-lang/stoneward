@@ -17,7 +17,7 @@ async function scenario(stopMidReply){
     setVoiceInputActive:active=>trace.push('input-'+active),
     clearTimeout:()=>trace.push('clear-timer'),
     conversationRestartTimer:null,
-    st:{conversationOn:true},
+    st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,
     musicFollowupUntil:0,
     Date,
     command:async()=>{trace.push('command');await command;trace.push('command-complete')},

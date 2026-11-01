@@ -136,7 +136,7 @@ async function publicVoiceResumesAndStaleAudioCannotPlay(){
   let resumes=0,stops=0;
   const context={
     voiceTurnBusy:false,voiceTurnGeneration:0,conversationRestartTimer:null,recognition:{stop:()=>stops++},
-    st:{conversationOn:true},showTranscript:()=>{},agent:()=>{},command:async()=>{},
+    st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,showTranscript:()=>{},agent:()=>{},command:async()=>{},
     pendingReply:Promise.resolve(),musicFollowupUntil:0,Date:{now:()=>1000},
     listeningPrompt:()=> 'Listening…',scheduleConversationListen:()=>resumes++,say:async()=>{},clearTimeout:()=>{},setVoiceInputActive:()=>{}
   };

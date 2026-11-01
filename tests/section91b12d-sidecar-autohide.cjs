@@ -15,7 +15,7 @@ function test(name,fn){fn();passed++;console.log('91B12D PASS '+name);}
 test('Lyric panel is a sibling of the player stack, not stacked underneath',()=>{
   const stack=js.indexOf('class="sf-agent-dock-stack"');
   const player=js.indexOf('id="sfAgentPlayerDock"');
-  const reveal=js.indexOf('class="sf-agent-player-reveal"');
+  const reveal=js.indexOf('class="sf-agent-chat-start"');
   const closeStack=js.indexOf('</div>',reveal);
   const panel=js.indexOf('<aside class="sf-agent-panel"');
   assert.ok(stack<player&&player<reveal&&reveal<closeStack&&closeStack<panel);
@@ -33,15 +33,15 @@ test('Viewport-aware side selection and mobile stacked fallback retain session a
   assert.match(js,/StonefellowSongExperience\.mount\(smallSession\)/);
   assert.match(js,/StonefellowSongExperience\.mount\(bigSession\)/);
 });
-test('Player fades after idle timeout and retains keyboard-accessible explicit reveal',()=>{
+test('Player fades after idle timeout and retains an orbital reveal icon',()=>{
   assert.match(js,/const PLAYER_IDLE_MS=5200/);
   assert.match(js,/playerTimer=window\.setTimeout\(hidePlayer,PLAYER_IDLE_MS\)/);
   assert.match(js,/playerDock\.classList\.add\('is-collapsed'\)/);
-  assert.match(js,/playerReveal\.hidden=false/);
+  assert.match(js,/data-orbit-action="player"[^>]*data-tip="Music Player"/);
   assert.match(js,/if\(action==='show-player'\)showPlayer\(\)/);
   assert.match(js,/playerDock\.classList\.remove\('is-collapsed'\)/);
   assert.match(css,/\.sf-agent-player-dock\.is-collapsed \{ opacity:0; visibility:hidden/);
-  assert.match(js,/aria-controls="sfAgentPlayerDock"/);
+  assert.match(js,/aria-label="Show music player"/);
   assert.match(js,/on\(playerDock,'focusin',pausePlayerHide\)/);
 });
 test('Playback, interaction, and cleanup preserve the single authoritative player',()=>{
@@ -83,7 +83,7 @@ test('Orb music widget keeps only playback and progress, not queue or extra butt
     assert.match(css,new RegExp(`#${button}[,\\s]`));
   }
   assert.match(css,/\.sf-agent-player-dock #playerQueueButton \{ display:none!important; \}/);
-  assert.doesNotMatch(js.slice(js.indexOf('id="sfAgentPlayerDock"'),js.indexOf('class="sf-agent-player-reveal"')),/data-agent-action="chat"|data-agent-action="capture"/);
+  assert.doesNotMatch(js.slice(js.indexOf('id="sfAgentPlayerDock"'),js.indexOf('class="sf-agent-chat-start"')),/data-agent-action="chat"|data-agent-action="capture"/);
   assert.match(js,/class="sf-agent-expanded-session"/);
   assert.match(js,/options\.onStartCapture\?\.\(\)/);
 });

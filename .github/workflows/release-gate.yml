@@ -572,6 +572,9 @@ jobs:
           node tests/section91b13h-direct-listening-and-echo.cjs
           node tests/section91b14a-atmosphere-ui.cjs
           node tests/section91b14b-ember-orb-controls.cjs
+          node tests/section91b14c-ios-lunar-mobile.cjs
+          php tests/section91b14d-media-stream-range.php
+          node tests/section91b14d-playback-completion.cjs
           php tests/section91b13e-lyric-review-gate.php
           php tests/section91b13c-grounded-agent-replies.php
           php tests/section91b8f-selective-song-memory.php

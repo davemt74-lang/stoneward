@@ -86,7 +86,7 @@ async function overlappingBargeTurnCannotBeOverwritten(){
   let firstResolve,secondResolve,resumes=0,listenMessages=[];
   const context={
     voiceTurnGeneration:0,voiceTurnBusy:false,conversationRestartTimer:null,
-    recognition:{stop:()=>{}},st:{conversationOn:true},clearTimeout:()=>{},
+    recognition:{stop:()=>{}},st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,clearTimeout:()=>{},
     command:message=>new Promise(resolve=>{
       if(message==='first')firstResolve=resolve;else secondResolve=resolve;
     }),

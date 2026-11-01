@@ -904,3 +904,120 @@ body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .voice-transcript[data-p
 body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .voice-transcript[data-phase="responding"] .voice-transcript-dot{
   background:#ffe8ba;box-shadow:0 0 0 4px #ffe8ba27;
 }
+
+/* 91B14C — a barely visible backing keeps the vertical + links legible
+   against photographic atmosphere backgrounds without becoming a modal. */
+body.sf-agent-canvas-active .chat-quick-menu{
+  border:1px solid rgba(var(--sf-atmo-rgb,139,204,255),.16);
+  border-radius:12px;
+  background:linear-gradient(95deg,rgba(7,12,20,.27),rgba(7,12,20,.11));
+  box-shadow:0 10px 32px #00000024;
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  padding:7px 10px 9px 7px;
+}
+body.sf-agent-canvas-active .chat-quick-menu button{
+  color:var(--sf-atmo-text,#eaf2ff);
+  border-bottom-color:rgba(var(--sf-atmo-rgb,139,204,255),.28);
+  text-shadow:0 1px 5px #000e1b,0 0 10px #000a15;
+}
+body.sf-agent-canvas-active .chat-quick-menu button::before{
+  background:var(--sf-atmo-accent);box-shadow:0 0 10px rgba(var(--sf-atmo-rgb),.65);
+}
+body.sf-agent-canvas-active .chat-quick-menu button::after{
+  background:linear-gradient(90deg,rgba(var(--sf-atmo-rgb),.53),transparent 80%);
+}
+body.sf-agent-canvas-active .chat-quick-menu button:hover,
+body.sf-agent-canvas-active .chat-quick-menu button:focus-visible{
+  color:#fff;border-color:var(--sf-atmo-accent);
+  background:rgba(var(--sf-atmo-rgb),.14);
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .chat-quick-menu{
+  background:linear-gradient(95deg,#1e110d4b,#1c10101c);
+}
+
+/* Moonlit Horizon pairs the silver moon and warm reflection with deep slate
+   panels and ivory controls, across the entire header/composer/drawer. */
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"]{
+  --accent:#f4ebd7;--accent-rgb:244,235,215;--accent-text:#142331;
+  --ink:#f4f6f8;--ink-rgb:244,246,248;--muted:#b5c7d4;
+  --line:#627a8e8c;--line2:#c1d2de94;--soft:#1b3041;
+  --surface:#111e2b;--surface2:#1a2b3a;--surface-rgb:17,30,43;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .topbar{
+  border-bottom-color:#dce8ef36!important;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .topbar .wordmark,
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .notification-button,
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .menu-button{
+  color:#f4f6f8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .notification-badge{
+  background:#f4ebd7;color:#172533;border-color:#0c1926;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar,
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .agent-chat-popup,
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .notification-drawer{
+  border-color:#c7d9e38c!important;
+  background:linear-gradient(115deg,#0e1d2de8,#152335e0)!important;
+  color:#f4f6f8;box-shadow:0 10px 36px #000c1990;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar input{color:#f4f6f8;}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar input::placeholder{color:#acbfcf;opacity:1;}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar .chat-action{
+  color:#f4ebd7;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar .chat-action.send,
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar .chat-action.mic.active{
+  color:#122233;background:#f4ebd7;box-shadow:0 0 18px #e8f4ff45;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar .chat-action.mic{
+  color:#e5edf5;background:#294154b8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar .chat-action.plus[aria-expanded="true"],
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .chatbar .chat-action.chat-toggle[aria-expanded="true"]{
+  color:#132636;background:#f4ebd7;border-color:#f4ebd7;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .social-links a{color:#d5e0e8!important;}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .social-links a:hover{color:#fff4db!important;}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .agent-chat-popup-head,
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .agent-chat-popup-entry{
+  color:#f4f6f8;border-color:#95aec15c;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .voice-transcript{
+  color:#f4f6f8;border-color:#abc5d67a;background:#102638d8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .voice-transcript-dot{
+  background:#f4ebd7;box-shadow:0 0 0 4px #f4ebd72e;
+}
+
+/* Real right-edge Activity slide-out on phone, with the main canvas visible
+   behind the dimmed scrim; existing notification actions remain unchanged. */
+@keyframes sfMobileNotificationIn{
+  from{transform:translateX(104%);opacity:.8}
+  to{transform:translateX(0);opacity:1}
+}
+@media(max-width:720px){
+  body.sf-agent-canvas-active .header-actions .notification-button{
+    display:grid!important;min-width:44px;min-height:44px;z-index:31;
+  }
+  body.sf-agent-canvas-active .notification-drawer{
+    right:0;left:auto;width:min(370px,88vw);max-width:none;height:100dvh;
+    border-radius:16px 0 0 16px;overflow:hidden;
+    animation:sfMobileNotificationIn .27s cubic-bezier(.2,.72,.2,1) both;
+    box-shadow:-12px 0 54px #000b1c9f;
+  }
+  body.sf-agent-canvas-active .notification-drawer .drawer-head{padding:18px 15px 13px;}
+  body.sf-agent-canvas-active .notification-drawer .drawer-tabs button{font-size:.58rem;letter-spacing:.035em;}
+  body.sf-agent-canvas-active .notification-drawer .drawer-tools{padding:9px 10px;}
+  body.sf-agent-canvas-active .notification-drawer .drawer-content{padding:4px 12px 30px;}
+  body.sf-agent-canvas-active .drawer-backdrop{background:rgba(3,10,18,.42);}
+  /* iPhone WebKit zooms focused inputs below 16px. Keep the actual viewport
+     scale unchanged without disabling the user's pinch-zoom accessibility. */
+  .chat-composer-shell .chatbar input{font-size:16px!important;line-height:1.25;}
+}
+@media(prefers-reduced-motion:reduce){
+  body.sf-agent-canvas-active .notification-drawer{animation:none!important;}
+}
+@media(prefers-reduced-transparency:reduce){
+  body.sf-agent-canvas-active .chat-quick-menu{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(7,12,20,.82);}
+}

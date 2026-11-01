@@ -20,7 +20,7 @@ function extract(name){
 function listenerFixture({pending=false,guard=0,busy=false,conversation=true,recognizer=true}={}){
   const timers=[],cancelled=[];
   const context={
-    st:{conversationOn:conversation},recognition:recognizer?{}:null,
+    st:{conversationOn:conversation},recognition:recognizer?{}:null,isIOSVoiceBrowser:false,
     voiceTurnBusy:busy,voicePlaybackPending:pending,conversationRestartTimer:42,
     voiceSpeechGuard:{remaining:()=>guard},
     clearTimeout:id=>cancelled.push(id),
@@ -50,6 +50,11 @@ function testRecognitionScheduling(){
   const normal=listenerFixture();
   normal.context.scheduleConversationListen();
   assert.equal(normal.timers[0].delay,320,'normal listening cadence must remain unchanged');
+
+  const ios=listenerFixture();
+  ios.context.isIOSVoiceBrowser=true;
+  ios.context.scheduleConversationListen();
+  assert.equal(ios.timers.length,0,'iPhone must not reopen recognition without a user tap');
 
   for(const options of [{conversation:false},{recognizer:false},{busy:true}]){
     const inactive=listenerFixture(options);

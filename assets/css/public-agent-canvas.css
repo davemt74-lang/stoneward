@@ -47,9 +47,18 @@ body.sf-agent-canvas-active .chat-footer::before { content:none!important; }
 .sf-agent-landing [data-mode="recording"] .sf-agent-state::before { background:#ff6c92; box-shadow:0 0 12px #ff6c92; }
 .sf-agent-landing .sf-agent-dock-stack { position:relative; z-index:7; display:grid; gap:10px; width:min(365px,calc(100vw - 28px)); margin-top:15px; cursor:default; user-select:text; touch-action:pan-y; }
 .sf-agent-landing .sf-agent-player-dock { min-width:0; padding:11px; border:1px solid #95d3ff4d; border-radius:18px; background:linear-gradient(145deg,#13223ce8,#0c1428e8); box-shadow:0 17px 60px #0007,0 0 35px #44a6ff20; backdrop-filter:blur(22px); opacity:1; visibility:visible; transition:opacity .3s ease,transform .3s ease,visibility .3s; }
-.sf-agent-landing .sf-agent-player-dock.is-collapsed { opacity:0; visibility:hidden; transform:translateY(-9px); pointer-events:none; }
-.sf-agent-landing .sf-agent-player-reveal { position:absolute; z-index:9; left:50%; top:6px; transform:translateX(-50%); border:1px solid #89cafa63; border-radius:999px; background:#132a48df; color:#b9e5ff; min-height:32px; padding:7px 15px; font-size:11px; white-space:nowrap; box-shadow:0 0 20px #79baff25; }
-.sf-agent-landing .sf-agent-player-reveal:hover,.sf-agent-landing .sf-agent-player-reveal:focus-visible { border-color:#a8dfff; background:#24486d; }
+.sf-agent-landing .sf-agent-player-dock.is-collapsed { opacity:0; visibility:hidden; max-height:0; padding:0; border-width:0; overflow:hidden; transform:translateY(-9px); pointer-events:none; }
+.sf-agent-landing .sf-agent-chat-start {
+  z-index:9;order:-1;align-self:center;border:1px solid var(--sf-atmo-border,#89cafa63);
+  border-radius:999px;background:rgba(16,23,34,.63);color:var(--sf-atmo-text,#dcecff);
+  min-height:36px;padding:7px 17px;font-size:11px;white-space:nowrap;
+  box-shadow:0 0 20px rgba(var(--sf-atmo-rgb,139,204,255),.2);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.sf-agent-landing .sf-agent-chat-start:hover,.sf-agent-landing .sf-agent-chat-start:focus-visible {
+  border-color:var(--sf-atmo-accent,#a8dfff);background:rgba(var(--sf-atmo-rgb,139,204,255),.2);
+  outline:2px solid var(--sf-atmo-accent,#a8dfff);outline-offset:3px;
+}
 .sf-agent-landing .sf-agent-player-ready { color:#a1c7e8; font:700 10px ui-monospace,monospace; letter-spacing:.16em; text-align:center; padding:7px 0; }
 .sf-agent-landing .sf-agent-player-dock.has-track .sf-agent-player-ready { display:none; }
 .sf-agent-landing .sf-agent-player-dock .footer-player { width:100%; min-width:0; margin:0; padding:0; gap:7px; background:transparent; border:0; border-radius:0; box-shadow:none; display:grid; grid-template-columns:38px minmax(0,1fr) 34px; grid-template-areas:"art meta toggle" "timeline timeline timeline"; }
@@ -257,6 +266,14 @@ body.sf-agent-canvas-active[data-sf-atmosphere="violet"]{
     radial-gradient(ellipse at 21% 85%,#393bba49,transparent 55%),
     linear-gradient(138deg,#0c0b21,#1c1237 60%,#090e20);
 }
+/* 91B14C — photographed moonlit horizon; no blue mesh over the image. */
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"]{
+  --sf-atmo-rgb:222,233,247;--sf-atmo-accent:#f4ebd7;
+  --sf-atmo-text:#f3f5f6;--sf-atmo-border:#dae5ed8c;
+  background:linear-gradient(180deg,#06101c4d 0%,#0a16231a 32%,#06101a17 68%,#07101e8f 100%),
+    url("../images/agent-atmosphere-lunar.webp") center center/cover fixed no-repeat,#081522;
+  color:var(--sf-atmo-text);
+}
 .sf-agent-landing[data-atmosphere] {color:var(--sf-atmo-text);}
 .sf-agent-landing[data-atmosphere] .sf-agent-sphere{
   border:1px solid var(--sf-atmo-border);
@@ -305,6 +322,25 @@ body.sf-agent-canvas-active[data-sf-atmosphere="violet"]{
 .sf-agent-landing[data-atmosphere="violet"] .sf-agent-panel{
   background:linear-gradient(135deg,#312449e3,#17132de8);
 }
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock,
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-panel{
+  background:linear-gradient(140deg,#111e2acb,#08121fe3);
+  border-color:#d7e3ee7a;box-shadow:0 15px 40px #020916a8,0 0 26px #dce9ff1f;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock .player-title,
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock .player-icon,
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock .player-close{
+  color:#f4f6f8;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock .player-release,
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock .player-timeline{color:#b9c8d6;}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock .player-toggle{
+  background:#f4ebd7;color:#17222c;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-player-dock .player-timeline input{accent-color:#f4ebd7;}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-chat-start{
+  background:#0b1b2ac4;color:#f4ebd7;border-color:#dce9f1a6;
+}
 .sf-agent-landing[data-atmosphere="ember"] .sf-agent-page-rail{
   --bg:#1d171a;--surface:#2c211f;--surface2:#352622;--surface-rgb:44,33,31;
   --panel:#2c211f;--soft:#4e3b2d;--accent-text:#211711;
@@ -317,11 +353,22 @@ body.sf-agent-canvas-active[data-sf-atmosphere="violet"]{
   --line:#6b508b;--line2:#a47ace;--ink:#f3e9ff;--muted:#c6afe0;
   border-color:#bc9ded8c;background:linear-gradient(150deg,#2c2041ed,#131025f6);
 }
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-page-rail{
+  --bg:#0a1521;--surface:#152637;--surface2:#1a3042;--surface-rgb:21,38,55;
+  --panel:#152637;--soft:#233747;--accent-text:#15212b;
+  --accent:#f4ebd7;--accent-rgb:244,235,215;
+  --line:#526b7e;--line2:#839cac;--ink:#f3f5f6;--muted:#bacbd7;
+  border-color:#d3e1ee7b;background:linear-gradient(150deg,#102334ec,#081423f3);
+}
 .sf-agent-landing[data-atmosphere="ember"]::after{
   background:linear-gradient(to bottom,#0c080f27,transparent 15%,transparent 71%,#100a0d54);
 }
 @media(max-width:720px){
   body.sf-agent-canvas-active[data-sf-atmosphere="ember"]{background-position:57% center;}
+  body.sf-agent-canvas-active[data-sf-atmosphere="lunar"]{
+    background-position:24% center;
+    background-attachment:scroll;
+  }
   .sf-agent-landing[data-atmosphere] .sf-agent-sphere{box-shadow:inset 0 0 12px rgba(var(--sf-atmo-rgb),.2),0 0 22px rgba(var(--sf-atmo-rgb),.2);}
 }
 
@@ -433,7 +480,7 @@ body.sf-agent-canvas-active[data-sf-atmosphere="violet"]{
 .sf-agent-landing[data-atmosphere="ember"] .sf-agent-player-dock .player-queue-button{
   color:#ffe8ba;background:#3b2b22;border-color:#ddad7e;
 }
-.sf-agent-landing[data-atmosphere="ember"] .sf-agent-player-reveal{
+.sf-agent-landing[data-atmosphere="ember"] .sf-agent-chat-start{
   border-color:#ffe0a8;color:#ffedca;background:#291e1be1;
 }
 .sf-agent-landing[data-atmosphere="ember"] .sf-agent-panel-head span{color:#ffe7b8;}
@@ -462,4 +509,29 @@ body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .sf-agent-live-feed .voi
 }
 body.sf-agent-canvas-active[data-sf-atmosphere="ember"] .sf-agent-live-feed .voice-transcript-dot{
   background:#ffe9be;box-shadow:0 0 0 3px #ffe9be2e;
+}
+
+/* Lunar orb and attached tools are cold slate with a warm-white lunar edge. */
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-sphere{
+  background:radial-gradient(circle at 48% 45%,#11263a75,#09162336 60%,transparent 78%);
+  box-shadow:inset 0 0 22px #ebf4ff24,0 0 38px #d3eaff40;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-orbit-tools button{
+  background:#0d2032cb;box-shadow:0 0 20px #dceaf72d,inset 0 1px 0 #f2f7fd20;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-live-feed{
+  background:rgba(10,27,42,.73);border-color:#d7e5f27b;box-shadow:0 10px 32px #020c17a3;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-tools button,
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-panel button{
+  background:#142738d8;border-color:#b7ccd984;color:#f1f5f8;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-workspace{
+  background:linear-gradient(150deg,#142738ef,#091725f7);color:#f4f6f8;
+}
+.sf-agent-landing[data-atmosphere="lunar"] .sf-agent-session .song-experience-card{
+  background:#112436cd;border-color:#bfd3e379;color:#f4f6f8;
+}
+body.sf-agent-canvas-active[data-sf-atmosphere="lunar"] .sf-agent-live-feed .voice-transcript{
+  border:0;background:transparent;box-shadow:none;color:#f2f5f8;
 }

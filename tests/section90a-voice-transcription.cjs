@@ -10,6 +10,7 @@ assert.ok(body,'Recognition result handler must be available for behavioral test
 const events=[],turns=[],micActivity=[];
 const context={
   st:{conversationOn:true},recognition:{},input:{value:'Unsent typed message'},
+  isIOSVoiceBrowser:false,voiceSpeechGuard:{blocked:false},
   showTranscript:(text,phase)=>events.push({text,phase}),
   setVoiceInputActive:active=>micActivity.push(active),
   // Music-aware gating is separately tested in 91B13H; these frames are user speech.
