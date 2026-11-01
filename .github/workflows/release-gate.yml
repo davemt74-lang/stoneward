@@ -569,6 +569,7 @@ jobs:
           node tests/section91b13f-conversation-ducking.cjs
           php tests/section91b13g-notification-actions.php
           node tests/section91b13g-notification-actions.cjs
+          node tests/section91b13h-direct-listening-and-echo.cjs
           php tests/section91b13e-lyric-review-gate.php
           php tests/section91b13c-grounded-agent-replies.php
           php tests/section91b8f-selective-song-memory.php

@@ -12,7 +12,9 @@ assert.ok(begin>0&&end>begin,'volume controller source must exist');
 const context={
   audio:{paused:false,volume:0.82},musicOriginalVolume:null,
   voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,
-  voicePlaybackPending:false,st:{conversationOn:true},lastAudibleVolume:0.82
+  voicePlaybackPending:false,voiceSpeechReleaseTimer:null,speechPilotReleaseTimer:null,speechPilotActive:false,
+  st:{conversationOn:true},lastAudibleVolume:0.82,
+  setTimeout:(fn)=>{context.scheduled=fn;return 1},clearTimeout:()=>{context.scheduled=null}
 };
 vm.runInNewContext(src.slice(begin,end),context);
 check('Simply arming the microphone leaves player volume untouched',()=>{
@@ -35,8 +37,12 @@ check('Preparing remote speech does not duck before the Agent is audible',()=>{
   context.setVoiceSpeechAudible(true);
   assert.equal(context.audio.volume,0.16);
   context.setVoiceSpeechAudible(false);
-  assert.equal(context.audio.volume,0.82);
+  assert.equal(context.audio.volume,0.16,'Adjacent TTS chunks retain one duck level');
+  context.setVoiceSpeechAudible(true);
+  assert.equal(context.scheduled,null,'Next spoken chunk cancels pending restore');
   context.voicePlaybackPending=false;
+  context.setVoiceSpeechAudible(false);
+  assert.equal(context.audio.volume,0.82);
 });
 check('Speech Engine only ducks for speaking mode, not idle listening mode',()=>{
   context.speechPilotAgentSpeaking=true;
@@ -55,13 +61,13 @@ check('Manual volume changes while ducked restore to the new requested level',()
   assert.equal(context.audio.volume,0.68);
 });
 check('Detection, interim transcript, end, errors and stop all have activity hooks',()=>{
-  assert.match(src,/recognition\.onspeechstart=\(\)=>\{/);
+  assert.match(src,/recognition\.onspeechstart=\(\)=>\{if\(shouldDuckConversationInput\(\)\)/);
   assert.match(src,/recognition\.onspeechend=\(\)=>setVoiceInputActive\(false\)/);
-  assert.match(src,/if\(spoken&&!finalReceived\)setVoiceInputActive\(true\)/);
+  assert.match(src,/if\(spoken&&!finalReceived\)setVoiceInputActive\(shouldDuckConversationInput\(spoken\)\)/);
   assert.match(src,/if\(finalReceived\)setVoiceInputActive\(false\)/);
   assert.match(src,/recognition\.onend=\(\)=>\{recognitionActive=false;setVoiceInputActive\(false\)/);
   assert.match(src,/recognition\.onerror=e=>\{\s*recognitionActive=false;setVoiceInputActive\(false\)/);
-  assert.match(src,/speechPilotAgentSpeaking=mode==='speaking';syncConversationMusic\(\)/);
+  assert.match(src,/setSpeechPilotSpeaking\(mode==='speaking'\)/);
   assert.match(src,/utterance\.onstart=\(\)=>\{started=true;[^\n]*setVoiceSpeechAudible\(true\)/);
   assert.match(src,/a\.play\(\)\.then\(\(\)=>\{[^\n]*setVoiceSpeechAudible\(true\)/);
   assert.doesNotMatch(src,/if\(\(st\.conversationOn\|\|voicePlaybackPending\)&&!audio\.paused\)/);
