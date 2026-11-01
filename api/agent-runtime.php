@@ -341,12 +341,20 @@ function sf_agent_explicit_player_route(string $message): ?string {
     if(preg_match('/\b(?:mute|volume|louder|quieter|softer|turn (?:it|the music|the sound) (?:up|down)|turn (?:up|down) (?:the )?(?:music|sound)|lower (?:it|the sound)|raise (?:it|the sound))\b/',$q))return 'player_volume';
     if(preg_match('/\b(?:what(?:\'s| is) playing|which (?:song|track) is (?:this|playing)|what (?:song|track) is this|(?:what(?:\'s| is)|show me|tell me) (?:the )?current (?:song|track)|how (?:much|long) (?:time )?(?:is )?left|how far (?:into|through) (?:this|the) (?:song|track)|player status|is (?:the )?(?:music|song|track|player) playing)\b/',$q))return 'player_status';
     if(preg_match('/\b(?:resume|unpause|continue)\s*(?:the\s+)?(?:music|song|track|player|playback|it)?\s*[.!?]*$/',$q)||preg_match('/\b(?:play|start) (?:the |this )?(?:music|song|track|player|playback|current song|current track)\s*[.!?]*$/',$q))return 'player_resume';
-    if(preg_match('/\b(?:pause|stop)\s*(?:the\s+)?(?:music|song|track|player|playback|it|this)?\s*[.!?]*$/',$q))return 'player_pause';
+    if(preg_match('/^(?:(?:hey|hi|okay|ok)\s+stonefellow[, ]+)?(?:please\s+)?stop\s*(?:the\s+)?(?:music|song|track|player|playback|audio|it|this)?\s*[.!?]*$/',$q))return 'player_stop';
+    if(preg_match('/\bpause\s*(?:the\s+)?(?:music|song|track|player|playback|it|this)?\s*[.!?]*$/',$q))return 'player_pause';
     if(preg_match('/\b(?:next (?:song|track)|skip (?:this |the )?(?:song|track)|skip it|skip)\s*[.!?]*$/',$q))return 'player_next';
     if(preg_match('/\b(?:previous (?:song|track)|last (?:song|track)|go back (?:a|one) (?:song|track)|play (?:the )?previous (?:song|track))\s*[.!?]*$/',$q))return 'player_previous';
     if(sf_agent_release_request($message)!==null)return 'player_play_from_release';
     if(sf_agent_named_playback_query($message)!==null)return 'player_play_named';
     return null;
+}
+function sf_agent_random_playlist_requested(string $message): bool {
+    $q=strtolower(trim($message));
+    // Do not steal a request to save an existing playlist or an album.
+    if(preg_match('/\b(?:save|persist|publish|permanent)\b|\b(?:don.t|do not|not)\b.*\b(?:create|make|random|shuffle)\b/',$q))return false;
+    return (bool)(preg_match('/\b(?:random|shuffle|surprise me)\b.*\b(?:playlist|mix|queue|songs|tracks)\b|\b(?:playlist|mix|queue)\b.*\b(?:random|shuffled|surprise)\b/',$q)
+        ||preg_match('/\b(?:create|make|build|give me|play|start)\s+(?:a\s+)?(?:temporary\s+)?(?:random|shuffled)\s+(?:music\s+)?(?:playlist|mix)\b/',$q));
 }
 function sf_agent_player_volume_action(string $message): array {
     $q=strtolower(trim($message));
@@ -361,6 +369,7 @@ function sf_agent_player_volume_action(string $message): array {
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
     if(($captureRoute=sf_agent_explicit_song_capture_route($message,$client))!==null)return $captureRoute;
+    if(sf_agent_random_playlist_requested($message))return 'playlist_random';
     if(sf_agent_catalog_list_requested($message))return 'catalog_list';
     if(sf_agent_page_context_request($message))return 'page_context';
     if(sf_agent_detail_request($message)!==null)return 'page_detail';
@@ -431,7 +440,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
     // start, stop, or submit a captured section; the upload endpoint later
     // checks the published catalog independently before provider processing.
     $captureAction=in_array($route,['song_capture_start','song_capture_live_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'],true);
-    $track=$captureAction?null:sf_agent_find_track($message,$active);
+    $track=($captureAction||$route==='playlist_random')?null:sf_agent_find_track($message,$active);
     $action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
         case 'song_capture_live_start':
@@ -554,6 +563,7 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             else{$action=['type'=>'open_queue'];$text='Open Up Next and choose the track you want.';}
             break;
         case 'player_pause':$action=['type'=>'pause_player'];$text='I’ll pause the player.';break;
+        case 'player_stop':$action=['type'=>'stop_player'];$text='I’ll stop the music and return to the start.';break;
         case 'player_resume':$action=['type'=>'resume_player'];$text='I’ll resume the player.';break;
         case 'player_next':$action=['type'=>'next_track'];$text='I’ll skip to the next track.';break;
         case 'player_previous':$action=['type'=>'previous_track'];$text='I’ll go back one track.';break;
@@ -581,6 +591,11 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'archive_browse':$action=['type'=>'open_view','view'=>'archive'];$text='Here is the Stonefellow music archive — recordings, versions, sessions and releases in context.';$profile='catalog';break;
         case 'release_browse':$action=['type'=>'open_view','view'=>'releases'];$text='Here are the releases.';$profile='catalog';break;
         case 'playlist_open':$action=['type'=>'open_view','view'=>'account'];$text='Your playlists are in My Stonefellow.';$profile='account';break;
+        case 'playlist_random':
+            $ids=sf_agent_random_playlist_track_ids(sf_agent_public_catalog(),7);
+            $action=$ids?['type'=>'load_temporary_playlist','name'=>'Stonefellow Random Mix','track_ids'=>$ids]:['type'=>'none'];
+            $text=$ids?'I’ll load a temporary random mix into the player and open its song queue.':'There are no playable published songs available for a random mix.';
+            $profile='recommendation';break;
         case 'playlist_create':
             $ids=sf_agent_playlist_track_ids($message,$active?:null,7,$userId);$name=sf_agent_playlist_name($message);$action=['type'=>'create_playlist','name'=>$name,'track_ids'=>$ids,'visibility'=>'private','source_type'=>'agent'];$text='I’ll create “'.$name.'” in your playlists.';$profile='recommendation';break;
         case 'playlist_save_session':
@@ -698,7 +713,9 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'listening_session_start'=>'Asks for play me something, a mood/theme session, or continuous agent listening.',
         'listening_session_release'=>'Asks to play through a named album/release.',
         'listening_session_guided_release'=>'Asks for a guided album/release listening experience with context between tracks.',
-        'player_pause'=>'Asks to pause or stop current music playback.',
+        'player_pause'=>'Asks to pause current music playback without rewinding.',
+        'player_stop'=>'Asks to stop current music and reset its playback position.',
+        'playlist_random'=>'Asks to build a temporary shuffled playlist and open its song queue.',
         'player_resume'=>'Asks to resume or unpause the current song.',
         'player_volume'=>'Asks to set, increase, decrease, mute or unmute the current music volume.',
         'player_status'=>'Asks what song is playing, whether the player is paused or what the playback progress is.',
@@ -799,6 +816,9 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     $client['_authorized_admin']=$isAdmin;
     $explicitCapture=sf_agent_explicit_song_capture_route($message,$client);
     $catalogListRequest=sf_agent_catalog_list_requested($message);
+    $explicitPlayer=sf_agent_explicit_player_route($message);
+    $randomPlaylist=sf_agent_random_playlist_requested($message);
+    $quickTransport=in_array($explicitPlayer,['player_stop','player_pause','player_resume'],true);
     $timeInsights=$explicitCapture===null?sf_agent_listening_insights($userId,(string)($client['timezone']??'UTC')):[];
     $decisionUsage=0;$routeSource='local';$jev=null;$llmIntent=null;
     // A user-initiated capture is time-sensitive. The server's exact allowlist
@@ -806,7 +826,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     // while the verse continues playing.
     // Conversational LLM interprets the intent first. Only the server policy
     // can translate that interpretation into an authorized action.
-    if($explicitCapture===null&&!$catalogListRequest&&($isAdmin||sf_can_use_ai($user,256)['ok'])){
+    if($explicitCapture===null&&!$catalogListRequest&&!$randomPlaylist&&!$quickTransport&&($isAdmin||sf_can_use_ai($user,256)['ok'])){
         try{
             $llmIntent=sf_agent_orchestrator_llm($message,$client,$history,sf_agent_public_catalog(),$isAdmin);
             if($llmIntent){
@@ -815,16 +835,22 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
             }
         }catch(Throwable $e){$llmIntent=null;}
     }
-    $explicitPlayer=sf_agent_explicit_player_route($message);
-    $albumRequest=$catalogListRequest?null:sf_agent_release_request($message,$client,$history);
+    $albumRequest=($catalogListRequest||$randomPlaylist)?null:sf_agent_release_request($message,$client,$history);
     if(!$albumRequest&&($llmIntent['route']??'')==='player_play_from_release'&&!empty($llmIntent['album_query']))
         $albumRequest=['title'=>(string)$llmIntent['album_query'],'different'=>false];
-    if($llmIntent===null&&$explicitCapture===null&&!$catalogListRequest&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
+    if($llmIntent===null&&$explicitCapture===null&&!$catalogListRequest&&!$randomPlaylist&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
     // Existing parsed routes remain an availability fallback, not an LLM bypass.
     $explicitContext=sf_agent_page_context_request($message)?'page_context':(sf_agent_detail_request($message)!==null?'page_detail':(sf_agent_public_page_target($message)!==null?'page_navigate':null));
-    $route=$explicitCapture??($catalogListRequest?'catalog_list':($albumRequest?'player_play_from_release':(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client))));
+    // High-confidence transport is immediate; nuanced song intent remains LLM-led.
+    if($explicitCapture!==null)$route=$explicitCapture;
+    elseif($catalogListRequest)$route='catalog_list';
+    elseif($randomPlaylist)$route='playlist_random';
+    elseif($quickTransport)$route=(string)$explicitPlayer;
+    elseif($albumRequest)$route='player_play_from_release';
+    else $route=(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client));
+    if($randomPlaylist||$quickTransport)$routeSource='explicit_control';
     if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';
     $plan=$albumRequest?sf_agent_release_play_plan((string)$albumRequest['title'],sf_agent_public_catalog(),(string)($client['active_track_id']??''),$timeInsights,!empty($albumRequest['different'])):sf_agent_policy($route,$message,$client,$userId);
     $audioResolution=null;

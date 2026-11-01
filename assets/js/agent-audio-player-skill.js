@@ -5,8 +5,8 @@
 (() => {
   'use strict';
   const CAPABILITIES=Object.freeze([
-    'play_track','pause_player','resume_player','next_track',
-    'previous_track','player_status','set_player_volume'
+    'play_track','pause_player','stop_player','resume_player','next_track',
+    'previous_track','player_status','set_player_volume','load_temporary_playlist'
   ]);
   const allowed=new Set(CAPABILITIES);
   const normalize=text=>String(text||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();
@@ -14,7 +14,8 @@
     let words=normalize(text).replace(/^(?:(?:hey|hi|okay|ok)\s+)?stone\s*fellow(?:\s+|$)/,'').replace(/^please\s+/,'').trim();
     if(!words)return null;
     if(/^(?:what(?: s| is)? playing|what(?: s| is)? the current (?:song|track)|what (?:song|track) is (?:this|playing)|which (?:song|track) is playing|player status|music status|is (?:the )?(?:music|song|track|player) playing)$/.test(words))return {type:'player_status'};
-    if(/^(?:pause|stop)(?: the)?(?: music| song| track| player| audio| playback| it)?$/.test(words))return {type:'pause_player'};
+    if(/^pause(?: the)?(?: music| song| track| player| audio| playback| it)?$/.test(words))return {type:'pause_player'};
+    if(/^stop(?: the)?(?: music| song| track| player| audio| playback| it)?$/.test(words))return {type:'stop_player'};
     if(/^(?:resume|unpause|continue)(?: playing)?(?: the)?(?: music| song| track| player| audio| playback| it)?$/.test(words))return {type:'resume_player'};
     if(/^(?:next|skip)(?: the| this)?(?: song| track| music| it)?$/.test(words))return {type:'next_track'};
     if(/^(?:previous|last|back)(?: song| track)?$/.test(words)||/^(?:go back|play the previous)(?: one| song| track)?$/.test(words))return {type:'previous_track'};
@@ -39,6 +40,11 @@
       if(raw.track_id!==undefined){if(typeof raw.track_id!=='string'||raw.track_id.length>180)return null;action.track_id=raw.track_id}
       if(raw.query!==undefined){if(typeof raw.query!=='string'||raw.query.length>160)return null;action.query=raw.query}
     }
+    if(type==='load_temporary_playlist'){
+      if(typeof raw.name!=='string'||raw.name.length>120||!Array.isArray(raw.track_ids)||raw.track_ids.length<1||raw.track_ids.length>20)return null;
+      if(raw.track_ids.some(id=>typeof id!=='string'||!id||id.length>180)||new Set(raw.track_ids).size!==raw.track_ids.length)return null;
+      action.name=raw.name;action.track_ids=raw.track_ids.slice();
+    }
     if(type==='set_player_volume'){
       if(!['mute','unmute','set','adjust'].includes(raw.mode))return null;
       action.mode=raw.mode;
@@ -55,6 +61,7 @@
     // begins with 'listen to this verse'. Leave its server-approved action intact.
     if(['song_capture_start','song_capture_live_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'].includes(serverAction?.type))
       return {action:serverAction};
+    if(serverAction?.type==='load_temporary_playlist')return {action:serverAction};
     // Album recommendations are server-selected, but the current browser must
     // independently confirm the exact published track and release before play.
     if(resolution?.method==='release_catalog'){

@@ -36,6 +36,9 @@
             <button type="button" data-agent-action="show-player" data-orbit-action="player" data-tip="Music Player" aria-label="Show music player">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="17.5" cy="16" r="2.5" fill="currentColor"/></svg>
             </button>
+            <button type="button" data-agent-action="show-queue" data-orbit-action="playlist" data-tip="Temporary Playlist" aria-label="Open temporary playlist song queue" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h8M17 12v7a2 2 0 1 1-2-2c.7 0 1.5.2 2 .6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
             <button type="button" data-agent-action="stop-listening" data-orbit-action="stop" data-tip="Stop listening" aria-label="Stop lyric listening" hidden>
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/></svg>
             </button>
@@ -227,6 +230,7 @@
       }
       for(const button of root.querySelectorAll('[data-agent-action="stop-listening"]'))button.hidden=!capturing;
       for(const button of root.querySelectorAll('[data-orbit-action="player"]'))button.hidden=!player||player.hidden;
+      for(const button of root.querySelectorAll('[data-orbit-action="playlist"]'))button.hidden=!options.hasTemporaryPlaylist?.();
       positionOrbitTools();
     }
     function session() {
@@ -454,6 +458,7 @@
       if(action==='listen-interpret')options.onListenInterpret?.();
       if(action==='stop-listening')options.onStopListening?.();
       if(action==='show-player')showPlayer();
+      if(action==='show-queue')options.onOpenQueue?.();
       if(action==='music'){closeWorkspace();options.onNavigate?.('music');}
       if(action==='close-panel'){panel.hidden=true;remotePanelDismissed=true;updateDock();}
       if(action==='close-workspace')closeWorkspace();
@@ -505,7 +510,7 @@
     resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();syncVoice();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);orbDraw(0);}
-    current={root,state,session,syncPlayer,syncVoice,openPage,closePage,syncTranscript,showConversation,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
+    current={root,state,session,syncPlayer,syncVoice,syncPlaylist:syncListeningButtons,openPage,closePage,syncTranscript,showConversation,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
       destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);pausePlayerHide();
       resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
       if(player && originalPlayerParent){
@@ -530,5 +535,5 @@
     const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':['moonlit horizon','moonlight'].includes(match[1])?'lunar':match[1];
     return current?.setAtmosphere(named)||null;
   }
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncPlaylist:()=>current?.syncPlaylist(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
 })();

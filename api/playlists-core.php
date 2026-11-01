@@ -51,3 +51,16 @@ function sf_playlist_reorder(int $userId,int $playlistId,array $itemIds): array 
 function sf_playlist_recent_agent_track_ids(int $userId,int $limit=20,int $minutes=180): array {sf_ops_ensure_schema();$limit=max(1,min(50,$limit));$since=gmdate('c',time()-max(5,min(1440,$minutes))*60);$q=sf_db()->prepare("SELECT track_id,MAX(id) AS last_id FROM listening_events WHERE user_id=? AND source='agent' AND created_at>=? AND event_type IN ('start','resume','complete') GROUP BY track_id ORDER BY last_id ASC LIMIT ".$limit);$q->execute([$userId,$since]);return array_values(array_filter(array_map(fn($r)=>(string)$r['track_id'],$q->fetchAll()),fn($id)=>isset(sf_track_map()[$id])));}
 function sf_playlist_create_from_agent_session(int $userId,string $name='Agent Listening Session'): array {$ids=sf_playlist_recent_agent_track_ids($userId);if(!$ids)throw new RuntimeException('No recent agent-curated listening session is available to save yet.');return sf_playlist_create($userId,$name,'Saved from your recent Stonefellow agent listening session.','private','agent_session',$ids);}
 function sf_agent_playlist_track_ids(string $message,?string $activeId=null,int $limit=7,?int $userId=null): array {$rows=[];$profile=$userId&&function_exists('sf_personalization_recommendation_profile')?sf_personalization_recommendation_profile($userId):null;$personal=[];if($profile){foreach(sf_personalization_rank_catalog(sf_catalog(),$profile,30,$activeId?[$activeId]:[]) as $r)$personal[(string)$r['track_id']]=(float)$r['score'];}foreach(sf_catalog() as $t){$id=(string)($t['id']??'');$score=sf_agent_track_score($t,$message)*4+(float)($personal[$id]??0);if($activeId&&$id===$activeId)$score+=2;$rows[]=['id'=>$id,'score'=>$score,'energy'=>(int)($t['energy']??3)];}usort($rows,fn($a,$b)=>$b['score']<=>$a['score']?:$a['energy']<=>$b['energy']);return array_values(array_filter(array_map(fn($x)=>$x['id'],array_slice($rows,0,max(1,min(20,$limit))))));}
+/** Temporary mix: shuffle only playable published IDs, never persist a playlist. */
+function sf_agent_random_playlist_track_ids(array $published,int $limit=7): array {
+    $ids=[];
+    foreach($published as $track){
+        $id=(string)($track['id']??'');
+        if($id!==''&&!empty($track['audio']))$ids[$id]=$id;
+    }
+    $ids=array_values($ids);
+    for($i=count($ids)-1;$i>0;$i--){
+        $j=random_int(0,$i);[$ids[$i],$ids[$j]]=[$ids[$j],$ids[$i]];
+    }
+    return array_slice($ids,0,max(1,min(20,$limit)));
+}

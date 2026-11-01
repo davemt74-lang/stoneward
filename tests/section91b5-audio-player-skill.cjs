@@ -11,7 +11,7 @@ const app={};vm.runInNewContext(read('assets/js/agent-audio-player-skill.js'),{w
 const skill=app.StonefellowAgentAudioSkill;
 const parsed=text=>JSON.parse(JSON.stringify(skill.command(text)));
 async function main(){
-  check('Shared command contract has seven named transport capabilities',()=>assert.equal(skill.capabilities.length,7));
+  check('Shared command contract includes temporary playlist and true stop',()=>assert.equal(skill.capabilities.length,9));
   check('Unrelated Agent conversation is not treated as a music command',()=>assert.equal(skill.command('Tell me about album artwork'),null));
   check('Wake phrase and song name resolve to local play intent',()=>assert.deepEqual(parsed('Hey Stonefellow, play Earth Girl'),{type:'play_track',query:'earth girl'}));
   check('Direct music play resolves to the current catalog',()=>assert.deepEqual(parsed('Play music'),{type:'play_track',query:''}));

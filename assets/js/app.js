@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.203';
+  window.STONEFELLOW_APP_BUILD='1.3.204';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate=site.homepageTemplate==='agent_canvas'?'agent_canvas':'classic',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -16,7 +16,7 @@
   let iosVoiceNeedsGesture=false,iosProcessedFinalIndex=-1,iosVoiceMuteUntil=0;
   const voiceReplyToggle=$('#agentVoiceReplyToggle');
   let voiceRepliesEnabled=localStorage.getItem('stonefellow.voice.replies.v1')!=='off',voiceInteractionStarted=false,speechPilotActive=false;
-  let voicePlaybackPending=false,voicePlaybackText='',speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
+  let voicePlaybackPending=false,voicePlaybackText='',speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,voiceEchoUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
   let voiceInputActive=false,voiceSpeechAudible=false,speechPilotAgentSpeaking=false,voiceSpeechReleaseTimer=null,speechPilotReleaseTimer=null;
   let voiceProbeAudio=null,voiceProbeSynth=false,voiceProbeMusicVolume=null;
   const voiceSpeechGuard=window.StonefellowBargeIn?.createSpeechGuard({cooldownMs:1100});
@@ -108,7 +108,7 @@
     return '“'+st.track.title+'”'+(st.track.release?' from '+st.track.release:'')+' is '+state+'.'+progress+' Player volume is '+Math.round(playerVolume()*100)+' percent.';
   }
   async function executePlayerAgentAction(action){
-    if(!action||!['play_track','pause_player','resume_player','next_track','previous_track','player_status','set_player_volume'].includes(action.type))return null;
+    if(!action||!['play_track','pause_player','stop_player','resume_player','next_track','previous_track','player_status','set_player_volume','load_temporary_playlist'].includes(action.type))return null;
     switch(action.type){
       case 'player_status':return describePlayer();
       case 'set_player_volume':{
@@ -126,6 +126,13 @@
         if(audio.paused)return '“'+st.track.title+'” is already paused.';
         recordListen('pause');audio.pause();st.playing=false;updateFooterPlayer();
         return 'Paused “'+st.track.title+'.”';
+      case 'stop_player':
+        if(!st.track)return 'There is no music to stop.';
+        if(!audio.paused)recordListen('pause');
+        audio.pause();try{audio.currentTime=0}catch(_){}
+        st.playing=false;musicFollowupUntil=0;setVoiceInputActive(false);updateFooterPlayer();syncConversationMusic();
+        return 'Stopped “'+st.track.title+'.”';
+      case 'load_temporary_playlist':return startTemporaryPlaylist(action);
       case 'resume_player':
         if(!st.track)return 'There is no song loaded. Tell me which Stonefellow song to play.';
         if(!audio.paused)return '“'+st.track.title+'” is already playing.';
@@ -759,7 +766,7 @@
       if(sequence===voicePlaybackSequence){
         restoreVoiceProbeMusic();
         voiceProbeAudio=null;voiceProbeSynth=false;
-        conversationBargeIn?.stop();voicePlaybackPending=false;voicePlaybackText='';setVoiceSpeechAudible(false);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();syncConversationMusic();
+        conversationBargeIn?.stop();voicePlaybackPending=false;voicePlaybackText='';setVoiceSpeechAudible(false);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();voiceEchoUntil=Date.now()+3000;syncConversationMusic();
         if(agentInterrupt)agentInterrupt.hidden=true;
         if(isIOSVoiceBrowser)iosVoiceMuteUntil=Date.now()+1800;
         agent(st.conversationOn&&!iosVoiceNeedsGesture?'listening':st.playing?'playing':'idle');
@@ -809,7 +816,15 @@
     return j;
   }
   function applyQueue(queue){const q=queue||{};st.queue.loaded=true;st.queue.items=Array.isArray(q.items)?q.items:[];updateQueueUi();return st.queue.items}
-  function updateQueueUi(){const n=st.queue.items.length;if(playerQueueCount)playerQueueCount.textContent=String(n);if(queueDrawerCount)queueDrawerCount.textContent=n+' track'+(n===1?'':'s');if(st.queue.open)renderQueueDrawer()}
+  function isTemporaryPlaylist(){return st.playlistPlayback.temporary===true&&st.playlistPlayback.trackIds.length>0}
+  function updateQueueUi(){
+    const temp=isTemporaryPlaylist(),n=temp?st.playlistPlayback.trackIds.length:st.queue.items.length;
+    if(playerQueueCount)playerQueueCount.textContent=String(n);
+    if(playerQueueButton){playerQueueButton.firstChild.nodeValue=temp?'Playlist ':'Queue ';playerQueueButton.setAttribute('aria-label',temp?'Open temporary playlist and song queue':'Open Up Next queue')}
+    if(queueDrawerCount)queueDrawerCount.textContent=n+' track'+(n===1?'':'s');
+    window.SFPublicAgentCanvas?.syncPlaylist?.();
+    if(st.queue.open)renderQueueDrawer();
+  }
   async function loadQueue(force=false){if(!st.auth.authenticated){st.queue={...st.queue,loaded:true,items:[]};updateQueueUi();return st.queue.items}if(st.queue.loaded&&!force)return st.queue.items;try{const j=await api('queue.php');if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf;applyQueue(j.queue)}catch(_){st.queue={...st.queue,loaded:true,items:[]};updateQueueUi()}return st.queue.items}
   function pushQueueHistory(){const id=st.track?.id;if(!id)return;const h=Array.isArray(st.queue.history)?st.queue.history:[];if(h[0]!==id)h.unshift(id);st.queue.history=h.slice(0,30);localStorage.setItem('stonefellow.queue.history.v1',JSON.stringify(st.queue.history))}
   async function addTrackToQueue(t,placement='end'){if(!t)return;if(!st.auth.authenticated){say('Sign in to keep an Up Next queue across devices.',()=>navigate('login'));return}try{const j=await secureJsonPost('queue.php',{action:'add',track_id:t.id,placement:placement==='next'?'next':'end'});applyQueue(j.queue);say(placement==='next'?'“'+t.title+'” will play next.':'Added “'+t.title+'” to Up Next.')}catch(e){say(e.message)}}
@@ -819,9 +834,27 @@
   async function clearQueue(confirmFirst=true){if(!st.auth.authenticated)return;if(confirmFirst&&!confirm('Clear everything from Up Next?'))return;try{const j=await secureJsonPost('queue.php',{action:'clear'});applyQueue(j.queue);if(!confirmFirst)say('Up Next is clear.')}catch(e){say(e.message)}}
   async function takeQueueItem(itemId){if(agentSessionActive()){say('End the active Agent listening session before switching to a queued track.');return false}try{const j=await secureJsonPost('queue.php',{action:'take',item_id:Number(itemId)});applyQueue(j.queue);const t=j.item?trackById(j.item.track_id):null;if(!t)return false;pushQueueHistory();play(t,0,'queue');return true}catch(e){say(e.message);return false}}
   async function playNextFromQueue(){if(agentSessionActive()||!st.auth.authenticated)return false;try{const j=await secureJsonPost('queue.php',{action:'pop'});applyQueue(j.queue);const t=j.item?trackById(j.item.track_id):null;if(!t)return false;pushQueueHistory();play(t,0,'queue');return true}catch(_){return false}}
-  function renderQueueDrawer(){if(!queueContent)return;const rows=st.queue.items||[];queueContent.innerHTML=rows.length?rows.map((x,i)=>`<article class="queue-item"><button type="button" class="queue-item-play" data-queue-play="${x.item_id}" aria-label="Play ${esc(x.title)}">▶</button><div><strong>${esc(x.title)}</strong><small>${esc(x.release||'')} · ${time(x.duration)}</small></div><div class="queue-item-actions"><button type="button" data-queue-move="${x.item_id}" data-dir="-1" ${i===0?'disabled':''}>↑</button><button type="button" data-queue-move="${x.item_id}" data-dir="1" ${i===rows.length-1?'disabled':''}>↓</button><button type="button" data-queue-remove="${x.item_id}" aria-label="Remove ${esc(x.title)}">×</button></div></article>`).join(''):'<p class="drawer-empty">Your Up Next queue is empty.</p>';Array.from(queueContent.querySelectorAll('[data-queue-play]')).forEach(b=>b.onclick=()=>takeQueueItem(b.dataset.queuePlay));Array.from(queueContent.querySelectorAll('[data-queue-remove]')).forEach(b=>b.onclick=()=>removeQueueItem(b.dataset.queueRemove));Array.from(queueContent.querySelectorAll('[data-queue-move]')).forEach(b=>b.onclick=()=>reorderQueueItem(b.dataset.queueMove,b.dataset.dir));updateQueueUiCountOnly()}
-  function updateQueueUiCountOnly(){const n=st.queue.items.length;if(playerQueueCount)playerQueueCount.textContent=String(n);if(queueDrawerCount)queueDrawerCount.textContent=n+' track'+(n===1?'':'s')}
-  async function openQueue(){if(!st.auth.authenticated){say('Sign in to use a persistent Up Next queue.',()=>navigate('login'));return}await loadQueue(true);st.queue.open=true;if(queueDrawer)queueDrawer.hidden=false;if(queueBackdrop)queueBackdrop.hidden=false;playerQueueButton?.setAttribute('aria-expanded','true');document.body.classList.add('queue-open');renderQueueDrawer()}
+  function renderQueueDrawer(){
+    if(!queueContent)return;
+    const temp=isTemporaryPlaylist(),rows=st.queue.items||[],mix=st.playlistPlayback;
+    const title=document.getElementById('queueDrawerTitle');if(title)title.textContent=temp?'Your Playlist':'Up Next';
+    if(queueClear)queueClear.hidden=!rows.length;
+    const playlistHtml=temp?`<section class="temporary-playlist" aria-label="Temporary song playlist"><div class="temporary-playlist-head"><div><span class="drawer-kicker">TEMPORARY PLAYLIST · NOT SAVED</span><h3>${esc(mix.playlistName)}</h3></div><span>${mix.trackIds.length} SONGS</span></div>${mix.trackIds.map((id,i)=>{const t=trackById(id);if(!t)return '';const current=i===mix.index;return `<article class="queue-item temporary-playlist-item ${current?'is-current':''}" ${current?'aria-current="true"':''}><button type="button" class="queue-item-play" data-temp-play="${i}" aria-label="Play ${esc(t.title)}">${current&&!audio.paused?'♫':'▶'}</button><div><strong>${String(i+1).padStart(2,'0')} · ${esc(t.title)}</strong><small>${esc(t.release||'Stonefellow')} · ${time(t.duration)}</small></div><span class="temporary-playlist-state">${current?(audio.ended?'FINISHED':audio.paused?'READY':'NOW PLAYING'):''}</span></article>`}).join('')}</section>`:'';
+    const savedHtml=rows.length?`<section class="persistent-queue"><h3>${temp?'UP NEXT · SAVED QUEUE':'UP NEXT'}</h3>${rows.map((x,i)=>`<article class="queue-item"><button type="button" class="queue-item-play" data-queue-play="${x.item_id}" aria-label="Play ${esc(x.title)}">▶</button><div><strong>${esc(x.title)}</strong><small>${esc(x.release||'')} · ${time(x.duration)}</small></div><div class="queue-item-actions"><button type="button" data-queue-move="${x.item_id}" data-dir="-1" ${i===0?'disabled':''}>↑</button><button type="button" data-queue-move="${x.item_id}" data-dir="1" ${i===rows.length-1?'disabled':''}>↓</button><button type="button" data-queue-remove="${x.item_id}" aria-label="Remove ${esc(x.title)}">×</button></div></article>`).join('')}</section>`:'';
+    queueContent.innerHTML=playlistHtml+savedHtml||'<p class="drawer-empty">Your Up Next queue is empty.</p>';
+    Array.from(queueContent.querySelectorAll('[data-temp-play]')).forEach(b=>b.onclick=()=>playTemporaryTrack(Number(b.dataset.tempPlay)));
+    Array.from(queueContent.querySelectorAll('[data-queue-play]')).forEach(b=>b.onclick=()=>takeQueueItem(b.dataset.queuePlay));
+    Array.from(queueContent.querySelectorAll('[data-queue-remove]')).forEach(b=>b.onclick=()=>removeQueueItem(b.dataset.queueRemove));
+    Array.from(queueContent.querySelectorAll('[data-queue-move]')).forEach(b=>b.onclick=()=>reorderQueueItem(b.dataset.queueMove,b.dataset.dir));
+    const n=temp?mix.trackIds.length:rows.length;
+    if(queueDrawerCount)queueDrawerCount.textContent=n+' track'+(n===1?'':'s');
+  }
+  async function openQueue(){
+    if(!st.auth.authenticated&&!isTemporaryPlaylist()){say('Sign in to use a persistent Up Next queue.',()=>navigate('login'));return}
+    if(st.auth.authenticated)await loadQueue(true);
+    st.queue.open=true;if(queueDrawer)queueDrawer.hidden=false;if(queueBackdrop)queueBackdrop.hidden=false;
+    playerQueueButton?.setAttribute('aria-expanded','true');document.body.classList.add('queue-open');renderQueueDrawer();
+  }
   function closeQueue(){st.queue.open=false;if(queueDrawer)queueDrawer.hidden=true;if(queueBackdrop)queueBackdrop.hidden=true;playerQueueButton?.setAttribute('aria-expanded','false');document.body.classList.remove('queue-open')}
   async function loadPersonalization(force=false){
     if(!st.auth.authenticated){st.personalization={loaded:true,favorites:{tracks:[],releases:[]},continue_listening:[],history:[],recommendations:{personalized:false,summary:'Sign in and listen to make recommendations personal.',signals:{},items:[]}};return st.personalization}
@@ -859,8 +892,25 @@
   async function saveCurrentAgentSession(){if(!agentSessionVisible())return;const name=prompt('Save this listening session as a playlist',st.agentSession.title||'Agent Listening Session');if(name===null)return;try{const j=await secureJsonPost('listening-sessions.php',{action:'save_playlist',session_id:st.agentSession.id,name});st.playlists={loaded:true,items:j.playlists||[]};say('Saved this listening session as a playlist.',()=>navigate('playlist',{id:j.playlist.id}))}catch(e){say(e.message)}}
   async function endCurrentAgentSession(){if(!agentSessionActive())return;try{const j=await secureJsonPost('listening-sessions.php',{action:'end',session_id:st.agentSession.id});st.agentSession={...st.agentSession,...(j.session||{}),status:'ended'};clearPlaylistPlayback();renderAgentSessionPanel();say('Listening session ended.')}catch(e){say(e.message)}}
   async function advanceAgentSession(result='complete'){if(!agentSessionActive()||!st.track)return null;try{const j=await secureJsonPost('listening-sessions.php',{action:'advance',session_id:st.agentSession.id,track_id:st.track.id,result});st.agentSession={...st.agentSession,...(j.session||{}),currentIndex:Number(j.session?.current_index||0),tracks:j.session?.tracks||st.agentSession.tracks};return j.session||null}catch(_){return null}}
-  function clearPlaylistPlayback(){st.playlistPlayback={playlistId:null,playlistName:'',trackIds:[],index:-1}}
-  function playPlaylist(p,startIndex=0){const ids=(p?.tracks||[]).map(x=>x.id).filter(id=>trackById(id));if(!ids.length){say('That playlist is empty.');return}const idx=Math.max(0,Math.min(ids.length-1,Number(startIndex)||0));st.playlistPlayback={playlistId:Number(p.id)||null,playlistName:p.name||'Playlist',trackIds:ids,index:idx};const t=trackById(ids[idx]);if(t)play(t,0,'playlist',true)}
+  async function startTemporaryPlaylist(action){
+    if(agentSessionActive())return 'End the active Agent listening session before starting a random playlist.';
+    const ids=Array.isArray(action?.track_ids)?action.track_ids:[];
+    if(!ids.length||ids.length>20||ids.some(id=>!trackById(id)?.audio)||new Set(ids).size!==ids.length)
+      return 'The temporary playlist contains an unavailable or repeated song. I have not changed playback.';
+    const name=String(action.name||'Stonefellow Random Mix').slice(0,120);
+    st.playlistPlayback={playlistId:'temporary:'+Date.now(),playlistName:name,trackIds:ids.slice(),index:0,temporary:true};
+    updateQueueUi();
+    const started=await play(trackById(ids[0]),0,'temporary_playlist',true);
+    await openQueue();
+    return started?'Created a temporary '+ids.length+'-song playlist and started “'+st.track.title+'.” The song queue is open.':'Created a temporary '+ids.length+'-song playlist and opened the queue. Tap Play to start the music.';
+  }
+  function playTemporaryTrack(index){
+    if(!isTemporaryPlaylist()||!Number.isInteger(index)||index<0||index>=st.playlistPlayback.trackIds.length)return;
+    const track=trackById(st.playlistPlayback.trackIds[index]);if(!track?.audio)return;
+    st.playlistPlayback.index=index;updateQueueUi();void play(track,0,'temporary_playlist',true);
+  }
+  function clearPlaylistPlayback(){st.playlistPlayback={playlistId:null,playlistName:'',trackIds:[],index:-1};updateQueueUi()}
+  function playPlaylist(p,startIndex=0){const ids=(p?.tracks||[]).map(x=>x.id).filter(id=>trackById(id));if(!ids.length){say('That playlist is empty.');return}const idx=Math.max(0,Math.min(ids.length-1,Number(startIndex)||0));st.playlistPlayback={playlistId:Number(p.id)||null,playlistName:p.name||'Playlist',trackIds:ids,index:idx};updateQueueUi();const t=trackById(ids[idx]);if(t)play(t,0,'playlist',true)}
   function playlistShareUrl(p){const u=new URL(location.href);u.search='';u.searchParams.set('view','playlist');u.searchParams.set('id',String(p.id));return u.toString()}
   async function copyPlaylistLink(p){const url=playlistShareUrl(p);try{await navigator.clipboard.writeText(url);say('Public playlist link copied.')}catch(_){window.prompt('Copy this public playlist link:',url)}}
   async function createPlaylistPrompt(){if(!st.auth.authenticated){navigate('login');return}const name=prompt('Playlist name','My Stonefellow Playlist');if(!name)return;try{const j=await secureJsonPost('playlists.php',{action:'create',name,description:'',visibility:'private',source_type:'user',track_ids:[]});st.playlists={loaded:true,items:j.playlists||[]};navigate('playlist',{id:j.playlist.id})}catch(e){say(e.message)}}
@@ -1399,6 +1449,8 @@
       player:footerPlayer,
       initialConversation:popupEntries.at(-1)||null,
       isCapturing:()=>!!(songCaptureSkill?.status()?.active||songListeningSkill?.status()?.active),
+      hasTemporaryPlaylist:()=>isTemporaryPlaylist(),
+      onOpenQueue:()=>void openQueue(),
       isConversationActive:()=>st.conversationOn,
       needsVoiceGesture:()=>iosVoiceNeedsGesture,
       // Keep the microphone start inside this click's user-activation turn.
@@ -1867,11 +1919,11 @@
     const fileDuration=Number.isFinite(audio.duration)?audio.duration:played;
     return published>=40&&played>=2&&Math.max(played,fileDuration)<published-Math.max(15,published*.08);
   }
-  function play(t,resumeAt=0,source='player',keepPlaylist=false){if(!t)return Promise.resolve(false);const changing=!st.track||st.track.id!==t.id;if(changing){songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');}if(changing&&st.track&&st.playing){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}if(!keepPlaylist)clearPlaylistPlayback();st.playSource=source||'player';st.track=t;if(changing){audio.pause();audio.src=t.audio||'';audio.load()}const startAt=Math.max(0,Number(resumeAt)||0);const applyResume=()=>{if(startAt>0&&Number.isFinite(audio.duration)&&audio.duration>startAt+1)audio.currentTime=startAt};if(changing&&startAt>0)audio.addEventListener('loadedmetadata',applyResume,{once:true});else applyResume();st.playing=true;updateFooterPlayer();return audio.play().then(()=>{recordListen(startAt>0?'resume':'start');agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');updateFooterPlayer();return true}).catch(()=>{st.playing=false;updateFooterPlayer();agent('idle','The catalog entry is ready, but this browser could not play its audio file. Add or verify '+(t.audio||'the track file')+'.');return false})}
+  function play(t,resumeAt=0,source='player',keepPlaylist=false){if(!t)return Promise.resolve(false);const changing=!st.track||st.track.id!==t.id;if(changing){songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');}if(changing&&st.track&&st.playing){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}if(!keepPlaylist)clearPlaylistPlayback();st.playSource=source||'player';st.track=t;updateQueueUi();if(changing){audio.pause();audio.src=t.audio||'';audio.load()}const startAt=Math.max(0,Number(resumeAt)||0);const applyResume=()=>{if(startAt>0&&Number.isFinite(audio.duration)&&audio.duration>startAt+1)audio.currentTime=startAt};if(changing&&startAt>0)audio.addEventListener('loadedmetadata',applyResume,{once:true});else if(!changing&&keepPlaylist&&startAt===0)try{audio.currentTime=0}catch(_){}else applyResume();st.playing=true;updateFooterPlayer();return audio.play().then(()=>{recordListen(startAt>0?'resume':'start');agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');updateFooterPlayer();return true}).catch(()=>{st.playing=false;updateFooterPlayer();agent('idle','The catalog entry is ready, but this browser could not play its audio file. Add or verify '+(t.audio||'the track file')+'.');return false})}
   function toggle(){if(!st.track)return;if(st.playing){recordListen('pause');audio.pause();st.playing=false;agent('idle','Paused “'+st.track.title+'.”')}else{audio.play().then(()=>{recordListen('resume');st.playing=true;agent('playing','Playing “'+st.track.title+'.”');updateFooterPlayer()}).catch(()=>{st.playing=false;updateFooterPlayer()})}updateFooterPlayer()}
   function stepTrack(delta){
     if(agentSessionActive()&&delta>0){advanceAgentSession('skip').then(session=>{if(!session||session.status!=='active'){renderAgentSessionPanel();return}const ids=sessionTrackIds();st.playlistPlayback.index=Number(session.current_index||0);const t=trackById(ids[st.playlistPlayback.index]);if(t)play(t,0,'agent_session',true);renderAgentSessionPanel()});return}
-    if(st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length){const ids=st.playlistPlayback.trackIds;let i=st.playlistPlayback.index;if(i<0)i=Math.max(0,ids.indexOf(st.track?.id));i=(i+delta+ids.length)%ids.length;st.playlistPlayback.index=i;const t=trackById(ids[i]);if(t)play(t,0,'playlist',true);return}
+    if(st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length){const ids=st.playlistPlayback.trackIds;let i=st.playlistPlayback.index;if(i<0)i=Math.max(0,ids.indexOf(st.track?.id));i=(i+delta+ids.length)%ids.length;st.playlistPlayback.index=i;updateQueueUi();const t=trackById(ids[i]);if(t)play(t,0,isTemporaryPlaylist()?'temporary_playlist':'playlist',true);return}
     if(delta>0&&st.auth.authenticated&&st.queue.items.length){playNextFromQueue();return}
     if(delta<0&&st.queue.history.length){const id=st.queue.history.shift();localStorage.setItem('stonefellow.queue.history.v1',JSON.stringify(st.queue.history));const t=trackById(id);if(t){play(t,0,'queue_history');return}}
     if(!st.track||!catalog.length)return;let i=catalog.findIndex(t=>t.id===st.track.id);if(i<0)i=0;i=(i+delta+catalog.length)%catalog.length;play(catalog[i])
@@ -2407,7 +2459,7 @@
   audio.addEventListener('loadedmetadata',()=>{playerDuration.textContent=time(audio.duration);updateFooterPlayer()});
   audio.addEventListener('timeupdate',()=>{songCaptureSkill?.playbackPosition();playerCurrent.textContent=time(audio.currentTime);playerDuration.textContent=time(audio.duration||st.track?.duration||0);playerSeek.value=audio.duration?String(Math.round((audio.currentTime/audio.duration)*1000)):'0';const now=Date.now();if(st.track&&st.playing&&now-st.lastProgressAt>30000){st.lastProgressAt=now;recordListen('progress')}});
   audio.addEventListener('seeking',()=>{if(songCaptureSkill?.status().active)songCaptureSkill.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('seek')});
-  audio.addEventListener('play',()=>{st.playing=true;updateFooterPlayer();syncConversationMusic()});audio.addEventListener('pause',()=>{if(!audio.ended){st.playing=false;updateFooterPlayer()}if(songCaptureSkill?.status().active)void songCaptureSkill.stop('pause');if(songListeningSkill?.status().active)void songListeningSkill.stop('pause');syncConversationMusic()});
+  audio.addEventListener('play',()=>{st.playing=true;updateFooterPlayer();updateQueueUi();syncConversationMusic()});audio.addEventListener('pause',()=>{if(!audio.ended){st.playing=false;updateFooterPlayer()}updateQueueUi();if(songCaptureSkill?.status().active)void songCaptureSkill.stop('pause');if(songListeningSkill?.status().active)void songListeningSkill.stop('pause');syncConversationMusic()});
   audio.addEventListener('ended',()=>{if(songCaptureSkill?.status().active)void songCaptureSkill.stop('end');if(songListeningSkill?.status().active)void songListeningSkill.stop('end');
     if(playbackEndedEarly()){
       st.playing=false;updateFooterPlayer();
@@ -2416,7 +2468,8 @@
     }
     recordListen('complete');st.playing=false;updateFooterPlayer();
     if(agentSessionActive()){advanceAgentSession('complete').then(session=>{if(!session)return;if(session.status==='active'){const ids=sessionTrackIds(),idx=Number(session.current_index||0),next=trackById(ids[idx]);st.playlistPlayback.index=idx;st.playlistPlayback.trackIds=ids;if(next){const previous=st.track,comment=st.agentSession.mode==='guided_release'&&previous?.story?'That was “'+previous.title+'.” '+String(previous.story).slice(0,180):'Next up: “'+next.title+'.”';agent('thinking',comment);setTimeout(()=>play(next,0,'agent_session',true),650)}renderAgentSessionPanel()}else{clearPlaylistPlayback();renderAgentSessionPanel();if(st.queue.items.length){playNextFromQueue();return}agent('idle','Finished “'+st.agentSession.title+'.” You can save it as a playlist from the listening session panel.')}});return}
-    if(st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length&&st.playlistPlayback.index<st.playlistPlayback.trackIds.length-1){st.playlistPlayback.index++;const t=trackById(st.playlistPlayback.trackIds[st.playlistPlayback.index]);if(t){play(t,0,'playlist',true);return}}
+    if(st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length&&st.playlistPlayback.index<st.playlistPlayback.trackIds.length-1){st.playlistPlayback.index++;updateQueueUi();const t=trackById(st.playlistPlayback.trackIds[st.playlistPlayback.index]);if(t){play(t,0,isTemporaryPlaylist()?'temporary_playlist':'playlist',true);return}}
+    if(isTemporaryPlaylist()&&st.queue.items.length===0){updateQueueUi();agent('idle','Finished “'+st.playlistPlayback.playlistName+'.” Open the playlist icon to replay any song.');return}
     const finished=st.playlistPlayback.playlistName;clearPlaylistPlayback();if(st.queue.items.length){playNextFromQueue();return}agent('idle',finished?'Finished “'+finished+'.”':'That was “'+(st.track?.title||'the song')+'.” Want another, the story, or should we put it on a record?')
   });
   audio.addEventListener('error',()=>{songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('error');if(st.track){st.playing=false;updateFooterPlayer();agent('idle','The player could not load “'+st.track.title+'.” Check the installed audio file.')}});
@@ -2443,7 +2496,7 @@
     voice.title=iosVoiceNeedsGesture?'Microphone paused · tap to resume':st.conversationOn?'Conversation active · click to stop':'Start hands-free conversation';
     window.SFPublicAgentCanvas?.syncVoice?.();
   }
-  function listeningPrompt(){return st.playing&&!audio.paused?'Listening · say “Stonefellow” to talk over music.':'Listening · speak naturally.'}
+  function listeningPrompt(){return st.playing&&!audio.paused?(Date.now()<musicFollowupUntil?'Listening · ask a follow-up.':'Listening · say “Stonefellow” to talk over music.'):'Listening · speak naturally.'}
   function greetAfterMicrophoneReady(){
     if(!voiceGreetingArmed)return false;
     voiceGreetingArmed=false;
@@ -2491,8 +2544,11 @@
     finally{if(turn===voiceTurnGeneration){voiceTurnBusy=false;if(st.conversationOn){musicFollowupUntil=Date.now()+18000;if(iosVoiceNeedsGesture){agent('idle','Microphone paused.');showTranscript('Microphone paused · tap Start Chat to resume.','waiting')}else{agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}}}}
   }
   function submitRecognizedVoiceTurn(spoken){
+    const own=String(voiceSpeechGuard?.reference||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+    const heard=String(spoken||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+    if(Date.now()<voiceEchoUntil&&heard.length>=9&&own.includes(heard))return;
     const woke=musicWakePhrase.test(spoken),words=spoken.replace(musicWakePhrase,'').trim();
-    if(st.playing&&!audio.paused&&!woke){
+    if(st.playing&&!audio.paused&&!woke&&Date.now()>=musicFollowupUntil){
       showTranscript('Music is playing. Say “Stonefellow” followed by your question.','listening');
       return;
     }

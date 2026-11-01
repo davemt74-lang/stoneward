@@ -20,7 +20,7 @@ function sf_agent_tool_registry(): array {
             'label'=>'Local Stonefellow audio player transport and status',
             'kind'=>'local_action','scope'=>'fan','owner'=>'assets/js/agent-audio-player-skill.js',
             'handler'=>'dispatch','confirmation'=>false,'execution'=>'browser',
-            'capabilities'=>['play_track','pause_player','resume_player','next_track','previous_track','player_status','set_player_volume'],
+            'capabilities'=>['play_track','pause_player','stop_player','resume_player','next_track','previous_track','player_status','set_player_volume','load_temporary_playlist'],
             'contract'=>'stonefellow.audio-player.v1',
         ],
         'favorite_track'=>['label'=>'Favorite a track','kind'=>'write','scope'=>'signed_in_fan','owner'=>'api/personalization.php','handler'=>'set_favorite','confirmation'=>true,'execution'=>'authenticated_api'],

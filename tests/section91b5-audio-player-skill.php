@@ -9,7 +9,7 @@ $check=static function(bool $ok,string $label)use(&$passed):void{
 };
 $tools=sf_agent_tool_registry();
 $tool=$tools['audio_player_transport']??null;
-$capabilities=['play_track','pause_player','resume_player','next_track','previous_track','player_status','set_player_volume'];
+$capabilities=['play_track','pause_player','stop_player','resume_player','next_track','previous_track','player_status','set_player_volume','load_temporary_playlist'];
 $check(is_array($tool),'Unified audio transport is registered');
 $check(($tool['kind']??null)==='local_action' && ($tool['execution']??null)==='browser','Transport cannot mutate the server');
 $check(($tool['owner']??null)==='assets/js/agent-audio-player-skill.js','Transport references the actual shared browser module');
@@ -24,12 +24,12 @@ foreach(['public','customer','admin'] as $context){
     $skill=sf_agent_skill_manifest('unified_audio_player',$context);
     $check(is_array($skill),'Unified audio skill appears in '.$context.' context');
     $check(($skill['tool_id']??'')==='audio_player_transport','Skill uses the shared transport in '.$context);
-    $check(($skill['capabilities']??[])===$capabilities,'Skill declares seven commands in '.$context);
+    $check(($skill['capabilities']??[])===$capabilities,'Skill declares all nine commands in '.$context);
     $check(($skill['execution_contract']??'')==='stonefellow.audio-player.v1','Skill contract remains consistent in '.$context);
     $check(($skill['execution_location']??'')==='browser' && empty($skill['may_execute_directly']),'Skill has browser-only execution in '.$context);
     $check(in_array('unified_audio_player',array_column(sf_agent_skill_inventory($context),'id'),true),'Context inventory discovers the skill in '.$context);
 }
-foreach(['player_play_named','player_pause','player_resume','player_next','player_previous','player_status','player_volume'] as $intent){
+foreach(['player_play_named','player_pause','player_stop','player_resume','player_next','player_previous','player_status','player_volume','playlist_random'] as $intent){
     $skill=sf_agent_skill_for_intent('customer',$intent);
     $check(($skill['id']??'')==='unified_audio_player','Customer intent routed through unified skill: '.$intent);
     $contract=sf_agent_orchestration_contract('admin',$intent);

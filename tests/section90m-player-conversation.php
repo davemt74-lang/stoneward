@@ -11,7 +11,7 @@ $check=static function(string $name,bool $ok)use(&$passed,&$failed):void{
 
 foreach([
     'pause the music'=>'player_pause',
-    'stop playback'=>'player_pause',
+    'stop playback'=>'player_stop',
     'resume the song'=>'player_resume',
     'unpause it'=>'player_resume',
     'play the current track'=>'player_resume',

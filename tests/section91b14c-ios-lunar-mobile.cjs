@@ -146,7 +146,7 @@ check('Mobile Activity is a right-side slide-out and chat input never triggers i
 });
 check('Version markers and updated browser JavaScript remain synchronized',()=>{
   const version=shell.match(/define\('SF_BUILD',\s*'([0-9.]+)'\)/)?.[1];
-  assert.equal(version,'1.3.203');
+  assert.equal(version,'1.3.204');
   for(const file of ['stonefellow-v120.php','admin/index.php','.htaccess','version.php','service-worker.js','assets/js/app.js','assets/css/turntable-builder.css'])
     assert.ok(read(file).includes(version),file);
   new vm.Script(app);new vm.Script(canvas);
