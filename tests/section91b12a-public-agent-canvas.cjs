@@ -56,7 +56,7 @@ check('Transcription, analysis and follow-up actions remain in the canonical ses
   const card=read('assets/js/agent-song-experience-ui.js');
   assert.match(card,/button\('Stop listening', 'stop'\)/);
   assert.match(card,/button\('Transcribe excerpt', 'transcribe'\)/);
-  assert.match(card,/button\(state\.reports\?\.length \? 'Analyze again'/);
+  assert.match(card,/button\(state\.reports\?\.length \? 'Interpret again'/);
   assert.match(card,/onAction\?\.\('ask', question\)/);
   assert.match(moduleSource,/\.sf-agent-expanded-session/);
 });

@@ -12,8 +12,14 @@ try{
     // The listener explicitly authorizes this report per request. Only public
     // knowledge plus THIS account's consented listening summary may be sent.
     $context=sf_agent_context($request['title'].' '.$request['release'].' '.$request['question'],'knowledge',$userId);
+    $knowledgeIndex=SF_ROOT.'/storage/knowledge/index.json';
+    $knowledge=is_file($knowledgeIndex)?json_decode((string)file_get_contents($knowledgeIndex),true):[];
+    $writer=sf_song_analysis_writer_context($request,sf_agent_public_catalog(),
+        function_exists('sf_story_list')?sf_story_list(true,'',80):[],
+        (array)($knowledge['files']??[]),
+        function_exists('sf_songbook_public_payload')?(array)(sf_songbook_public_payload($request['track_id'])??[]):[]);
     $listening=sf_agent_listening_context(sf_agent_listening_insights($userId,$request['timezone']));
-    $system=sf_song_analysis_system($request,$context,$listening);
+    $system=sf_song_analysis_system($request,$context,$listening,$writer['text']);
     $estimate=max(120,(int)ceil((strlen($system)+strlen($request['question']))/4)+800);
     $allow=sf_can_use_ai($user,$estimate);
     if(!$allow['ok'])sf_json_response(['ok'=>false,'error'=>'active_tokens_required','message'=>'More Active Tokens are required for this lyric analysis.'],402);
@@ -23,7 +29,7 @@ try{
             $response=$provider['provider']==='openai'
                 ?sf_openai_call($provider,$system,[],$request['question'],700)
                 :sf_anthropic_call($provider,$system,[],$request['question'],700);
-            $report=sf_song_analysis_report($request,$response);
+            $report=sf_song_analysis_report($request,$response,$writer['sources']);
             $used=max(1,(int)($response['input_tokens']??0)+(int)($response['output_tokens']??0));
             $balance=sf_consume_ai($user,$used,$response,'song-section-analysis');
             sf_json_response(['ok'=>true,'analysis'=>$report,'active_tokens_remaining'=>($user['role']??'')==='admin'?null:$balance]);

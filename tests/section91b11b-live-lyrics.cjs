@@ -96,7 +96,7 @@ async function main(){
   });
   check('The original full-clip transcription and follow-up analysis remain in the player',()=>{
     const app=read('assets/js/app.js');
-    assert.match(app,/void transcribeLastCapturedSong\(\)/);
+    assert.match(app,/void transcribeLastCapturedSong\(false,songInterpretAfterTranscribe\)/);
     assert.match(app,/if\(songLiveOptedIn&&!songLiveFinalizing\)/);
     assert.match(app,/song_capture_live_start/);
     assert.match(app,/song_lyric_draft_available:songLyricDraft\?1:0/);
@@ -200,7 +200,7 @@ function exerciseLiveCard(){
     assert.match(host.textContent,/2 section\(s\) transcribed/);
     assert.match(host.textContent,/<script>fake<\/script>/);
     assert.equal(host.all('script').length,0);
-    assert.equal(host.all('button').find(b=>b.textContent==='Analyze excerpt').disabled,true);
+    assert.equal(host.all('button').find(b=>b.textContent==='Interpret lyrics').disabled,true);
     assert.equal(host.all('form').length,0);
     assert.equal(host.all('button').some(b=>b.textContent==='Start live transcription'),false);
   });

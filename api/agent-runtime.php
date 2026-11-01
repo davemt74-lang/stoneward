@@ -276,7 +276,8 @@ function sf_agent_explicit_song_capture_route(string $message,array $client=[]):
     $q=preg_replace('/^(?:(?:hey|hi|ok|okay)\s+)?stone\s*-?\s*fellow[,.:!?\s]*/i','',$q)??$q;
     // Live transcription is a distinct, user-authorized network action.
     // Check before ordinary 'transcribe this verse', which stays local.
-    if(preg_match('/\b(?:live|real[- ]?time)\s+(?:song\s+|audio\s+|lyric\s+)?(?:transcription|transcribing|captions|lyrics)\b|\btranscrib(?:e|ing)\s+(?:the\s+)?(?:song\s+|lyrics?\s+)?(?:live|in\s+real[- ]?time)\b|\b(?:start|enable|show|turn\s+on)\s+(?:the\s+)?(?:live|real[- ]?time)\s+(?:captions|lyrics|transcription)\b/i',$q))return 'song_capture_live_start';
+    if(preg_match('/\b(?:live|real[- ]?time)\s+(?:song\s+|audio\s+|lyric\s+)?(?:transcription|transcribing|captions|lyrics)\b|\btranscrib(?:e|ing)\s+(?:the\s+)?(?:song\s+|lyrics?\s+)?(?:live|in\s+real[- ]?time)\b|\b(?:start|enable|show|turn\s+on)\s+(?:the\s+)?(?:live|real[- ]?time)\s+(?:captions|lyrics|transcription)\b/i',$q)
+        ||preg_match('/\blisten(?:ing)?\b.*\b(?:transcrib\w*|interpret\w*|analy[sz]\w*|lyric\s+meaning)\b/i',$q))return 'song_capture_live_start';
     if(!empty($client['song_lyric_draft_available'])&&(
         preg_match('/\b(?:analy[sz]e|analysis|explain|interpret|research|report|summari[sz]e|translate|meaning|symbolism|themes?)\b.*\b(?:verse|chorus|lyrics?|transcript(?:ion)?|song|excerpt|line|words|section|that|it)\b/i',$q)
         ||preg_match('/\b(?:what\s+does\s+(?:(?:that|this|the)\s+(?:line|verse|lyric|section)|that|this|it)\s+mean|what\s+do\s+(?:those|these|the)\s+lyrics\s+mean|what\s+is\s+that\s+verse\s+about|tell\s+me\s+more\s+about\s+that\s+(?:verse|lyric|section))\b/i',$q)
@@ -394,14 +395,19 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
     switch($route){
         case 'song_capture_live_start':
             // A model-selected route cannot itself authorize a metered audio
-            // upload. The user's words must explicitly request live captions.
+            // upload. The user must ask for transcription, or for the agent
+            // to listen AND interpret the playing lyrics.
+            $interpretAfter=(bool)preg_match('/\blisten(?:ing)?\b.*\b(?:interpret\w*|analy[sz]\w*|lyric\s+meaning)\b/i',$message);
             if(sf_agent_explicit_song_capture_route($message,$client)!=='song_capture_live_start'||
                 (!preg_match('/\b(?:start|begin|enable|activate|turn\s+on|show|display|transcrib\w*|give|write)\b/i',$message)
-                  &&!preg_match('/^\s*(?:live|real[- ]?time)\s+(?:lyric\s+|song\s+|audio\s+)?(?:captions|lyrics|transcription)\s*[.!?]*\s*$/i',$message)))
-                $text='Say “start live transcription” to authorize metered live lyric captions.';
+                  &&!preg_match('/^\s*(?:live|real[- ]?time)\s+(?:lyric\s+|song\s+|audio\s+)?(?:captions|lyrics|transcription)\s*[.!?]*\s*$/i',$message)
+                  &&!$interpretAfter))
+                $text='Say “start live transcription” or “listen and interpret the lyrics” to authorize metered audio processing.';
             elseif($active===''||empty($client['player_is_playing']))$text='Play a published song first, then ask for live lyrics.';
             elseif(!empty($client['song_capture_live_enabled']))$text='Live lyric transcription is already active.';
-            else{$action=['type'=>'song_capture_live_start'];$text='Enabling metered live transcription of the current player audio. Provisional lyrics will appear in chat.';}
+            else{$action=['type'=>'song_capture_live_start','interpret_on_stop'=>$interpretAfter];$text=$interpretAfter
+                    ?'Listening, transcribing and preparing a songwriter-aware interpretation after you stop.'
+                    :'Enabling metered live transcription of the current player audio. Provisional lyrics will appear in chat.';}
             break;
         case 'song_capture_analyze':
             if(empty($client['song_lyric_draft_available']))$text='First capture and transcribe a song section. Then I can analyze or research the lyrics you heard.';

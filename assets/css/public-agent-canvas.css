@@ -33,6 +33,15 @@ body.sf-agent-canvas-active .chat-footer::before { content:none!important; }
 .sf-agent-landing .sf-agent-state { display:flex; align-items:center; gap:9px; margin-top:29px; font-size:10px; font-weight:750; letter-spacing:.23em; text-shadow:0 2px 12px #050916; white-space:nowrap; }
 .sf-agent-landing .sf-agent-state::before { content:""; width:7px; height:7px; border-radius:50%; background:#a9f3df; box-shadow:0 0 13px #80ead0; }
 .sf-agent-landing .sf-agent-hint { margin:9px 0 0; color:#94a8c9; font-size:9px; letter-spacing:.12em; text-align:center; white-space:nowrap; }
+.sf-agent-landing .sf-agent-listen-actions { position:relative;z-index:7;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:min(365px,calc(100vw - 28px));margin-top:14px;cursor:default;user-select:none; }
+.sf-agent-landing .sf-agent-listen-actions button { min-width:0;min-height:52px;padding:9px 11px;text-align:left;border-radius:13px;border:1px solid #8bc7f064;background:linear-gradient(135deg,#203d67d9,#122b4bd9);color:#dff4ff;box-shadow:inset 0 1px 0 #c4eaff19,0 6px 22px #0309164d;backdrop-filter:blur(16px); }
+.sf-agent-landing .sf-agent-listen-actions button:first-child { border-color:#87d6ffad;background:linear-gradient(135deg,#275b8de8,#15466fe8);box-shadow:0 0 25px #48b7ff26; }
+.sf-agent-landing .sf-agent-listen-actions button strong { display:block;font:700 11px/1.2 var(--body-font,system-ui,sans-serif); }
+.sf-agent-landing .sf-agent-listen-actions button small { display:block;color:#9ed3f6;font:700 8px/1.4 ui-monospace,monospace;letter-spacing:.035em;margin-top:5px; }
+.sf-agent-landing .sf-agent-listen-actions button:hover:not(:disabled),.sf-agent-landing .sf-agent-listen-actions button:focus-visible { border-color:#c5f0ff;background:#2f628d; }
+.sf-agent-landing .sf-agent-listen-actions button:disabled { opacity:.42;cursor:not-allowed; }
+.sf-agent-landing .sf-agent-listen-actions [data-agent-action="stop-listening"] { grid-column:1/-1;text-align:center;border-color:#ff9cb77a;background:#633049c9; }
+.sf-agent-landing .sf-agent-listen-actions [data-agent-action="stop-listening"] small { color:#ffc2d2; }
 .sf-agent-landing .sf-agent-tools { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:11px; border-top:1px solid #8bcbff35; }
 .sf-agent-landing .sf-agent-tools button,.sf-agent-landing .sf-agent-panel button { min-height:32px; padding:6px 11px; border:1px solid #9dcfff54; border-radius:999px; background:#21344bbf; color:#d8efff; font-size:11px; }
 .sf-agent-landing .sf-agent-tools button:hover,.sf-agent-landing .sf-agent-panel button:hover { border-color:#a8dcff; background:#334f73; }
@@ -111,6 +120,10 @@ body.sf-agent-canvas-active .chat-footer::before { content:none!important; }
   .sf-agent-landing .sf-agent-visual { width:148px; height:148px; }
   .sf-agent-landing .sf-agent-cloud { inset:-104px; width:356px; height:356px; }
   .sf-agent-landing .sf-agent-state { margin-top:17px; font-size:9px; }
+  .sf-agent-landing .sf-agent-listen-actions { width:min(320px,calc(100vw - 20px));margin-top:11px; }
+  .sf-agent-landing .sf-agent-listen-actions button { min-height:49px;padding:7px 8px; }
+  .sf-agent-landing .sf-agent-listen-actions button strong { font-size:10px; }
+  .sf-agent-landing .sf-agent-listen-actions button small { font-size:7px; }
   .sf-agent-landing .sf-agent-tools { margin-top:8px; }
   .sf-agent-landing .sf-agent-dock-stack { width:min(320px,calc(100vw - 20px)); }
   .sf-agent-landing .sf-agent-session { max-height:28dvh; }
