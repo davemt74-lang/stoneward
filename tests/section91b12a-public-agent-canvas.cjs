@@ -118,7 +118,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   }
   const selectors=['.sf-agent-landing','.sf-agent-floater','.sf-agent-visual','.sf-agent-sphere','.sf-agent-state',
     '.sf-agent-mesh','.sf-agent-cloud','.sf-agent-points','.sf-agent-workspace','.sf-agent-panel',
-    '.sf-agent-session','.sf-agent-expanded-session','.sf-agent-player-dock'];
+    '.sf-agent-session','.sf-agent-expanded-session','.sf-agent-player-dock','.sf-agent-player-reveal'];
   const elements={};for(const key of selectors)elements[key]=new Element(key);
   elements['.sf-agent-landing'].clientWidth=950;elements['.sf-agent-landing'].clientHeight=650;
   const rootElement=elements['.sf-agent-landing'];
@@ -127,8 +127,9 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   const footer=new Element('footer'),player=new Element('player'),composer=new Element('composer');
   footer.appendChild(player);footer.appendChild(composer);player.nextSibling=composer;
   let captureInvoked=0,chatInvoked=0,mountCalls=0,capturing=false;
+  let nextTimer=0;const timers=new Map();
   const window={matchMedia:()=>({matches:true}),addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type),
-    setTimeout:()=>1,clearTimeout(){},devicePixelRatio:1,
+    setTimeout:(fn,delay)=>{const id=++nextTimer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),devicePixelRatio:1,
     StonefellowSongExperience:{active:()=>true,mount:host=>{mountCalls++;host.mounted=true;}}};
   const scope={window,document:{},ResizeObserver:class{observe(){}disconnect(){}},
     requestAnimationFrame:()=>1,cancelAnimationFrame(){},performance:{now:()=>1000}};
@@ -144,6 +145,16 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   const fireAction=action=>rootElement.listeners.click({target:{closest:()=>({dataset:{agentAction:action}})}});
   fireAction('capture');fireAction('chat');
   assert.equal(captureInvoked,1);assert.equal(chatInvoked,1);
+  check('Auto-hide fires after 5.2 seconds and the reveal action restores the real player',()=>{
+    const idle=Array.from(timers.values()).find(t=>t.delay===5200);
+    assert.ok(idle);
+    idle.fn();
+    assert.equal(elements['.sf-agent-player-dock'].classList.contains('is-collapsed'),true);
+    assert.equal(elements['.sf-agent-player-reveal'].hidden,false);
+    fireAction('show-player');
+    assert.equal(elements['.sf-agent-player-dock'].classList.contains('is-collapsed'),false);
+    assert.equal(elements['.sf-agent-player-reveal'].hidden,true);
+  });
   capturing=true;window.SFPublicAgentCanvas.setState('recording');window.SFPublicAgentCanvas.syncSongExperience();
   assert.equal(elements['.sf-agent-floater'].dataset.mode,'recording');
   assert.equal(captureButtons[0].hidden,true);
