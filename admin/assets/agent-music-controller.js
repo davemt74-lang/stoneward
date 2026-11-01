@@ -32,6 +32,7 @@
       catch(_){publish();return 'The browser blocked playback. Click Play in the Admin music bar to enable audio.'}
     };
     const pause=()=>{if(!current)return 'No song is loaded.';audio.pause();publish();return 'Paused “'+current.title+'.”'};
+    const stop=()=>{if(!current)return 'No song is loaded.';audio.pause();try{audio.currentTime=0}catch(_){}publish();return 'Stopped “'+current.title+'.”'};
     const resume=async()=>current?audio.paused?play(current):'“'+current.title+'” is already playing.':'No song is loaded. Ask me to play a Stonefellow track.';
     const step=async direction=>{
       const available=catalog();if(!available.length)return 'No playable Stonefellow songs are available.';
@@ -46,6 +47,8 @@
         switch(action.type){
           case 'player_status':return status();
           case 'pause_player':return pause();
+          case 'stop_player':return stop();
+          case 'load_temporary_playlist':return 'Temporary playlists are available in the public Stonefellow Agent Canvas.';
           case 'resume_player':return resume();
           case 'next_track':return step(1);
           case 'previous_track':return step(-1);
@@ -74,7 +77,8 @@
       const cleaned=norm(message).replace(/^(?:hey|hi|okay|ok)?\s*stone\s*fellow\s*/, '').replace(/^please\s+/,'');
       if(!cleaned)return null;
       if(/^(?:what(?: s| is)? (?:playing|the current song)|what song is (?:this|playing)|player status|music status)$/.test(cleaned))return status();
-      if(/^(?:pause|stop)(?: the)? (?:music|song|track|player|audio)$/.test(cleaned))return pause();
+      if(/^pause(?: the)? (?:music|song|track|player|audio)$/.test(cleaned))return pause();
+      if(/^stop(?: the)? (?:music|song|track|player|audio)$/.test(cleaned))return stop();
       if(/^(?:resume|unpause|continue)(?: the)? (?:music|song|track|player|audio)$/.test(cleaned))return resume();
       if(/^(?:next|skip)(?: the)?(?: song| track| music)?$/.test(cleaned))return step(1);
       if(/^(?:previous|last|back)(?: song| track)?$/.test(cleaned))return step(-1);
@@ -99,7 +103,7 @@
     audio.addEventListener?.('play',publish);
     audio.addEventListener?.('pause',publish);
     publish();
-    return {handle,dispatch:action=>sharedSkill?.dispatch(action),play,pause,resume,step,status,state,duck,setVolume,get current(){return current}};
+    return {handle,dispatch:action=>sharedSkill?.dispatch(action),play,pause,stop,resume,step,status,state,duck,setVolume,get current(){return current}};
   }
   window.StonefellowAdminMusic={create};
 })();

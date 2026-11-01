@@ -56,11 +56,13 @@ jobs:
         run: |
           set -euo pipefail
           find . -type f -name '*.php' ! -path './storage/*' -print0 | xargs -0 -n1 php -l
+          php tests/section91b15a-smart-playlist.php
 
       - name: Public JavaScript syntax
         run: |
           node --check assets/js/app.js
           node tests/section91b5h-playback-intent.cjs
+          node tests/section91b15a-smart-playlist.cjs
           node --check assets/js/conversation-barge-in.js
           node --check assets/js/build-integrity.js
           node --check service-worker.js

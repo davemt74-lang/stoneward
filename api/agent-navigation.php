@@ -39,7 +39,7 @@ function sf_agent_public_page_destinations(): array {
 
 function sf_agent_page_navigation_phrase(string $message): ?string {
     $input=strtolower(trim($message));
-    if(!preg_match('/^(?:hey\s+(?:stonefellow|agent)[, ]+)?(?:please\s+)?(?:go to|navigate to|switch to|take me to|bring me to|open|show me|show|pull up|bring up|visit)\s+(.+)$/iu',$input,$m))return null;
+    if(!preg_match('/^(?:hey\s+(?:stonefellow|agent)[, ]+)?(?:please\s+)?(?:go to|navigate to|switch to|take me to|bring me to|open|load|show me|show|pull up|bring up|visit)\s+(.+)$/iu',$input,$m))return null;
     $name=trim((string)$m[1]);
     $name=preg_replace('/[.!?]+$/u','',$name)??$name;
     $name=preg_replace('/^(?:the|my|our)\s+/u','',$name)??$name;
