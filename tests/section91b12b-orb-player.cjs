@@ -23,7 +23,7 @@ test('Chat still opens manually, but capture progress cannot auto-open it on Age
 });
 test('Actual player passes into the floating canvas and keeps one authoritative audio element',()=>{
   assert.match(app,/player:footerPlayer/);
-  assert.match(canvas,/playerDock\.appendChild\(player\)/);
+  assert.match(canvas,/playerDock\.insertBefore\(player,playerDock\.firstChild\)/);
   assert.match(canvas,/originalPlayerParent\.insertBefore\(player,before\)/);
   assert.match(canvas,/playerObserver\?\.disconnect\(\)/);
   assert.match(app,/SFPublicAgentCanvas\?\.syncPlayer\?\.\(\)/);
@@ -35,7 +35,7 @@ test('Lyric capture keeps the same real session underneath the player',()=>{
   assert.match(canvas,/sf-agent-player-dock/);
   assert.match(canvas,/StonefellowSongExperience\.mount\(smallSession\)/);
   assert.match(canvas,/StonefellowSongExperience\.mount\(bigSession\)/);
-  assert.match(canvas,/if\s*\(panel\.hidden && playerDock\.hidden\) return/);
+  assert.match(canvas,/floater\.dataset\.side='below'/);
 });
 test('Player controls, seek interaction and mobile layout are usable',()=>{
   assert.match(css,/\.sf-agent-player-dock \.footer-player/);
@@ -43,7 +43,7 @@ test('Player controls, seek interaction and mobile layout are usable',()=>{
   assert.match(css,/\.player-timeline \{ grid-area:timeline/);
   assert.match(canvas,/e\.target\.closest\('\.sf-agent-dock-stack'\)/);
   assert.match(css,/@media\(max-width:720px\)/);
-  assert.match(css,/height:max\(calc\(100dvh - 169px\),810px\)/);
+  assert.match(css,/height:max\(calc\(100dvh - 169px\),760px\)/);
 });
 test('Agent responding state animates face rather than reopening chat',()=>{
   assert.match(canvas,/responding:'speaking'/);

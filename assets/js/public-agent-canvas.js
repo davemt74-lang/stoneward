@@ -24,12 +24,14 @@
         </div>
         <div class="sf-agent-state" role="status">AGENT READY</div>
         <p class="sf-agent-hint">DRAG TO MOVE · CLICK TO EXPAND</p>
-        <div class="sf-agent-tools">
-          <button type="button" data-agent-action="chat">Chat with Agent</button>
-          <button type="button" data-agent-action="capture" hidden>Capture song lyrics</button>
-        </div>
         <div class="sf-agent-dock-stack">
-          <div class="sf-agent-player-dock" hidden aria-label="Current music player"></div>
+          <div class="sf-agent-player-dock" aria-label="Agent music and interaction controls">
+            <div class="sf-agent-player-ready">MUSIC / PLAYER READY</div>
+            <div class="sf-agent-tools">
+              <button type="button" data-agent-action="chat">Chat with Agent</button>
+              <button type="button" data-agent-action="capture" hidden>Capture song lyrics</button>
+            </div>
+          </div>
           <aside class="sf-agent-panel" hidden aria-label="Active song lyric capture and analysis">
             <div class="sf-agent-panel-head"><span>LYRIC / CAPTURE · AGENT PROCESS</span><button type="button" data-agent-action="close-panel" aria-label="Hide session panel">×</button></div>
             <div class="sf-agent-session"></div>
@@ -67,6 +69,9 @@
     const smallSession = by(root, '.sf-agent-session');
     const bigSession = by(root, '.sf-agent-expanded-session');
     const contexts = [mesh, cloud, face].map(c => c.getContext('2d'));
+    // The mesh lives behind the entire shell, including the transparent
+    // header and footer, instead of being cropped at the stage boundary.
+    if(document.body?.appendChild)document.body.appendChild(mesh);
     if (contexts.some(c => !c)) root.classList.add('no-canvas');
     const motionOff = reduced();
     const pointer = {x:0,y:0,driftX:0,driftY:0};
@@ -79,7 +84,7 @@
       const r=Math.sqrt((i+.5)/pointCount)*.98, a=i*2.399963229728653;
       return {x:Math.cos(a)*r,y:Math.sin(a)*r,r,seed:i*.913};
     });
-    let mode='idle', raf=0, destroyed=false, dragging=null, suppressClick=false;
+    let mode='idle', raf=0, destroyed=false, dragging=null, hovered=false, suppressClick=false;
     let frameSize=0,lastFrame=0,workspaceTimer=0,remotePanelDismissed=false;
     const roam = {step:0,fromX:0,fromY:0,toX:0,toY:0,start:0,delay:0};
     const spots = [[.20,.24],[.80,.18],[.66,.74],[.13,.68],[.83,.49],[.47,.35]];
@@ -91,9 +96,10 @@
     const player = options.player || null;
     const originalPlayerParent = player?.parentNode || null;
     const originalPlayerNext = player?.nextSibling || null;
-    if (player && originalPlayerParent) playerDock.appendChild(player);
+    if (player && originalPlayerParent) playerDock.insertBefore(player,playerDock.firstChild);
     function syncPlayer() {
-      playerDock.hidden = !player || player.hidden;
+      const loaded=!!player && !player.hidden;
+      playerDock.classList[loaded?'add':'remove']('has-track');
       updateDock();
     }
     const playerObserver = player && typeof MutationObserver === 'function'
@@ -117,15 +123,14 @@
       for (const control of root.querySelectorAll('[data-agent-action="capture"]')) control.hidden=!(audio && audio.src && !audio.paused)||!!options.isCapturing?.();
     }
     function updateDock() {
-      if (panel.hidden && playerDock.hidden) return;
-      if (root.clientWidth<721) {floater.dataset.side='below';floater.dataset.vertical='below';return;}
-      floater.dataset.side=floater.offsetLeft>root.clientWidth*.52?'left':'right';
-      floater.dataset.vertical=floater.offsetTop>root.clientHeight*.54?'above':'below';
+      floater.dataset.side='below';
+      floater.dataset.vertical='below';
     }
     function position(x,y) {
       const margin=Math.min(root.clientWidth*.2,visual.offsetWidth*.65+24);
-      const minX=Math.min(root.clientWidth*.5,margin);
-      const minY=Math.min(root.clientHeight*.5,visual.offsetHeight*.52+40);
+      const minX=Math.min(root.clientWidth*.5,Math.max(margin,floater.offsetWidth*.5+18));
+      // Include the player and any live lyric panel in the moving body's bounds.
+      const minY=Math.min(root.clientHeight*.5,floater.offsetHeight*.5+16);
       const xx=Math.max(minX,Math.min(root.clientWidth-minX,x));
       const yy=Math.max(minY,Math.min(root.clientHeight-minY,y));
       floater.style.left=xx+'px'; floater.style.top=yy+'px'; updateDock();
@@ -135,9 +140,9 @@
       return {x:root.clientWidth*(.14+.72*spot[0]),y:root.clientHeight*(.14+.72*spot[1])};
     }
     function wander(time) {
-      if (motionOff||dragging||workspace.classList.contains('open'))return;
-      if ((!panel.hidden || !playerDock.hidden)&&root.clientWidth<721) {
-        position(root.clientWidth*.5+Math.sin(time*.0005)*14,Math.min(root.clientHeight*.32,210));return;
+      if (motionOff||dragging||hovered||workspace.classList.contains('open'))return;
+      if (root.clientWidth<721) {
+        position(root.clientWidth*.5,root.clientHeight*.36);return;
       }
       if(!roam.start){roam.fromX=floater.offsetLeft||root.clientWidth*.64;roam.fromY=floater.offsetTop||root.clientHeight*.46;const n=nextSpot();roam.toX=n.x;roam.toY=n.y;roam.start=time;}
       if(time<roam.delay)return;
@@ -160,7 +165,7 @@
     }
     function meshDraw(t) {
       const ctx=contexts[0];if(!ctx)return;
-      const w=dim.w,h=dim.h,m=motionOff?0:t*.00023;
+      const w=mesh.clientWidth||dim.w,h=mesh.clientHeight||dim.h,m=motionOff?0:t*.00023;
       ctx.clearRect(0,0,w,h);
       const halo=ctx.createRadialGradient(w*.68,h*.47,0,w*.68,h*.47,Math.max(w,h)*.6);
       halo.addColorStop(0,'#4e6fdb2b');halo.addColorStop(1,'#00000000');ctx.fillStyle=halo;ctx.fillRect(0,0,w,h);
@@ -293,6 +298,12 @@
       roam.start=0;roam.delay=performance.now()+3000;
     }));
     cleanup.push(on(floater,'pointercancel',()=>{dragging=null;floater.classList.remove('dragging');}));
+    // Pause travel on both the face and its attached player/lyric controls.
+    // Restart the path from the current position, never jump to an old waypoint.
+    cleanup.push(on(floater,'pointerenter',()=>{hovered=true;}));
+    cleanup.push(on(floater,'pointerleave',()=>{hovered=false;roam.start=0;roam.delay=0;}));
+    cleanup.push(on(floater,'focusin',()=>{hovered=true;}));
+    cleanup.push(on(floater,'focusout',e=>{if(!floater.contains(e.relatedTarget)){hovered=false;roam.start=0;roam.delay=0;}}));
     cleanup.push(on(window,'pointermove',e=>gazeAt(e.clientX,e.clientY),{passive:true}));
     cleanup.push(on(window,'keydown',e=>{if(e.key==='Escape'&&workspace.classList.contains('open'))closeWorkspace();}));
     cleanup.push(on(audio,'play',()=>{state('music');}));
@@ -310,6 +321,7 @@
         const before = originalPlayerNext?.parentNode===originalPlayerParent ? originalPlayerNext : null;
         originalPlayerParent.insertBefore(player,before);
       }
+      if(mesh.parentNode!==root)mesh.remove();
       root.remove();
     }};
     return true;
