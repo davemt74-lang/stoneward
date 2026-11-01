@@ -30,18 +30,19 @@ test('Actual player passes into the floating canvas and keeps one authoritative 
   assert.equal((shell.match(/id="persistentAudio"/g)||[]).length,1);
   assert.equal((shell.match(/id="footerPlayer"/g)||[]).length,1);
 });
-test('Lyric capture keeps the same real session underneath the player',()=>{
+test('Lyric capture keeps the same real session in an attached sidecar',()=>{
   assert.match(canvas,/sf-agent-dock-stack/);
   assert.match(canvas,/sf-agent-player-dock/);
   assert.match(canvas,/StonefellowSongExperience\.mount\(smallSession\)/);
   assert.match(canvas,/StonefellowSongExperience\.mount\(bigSession\)/);
-  assert.match(canvas,/floater\.dataset\.side='below'/);
+  assert.match(canvas,/floater\.dataset\.side=root\.clientWidth<1160\?'below':/);
 });
-test('Player controls, seek interaction and mobile layout are usable',()=>{
+test('Minimal player retains play, seek interaction and mobile layout',()=>{
   assert.match(css,/\.sf-agent-player-dock \.footer-player/);
-  assert.match(css,/grid-template-areas:"art meta prev toggle next close"/);
+  assert.match(css,/grid-template-areas:"art meta toggle" "timeline timeline timeline"/);
+  assert.match(css,/\.sf-agent-player-dock #playerQueueButton \{ display:none!important; \}/);
   assert.match(css,/\.player-timeline \{ grid-area:timeline/);
-  assert.match(canvas,/e\.target\.closest\('\.sf-agent-dock-stack'\)/);
+  assert.match(canvas,/e\.target\.closest\('\.sf-agent-dock-stack,\.sf-agent-panel'\)/);
   assert.match(css,/@media\(max-width:720px\)/);
   assert.match(css,/height:max\(calc\(100dvh - 169px\),760px\)/);
 });

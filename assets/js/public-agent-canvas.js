@@ -25,18 +25,15 @@
         <div class="sf-agent-state" role="status">AGENT READY</div>
         <p class="sf-agent-hint">DRAG TO MOVE · CLICK TO EXPAND</p>
         <div class="sf-agent-dock-stack">
-          <div class="sf-agent-player-dock" aria-label="Agent music and interaction controls">
+          <div id="sfAgentPlayerDock" class="sf-agent-player-dock" aria-label="Agent music player">
             <div class="sf-agent-player-ready">MUSIC / PLAYER READY</div>
-            <div class="sf-agent-tools">
-              <button type="button" data-agent-action="chat">Chat with Agent</button>
-              <button type="button" data-agent-action="capture" hidden>Capture song lyrics</button>
-            </div>
           </div>
-          <aside class="sf-agent-panel" hidden aria-label="Active song lyric capture and analysis">
-            <div class="sf-agent-panel-head"><span>LYRIC / CAPTURE · AGENT PROCESS</span><button type="button" data-agent-action="close-panel" aria-label="Hide session panel">×</button></div>
-            <div class="sf-agent-session"></div>
-          </aside>
+          <button type="button" class="sf-agent-player-reveal" data-agent-action="show-player" aria-controls="sfAgentPlayerDock" hidden>♫ Show player</button>
         </div>
+        <aside class="sf-agent-panel" hidden aria-label="Active song lyric capture and analysis">
+          <div class="sf-agent-panel-head"><span>LYRIC / CAPTURE · AGENT PROCESS</span><button type="button" data-agent-action="close-panel" aria-label="Hide session panel">×</button></div>
+          <div class="sf-agent-session"></div>
+        </aside>
       </div>
       <section class="sf-agent-workspace" aria-label="Expanded Agent Canvas" aria-hidden="true" inert>
         <div class="sf-agent-workspace-inner">
@@ -66,6 +63,7 @@
     const workspace = by(root, '.sf-agent-workspace');
     const panel = by(root, '.sf-agent-panel');
     const playerDock = by(root, '.sf-agent-player-dock');
+    const playerReveal = by(root, '.sf-agent-player-reveal');
     const smallSession = by(root, '.sf-agent-session');
     const bigSession = by(root, '.sf-agent-expanded-session');
     const contexts = [mesh, cloud, face].map(c => c.getContext('2d'));
@@ -85,7 +83,7 @@
       return {x:Math.cos(a)*r,y:Math.sin(a)*r,r,seed:i*.913};
     });
     let mode='idle', raf=0, destroyed=false, dragging=null, hovered=false, suppressClick=false;
-    let frameSize=0,lastFrame=0,workspaceTimer=0,remotePanelDismissed=false;
+    let frameSize=0,lastFrame=0,workspaceTimer=0,playerTimer=0,remotePanelDismissed=false;
     const roam = {step:0,fromX:0,fromY:0,toX:0,toY:0,start:0,delay:0};
     const spots = [[.20,.24],[.80,.18],[.66,.74],[.13,.68],[.83,.49],[.47,.35]];
     const on = (node,event,fn,opts) => { node?.addEventListener(event,fn,opts); return () => node?.removeEventListener(event,fn,opts); };
@@ -97,9 +95,31 @@
     const originalPlayerParent = player?.parentNode || null;
     const originalPlayerNext = player?.nextSibling || null;
     if (player && originalPlayerParent) playerDock.insertBefore(player,playerDock.firstChild);
+    const PLAYER_IDLE_MS=5200;
+    function pausePlayerHide(){window.clearTimeout(playerTimer);playerTimer=0;}
+    function schedulePlayerHide(){
+      pausePlayerHide();
+      playerTimer=window.setTimeout(hidePlayer,PLAYER_IDLE_MS);
+    }
+    function showPlayer(){
+      playerDock.classList.remove('is-collapsed');
+      playerReveal.hidden=true;
+      schedulePlayerHide();
+    }
+    function hidePlayer(){
+      if(destroyed)return;
+      const interacting=playerDock.matches?.(':hover')||visual.matches?.(':hover')||
+        playerDock.contains?.(document.activeElement)||workspace.classList.contains('open');
+      if(interacting){schedulePlayerHide();return;}
+      playerDock.classList.add('is-collapsed');
+      playerReveal.hidden=false;
+      pausePlayerHide();
+    }
     function syncPlayer() {
       const loaded=!!player && !player.hidden;
+      const changed=loaded!==playerDock.classList.contains('has-track');
       playerDock.classList[loaded?'add':'remove']('has-track');
+      if(changed)showPlayer();
       updateDock();
     }
     const playerObserver = player && typeof MutationObserver === 'function'
@@ -123,16 +143,23 @@
       for (const control of root.querySelectorAll('[data-agent-action="capture"]')) control.hidden=!(audio && audio.src && !audio.paused)||!!options.isCapturing?.();
     }
     function updateDock() {
-      floater.dataset.side='below';
-      floater.dataset.vertical='below';
+      const half=floater.offsetWidth*.5;
+      const availableRight=root.clientWidth-(floater.offsetLeft+half);
+      const availableLeft=floater.offsetLeft-half;
+      const room=(panel.offsetWidth||365)+20;
+      floater.dataset.side=root.clientWidth<1160?'below':
+        availableRight>=room?'right':availableLeft>=room?'left':availableRight>=availableLeft?'right':'left';
+      floater.dataset.vertical=floater.offsetTop>root.clientHeight*.55?'above':'below';
     }
     function position(x,y) {
       const margin=Math.min(root.clientWidth*.2,visual.offsetWidth*.65+24);
       const minX=Math.min(root.clientWidth*.5,Math.max(margin,floater.offsetWidth*.5+18));
-      // Include the player and any live lyric panel in the moving body's bounds.
-      const minY=Math.min(root.clientHeight*.5,floater.offsetHeight*.5+16);
+      // Reserve room for the orbit rings above the face and the player below.
+      // The sidecar is absolute, so its height never forces the orb under the header.
+      const minY=Math.min(root.clientHeight*.5,floater.offsetHeight*.5+78);
+      const maxY=Math.max(minY,root.clientHeight-floater.offsetHeight*.5-16);
       const xx=Math.max(minX,Math.min(root.clientWidth-minX,x));
-      const yy=Math.max(minY,Math.min(root.clientHeight-minY,y));
+      const yy=Math.max(minY,Math.min(maxY,y));
       floater.style.left=xx+'px'; floater.style.top=yy+'px'; updateDock();
     }
     function nextSpot() {
@@ -274,14 +301,22 @@
       const action=button.dataset.agentAction;
       if(action==='chat')options.onOpenChat?.();
       if(action==='capture')options.onStartCapture?.();
+      if(action==='show-player')showPlayer();
       if(action==='music'){closeWorkspace();options.onNavigate?.('music');}
       if(action==='close-panel'){panel.hidden=true;remotePanelDismissed=true;updateDock();}
       if(action==='close-workspace')closeWorkspace();
     }
     cleanup.push(on(root,'click',handleAction));
+    cleanup.push(on(playerDock,'pointerenter',pausePlayerHide));
+    cleanup.push(on(playerDock,'pointerleave',schedulePlayerHide));
+    cleanup.push(on(playerDock,'focusin',pausePlayerHide));
+    cleanup.push(on(playerDock,'focusout',schedulePlayerHide));
+    cleanup.push(on(playerDock,'click',schedulePlayerHide));
+    cleanup.push(on(visual,'pointerenter',()=>{showPlayer();pausePlayerHide();}));
+    cleanup.push(on(visual,'pointerleave',schedulePlayerHide));
     cleanup.push(on(sphere,'click',()=>{if(!suppressClick)openWorkspace();suppressClick=false;}));
     cleanup.push(on(floater,'pointerdown',e=>{
-      if(e.target.closest('.sf-agent-dock-stack'))return;
+      if(e.target.closest('.sf-agent-dock-stack,.sf-agent-panel'))return;
       if(e.target.closest('button,input')&&e.target!==sphere)return;
       dragging={id:e.pointerId,x:e.clientX,y:e.clientY,left:floater.offsetLeft,top:floater.offsetTop,moved:false};
       floater.setPointerCapture?.(e.pointerId);floater.classList.add('dragging');
@@ -306,16 +341,16 @@
     cleanup.push(on(floater,'focusout',e=>{if(!floater.contains(e.relatedTarget)){hovered=false;roam.start=0;roam.delay=0;}}));
     cleanup.push(on(window,'pointermove',e=>gazeAt(e.clientX,e.clientY),{passive:true}));
     cleanup.push(on(window,'keydown',e=>{if(e.key==='Escape'&&workspace.classList.contains('open'))closeWorkspace();}));
-    cleanup.push(on(audio,'play',()=>{state('music');}));
+    cleanup.push(on(audio,'play',()=>{state('music');showPlayer();}));
     cleanup.push(on(audio,'pause',()=>{if(mode==='music')state('idle');}));
     cleanup.push(on(window,'resize',resize));
     const resizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(resize):null;
     resizeObserver?.observe(root);
-    resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();
+    resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();showPlayer();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);faceDraw(0);}
     current={root,state,session,syncPlayer,destroy(){
-      destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);
+      destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);pausePlayerHide();
       resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
       if(player && originalPlayerParent){
         const before = originalPlayerNext?.parentNode===originalPlayerParent ? originalPlayerNext : null;

@@ -1,3 +1,10 @@
+# Stonefellow v1.3.193 — Section 91B12D: Sidecar Lyrics, Quiet Player and Agent Control Deck
+
+- Returned the real live lyric-capture / transcription / analysis panel to a floating sidecar alongside the agent on desktop, without disconnecting its existing `StonefellowSongExperience` session, controls or reports. A narrower viewport places the panel below the agent in normal page height rather than cutting it beneath the sticky composer.
+- The attached music player now fades after 5.2 seconds of inactivity, leaves a small **Show player** button, and reappears on demand, when playback starts, or when the orb is hovered. Hover and keyboard interaction postpone dismissal. The mini-player now displays only artwork, title, play/pause and seek, removing the queue/previous/next/close/extra chat buttons from its face. The authoritative audio and queue state, lyric capture, and footer restoration remain intact.
+- Replaced the old black `+` popup with a left-anchored futuristic blue-glass control deck on desktop: two-column action cards, glowing status indicators, animated miniature activity meters, a dedicated close button and keyboard focus management. All seven always-present actions plus the conditional fan-community action still use their existing navigation and permission flows. On mobile the panel adjusts to the viewport and offers one accessible scrolling surface; reduced-motion users see static indicators.
+- Kept the particle orb, transparent header/footer mesh, Admin particle companion and blue glass menus from Section 91B12C. No database migration or new recording privileges.
+
 # Stonefellow v1.3.192 — Section 91B12C: Under-Orb Player, Transparent Mesh Shell and Particle Admin Agent
 
 - The opt-in public Agent Canvas now anchors its music player **underneath** the floating orb, with Chat and Capture buttons inside the same translucent player/control deck. A quiet player-ready state keeps those actions available even before a song is loaded. The original player, audio element, playback queue and lyric capture workflow stay authoritative.
