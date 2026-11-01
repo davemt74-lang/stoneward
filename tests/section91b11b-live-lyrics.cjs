@@ -77,7 +77,7 @@ async function main(){
   check('Live listening mode describes no retained song clip',()=>{
     ctx.window.SFSongExperienceUI.mount(host,{...base,listening_mode:'recognition',
       live_enabled:true,auto_interpret:true,transcript:'Estimated lyrics'},()=>{});
-    assert.match(host.textContent,/live lyrics → interpretation on Stop/);
+    assert.match(host.textContent,/live lyrics → review before interpretation/);
     assert.match(host.textContent,/No song clip is being recorded/);
     assert.doesNotMatch(host.textContent,/Transcribe excerpt/);
     assert.doesNotMatch(host.textContent,/Start live transcription/);
