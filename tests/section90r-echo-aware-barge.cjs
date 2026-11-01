@@ -86,7 +86,7 @@ async function audioPauseMustNotResolveRemoteSpeech(){
     globalThis:{StonefellowSpeechSegments:{split:()=>['Spoken sentence.']}},
     fetch:async()=>({ok:true,blob:async()=>({})}),
     URL:{createObjectURL:()=> 'blob:sample',revokeObjectURL:()=>{}},
-    Audio,agent:()=>{},loadAuth:async()=>{},encodeURIComponent
+    Audio,agent:()=>{},setVoiceSpeechAudible:()=>{},loadAuth:async()=>{},encodeURIComponent
   };
   vm.createContext(context);
   vm.runInContext(extract(source,'elevenLabsSpeak'),context);
