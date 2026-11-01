@@ -41,7 +41,7 @@ check('Interpretation exposes approved writer-source provenance and unverified l
 check('No writer notes means an explicitly labeled reading, never invented intentions',()=>{
   mount(target,{title:'Earth Girl',phase:'report',start_ms:0,end_ms:2000,
     transcript:'Sky',canAnalyze:true,reports:[{text:'Tentative reading',sources:[]}]},()=>{});
-  assert.match(target.textContent,/No song-specific published songwriter notes were matched/);
+  assert.match(target.textContent,/No song-specific published songwriter notes matched/);
 });
 check('Quick links form a vertical mesh-overlay rail without modal, title, or redundant actions',()=>{
   const html=read('stonefellow-v120.php'),css=read('assets/css/site.css');
