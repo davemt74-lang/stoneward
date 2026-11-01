@@ -16,7 +16,7 @@ const draft={track_id:'track-1',start_ms:12100,end_ms:27700,captured_at:'2026-10
 const requests=[];const messages=[];
 let available=capture,mode='ok';
 const context={songAnalysisBusy:false,songLyricReport:null,songLyricDraft:draft,songLyricCorrected:'',
-  songCaptureSkill:{getCapture:()=>available},Intl,
+  songCaptureSkill:{getCapture:()=>available},currentSongSource:()=>available,Intl,
   popupEntry:(role,text)=>messages.push({role,text}),
   updateSongExperience:()=>{},songExperience:{reports:[]},
   secureJsonPost:async(api,payload)=>{requests.push({api,payload});if(mode==='fail')throw Error('Provider unavailable');

@@ -26,10 +26,10 @@
     const heading = el('h3', '', state.title || 'Current song section');
     const meta = el('p', 'song-experience-meta', clock(state.start_ms) + ' – ' + (state.end_ms == null ? 'Live' : clock(state.end_ms)));
     const phaseLabels = {
-      capturing: 'Listening now', captured: 'Captured · ready to transcribe',
+      capturing: 'Listening now', captured: 'Recorded · ready to transcribe',
       transcribing: 'Creating an unverified lyric draft…', draft: 'Unverified transcript ready',
       analyzing: 'Reviewing lyrics and Stonefellow song notes…', report: 'Lyric interpretation ready',
-      discarded: 'Capture ended without a usable excerpt'
+      discarded: 'Listening ended without a usable excerpt'
     };
     const phase = el('p', 'song-experience-phase'+(state.live_enabled?' song-experience-live':''),
       state.phase==='capturing'&&state.live_enabled ? (state.auto_interpret?'Listening · live lyrics → interpretation on Stop':'Listening · provisional live lyrics') :
@@ -44,7 +44,8 @@
       if (state.corrected) panel.append(el('small', '', 'Original machine draft retained in this session.'));
       panel.append(el('small', '', 'Automated words can be wrong. Nothing is saved to Agent Brain automatically.'));
       if (state.live_enabled) panel.append(el('small', '',
-        (Number(state.segments_completed)||0)+' section(s) transcribed. The final full-clip pass will replace these provisional words.'));
+        state.listening_mode==='recognition' ? 'Listening directly to the player. No song clip is being recorded.' :
+           (Number(state.segments_completed)||0)+' section(s) transcribed. The final full-clip pass will replace these provisional words.'));
       card.append(panel);
     }
     for (const [index, report] of (state.reports || []).entries()) {
@@ -68,13 +69,13 @@
     };
     if (state.phase === 'capturing') {
       button('Stop listening', 'stop');
-      if (!state.live_enabled) {
+      if (state.listening_mode==='record_clip') card.append(el('small', 'song-experience-consent',
+        'Record Clip keeps a browser-local audio excerpt. It does not automatically transcribe or interpret.'));
+      else if (!state.live_enabled) {
         button('Start live transcription', 'live');
-        if (!state.auto_interpret) card.append(el('small', 'song-experience-consent',
-          'Optional: live transcription uploads short player-audio clips to your configured transcription provider and uses active tokens. Ordinary listening stays local.'));
       }
     }
-    if (state.phase === 'captured') button('Transcribe excerpt', 'transcribe');
+    if (state.phase === 'captured' && state.listening_mode !== 'recognition') button('Transcribe excerpt', 'transcribe');
     if (state.transcript && !['transcribing', 'analyzing', 'discarded'].includes(state.phase)) {
       button(state.reports?.length ? 'Interpret again' : 'Interpret lyrics', 'analyze', !state.canAnalyze);
       button(state.saved_note_id ? 'Saved privately #' + state.saved_note_id : 'Save private note', 'save', !state.canAnalyze || !!state.saved_note_id);

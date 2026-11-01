@@ -5,7 +5,7 @@ const from=app.indexOf('  function currentSongDraft('),to=app.indexOf('  // LLM-
 assert.ok(from>0&&to>from,'Browser-private command dispatcher exists');
 let passes=0;const check=(label,fn)=>{fn();passes++;console.log('91B8F PASS '+label)};
 const writes=[];let approved=false,removed=false;
-const scope={songCaptureSkill:{getCapture:()=>null},songLyricDraft:null,songLyricCorrected:'',songLyricReport:null,songPersonalNote:'',
+const scope={songCaptureSkill:{getCapture:()=>null},currentSongSource:()=>null,songLyricDraft:null,songLyricCorrected:'',songLyricReport:null,songPersonalNote:'',
   st:{track:null,conversationId:'old_session'},
   window:{confirm:()=>approved},localStorage:{removeItem:key=>{if(key==='stonefellow.agent.conversation')removed=true}},
   secureJsonPost:async(path,payload)=>{writes.push({path,payload});return {sharing:{id:payload.id,scope:payload.scope,changed:true}}},
