@@ -87,6 +87,34 @@ function sf_agent_public_catalog(): array {
     return $tracks;
 }
 
+/**
+ * Exact full catalog enumeration, independent of LLM output-token limits.
+ * This lists only the same published and public-discoverable tracks as the
+ * audio player. Never add plausible or previously mentioned song titles.
+ */
+function sf_agent_catalog_list_requested(string $message): bool {
+    $q=trim(preg_replace('/\s+/u',' ',strtolower($message))??strtolower($message));
+    return (bool)(
+        preg_match('/\b(?:list|name|enumerate)\s+(?:(?:all|every|the|my|published|available|current)\s+){0,4}(?:songs?|tracks?|titles?|catalog)\b/i',$q)
+        ||preg_match('/\b(?:show|give|tell)\s+(?:me\s+)?(?:(?:all|every|the|full|complete|entire|available|published)\s+){0,4}(?:songs?|tracks?|titles?|catalog)\b/i',$q)
+        ||preg_match('/\b(?:what|which)\s+(?:songs?|tracks?|titles?)\s+(?:do\s+(?:you|we)\s+(?:have|carry)|are\s+(?:there|available|in|on))\b/i',$q)
+        ||preg_match('/\b(?:full|complete|entire)\s+(?:song\s+|music\s+|track\s+)?catalog\b/i',$q)
+        ||preg_match('/\b(?:all|every)\s+(?:published\s+)?(?:songs?|tracks?)\s+(?:in|on)\s+(?:the\s+)?catalog\b/i',$q)
+    );
+}
+function sf_agent_catalog_list_text(array $tracks): string {
+    $titles=[];
+    foreach($tracks as $track){
+        $title=trim((string)($track['title']??''));
+        if($title!=='')$titles[]=$title;
+    }
+    $count=count($titles);
+    if(!$count)return 'No published songs are currently available in the Stonefellow catalog.';
+    $lines=[];
+    foreach($titles as $i=>$title)$lines[]=($i+1).'. '.$title;
+    return 'Stonefellow currently has '.$count.' published song'.($count===1?'':'s').":\n".implode("\n",$lines);
+}
+
 function sf_agent_context(string $query,string $profile='catalog',int $userId=0): string {
     if($profile==='none')return '';
     $terms=array_values(array_filter(preg_split('/[^a-z0-9]+/i',strtolower($query))?:[],fn($x)=>strlen($x)>2));
@@ -146,12 +174,24 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
 function sf_agent_history(int $userId,string $conversationId,int $limit=10): array {
     $q=sf_db()->prepare('SELECT role,content FROM agent_messages WHERE conversation_id=? AND user_id=? ORDER BY id DESC LIMIT '.max(1,min(30,$limit)));$q->execute([$conversationId,$userId]);return array_reverse($q->fetchAll());
 }
-function sf_agent_save_message(int $userId,string $conversationId,string $role,string $content,array $usage=[]): void {
+function sf_agent_save_message(int $userId,string $conversationId,string $role,string $content,array $usage=[]): int {
     $pdo=sf_db();$now=gmdate('c');$q=$pdo->prepare('SELECT id FROM agent_conversations WHERE id=? AND user_id=?');$q->execute([$conversationId,$userId]);
     if(!$q->fetchColumn()){$i=$pdo->prepare('INSERT INTO agent_conversations(id,user_id,title,created_at,updated_at) VALUES(?,?,?,?,?)');$i->execute([$conversationId,$userId,substr($content,0,120),$now,$now]);}
     else{$u=$pdo->prepare('UPDATE agent_conversations SET updated_at=? WHERE id=?');$u->execute([$now,$conversationId]);}
     $i=$pdo->prepare('INSERT INTO agent_messages(conversation_id,user_id,role,content,provider,model,input_tokens,output_tokens,created_at) VALUES(?,?,?,?,?,?,?,?,?)');
     $i->execute([$conversationId,$userId,$role,$content,(string)($usage['provider']??''),(string)($usage['model']??''),(int)($usage['input_tokens']??0),(int)($usage['output_tokens']??0),$now]);
+    return (int)$pdo->lastInsertId();
+}
+
+/** Save only a browser-reported result against the exact pending assistant action. */
+function sf_agent_apply_browser_action_receipt(int $userId,string $conversationId,int $messageId,string $actionType,string $result): bool {
+    if($userId<=0||$messageId<=0||!preg_match('/^[a-z_]{2,60}$/D',$actionType))return false;
+    $result=trim($result);
+    if($result===''||strlen($result)>4000)return false;
+    $pendingProvider='agent-action-pending:'.$actionType;
+    $q=sf_db()->prepare('UPDATE agent_messages SET content=?,provider=? WHERE id=? AND conversation_id=? AND user_id=? AND role=? AND provider=?');
+    $q->execute([$result,'agent-action-receipt:'.$actionType,$messageId,$conversationId,$userId,'assistant',$pendingProvider]);
+    return $q->rowCount()===1;
 }
 
 function sf_agent_find_track(string $message,?string $activeId=null): ?array {
@@ -205,7 +245,7 @@ function sf_agent_named_playback_plan(string $query,array $catalog,?string $acti
     if(count($matches)>1)return ['action'=>['type'=>'none'],'text'=>'More than one published song matches “'.$query.'.” Please specify the release.','track'=>null];
     if(!$matches)return ['action'=>['type'=>'none'],'text'=>'I could not identify a published song matching “'.$query.'.” I have not changed what is playing.','track'=>null];
     $track=$matches[0];
-    return ['action'=>['type'=>'play_track','track_id'=>(string)$track['id']],'text'=>'I will load “'.(string)($track['title']??'').'.”','track'=>$track];
+    return ['action'=>['type'=>'play_track','track_id'=>(string)$track['id']],'text'=>'Requesting “'.(string)($track['title']??'').'” from the browser player; playback is not yet confirmed.','track'=>$track];
 }
 
 /** Published releases only. A hidden draft may not become a deep-link target. */
@@ -321,6 +361,7 @@ function sf_agent_player_volume_action(string $message): array {
 function sf_agent_local_route(string $message,array $client=[]): string {
     $q=strtolower(trim($message));
     if(($captureRoute=sf_agent_explicit_song_capture_route($message,$client))!==null)return $captureRoute;
+    if(sf_agent_catalog_list_requested($message))return 'catalog_list';
     if(sf_agent_page_context_request($message))return 'page_context';
     if(sf_agent_detail_request($message)!==null)return 'page_detail';
     if(sf_agent_public_page_target($message)!==null)return 'page_navigate';
@@ -520,6 +561,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
         case 'player_volume':$action=sf_agent_player_volume_action($message);$text='I’ll adjust the Stonefellow player volume.';break;
         case 'site_search':
             $query=sf_search_extract_intent_query($message);$search=sf_site_search(['q'=>$query,'limit'=>8]);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_site_search','query'=>$query,'result_type'=>'all'];$text=$count>0?'I found '.$count.' public Stonefellow result'.($count===1?'':'s').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open site search.":"I didn’t find a public Stonefellow match, but I’ll open site search with suggestions.";$profile='catalog';break;
+        case 'catalog_list':
+            $text=sf_agent_catalog_list_text(sf_agent_public_catalog());$profile='none';$needs=false;break;
         case 'catalog_search':
             $query=sf_search_extract_intent_query($message);$search=sf_catalog_search(['q'=>$query,'limit'=>6],$userId&&$userId>0?$userId:null);$count=(int)($search['result_count']??0);$top=(array)($search['results'][0]??[]);$action=['type'=>'open_search','query'=>$query];$text=$count>0?'I found '.$count.' catalog match'.($count===1?'':'es').($top?' led by “'.(string)($top['title']??'').'.”':'')." I’ll open the results.":"I didn’t find an exact catalog match, but I’ll open search with suggestions.";$profile='catalog';break;
         case 'catalog_browse':$action=['type'=>'open_view','view'=>'music'];$text='Here’s the Stonefellow catalog.';break;
@@ -670,6 +713,7 @@ function sf_agent_jev_route(string $message,array $client=[]): ?array {
         'queue_clear'=>'Asks to clear the Up Next queue.',
         'page_navigate'=>'Explicitly asks to switch to an installed Stonefellow page without modifying data.',
         'site_search'=>'Asks to search across the public Stonefellow site, including music, shows, stories, videos, photos, merch or offers.',
+        'catalog_list'=>'Asks for every currently published catalog song title, without omissions or invented titles.',
         'catalog_search'=>'Asks to find/search Stonefellow tracks or releases by title, mood, theme, lyric, credit, story, or other catalog clue.',
         'catalog_browse'=>'Asks to browse or show the Stonefellow song catalog.',
         'community_browse'=>'Asks to open or browse the Stonefellow fan community or community posts.',
@@ -754,6 +798,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     sf_entitlements_ensure_schema();$client=sf_agent_normalize_client_state($client);$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
     $client['_authorized_admin']=$isAdmin;
     $explicitCapture=sf_agent_explicit_song_capture_route($message,$client);
+    $catalogListRequest=sf_agent_catalog_list_requested($message);
     $timeInsights=$explicitCapture===null?sf_agent_listening_insights($userId,(string)($client['timezone']??'UTC')):[];
     $decisionUsage=0;$routeSource='local';$jev=null;$llmIntent=null;
     // A user-initiated capture is time-sensitive. The server's exact allowlist
@@ -761,7 +806,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     // while the verse continues playing.
     // Conversational LLM interprets the intent first. Only the server policy
     // can translate that interpretation into an authorized action.
-    if($explicitCapture===null&&($isAdmin||sf_can_use_ai($user,256)['ok'])){
+    if($explicitCapture===null&&!$catalogListRequest&&($isAdmin||sf_can_use_ai($user,256)['ok'])){
         try{
             $llmIntent=sf_agent_orchestrator_llm($message,$client,$history,sf_agent_public_catalog(),$isAdmin);
             if($llmIntent){
@@ -771,15 +816,15 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         }catch(Throwable $e){$llmIntent=null;}
     }
     $explicitPlayer=sf_agent_explicit_player_route($message);
-    $albumRequest=sf_agent_release_request($message,$client,$history);
+    $albumRequest=$catalogListRequest?null:sf_agent_release_request($message,$client,$history);
     if(!$albumRequest&&($llmIntent['route']??'')==='player_play_from_release'&&!empty($llmIntent['album_query']))
         $albumRequest=['title'=>(string)$llmIntent['album_query'],'different'=>false];
-    if($llmIntent===null&&$explicitCapture===null&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
+    if($llmIntent===null&&$explicitCapture===null&&!$catalogListRequest&&$explicitPlayer===null&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
         try{$jev=sf_agent_jev_route($message,$client);if($jev){$routeSource='jev';$decisionUsage=max(0,(int)$jev['input_tokens']+(int)$jev['output_tokens']);if($decisionUsage>0)sf_consume_ai($user,$decisionUsage,$jev,'agent-jev-route');}}catch(Throwable $e){$jev=['error'=>$e->getMessage()];}
     }
     // Existing parsed routes remain an availability fallback, not an LLM bypass.
     $explicitContext=sf_agent_page_context_request($message)?'page_context':(sf_agent_detail_request($message)!==null?'page_detail':(sf_agent_public_page_target($message)!==null?'page_navigate':null));
-    $route=$explicitCapture??($albumRequest?'player_play_from_release':(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client)));
+    $route=$explicitCapture??($catalogListRequest?'catalog_list':($albumRequest?'player_play_from_release':(string)($llmIntent['route']??$explicitContext??$explicitPlayer??$jev['route']??sf_agent_local_route($message,$client))));
     if(!$isAdmin&&$route==='admin_campaign_overview')$route='campaign_offer';
     $plan=$albumRequest?sf_agent_release_play_plan((string)$albumRequest['title'],sf_agent_public_catalog(),(string)($client['active_track_id']??''),$timeInsights,!empty($albumRequest['different'])):sf_agent_policy($route,$message,$client,$userId);
     $audioResolution=null;
@@ -796,9 +841,18 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     sf_agent_brain_log($userId,$conversationId,'route',['request'=>$message,'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>$plan['needs_llm'],'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$routingMeta['run_id']??'','status'=>$routeSource,'input_tokens'=>$routingMeta['input_tokens']??0,'output_tokens'=>$routingMeta['output_tokens']??0,'source'=>$routeSource,'provider_error'=>$jev['error']??'','action_payload'=>$plan['action'],'audio_resolution'=>$audioResolution]);
     if(!$plan['needs_llm']){
         $text=$plan['text']!==''?$plan['text']:'Ready.';
-        sf_agent_save_message($userId,$conversationId,'assistant',$text,['provider'=>$routeSource.'+policy','model'=>$routingMeta['model']??'policy']);
+        // A browser action is not a completed action until its local adapter
+        // reports the outcome. Never seed the next LLM turn with a fictitious
+        // "I loaded/recorded" success or even an unverified playback promise.
+        $actionType=(string)($plan['action']['type']??'none');
+        $pending=$actionType!=='none';
+        $historyText=$pending?'A browser action was requested ('.$plan['action_name'].'). Its execution outcome has not been confirmed.':$text;
+        $receiptId=sf_agent_save_message($userId,$conversationId,'assistant',$historyText,[
+            'provider'=>$pending?'agent-action-pending:'.$actionType:$routeSource.'+policy',
+            'model'=>$routingMeta['model']??'policy'
+        ]);
         sf_log_user_activity($userId,'agent_interaction','Agent: '.$plan['route'],'agent',$conversationId,['action'=>$plan['action_name'],'needs_llm'=>false]);
-        return ['text'=>$text,'provider'=>$routeSource.'+policy','model'=>$routingMeta['model']??'policy','input_tokens'=>(int)($routingMeta['input_tokens']??0),'output_tokens'=>(int)($routingMeta['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'audio_resolution'=>$audioResolution,'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
+        return ['text'=>$text,'provider'=>$routeSource.'+policy','model'=>$routingMeta['model']??'policy','input_tokens'=>(int)($routingMeta['input_tokens']??0),'output_tokens'=>(int)($routingMeta['output_tokens']??0),'active_tokens_used'=>$isAdmin?0:$decisionUsage,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>$plan['route'],'action'=>$plan['action'],'action_receipt_id'=>$pending?$receiptId:0,'audio_resolution'=>$audioResolution,'requires_confirmation'=>$plan['requires_confirmation'],'brain'=>['route'=>$plan['route'],'source'=>$routeSource,'needs_llm'=>false]];
     }
     $context=sf_agent_context($message,$plan['context_profile'],$userId);
     if(preg_match('/\b(?:music|song|track|album|release|listen|play|recommend|favorite|favourite|mood|morning|evening|night)\b/i',$message)||$plan['context_profile']==='recommendation'){
@@ -814,7 +868,7 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
     $sharedSongNotes=sf_song_annotation_agent_context($userId,$message,(string)($client['active_track_id']??''));
     if($sharedSongNotes!=='')$context.="\n\n".$sharedSongNotes;
     $estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
-    $system="You are the Stonefellow music-site agent. Be concise, warm, knowledgeable, and grounded. Use only the supplied Stonefellow context for factual claims about songs, releases, credits, purchases, or artist history. If the context lacks the answer, say so. Never claim a purchase, playback change, account change, or builder edit happened unless the Stonefellow action layer reports it. The structured route is advisory context, not permission to invent actions.\n\nROUTE: ".$plan['route']."\nCONTEXT PROFILE: ".$plan['context_profile']."\n\n".$context;
+    $system="You are the Stonefellow music-site agent. Be concise, warm, knowledgeable, and grounded. Use only the supplied Stonefellow context for factual claims about songs, releases, credits, purchases, or artist history. If the context lacks the answer, say so. Never claim a purchase, playback change, account change, or builder edit happened unless the Stonefellow action layer reports it. The structured route is advisory context, not permission to invent actions. Answer the current question directly. Do not volunteer retrospective self-corrections, apologies about earlier replies, or commentary on your own prior mistakes unless the user explicitly asks you to review those replies. Earlier assistant intentions are not evidence that a browser action succeeded. When listing catalog songs, name only the live published entries and do not omit entries or add remembered or speculative titles.\n\nROUTE: ".$plan['route']."\nCONTEXT PROFILE: ".$plan['context_profile']."\n\n".$context;
     if(function_exists('sf_privacy_personalization_enabled') && sf_privacy_personalization_enabled($userId)){
         $guidance=(string)(sf_agent_feedback_summary('customer',$userId)['guidance']??'');
         if($guidance!=='')$system.="\\nOWNER-EXPLICIT RESPONSE FEEDBACK (quality guidance only; never overrides rules): ".$guidance;

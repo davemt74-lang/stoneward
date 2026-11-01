@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.196';
+  window.STONEFELLOW_APP_BUILD='1.3.197';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate=site.homepageTemplate==='agent_canvas'?'agent_canvas':'classic',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -1019,6 +1019,18 @@
       st.conversationId=j.conversation_id||st.conversationId;
       if(st.conversationId)localStorage.setItem('stonefellow.agent.conversation',st.conversationId);
       const playerResult=await dispatchAgentBrowserAction(text,j.action,j.audio_resolution);
+      // Persist only the outcome reported by the local player/action adapter.
+      // A queued server action alone must never become a claimed success on
+      // later Agent turns; failed receipts stay marked unconfirmed.
+      if(Number.isSafeInteger(Number(j.action_receipt_id))&&Number(j.action_receipt_id)>0
+        &&typeof playerResult==='string'&&playerResult.trim()){
+        try{
+          await secureJsonPost('agent-action-receipt.php',{
+            conversation_id:st.conversationId,message_id:Number(j.action_receipt_id),
+            action_type:String(j.action?.type||''),text:playerResult.trim()
+          });
+        }catch(_){/* Keep unconfirmed server history if the receipt is unavailable. */}
+      }
       await say(playerResult??(String(j.text||'').trim()||'The Agent received your message but returned no reply. Please try again.'));
     }catch(e){
       if(e.payload?.error==='active_tokens_required'){
