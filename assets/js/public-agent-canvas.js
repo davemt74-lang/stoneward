@@ -28,7 +28,7 @@
           <div class="sf-agent-orbit secondary" aria-hidden="true"></div>
           <button class="sf-agent-sphere" type="button" aria-label="Expand Stonefellow Agent canvas" aria-expanded="false">
             <canvas class="sf-agent-points" aria-hidden="true"></canvas>
-            <span class="sf-agent-face-fallback" aria-hidden="true"><span></span><span></span></span>
+            <span class="sf-agent-core-fallback" aria-hidden="true"></span>
           </button>
         </div>
         <div class="sf-agent-state" role="status">AGENT READY</div>
@@ -95,10 +95,19 @@
     const dim = {w:1,h:1,dpr:1};
     const particles = Array.from({length:110}, (_, i) => ({a:i*2.39996,r:110+(i%10)*13,v:.25+(i%6)*.08,s:i*1.37}));
     const stars = Array.from({length:110}, (_, i) => ({x:((i*73.413+11)%100)/100,y:((i*39.127+7)%100)/100,r:i%11===0?1.6:.65,phase:i*1.717}));
-    const pointCount = window.matchMedia?.('(max-width: 720px)').matches ? 1350 : 2450;
-    const facePoints = Array.from({length:pointCount}, (_, i) => {
-      const r=Math.sqrt((i+.5)/pointCount)*.98, a=i*2.399963229728653;
-      return {x:Math.cos(a)*r,y:Math.sin(a)*r,r,seed:i*.913};
+    const presets=Object.freeze({
+      ember:{label:'Ember',rgb:[255,183,110],mesh:false},
+      mesh:{label:'Blue Mesh',rgb:[139,204,255],mesh:true},
+      violet:{label:'Violet Signal',rgb:[205,170,255],mesh:true}
+    });
+    const atmosphereKey='stonefellow.agent.atmosphere.v1';
+    let atmosphere='ember';
+    const pointCount=window.matchMedia?.('(max-width: 720px)').matches?1500:2900;
+    // Fibonacci sphere: every point belongs to the same kinetic orb,
+    // with no eyes, mouth or flattened face mask.
+    const orbPoints=Array.from({length:pointCount},(_,i)=>{
+      const y=1-2*(i+.5)/pointCount,r=Math.sqrt(Math.max(0,1-y*y)),a=i*2.399963229728653;
+      return {x:Math.cos(a)*r,y,z:Math.sin(a)*r,seed:i*.913};
     });
     let mode='idle', raf=0, destroyed=false, dragging=null, hovered=false, suppressClick=false;
     let frameSize=0,lastFrame=0,workspaceTimer=0,playerTimer=0,remotePanelDismissed=false;
@@ -218,13 +227,37 @@
       frameSize=0;
       if(!floater.style.left)position(dim.w*.64,dim.h*.46);
     }
+    function applyAtmosphere(value,persist=true){
+      const name=Object.prototype.hasOwnProperty.call(presets,String(value||''))?String(value):null;
+      if(!name)return false;
+      atmosphere=name;
+      root.dataset.atmosphere=name;
+      document.body.dataset.sfAtmosphere=name;
+      for(const button of document.querySelectorAll('[data-sf-atmosphere]')){
+        button.setAttribute('aria-pressed',String(button.dataset.sfAtmosphere===name));
+      }
+      if(persist){try{window.localStorage?.setItem(atmosphereKey,name)}catch(_){}}
+      if(motionOff){meshDraw(0);cloudDraw(0);orbDraw(0)}
+      return name;
+    }
     function meshDraw(t) {
       const ctx=contexts[0];if(!ctx)return;
       const w=mesh.clientWidth||dim.w,h=mesh.clientHeight||dim.h,m=motionOff?0:t*.00023;
       ctx.clearRect(0,0,w,h);
+      if(!presets[atmosphere].mesh){
+        // The photographed space is the environment. A few warm sparks
+        // add life without painting a blue grid over the artwork.
+        for(const star of stars.slice(0,44)){
+          const alpha=Math.max(.08,.13+.16*Math.sin(m*3+star.phase));
+          ctx.fillStyle='rgba(255,184,110,'+alpha+')';
+          ctx.beginPath();ctx.arc(star.x*w,star.y*h,star.r*.65,0,Math.PI*2);ctx.fill();
+        }
+        return;
+      }
+      const violet=atmosphere==='violet';
       const halo=ctx.createRadialGradient(w*.68,h*.47,0,w*.68,h*.47,Math.max(w,h)*.6);
-      halo.addColorStop(0,'#4e6fdb2b');halo.addColorStop(1,'#00000000');ctx.fillStyle=halo;ctx.fillRect(0,0,w,h);
-      for(const s of stars){ctx.fillStyle='rgba(190,219,252,'+Math.max(.10,.25+.31*Math.sin(m*3+s.phase))+')';ctx.beginPath();ctx.arc(s.x*w,s.y*h,s.r,0,Math.PI*2);ctx.fill();}
+      halo.addColorStop(0,violet?'#8a4ce82b':'#4e6fdb2b');halo.addColorStop(1,'#00000000');ctx.fillStyle=halo;ctx.fillRect(0,0,w,h);
+      for(const s of stars){ctx.fillStyle=(violet?'rgba(226,191,255,':'rgba(190,219,252,')+Math.max(.10,.25+.31*Math.sin(m*3+s.phase))+')';ctx.beginPath();ctx.arc(s.x*w,s.y*h,s.r,0,Math.PI*2);ctx.fill();}
       const cols=24,rows=13,grid=[];
       for(let y=0;y<=rows;y++){const r=[];for(let x=0;x<=cols;x++){
         const u=x/cols,v=y/rows,weight=Math.max(0,1-Math.abs(u-.65)*1.8);
@@ -232,13 +265,13 @@
           y:h*(-.07+v*1.16)+Math.sin(x*.44+y*.58+m*1.6)*15*weight+pointer.driftY*.01,weight});
       }grid.push(r);}
       ctx.lineWidth=.8;
-      const link=(a,b,alpha)=>{ctx.strokeStyle='rgba(104,172,241,'+Math.max(.035,alpha)+')';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();};
+      const link=(a,b,alpha)=>{ctx.strokeStyle=(violet?'rgba(175,130,241,':'rgba(104,172,241,')+Math.max(.035,alpha)+')';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();};
       for(let y=0;y<=rows;y++)for(let x=0;x<=cols;x++){
         const p=grid[y][x],level=.16+.13*p.weight+.035*Math.sin((x+y)*.52-m*1.8);
         if(x<cols)link(p,grid[y][x+1],level);
         if(y<rows)link(p,grid[y+1][x],level);
         if(y<rows&&x<cols&&(x+y)%2===0)link(p,grid[y+1][x+1],level*.52);
-        if((x+y)%3===0||p.weight>.8){ctx.fillStyle='rgba(174,220,255,'+(.24+.26*p.weight)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.weight>.7?1.65:1.1,0,Math.PI*2);ctx.fill();}
+        if((x+y)%3===0||p.weight>.8){ctx.fillStyle=(violet?'rgba(220,176,255,':'rgba(174,220,255,')+(.24+.26*p.weight)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.weight>.7?1.65:1.1,0,Math.PI*2);ctx.fill();}
       }
     }
     function gazeAt(x,y) {
@@ -256,7 +289,7 @@
       const w=cloud.clientWidth,h=cloud.clientHeight,cx=w/2,cy=h/2,sec=motionOff?0:t*.001;
       ctx.clearRect(0,0,w,h);
       const strong=mode==='music'||mode==='speaking',thinking=mode==='thinking';
-      const tint=mode==='music'?'127,244,213':mode==='speaking'?'255,218,156':thinking?'213,162,255':'163,205,255';
+      const tint=mode==='recording'?'255,118,155':presets[atmosphere].rgb.join(',');
       if(strong){const levels=spectrum(t),radius=visual.clientWidth*.5+30;
         for(let i=0;i<levels.length;i++){const angle=i/levels.length*Math.PI*2-Math.PI/2,amp=levels[i],inner=radius+8;
           ctx.strokeStyle='rgba('+tint+','+(.27+amp*.67)+')';ctx.lineWidth=2.2+amp*3;ctx.beginPath();ctx.moveTo(cx+Math.cos(angle)*inner,cy+Math.sin(angle)*inner);ctx.lineTo(cx+Math.cos(angle)*(inner+7+amp*50),cy+Math.sin(angle)*(inner+7+amp*50));ctx.stroke();
@@ -267,32 +300,44 @@
         ctx.fillStyle='rgba('+tint+','+(.43+.24*Math.sin(sec*1.7+p.s))+')';ctx.beginPath();ctx.arc(x,y,strong?2.6:2,0,Math.PI*2);ctx.fill();
       }
     }
-    function faceDraw(t) {
+    function orbDraw(t){
       const ctx=contexts[2];if(!ctx)return;
       const size=Math.max(1,sphere.offsetWidth),dpr=Math.min(window.devicePixelRatio||1,2);
       if(size!==frameSize){frameSize=size;face.width=Math.round(size*dpr);face.height=Math.round(size*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
-      const c=size/2,time=motionOff?0:t*.001;
+      const c=size*.5,sec=motionOff?0:t*.001,base=presets[atmosphere].rgb;
+      const color=mode==='recording'?[255,129,150]:base;
+      const rgb=color.join(','),r=size*.427;
       ctx.clearRect(0,0,size,size);
-      const color={idle:[177,161,253],listening:[112,215,255],recording:[255,122,165],thinking:[211,154,255],speaking:[255,204,160],music:[113,246,202]}[mode]||[177,161,253];
-      const px=gaze.x/c*.65,py=gaze.y/c*.7;
-      for(const p of facePoints){let x=p.x,y=p.y;
-        const swirl=mode==='thinking'?Math.sin(time*2+p.r*6)*.08:Math.sin(time*.37+p.r*3)*.012;
-        const cs=Math.cos(swirl),sn=Math.sin(swirl);
-        x=p.x*cs-p.y*sn;y=p.x*sn+p.y*cs;
-        const breath=mode==='speaking'?Math.sin(time*14+p.seed*.09)*.022:mode==='listening'?Math.sin(time*3+p.seed*.04)*.014:0;
-        x*=1+breath;y*=1+breath;
-        const light=Math.max(0,Math.min(1,.38+Math.sqrt(Math.max(0,1-p.r*p.r))*.52-x*.19-y*.23));
-        const shade=.25+Math.floor(light*11)*.072;
-        let ink='rgba('+Math.round(color[0]*shade)+','+Math.round(color[1]*shade)+','+Math.round(color[2]*shade)+',.98)';
-        let radius=(size/220)*(p.r>.88?.85:1.38);
-        for(const side of [-1,1]){const ex=side*.255,ey=.025;
-          if(((p.x-ex)/.145)**2+((p.y-ey)/.205)**2<1.27){ink='#ced5ffbb';radius*=1.08;}
-          if(((p.x-ex-px)/.100)**2+((p.y-ey-py)/(mode==='thinking'?.115:.16))**2<1){ink='#070c1ff7';radius*=1.32;}
-        }
-        if(Math.abs(p.x)<.17&&Math.abs(p.y-(.405+.037*(1-(p.x/.18)**2)))<(.018+(mode==='speaking'?.11:.015)*.46)){ink='#10152eeb';radius*=1.16;}
-        ctx.fillStyle=ink;ctx.beginPath();ctx.arc(c+x*c*.97,c+y*c*.97,Math.max(.5,radius),0,Math.PI*2);ctx.fill();
+      const glow=ctx.createRadialGradient(c,c,r*.12,c,c,r*1.19);
+      glow.addColorStop(0,'rgba('+rgb+',.075)');
+      glow.addColorStop(.56,'rgba('+rgb+',.045)');
+      glow.addColorStop(.86,'rgba('+rgb+',.12)');
+      glow.addColorStop(1,'rgba('+rgb+',0)');
+      ctx.fillStyle=glow;ctx.beginPath();ctx.arc(c,c,r*1.19,0,Math.PI*2);ctx.fill();
+      const spin=sec*(mode==='thinking'?.72:mode==='music'?.37:.19);
+      const sin=Math.sin(spin),cos=Math.cos(spin);
+      const tilt=.15+gaze.y*.014,st=Math.sin(tilt),ct=Math.cos(tilt);
+      const breath=motionOff?1:1+.025*Math.sin(sec*(mode==='speaking'?5.2:1.35));
+      const hover=mode==='speaking'?.08:mode==='listening'?.04:0;
+      for(const p of orbPoints){
+        const rx=p.x*cos-p.z*sin,rz=p.x*sin+p.z*cos;
+        const ry=p.y*ct-rz*st,depth=p.y*st+rz*ct;
+        const perspective=1/(1-depth*.15);
+        const x=c+(rx+gaze.x*.002)*r*perspective*breath;
+        const y=c+ry*r*perspective*breath;
+        const front=(depth+1)*.5,shimmer=.5+.5*Math.sin(sec*2.1+p.seed*9);
+        const alpha=Math.min(.99,.12+front*.68+shimmer*.18+hover);
+        const dot=(.45+front*.93+(shimmer>.98?.7:0))*(size/230);
+        ctx.fillStyle='rgba('+rgb+','+alpha.toFixed(3)+')';
+        ctx.fillRect(x-dot*.5,y-dot*.5,dot,dot);
       }
-      for(const side of [-1,1]){ctx.fillStyle='#dcf6ffe6';ctx.beginPath();ctx.arc(c+(side*.255+px+.025)*c*.97,c+(.025+py-.065)*c*.97,Math.max(1,size*.009),0,Math.PI*2);ctx.fill();}
+      // Quiet orbital trails knit the point field into the surrounding canvas.
+      ctx.lineWidth=Math.max(.55,size/320);
+      for(let i=0;i<3;i++){
+        const wobble=sec*(.11+i*.065),wide=r*(1.23+i*.12);
+        ctx.strokeStyle='rgba('+rgb+','+(.12+i*.042)+')';
+        ctx.beginPath();ctx.ellipse(c,c,wide,r*(.33+i*.055),wobble+i*.86,0,Math.PI*2);ctx.stroke();
+      }
     }
     function tick(t){
       if(destroyed)return;
@@ -301,8 +346,7 @@
       lastFrame=t;
       wander(t);
       gaze.x+=(gaze.targetX-gaze.x)*.17;gaze.y+=(gaze.targetY-gaze.y)*.17;
-      sphere.style.setProperty('--sf-eye-x',gaze.x.toFixed(2)+'px');sphere.style.setProperty('--sf-eye-y',gaze.y.toFixed(2)+'px');
-      meshDraw(t);cloudDraw(t);faceDraw(t);
+      meshDraw(t);cloudDraw(t);orbDraw(t);
       if(audio&&mode==='music'&&audio.paused)state('idle');
     }
     function openWorkspace(){
@@ -393,10 +437,12 @@
     cleanup.push(on(window,'resize',resize));
     const resizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(resize):null;
     resizeObserver?.observe(root);
+    let selectedAtmosphere='ember';try{selectedAtmosphere=window.localStorage?.getItem(atmosphereKey)||'ember'}catch(_){}
+    applyAtmosphere(selectedAtmosphere,false);
     resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();showPlayer();
     if(!motionOff)raf=requestAnimationFrame(tick);
-    else {meshDraw(0);cloudDraw(0);faceDraw(0);}
-    current={root,state,session,syncPlayer,openPage,closePage,destroy(){
+    else {meshDraw(0);cloudDraw(0);orbDraw(0);}
+    current={root,state,session,syncPlayer,openPage,closePage,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
       destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);pausePlayerHide();
       resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
       if(player && originalPlayerParent){
@@ -404,10 +450,18 @@
         originalPlayerParent.insertBefore(player,before);
       }
       if(mesh.parentNode!==root)mesh.remove();
+      delete document.body.dataset.sfAtmosphere;
       root.remove();
     }};
     return true;
   }
   function unmount(){if(current){current.destroy();current=null;}}
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
+  function applyCommand(text){
+    const value=String(text||'').trim().toLowerCase();
+    const match=value.match(/^(?:(?:stonefellow|agent)[, ]+)?(?:set|switch|change|use)(?: the)? (?:agent )?(?:atmosphere|environment|theme)(?: (?:to|as))? (ember|blue mesh|mesh|violet signal|violet)[.!]?$/);
+    if(!match)return null;
+    const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':match[1];
+    return current?.setAtmosphere(named)||null;
+  }
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
 })();
