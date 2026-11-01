@@ -26,17 +26,27 @@
           <div class="sf-agent-ring" aria-hidden="true"></div>
           <div class="sf-agent-orbit" aria-hidden="true"></div>
           <div class="sf-agent-orbit secondary" aria-hidden="true"></div>
+          <div class="sf-agent-orbit-tools" role="group" aria-label="Agent orb actions">
+            <button type="button" data-agent-action="listen-interpret" data-orbit-action="listen" data-tip="Listen &amp; Interpret" aria-label="Listen and interpret the current lyrics">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-5 3 10 3-13 3 16 3-8h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" data-agent-action="capture" data-orbit-action="record" data-tip="Record Clip" aria-label="Record a song clip">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.1" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="3.8" fill="currentColor"/></svg>
+            </button>
+            <button type="button" data-agent-action="stop-listening" data-orbit-action="stop" data-tip="Stop listening" aria-label="Stop lyric listening" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/></svg>
+            </button>
+          </div>
           <button class="sf-agent-sphere" type="button" aria-label="Expand Stonefellow Agent canvas" aria-expanded="false">
             <canvas class="sf-agent-points" aria-hidden="true"></canvas>
             <span class="sf-agent-core-fallback" aria-hidden="true"></span>
           </button>
         </div>
         <div class="sf-agent-state" role="status">AGENT READY</div>
-        <p class="sf-agent-hint">DRAG TO MOVE · CLICK TO EXPAND</p>
-        <div class="sf-agent-listen-actions" aria-label="Song listening and recording tools">
-          <button type="button" class="sf-agent-listen-primary" data-agent-action="listen-interpret"><strong>Listen &amp; Interpret</strong><small>LIVE LYRICS + SONGWRITER CONTEXT</small></button>
-          <button type="button" data-agent-action="capture"><strong>Record Clip</strong><small>LOCAL AUDIO EXCERPT</small></button>
-          <button type="button" data-agent-action="stop-listening" hidden><strong>Stop listening</strong><small>FINISH CURRENT SECTION</small></button>
+        <div class="sf-agent-live-feed" aria-label="Live transcription and Agent Chat">
+          <div class="sf-agent-live-transcript-slot"></div>
+          <div class="sf-agent-live-preview"><span class="sf-agent-live-label">AGENT CHAT</span><span class="sf-agent-live-message">Ready for a conversation</span></div>
+          <button type="button" class="sf-agent-live-open" data-agent-action="chat" aria-label="Open Agent Chat" title="Open Agent Chat">↗</button>
         </div>
         <div class="sf-agent-dock-stack">
           <div id="sfAgentPlayerDock" class="sf-agent-player-dock" aria-label="Agent music player">
@@ -69,8 +79,12 @@
     const root = by(target, '.sf-agent-landing');
     const floater = by(root, '.sf-agent-floater');
     const visual = by(root, '.sf-agent-visual');
+    const orbitTools = by(root, '.sf-agent-orbit-tools');
     const sphere = by(root, '.sf-agent-sphere');
     const status = by(root, '.sf-agent-state');
+    const liveHost = by(root, '.sf-agent-live-feed');
+    const liveSlot = by(root, '.sf-agent-live-transcript-slot');
+    const liveMessage = by(root, '.sf-agent-live-message');
     const mesh = by(root, '.sf-agent-mesh');
     const cloud = by(root, '.sf-agent-cloud');
     const face = by(root, '.sf-agent-points');
@@ -122,6 +136,26 @@
     const originalPlayerParent = player?.parentNode || null;
     const originalPlayerNext = player?.nextSibling || null;
     if (player && originalPlayerParent) playerDock.insertBefore(player,playerDock.firstChild);
+    // Keep one authoritative transcript node; move it into the orb's live
+    // feed only while this canvas is mounted, and restore it on navigation.
+    const voiceTranscript = document.getElementById?.('voiceTranscript') || null;
+    const originalTranscriptParent = voiceTranscript?.parentNode || null;
+    const originalTranscriptNext = voiceTranscript?.nextSibling || null;
+    if(voiceTranscript && originalTranscriptParent && liveSlot)liveSlot.appendChild(voiceTranscript);
+    function syncTranscript(){
+      if(!liveHost)return;
+      const visible=!!voiceTranscript&&!voiceTranscript.hidden;
+      if(visible)liveHost.classList.add('has-live-transcript');
+      else liveHost.classList.remove('has-live-transcript');
+    }
+    function showConversation(role,text){
+      if(!liveMessage||!['user','assistant'].includes(role))return;
+      const value=String(text||'').trim();if(!value)return;
+      liveMessage.textContent=(role==='user'?'You: ':'Stonefellow: ')+value.slice(0,180);
+      liveHost.classList.add('has-conversation');
+    }
+    if(options.initialConversation)showConversation(options.initialConversation.role,options.initialConversation.text);
+    syncTranscript();
     const PLAYER_IDLE_MS=5200;
     function pausePlayerHide(){window.clearTimeout(playerTimer);playerTimer=0;}
     function schedulePlayerHide(){
@@ -160,15 +194,28 @@
       status.textContent=label || ({idle:'AGENT READY',music:'MUSIC PLAYING',listening:'LISTENING',thinking:'THINKING',speaking:'RESPONDING',recording:'CAPTURING LYRICS'}[mode]);
       syncListeningButtons();
     }
+    function positionOrbitTools(){
+      if(!orbitTools)return;
+      const visible=Array.from(orbitTools.querySelectorAll('button')).filter(button=>!button.hidden);
+      const count=visible.length, radius=visual.offsetWidth*.5+(visual.offsetWidth>175?78:58);
+      const spread=count<2?0:Math.min(168,56+(count-2)*42);
+      visible.forEach((button,index)=>{
+        const deg=-90+(count<2?0:-spread/2+spread*index/(count-1));
+        const rad=deg*Math.PI/180;
+        button.style.left='calc(50% + '+(Math.cos(rad)*radius).toFixed(1)+'px)';
+        button.style.top='calc(50% + '+(Math.sin(rad)*radius).toFixed(1)+'px)';
+      });
+    }
     function syncListeningButtons() {
       const capturing=!!options.isCapturing?.();
       const playable=!!(audio && (audio.currentSrc || audio.src) && !audio.paused);
       for(const action of ['listen-interpret','capture'])for(const button of root.querySelectorAll(`[data-agent-action="${action}"]`)){
         button.hidden=capturing;
         button.disabled=!playable;
-        button.title=!playable?'Play a Stonefellow song to use this tool.':'';
+        button.title=!playable?'Play a Stonefellow song to use this tool.':action==='listen-interpret'?'Listen & Interpret':'Record Clip';
       }
       for(const button of root.querySelectorAll('[data-agent-action="stop-listening"]'))button.hidden=!capturing;
+      positionOrbitTools();
     }
     function session() {
       const active=!!window.StonefellowSongExperience?.active?.();
@@ -225,6 +272,7 @@
       dim.w=Math.max(1,root.clientWidth);dim.h=Math.max(1,root.clientHeight);
       for(let i=0;i<2;i++)fit([mesh,cloud][i],contexts[i]);
       frameSize=0;
+      positionOrbitTools();
       if(!floater.style.left)position(dim.w*.64,dim.h*.46);
     }
     function applyAtmosphere(value,persist=true){
@@ -407,6 +455,7 @@
     cleanup.push(on(visual,'pointerleave',schedulePlayerHide));
     cleanup.push(on(sphere,'click',()=>{if(!suppressClick)openWorkspace();suppressClick=false;}));
     cleanup.push(on(floater,'pointerdown',e=>{
+      if(e.target.closest?.('.sf-agent-live-feed'))return;
       if(e.target.closest('.sf-agent-dock-stack,.sf-agent-panel'))return;
       if(e.target.closest('button,input')&&e.target!==sphere)return;
       dragging={id:e.pointerId,x:e.clientX,y:e.clientY,left:floater.offsetLeft,top:floater.offsetTop,moved:false};
@@ -442,12 +491,16 @@
     resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();showPlayer();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);orbDraw(0);}
-    current={root,state,session,syncPlayer,openPage,closePage,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
+    current={root,state,session,syncPlayer,openPage,closePage,syncTranscript,showConversation,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
       destroyed=true;cancelAnimationFrame(raf);window.clearTimeout(workspaceTimer);pausePlayerHide();
       resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
       if(player && originalPlayerParent){
         const before = originalPlayerNext?.parentNode===originalPlayerParent ? originalPlayerNext : null;
         originalPlayerParent.insertBefore(player,before);
+      }
+      if(voiceTranscript && originalTranscriptParent){
+        const before = originalTranscriptNext?.parentNode===originalTranscriptParent ? originalTranscriptNext : null;
+        originalTranscriptParent.insertBefore(voiceTranscript,before);
       }
       if(mesh.parentNode!==root)mesh.remove();
       delete document.body.dataset.sfAtmosphere;
@@ -463,5 +516,5 @@
     const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':match[1];
     return current?.setAtmosphere(named)||null;
   }
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),openPage:view=>current?.openPage(view),closePage:()=>current?.closePage(),active:()=>!!current});
 })();
