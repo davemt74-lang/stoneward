@@ -920,13 +920,16 @@
   async function notificationChat(id){
     const n=notificationById(id);if(!n)return;
     closeNotificationDrawer();void recordNotificationInteraction(id);
-    await openChatPopup();
+    // Open and focus in the original tap turn so mobile Safari can raise the
+    // keyboard. Loading prior chat history may finish asynchronously later.
+    const opening=openChatPopup();
     if(input){
       const context=(String(n.title||'')+'. '+String(n.body||'')).trim().slice(0,360);
       input.value='Help me with this Stonefellow notification: '+context;
       input.dispatchEvent(new Event('input',{bubbles:true}));
       input.focus();
     }
+    await opening;
   }
   function renderDrawer(){
     if(!drawerContent||!st.drawer.data)return;
