@@ -19,3 +19,22 @@ Stonefellow 1.3.199 changes the existing Listen & Interpret flow without changin
 ## Section 91B13F — Conversation-aware volume
 
 Starting an armed microphone no longer lowers music. The player ducks to 40% maximum only when browser speech detection/interim transcription is active, or 16% maximum while actual Agent speech is audible. Silence, completed transcription, network errors, and microphone stop restore the listener's original slider level. ElevenLabs Speech Engine sessions duck while the SDK reports Agent speaking, not merely while the conversation is connected. A volume change made by the listener while ducked is preserved when the duck ends. The new volume regression test runs as part of the release gate.
+
+## Section 91B13G — Activity notification actions
+
+The notification drawer now shows contextual controls beneath each card.
+
+| Notification | Primary action | Additional choices |
+|---|---|---|
+| Continue Listening | Resume at the reminder's exact saved mm:ss, directly on the existing player | Add to persistent Up Next, save to an owned playlist, or create a private Activity Picks playlist |
+| Recommendation | Play the exact published track | Queue, playlist |
+| New release | Explore release | Ask Agent |
+| Saved build | My builds | Ask Agent |
+| Newsletter/community | Account details | Ask Agent |
+| Vinyl production/order | Order status | Ask Agent |
+| Other service notices | Open details when linked | Ask Agent |
+
+All types offer **Ask Agent**, which opens the existing chat with a reviewable contextual question; it does not silently submit an LLM request. The server derives playback track IDs from per-user delivery records and canonical catalog links, including for previously created listening reminders, rather than parsing track titles. A playlist dropdown only includes the signed-in user's playlists. Playback begins directly in the tap handler (important for iOS Safari activation). No iframe or separate media player is created.
+
+- `php tests/section91b13g-notification-actions.php`
+- `node tests/section91b13g-notification-actions.cjs`

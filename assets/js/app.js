@@ -846,9 +846,107 @@
   function recordListen(eventType){if(!st.track)return;const payload={session_key:ensureListenSession(),track_id:String(st.track.id||''),event_type:eventType,position_seconds:Math.round(audio.currentTime||0),duration_seconds:Math.round(audio.duration||st.track.duration||0),source:st.playSource||'player'};fetch((cfg.apiBase||'api')+'/listening.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{})}
   function fmtWhen(v){if(!v)return'';const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString()}
   function drawerItem(title,meta,body=''){return `<article class="drawer-item"><strong>${esc(title)}</strong>${body?`<p>${esc(body)}</p>`:''}<small>${esc(meta)}</small></article>`}
-  function renderDrawer(){if(!drawerContent||!st.drawer.data)return;const d=st.drawer.data||{},tab=st.drawer.tab;$$('[data-drawer-tab]').forEach(b=>b.classList.toggle('active',b.dataset.drawerTab===tab));if(tab==='notifications'){const rows=d.notifications||[];drawerContent.innerHTML=rows.length?rows.map(n=>`<article class="drawer-item notification-card ${Number(n.is_read)?'':'unread'}"><div class="notification-card-main"><strong>${esc(n.title)}</strong>${n.body?`<p>${esc(n.body)}</p>`:''}<small>${esc(String(n.kind||'service').replaceAll('_',' '))} · ${esc(fmtWhen(n.created_at))}</small></div><div class="notification-card-actions">${!Number(n.is_read)?`<button type="button" data-notification-read="${n.id}">Mark read</button>`:''}${n.link_url?`<button type="button" data-notification-open="${n.id}">Open</button>`:''}<button type="button" data-notification-dismiss="${n.id}">Dismiss</button></div></article>`).join(''):'<p class="drawer-empty">No notifications yet.</p>';Array.from(drawerContent.querySelectorAll('[data-notification-read]')).forEach(b=>b.onclick=()=>markNotification(Number(b.dataset.notificationRead)));Array.from(drawerContent.querySelectorAll('[data-notification-open]')).forEach(b=>b.onclick=()=>openNotification(Number(b.dataset.notificationOpen)));Array.from(drawerContent.querySelectorAll('[data-notification-dismiss]')).forEach(b=>b.onclick=()=>dismissNotification(Number(b.dataset.notificationDismiss)))}else if(tab==='history'){const rows=d.history||[],listens=d.listening_preview||[];drawerContent.innerHTML=(listens.length?`<div class="drawer-section-title">Recent listening</div>${listens.map(r=>drawerItem(r.title,(r.event_type||'listen')+' · '+fmtWhen(r.created_at),r.release||'')).join('')}<button class="drawer-history-link" type="button" id="drawerOpenHistory">Open full listening history</button>`:'')+(rows.length?`<div class="drawer-section-title">Account activity</div>${rows.map(r=>drawerItem(r.title,(r.event_type||'activity')+' · '+fmtWhen(r.created_at),r.entity_type?`${r.entity_type}${r.entity_id?' · '+r.entity_id:''}`:'' )).join('')}`:'')||'<p class="drawer-empty">Your Stonefellow history will appear here.</p>';const open=$('#drawerOpenHistory',drawerContent);if(open)open.onclick=()=>{closeNotificationDrawer();navigate('history')}}else{const rows=d.brain||[];drawerContent.innerHTML=rows.length?rows.map(r=>`<article class="drawer-item brain"><strong>${esc(r.route||r.phase||'Agent decision')}</strong><p>${esc(r.request_excerpt||r.response_excerpt||'')}</p><small>${esc(r.phase||'')} · ${esc(r.action||'none')} · ${esc(fmtWhen(r.created_at))}</small></article>`).join(''):'<p class="drawer-empty">No Agent Brain events yet.</p>'}}
+  function notificationTrack(n){
+    const context=n?.action_context;
+    return context?.type==='track'?trackById(String(context.track_id||'')):null;
+  }
+  function notificationActionMarkup(n){
+    const id=Number(n.id)||0,kind=String(n.kind||'service'),track=notificationTrack(n);
+    let html='<div class="notification-context-actions" aria-label="Notification options">';
+    if(track){
+      html+='<button type="button" class="notification-primary-action" data-notification-play="'+id+'">▶ '+(kind==='listening'?'Resume':'Play track')+'</button>';
+      html+='<button type="button" data-notification-queue="'+id+'">+ Up Next</button>';
+      const playlists=st.playlists?.items||[];
+      if(playlists.length){
+        html+='<select data-notification-playlist="'+id+'" aria-label="Add '+esc(track.title)+' to playlist"><option value="">+ Playlist…</option>';
+        for(const p of playlists)html+='<option value="'+(Number(p.id)||0)+'">'+esc(p.name||'Playlist')+'</option>';
+        html+='</select>';
+      }else html+='<button type="button" data-notification-new-playlist="'+id+'">+ New playlist</button>';
+    }else if(n.link_url){
+      const label={release:'Explore release',build:'My builds',community:'Account details',vinyl_production:'Order status',membership:'Membership'}[kind]||'Open details';
+      html+='<button type="button" class="notification-primary-action" data-notification-open="'+id+'">'+label+'</button>';
+    }else if(kind==='build'||kind==='community'||kind==='membership'){
+      html+='<button type="button" class="notification-primary-action" data-notification-account="'+id+'">'+(kind==='build'?'My builds':'My account')+'</button>';
+    }
+    html+='<button type="button" class="notification-chat-action" data-notification-chat="'+id+'">Ask Agent</button>';
+    return html+'</div>';
+  }
+  function notificationById(id){return (st.drawer.data?.notifications||[]).find(n=>Number(n.id)===Number(id))||null}
+  function notificationFeedback(id,message){
+    const card=drawerContent?.querySelector('[data-notification-id="'+Number(id)+'"]');
+    if(!card)return;
+    let label=card.querySelector('.notification-action-status');
+    if(!label){label=document.createElement('p');label.className='notification-action-status';label.setAttribute('role','status');card.querySelector('.notification-card-main')?.append(label)}
+    label.textContent=String(message);
+  }
+  async function recordNotificationInteraction(id){
+    try{
+      const result=await secureJsonPost('notifications.php',{action:'click',id:Number(id)});
+      updateNotificationBadge(result.unread||0);
+      const row=notificationById(id);if(row)row.is_read=1;
+      drawerContent?.querySelector('[data-notification-id="'+Number(id)+'"]')?.classList.remove('unread');
+    }catch(_){}
+  }
+  async function notificationPlay(id){
+    const n=notificationById(id),t=notificationTrack(n);if(!n||!t)return;
+    if(agentSessionActive()){notificationFeedback(id,'End the active Agent listening session before switching tracks.');return}
+    // Invoke audio.play from the original tap before awaiting a network request:
+    // iPhone Safari requires a direct user gesture for playback.
+    const task=play(t,Math.max(0,Number(n.action_context.position_seconds)||0),'notification');
+    const started=await task;
+    if(!started){notificationFeedback(id,'Playback was blocked. Tap Play again to retry.');return}
+    closeNotificationDrawer();void recordNotificationInteraction(id);
+  }
+  async function notificationQueue(id){
+    const t=notificationTrack(notificationById(id));if(!t)return;
+    try{
+      const j=await secureJsonPost('queue.php',{action:'add',track_id:t.id,placement:'end'});
+      applyQueue(j.queue);notificationFeedback(id,'Added “'+t.title+'” to Up Next.');
+      void recordNotificationInteraction(id);
+    }catch(e){notificationFeedback(id,e.message||'Could not add that track to the queue.')}
+  }
+  async function notificationPlaylist(id,playlistId){
+    const t=notificationTrack(notificationById(id));if(!t)return;
+    try{
+      const j=playlistId>0
+        ?await secureJsonPost('playlists.php',{action:'add_track',playlist_id:playlistId,track_id:t.id})
+        :await secureJsonPost('playlists.php',{action:'create',name:'Activity Picks',description:'Tracks saved from Stonefellow Activity',visibility:'private',track_ids:[t.id]});
+      st.playlists={loaded:true,items:j.playlists||[]};
+      notificationFeedback(id,'Saved “'+t.title+'” in '+(j.playlist?.name||'your playlist')+'.');
+      void recordNotificationInteraction(id);
+      // Preserve the feedback; refresh playlist controls only on the next open.
+    }catch(e){notificationFeedback(id,e.message||'Could not save the track to that playlist.')}
+  }
+  async function notificationChat(id){
+    const n=notificationById(id);if(!n)return;
+    closeNotificationDrawer();void recordNotificationInteraction(id);
+    await openChatPopup();
+    if(input){
+      const context=(String(n.title||'')+'. '+String(n.body||'')).trim().slice(0,360);
+      input.value='Help me with this Stonefellow notification: '+context;
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      input.focus();
+    }
+  }
+  function renderDrawer(){
+    if(!drawerContent||!st.drawer.data)return;
+    const d=st.drawer.data||{},tab=st.drawer.tab;
+    $$('[data-drawer-tab]').forEach(b=>b.classList.toggle('active',b.dataset.drawerTab===tab));
+    if(tab==='notifications'){
+      const rows=d.notifications||[];
+      drawerContent.innerHTML=rows.length?rows.map(n=>'<article data-notification-id="'+(Number(n.id)||0)+'" class="drawer-item notification-card '+(Number(n.is_read)?'':'unread')+'"><div class="notification-card-main"><strong>'+esc(n.title)+'</strong>'+(n.body?'<p>'+esc(n.body)+'</p>':'')+'<small>'+esc(String(n.kind||'service').replaceAll('_',' '))+' · '+esc(fmtWhen(n.created_at))+'</small>'+notificationActionMarkup(n)+'</div><div class="notification-card-actions">'+(!Number(n.is_read)?'<button type="button" data-notification-read="'+(Number(n.id)||0)+'">Mark read</button>':'')+'<button type="button" data-notification-dismiss="'+(Number(n.id)||0)+'">Dismiss</button></div></article>').join(''):'<p class="drawer-empty">No notifications yet.</p>';
+      Array.from(drawerContent.querySelectorAll('[data-notification-read]')).forEach(b=>b.onclick=()=>markNotification(Number(b.dataset.notificationRead)));
+      Array.from(drawerContent.querySelectorAll('[data-notification-open]')).forEach(b=>b.onclick=()=>openNotification(Number(b.dataset.notificationOpen)));
+      Array.from(drawerContent.querySelectorAll('[data-notification-dismiss]')).forEach(b=>b.onclick=()=>dismissNotification(Number(b.dataset.notificationDismiss)));
+      Array.from(drawerContent.querySelectorAll('[data-notification-play]')).forEach(b=>b.onclick=()=>notificationPlay(Number(b.dataset.notificationPlay)));
+      Array.from(drawerContent.querySelectorAll('[data-notification-queue]')).forEach(b=>b.onclick=()=>notificationQueue(Number(b.dataset.notificationQueue)));
+      Array.from(drawerContent.querySelectorAll('[data-notification-new-playlist]')).forEach(b=>b.onclick=()=>notificationPlaylist(Number(b.dataset.notificationNewPlaylist),0));
+      Array.from(drawerContent.querySelectorAll('[data-notification-playlist]')).forEach(b=>b.onchange=()=>{const playlistId=Number(b.value)||0;if(playlistId){void notificationPlaylist(Number(b.dataset.notificationPlaylist),playlistId);b.value=''}});
+      Array.from(drawerContent.querySelectorAll('[data-notification-chat]')).forEach(b=>b.onclick=()=>notificationChat(Number(b.dataset.notificationChat)));
+      Array.from(drawerContent.querySelectorAll('[data-notification-account]')).forEach(b=>b.onclick=()=>{const id=Number(b.dataset.notificationAccount);closeNotificationDrawer();void recordNotificationInteraction(id);navigate('account')});
+    }else if(tab==='history'){const rows=d.history||[],listens=d.listening_preview||[];drawerContent.innerHTML=(listens.length?`<div class="drawer-section-title">Recent listening</div>${listens.map(r=>drawerItem(r.title,(r.event_type||'listen')+' · '+fmtWhen(r.created_at),r.release||'')).join('')}<button class="drawer-history-link" type="button" id="drawerOpenHistory">Open full listening history</button>`:'')+(rows.length?`<div class="drawer-section-title">Account activity</div>${rows.map(r=>drawerItem(r.title,(r.event_type||'activity')+' · '+fmtWhen(r.created_at),r.entity_type?`${r.entity_type}${r.entity_id?' · '+r.entity_id:''}`:'' )).join('')}`:'')||'<p class="drawer-empty">Your Stonefellow history will appear here.</p>';const open=$('#drawerOpenHistory',drawerContent);if(open)open.onclick=()=>{closeNotificationDrawer();navigate('history')}}else{const rows=d.brain||[];drawerContent.innerHTML=rows.length?rows.map(r=>`<article class="drawer-item brain"><strong>${esc(r.route||r.phase||'Agent decision')}</strong><p>${esc(r.request_excerpt||r.response_excerpt||'')}</p><small>${esc(r.phase||'')} · ${esc(r.action||'none')} · ${esc(fmtWhen(r.created_at))}</small></article>`).join(''):'<p class="drawer-empty">No Agent Brain events yet.</p>'}}
   function updateNotificationBadge(count){if(!notificationBadge)return;const n=Math.max(0,Number(count)||0);notificationBadge.textContent=n>99?'99+':String(n);notificationBadge.hidden=n===0;if(drawerUnreadCount)drawerUnreadCount.textContent=n?`(${n})`:''}
-  async function loadNotificationDrawer(){if(!st.auth.authenticated||!notificationDrawer)return;try{const r=await fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'Could not load activity.');st.drawer.data=j;if(j.csrf)st.auth.csrf=j.csrf;updateNotificationBadge(j.unread||0);renderDrawer()}catch(e){if(drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(e.message)}</p>`}}
+  async function loadNotificationDrawer(){if(!st.auth.authenticated||!notificationDrawer)return;try{const [r]=await Promise.all([fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),loadPlaylists(true)]),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'Could not load activity.');st.drawer.data=j;if(j.csrf)st.auth.csrf=j.csrf;updateNotificationBadge(j.unread||0);renderDrawer()}catch(e){if(drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(e.message)}</p>`}}
   function openNotificationDrawer(){if(!notificationDrawer)return;notificationDrawer.hidden=false;if(notificationBackdrop)notificationBackdrop.hidden=false;document.body.classList.add('drawer-open');notificationButton?.setAttribute('aria-expanded','true');loadNotificationDrawer()}
   function closeNotificationDrawer(){if(!notificationDrawer)return;notificationDrawer.hidden=true;if(notificationBackdrop)notificationBackdrop.hidden=true;document.body.classList.remove('drawer-open');notificationButton?.setAttribute('aria-expanded','false')}
   async function markNotification(id){try{const j=await secureJsonPost('notifications.php',{action:'read',id});updateNotificationBadge(j.unread||0);await loadNotificationDrawer()}catch(_){}}

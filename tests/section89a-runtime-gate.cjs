@@ -14,6 +14,7 @@ async function scenario(stopMidReply){
   const audio=new Promise(resolve=>{resolveAudio=resolve});
   const sandbox={
     recognition:{stop:()=>trace.push('stop-recognition')},
+    setVoiceInputActive:active=>trace.push('input-'+active),
     clearTimeout:()=>trace.push('clear-timer'),
     conversationRestartTimer:null,
     st:{conversationOn:true},
@@ -32,6 +33,7 @@ async function scenario(stopMidReply){
   const task=sandbox.run('Hello Stonefellow');
   assert.equal(sandbox.isBusy(),true,'Must become busy synchronously');
   assert.equal(trace.filter(x=>x==='command').length,1);
+  assert.equal(trace.includes('input-false'),true,'Transcription ducking ends before the Agent handles a recognized turn');
   assert.equal(trace.includes('restart'),false,'Recognition cannot restart before the reply');
   resolveCommand();await new Promise(resolve=>setImmediate(resolve));
   assert.equal(trace.includes('restart'),false,'Recognition must wait for voice/audio completion');

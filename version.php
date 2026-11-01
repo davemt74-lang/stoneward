@@ -17,6 +17,7 @@ echo json_encode([
   'agent_integration_coverage'=>'authenticated-read-only-live-tool-skill-module-audit-no-execution-grant',
   'conversational_voice_reliability'=>'transcript-acoustic-confirmation-retry-truncated-speech-public-admin',
   'conversation_volume_ducking'=>'91B13F: audible-agent-speech-or-active-recognition-only-user-volume-preserved',
+  'notification_contextual_actions'=>'91B13G: typed-notification-resume-queue-existing-or-new-playlist-agent-chat-cta',
   'catalog_single_publish_flow'=>'streaming-digital-vinyl-explicit-uses-protected-master-transcoded-preview',
   'folder_scan_private_intake'=>'per-song-confirmation-template-snapshot-vinyl-opt-in',
   'source_audio_revisions'=>'private-master-history-stable-catalog-identity',

@@ -114,8 +114,38 @@ function sf_notification_generate_all(int $limit=500): array {
     foreach($rows as $r){$x=sf_notification_generate_for_user((int)$r['id']);$users++;$generated+=(int)$x['generated'];if(!empty($x['baseline_initialized']))$baselines++;}
     return ['users'=>$users,'generated'=>$generated,'baselines_initialized'=>$baselines,'ran_at'=>gmdate('c')];
 }
+/**
+ * Notification actions must resolve server-side canonical track IDs, not guess
+ * an identity from a human-readable headline. Old reminder rows retain their
+ * delivery-key source and timestamp in the displayed body.
+ */
+function sf_notification_action_context(array $row,string $dedupeKey,array $tracks): ?array {
+    $kind=(string)($row['kind']??'');$id='';
+    if($kind==='listening'&&preg_match('/^listen:(.+):\d{4}-\d{2}-\d{2}T/',$dedupeKey,$m))$id=$m[1];
+    if($kind==='recommendation'){
+        $link=(string)($row['link_url']??'');
+        if(parse_url($link,PHP_URL_HOST)!==null)return null;
+        $query=parse_url($link,PHP_URL_QUERY);
+        if(is_string($query)){parse_str($query,$params);if(($params['view']??'')==='track'&&is_string($params['id']??null))$id=$params['id'];}
+    }
+    if($id===''||!isset($tracks[$id]))return null;
+    $position=0;
+    if($kind==='listening'&&preg_match('/\bfrom\s+(\d{1,4}):([0-5]\d)\b/i',(string)($row['body']??''),$m))
+        $position=min(86400,(int)$m[1]*60+(int)$m[2]);
+    return ['type'=>'track','track_id'=>$id,'position_seconds'=>$position];
+}
 function sf_smart_user_notifications(int $userId,int $limit=60): array {
-    sf_notification_ensure_schema();$limit=max(1,min(200,$limit));$q=sf_db()->prepare("SELECT n.id,n.kind,n.title,n.body,n.link_url,n.is_read,n.created_at,n.read_at FROM user_notifications n WHERE n.user_id=? AND NOT EXISTS(SELECT 1 FROM notification_events e WHERE e.notification_id=n.id AND e.event_type='dismiss') ORDER BY n.id DESC LIMIT ".$limit);$q->execute([$userId]);return $q->fetchAll();
+    sf_notification_ensure_schema();$limit=max(1,min(200,$limit));
+    $q=sf_db()->prepare("SELECT n.id,n.kind,n.title,n.body,n.link_url,n.is_read,n.created_at,n.read_at,
+        (SELECT d.dedupe_key FROM notification_delivery_keys d WHERE d.user_id=n.user_id AND d.notification_id=n.id LIMIT 1) AS source_key
+        FROM user_notifications n WHERE n.user_id=? AND NOT EXISTS(SELECT 1 FROM notification_events e WHERE e.notification_id=n.id AND e.event_type='dismiss') ORDER BY n.id DESC LIMIT ".$limit);
+    $q->execute([$userId]);$tracks=sf_track_map();$rows=$q->fetchAll();
+    foreach($rows as &$row){
+        $source=(string)($row['source_key']??'');unset($row['source_key']);
+        $action=sf_notification_action_context($row,$source,$tracks);
+        if($action!==null)$row['action_context']=$action;
+    }
+    unset($row);return $rows;
 }
 function sf_notification_mark_read(int $userId,int $id): int {
     $now=gmdate('c');$q=sf_db()->prepare('UPDATE user_notifications SET is_read=1,read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?');$q->execute([$now,$id,$userId]);if($q->rowCount())sf_notification_event($userId,$id,'read');return sf_notification_unread_count($userId);
