@@ -63,8 +63,8 @@ check('Second tap stops conversation',()=>{
 check('Account preference is warmed ahead of mic clicks',()=>{
   assert.match(settings,/loadEnginePreference\(\)\.catch\(\(\)=>\{\}\)/);
   assert.match(settings,/rememberEngine\(result\.speech_engine\)/);
-  assert.match(app,/window\\.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP\\|\\|localStorage\\.getItem\\(voiceEngineKey\\)/);
-  assert.match(settings,/window\\.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP=engine/);
+  assert.ok(app.includes('window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP||localStorage.getItem(voiceEngineKey)'));
+  assert.ok(settings.includes('window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP=engine'));
   assert.match(page,/sf_speech_engine_public_state/);
   assert.doesNotMatch(app,/await window\.StonefellowSpeechEngine\?\.isSelected/);
 });
