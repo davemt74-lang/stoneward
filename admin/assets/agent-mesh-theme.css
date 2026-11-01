@@ -78,14 +78,66 @@ body {
   box-shadow:0 0 16px rgba(138,212,255,.22);
 }
 .admin-orb.listening { box-shadow:0 0 0 5px rgba(138,212,255,.13),0 0 19px rgba(138,212,255,.28); }
-.admin-chat-footer { background:linear-gradient(180deg,rgba(8,13,25,0),rgba(8,13,25,.94) 32%,#080d19 75%); }
+.admin-chat-footer { background:linear-gradient(180deg,rgba(8,13,25,0),rgba(8,13,25,.34) 65%,rgba(8,13,25,.25)); }
 .admin-chatbar { background:rgba(15,28,48,.93); border-color:var(--line2); backdrop-filter:blur(22px); box-shadow:0 16px 45px rgba(1,7,20,.35); }
 .notice { background:rgba(16,30,54,.75); color:var(--muted); }
+/* The permanent Admin companion uses the same individual particle-face language
+   as the public orb while retaining the original Admin Agent state and click. */
+.admin-floating-agent { filter:drop-shadow(0 12px 20px rgba(0,4,22,.68)); }
+.admin-floating-agent:hover { animation-play-state:paused; }
+.admin-floating-agent .admin-floating-core {
+  background:radial-gradient(circle at 35% 24%,#6a73b9,#35376c 42%,#141a3c 77%,#090e20);
+  border:1px solid rgba(204,221,255,.43);
+  box-shadow:inset 6px 7px 14px rgba(190,190,255,.14),inset -9px -12px 19px #000a,0 0 33px rgba(91,144,243,.37);
+}
+.admin-floating-agent .admin-floating-ring { border-color:rgba(138,212,255,.66);box-shadow:0 0 0 9px rgba(112,167,249,.07),0 0 26px rgba(138,212,255,.35); }
+.admin-floating-points { position:absolute;inset:0;width:100%;height:100%;border-radius:50%;pointer-events:none; }
+.admin-floating-agent.particle-ready .admin-floating-eyes,
+.admin-floating-agent.particle-ready .admin-floating-mouth { display:none; }
+.admin-floating-agent .admin-floating-caption { color:#c7ebff;background:rgba(14,29,53,.84);border-color:rgba(138,212,255,.43);backdrop-filter:blur(14px); }
+.admin-floating-agent[data-mode="listening"] .admin-floating-ring { border-color:#80d9ff;box-shadow:0 0 0 9px #57c7ff1e,0 0 26px #60ccff6b; }
+.admin-floating-agent[data-mode="thinking"] .admin-floating-ring { border-top-color:#c8b2ff; }
+.admin-floating-agent[data-mode="speaking"] .admin-floating-ring { border-color:#ffdab6; }
+/* Every identity dropdown and slide-out uses the same translucent blue panels. */
+.admin-profile-toggle { background:rgba(16,31,54,.77);border-color:var(--line2);color:var(--ink);backdrop-filter:blur(18px); }
+.admin-profile-toggle:hover,.admin-profile-toggle[aria-expanded="true"] { background:rgba(30,57,92,.94);border-color:var(--accent); }
+.admin-profile-avatar { border-color:rgba(138,212,255,.56);background:#243958; }
+.admin-profile-dropdown,.admin-brain-drawer,.admin-chat-popup,
+.catalog-publish-dialog,.admin-proof-inline {
+  background:linear-gradient(150deg,rgba(22,42,72,.96),rgba(8,18,34,.97));
+  border-color:rgba(138,212,255,.35);
+  color:var(--ink);
+  box-shadow:0 25px 72px rgba(1,6,20,.72),0 0 38px rgba(92,153,238,.12);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+}
+.admin-profile-photo-status,.admin-proof-card,.admin-brain-decision-list li,
+.admin-agent-message,.admin-chat-popup-message,.admin-agent-music-bar:not([hidden]) {
+  background:rgba(28,51,85,.72);
+  border-color:rgba(138,212,255,.23);
+  color:var(--ink);
+}
+.admin-profile-menu-group { border-top-color:rgba(138,212,255,.24); }
+.admin-profile-menu-group>a:hover,.admin-profile-menu-group>button:hover,
+.admin-brain-tabs button:hover,.admin-chat-popup-actions button:hover { background:rgba(90,158,245,.16);color:var(--accent); }
+.admin-brain-header,.admin-brain-tabs,.admin-proof-preview { border-color:rgba(138,212,255,.26); }
+.admin-brain-tabs button { background:rgba(12,28,51,.57);border-color:var(--line2);color:var(--ink);border-radius:9px; }
+.admin-brain-tabs button[aria-selected="true"] { background:var(--accent);color:#071427; }
+.admin-brain-backdrop { background:rgba(2,9,24,.6);backdrop-filter:blur(4px); }
+.admin-proof-card p,.admin-proof-meta,.admin-brain-decision-list time { color:var(--muted); }
+.admin-proof-actor,.admin-brain-decision-list span { color:var(--accent); }
+.admin-proof-verified { color:var(--good); }
+.admin-proof-recorded { color:#ffdaa1; }
+.admin-chat-popup-message.human,.admin-agent-message.human { background:rgba(68,109,178,.29); }
+.admin-chat-popup-message.agent,.admin-agent-message.agent { background:rgba(24,54,88,.59); }
+.admin-brain-drawer :focus-visible,.admin-agent-transcript :focus-visible { outline:2px solid var(--accent);outline-offset:3px; }
+.admin-agent-music-bar button { border-color:var(--line2);color:var(--ink); }
+:is(.admin-profile-dropdown,.admin-brain-drawer,.admin-chat-popup) :is(button,a):focus-visible { outline:2px solid var(--accent);outline-offset:3px; }
 :where(button,a,input,textarea,select,summary):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 @media(max-width:760px){
   .sidebar { box-shadow:16px 0 50px rgba(0,4,14,.56); }
   .admin-topbar { background:rgba(10,19,37,.95); }
 }
 @media(prefers-reduced-transparency:reduce){
-  .admin-topbar,.admin-chatbar { backdrop-filter:none; background:var(--panel); }
+  .admin-topbar,.admin-chatbar,.admin-profile-dropdown,.admin-brain-drawer,.admin-chat-popup { backdrop-filter:none; background:var(--panel); }
 }

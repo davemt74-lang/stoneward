@@ -1,3 +1,11 @@
+# Stonefellow v1.3.192 — Section 91B12C: Under-Orb Player, Transparent Mesh Shell and Particle Admin Agent
+
+- The opt-in public Agent Canvas now anchors its music player **underneath** the floating orb, with Chat and Capture buttons inside the same translucent player/control deck. A quiet player-ready state keeps those actions available even before a song is loaded. The original player, audio element, playback queue and lyric capture workflow stay authoritative.
+- Orb travel pauses while the user hovers over or focuses its face or the attached controls, resumes smoothly from the current position and remains draggable. Its mobile position and bounds account for the music and transcription panels.
+- The mesh renders across the full viewport behind a truly transparent public header and footer; the existing sticky composer remains legible and interactive.
+- Admin's floating agent now uses a code-drawn particle face with cursor-following eyes and the same speaking/listening/thinking visual states, while retaining its existing chat and voice actions. Admin account menus, notification/Agent Brain slideouts, chat popups, proof cards and music controls get consistent blue glass surfaces. Reduced-motion and fallback rendering remain supported.
+- Added new regression coverage for layout, pointer pause, source preservation, Admin particle rendering and blue modal styling. No database migration or changes to AI permissions, audio capture or authorizations.
+
 # Stonefellow v1.3.191 — Section 91B12B: Orb-Attached Player and Quiet Agent Replies
 
 - The opt-in Agent Canvas now uses a transparent site header so its mesh background reads through to the top of the page; the classic template retains its header styling.

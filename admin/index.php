@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.191');
+define('SF_ADMIN_BUILD','1.3.192');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -204,7 +204,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
               data-mode="idle" aria-label="Open or close Stonefellow Admin Agent conversation" aria-pressed="false"
               title="Toggle Admin Agent conversation · microphone available in the chat bar">
         <span class="admin-floating-ring" aria-hidden="true"></span>
-        <span class="admin-floating-core" aria-hidden="true"><span class="admin-floating-eyes"><i></i><i></i></span><span class="admin-floating-mouth"></span></span>
+        <span class="admin-floating-core" aria-hidden="true"><canvas class="admin-floating-points" aria-hidden="true"></canvas><span class="admin-floating-eyes"><i></i><i></i></span><span class="admin-floating-mouth"></span></span>
         <span class="admin-floating-caption" id="adminFloatingAgentState">READY</span>
       </button>
     </div>
@@ -223,6 +223,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="../assets/js/agent-audio-player-skill.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-music-controller.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>&amp;e5=1"></script>
+  <script src="assets/agent-particle-orb.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/speech-engine-pilot.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/stripe-connect.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/commerce-ops.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>

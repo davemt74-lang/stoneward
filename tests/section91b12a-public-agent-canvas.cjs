@@ -82,7 +82,7 @@ check('Responsive, reduced-motion and session-scroll rules are present',()=>{
   assert.match(css,/@media\(max-width:720px\)/);
   assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
   assert.match(css,/\.sf-agent-session \{ max-height/);
-  assert.match(css,/\.sf-agent-floater\[data-side="left"\]/);
+  assert.match(css,/\.sf-agent-dock-stack \{ position:relative/);
 });
 check('New module loads without initiating capture or network work',()=>{
   const context={window:{}};
@@ -151,11 +151,12 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   window.SFPublicAgentCanvas.setState('recording');window.SFPublicAgentCanvas.syncSongExperience();
   assert.equal(elements['.sf-agent-panel'].hidden,false);
   assert.equal(player.parentNode,elements['.sf-agent-player-dock']);
-  assert.equal(elements['.sf-agent-player-dock'].hidden,false);
+  assert.equal(elements['.sf-agent-player-dock'].classList.contains('has-track'),true);
   player.hidden=true;window.SFPublicAgentCanvas.syncPlayer();
-  assert.equal(elements['.sf-agent-player-dock'].hidden,true);
-  player.hidden=false;window.SFPublicAgentCanvas.syncPlayer();
+  assert.equal(elements['.sf-agent-player-dock'].classList.contains('has-track'),false);
   assert.equal(elements['.sf-agent-player-dock'].hidden,false);
+  player.hidden=false;window.SFPublicAgentCanvas.syncPlayer();
+  assert.equal(elements['.sf-agent-player-dock'].classList.contains('has-track'),true);
   window.SFPublicAgentCanvas.unmount();
   assert.equal(player.parentNode,footer);
   assert.deepEqual(footer.children,[player,composer]);
