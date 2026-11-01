@@ -22,3 +22,9 @@
 4. Start Listen & Interpret; its visible icon transitions into Stop Listening. Record Clip stays separate from lyric listening.
 5. Switch to the full builder. The voice transcript returns to the regular footer; no iframe or duplicate microphone session is created.
 6. Repeat on mobile Safari; the orb remains draggable, the icons stay above the outside ring, and the chatbar remains usable.
+
+## Agent identity
+
+- The public conversational LLM is explicitly named **Stonefellow**, with instructions to introduce itself when greeting a new conversation and not before every reply.
+- The existing one-time, microphone-ready browser voice greeting says “Hi, I’m Stonefellow. What would you like to explore?” through the normal speech guard; this does not bypass microphone consent or start an extra TTS stream.
+- The public Agent Chat heading and conversation author label also use “Stonefellow”.

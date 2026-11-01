@@ -603,7 +603,7 @@
     for(const entry of popupEntries.slice(-60)){
       const row=document.createElement('article'),who=document.createElement('strong'),body=document.createElement('p');
       row.className='agent-chat-popup-entry '+(entry.role==='user'?'from-user':entry.role==='notice'?'notice':'from-agent');
-      who.textContent=entry.role==='user'?'You':entry.role==='notice'?'Session update':'Stonefellow Agent';
+      who.textContent=entry.role==='user'?'You':entry.role==='notice'?'Session update':'Stonefellow';
       body.textContent=entry.text;row.append(who,body);chatPopupMessages.appendChild(row);
     }
     if(songExperience){
@@ -1420,7 +1420,7 @@
     window.SFPublicAgentCanvas?.unmount?.();
     document.body.classList.remove('sf-agent-canvas-active');
     if(homepageTemplate==='agent_canvas'&&await renderAgentCanvas())return;
-    if(artistHomepageEnabled&&await renderArtistHomepage())return;document.body.classList.remove('artist-home-active','artist-home-chat-hidden');canvas.innerHTML='';starters.hidden=false;agent(st.playing?'playing':'idle','Hey. I’m the Stonefellow agent. I can play you something, tell you about the music, help you make your own record, or sell you the music directly.');
+    if(artistHomepageEnabled&&await renderArtistHomepage())return;document.body.classList.remove('artist-home-active','artist-home-chat-hidden');canvas.innerHTML='';starters.hidden=false;agent(st.playing?'playing':'idle','Hey, I’m Stonefellow. I can play you something, tell you about the music, help you make your own record, or sell you the music directly.');
     if(!st.auth.authenticated){canvas.innerHTML=newsletterSignupHtml(false);bindNewsletterForms(canvas);return;}
     await loadPersonalization();const home=await loadHome(true);
     if(!home){const rec=st.personalization.recommendations||{},items=Array.isArray(rec.items)?rec.items:[];canvas.innerHTML=items.length?`<article class="module recommendation-module"><div class="module-kicker">FOR YOU</div><div class="recommendation-heading"><div><h2>Recommended for you</h2><p class="player-note">${esc(rec.summary||'Based on your Stonefellow listening.')}</p></div><button class="text-control" type="button" data-command="recommend something for me">Ask the agent</button></div><div class="recommendation-grid">${items.slice(0,6).map(recommendationCard).join('')}</div></article>`:'';bindRecommendationCards(canvas);bind(canvas);return}
@@ -2417,7 +2417,7 @@
     // a muted session, or a browser where the user disabled greetings.
     if(voiceGreetingDelivered||!voiceRepliesEnabled||localStorage.getItem('stonefellow.voice.greeting.v1')==='off')return false;
     voiceGreetingDelivered=true;
-    const greeting='Hello. I’m ready when you are. What would you like to do?';
+    const greeting='Hi, I’m Stonefellow. What would you like to explore?';
     popupEntry('assistant',greeting);
     showTranscript('Stonefellow: '+greeting,'responding');
     void agentSpeak(greeting);

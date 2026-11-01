@@ -243,7 +243,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
     <div class="chat-composer-shell">
       <div id="voiceTranscript" class="voice-transcript" role="status" aria-live="polite" hidden><span class="voice-transcript-dot" aria-hidden="true"></span><span id="voiceTranscriptText"></span></div>
       <section id="agentChatPopup" class="agent-chat-popup" aria-label="Stonefellow conversation" hidden>
-        <header class="agent-chat-popup-head"><div><strong>Stonefellow Agent</strong><span id="agentChatPopupState" role="status">Ready</span></div><div class="agent-chat-popup-tools"><button id="agentVoiceReplyToggle" type="button" aria-pressed="true" title="Toggle spoken Agent replies">Voice on</button><button id="agentChatNew" type="button">New chat</button><button id="agentChatClose" type="button" aria-label="Close Agent Chat">×</button></div></header>
+        <header class="agent-chat-popup-head"><div><strong>Stonefellow</strong><span id="agentChatPopupState" role="status">Ready</span></div><div class="agent-chat-popup-tools"><button id="agentVoiceReplyToggle" type="button" aria-pressed="true" title="Toggle spoken Agent replies">Voice on</button><button id="agentChatNew" type="button">New chat</button><button id="agentChatClose" type="button" aria-label="Close Agent Chat">×</button></div></header>
         <div id="agentChatPopupMessages" class="agent-chat-popup-messages" role="log" aria-live="polite" aria-label="Conversation history"><p class="agent-chat-empty">Your conversation will appear here. Use the bar below to type or speak.</p></div>
       </section>
     <form id="chatForm" class="chatbar" autocomplete="off">

@@ -98,4 +98,15 @@ check('All build markers are in sync and browser scripts parse',()=>{
   for(const file of ['stonefellow-v120.php','admin/index.php','.htaccess','version.php','service-worker.js','assets/js/app.js','assets/css/turntable-builder.css'])assert.ok(read(file).includes(version),file);
   new vm.Script(canvas);new vm.Script(app);
 });
+check('Stonefellow introduces itself by name once through the existing echo-safe voice route',()=>{
+  const runtime=read('api/agent-runtime.php');
+  assert.match(runtime,/You are Stonefellow, the music-site conversational agent/);
+  assert.match(runtime,/Do not repeat the introduction in ordinary follow-up replies/);
+  assert.match(app,/const greeting='Hi, I’m Stonefellow\. What would you like to explore\?'/);
+  assert.match(app,/if\(voiceGreetingDelivered\|\|!voiceRepliesEnabled/);
+  assert.match(app,/voiceGreetingDelivered=true/);
+  assert.match(app,/void agentSpeak\(greeting\)/);
+  assert.match(app,/who\.textContent=entry\.role==='user'\?'You':entry\.role==='notice'\?'Session update':'Stonefellow'/);
+  assert.match(shell,/<strong>Stonefellow<\/strong><span id="agentChatPopupState"/);
+});
 console.log('Section 91B14B: '+passed+' orb actions + live caption checks passed');
