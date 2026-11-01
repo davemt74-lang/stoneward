@@ -2457,7 +2457,7 @@
       return;
     }
     if(!recognition){showTranscript('Voice recognition is unavailable here. Select Speech Engine in Account Settings or type a message.','error');return}
-    voiceInteractionStarted=true;st.conversationOn=true;voiceGreetingArmed=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');if(!isIOSVoiceBrowser)void conversationBargeIn?.prepare();startConversationListen();
+    voiceInteractionStarted=true;st.conversationOn=true;voiceGreetingArmed=true;recognitionNetworkFailures=0;updateConversationButton();syncConversationMusic();showTranscript('Starting microphone…','connecting');agent('connecting','Starting the microphone…');startConversationListen();
   }
   async function deliverSpeechEngineAction(){
     if(!speechPilotActive||!window.StonefellowSpeechEngine?.active)return;

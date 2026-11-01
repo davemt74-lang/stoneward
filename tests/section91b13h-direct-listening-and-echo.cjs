@@ -100,6 +100,7 @@ async function run(){
     assert.match(app,/say “Stonefellow” to talk over music/);
     assert.match(app,/\{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930\}/);
     assert.doesNotMatch(app,/conversationBargeIn\?\.start\(\)/,'The Agent must not start an acoustic monitor while its own voice is audible');
+    assert.doesNotMatch(app,/conversationBargeIn\?\.prepare\(\)/,'The Agent must not prepare a redundant microphone');
     assert.match(app,/conversationBargeIn\?\.stop\(\)/);
     assert.match(app,/songExperience\.listening_mode==='recognition'\?'listening':'recording'/);
     assert.match(app,/if\(directSongListeningCommand\(text\)\)\{await liveAgent\(text\);return\}await loadAuth\(\)/);
