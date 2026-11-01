@@ -61,7 +61,9 @@ check('Transcription, analysis and follow-up actions remain in the canonical ses
   assert.match(moduleSource,/\.sf-agent-expanded-session/);
 });
 check('New canvas performs no recording, inference, storage or provider upload',()=>{
-  assert.doesNotMatch(moduleSource,/\bfetch\s*\(|MediaRecorder|captureStream|getUserMedia|localStorage|sessionStorage|XMLHttpRequest/);
+  assert.doesNotMatch(moduleSource,/\bfetch\s*\(|MediaRecorder|captureStream|getUserMedia|sessionStorage|XMLHttpRequest/);
+  assert.match(moduleSource,/stonefellow\.agent\.atmosphere\.v1/);
+  assert.match(moduleSource,/localStorage\?\.setItem\(atmosphereKey,name\)/);
   assert.match(moduleSource,/This module never records or uploads audio/);
   assert.match(moduleSource,/options\.onStartCapture/);
 });
@@ -69,8 +71,9 @@ check('Follows user and roams across entire mesh with usable touch drag',()=>{
   assert.match(moduleSource,/window,'pointermove'/);
   assert.match(moduleSource,/function wander\(time\)/);
   assert.match(moduleSource,/floater,'pointerdown'/);
-  assert.match(moduleSource,/function faceDraw\(t\)/);
-  assert.match(moduleSource,/2450/);
+  assert.match(moduleSource,/function orbDraw\(t\)/);
+  assert.match(moduleSource,/2900/);
+  assert.doesNotMatch(moduleSource,/function faceDraw\(/);
 });
 check('Expands from orb coordinates and closes with keyboard',()=>{
   assert.match(moduleSource,/from\.left-rect\.left/);
@@ -95,7 +98,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   const events=new Map();
   const clazz=()=>({values:new Set(),add(v){this.values.add(v);},remove(v){this.values.delete(v);},contains(v){return this.values.has(v);}});
   const graphic={setTransform(){},clearRect(){},fillRect(){},beginPath(){},arc(){},fill(){},moveTo(){},lineTo(){},stroke(){},
-    createRadialGradient(){return {addColorStop(){}};}};
+    createRadialGradient(){return {addColorStop(){}};},ellipse(){}};
   class Element {
     constructor(name){this.name=name;this.listeners={};this.style={values:{},setProperty(k,v){this.values[k]=v;}};
       this.classList=clazz();this.dataset={};this.attributes={};this.hidden=false;this.paused=false;this.src='song.mp3';
@@ -131,7 +134,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   const window={matchMedia:()=>({matches:true}),addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type),
     setTimeout:(fn,delay)=>{const id=++nextTimer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),devicePixelRatio:1,
     StonefellowSongExperience:{active:()=>true,mount:host=>{mountCalls++;host.mounted=true;}}};
-  const scope={window,document:{},ResizeObserver:class{observe(){}disconnect(){}},
+  const scope={window,document:{body:{dataset:{}},querySelectorAll:()=>[]},ResizeObserver:class{observe(){}disconnect(){}},
     requestAnimationFrame:()=>1,cancelAnimationFrame(){},performance:{now:()=>1000}};
   vm.runInNewContext(moduleSource,scope);
   check('Initial UI mounts with a real capture/report card in both agent and workspace',()=>{

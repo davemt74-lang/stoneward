@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.200');
+define('SF_BUILD', '1.3.201');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -99,6 +99,14 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <summary id="menuButton" class="menu-button" aria-label="Open menu">•••</summary>
       <div class="menu-sheet">
         <button class="menu-close" id="menuClose" type="button" aria-label="Close menu">×</button>
+        <div class="menu-atmosphere" role="group" aria-label="Agent atmosphere presets">
+          <span class="menu-atmosphere-label">ATMOSPHERE</span>
+          <div class="menu-atmosphere-options">
+            <button type="button" data-sf-atmosphere="ember" aria-pressed="false" title="Cinematic sunset">Ember</button>
+            <button type="button" data-sf-atmosphere="mesh" aria-pressed="false" title="Blue mesh">Mesh</button>
+            <button type="button" data-sf-atmosphere="violet" aria-pressed="false" title="Violet signal">Violet</button>
+          </div>
+        </div>
         <nav>
           <a href="./" data-view="home"><?=($siteSettings['homepage_template']??'classic')==='agent_canvas'?'Agent Canvas':(!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent')?></a>
           <a href="world" data-view="world">Artist World</a>

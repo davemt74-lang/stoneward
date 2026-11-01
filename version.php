@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.200',
+  'stonefellow'=>'1.3.201',
   'direct_song_listening'=>'91B13H: local-explicit-listen-stop-interpret-actions-independent-of-agent-chat-provider',
   'agent_lyric_interpretation'=>'91B13E: listener-reviewed-lyric-draft-native-edit-sources-as-metadata-llm-interpretation-only-in-agent-voice',
   'quick_links_canvas'=>'91B12E: unboxed-one-row-mesh-overlay-small-links-leds-and-meters',
