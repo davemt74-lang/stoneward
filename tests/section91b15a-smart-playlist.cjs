@@ -26,7 +26,7 @@ check('Song transitions and previous-next update playlist visual order',()=>{ass
 check('Music follow-up window is consulted while playing',()=>assert.match(app,/!woke&&Date\.now\(\)>=musicFollowupUntil/));
 check('Stop resets playback position and listening follow-up',()=>{assert.match(app,/case 'stop_player':/);assert.match(app,/audio\.currentTime=0/);assert.match(app,/musicFollowupUntil=0/)});
 check('Load album phrase uses installed page route',()=>assert.match(read('api/agent-navigation.php'),/open\|load\|show me/));
-check('Current version markers stay synchronized',()=>{assert.match(read('stonefellow-v120.php'),/1\.3\.233/);assert.match(read('service-worker.js'),/1\.3\.233/)});
+check('Current version markers stay synchronized',()=>{const version=read('version.php').match(/'stonefellow'=>'(1\.3\.\d+)'/)?.[1];assert.ok(version&&Number(version.split('.')[2])>=233);assert.ok(read('stonefellow-v120.php').includes(version));assert.ok(read('service-worker.js').includes(version))});
 (async()=>{
   const invoked=[];const adapter=skill.create({invoke:async action=>{invoked.push(action);return 'Queue opened.'}});
   const reply=await adapter.dispatch(temp);
