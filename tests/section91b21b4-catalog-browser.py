@@ -22,9 +22,40 @@ def block(start, end):
 
 
 def check(value, label):
+    if not value:
+        capture_evidence(page, width, 'failure')
     assert value, label
     checks.append(label)
     print('PASS', label, flush=True)
+
+
+def visible_text(locator):
+    # innerText can include layout-dependent whitespace. Keep every word and
+    # its case, while treating line wrapping as presentation rather than copy.
+    return ' '.join(locator.inner_text().split())
+
+
+def capture_evidence(page, width, stage):
+    details = page.evaluate('''() => {
+      const describe=selector=>{
+        const node=document.querySelector(selector);if(!node)return null;
+        const style=getComputedStyle(node),rect=node.getBoundingClientRect();
+        return {innerText:node.innerText,textContent:node.textContent,hidden:node.hidden,
+          className:node.className,display:style.display,visibility:style.visibility,
+          opacity:style.opacity,textTransform:style.textTransform,whiteSpace:style.whiteSpace,
+          rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
+      };
+      return {phase:songExperience?.phase,controller:songListeningSkill.status(),
+        gets:gets.length,posts:posts.length,rail:describe('.sf-agent-page-rail'),
+        viewport:describe('.sf-agent-page-viewport'),workspace:describe('.sf-agent-lyric-workspace'),
+        phaseLabel:describe('.sf-agent-lyric-workspace .song-experience-phase'),
+        orb:describe('.sf-agent-state'),stop:describe('[data-agent-action="stop-lyrics"]')};
+    }''')
+    name = f'catalog-{stage}-{BROWSER}-{width}'
+    (OUT / f'{name}.json').write_text(json.dumps(details, ensure_ascii=False, indent=2))
+    print('UI EVIDENCE', name, json.dumps(details, ensure_ascii=False), flush=True)
+    page.screenshot(path=str(OUT / f'{name}.png'), full_page=True)
+    return details
 
 
 with sync_playwright() as p:
@@ -124,29 +155,43 @@ with sync_playwright() as p:
         before = page.locator('[data-orbit-action="listen"]').evaluate('(e)=>[e.style.left,e.style.top]')
         page.locator('[data-orbit-action="listen"]').click(force=True)
         page.wait_for_function('songExperience?.phase === "capturing"')
+        # The app's state can be ready before openPage's two animation frames.
+        # Assert the final visible slideout, not its still-growing shell.
+        try:
+            page.wait_for_function('''() => {
+              const rail=document.querySelector('.sf-agent-page-rail');
+              const viewport=document.querySelector('.sf-agent-page-viewport');
+              return rail?.classList.contains('open')&&viewport&&getComputedStyle(viewport).opacity==='1';
+            }''')
+        except Exception:
+            capture_evidence(page, width, 'opening-failure')
+            raise
         check(page.evaluate('songListeningSkill.mode() === "catalog"'), label + ': iPhone UA uses server catalog path')
         check(page.locator('.sf-agent-page-rail[data-view="lyrics"]').is_visible(), label + ': opens existing lyric slideout')
         check(not page.locator('.sf-agent-panel').is_visible(), label + ': no duplicate recording panel')
         check(page.evaluate('recordings===0&&mics===0&&captures===0&&posts.length===0'), label + ': selection starts without recording, microphone or paid request')
         check(page.evaluate('gets.length===1&&gets[0].includes("source_ref=")'), label + ': readiness binds current player source')
-        check('Stop converts' in page.locator('.sf-agent-lyric-workspace').inner_text(), label + ': sidebar explains selected-section conversion')
-        page.screenshot(path=str(OUT / f'catalog-selection-{BROWSER}-{width}.png'), full_page=True)
+        details = capture_evidence(page, width, 'selection')
+        expected_phase = 'Selecting song section · Stop converts it into text'
+        check(visible_text(page.locator('.sf-agent-lyric-workspace .song-experience-phase')) == expected_phase
+              and details['phaseLabel']['textContent'] == expected_phase,
+              label + ': sidebar explains selected-section conversion')
         page.locator('.sf-agent-page-rail [data-agent-action="close-page"]').click()
         check(page.evaluate('songListeningSkill.status().active') and not page.locator('.sf-agent-page-rail').is_visible(), label + ': closing sidebar preserves selection')
-        check(page.locator('.sf-agent-state').inner_text() == 'SELECTING SONG SECTION', label + ': selection state stays truthful')
+        check(visible_text(page.locator('.sf-agent-state')) == 'SELECTING SONG SECTION', label + ': selection state stays truthful')
         check(page.locator('[data-agent-action="stop-lyrics"]').is_visible(), label + ': orb Stop remains visible')
         check(page.locator('[data-orbit-action="listen"]').evaluate('(e)=>[e.style.left,e.style.top]') == before, label + ': orbital icon position stays stable')
         page.evaluate('advance(8000)')
         page.locator('[data-agent-action="stop-lyrics"]').click()
         page.wait_for_function('posts.length===1')
         check(page.evaluate('posts[0].start_ms===60000&&posts[0].end_ms===68000&&posts[0].source_fingerprint==="a".repeat(64)'), label + ': Stop submits the selected source/time window once')
-        check(page.locator('.sf-agent-state').inner_text() == 'TRANSCRIBING LYRICS', label + ': processing state remains visible after sidebar closes')
-        check(page.locator('[data-agent-action="stop-lyrics"]').inner_text() == 'Stop waiting', label + ': processing has an explicit Stop waiting control')
+        check(visible_text(page.locator('.sf-agent-state')) == 'TRANSCRIBING LYRICS', label + ': processing state remains visible after sidebar closes')
+        check(visible_text(page.locator('[data-agent-action="stop-lyrics"]')) == 'Stop waiting', label + ': processing has an explicit Stop waiting control')
         check(page.locator('[data-orbit-action="record"]').is_disabled(), label + ': Record Studio cannot compete with transcription')
         box = page.locator('.sf-agent-lyric-controls').bounding_box()
         check(box and box['x'] >= 0 and box['x']+box['width'] <= width and box['y']+box['height'] <= 850, label + ': transcription controls fit viewport')
         page.evaluate('SFPublicAgentCanvas.setState("music");SFPublicAgentCanvas.syncSongExperience()')
-        check(page.locator('.sf-agent-state').inner_text() == 'TRANSCRIBING LYRICS' and not page.locator('.sf-agent-page-rail').is_visible(), label + ': player updates preserve transcription status and closed rail')
+        check(visible_text(page.locator('.sf-agent-state')) == 'TRANSCRIBING LYRICS' and not page.locator('.sf-agent-page-rail').is_visible(), label + ': player updates preserve transcription status and closed rail')
         page.screenshot(path=str(OUT / f'catalog-transcribing-{BROWSER}-{width}.png'), full_page=True)
         page.evaluate('reply(0)')
         page.wait_for_function('songExperience?.phase === "draft"')
@@ -154,12 +199,12 @@ with sync_playwright() as p:
         check(not page.locator('[data-agent-action="stop-lyrics"]').is_visible(), label + ': Stop clears on completion')
         check(page.evaluate('currentSongSource()===songLyricDraft&&currentSongDraft()===songLyricDraft'), label + ': catalog receipt integrates with existing draft gates')
         page.locator('[data-agent-action="open-lyrics"]').click()
-        check('Words from the selected song' in page.locator('.sf-agent-lyric-workspace').inner_text(), label + ': reopening displays completed lyric draft')
+        check('Words from the selected song' in visible_text(page.locator('.sf-agent-lyric-workspace')), label + ': reopening displays completed lyric draft')
         check(page.evaluate('interpretations===0&&posts.length===1'), label + ': completion never auto-interprets or repeats transcription')
         page.locator('.sf-agent-lyric-workspace [aria-label="Edit lyric draft"]').click()
         page.locator('.sf-agent-lyric-workspace textarea').fill('Corrected lyric words')
         page.locator('.sf-agent-lyric-workspace button', has_text='Save lyric correction').click()
-        check('Corrected lyric words' in page.locator('.sf-agent-lyric-workspace').inner_text(), label + ': listener may correct the draft')
+        check('Corrected lyric words' in visible_text(page.locator('.sf-agent-lyric-workspace')), label + ': listener may correct the draft')
         page.locator('.sf-agent-lyric-workspace button', has_text='Review & interpret lyrics').click()
         check(page.evaluate('interpretations===1&&posts.length===1'), label + ': interpretation requires its own explicit action')
         page.keyboard.press('Escape')

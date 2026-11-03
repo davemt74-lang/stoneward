@@ -95,9 +95,12 @@ function sf_entitlement_state(int $userId): array {
     sf_entitlements_ensure_schema();sf_billing_ensure_schema();
     sf_subscription_refresh_local($userId);
     $q=sf_db()->prepare('SELECT s.*,p.name package_name,p.slug package_slug,p.monthly_price_cents,p.monthly_tokens,p.trial_days,p.trial_tokens,p.provider_price_id FROM user_subscriptions s LEFT JOIN subscription_packages p ON p.id=s.package_id WHERE s.user_id=? LIMIT 1');
-    $q->execute([$userId]);$s=$q->fetch()?:null;
+    $q->execute([$userId]);$s=$q->fetch()?:null;$q->closeCursor();
     if($s){$s['stored_status']=$s['status'];$s['status']=sf_subscription_effective_status($s);}
-    $ledger=sf_db()->prepare('SELECT delta,balance_after,entry_type,source,provider,model,input_tokens,output_tokens,voice_chars,note,created_at FROM token_ledger WHERE user_id=? ORDER BY id DESC LIMIT 20');$ledger->execute([$userId]);$out=['balance'=>sf_token_balance($userId),'subscription'=>$s,'ledger'=>$ledger->fetchAll()];if(function_exists('sf_membership_state'))$out['membership']=sf_membership_state($userId,true);return $out;
+    $ledger=sf_db()->prepare('SELECT delta,balance_after,entry_type,source,provider,model,input_tokens,output_tokens,voice_chars,note,created_at FROM token_ledger WHERE user_id=? ORDER BY id DESC LIMIT 20');$ledger->execute([$userId]);$entries=$ledger->fetchAll();$ledger->closeCursor();
+    // Balance/schema refresh and CRM sync may write. Release implicit SQLite
+    // read locks first so a concurrent request cannot force a lock upgrade failure.
+    $out=['balance'=>sf_token_balance($userId),'subscription'=>$s,'ledger'=>$entries];if(function_exists('sf_membership_state'))$out['membership']=sf_membership_state($userId,true);return $out;
 }
 function sf_can_use_ai(array $user,int $estimated=1): array {if(($user['role']??'')==='admin')return ['ok'=>true,'unlimited'=>true,'balance'=>PHP_INT_MAX];$state=sf_entitlement_state((int)$user['id']);if(!$state['subscription'])$state=sf_enroll_user((int)$user['id'],null);return ['ok'=>$state['balance']>=$estimated,'unlimited'=>false,'balance'=>$state['balance'],'state'=>$state];}
 function sf_consume_ai(array $user,int $amount,array $usage,string $source='agent'): int {

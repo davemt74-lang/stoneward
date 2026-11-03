@@ -20,6 +20,7 @@ define('SF_ROOT',$tmp);session_save_path($tmp.'/sessions');
 require $source.'/api/bootstrap.php';require $source.'/api/agent-runtime.php';require $source.'/api/agent-song-catalog-core.php';
 $db=sf_db();if($driver==='sqlite')$db->exec('PRAGMA busy_timeout=15000');
 if($worker){
+    ini_set('log_errors','1');ini_set('error_log',$tmp.'/worker-'.$argv[3].'.error.log');
     file_put_contents($tmp.'/ready-'.$argv[3],'ready');$until=microtime(true)+15;
     while(!is_file($tmp.'/go')&&microtime(true)<$until)usleep(10000);
     if(!is_file($tmp.'/go'))throw new RuntimeException('Concurrent worker barrier timed out.');
@@ -31,7 +32,10 @@ if($worker){
                 return ['text'=>'A synthetic lyric fixture.'];
             });
         echo json_encode(['status'=>200,'ok'=>$result['ok']]);
-    }catch(SFSongCatalogError $e){echo json_encode(['status'=>$e->httpStatus,'error'=>$e->error]);}
+    }catch(SFSongCatalogError $e){
+        $causes=[];for($cause=$e->getPrevious();$cause;$cause=$cause->getPrevious())$causes[]=['type'=>get_class($cause),'message'=>$cause->getMessage(),'file'=>$cause->getFile(),'line'=>$cause->getLine(),'trace'=>$cause->getTraceAsString()];
+        echo json_encode(['status'=>$e->httpStatus,'error'=>$e->error,'causes'=>$causes]);
+    }
     exit;
 }
 ob_start();$checks=0;$server=null;$serverPipes=[];
@@ -187,9 +191,14 @@ try{
     file_put_contents($tmp.'/race.json',json_encode(req()));$jobs=[];
     foreach([1,2] as $n){$pipes=[];$proc=proc_open([PHP_BINARY,__FILE__,'worker',$tmp,(string)$n],[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);if(!is_resource($proc))throw new RuntimeException('Worker launch failed.');fclose($pipes[0]);$jobs[]=[$proc,$pipes];}
     $until=microtime(true)+15;while((!is_file($tmp.'/ready-1')||!is_file($tmp.'/ready-2'))&&microtime(true)<$until)usleep(10000);
-    check(is_file($tmp.'/ready-1')&&is_file($tmp.'/ready-2'),'Independent PHP workers reached the duplicate-request barrier');touch($tmp.'/go');$statuses=[];
-    foreach($jobs as [$proc,$pipes]){$raw=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$exit=proc_close($proc);if($exit!==0)throw new RuntimeException('Worker failed: '.$err);$statuses[]=json_decode($raw,true,512,JSON_THROW_ON_ERROR)['status'];}
-    sort($statuses);check($statuses===[200,409],'Concurrent duplicate submissions admit exactly one provider operation');
+    check(is_file($tmp.'/ready-1')&&is_file($tmp.'/ready-2'),'Independent PHP workers reached the duplicate-request barrier');touch($tmp.'/go');$statuses=[];$diagnostics=[];
+    foreach($jobs as $i=>[$proc,$pipes]){
+        $raw=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$exit=proc_close($proc);
+        $errorLog=$tmp.'/worker-'.($i+1).'.error.log';$diagnostics[]=['worker'=>$i+1,'exit'=>$exit,'stdout'=>$raw,'stderr'=>$err,'error_log'=>is_file($errorLog)?file_get_contents($errorLog):''];
+        if($exit!==0)continue;
+        $decoded=json_decode($raw,true);$statuses[]=$decoded['status']??null;
+    }
+    sort($statuses);check($statuses===[200,409],'Concurrent duplicate submissions admit exactly one provider operation'.($statuses===[200,409]?'':': '.json_encode($diagnostics,JSON_UNESCAPED_SLASHES)));
     check(substr_count((string)file_get_contents($tmp.'/provider-calls'),'call')===1&&sf_token_balance(4)===988,'Concurrent duplicate submissions debit once across workers');
     clearClaims();
     // The real endpoint and real bootstrap run over HTTP against the isolated site.

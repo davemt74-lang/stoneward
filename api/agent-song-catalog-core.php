@@ -10,7 +10,7 @@ const SF_SONG_CATALOG_SOURCE_LIMIT = 67108864; // 64 MiB; the extractor uses the
 const SF_SONG_CATALOG_CLIP_LIMIT = 20971520; // 20 MiB, below the provider's 25 MB limit.
 
 final class SFSongCatalogError extends RuntimeException {
-    public function __construct(public readonly string $error,public readonly int $httpStatus,string $message){parent::__construct($message);}
+    public function __construct(public readonly string $error,public readonly int $httpStatus,string $message,?Throwable $previous=null){parent::__construct($message,0,$previous);}
 }
 
 function sf_song_catalog_error(string $error,int $status,string $message): never {
@@ -266,14 +266,14 @@ function sf_song_catalog_transcribe(array $user,array $raw,array $published,?cal
         if($reserved&&!$settled){
             // Never refund an already-settled reservation if a later status write failed.
             $held=($user['role']??'')==='admin';
-            if($reservation){$q=sf_db()->prepare('SELECT status FROM ai_token_reservations WHERE request_key=? AND user_id=?');$q->execute([$reservation,(int)$user['id']]);$held=$q->fetchColumn()==='held';}
+            if($reservation){$q=sf_db()->prepare('SELECT status FROM ai_token_reservations WHERE request_key=? AND user_id=?');$q->execute([$reservation,(int)$user['id']]);$held=$q->fetchColumn()==='held';$q->closeCursor();}
             if($held)sf_ai_finish_reservation($user,$reservation,0,[], $tokenSource,false);
         }
         try{sf_song_catalog_request_state($user,$meta['request_id'],$providerStarted?'unknown':'failed',$reservation);}catch(Throwable $ignored){}
         if($e instanceof SFSongCatalogError)throw $e;
-        sf_song_catalog_error('transcription_failed',503,$providerStarted
+        throw new SFSongCatalogError('transcription_failed',503,$providerStarted
             ?'The lyric request could not finish. It will not be retried automatically. Start a new selection to try again.'
-            :'This song section could not be prepared for transcription. Try a longer section or check its published audio.');
+            :'This song section could not be prepared for transcription. Try a longer section or check its published audio.',$e);
     }finally{
         if(is_array($clip)&&is_string($clip['path']??null)){
             $tmpRoot=realpath(sys_get_temp_dir());$path=realpath($clip['path']);
