@@ -1,6 +1,6 @@
-Stonefellow v1.3.232 — Section 91B20F Visual Mask Editor
-Base release: v1.3.231, reconciled and merged as Stoneward PR #331 (merge 8412ea9f1dcf562cf2e5eac96de5fde72f7f1275)
-Scope: Admin Image Studio browser-only mask painting, touch/pen/mouse drawing, undo/redo, crop/focus, private PNG upload, responsive dialog and focused tests
+Stonefellow v1.3.233 — Section 91B20G Reviewed Image Apply & Restore
+Base release: v1.3.232, merged as Stoneward PR #332; direct GitHub ZIP releases added in PR #333
+Scope: reviewed public image replacement on five existing editor surfaces; role/approval/stale-previews guards, durable Admin audit receipts, Agent Brain receipts, prior managed-image restore, plus the v1.3.232 Visual Mask Editor
 Production artifact: generated only by the GitHub Release Gate after full PR certification; this manifest is not a claim of deployment
 Private data: configuration/secrets, storage/media originals and host-specific settings are not bundled as mutable application source
 Mask permissions: original reference rights, mask rights, exact prompt approval, paid generation approval, generated asset approval, and public publication remain separate explicit steps

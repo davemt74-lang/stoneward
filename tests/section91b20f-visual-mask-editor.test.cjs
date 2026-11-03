@@ -58,8 +58,11 @@ test('Responsive modal uses one scroll surface and accessible touch controls',()
 test('Mask feature is part of the permanent release gate and version markers',()=>{
   assert.match(gate,/node --test tests\/section91b20f-visual-mask-editor\.test\.cjs/);
   assert.match(gate,/node --check admin\/assets\/image-mask-editor\.js/);
+  const version=fs.readFileSync('version.php','utf8').match(/'stonefellow'=>'(1\.3\.\d+)'/)?.[1];
+  assert.ok(version,'release version is declared');
+  assert.ok(Number(version.split('.')[2])>=232,'mask editor release cannot regress below v1.3.232');
   for(const file of ['admin/index.php','stonefellow-v120.php','service-worker.js','assets/js/app.js','assets/css/turntable-builder.css','.htaccess','version.php'])
-    assert.ok(fs.readFileSync(file,'utf8').includes('1.3.232'),file);
+    assert.ok(fs.readFileSync(file,'utf8').includes(version),file);
 });
 test('A simulated Admin can paint, undo/redo, crop/focus, and save once without paying for generation',async()=>{
   const callbacks=[],fetched=[],toolButtons=[],values=new Map();

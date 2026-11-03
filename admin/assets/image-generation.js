@@ -6,6 +6,7 @@
   let state={settings:{},openai:{},jobs:[],models:[],presets:[],dashboard:{}};
   let pendingDraft=null,busy=false,incomingBrief=null,composerCache=null,referenceAssets=[];
   let placementOverlay=null,compareOverlay=null,galleryQuery='',galleryFilter='all',referenceQuery='';
+  const publishablePlacements=new Set(['song_cover','release','story','campaign','site']);
   const placementSpecs={
     song_cover:{label:'Song cover',type:'track',role:'artwork',shape:'square',note:'Stages alternate song artwork. Publish primary artwork separately in the Catalog editor.'},
     story:{label:'Story hero',type:'story_entry',role:'hero',shape:'portrait',note:'Stages a private Story hero. Open the Story editor to approve its publication.'},
@@ -97,13 +98,13 @@
     };
     const overlay=document.createElement('div');overlay.className='imagegen-placement-backdrop';placementOverlay=overlay;
     overlay.innerHTML='<div class="imagegen-placement-dialog" role="dialog" aria-modal="true" aria-labelledby="imagegenPlacementTitle">'+
-      '<header class="imagegen-placement-header"><div><small>91B20C · PRIVATE IMAGE REVIEW</small><h2 id="imagegenPlacementTitle">Preview image placements</h2><p>Compare current artwork and your approved AI image. No publishing or provider request is performed here.</p></div><button type="button" class="secondary" data-placement-close>Close ×</button></header>'+
+      '<header class="imagegen-placement-header"><div><small>91B20G · REVIEW & APPLY</small><h2 id="imagegenPlacementTitle">Preview image placements</h2><p>Preview and private staging do not publish or charge. No publishing or provider request is performed here without separate, explicit Apply authorization. Managed prior images can be restored.</p></div><button type="button" class="secondary" data-placement-close>Close ×</button></header>'+
       '<div class="imagegen-placement-controls"><label class="field">Where to preview<select data-placement-kind>'+Object.entries(placementSpecs).map(([id,s])=>'<option value="'+id+'">'+esc(s.label)+'</option>').join('')+'</select></label>'+
       '<label class="field">Existing content<select data-placement-target></select></label><label class="field">Device<select data-placement-device><option value="desktop">Desktop</option><option value="mobile">Mobile</option></select></label></div>'+
       '<p class="imagegen-placement-note" data-placement-note></p><div class="imagegen-placement-compare" data-placement-compare></div>'+
-      '<div class="imagegen-placement-footer"><label class="check-field"><input type="checkbox" data-placement-confirm> I approve adding this image as a private Media Library attachment; do not publish or replace any current public image.</label><div class="actions"><button class="primary" type="button" data-placement-stage disabled>Stage private attachment</button><button class="secondary" type="button" data-placement-media>Open Media Library</button><button class="secondary" type="button" data-placement-editor>Open content editor</button></div><p role="status" data-placement-status></p></div></div>';
+      '<div class="imagegen-placement-footer"><label class="check-field"><input type="checkbox" data-placement-confirm> I approve adding this image as a private Media Library attachment; do not publish or replace any current public image.</label><div class="actions"><button class="primary" type="button" data-placement-stage disabled>Stage private attachment</button><button class="secondary" type="button" data-placement-media>Open Media Library</button><button class="secondary" type="button" data-placement-editor>Open content editor</button></div><p role="status" data-placement-status></p></div>'+      '<section class="imagegen-placement-publish" data-placement-publish hidden><h3>Public artwork · reviewed apply</h3><p>Applying changes live artwork for this target. Previous managed attachments remain available for restoration.</p>'+      '<label class="check-field"><input type="checkbox" data-placement-publish-confirm> I reviewed the current and proposed artwork and explicitly authorize replacing the public image.</label>'+      '<div class="actions"><button type="button" class="primary" data-placement-apply disabled>Apply approved artwork</button><button type="button" class="secondary" data-placement-restore disabled>Restore previous artwork</button></div>'+      '<div class="imagegen-placement-history" data-placement-history aria-live="polite"></div></section></div>';
     document.body.appendChild(overlay);document.body.classList.add('imagegen-placement-open');
-    const kind=$('[data-placement-kind]',overlay),target=$('[data-placement-target]',overlay),device=$('[data-placement-device]',overlay),note=$('[data-placement-note]',overlay),compare=$('[data-placement-compare]',overlay),confirmed=$('[data-placement-confirm]',overlay),stage=$('[data-placement-stage]',overlay),status=$('[data-placement-status]',overlay);
+    const kind=$('[data-placement-kind]',overlay),target=$('[data-placement-target]',overlay),device=$('[data-placement-device]',overlay),note=$('[data-placement-note]',overlay),compare=$('[data-placement-compare]',overlay),confirmed=$('[data-placement-confirm]',overlay),stage=$('[data-placement-stage]',overlay),status=$('[data-placement-status]',overlay),publicArea=$('[data-placement-publish]',overlay),publicConsent=$('[data-placement-publish-confirm]',overlay),apply=$('[data-placement-apply]',overlay),restore=$('[data-placement-restore]',overlay),history=$('[data-placement-history]',overlay);
     const dismiss=()=>{overlay.remove();document.body.classList.remove('imagegen-placement-open');if(placementOverlay===overlay)placementOverlay=null};
     $('[data-placement-close]',overlay).onclick=dismiss;
     overlay.addEventListener('click',e=>{if(e.target===overlay)dismiss()});
@@ -112,34 +113,82 @@
       if(!items.length)return;if(e.shiftKey&&document.activeElement===items[0]){e.preventDefault();items[items.length-1].focus()}
       else if(!e.shiftKey&&document.activeElement===items[items.length-1]){e.preventDefault();items[0].focus()}
     });
-    let refreshNonce=0,staging=false;
+    let refreshNonce=0,staging=false,applying=false,currentLinkId=0,candidateLinkId=0,restoreReceipt=0;
     const currentView=(title,url,shape,proposed)=>'<article class="imagegen-placement-example"><h3>'+esc(title)+'</h3><div class="imagegen-placement-frame '+esc(shape)+' '+(device.value==='mobile'?'phone':'desktop')+'">'+
       (shape==='moment'?'<div class="imagegen-placement-orb" aria-hidden="true">✧</div>':'')+
       (url?'<img src="'+esc(url)+'" alt="'+esc(title)+' artwork" loading="lazy">':'<div class="imagegen-placement-empty">No current artwork</div>')+
       (shape==='moment'?'<span class="imagegen-placement-time">♪ · 1:24</span>':'')+'</div><small>'+(proposed?'Approved image #'+Number(job.id)+' · private preview':'Current Media Library selection')+'</small></article>';
+    const syncPublish=()=>{
+      const enabled=publishablePlacements.has(kind.value)&&!!target.value&&!applying&&!staging;
+      publicArea.hidden=!publishablePlacements.has(kind.value);
+      apply.disabled=!enabled||!candidateLinkId||candidateLinkId===currentLinkId||!publicConsent.checked;
+      restore.disabled=!enabled||!restoreReceipt;
+    };
     const updateTargets=()=>{
       const s=placementSpecs[kind.value],rows=sources[s.type]||[];
       target.innerHTML=rows.filter(x=>x.id).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.title)+'</option>').join('')||'<option value="">No existing content found</option>';
-      confirmed.checked=false;stage.disabled=true;updatePreview();
+      confirmed.checked=false;stage.disabled=true;publicConsent.checked=false;currentLinkId=0;candidateLinkId=0;restoreReceipt=0;history.innerHTML='';
+      syncPublish();updatePreview();
     };
     const updatePreview=async()=>{
-      const seq=++refreshNonce,s=placementSpecs[kind.value],entityId=target.value;
-      stage.disabled=true;confirmed.checked=false;note.textContent=s.note;status.textContent='Reading existing Media Library attachments…';
+      const seq=++refreshNonce,s=placementSpecs[kind.value],entityId=target.value,canApply=publishablePlacements.has(kind.value);
+      stage.disabled=true;confirmed.checked=false;publicConsent.checked=false;currentLinkId=0;candidateLinkId=0;restoreReceipt=0;
+      note.textContent=s.note;history.innerHTML='';status.textContent='Reading existing Media Library attachments…';syncPublish();
       if(!entityId){compare.innerHTML='<p class="notice">Choose an existing '+s.label.toLowerCase()+' target first.</p>';status.textContent='';return}
       try{
-        const r=await api('media.php?entity_type='+encodeURIComponent(s.type)+'&entity_id='+encodeURIComponent(entityId));
+        const params='entity_type='+encodeURIComponent(s.type)+'&entity_id='+encodeURIComponent(entityId);
+        const [r,h]=await Promise.all([
+          api('media.php?entity_type='+encodeURIComponent(s.type)+'&entity_id='+encodeURIComponent(entityId)),
+          canApply?api('media.php?mode=image_placement_history&'+params+'&role='+encodeURIComponent(s.role)):Promise.resolve({current_link_id:0,entries:[]})
+        ]);
         if(seq!==refreshNonce||!overlay.isConnected)return;
         const links=(r.links||[]).filter(x=>x.category==='image');
         const matching=links.filter(x=>x.role===s.role||(s.type==='track'&&s.role==='artwork'&&x.role==='primary_artwork'));
-        const old=matching.find(x=>Number(x.featured)===1)||matching.find(x=>Number(x.public_visible)===1)||matching[0];
+        const old=matching.find(x=>Number(x.public_visible)===1&&Number(x.featured)===1)||matching.find(x=>Number(x.public_visible)===1)||null;
         const oldUrl=old?.uuid?'../api/media.php?id='+encodeURIComponent(old.uuid):'';
         compare.innerHTML=currentView('Current',oldUrl,s.shape,false)+currentView('Proposed',imageUrl,s.shape,true);
-        status.textContent='Preview only. No content has been changed.';
-        stage.disabled=!confirmed.checked;
-      }catch(e){if(seq===refreshNonce){compare.innerHTML='<p role="alert">'+esc(e.message)+'</p>';status.textContent='Could not verify the existing artwork. Staging is disabled.'}}
+        currentLinkId=canApply?Number(h.current_link_id||0):0;
+        const candidate=links.find(x=>Number(x.asset_id)===Number(job.media_asset_id)&&x.role===s.role);
+        candidateLinkId=candidate?Number(candidate.id):0;
+        const entries=Array.isArray(h.entries)?h.entries:[];
+        const activeReceipt=entries.find(e=>Number(e.new_link_id)===currentLinkId&&Number(e.previous_link_id)>0);
+        restoreReceipt=activeReceipt?Number(activeReceipt.id):0;
+        history.innerHTML=canApply?(entries.length?'<h4>Recent reviewed artwork changes</h4>'+entries.slice(0,5).map(e=>
+          '<div class="imagegen-placement-receipt"><span>'+esc(e.created_at||'')+' · Admin #'+Number(e.actor_id||0)+'</span><strong>'+esc(e.new_title||'Artwork #'+e.new_link_id)+'</strong><small>'+(e.action==='image_studio_placement_restored'?'Restored':'Applied')+' · receipt #'+Number(e.id)+'</small></div>').join(''):
+          '<p class="hint">No reviewed apply history for this target yet. Unmanaged existing artwork cannot be restored here.</p>'):'';
+        status.textContent=canApply?(candidateLinkId?'Image attached. Review and authorize Apply before changing public artwork.':'Preview only. Stage this approved image privately before applying.'):'Preview and private staging only. Open the specialized editor to publish this kind of artwork.';
+        stage.disabled=!confirmed.checked;syncPublish();
+      }catch(e){if(seq===refreshNonce){compare.innerHTML='<p role="alert">'+esc(e.message)+'</p>';status.textContent='Could not verify artwork. Publishing is disabled.';candidateLinkId=0;restoreReceipt=0;syncPublish()}}
     };
     kind.onchange=updateTargets;target.onchange=updatePreview;device.onchange=updatePreview;
     confirmed.onchange=()=>{stage.disabled=!confirmed.checked||!target.value||!compare.querySelector('.imagegen-placement-example')||staging};
+    publicConsent.onchange=syncPublish;
+    apply.onclick=async()=>{
+      if(applying||staging||!publicConsent.checked||!candidateLinkId||candidateLinkId===currentLinkId||!publishablePlacements.has(kind.value))return;
+      const spec=placementSpecs[kind.value],entityId=target.value,label=target.selectedOptions[0]?.textContent||entityId;
+      if(!confirm('PUBLISH approved image #'+job.id+' as the primary '+spec.role+' for '+label+'? This changes live artwork. No AI request will be made.'))return;
+      applying=true;syncPublish();status.textContent='Applying reviewed artwork to the existing content editor…';
+      try{
+        await api('media.php',{action:'image_studio_apply',entity_type:spec.type,entity_id:entityId,role:spec.role,
+          link_id:candidateLinkId,job_id:Number(job.id),expected_current_link_id:currentLinkId,confirmed:true});
+        await updatePreview();status.textContent='Published approved artwork. Previous managed versions remain available for restoration.';
+        say('Approved image applied to '+label+'. No additional image generation was requested.');
+      }catch(error){status.textContent=error.message||'Could not confirm artwork publication. Refresh before retrying.';publicConsent.checked=false}
+      finally{applying=false;syncPublish()}
+    };
+    restore.onclick=async()=>{
+      if(applying||staging||!restoreReceipt||!publishablePlacements.has(kind.value))return;
+      const spec=placementSpecs[kind.value],entityId=target.value,label=target.selectedOptions[0]?.textContent||entityId;
+      if(!confirm('RESTORE the previous managed '+spec.role+' for '+label+'? This changes live artwork.'))return;
+      applying=true;syncPublish();status.textContent='Restoring the previous reviewed Media Library image…';
+      try{
+        await api('media.php',{action:'image_studio_restore',entity_type:spec.type,entity_id:entityId,role:spec.role,
+          receipt_id:restoreReceipt,expected_current_link_id:currentLinkId,confirmed:true});
+        await updatePreview();status.textContent='Previous managed artwork restored. The new artwork is still retained privately.';
+        say('Previous artwork restored for '+label+'.');
+      }catch(error){status.textContent=error.message||'Restore could not be confirmed. Refresh the artwork list.'}
+      finally{applying=false;syncPublish()}
+    };
     stage.onclick=async()=>{
       if(staging||!confirmed.checked||!target.value)return;
       const s=placementSpecs[kind.value],label=target.selectedOptions[0]?.textContent||target.value;

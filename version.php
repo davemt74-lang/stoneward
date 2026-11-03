@@ -3,8 +3,8 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.232',
-  'admin_image_studio'=>'91B20F: visual private mask brush editor and mobile crop/focus, searchable variation gallery and comparison slider, transparent background, validated PNG edit masks, immutable options and manual invoice reconciliation',
+  'stonefellow'=>'1.3.233',
+  'admin_image_studio'=>'91B20G: reviewed public image apply, audit-backed restore, validated image placement permissions; 91B20F visual private mask brush editor and mobile crop/focus, searchable variation gallery and comparison slider, transparent background, validated PNG edit masks, immutable options and manual invoice reconciliation',
   'agent_playback_lifecycle'=>'91B17I: authoritative playback epochs, completion dedup, one position-preserving network recovery, buffered status, queue race protection and raw byte-range streaming',
   'admin_media_health_recovery'=>'91B17H: admin-scoped read-only managed-media and catalog audit, safe explicit existing-audio relink with private-master protection and catalog revision guard',
   'admin_song_delete_recovery'=>'91B17G: themed confirmation, authoritative lifecycle receipt, active-song list separate from recoverable Trash',
