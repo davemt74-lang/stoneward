@@ -19,7 +19,7 @@ function functionSource(source,name,indent){
 
 function publicGreeting({enabled=true,preference='on',armed=true,delivered=false}={}){
   const entries=[],spoken=[],transcripts=[],storage={getItem:key=>key==='stonefellow.voice.greeting.v1'?preference:null};
-  const sandbox={voiceGreetingArmed:armed,voiceGreetingDelivered:delivered,voiceRepliesEnabled:enabled,localStorage:storage,
+  const sandbox={voiceGreetingArmed:armed,voiceGreetingDelivered:delivered,voiceRepliesEnabled:enabled,welcomeStarted:false,welcomeGreeting:'',beginWelcome:()=>{sandbox.welcomeStarted=true;sandbox.welcomeGreeting='Hi, I’m Stonefellow.';sandbox.popupEntry('assistant',sandbox.welcomeGreeting)},localStorage:storage,
     popupEntry:(role,text)=>entries.push({role,text}),showTranscript:(text,phase)=>transcripts.push({text,phase}),agentSpeak:text=>spoken.push(text)};
   vm.createContext(sandbox);
   vm.runInContext(functionSource(publicApp,'greetAfterMicrophoneReady',2),sandbox);
