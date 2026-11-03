@@ -15,12 +15,10 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'){
     }else{
     $email=sf_email((string)($_POST['email']??''));
     $password=(string)($_POST['password']??'');
-    $u=sf_user_by_email($email);
-    if(!$u||($u['role']??'')!=='admin'||($u['status']??'')!=='active'||!password_verify($password,(string)($u['password_hash']??''))){
-        usleep(250000);$error='Invalid administrator email or password.';
-    }else{
-        sf_login_user($u);header('Location: index.php',true,303);exit;
-    }
+    try{$result=sf_auth_password_check($email,$password,'admin');}
+    catch(Throwable $e){error_log('Stonefellow Admin login failed: '.get_class($e));$result=sf_login_unavailable();}
+    if(!$result['ok']){sf_login_error_headers($result);$error=$result['message'];}
+    else{sf_login_user($result['user']);header('Location: index.php',true,303);exit;}
     }
 }
 function h(string $v): string{return htmlspecialchars($v,ENT_QUOTES,'UTF-8');}

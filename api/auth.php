@@ -40,14 +40,10 @@ if($action==='register'){
 if($action==='login'){
     $email=sf_email((string)($body['email']??''));
     $pw=(string)($body['password']??'');
-    $gate=sf_auth_login_allowed($email);
-    if(!$gate['ok'])sf_json_response(['ok'=>false,'error'=>'login_throttled','message'=>'Too many unsuccessful login attempts. Try again later.','retry_after_seconds'=>$gate['retry_after_seconds']],429);
-    $u=sf_user_by_email($email);
-    if(!$u||($u['status']??'')!=='active'||!password_verify($pw,(string)$u['password_hash'])){
-        sf_auth_record_attempt($email,false);usleep(250000);
-        sf_json_response(['ok'=>false,'message'=>'Invalid email or password.'],401);
-    }
-    sf_auth_record_attempt($email,true);
+    try{$result=sf_auth_password_check($email,$pw,'public');}
+    catch(Throwable $e){error_log('Stonefellow public login failed: '.get_class($e));$result=sf_login_unavailable();}
+    if(!$result['ok']){sf_login_error_headers($result);sf_json_response($result,(int)$result['status']);}
+    $u=$result['user'];
     sf_login_user($u);
     sf_log_user_activity((int)$u['id'],'login','Signed in to Stonefellow','account',(string)$u['id']);
     sf_json_response(['ok'=>true,'authenticated'=>true,'user'=>sf_user_public(sf_current_user()),'csrf'=>sf_user_csrf()]);
