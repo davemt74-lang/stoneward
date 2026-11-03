@@ -1,0 +1,42 @@
+name: Prepare lyric sidebar integration
+on:
+  push:
+    branches: [codex/91b21b3-lyrics-sidebar]
+    paths: [.github/workflows/91b21b3-prepare.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    if: github.repository == 'davemt74-lang/stoneward' && github.ref == 'refs/heads/codex/91b21b3-lyrics-sidebar'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply exact-anchor integration and test production functions
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 63cbe5750977ad30cea3b1e7baf816671b17ab72 HEAD
+          python3 .github/91b21b3-integrate.py
+          node --check assets/js/app.js
+          node --check assets/js/public-agent-canvas.js
+          node --test tests/section91b21b3-lyrics.test.cjs
+          php -l api/agent-runtime.php
+          php -l api/agent-llm-orchestrator.php
+      - name: Commit only to this working branch
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          branch=codex/91b21b3-lyrics-sidebar
+          test "$(git ls-remote origin refs/heads/$branch | cut -f1)" = "$EXPECTED_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets api admin/index.php version.php stonefellow-v120.php service-worker.js .htaccess tests
+          git commit -m 'fix: separate lyric listening and add native sidebar controls (v1.3.239)'
+          git push origin HEAD:refs/heads/$branch
