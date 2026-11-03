@@ -15,7 +15,7 @@ foreach($tests as $name=>$ok)echo ($ok?'PASS':'FAIL').' '.$name.PHP_EOL;
 if(in_array(false,$tests,true))exit(1);
 $js=(string)file_get_contents(dirname(__DIR__).'/assets/js/app.js');
 $checks=[
- 'frontend supports favorite actions'=>str_contains($js,"case'set_favorite_track'"),
+ 'frontend supports favorite actions'=>preg_match("/case\s*'set_favorite_track'/",$js),
  'server favorite API used'=>str_contains($js,"action:'set_favorite'"),
  'user-facing confirmation follows response'=>str_contains($js,"st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;say("),
 ];
