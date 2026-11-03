@@ -159,7 +159,12 @@ function sf_current_user(): ?array {
     sf_user_session();
     $cachedId=(int)($_SESSION['sf_user_id']??0);
     $id=sf_auth_restore_user_id();
-    if($id<1){unset($_SESSION['sf_user_id'],$_SESSION['sf_csrf']);return null;}
+    if($id<1){
+        unset($_SESSION['sf_user_id']);
+        // Anonymous form tokens must survive GET-to-POST checks; revoked authenticated identities must not.
+        if($cachedId>0)unset($_SESSION['sf_csrf']);
+        return null;
+    }
     if($cachedId!==$id){
         session_regenerate_id(true);
         $_SESSION['sf_user_id']=$id;
