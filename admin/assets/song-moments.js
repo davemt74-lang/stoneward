@@ -4,67 +4,95 @@
   const ctx=window.STONEFELLOW_ADMIN_CONTEXT;if(!ctx)return;
   const {api,canvas,head,say,esc}=ctx;
   const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const state={data:null,track:'',tab:'timeline',editing:0,busy:false,editorDirty:false,importTrack:'',importJobs:[],importError:'',importNotice:'',importReady:false,importBusy:false,pausingImportJob:0,workerEnabled:false,workerPaused:false,workerBusy:false,workerEpoch:0,pollTimer:null};
+  const state={data:null,track:'',tab:'timeline',editing:0,busy:false,editorDirty:false,view:null,workerEnabled:false,workerPaused:false,workerPauseVersion:0,workerBusy:false,pollTimer:null};
   const automaticImports=new Set(),checkingPublishedTracks=new Set();
+  const importsByTrack=new Map();
+  let catalogPanel=null;
   const clock=ms=>{const s=Math.max(0,Math.floor(Number(ms||0)/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
   const preciseClock=ms=>clock(ms)+'.'+String(Math.max(0,Math.round(Number(ms)||0))%1000).padStart(3,'0');
   const parsePosition=value=>{const m=String(value||'').trim().match(/^(\d{1,3}):([0-5]\d)(?:\.(\d{1,3}))?$/);return m?(Number(m[1])*60+Number(m[2]))*1000+Number((m[3]||'').padEnd(3,'0')):null;};
   const artistEntries=()=>((state.data?.entries||[]).filter(e=>Number(e.source_annotation_id||0)===0&&e.status!=='private'));
   const opt=(v,label,selected)=>'<option value="'+esc(v)+'"'+(String(v)===String(selected)?' selected':'')+'>'+esc(label)+'</option>';
   const refTitle=(id)=>state.data?.references?.tracks?.find(t=>String(t.id)===String(id))?.title||String(id);
-  async function load(){state.data=await api('song-moments.php');return state.data;}
-  const importJobFor=id=>state.importJobs.filter(j=>String(j.track_id)===String(id)).sort((a,b)=>Number(b.id)-Number(a.id))[0]||null;
-  const selectedImportTrack=()=>state.importTrack||state.track||state.data?.references?.tracks?.[0]?.id||'';
-  function rememberImportJob(job){if(!job||!Number.isInteger(Number(job.id)))return;const id=Number(job.id);state.importJobs=state.importJobs.filter(j=>Number(j.id)!==id);state.importJobs.push(job);if(!['queued','processing'].includes(job.status))automaticImports.delete(id);}
-  const canAdvanceImport=job=>job.status==='queued'&&job.can_advance!==false;
-  const hasImportPanel=()=>{const panel=$('#sfLyricsImportPanel',canvas);return !!panel&&panel.isConnected!==false;};
-  const inWorkerScope=job=>hasImportPanel()||automaticImports.has(Number(job.id));
-  const canAdvanceHere=job=>inWorkerScope(job)&&canAdvanceImport(job)&&Number(job.id)!==state.pausingImportJob;
-  const processingHere=job=>inWorkerScope(job)&&job.status==='processing';
-  async function loadImports(){try{const data=await api('song-lyrics-import.php');const previous=state.importJobs;state.importJobs=[];for(const job of Array.isArray(data.jobs)?data.jobs:[])rememberImportJob(job);for(const job of previous)if(automaticImports.has(Number(job.id))&&!state.importJobs.some(j=>Number(j.id)===Number(job.id)))rememberImportJob(job);state.importError='';return true;}catch(e){state.importError=e.message||'Song lyric import status is unavailable.';return false;}}
+  const currentView=view=>view&&view===state.view&&(!ctx.app||ctx.app.view===view.route);
+  async function load(view){const data=await api('song-moments.php');if(!currentView(view))return false;state.data=data;return true;}
+  const validTrackId=id=>typeof id==='string'&&id.length>0&&id.length<=180;
+  function importState(track){
+    if(!importsByTrack.has(track))importsByTrack.set(track,{job:null,loaded:false,loading:false,busy:false,needsRefresh:false,notice:'',error:''});
+    return importsByTrack.get(track);
+  }
+  function activePanel(){if(catalogPanel&&!catalogPanel.target.isConnected)catalogPanel=null;return catalogPanel;}
+  const canAdvanceImport=job=>job?.status==='queued'&&job.can_advance!==false&&!job.pause_requested;
+  const inWorkerScope=job=>activePanel()?.track===String(job.track_id)||automaticImports.has(Number(job.id));
+  const canAdvanceHere=item=>item.job&&inWorkerScope(item.job)&&canAdvanceImport(item.job)&&!item.loading&&!item.busy&&!item.needsRefresh;
+  const processingHere=item=>item.job&&inWorkerScope(item.job)&&item.job.status==='processing'&&!item.needsRefresh;
+  const matchingImports=predicate=>Array.from(importsByTrack.values()).filter(predicate);
+  function rememberImportJob(track,job){
+    const item=importState(track),id=Number(job?.id);
+    if(!Number.isInteger(id)||id<1||String(job.track_id)!==track)return false;
+    const previous=Number(item.job?.id||0);
+    if(previous>id)return false;
+    if(previous&&previous!==id)automaticImports.delete(previous);
+    item.job=job;item.loaded=true;
+    if(!['queued','processing'].includes(job.status))automaticImports.delete(id);
+    return true;
+  }
+  async function readLatestImport(track){
+    const data=await api('song-lyrics-import.php?track_id='+encodeURIComponent(track));
+    return (Array.isArray(data.jobs)?data.jobs:[]).filter(j=>String(j.track_id)===track).sort((a,b)=>Number(b.id)-Number(a.id))[0]||null;
+  }
+  function refreshImport(track){
+    const item=importState(track);
+    if(item.reading){renderImport();return item.reading;}
+    const previous=item.job;
+    item.loading=true;renderImport();
+    item.reading=readLatestImport(track).then(job=>{
+      // A slower status read must not replace a more recent worker or control response.
+      if(item.job===previous){
+        if(job){if(!rememberImportJob(track,job))throw new Error('Song lyric import status is unavailable.');}
+        else if(previous)throw new Error('Song lyric import status is unavailable.');
+        else item.loaded=true;
+        item.needsRefresh=false;item.error='';item.notice='';
+      }
+      return true;
+    }).catch(e=>{item.error=e.message||'Song lyric import status is unavailable.';item.needsRefresh=true;return false;})
+      .finally(()=>{item.loading=false;item.reading=null;renderImport();});
+    return item.reading;
+  }
+  function pauseWorker(){
+    state.workerPaused=true;state.workerEnabled=false;state.workerPauseVersion++;
+    if(state.pollTimer){clearTimeout(state.pollTimer);state.pollTimer=null;}
+  }
   /** Successful publication has already queued this specific listening copy on the server. */
   async function resumePublishedTrack(trackId){
-    if(typeof trackId!=='string'||!trackId||trackId.length>180||checkingPublishedTracks.has(trackId))return false;
+    if(!validTrackId(trackId)||checkingPublishedTracks.has(trackId))return false;
     checkingPublishedTracks.add(trackId);
+    const item=importState(trackId),previous=item.job;
     try{
-      const data=await api('song-lyrics-import.php?track_id='+encodeURIComponent(trackId));
-      const job=(Array.isArray(data.jobs)?data.jobs:[]).filter(j=>String(j.track_id)===trackId)
-        .sort((a,b)=>Number(b.id)-Number(a.id))[0];
-      if(!job||!Number.isInteger(Number(job.id))||Number(job.id)<1||!(canAdvanceImport(job)||job.status==='processing'))return false;
-      const known=state.importJobs.find(j=>Number(j.id)===Number(job.id));
-      if(known&&Number(known.completed_chunks)>=Number(job.completed_chunks)&&!canAdvanceImport(known)&&known.status!=='processing')return false;
+      const result=await readLatestImport(trackId);
+      if(result&&(!item.job||Number(result.id)>Number(item.job.id)||item.job===previous))rememberImportJob(trackId,result);
+      const job=item.job;
+      if(!result||!job||Number(result.id)!==Number(job.id)||!(canAdvanceImport(job)||job.status==='processing'))return false;
       automaticImports.add(Number(job.id));
-      if(!known||(!state.workerBusy&&Number(known.completed_chunks)<=Number(job.completed_chunks)))rememberImportJob(job);
-      if(!state.workerPaused){state.workerEnabled=true;renderImport();void pumpImports(state.workerEpoch);}
+      if(!state.workerPaused){state.workerEnabled=true;renderImport();void pumpImports();}
       return true;
     }catch(_){return false;}
     finally{checkingPublishedTracks.delete(trackId);}
   }
-  function scheduleImportPoll(epoch){
-    if(state.pollTimer)clearTimeout(state.pollTimer);state.pollTimer=null;
-    if(!state.workerEnabled||epoch!==state.workerEpoch||!state.importJobs.some(processingHere))return;
+  function scheduleImportPoll(){
+    if(state.pollTimer||!state.workerEnabled||!matchingImports(processingHere).length)return;
     state.pollTimer=setTimeout(async()=>{
-      state.pollTimer=null;if(epoch!==state.workerEpoch||!state.workerEnabled||!state.importJobs.some(processingHere))return;
-      const processing=new Set(state.importJobs.filter(processingHere).map(j=>Number(j.id)));
-      const refreshed=await loadImports();if(epoch!==state.workerEpoch)return;
-      if(!refreshed){state.workerPaused=true;state.workerEnabled=false;renderImport();return;}
-      const ready=state.importJobs.find(j=>j.status==='ready'&&processing.has(Number(j.id)));
-      if(ready)try{await showCompletedImport(ready,epoch);}catch(e){state.importError=e.message||'Saved import could not be refreshed.';}
-      if(epoch!==state.workerEpoch)return;
-      if(!state.importJobs.some(j=>canAdvanceHere(j)||processingHere(j)))state.workerEnabled=false;
-      renderImport();if(state.importJobs.some(canAdvanceHere))void pumpImports(epoch);else scheduleImportPoll(epoch);
+      state.pollTimer=null;if(!state.workerEnabled)return;
+      const results=await Promise.all(matchingImports(processingHere).map(item=>refreshImport(String(item.job.track_id))));
+      if(results.includes(false)){pauseWorker();renderImport();return;}
+      if(state.workerEnabled)void pumpImports();
     },2000);
   }
-  async function showCompletedImport(job,epoch){
-    if(hasImportPanel())await load();if(epoch!==state.workerEpoch)return;
-    state.importReady=String(job.track_id);state.importNotice='Lyrics saved as unverified timeline drafts.';
-    if(!state.editorDirty&&state.tab==='timeline'&&$('#sfLyricsImportPanel',canvas)){state.editing=0;render();}
-  }
-  function importContent(){
-    const track=selectedImportTrack(),job=importJobFor(track),status=String(job?.status||''),queued=state.importJobs.filter(canAdvanceImport).length;
+  function importContent(item){
+    const {job}=item,status=String(job?.status||'');
     const completed=Number(job?.completed_chunks||0),total=Number(job?.total_chunks||0);
     const descriptions={
-      ready:'Import saved. Review the unverified lyric blocks below, then approve and publish each segment.',
+      ready:'Import saved. Open Song Moments to review, approve and publish the unverified lyric segments.',
       unknown:'Provider outcome is unknown. Review the provider request and token ledger manually.',
       failed:'Import failed before transcription started. Check the provider and source configuration, then retry the import.',
       processing:'A transcription request is in progress. Pause import takes effect after the current block.',
@@ -73,80 +101,105 @@
       queued:'Queued for one request at a time. Pause import saves a pause for this song across workers.'
     };
     const description=job?.pause_requested&&status==='processing'?'Pause saved. The current block will finish before the import pauses.':descriptions[status]||'Import the authorized listening copy once. Listeners reuse its saved lyrics during playback.';
-    const disabled=state.importBusy||!track||['queued','running','processing','ready','unknown'].includes(status);
+    const disabled=item.busy||item.loading||!item.loaded||item.needsRefresh||['queued','running','processing','ready','unknown'].includes(status);
     const importLabel=status==='paused'?'Resume import':status==='failed'?'Retry import':'Import song lyrics';
     const pauseButton=['queued','processing'].includes(status)&&!job?.pause_requested
-      ?'<button type="button" id="sfLyricsImportPause"'+(state.importBusy?' disabled':'')+'>Pause import</button>':'';
+      ?'<button type="button" id="sfLyricsImportPause"'+(item.busy||item.loading?' disabled':'')+'>Pause import</button>':'';
     const progress=total>0?completed+' / '+total+' blocks saved':'';
-    const fullText=String(job?.full_text||job?.transcript||'');
-    return '<div class="sf-moment-admin-import-title"><div><small>SONG LYRICS IMPORT</small><h2>Transcribe once, reuse during playback</h2></div><span class="sf-moment-admin-import-badge">APPROXIMATE BLOCK TIMING</span></div><p>Catalog audio is processed in roughly 60-second blocks. Blocks mark an audio range; they do not align individual words. Imported lyrics remain unverified drafts until reviewed.</p>'+
-      '<div class="sf-moment-admin-import-controls"><label>SONG<select id="sfLyricsImportTrack">'+(state.data?.references?.tracks||[]).map(t=>opt(t.id,t.title,track)).join('')+'</select></label><button type="button" id="sfLyricsImportEnqueue"'+(disabled?' disabled':'')+'>'+importLabel+'</button>'+pauseButton+'<button type="button" id="sfLyricsImportWorker"'+(!state.workerEnabled&&!queued&&!state.importJobs.some(j=>j.status==='processing')?' disabled':'')+'>'+(state.workerEnabled?'Stop worker in this browser':'Resume worker in this browser')+'</button><button type="button" id="sfLyricsImportRefresh">Refresh status</button><button type="button" id="sfLyricsApplySong"'+(state.importBusy||!track?' disabled':'')+'>Save approved lyrics to song</button></div>'+
-      '<div class="sf-moment-admin-import-status" role="status" aria-live="polite"><strong>'+esc(status?status.toUpperCase():'NOT IMPORTED')+(progress?' · '+esc(progress):'')+'</strong><span>'+esc(description)+'</span>'+(job?.error_code?'<span>'+esc(String(job.error_code))+'</span>':'')+(state.importNotice?'<span>'+esc(state.importNotice)+'</span>':'')+(state.importError?'<span class="sf-moment-admin-import-error">'+esc(state.importError)+'</span>':'')+'</div>'+
+    return '<div class="sf-moment-admin-import-title"><div><small>SONG LYRICS IMPORT</small><h2>Transcribe this song once</h2></div><span class="sf-moment-admin-import-badge">APPROXIMATE BLOCK TIMING</span></div><p>The published listening copy is transcribed in roughly 60-second blocks. Lyrics are saved as unverified drafts for review.</p>'+
+      '<div class="sf-moment-admin-import-controls"><button type="button" id="sfLyricsImportEnqueue"'+(disabled?' disabled':'')+'>'+importLabel+'</button>'+pauseButton+'<button type="button" id="sfLyricsImportWorker"'+(!state.workerEnabled&&!matchingImports(canAdvanceHere).length&&!matchingImports(processingHere).length?' disabled':'')+'>'+(state.workerEnabled?'Stop worker in this browser':'Resume worker in this browser')+'</button><button type="button" id="sfLyricsImportRefresh"'+(item.loading||item.busy?' disabled':'')+'>Refresh status</button></div>'+
+      '<div class="sf-moment-admin-import-status" role="status" aria-live="polite"><strong>'+esc(status?status.toUpperCase():item.loading?'CHECKING STATUS':item.loaded?'NOT IMPORTED':'STATUS UNAVAILABLE')+(progress?' · '+esc(progress):'')+'</strong><span>'+esc(description)+'</span>'+(job?.error_code?'<span>'+esc(String(job.error_code))+'</span>':'')+(item.notice?'<span>'+esc(item.notice)+'</span>':'')+(item.error?'<span class="sf-moment-admin-import-error">'+esc(item.error)+'</span>':'')+'</div>'+
       (total>0?'<progress max="'+total+'" value="'+Math.min(total,Math.max(0,completed))+'" aria-label="Lyric import blocks saved"></progress>':'')+
-      (state.importReady?'<button type="button" id="sfLyricsImportReview">Review imported lyric segments · '+esc(refTitle(state.importReady))+'</button>':'')+
-      (fullText?'<details class="sf-moment-admin-import-text"><summary>Combined lyric draft · unverified</summary><pre>'+esc(fullText)+'</pre></details>':'');
+      (status==='ready'?'<button type="button" id="sfLyricsImportReview">Review lyric segments</button>':'');
   }
   function renderImport(){
-    const target=$('#sfLyricsImportPanel',canvas);if(!target)return;
-    target.innerHTML=importContent();
-    $('#sfLyricsImportTrack',target).onchange=event=>{state.importTrack=event.target.value;renderImport();};
+    const panel=activePanel();if(!panel)return;
+    const {target,track}=panel,item=importState(track);
+    target.innerHTML=importContent(item);
     $('#sfLyricsImportEnqueue',target).onclick=async()=>{
-      if(state.importBusy)return;const track=selectedImportTrack();if(!track)return;
-      const current=importJobFor(track);
+      if(activePanel()!==panel||item.busy||item.loading||!item.loaded||item.needsRefresh)return;
+      const current=item.job;
       let request={action:'enqueue',track_id:track};
       if(current?.status==='paused')request={action:'resume',job_id:Number(current.id)};
       else if(current?.status==='failed')request={action:'retry',job_id:Number(current.id)};
       else if(current&&current.status!=='stale')return;
-      state.importBusy=true;state.importError='';state.importNotice='Queueing song lyric import…';renderImport();
-      try{const data=await api('song-lyrics-import.php',request);rememberImportJob(data.job);state.importNotice=data.job?.status==='queued'?'Song queued for its one-time import.':'Import status refreshed.';state.workerPaused=false;state.workerEnabled=true;renderImport();void pumpImports(state.workerEpoch);}
-      catch(e){state.importError=e.message||'Could not queue lyric import.';state.importNotice='';}
-      finally{state.importBusy=false;renderImport();}
+      const pauseVersion=state.workerPauseVersion;
+      item.busy=true;item.error='';item.notice='Queueing song lyric import…';renderImport();
+      try{
+        const data=await api('song-lyrics-import.php',request);
+        if(!rememberImportJob(track,data.job))throw new Error('Import status was missing from the response.');
+        item.notice=data.job.status==='queued'?'Song queued for its one-time import.':'Import status refreshed.';
+        if(activePanel()===panel&&state.workerPauseVersion===pauseVersion){state.workerPaused=false;state.workerEnabled=true;}
+      }catch(e){item.error=e.message||'Could not queue lyric import.';item.notice='';}
+      finally{item.busy=false;renderImport();if(state.workerEnabled)void pumpImports();}
     };
     const pause=$('#sfLyricsImportPause',target);
     if(pause)pause.onclick=async()=>{
-      const current=importJobFor(selectedImportTrack());
-      if(state.importBusy||!current||!['queued','processing'].includes(current.status)||current.pause_requested)return;
+      const current=item.job;
+      if(activePanel()!==panel||item.busy||item.loading||!current||!['queued','processing'].includes(current.status)||current.pause_requested)return;
       const id=Number(current.id);
-      state.importBusy=true;
-      state.pausingImportJob=id;
-      state.importError='';
-      state.importNotice='Saving import pause…';
+      item.busy=true;
+      item.error='';
+      item.notice='Saving import pause…';
       renderImport();
       try{
         const data=await api('song-lyrics-import.php',{action:'pause',job_id:id});
-        const latest=state.importJobs.find(job=>Number(job.id)===id);
-        if(!latest||Number(latest.completed_chunks)<=Number(data.job?.completed_chunks))rememberImportJob(data.job);
-        state.importNotice='';
-      }catch(e){state.importError=e.message||'Could not pause the import.';state.importNotice='';}
-      finally{state.importBusy=false;state.pausingImportJob=0;renderImport();}
+        if(Number(data?.job?.id)!==id||String(data.job.track_id)!==track)throw new Error('Pause status was missing from the response.');
+        if(Number(item.job?.completed_chunks)<=Number(data.job?.completed_chunks))rememberImportJob(track,data.job);
+        item.notice='';
+      }catch(e){item.error=(e.message||'Could not pause the import.')+' Refresh status before resuming.';item.notice='';item.needsRefresh=true;}
+      finally{item.busy=false;renderImport();if(state.workerEnabled)void pumpImports();}
     };
-    $('#sfLyricsImportWorker',target).onclick=()=>{state.workerEnabled=!state.workerEnabled;state.workerPaused=!state.workerEnabled;if(!state.workerEnabled&&state.pollTimer){clearTimeout(state.pollTimer);state.pollTimer=null;}state.importNotice=state.workerEnabled?'Worker resumed in this browser.':'Worker stopped in this browser. The current request will finish.';renderImport();if(state.workerEnabled)void pumpImports(state.workerEpoch);};
-    $('#sfLyricsImportRefresh',target).onclick=async()=>{await loadImports();renderImport();};
-    $('#sfLyricsApplySong',target).onclick=async()=>{
-      const track=selectedImportTrack();if(!track||state.importBusy||!confirm('Replace this song’s saved lyrics with its approved, published timeline lyric segments? Existing song lyrics will be overwritten.'))return;
-      state.importBusy=true;state.importError='';state.importNotice='Saving approved lyrics to the song…';renderImport();
-      try{await api('song-moments.php',{action:'apply_lyrics',track_id:track,confirmed:true});state.importNotice='Approved lyrics saved to the song and Songbook.';}catch(e){state.importError=e.message||'Could not save lyrics to the song.';state.importNotice='';}finally{state.importBusy=false;renderImport();}
+    $('#sfLyricsImportWorker',target).onclick=()=>{
+      if(activePanel()!==panel||(!state.workerEnabled&&!matchingImports(canAdvanceHere).length&&!matchingImports(processingHere).length))return;
+      if(state.workerEnabled)pauseWorker();
+      else{state.workerEnabled=true;state.workerPaused=false;}
+      item.notice=state.workerEnabled?'Worker resumed in this browser.':'Worker stopped in this browser. The current request will finish.';
+      renderImport();if(state.workerEnabled)void pumpImports();
     };
-    const review=$('#sfLyricsImportReview',target);if(review)review.onclick=()=>{if(state.editorDirty&&!confirm('Discard unsaved editor changes and review imported lyric segments?'))return;state.editorDirty=false;state.editing=0;state.track=state.importReady;state.importTrack=state.importReady;state.importReady=false;render();};
+    $('#sfLyricsImportRefresh',target).onclick=async()=>{if(activePanel()===panel&&!item.busy){await refreshImport(track);if(state.workerEnabled)void pumpImports();}};
+    const review=$('#sfLyricsImportReview',target);if(review)review.onclick=()=>{if(activePanel()===panel)return ctx.openSongTimeline?.(track);};
   }
-  async function pumpImports(epoch){
-    if(state.workerBusy||!state.workerEnabled||epoch!==state.workerEpoch)return;
+  async function mountCatalogImport(target,trackId){
+    if(!target?.isConnected||!validTrackId(trackId))return false;
+    const panel=catalogPanel={target,track:trackId};
+    await refreshImport(trackId);
+    if(activePanel()!==panel)return false;
+    if(!state.workerPaused&&matchingImports(item=>canAdvanceHere(item)||processingHere(item)).length){state.workerEnabled=true;void pumpImports();}
+    return true;
+  }
+  async function pumpImports(){
+    if(state.workerBusy||!state.workerEnabled)return;
     state.workerBusy=true;
     try{
-      while(state.workerEnabled&&epoch===state.workerEpoch){
-        const job=state.importJobs.find(canAdvanceHere);if(!job)break;
-        state.importNotice='Transcribing the next approximate audio block…';renderImport();
-        let data;try{data=await api('song-lyrics-import.php',{action:'advance',job_id:Number(job.id)});}catch(e){state.importError=(e.message||'Import request interrupted.')+' Refresh status before resuming; this request will not be retried automatically.';state.workerPaused=true;state.workerEnabled=false;break;}
-        if(epoch!==state.workerEpoch)return;
-        if(!data?.job){state.importError='Import status was missing from the response. Refresh before resuming.';state.workerPaused=true;state.workerEnabled=false;break;}
-        rememberImportJob(data.job);
-        if(data.job.status==='queued'&&(data.advanced===false||Number(data.job.completed_chunks)<=Number(job.completed_chunks))){state.importNotice='No block was saved. Refresh status before resuming.';state.workerPaused=true;state.workerEnabled=false;break;}
-        if(data.job.status==='ready'){await showCompletedImport(data.job,epoch);if(epoch!==state.workerEpoch)return;}
-        else if(['unknown','failed'].includes(data.job.status)){state.importNotice='Import paused for administrator review.';}
+      while(state.workerEnabled){
+        const item=matchingImports(canAdvanceHere)[0];if(!item)break;
+        const job=item.job,track=String(job.track_id);
+        item.notice='Transcribing the next approximate audio block…';renderImport();
+        try{
+          const data=await api('song-lyrics-import.php',{action:'advance',job_id:Number(job.id)});
+          const result=data?.job;
+          if(!result||Number(result.id)!==Number(job.id))throw new Error('Import status was missing from the response.');
+          if(Number(item.job.id)>Number(result.id))continue;
+          if(item.job.pause_requested&&result.status==='queued'&&Number(item.job.completed_chunks)>=Number(result.completed_chunks))continue;
+          if(!rememberImportJob(track,result))throw new Error('Import status did not match the selected song.');
+          if(result.status==='queued'&&(data.advanced===false||Number(result.completed_chunks)<=Number(job.completed_chunks))){
+            item.notice='No block was saved. Refresh status before resuming.';item.needsRefresh=true;pauseWorker();break;
+          }
+          if(result.status==='ready')item.notice='Lyrics saved as unverified timeline drafts.';
+          else if(['unknown','failed'].includes(result.status))item.notice='Import paused for administrator review.';
+          else if(state.workerEnabled)item.notice='';
+        }catch(e){
+          item.error=(e.message||'Import request interrupted.')+' Refresh status before resuming; this request will not be retried automatically.';
+          item.notice='';item.needsRefresh=true;pauseWorker();break;
+        }
         renderImport();
       }
-    }catch(e){if(epoch===state.workerEpoch){state.importError=e.message||'Saved import could not be refreshed.';state.workerPaused=true;state.workerEnabled=false;}}
-    finally{state.workerBusy=false;if(epoch===state.workerEpoch){if(!state.importJobs.some(j=>canAdvanceHere(j)||processingHere(j)))state.workerEnabled=false;renderImport();scheduleImportPoll(epoch);}else if(state.workerEnabled)void pumpImports(state.workerEpoch);}
+    }finally{
+      state.workerBusy=false;
+      if(!matchingImports(item=>canAdvanceHere(item)||processingHere(item)).length)state.workerEnabled=false;
+      renderImport();scheduleImportPoll();
+    }
   }
   function metrics(){const m=state.data?.metrics||{};return '<div class="sf-moment-admin-metrics">'+[
     ['PENDING APPROVAL',m.pending_comments||0],['PUBLIC COMMENTS',m.published_comments||0],
@@ -183,14 +236,23 @@
     const review=lyric?'<small class="sf-moment-admin-lyric-state">'+esc(String(e.lyric_state||'unverified').toUpperCase())+' · '+(['whole_clip_estimate','catalog_chunk_estimate'].includes(e.timing_source)?'APPROXIMATE RANGE':e.timing_source==='provider'?'PROVIDER TIMING':'MANUAL TIMING')+' · '+(e.confidence==null?'CONFIDENCE UNKNOWN':'CONFIDENCE '+Math.round(Number(e.confidence)*100)+'%')+'</small>':'';
     return '<article class="sf-moment-admin-row'+(lyric?' sf-moment-admin-row-lyric':'')+'"><div class="sf-moment-admin-time">'+range+'</div><div class="sf-moment-admin-row-body"><div class="sf-moment-admin-label">'+kind+' · '+esc(refTitle(e.track_id))+'</div><strong>'+esc(e.title||e.body?.slice(0,100)||'Untitled')+'</strong>'+info+'<p>'+esc(e.body||'')+'</p><small class="sf-moment-admin-state status-'+esc(e.status)+'">'+esc(String(e.status||'').toUpperCase())+'</small>'+review+'</div><div class="sf-moment-admin-row-actions">'+commands+remove+'</div></article>';
   }
-  function render(){const d=state.data||{entries:[],metrics:{},references:{tracks:[]}},all=artistEntries(),pending=all.filter(e=>e.kind==='comment'&&e.status==='pending'),rows=state.tab==='moderation'?all.filter(e=>e.kind==='comment'):
+  function render(){const view=state.view;if(!currentView(view))return;const d=state.data||{entries:[],metrics:{},references:{tracks:[]}},all=artistEntries(),pending=all.filter(e=>e.kind==='comment'&&e.status==='pending'),rows=state.tab==='moderation'?all.filter(e=>e.kind==='comment'):
     all.filter(e=>(!state.track||String(e.track_id)===String(state.track))&&e.kind!=='comment').sort((a,b)=>Number(a.at_ms)-Number(b.at_ms));
     canvas.innerHTML=head('MUSIC / FAN EXPERIENCE','Song Moments','Publish timed lyrics, photos, notes, and stories around the agent orb. Review lyric text and public listener comments before publication.')+
       metrics()+'<div class="sf-moment-admin-tabs"><button data-moment-tab="timeline" class="'+(state.tab==='timeline'?'active':'')+'">Song Timeline Editor</button><button data-moment-tab="moderation" class="'+(state.tab==='moderation'?'active':'')+'">Comment Approval <b>'+pending.length+'</b></button></div>'+
-      (state.tab==='timeline'?'<section class="panel sf-moment-admin-import" id="sfLyricsImportPanel">'+importContent()+'</section><section class="panel">'+editor()+'<div class="sf-moment-admin-list-title"><h2>Artist timeline</h2><select id="sfMomentFilterSong" aria-label="Filter moments by song">'+opt('','All songs',state.track)+(d.references?.tracks||[]).map(x=>opt(x.id,x.title,state.track)).join('')+'</select></div><div class="sf-moment-admin-list">'+(rows.length?rows.map(entryCard).join(''):'<p class="empty">No artist moments for this song yet. Add lyrics, a photo, story or note above.</p>')+'</div></section>':
+      (state.tab==='timeline'?'<section class="panel">'+editor()+'<div class="sf-moment-admin-list-title"><h2>Artist timeline</h2><select id="sfMomentFilterSong" aria-label="Filter moments by song">'+opt('','All songs',state.track)+(d.references?.tracks||[]).map(x=>opt(x.id,x.title,state.track)).join('')+'</select></div><div class="sf-moment-admin-list">'+(rows.length?rows.map(entryCard).join(''):'<p class="empty">No artist moments for this song yet. Add lyrics, a photo, story or note above.</p>')+'</div><div class="sf-moment-admin-actions"><button type="button" id="sfLyricsApplySong"'+(!state.track||view.applyBusy?' disabled':'')+'>Save approved lyrics to song</button><span id="sfLyricsApplyStatus" role="status">'+(!state.track?'Filter to a song to save its approved lyrics.':'')+'</span></div></section>':
       '<section class="panel"><div class="panel-title"><div><h2>Public comment moderation</h2><p>Fan submissions are pending by default. Only Approved comments appear in the public orb and song timeline.</p></div></div><div class="sf-moment-admin-list">'+(rows.length?rows.map(entryCard).join(''):'<p class="empty">No fan comments awaiting or in review history.</p>')+'</div></section>');
     $$('[data-moment-tab]',canvas).forEach(button=>button.onclick=()=>{if(state.editorDirty&&!confirm('Discard unsaved timeline changes?'))return;state.tab=button.dataset.momentTab;state.editing=0;state.editorDirty=false;render()});
-    const filter=$('#sfMomentFilterSong',canvas);if(filter)filter.onchange=()=>{state.track=filter.value;state.editing=0;render()};
+    const filter=$('#sfMomentFilterSong',canvas);if(filter)filter.onchange=()=>{if(state.editorDirty&&!confirm('Discard unsaved timeline changes?')){filter.value=state.track;return;}state.track=filter.value;state.editing=0;state.editorDirty=false;render()};
+    const apply=$('#sfLyricsApplySong',canvas);
+    if(apply)apply.onclick=async()=>{
+      const track=state.track,status=$('#sfLyricsApplyStatus',canvas);
+      if(!currentView(view)||!track||view.applyBusy||!confirm('Replace this song’s saved lyrics with its approved, published timeline lyric segments? Existing song lyrics will be overwritten.'))return;
+      view.applyBusy=true;apply.disabled=true;status.textContent='Saving approved lyrics to the song…';
+      try{await api('song-moments.php',{action:'apply_lyrics',track_id:track,confirmed:true});status.textContent='Approved lyrics saved to the song and Songbook.';}
+      catch(e){status.textContent=e.message||'Could not save lyrics to the song.';}
+      finally{view.applyBusy=false;if(currentView(view)){const currentButton=$('#sfLyricsApplySong',canvas);if(currentButton)currentButton.disabled=!state.track;}}
+    };
     const form=$('#sfMomentAdminForm',canvas);
     if(form){
       form.addEventListener?.('input',()=>{state.editorDirty=true;});form.addEventListener?.('change',()=>{state.editorDirty=true;});
@@ -218,22 +280,30 @@
           if(publish&&entry.lyric_state!=='approved'){status.textContent='Check the lyric text and choose Approved by administrator before publishing.';return;}
         }
         if(publish&&!confirm(kind==='lyric'?'Publish this reviewed lyric segment to everyone listening to this song?':'Publish this artist moment to everyone listening to this song?'))return;
-        state.busy=true;status.textContent='Saving…';try{await api('song-moments.php',{action:'save',entry});state.editing=0;state.editorDirty=false;await load();say('Song moment saved.');render()}catch(e){status.textContent=e.message}finally{state.busy=false;}
+        state.busy=true;status.textContent='Saving…';try{await api('song-moments.php',{action:'save',entry});if(!await load(view))return;state.editing=0;state.editorDirty=false;say('Song moment saved.');render()}catch(e){status.textContent=e.message}finally{state.busy=false;}
       };
     }
     $$('[data-moment-edit]',canvas).forEach(b=>b.onclick=()=>{state.editing=Number(b.dataset.momentEdit);state.track=all.find(e=>Number(e.id)===state.editing)?.track_id||'';state.tab='timeline';render();$('#sfMomentAdminForm',canvas)?.scrollIntoView({block:'start',behavior:'smooth'})});
     for(const action of ['approve','reject','remove'])$$('[data-moment-'+action+']',canvas).forEach(b=>b.onclick=async()=>{
       if(state.busy)return;const id=Number(b.dataset['moment'+action[0].toUpperCase()+action.slice(1)]);if(!confirm((action==='approve'?'Make this fan comment public?':action==='reject'?'Reject this comment?':'Remove this moment from public display?')+' This decision is logged.'))return;
-      state.busy=true;try{await api('song-moments.php',{action,id,confirmed:true});await load();say('Moment '+action+'d.');render()}catch(e){say(e.message)}finally{state.busy=false;}
+      state.busy=true;try{await api('song-moments.php',{action,id,confirmed:true});if(!await load(view))return;say('Moment '+action+'d.');render()}catch(e){if(currentView(view))say(e.message)}finally{state.busy=false;}
     });
-    renderImport();
   }
-  async function open(tab='timeline'){const epoch=++state.workerEpoch;if(state.pollTimer){clearTimeout(state.pollTimer);state.pollTimer=null;}state.tab=tab;state.editorDirty=false;state.workerEnabled=!state.workerPaused&&(tab==='timeline'||automaticImports.size>0);canvas.innerHTML=head('MUSIC / FAN EXPERIENCE','Song Moments','Loading the song timeline and approval queue…');try{await load();if(epoch!==state.workerEpoch)return;await loadImports();if(epoch!==state.workerEpoch)return;render();if(state.workerEnabled)void pumpImports(epoch);}catch(e){if(epoch===state.workerEpoch)canvas.innerHTML='<section class="panel"><p role="alert">'+esc(e.message)+'</p></section>';}}
+  async function open(tab='timeline',trackId=''){
+    const view=state.view={route:ctx.app?.view,applyBusy:false};
+    state.tab=tab;state.track=validTrackId(trackId)?trackId:'';state.editing=0;state.editorDirty=false;
+    canvas.innerHTML=head('MUSIC / FAN EXPERIENCE','Song Moments','Loading the song timeline and approval queue…');
+    try{
+      if(!await load(view))return;
+      if(state.track&&!(state.data?.references?.tracks||[]).some(t=>String(t.id)===state.track))state.track='';
+      render();
+    }catch(e){if(currentView(view))canvas.innerHTML='<section class="panel"><p role="alert">'+esc(e.message)+'</p></section>';}
+  }
   async function dashboard(){const target=$('#sfSongMomentsDashboard',canvas);if(!target)return;
     try{const d=await api('song-moments.php'),m=d.metrics||{};if(!target.isConnected)return;
       target.innerHTML='<div class="panel-title"><h2>Song Moments &amp; Fan Approval</h2><button data-view="song-moments" class="panel-link">Open editor →</button></div><div class="dashboard-kpi-stack"><button class="dashboard-kpi" data-view="song-moderation"><small>AWAITING APPROVAL</small><strong>'+Number(m.pending_comments||0)+'</strong><span>fan comments not public</span></button><button class="dashboard-kpi" data-view="song-moments"><small>LIVE TIMELINE</small><strong>'+Number(m.published_artist_moments||0)+'</strong><span>published photos, stories and notes</span></button></div>';
       target.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>ctx.openView(b.dataset.view));
     }catch(e){if(target.isConnected)target.innerHTML='<div class="panel-title"><h2>Song Moments</h2><button data-view="song-moments" class="panel-link">Open editor →</button></div><p class="empty">Moment totals are unavailable.</p>';target.querySelector('button')?.addEventListener('click',()=>ctx.openView('song-moments'));}
   }
-  window.SFSongMomentsAdmin=Object.freeze({open,dashboard,resumePublishedTrack});
+  window.SFSongMomentsAdmin=Object.freeze({open,dashboard,mountCatalogImport,resumePublishedTrack});
 })();
