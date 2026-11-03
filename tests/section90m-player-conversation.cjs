@@ -21,14 +21,17 @@ async function run(){
     play:async()=>{if(failToPlay)throw Error('autoplay rejected');audio.paused=false},
     pause:()=>{audio.paused=true}};
   const st={track:{id:'song-1',title:'Night Drive',release:'Moonlight',duration:200},playing:true,conversationOn:false,playlistPlayback:{playlistId:null},playSource:'player'};
-  const sandbox={audio,st,musicOriginalVolume:null,voicePlaybackPending:false,voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,lastAudibleVolume:0.7,
+  const sandbox={window:{},audio,st,musicOriginalVolume:null,voicePlaybackPending:false,voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,lastAudibleVolume:0.7,
     recordListen:type=>events.push(type),invalidatePlayback:()=>{},updateFooterPlayer:()=>events.push('render'),
     stepTrack:delta=>events.push('step:'+delta),
-    play:async track=>{st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;st.playing=!failToPlay;return !failToPlay},
+    play:async (track,position)=>{events.push('play-at:'+position);st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;st.playing=!failToPlay;return !failToPlay},
     trackById:id=>id==='song-1'?st.track?.id==='song-1'?st.track:{id,title:'Night Drive',release:'Moonlight',duration:200,audio:'assets/night-drive.mp3'}:id==='song-2'?{id,title:'Northern Sky',audio:'assets/northern-sky.mp3'}:null,
     time:seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`};
   vm.createContext(sandbox);
-  const code=['syncConversationMusic','playerVolume','setPlayerVolume','observedPlayer','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../assets/js/player-playback-lifecycle.js'),'utf8'),sandbox);
+  sandbox.playbackLifecycle=sandbox.window.StonefellowPlaybackLifecycle.create();
+  sandbox.playbackLifecycle.remember(sandbox.playbackLifecycle.token(),75);
+  const code=['savedPlaybackPosition','syncConversationMusic','playerVolume','setPlayerVolume','observedPlayer','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
   vm.runInContext(code+';globalThis.run=executePlayerAgentAction;',sandbox);
   assert.match(await sandbox.run({type:'player_status'}),/“Night Drive”.*playing.*1:15 of 3:20.*80 percent/);
   assert.equal((await sandbox.run({type:'set_player_volume',mode:'set',percent:30})), 'Stonefellow player volume is now 30 percent.');
@@ -54,6 +57,7 @@ async function run(){
   assert.match(await sandbox.run({type:'pause_player'}),/already paused/);
   assert.equal(await sandbox.run({type:'resume_player'}),'Resumed “Night Drive.”');
   assert.equal(st.playing,true);
+  assert.ok(events.includes('play-at:75'),'Agent resume uses the verified playback checkpoint');
   audio.pause();failToPlay=true;
   assert.match(await sandbox.run({type:'resume_player'}),/could not confirm playback/);
   failToPlay=false;
@@ -69,6 +73,6 @@ async function run(){
   assert.match(app,/const shared=captured===null\?await publicAudioSkill\?\.dispatch\(verified\.action\):null/,'capture dispatch stays separate while named player action remains verified before reaching the local player');
   assert.match(app,/shared\?\.text\?\?await executePlayerAgentAction\(verified\.action\)/,'existing local player remains a safe fallback');
   assert.match(app,/getVolume:\(\)=>playerVolume\(\),setVolume:value=>setPlayerVolume\(value\)/,'turntable and Agent share one volume handler');
-  console.log('Section 90M player conversation: 24 behavior and integration assertions passed');
+  console.log('Section 90M player conversation: behavior and integration assertions passed');
 }
 run().catch(error=>{console.error(error);process.exitCode=1});
