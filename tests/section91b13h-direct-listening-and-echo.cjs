@@ -14,6 +14,7 @@ assert.ok(directStart>0&&liveStart>directStart&&liveEnd>liveStart);
 let active=false,loadAuthCalls=0;
 const actions=[],notices=[],modes=[],spoken=[];
 const scope={
+  directRandomPlaylistCommand:()=>false,
   songListeningSkill:{status:()=>({active})},
   currentSongDraft:()=>active?null:{track_id:'sf-earth',text:'A corrected verse'},
   songLyricReport:null,
@@ -103,7 +104,7 @@ async function run(){
     assert.doesNotMatch(app,/conversationBargeIn\?\.prepare\(\)/,'The Agent must not prepare a redundant microphone');
     assert.match(app,/conversationBargeIn\?\.stop\(\)/);
     assert.match(app,/songExperience\.listening_mode==='recognition'\?'listening':'recording'/);
-    assert.match(app,/if\(directSongListeningCommand\(text\)\)\{await liveAgent\(text\);return\}await loadAuth\(\)/);
+    assert.match(app,/if\(directSongListeningCommand\(text\)\|\|directRandomPlaylistCommand\(text\)\)\{await liveAgent\(text\);return\}await loadAuth\(\)/);
   });
   check('Small speech gaps do not repeatedly restore and re-duck music',()=>{
     assert.match(app,/voiceSpeechReleaseTimer=setTimeout/);
