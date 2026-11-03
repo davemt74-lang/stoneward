@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET') sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
-$catalog=sf_catalog();
+$catalog=sf_public_catalog();
 $releasePath=SF_ROOT.'/data/releases.json';
 $releases=[];
 if(is_file($releasePath)){

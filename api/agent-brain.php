@@ -19,11 +19,19 @@ if(!$write){
     $snapshot['feedback_summary']=sf_agent_feedback_summary('customer',$userId);
     $snapshot['recovery_summary']=sf_agent_mission_recovery_summary('customer',$userId);
     $snapshot['proactive_suggestion']=sf_agent_proactive_customer_suggestion($userId);
+    // Optional owner-initiated search: never forward the retrieved messages to
+    // Claude/OpenAI. Existing Personalization consent remains authoritative.
+    $memoryQuery=sf_clean_text($_GET['memory_query']??'',180);
+    if($memoryQuery!==''){
+        $snapshot['recalled_conversation_excerpts']=sf_agent_cross_thread_recall($userId,'',$memoryQuery,6);
+    }
     $conversation=sf_clean_text($_GET['conversation_id']??'',80);
     if($conversation!==''&&preg_match('/^[A-Za-z0-9_-]{12,80}$/D',$conversation)){
         $snapshot['messages']=sf_agent_history($userId,$conversation,30);
         // Canvas-only reply IDs: never add API-only fields to LLM history.
-        $ids=sf_db()->prepare('SELECT id FROM agent_messages WHERE conversation_id=? AND user_id=? ORDER BY id DESC LIMIT 30');
+        // Keep reply IDs aligned with the visible/LLM-safe history: a queued
+        // action without a browser result is deliberately not a chat reply.
+        $ids=sf_db()->prepare("SELECT id FROM agent_messages WHERE conversation_id=? AND user_id=? AND (provider IS NULL OR provider NOT LIKE 'agent-action-pending:%') ORDER BY id DESC LIMIT 30");
         $ids->execute([$conversation,$userId]);$replyIds=array_reverse($ids->fetchAll(PDO::FETCH_COLUMN));
         foreach($snapshot['messages'] as $i=>&$entry)$entry['id']=(int)($replyIds[$i]??0);
         unset($entry);

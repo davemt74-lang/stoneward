@@ -23,7 +23,10 @@ function sf_ops_test_provider(string $provider,array $admin): array {
             $r=sf_ops_http_get_json('https://api.openai.com/v1/models',['Authorization: Bearer '.$key]);$details=['models'=>count((array)($r['json']['data']??[]))];$lat=$r['latency_ms'];
         }elseif($provider==='anthropic'){
             $key=sf_ai_provider_secret('anthropic');if($key==='')throw new RuntimeException('Anthropic API key is not configured.');
-            $row=sf_ai_provider_row('anthropic');$start=microtime(true);$r=sf_anthropic_call(['provider'=>'anthropic','api_key'=>$key,'model'=>(string)($row['model']??'')],'Stonefellow provider health check. Reply with OK only.',[],'Reply OK.',8);$lat=(int)round((microtime(true)-$start)*1000);$details=['model'=>$r['model']??'','output_tokens'=>$r['output_tokens']??0];
+            // Exercise the actual public chat model, not an obsolete manual
+            // row value, so Operations accurately tests production routing.
+            $row=sf_ai_provider_row('anthropic');$candidate=sf_claude_choose_model(['provider'=>'anthropic','api_key'=>$key,'model'=>(string)($row['model']??'')],sf_ai_state()['routing'],'chat');
+            $start=microtime(true);$r=sf_anthropic_call($candidate,'Stonefellow provider health check. Reply with OK only.',[],'Reply OK.',96);$lat=(int)round((microtime(true)-$start)*1000);$details=['model'=>$r['model']??'','model_tier'=>$candidate['model_tier']??'','output_tokens'=>$r['output_tokens']??0];
         }elseif($provider==='elevenlabs'){
             $key=sf_ai_provider_secret('elevenlabs');if($key==='')throw new RuntimeException('ElevenLabs API key is not configured.');
             $r=sf_ops_http_get_json('https://api.elevenlabs.io/v1/user',['xi-api-key: '.$key]);$details=['tier'=>(string)($r['json']['subscription']['tier']??'')];$lat=$r['latency_ms'];

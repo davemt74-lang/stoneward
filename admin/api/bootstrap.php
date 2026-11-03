@@ -89,7 +89,7 @@ function sf_admin_write_catalog(array $catalog,?string $expectedContentHash=null
     $tmp=$catalogPath.'.tmp.'.bin2hex(random_bytes(3));
     if(file_put_contents($tmp,$json,LOCK_EX)===false) throw new RuntimeException('Could not write catalog.');
     if(!rename($tmp,$catalogPath)){@unlink($tmp);throw new RuntimeException('Could not finalize catalog.');}
-    $publicCatalog=function_exists('sf_songbook_public_catalog_rows')?sf_songbook_public_catalog_rows($catalog):array_map(function($track){if(is_array($track))unset($track['lyrics']);return $track;},array_values($catalog));
+    $publicCatalog=function_exists('sf_songbook_public_catalog_rows')?sf_songbook_public_catalog_rows($catalog):array_values(array_filter(array_map(function($track){if(!is_array($track))return null;if(!sf_track_is_public($track))return null;unset($track['lyrics']);return $track;},array_values($catalog))));
     $publicJson=json_encode(array_values($publicCatalog), JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
     if($publicJson===false) throw new RuntimeException('Could not encode public catalog.');
     $js="window.STONEFELLOW_CATALOG = ".$publicJson.";\n";

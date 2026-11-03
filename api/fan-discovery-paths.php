@@ -14,8 +14,7 @@ function sf_fan_discovery_public(array $catalog):array {
  $rows=[];
  foreach($catalog as $track){
   $id=(string)($track['id']??'');
-  if($id===''||($track['public_visible']??true)===false
-   ||in_array((string)($track['state']??''),['draft','private','archived'],true))continue;
+  if($id===''||!sf_track_is_public($track))continue;
   if(function_exists('sf_seo_public_track')&&!sf_seo_public_track($id))continue;
   $rows[]=$track;
  }

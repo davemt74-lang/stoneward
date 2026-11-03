@@ -95,8 +95,9 @@ function sf_search_popularity_map(int $days=3650): array {
     return $out;
 }
 function sf_search_facets(): array {
-    $moods=[];$themes=[];$releases=[];$years=[];$energies=[];$trackMap=sf_track_map();
-    foreach(sf_catalog() as $t){foreach((array)($t['mood']??[]) as $v){$v=trim((string)$v);if($v!=='')$moods[$v]=($moods[$v]??0)+1;}foreach((array)($t['themes']??[]) as $v){$v=trim((string)$v);if($v!=='')$themes[$v]=($themes[$v]??0)+1;}$rel=trim((string)($t['release']??''));if($rel!=='')$releases[$rel]=($releases[$rel]??0)+1;$year=(int)($t['year']??0);if($year>0)$years[(string)$year]=($years[(string)$year]??0)+1;$energy=(int)($t['energy']??0);if($energy>0)$energies[(string)$energy]=($energies[(string)$energy]??0)+1;}
+    $moods=[];$themes=[];$releases=[];$years=[];$energies=[];$trackMap=[];
+    foreach(sf_public_catalog() as $publicTrack)if(!empty($publicTrack['id']))$trackMap[(string)$publicTrack['id']]=$publicTrack;
+    foreach(sf_public_catalog() as $t){foreach((array)($t['mood']??[]) as $v){$v=trim((string)$v);if($v!=='')$moods[$v]=($moods[$v]??0)+1;}foreach((array)($t['themes']??[]) as $v){$v=trim((string)$v);if($v!=='')$themes[$v]=($themes[$v]??0)+1;}$rel=trim((string)($t['release']??''));if($rel!=='')$releases[$rel]=($releases[$rel]??0)+1;$year=(int)($t['year']??0);if($year>0)$years[(string)$year]=($years[(string)$year]??0)+1;$energy=(int)($t['energy']??0);if($energy>0)$energies[(string)$energy]=($energies[(string)$energy]??0)+1;}
     $pack=function(array $map): array {uksort($map,'strnatcasecmp');$out=[];foreach($map as $value=>$count)$out[]=['value'=>(string)$value,'count'=>(int)$count];return $out;};
     return ['moods'=>$pack($moods),'themes'=>$pack($themes),'releases'=>$pack($releases),'years'=>array_reverse($pack($years)),'energies'=>$pack($energies),'track_count'=>count($trackMap),'release_count'=>count(array_filter(sf_release_rows(),fn($r)=>($r['state']??'published')==='published'&&($r['public_visible']??true)!==false))];
 }
@@ -112,7 +113,7 @@ function sf_search_filter_active(array $p): bool {return $p['q']!==''||$p['type'
 function sf_catalog_search(array $raw,?int $userId=null): array {
     $p=sf_search_params($raw);$q=(string)$p['q'];$trackMap=sf_track_map();$pop=sf_search_popularity_map();$profile=$userId&&$userId>0?sf_personalization_recommendation_profile($userId):null;$rows=[];
     if($p['type']!=='release'){
-        foreach(sf_catalog() as $idx=>$t){$id=(string)($t['id']??'');if($id==='')continue;
+        foreach(sf_public_catalog() as $idx=>$t){$id=(string)($t['id']??'');if($id==='')continue;
             if($p['mood']!==''&&!in_array($p['mood'],(array)($t['mood']??[]),true))continue;if($p['theme']!==''&&!in_array($p['theme'],(array)($t['themes']??[]),true))continue;if($p['release']!==''&&(string)($t['release']??'')!==$p['release'])continue;if($p['year']>0&&(int)($t['year']??0)!==$p['year'])continue;if($p['energy']>0&&(int)($t['energy']??0)!==$p['energy'])continue;
             $match=sf_search_score_document($q,sf_search_track_fields($t));if($q!==''&&$match['score']<=0)continue;$popScore=(int)($pop[$id]['score']??0);$personal=0.0;
             if($profile){$personal=min(28,max(-20,(float)($profile['seed_scores'][$id]??0)*.6));if(isset($profile['favorite_track_ids'][$id]))$personal+=12;}
@@ -140,8 +141,8 @@ function sf_catalog_search(array $raw,?int $userId=null): array {
 }
 function sf_search_suggestions(string $query,int $limit=8): array {
     $q=sf_search_normalize($query);if($q==='')return [];$candidates=[];
-    foreach(sf_catalog() as $t){$candidates[]=(string)($t['title']??'');$candidates[]=(string)($t['release']??'');foreach((array)($t['mood']??[]) as $v)$candidates[]=(string)$v;foreach((array)($t['themes']??[]) as $v)$candidates[]=(string)$v;}
-    foreach(sf_release_rows() as $r)$candidates[]=(string)($r['title']??'');
+    foreach(sf_public_catalog() as $t){$candidates[]=(string)($t['title']??'');$candidates[]=(string)($t['release']??'');foreach((array)($t['mood']??[]) as $v)$candidates[]=(string)$v;foreach((array)($t['themes']??[]) as $v)$candidates[]=(string)$v;}
+    foreach(sf_release_rows() as $r)if(($r['state']??'published')==='published'&&($r['public_visible']??true)!==false)$candidates[]=(string)($r['title']??'');
     $candidates=array_values(array_unique(array_filter(array_map('trim',$candidates))));$rows=[];
     foreach($candidates as $value){$n=sf_search_normalize($value);if($n==='')continue;$d=levenshtein(substr($q,0,120),substr($n,0,120));$contains=str_contains($n,$q)||str_contains($q,$n);if(!$contains&&$d>max(2,(int)floor(strlen($q)*.45)))continue;$rows[]=['value'=>$value,'distance'=>$contains?0:$d];}
     usort($rows,fn($a,$b)=>($a['distance']<=>$b['distance'])?:strlen($a['value'])<=>strlen($b['value']));return array_slice(array_column($rows,'value'),0,max(1,min(12,$limit)));

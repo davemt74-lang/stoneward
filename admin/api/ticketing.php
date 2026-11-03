@@ -5,6 +5,16 @@ $b=sf_request_json();$action=(string)($b['action']??'');
 try{
  if($action==='save_offer'){$raw=(array)($b['offer']??[]);if(($raw['status']??'draft')==='published'&&!empty($b['confirmed'])!==true)throw new RuntimeException('Publishing an offer requires explicit Admin confirmation.');$offer=sf_ticket_offer_save($raw,(int)$me['id']);sf_log_admin_action((int)$me['id'],'ticket_offer_saved','ticket_offer',(string)$offer['id'],['show_id'=>$offer['show_id'],'status'=>$offer['status'],'offer_type'=>$offer['offer_type']]);if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_ticketing','ticket_offer',['route'=>'ticketing','action'=>'save_offer','context_profile'=>'commerce','needs_llm'=>false,'requires_confirmation'=>$offer['status']==='published','status'=>$offer['status'],'request'=>'Save '.$offer['offer_type'].' offer '.$offer['title'],'response'=>'Offer saved for show '.$offer['show_id'].'.']);sf_json_response(['ok'=>true,'offer'=>$offer]);}
  if($action==='archive_offer'){$id=(int)($b['id']??0);$o=sf_ticket_offer($id);if(!$o)throw new InvalidArgumentException('Offer not found.');sf_db()->prepare("UPDATE ticket_offers SET status='archived',updated_at=? WHERE id=?")->execute([gmdate('c'),$id]);sf_log_admin_action((int)$me['id'],'ticket_offer_archived','ticket_offer',(string)$id,['show_id'=>$o['show_id']]);sf_json_response(['ok'=>true]);}
+ if($action==='lifecycle_offer'){
+  $id=(int)($b['id']??0);$next=(string)($b['status']??'');$offer=sf_ticket_offer($id);
+  if(!$offer)throw new InvalidArgumentException('Offer not found.');
+  // Paused is the existing public-hidden ticket state; no reservation can be created while paused.
+  if(!in_array($next,['published','paused','archived','deleted'],true))throw new InvalidArgumentException('Invalid ticket lifecycle state.');
+  if(empty($b['confirmed']))throw new InvalidArgumentException('Confirm the ticket lifecycle change.');
+  sf_db()->prepare('UPDATE ticket_offers SET status=?,updated_at=? WHERE id=?')->execute([$next,gmdate('c'),$id]);
+  sf_log_admin_action((int)$me['id'],'ticket_offer_lifecycle_changed','ticket_offer',(string)$id,['from'=>$offer['status'],'to'=>$next,'show_id'=>$offer['show_id']]);
+  sf_json_response(['ok'=>true,'offer'=>sf_ticket_offer($id)]);
+ }
  if($action==='check_in'){$r=!empty($b['confirmation_code'])?sf_ticket_check_in_code((string)$b['confirmation_code'],(int)$me['id']):sf_ticket_check_in((int)($b['reservation_id']??0),(int)$me['id']);sf_log_admin_action((int)$me['id'],'guest_checked_in','ticket_reservation',(string)$r['id'],['show_id'=>$r['show_id'],'confirmation_code'=>$r['confirmation_code']]);sf_json_response(['ok'=>true,'reservation'=>$r]);}
  if($action==='cancel'){$r=sf_ticket_cancel((int)($b['reservation_id']??0),(int)$me['id'],true);sf_log_admin_action((int)$me['id'],'ticket_reservation_cancelled','ticket_reservation',(string)$r['id'],['show_id'=>$r['show_id']]);sf_json_response(['ok'=>true,'reservation'=>$r]);}
  sf_json_response(['ok'=>false,'message'=>'Unsupported ticketing action.'],422);

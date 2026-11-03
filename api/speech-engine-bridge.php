@@ -36,7 +36,8 @@ try {
         if($message==='')sf_json_response(['ok'=>false,'error'=>'empty_turn'],422);
         // Same policy and persisted Agent Brain path as authenticated text chat.
         // The gateway does not receive client action payloads or credentials.
-        $reply=sf_agent_reply($user,'voice_'.substr(hash('sha256',$cid),0,38),$message,['voice_source'=>'speech_engine_pilot']);
+        $voiceClient=sf_agent_normalize_client_state(sf_speech_read_browser_context((int)$user['id'],$cid));
+        $reply=sf_agent_reply($user,'voice_'.substr(hash('sha256',$cid),0,38),$message,$voiceClient);
         $actionType=(string)($reply['action']['type']??'none');
         $queued=sf_speech_queue_action((int)$user['id'],$cid,$reply,$message);
         if($actionType!=='none'&&!$queued)sf_json_response(['ok'=>true,'text'=>'I understood the request, but this action needs the original chat or additional confirmation. I have not performed it.','action_deferred'=>true]);

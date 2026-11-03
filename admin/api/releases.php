@@ -3,9 +3,21 @@ declare(strict_types=1); require __DIR__.'/bootstrap.php';
 if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'){sf_admin_require_auth(false);sf_json_response(['ok'=>true,'releases'=>sf_admin_releases()]);}
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $me=sf_admin_require_auth(true);$b=sf_request_json();$action=(string)($b['action']??'save');$rows=sf_admin_releases();
-if($action==='delete'){$id=sf_admin_slug((string)($b['id']??''),'');$rows=array_values(array_filter($rows,fn($r)=>(string)($r['id']??'')!==$id));sf_admin_write_releases($rows);sf_log_admin_action((int)$me['id'],'release_deleted','release',$id);sf_json_response(['ok'=>true]);}
+if($action==='lifecycle'||$action==='delete'){
+  $id=sf_admin_slug((string)($b['id']??''),'');$state=$action==='delete'?'deleted':(string)($b['state']??'');
+  if(!in_array($state,['published','hidden','archived','deleted'],true))sf_json_response(['ok'=>false,'message'=>'Invalid release lifecycle state.'],422);
+  if(empty($b['confirmed']))sf_json_response(['ok'=>false,'message'=>'Confirm this release lifecycle change.'],422);
+  foreach($rows as $i=>$r)if((string)($r['id']??'')===$id){
+    $before=(string)($r['state']??'draft');$rows[$i]['state']=$state;
+    $rows[$i]['public_visible']=$state==='published';$rows[$i]['updated_at']=gmdate('c');
+    sf_admin_write_releases($rows);
+    sf_log_admin_action((int)$me['id'],'release_lifecycle_changed','release',$id,['from'=>$before,'to'=>$state]);
+    sf_json_response(['ok'=>true,'release'=>$rows[$i]]);
+  }
+  sf_json_response(['ok'=>false,'message'=>'Release not found.'],404);
+}
 $raw=is_array($b['release']??null)?$b['release']:[];$title=sf_clean_text($raw['title']??'',180);if($title==='')sf_json_response(['ok'=>false,'message'=>'Release title is required.'],422);$id=sf_admin_slug((string)($raw['id']??$title),'release');$idx=null;foreach($rows as $i=>$r)if((string)($r['id']??'')===$id){$idx=$i;break;}$old=$idx===null?[]:$rows[$idx];
-$state=(string)($raw['state']??($old['state']??'draft'));if(!in_array($state,['draft','review','scheduled','published','archived'],true))$state='draft';
+$state=(string)($raw['state']??($old['state']??'draft'));if(!in_array($state,['draft','review','scheduled','published','hidden','archived','deleted'],true))$state='draft';if($state==='deleted'&&($old['state']??'')!=='deleted')sf_json_response(['ok'=>false,'message'=>'Use the confirmed Delete action to move a release to Trash.'],422);
 $catalog=sf_catalog();$trackMap=[];foreach($catalog as $t)if(!empty($t['id']))$trackMap[(string)$t['id']]=$t;
 $trackIds=[];foreach((array)($raw['track_ids']??[]) as $tid){$tid=sf_clean_text($tid,100);if($tid===''||in_array($tid,$trackIds,true))continue;if(!isset($trackMap[$tid]))sf_json_response(['ok'=>false,'message'=>'Unknown catalog track: '.$tid],422);$trackIds[]=$tid;}
 $featured=sf_clean_text($raw['featured_track_id']??'',100);if($featured!==''&&!in_array($featured,$trackIds,true))sf_json_response(['ok'=>false,'message'=>'Featured track must belong to this release.'],422);

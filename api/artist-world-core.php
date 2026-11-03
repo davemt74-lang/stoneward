@@ -13,7 +13,7 @@ function sf_world_node(string $type,array $data):?array {
     $types=['track'=>'track','release'=>'release','story'=>'story','video'=>'video','photo'=>'photo','show'=>'show'];
     if(!isset($types[$type]))return null;
     if(($data['public_visible']??true)===false)return null;
-    if(in_array((string)($data['status']??$data['state']??'published'),['draft','private','archived','disabled'],true))return null;
+    if(in_array((string)($data['status']??$data['state']??'published'),['draft','private','hidden','archived','deleted','disabled'],true))return null;
     $id=(string)($data['id']??'');
     if($id===''||strlen($id)>160||!preg_match('/^[a-zA-Z0-9_-]+$/D',$id))return null;
     $title=sf_world_text($data['title']??$data['venue']??'',180);

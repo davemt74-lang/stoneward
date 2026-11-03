@@ -1,16 +1,37 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.204';
-  const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate=site.homepageTemplate==='agent_canvas'?'agent_canvas':'classic',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
+  window.STONEFELLOW_APP_BUILD='1.3.225';
+  const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
+  const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
+  const playbackLifecycle=window.StonefellowPlaybackLifecycle.create();
+  let playbackWantsAudio=false,playbackBufferTimer=null,pendingNetworkRecovery=null,queueAdvancePending=false;
   let canvas=mainCanvas;
   const readJSON=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch(_){return fallback}};
+  const temporaryPlaylistKey='stonefellow.temporary-playlist.v1';
+  function restoreTemporaryPlaylist(){
+    const saved=readJSON(temporaryPlaylistKey,null),empty={playlistId:null,playlistName:'',trackIds:[],index:-1};
+    if(!saved||!Array.isArray(saved.trackIds)||saved.trackIds.length<1||saved.trackIds.length>20||
+      saved.trackIds.some(id=>typeof id!=='string'||!id||id.length>180)||
+      new Set(saved.trackIds).size!==saved.trackIds.length)return empty;
+    return {playlistId:'temporary:restored',playlistName:String(saved.playlistName||'Stonefellow Mix').slice(0,120),
+      trackIds:saved.trackIds.slice(),index:Math.max(0,Math.min(saved.trackIds.length-1,Number(saved.index)||0)),temporary:true};
+  }
   const legacyBuildV2=readJSON('stonefellow.build.v02',null), legacyBuildV3=readJSON('stonefellow.build.v03',null), newBuild=readJSON('stonefellow.build.v04',null);
   const defaultBuild=()=>({version:4,format:'vinyl',title:'My Stonefellow Record',theme:'desert',A:[],B:[],playerModules:{base:'base-studio',platter:'platter-classic',arm:'arm-studio',label:'label-classic',effect:'effect-none'},coverFront:'stonefellow',coverBack:'stonefellow',customNote:'',savedAt:null});
   const bootAuth=window.STONEFELLOW_AUTH_BOOTSTRAP||{authenticated:false,user:null};
-  const st={auth:{loaded:true,authenticated:!!bootAuth.authenticated,user:bootAuth.user||null,csrf:null},plans:[],selectedPlanId:null,conversationId:localStorage.getItem('stonefellow.agent.conversation')||'',conversationOn:false,voiceAudio:null,track:null,playing:false,audio:audio,builder:(newBuild&&newBuild.version===4)?newBuild:(legacyBuildV3?{...defaultBuild(),...legacyBuildV3,version:4}:(legacyBuildV2?{...defaultBuild(),...legacyBuildV2,version:4}:defaultBuild())),builderDrafts:{loaded:false,items:[],activeId:Number(localStorage.getItem('stonefellow.build.draft.id')||0)},cart:readJSON('stonefellow.cart.v03',[]),campaignCode:localStorage.getItem('stonefellow.campaign.code')||'',store:null,drawer:{tab:'notifications',data:null},listenSession:localStorage.getItem('stonefellow.listen.session')||'',lastProgressAt:0,playSource:'player',playlistPlayback:{playlistId:null,playlistName:'',trackIds:[],index:-1},personalization:{loaded:false,favorites:{tracks:[],releases:[]},continue_listening:[],history:[],recommendations:{personalized:false,summary:'',signals:{},items:[]}},playlists:{loaded:false,items:[]},historyPage:{rows:[],sessions:[],summary:null,nextBefore:null,loaded:false},agentSession:{id:'',title:'',mode:'',status:'',currentIndex:0,tracks:[]},queue:{loaded:false,items:[],open:false,history:readJSON('stonefellow.queue.history.v1',[])},home:{loaded:false,data:null},fanEngagementLoaded:false};
+  const st={auth:{loaded:true,authenticated:!!bootAuth.authenticated,user:bootAuth.user||null,csrf:null},plans:[],selectedPlanId:null,conversationId:localStorage.getItem('stonefellow.agent.conversation')||'',conversationOn:false,voiceAudio:null,track:null,playing:false,audio:audio,builder:(newBuild&&newBuild.version===4)?newBuild:(legacyBuildV3?{...defaultBuild(),...legacyBuildV3,version:4}:(legacyBuildV2?{...defaultBuild(),...legacyBuildV2,version:4}:defaultBuild())),builderDrafts:{loaded:false,items:[],activeId:Number(localStorage.getItem('stonefellow.build.draft.id')||0)},cart:readJSON('stonefellow.cart.v03',[]),campaignCode:localStorage.getItem('stonefellow.campaign.code')||'',store:null,drawer:{mode:'activity',tab:'notifications',data:null},listenSession:localStorage.getItem('stonefellow.listen.session')||'',lastProgressAt:0,playSource:'player',playlistPlayback:restoreTemporaryPlaylist(),personalization:{loaded:false,favorites:{tracks:[],releases:[]},continue_listening:[],history:[],recommendations:{personalized:false,summary:'',signals:{},items:[]}},playlists:{loaded:false,items:[]},historyPage:{rows:[],sessions:[],summary:null,nextBefore:null,loaded:false},agentSession:{id:'',title:'',mode:'',status:'',currentIndex:0,tracks:[]},queue:{loaded:false,items:[],open:false,history:readJSON('stonefellow.queue.history.v1',[])},home:{loaded:false,data:null},fanEngagementLoaded:false};
+  const drawerTitle=$('#activityDrawerTitle'),drawerCartCount=$('#drawerCartCount'),drawerTools=$('#activityDrawerTools'),chatFooterRestore=$('#chatFooterRestore'),chatFooterHide=$('#chatFooterHide');
+  let drawerRenderSequence=0;
+  let drawerReturnFocus=null,queueReturnFocus=null;
   let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,voiceTurnGeneration=0,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupEntries=[];
   let voiceGreetingArmed=false,voiceGreetingDelivered=false;
+  const guestProfileKey='stonefellow.guest.profile.v1';
+  let guestProfile=readJSON(guestProfileKey,null),welcomeStarted=false,welcomeWaitingForName=false,welcomeGreeting='';
+  const guestSavedPlaylistsKey='stonefellow.guest.saved-playlists.v1';
+  let guestSavedPlaylists=readJSON(guestSavedPlaylistsKey,[]);
+  if(!Array.isArray(guestSavedPlaylists))guestSavedPlaylists=[];
+  guestSavedPlaylists=guestSavedPlaylists.filter(p=>p&&typeof p.id==='string'&&Array.isArray(p.track_ids)&&p.track_ids.length>0&&p.track_ids.length<=20).slice(-20);
+  let welcomeLatestTrackId='',lastSavedMixSignature='';
   // iOS WebKit can request microphone authorization for each Web Speech
   // start(). Retain one continuous session and never silently reopen it.
   let iosVoiceNeedsGesture=false,iosProcessedFinalIndex=-1,iosVoiceMuteUntil=0;
@@ -95,17 +116,25 @@
     else audio.volume=level;
     return Math.round(level*100);
   }
-  function playerState(){
+  // One browser observation feeds the LLM, voice bridge, status replies and
+  // player skill. A stale saved title or an unconfirmed command is not state.
+  function observedPlayer(){
+    const track=(st.track?.id?trackById(st.track.id):null)||null;
     const duration=Number.isFinite(audio.duration)?Math.max(0,Math.floor(audio.duration)):0;
     const position=Number.isFinite(audio.currentTime)?Math.max(0,Math.floor(audio.currentTime)):0;
-    return {player_is_playing:!!st.track&&!audio.paused?1:0,song_capture_active:(songCaptureSkill?.status().active||songListeningSkill?.status().active)?1:0,song_capture_live_enabled:(songCaptureSkill?.status().live_enabled||songListeningSkill?.status().active)?1:0,song_capture_available:songCaptureSkill?.getCapture()?1:0,song_lyric_draft_available:songLyricDraft?1:0,player_volume_percent:Math.round(playerVolume()*100),player_position_seconds:Math.min(86400,position),player_duration_seconds:Math.min(86400,duration)};
+    return {track,playing:!!track&&!audio.paused&&!audio.ended,
+      position:Math.min(86400,position),duration:Math.min(86400,duration)};
+  }
+  function playerState(){
+    const observed=observedPlayer();
+    return {player_is_playing:observed.playing?1:0,song_capture_active:(songCaptureSkill?.status().active||songListeningSkill?.status().active)?1:0,song_capture_live_enabled:(songCaptureSkill?.status().live_enabled||songListeningSkill?.status().active)?1:0,song_capture_available:songCaptureSkill?.getCapture()?1:0,song_lyric_draft_available:songLyricDraft?1:0,player_volume_percent:Math.round(playerVolume()*100),player_position_seconds:observed.position,player_duration_seconds:observed.duration};
   }
   function describePlayer(){
-    if(!st.track)return 'No song is loaded in the Stonefellow player.';
-    const state=audio.paused?'paused':'playing';
-    const duration=Number.isFinite(audio.duration)?audio.duration:Number(st.track.duration||0);
-    const progress=duration>0?' At '+time(audio.currentTime)+' of '+time(duration)+'.':'';
-    return '“'+st.track.title+'”'+(st.track.release?' from '+st.track.release:'')+' is '+state+'.'+progress+' Player volume is '+Math.round(playerVolume()*100)+' percent.';
+    const observed=observedPlayer(),track=observed.track;
+    if(!track)return 'No published song is loaded in the Stonefellow player.';
+    const duration=observed.duration||Number(track.duration||0);
+    const progress=duration>0?' At '+time(observed.position)+' of '+time(duration)+'.':'';
+    return '“'+track.title+'”'+(track.release?' from '+track.release:'')+' is '+(observed.playing?'playing':'paused')+'.'+progress+' Player volume is '+Math.round(playerVolume()*100)+' percent.';
   }
   async function executePlayerAgentAction(action){
     if(!action||!['play_track','pause_player','stop_player','resume_player','next_track','previous_track','player_status','set_player_volume','load_temporary_playlist'].includes(action.type))return null;
@@ -124,20 +153,20 @@
       case 'pause_player':
         if(!st.track)return 'There is no song to pause.';
         if(audio.paused)return '“'+st.track.title+'” is already paused.';
-        recordListen('pause');audio.pause();st.playing=false;updateFooterPlayer();
+        recordListen('pause');invalidatePlayback();audio.pause();st.playing=false;updateFooterPlayer();
         return 'Paused “'+st.track.title+'.”';
       case 'stop_player':
         if(!st.track)return 'There is no music to stop.';
         if(!audio.paused)recordListen('pause');
-        audio.pause();try{audio.currentTime=0}catch(_){}
+        invalidatePlayback();audio.pause();try{audio.currentTime=0}catch(_){}
         st.playing=false;musicFollowupUntil=0;setVoiceInputActive(false);updateFooterPlayer();syncConversationMusic();
         return 'Stopped “'+st.track.title+'.”';
       case 'load_temporary_playlist':return startTemporaryPlaylist(action);
       case 'resume_player':
         if(!st.track)return 'There is no song loaded. Tell me which Stonefellow song to play.';
         if(!audio.paused)return '“'+st.track.title+'” is already playing.';
-        try{await audio.play();recordListen('resume');st.playing=true;updateFooterPlayer();syncConversationMusic();return 'Resumed “'+st.track.title+'.”'}
-        catch(_){st.playing=false;updateFooterPlayer();return 'The browser blocked playback. Press Play in the Stonefellow player to enable audio.'}
+        return await play(st.track,Number(audio.currentTime)||0,st.playSource,!!st.playlistPlayback.playlistId)
+          ?'Resumed “'+st.track.title+'.”':'The browser could not confirm playback. Tap Play or check Media Health.';
       case 'play_track':{
         const track=trackById(action.track_id);
         if(!track)return 'I could not find that published song in the player.';
@@ -149,8 +178,8 @@
       case 'next_track':
       case 'previous_track':
         if(!st.track)return 'There is no song loaded. Tell me which song to start.';
-        stepTrack(action.type==='next_track'?1:-1);
-        return action.type==='next_track'?'Moving to the next song.':'Moving to the previous song.';
+        return await stepTrack(action.type==='next_track'?1:-1)
+          ?describePlayer():'The browser did not confirm a new song. '+describePlayer();
     }
     return null;
   }
@@ -158,7 +187,7 @@
   // this signed-in page alone owns its playback and reports the actual result.
   const publicAudioSkill=window.StonefellowAgentAudioSkill?.create({
     invoke:executePlayerAgentAction,
-    getState:()=>({...playerState(),track_id:st.track?.id||'',title:st.track?.title||''})
+    getState:()=>({...playerState(),track_id:observedPlayer().track?.id||'',title:observedPlayer().track?.title||''})
   });
   // Independent browser paths: Listen & Interpret recognizes a player track
   // without making an audio clip. Record Clip is the only MediaRecorder path.
@@ -193,6 +222,71 @@
       }
     }
   });
+  // Public overdubs are browser-local, opt-in recordings. They use the
+  // selectable microphone plus the authoritative player in a separate mix.
+  // Record Clip and Listen & Interpret retain their independent audio paths.
+  const vocalStudio=window.StonefellowVocalStudio?.create({
+    audio,getTrack:()=>st.track,
+    drawer:$('#vocalStudioDrawer'),backdrop:$('#vocalStudioBackdrop'),
+    onCanRecord:()=>!songCaptureSkill?.status().active&&!songListeningSkill?.status().active,
+    onClose:()=>{if(songCaptureSkill?.status().active)void songCaptureSkill.stop();},
+    onBeforeRecord:()=>{
+      if(st.conversationOn)stopConversation();
+      if(voicePlaybackPending)stopAgentSpeaking();
+    }
+  });
+  function selectVocalStudioTab(tab='vocal'){
+    const drawer=$('#vocalStudioDrawer');
+    if(!drawer)return;
+    if(vocalStudio?.status()?.active)return;
+    if(tab==='clip')vocalStudio?.disconnectMic?.();
+    $$('[data-vocal-tab]',drawer).forEach(button=>{
+      const selected=button.dataset.vocalTab===tab;
+      button.classList.toggle('active',selected);
+      button.setAttribute('aria-selected',String(selected));
+    });
+    $$('[data-vocal-panel]',drawer).forEach(panel=>panel.hidden=panel.dataset.vocalPanel!==tab);
+    $('#vocalClipStatus').textContent=songCaptureSkill?.status().active
+      ?'Capturing the current song section…'
+      :songCaptureSkill?.getCapture()?'A song section is captured in this browser.':'Play a song to start a clip.';
+  }
+  $$('[data-vocal-tab]',$('#vocalStudioDrawer')||document).forEach(button=>{
+    button.addEventListener('click',()=>selectVocalStudioTab(button.dataset.vocalTab));
+  });
+  $('#vocalClipStart')?.addEventListener('click',async()=>{
+    const reply=await executeSongCaptureAction({type:'song_capture_start'});
+    $('#vocalClipStatus').textContent=String(reply||'');
+  });
+  $('#vocalClipStop')?.addEventListener('click',async()=>{
+    const reply=await executeSongCaptureAction({type:'song_capture_stop'});
+    $('#vocalClipStatus').textContent=String(reply||'');
+  });
+  function openVocalStudio(tab='vocal'){
+    if(!vocalStudio)return popupEntry('notice','Vocal Studio is unavailable in this browser.');
+    if(st.queue.open)closeQueue();
+    if(notificationDrawer&&!notificationDrawer.hidden)closeNotificationDrawer();
+    selectVocalStudioTab(tab);
+    vocalStudio.open();
+  }
+  // Song Moments are catalog-timecoded public data. Guest drafts stay local;
+  // signed-in fan comments require administrator approval before publication.
+  const songMoments=window.StonefellowSongMoments?.create({
+    audio,seekInput:playerSeek,apiBase:cfg.apiBase||'api',
+    submit:payload=>secureJsonPost('song-moments.php',payload),
+    onNeedTrack:()=>popupEntry('notice','Play a song first, then open Song Moments.'),
+    onStory:slug=>void navigate('story',{slug}),
+    onPresent:moment=>{
+      const brief=moment.title||moment.story?.title||moment.body||'A listener moment';
+      window.SFPublicAgentCanvas?.showConversation?.('assistant','Song Moment at '+time(moment.at_ms/1000)+': '+String(brief).slice(0,130));
+    },
+    onNarrate:moment=>{
+      if(voicePlaybackPending||recognitionActive||voiceTurnBusy||songListeningSkill?.status().active||songCaptureSkill?.status().active||vocalStudio?.status().active)return;
+      const brief=(moment.kind==='story'?'A Stonefellow story: ':moment.kind==='photo'?'Here is a photograph from the song: ':'A note from Stonefellow: ')+String(moment.title||moment.story?.title||moment.body||'').slice(0,160);
+      agent('responding',brief);
+      if(voiceRepliesEnabled&&!speechPilotActive)void agentSpeak(brief);
+    }
+  });
+  $('#playerMomentsButton')?.addEventListener('click',()=>songMoments?.open());
   // VP3-style live speech recognition from the player's actual audio track.
   // This is distinct from Record Clip: no MediaRecorder, Blob or OpenAI call.
   // The browser's recognition service may process song audio online.
@@ -363,6 +457,8 @@
   }
   async function executeSongCaptureAction(action){
     if(!action||!['song_capture_start','song_capture_live_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'].includes(action.type))return null;
+    if(vocalStudio?.status()?.active&&['song_capture_start','song_capture_live_start'].includes(action.type))
+      return 'Finish your vocal recording before starting song lyric listening or a separate song clip.';
     if(action.type==='song_capture_live_start'){
       if(songCaptureSkill?.status().active)return 'Record Clip is active. Stop that recording before choosing Listen & Interpret.';
       if(!songListeningSkill)return 'Live player-track recognition is unavailable. No audio recording was started.';
@@ -512,13 +608,24 @@
   // Both typed chat and Speech Engine actions use the same published-catalog
   // receipt verification and browser-owned player/navigation dispatch.
   async function dispatchAgentBrowserAction(message,action,resolution,allowSongCapture=true){
+    // A generic playlist request must not be converted into a blank /music
+    // search by a model or a delayed Speech Engine action.
+    if(directRandomPlaylistCommand(message)&&action?.type!=='load_temporary_playlist')
+      return startRandomTemporaryPlaylist();
+    if(action?.type==='create_playlist'&&!/\b(?:save|saved|permanent|to my account|to my library)\b/i.test(String(message||''))){
+      const ids=Array.isArray(action.track_ids)?action.track_ids:[];
+      return ids.length?startTemporaryPlaylist({name:action.name||'Stonefellow Mix',track_ids:ids}):startRandomTemporaryPlaylist();
+    }
     const verified=verifiedNamedPlayerAction(message,action,resolution);
     if(verified.text)return verified.text;
     const captured=allowSongCapture?await executeSongCaptureAction(verified.action):null;
     const shared=captured===null?await publicAudioSkill?.dispatch(verified.action):null;
     const playerResult=captured??shared?.text??await executePlayerAgentAction(verified.action);
-    if(playerResult===null)await executeAgentAction(verified.action);
-    return playerResult;
+    if(playerResult!==null)return playerResult;
+    // Page, builder, queue and account actions also return a browser-observed
+    // receipt. Otherwise chat would fall back to the model's intention while
+    // Agent Brain silently discarded what actually happened.
+    return await executeAgentAction(verified.action);
   }
   function holdVoicePlaybackForBarge(){
     if(!st.conversationOn||!voicePlaybackPending)return;
@@ -595,6 +702,24 @@
     syncConversationMusic();
     if(st.conversationOn){showTranscript('Agent interrupted. Listening for you…','listening');agent('listening','I’m listening.');scheduleConversationListen()}
   }
+  // Section 91B17F: a single tap on the main particle orb interrupts whichever
+  // voice engine is actually speaking. It must not restart a microphone session.
+  function stopAgentSpeaking(){
+    if(speechPilotActive){
+      if(!speechPilotAgentSpeaking)return false;
+      const interrupted=window.StonefellowSpeechEngine?.interrupt?.();
+      if(interrupted===false)return false;
+      speechPilotAgentSpeaking=false;
+      setSpeechPilotSpeaking(false);
+      window.StonefellowSpeechEngine?.setInputMuted?.(false);
+      agent('listening','I’m listening.');
+      showTranscript('Stonefellow stopped speaking. I’m listening.','listening');
+      return true;
+    }
+    if(!voicePlaybackPending&&!voiceSpeechAudible&&!speechFallbackResolve)return false;
+    interruptVoicePlayback();
+    return true;
+  }
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const time=s=>{s=Math.max(0,Math.floor(Number(s)||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
   const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
@@ -629,9 +754,178 @@
   async function openChatPopup(){if(!chatPopup)return;closeQuickMenu();chatPopup.hidden=false;document.body.classList.add('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','true');chatToggle?.setAttribute('aria-label','Close Agent Chat');chatToggle.title='Close Agent Chat';orb?.setAttribute('aria-expanded','true');orb?.setAttribute('aria-label','Close Agent Chat');if(popupHistoryLoaded)return;popupHistoryLoaded=true;await loadAuth();if(!st.auth.authenticated){popupHistoryLoaded=false;return}try{const cid=st.conversationId;const response=await api('agent-brain.php'+(cid?'?conversation_id='+encodeURIComponent(cid):''));const messages=response.brain?.messages||response.messages||[];const historical=messages.filter(m=>['user','assistant'].includes(m.role)).slice(-40).map(m=>({role:m.role==='user'?'user':'assistant',text:String(m.content||'')}));const live=popupEntries.slice();let overlap=0;for(let n=Math.min(historical.length,live.length);n>0;n--){if(historical.slice(-n).every((m,i)=>m.role===live[i].role&&m.text===live[i].text)){overlap=n;break}}popupEntries=historical.concat(live.slice(overlap)).slice(-60);renderPopupEntries()}catch(_){popupHistoryLoaded=false;/* A history outage must not stop new chat turns. */}}
   function closeChatPopup(){if(!chatPopup)return;chatPopup.hidden=true;document.body.classList.remove('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','false');chatToggle?.setAttribute('aria-label','Open Agent Chat');chatToggle.title='Open Agent Chat';orb?.setAttribute('aria-expanded','false');orb?.setAttribute('aria-label','Open Agent Chat')}
   function say(text,cb){const answer=String(text||'');agent('thinking','…');popupEntry('assistant',answer);if(st.conversationOn)showTranscript('Stonefellow: '+answer.slice(0,240),'responding');const work=new Promise(resolve=>setTimeout(resolve,120)).then(async()=>{agent('responding',answer);if(cb)cb();if(!speechPilotActive&&voiceRepliesEnabled&&(st.conversationOn||voiceInteractionStarted)&&(await agentSpeak(answer))===false){const note='The reply is available in text, but speech playback is unavailable on this device.';popupEntry('notice',note);agent('idle',note)}if(st.conversationOn&&!speechPilotActive&&!voiceRepliesEnabled&&!voiceTurnBusy){agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}else if(!st.conversationOn)agent(st.playing?'playing':'idle');});pendingReply=work.catch(()=>{agent('idle',answer)});return pendingReply}
+  // Local-first visitor identity. The schema deliberately keeps a guest scope
+  // and timestamps so a future explicit account migration can read it; never
+  // upload this record or claim it is already synchronized with an account.
+  function validGuestName(value){
+    const name=String(value||'').trim().replace(/\s+/g,' ').replace(/[.!?,;:]+$/,'');
+    if(name.length<2||name.length>48||name.split(' ').length>3)return '';
+    if(!/^[\p{L}\p{M}][\p{L}\p{M}'’\- ]*$/u.test(name))return '';
+    if(/^(?:play|next|stop|skip|music|playlist|latest|release|listen|start|create|make|help|hello|hey|no|yes|open|close|show|queue|add|tell|what|who|how|song|album|nothing|anything)\b/i.test(name))return '';
+    return name;
+  }
+  function rememberedVisitorName(){
+    const account=st.auth.authenticated?validGuestName(st.auth.user?.display_name):'';
+    return account||validGuestName(guestProfile?.display_name);
+  }
+  function nameFromTurn(text){
+    const value=String(text||'').trim();
+    const explicit=value.match(/^(?:my name is|call me)\s+(.+)$/i)
+      ||(welcomeWaitingForName?value.match(/^(?:i['’]?m|i am)\s+(.+)$/i):null);
+    if(explicit)return validGuestName(explicit[1]);
+    if(welcomeWaitingForName&&catalog.some(track=>norm(track.title)===norm(value)))return '';
+    return welcomeWaitingForName?validGuestName(value):'';
+  }
+  function saveVisitorName(value){
+    const name=validGuestName(value);if(!name)return '';
+    const now=new Date().toISOString(),created=guestProfile?.created_at||now;
+    guestProfile={schema_version:1,scope:'guest_local',display_name:name,created_at:created,updated_at:now};
+    try{localStorage.setItem(guestProfileKey,JSON.stringify(guestProfile))}catch(_){/* memory-only fallback */}
+    return name;
+  }
+  function beginWelcome(){
+    if(welcomeStarted)return;
+    welcomeStarted=true;
+    const name=rememberedVisitorName();welcomeWaitingForName=!name;
+    welcomeGreeting=name
+      ?`Hi ${name}, I’m Stonefellow. Welcome back. Ready for some music? You can hear the latest release or let me make you a playlist.`
+      :'Hi, I’m Stonefellow. What should I call you?';
+    syncWelcomeActions();
+    popupEntry('assistant',welcomeGreeting);
+  }
+  async function acceptVisitorName(text){
+    const name=nameFromTurn(text);
+    if(!name)return false;
+    saveVisitorName(name);welcomeWaitingForName=false;
+    voiceGreetingDelivered=true;
+    syncWelcomeActions();
+    const answer=`Nice to meet you, ${name}! Let’s get some music going. Would you like the latest release, or should I make you a playlist?`;
+    await say(answer);
+    return true;
+  }
+  async function skipVisitorName(){
+    welcomeWaitingForName=false;voiceGreetingDelivered=true;
+    syncWelcomeActions();
+    await say('No problem. I’m Stonefellow, and you can jump straight into the music. How about the latest release or a playlist?');
+  }
+  function currentMixSignature(){return isTemporaryPlaylist()?JSON.stringify(st.playlistPlayback.trackIds):''}
+  function currentMixSaved(){
+    const signature=currentMixSignature();
+    return !!signature&&(signature===lastSavedMixSignature||guestSavedPlaylists.some(p=>JSON.stringify(p.track_ids)===signature));
+  }
+  function welcomeButtonState(){
+    const nameReady=!!rememberedVisitorName()||!welcomeWaitingForName;
+    return {mode:nameReady?'choices':'name',latestAction:welcomeLatestTrackId?'play':'latest',
+      playlistAction:isTemporaryPlaylist()?(currentMixSaved()?'saved':'save'):'create'};
+  }
+  function syncWelcomeActions(){if(welcomeStarted)window.SFPublicAgentCanvas?.setWelcomeState?.(welcomeButtonState())}
+  // Guest identity and listening hints are imported only after authenticated,
+  // itemized consent. Local data is left untouched until a verified receipt.
+  const guestImportRoot='stonefellow.guest.migration.v1';
+  function guestImportKeys(){
+    const userId=Number(st.auth.user?.id||0);
+    if(!st.auth.authenticated||userId<1)return null;
+    return {userId,offer:guestImportRoot+'.offer.'+userId,recent:guestImportRoot+'.recent.'+userId,pending:guestImportRoot+'.pending.'+userId};
+  }
+  function guestMigrationPreview(){
+    const keys=guestImportKeys();if(!keys)return null;
+    const guestName=validGuestName(guestProfile?.display_name);
+    const name=guestName&&guestName!==st.auth.user?.display_name?guestName:'';
+    const playlists=guestSavedPlaylists.filter(item=>item?.id&&item?.name&&Array.isArray(item.track_ids)&&
+      item.track_ids.length>0&&item.track_ids.every(id=>trackById(id)?.audio));
+    const recent=[...new Set((Array.isArray(st.queue.history)?st.queue.history:[]).filter(id=>typeof id==='string'&&trackById(id)?.audio))].slice(0,30);
+    const recentSignature=JSON.stringify(recent);
+    let importedSignature='';try{importedSignature=localStorage.getItem(keys.recent)||''}catch(_){}
+    const needsRecent=recent.length>0&&importedSignature!==recentSignature;
+    return {keys,name,playlists,recent:needsRecent?recent:[],recentSignature};
+  }
+  function closeGuestMigrationDialog(){
+    const panel=document.getElementById('guestMigrationDialog');
+    if(!panel)return;
+    panel.remove();document.body.classList.remove('sf-guest-migration-open');
+    $('#reviewGuestMigration')?.focus?.({preventScroll:true});
+  }
+  function openGuestMigrationDialog(){
+    const preview=guestMigrationPreview();
+    if(!preview||(!preview.name&&!preview.playlists.length&&!preview.recent.length))return;
+    closeGuestMigrationDialog();
+    const layer=document.createElement('div');layer.id='guestMigrationDialog';layer.className='sf-guest-migration-layer';
+    const playlistNames=preview.playlists.slice(0,4).map(p=>'<li>'+esc(p.name)+' · '+p.track_ids.length+' tracks</li>').join('');
+    const recentNames=preview.recent.slice(0,5).map(id=>esc(trackById(id)?.title||id)).join(', ');
+    layer.innerHTML=`<section class="sf-guest-migration-card" role="dialog" aria-modal="true" aria-labelledby="guestMigrationTitle"><div class="sf-guest-migration-kicker">STONEFELLOW / GUEST MUSIC</div><h2 id="guestMigrationTitle">Bring your music with you?</h2><p>Choose what to copy from this browser into your signed-in Stonefellow account. Existing account playlists and preferences are kept. Nothing transfers until you confirm.</p><form id="guestMigrationForm">${preview.name?`<label class="sf-guest-migration-option"><input type="checkbox" name="name"><span><strong>Use my guest name: ${esc(preview.name)}</strong><small>This replaces your account display name. Off by default.</small></span></label>`:''}${preview.playlists.length?`<label class="sf-guest-migration-option"><input type="checkbox" name="playlists" checked><span><strong>Save ${preview.playlists.length} guest playlist${preview.playlists.length===1?'':'s'}</strong><small>Private playlists in your account, available across devices.</small><ul>${playlistNames}</ul></span></label>`:''}${preview.recent.length?`<label class="sf-guest-migration-option"><input type="checkbox" name="recent"><span><strong>Remember ${preview.recent.length} recently selected song${preview.recent.length===1?'':'s'}</strong><small>${recentNames}. Optional and off by default. Helps future recommendations; no play dates or listening events are invented.</small></span></label>`:''}<p class="sf-guest-migration-error" id="guestMigrationError" role="alert" aria-live="polite"></p><div class="sf-guest-migration-actions"><button type="button" data-guest-import-close>Not now</button><button type="submit" class="sf-guest-migration-submit">Confirm import</button></div></form></section>`;
+    document.body.appendChild(layer);document.body.classList.add('sf-guest-migration-open');
+    const form=$('#guestMigrationForm',layer),err=$('#guestMigrationError',layer),submit=$('[type="submit"]',form);
+    let importing=false;
+    layer.querySelector('[data-guest-import-close]').onclick=()=>{if(!importing)closeGuestMigrationDialog();};
+    layer.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();if(!importing)closeGuestMigrationDialog();return;}
+      if(event.key!=='Tab')return;
+      const list=Array.from(layer.querySelectorAll('button:not([disabled]),input:not([disabled])'));
+      if(!list.length)return;
+      const first=list[0],last=list[list.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    });
+    form.onsubmit=async event=>{
+      event.preventDefault();err.textContent='';
+      const importName=!!form.elements.name?.checked,selectedPlaylists=form.elements.playlists?.checked?preview.playlists:[],selectedRecent=form.elements.recent?.checked?preview.recent:[];
+      if(!importName&&!selectedPlaylists.length&&!selectedRecent.length){err.textContent='Choose at least one item to import.';return;}
+      const payload={import_name:importName,display_name:importName?preview.name:'',playlists:selectedPlaylists.map(p=>({name:p.name,track_ids:p.track_ids})),recent_track_ids:selectedRecent};
+      const previous=readJSON(preview.keys.pending,null);
+      const requestId=previous&&JSON.stringify(previous.payload)===JSON.stringify(payload)?previous.request_id:
+        'guest_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,16);
+      try{localStorage.setItem(preview.keys.pending,JSON.stringify({request_id:requestId,payload}));}
+      catch(_){err.textContent='Browser storage is unavailable. Keeping this data safe for a later attempt.';return;}
+      importing=true;submit.disabled=true;submit.textContent='Importing…';
+      try{
+        const response=await secureJsonPost('guest-migration.php',{action:'import',request_id:requestId,...payload}),receipt=response.import||{};
+        if(receipt.request_id!==requestId||Number(receipt.playlist_count)!==selectedPlaylists.length||
+          Number(receipt.recent_count)!==selectedRecent.length||!!receipt.name_updated!==importName)
+          throw new Error('The server did not confirm the complete import. Your guest information is still in this browser.');
+        if(importName&&response.user?.display_name!==preview.name)
+          throw new Error('Your account name could not be verified. Guest data is still in this browser.');
+        if(importName&&response.user?.display_name===preview.name){
+          st.auth.user=response.user;syncAuthMenu();
+          try{localStorage.removeItem(guestProfileKey);guestProfile=null}catch(_){}
+        }
+        if(selectedPlaylists.length){
+          if(selectedPlaylists.some(p=>JSON.stringify(p.track_ids)===currentMixSignature()))lastSavedMixSignature=currentMixSignature();
+          const transferred=new Set(selectedPlaylists.map(p=>p.id));
+          const remaining=guestSavedPlaylists.filter(p=>!transferred.has(p.id));
+          try{localStorage.setItem(guestSavedPlaylistsKey,JSON.stringify(remaining));guestSavedPlaylists=remaining;}catch(_){}
+        }
+        if(selectedRecent.length)try{localStorage.setItem(preview.keys.recent,preview.recentSignature)}catch(_){}
+        // Keep request id until local cleanup succeeds; a retry remains server-idempotent.
+        const left=guestMigrationPreview();
+        if(!left?.name&&!left?.playlists.length&&!left?.recent.length)try{localStorage.removeItem(preview.keys.pending)}catch(_){}
+        st.playlists.loaded=false;st.personalization.loaded=false;st.home.loaded=false;
+        updateQueueUi();closeGuestMigrationDialog();
+        popupEntry('assistant','Your guest music is now linked to this Stonefellow account: '+selectedPlaylists.length+' playlist(s), '+selectedRecent.length+' recent-song hints'+(importName?', and your chosen name':'')+'.');
+        await renderAccount();
+      }catch(error){err.textContent=error.message||'The import did not complete. Your local data is still available.';}
+      finally{importing=false;submit.disabled=false;submit.textContent='Confirm import';}
+    };
+    layer.querySelector('input,button')?.focus({preventScroll:true});
+  }
+  function renderGuestMigrationOffer(){
+    const preview=guestMigrationPreview(),host=canvas?.querySelector('.account-header');
+    if(!host||!preview||(!preview.name&&!preview.playlists.length&&!preview.recent.length))return;
+    const button=document.createElement('button');button.type='button';button.id='reviewGuestMigration';button.className='text-control sf-guest-migration-trigger';
+    button.textContent='Review guest music transfer';button.onclick=openGuestMigrationDialog;
+    host.appendChild(button);
+    let offered=false;try{offered=!!localStorage.getItem(preview.keys.offer)}catch(_){}
+    if(!offered){
+      try{localStorage.setItem(preview.keys.offer,'shown')}catch(_){}
+      openGuestMigrationDialog();
+    }
+  }
   function hide(){starters.hidden=true}
   function persist(){st.builder.savedAt=new Date().toISOString();localStorage.setItem('stonefellow.build.v04',JSON.stringify(st.builder))}
-  function persistCart(){localStorage.setItem('stonefellow.cart.v03',JSON.stringify(st.cart))}
+  function persistCart(){localStorage.setItem('stonefellow.cart.v03',JSON.stringify(st.cart));if(st.drawer.mode==='commerce'&&!notificationDrawer?.hidden){syncDrawerChrome();if(st.drawer.tab==='cart')renderDrawer()}}
+  function showCartAfterAdd(message){
+    if(window.SFPublicAgentCanvas?.active?.()){openExperienceDrawer('commerce','cart');popupEntry('notice',message);}
+    else void say(message,renderCart);
+  }
   function download(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}
   function trackById(id){return catalog.find(t=>t.id===id)}
   function findTitle(q){const n=norm(q);return catalog.find(t=>n.includes(norm(t.title)))||null}
@@ -775,7 +1069,97 @@
       }
     }
   }
-  async function executeAgentAction(a){if(!a||!a.type||a.type==='none')return;const t=a.track_id?trackById(a.track_id):null;switch(a.type){case'play_track':if(t)play(t,0,'agent');break;case'pause_player':if(!audio.paused)audio.pause();break;case'next_track':stepTrack(1);break;case'previous_track':stepTrack(-1);break;case'open_view':navigate(a.view||'home',{slug:a.slug||'',id:a.id||'',type:a.inquiry_type||''});break;case'open_search':navigate('music',{q:a.query||''});break;case'open_site_search':navigate('search',{q:a.query||'',type:a.result_type||'all'});break;case'open_library':navigate('library',{tab:a.tab||'all'});break;case'open_notifications':openNotificationDrawer();break;case'show_track':if(t){renderStory(t);setUrl('track',{id:t.id})}break;case'builder_add_track':if(t){const r=add(t,a.side||undefined);persist();navigate('builder');if(!r.ok)say(r.why==='already'?'That track is already on the build.':'That track will not fit on the requested side.')}break;case'builder_move_track':if(t&&a.side)moveBuilderTrackToSide(t.id,a.side);break;case'builder_fill':await fillBuild(a.side||'both');break;case'builder_dedupe':dedupeBuild();say('Removed duplicate tracks from the build.');break;case'builder_save':await saveBuilderDraft(false);break;case'set_favorite_track':{if(!t){say('That track is no longer publicly available.');break}const desired=a.favorite===true;const j=await secureJsonPost('personalization.php',{action:'set_favorite',item_type:'track',item_id:t.id,favorite:desired});st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;say(desired?'Saved “'+t.title+'” to your favorites.':'Removed “'+t.title+'” from your favorites.');break}case'create_playlist':{const j=await secureJsonPost('playlists.php',{action:'create',name:a.name||'Stonefellow Mix',description:'Curated by the Stonefellow agent.',visibility:a.visibility||'private',source_type:'agent',track_ids:Array.isArray(a.track_ids)?a.track_ids:[]});st.playlists={loaded:true,items:j.playlists||[]};navigate('playlist',{id:j.playlist.id});break}case'save_agent_session':{const j=await secureJsonPost('playlists.php',{action:'save_agent_session',name:a.name||'Agent Listening Session'});st.playlists={loaded:true,items:j.playlists||[]};navigate('playlist',{id:j.playlist.id});break}case'start_listening_session':{startAgentListeningSession(a.session);break}case'session_feedback':{if(a.session_id&&a.track_id){const x=await secureJsonPost('listening-sessions.php',{action:'feedback',session_id:a.session_id,track_id:a.track_id,sentiment:a.sentiment||'neutral'});st.agentSession={...st.agentSession,...(x.session||{})};await loadPersonalization(true);renderAgentSessionPanel()}break}case'end_listening_session':{if(a.session_id){const x=await secureJsonPost('listening-sessions.php',{action:'end',session_id:a.session_id});st.agentSession={...st.agentSession,...(x.session||{}),status:'ended'};clearPlaylistPlayback();renderAgentSessionPanel()}break}case'save_current_listening_session':{if(a.session_id){const x=await secureJsonPost('listening-sessions.php',{action:'save_playlist',session_id:a.session_id,name:a.name||st.agentSession.title||'Agent Listening Session'});st.playlists={loaded:true,items:x.playlists||[]};navigate('playlist',{id:x.playlist.id})}break}case'open_queue':{openQueue();break}case'queue_add_track':{if(t)await addTrackToQueue(t,'end');break}case'queue_play_next':{if(t)await addTrackToQueue(t,'next');break}case'queue_remove_track':{if(a.track_id)await removeTrackFromQueue(a.track_id);break}case'queue_clear':{await clearQueue(false);break}}}
+  // Browser-owned action receipt: all Agent entry points share this adapter.
+  // Never turn a server plan into a completed-action claim without observing
+  // the local route, player state, or the result of an authenticated write.
+  async function executeAgentAction(a){
+    if(!a?.type||a.type==='none')return null;
+    const t=a.track_id?trackById(a.track_id):null;
+    if(['play_track','pause_player','stop_player','resume_player','next_track','previous_track','player_status','set_player_volume','load_temporary_playlist'].includes(a.type))
+      return executePlayerAgentAction(a);
+    switch(a.type){
+      case 'open_view':{
+        const view=a.view||'home';
+        return await navigate(view,{slug:a.slug||'',id:a.id||'',type:a.inquiry_type||''})
+          ?'Opened '+(view==='builder'?'the Create Record studio':view.replaceAll('_',' '))+'.':'That page could not be opened.';
+      }
+      case 'open_search':return await navigate('music',{q:a.query||''})?'Opened the music catalog.':'The music catalog could not be opened.';
+      case 'open_site_search':return await navigate('search',{q:a.query||'',type:a.result_type||'all'})?'Opened site search.':'Site search could not be opened.';
+      case 'open_library':return await navigate('library',{tab:a.tab||'all'})?'Opened your library.':'Your library could not be opened.';
+      case 'open_notifications':openNotificationDrawer();return 'Opened your notifications.';
+      case 'show_track':{
+        if(!t)return 'That song is no longer in the published catalog.';
+        return await navigate('track',{id:t.id})?'Opened the details for “'+t.title+'.”':'The song details could not be opened.';
+      }
+      case 'builder_add_track':{
+        if(!t)return 'That song is no longer in the published catalog.';
+        const result=add(t,a.side||undefined);persist();
+        await navigate('builder');
+        return result.ok?'Added “'+t.title+'” to Side '+result.side+'.'
+          :result.why==='already'?'“'+t.title+'” is already on the record.':'“'+t.title+'” does not fit on the record. No track was added.';
+      }
+      case 'builder_move_track':return t?moveBuilderTrackToSide(t.id,a.side,false):'That song is no longer in the published catalog.';
+      case 'builder_fill':return fillBuild(a.side||'both',false);
+      case 'builder_dedupe':{
+        const before=selectedBuildIds().length;dedupeBuild();
+        const count=before-selectedBuildIds().length;
+        return count?'Removed '+count+' duplicate track'+(count===1?'':'s')+' from the record.':'The record already has no duplicate tracks.';
+      }
+      case 'builder_save':{
+        const saved=await saveBuilderDraft(false);
+        return saved?'Saved “'+st.builder.title+'” '+(saved.id==='local'?'on this device.':'to your account drafts.'):'The record draft was not saved.';
+      }
+      case 'set_favorite_track':{
+        if(!t)return 'That song is no longer in the published catalog.';
+        const desired=a.favorite===true;
+        const j=await secureJsonPost('personalization.php',{action:'set_favorite',item_type:'track',item_id:t.id,favorite:desired});
+        st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;
+        return desired?'Saved “'+t.title+'” to your favorites.':'Removed “'+t.title+'” from your favorites.';
+      }
+      case 'create_playlist':{
+        const j=await secureJsonPost('playlists.php',{action:'create',name:a.name||'Stonefellow Mix',description:'Curated by the Stonefellow agent.',visibility:a.visibility||'private',source_type:'agent',track_ids:Array.isArray(a.track_ids)?a.track_ids:[]});
+        if(!j.playlist?.id)return 'The server did not confirm a saved playlist.';
+        st.playlists={loaded:true,items:j.playlists||[]};await navigate('playlist',{id:j.playlist.id});
+        return 'Saved “'+(j.playlist.name||a.name||'Stonefellow Mix')+'” to your playlists.';
+      }
+      case 'save_agent_session':{
+        const j=await secureJsonPost('playlists.php',{action:'save_agent_session',name:a.name||'Agent Listening Session'});
+        if(!j.playlist?.id)return 'The server did not confirm a saved listening session.';
+        st.playlists={loaded:true,items:j.playlists||[]};await navigate('playlist',{id:j.playlist.id});
+        return 'Saved “'+(j.playlist.name||a.name||'Agent Listening Session')+'” as a playlist.';
+      }
+      case 'start_listening_session':{
+        const started=await startAgentListeningSession(a.session);
+        return started?'Started the “'+st.agentSession.title+'” listening session. '+describePlayer()
+          :'The listening session was created, but the browser did not confirm playback. Open the playlist and tap Play.';
+      }
+      case 'session_feedback':{
+        if(!a.session_id||!a.track_id)return 'A listening session and track are required for feedback.';
+        const j=await secureJsonPost('listening-sessions.php',{action:'feedback',session_id:a.session_id,track_id:a.track_id,sentiment:a.sentiment||'neutral'});
+        st.agentSession={...st.agentSession,...(j.session||{})};await loadPersonalization(true);renderAgentSessionPanel();
+        return 'Saved your feedback for “'+(trackById(a.track_id)?.title||'this song')+'.”';
+      }
+      case 'end_listening_session':{
+        if(!a.session_id)return 'No listening session was supplied.';
+        const j=await secureJsonPost('listening-sessions.php',{action:'end',session_id:a.session_id});
+        st.agentSession={...st.agentSession,...(j.session||{}),status:'ended'};clearPlaylistPlayback();renderAgentSessionPanel();
+        return 'Ended the listening session.';
+      }
+      case 'save_current_listening_session':{
+        if(!a.session_id)return 'There is no listening session to save.';
+        const j=await secureJsonPost('listening-sessions.php',{action:'save_playlist',session_id:a.session_id,name:a.name||st.agentSession.title||'Agent Listening Session'});
+        if(!j.playlist?.id)return 'The server did not confirm a saved playlist.';
+        st.playlists={loaded:true,items:j.playlists||[]};await navigate('playlist',{id:j.playlist.id});
+        return 'Saved “'+(j.playlist.name||a.name||'Agent Listening Session')+'” as a playlist.';
+      }
+      case 'open_queue':await openQueue();return 'Opened your song queue.';
+      case 'queue_add_track':return addTrackToQueue(t,'end',false);
+      case 'queue_play_next':return addTrackToQueue(t,'next',false);
+      case 'queue_remove_track':return a.track_id?removeTrackFromQueue(a.track_id,false):'Choose a song to remove from Up Next.';
+      case 'queue_clear':return clearQueue(false,false);
+    }
+    return null;
+  }
   function syncAuthMenu(){
     // Account navigation is rendered exclusively by PHP on full-page requests.
     document.documentElement.dataset.authState=st.auth.authenticated?'logged-in':'logged-out';
@@ -819,29 +1203,110 @@
   function isTemporaryPlaylist(){return st.playlistPlayback.temporary===true&&st.playlistPlayback.trackIds.length>0}
   function updateQueueUi(){
     const temp=isTemporaryPlaylist(),n=temp?st.playlistPlayback.trackIds.length:st.queue.items.length;
+    try{
+      if(temp)localStorage.setItem(temporaryPlaylistKey,JSON.stringify({version:1,playlistName:st.playlistPlayback.playlistName,
+        trackIds:st.playlistPlayback.trackIds,index:st.playlistPlayback.index}));
+      else localStorage.removeItem(temporaryPlaylistKey);
+    }catch(_){/* Private browsing may make device storage unavailable. */}
     if(playerQueueCount)playerQueueCount.textContent=String(n);
     if(playerQueueButton){playerQueueButton.firstChild.nodeValue=temp?'Playlist ':'Queue ';playerQueueButton.setAttribute('aria-label',temp?'Open temporary playlist and song queue':'Open Up Next queue')}
     if(queueDrawerCount)queueDrawerCount.textContent=n+' track'+(n===1?'':'s');
     window.SFPublicAgentCanvas?.syncPlaylist?.();
+    syncWelcomeActions();
     if(st.queue.open)renderQueueDrawer();
+    scheduleSpeechContextSync();
   }
   async function loadQueue(force=false){if(!st.auth.authenticated){st.queue={...st.queue,loaded:true,items:[]};updateQueueUi();return st.queue.items}if(st.queue.loaded&&!force)return st.queue.items;try{const j=await api('queue.php');if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf;applyQueue(j.queue)}catch(_){st.queue={...st.queue,loaded:true,items:[]};updateQueueUi()}return st.queue.items}
   function pushQueueHistory(){const id=st.track?.id;if(!id)return;const h=Array.isArray(st.queue.history)?st.queue.history:[];if(h[0]!==id)h.unshift(id);st.queue.history=h.slice(0,30);localStorage.setItem('stonefellow.queue.history.v1',JSON.stringify(st.queue.history))}
-  async function addTrackToQueue(t,placement='end'){if(!t)return;if(!st.auth.authenticated){say('Sign in to keep an Up Next queue across devices.',()=>navigate('login'));return}try{const j=await secureJsonPost('queue.php',{action:'add',track_id:t.id,placement:placement==='next'?'next':'end'});applyQueue(j.queue);say(placement==='next'?'“'+t.title+'” will play next.':'Added “'+t.title+'” to Up Next.')}catch(e){say(e.message)}}
-  async function removeTrackFromQueue(trackId){if(!st.auth.authenticated)return;try{const j=await secureJsonPost('queue.php',{action:'remove',track_id:trackId});applyQueue(j.queue)}catch(e){say(e.message)}}
+  async function addTrackToQueue(t,placement='end',announce=true){
+    if(!t)return 'The selected song is not in the published catalog.';
+    if(!st.auth.authenticated){if(announce)say('Sign in to keep an Up Next queue across devices.',()=>navigate('login'));return 'Sign in to use the saved queue.'}
+    try{
+      const j=await secureJsonPost('queue.php',{action:'add',track_id:t.id,placement:placement==='next'?'next':'end'});
+      applyQueue(j.queue);
+      if(!Array.isArray(j.queue?.items)||!j.queue.items.some(item=>String(item.track_id)===String(t.id)))
+        return 'The server did not confirm “'+t.title+'” in Up Next.';
+      const result=placement==='next'?'“'+t.title+'” is queued to play next.':'Added “'+t.title+'” to Up Next.';
+      if(announce)say(result);return result;
+    }catch(e){if(announce)say(e.message);return 'The queue was not updated: '+e.message}
+  }
+  async function removeTrackFromQueue(trackId,announce=true){
+    if(!st.auth.authenticated)return 'Sign in to edit the saved queue.';
+    try{
+      const before=await loadQueue(true);
+      const wasQueued=before.some(item=>String(item.track_id)===String(trackId));
+      if(!wasQueued)return 'That song is not currently in Up Next.';
+      const j=await secureJsonPost('queue.php',{action:'remove',track_id:trackId});applyQueue(j.queue);
+      if(!Array.isArray(j.queue?.items)||j.queue.items.some(item=>String(item.track_id)===String(trackId)))
+        return 'The server did not confirm that the song was removed from Up Next.';
+      return 'Removed “'+(trackById(trackId)?.title||'the song')+'” from Up Next.';
+    }catch(e){if(announce)say(e.message);return 'The queue was not updated: '+e.message}
+  }
   async function removeQueueItem(itemId){try{const j=await secureJsonPost('queue.php',{action:'remove',item_id:Number(itemId)});applyQueue(j.queue)}catch(e){say(e.message)}}
   async function reorderQueueItem(itemId,delta){const ids=st.queue.items.map(x=>Number(x.item_id)),i=ids.indexOf(Number(itemId)),j=i+Number(delta);if(i<0||j<0||j>=ids.length)return;[ids[i],ids[j]]=[ids[j],ids[i]];try{const x=await secureJsonPost('queue.php',{action:'reorder',item_ids:ids});applyQueue(x.queue)}catch(e){say(e.message)}}
-  async function clearQueue(confirmFirst=true){if(!st.auth.authenticated)return;if(confirmFirst&&!confirm('Clear everything from Up Next?'))return;try{const j=await secureJsonPost('queue.php',{action:'clear'});applyQueue(j.queue);if(!confirmFirst)say('Up Next is clear.')}catch(e){say(e.message)}}
-  async function takeQueueItem(itemId){if(agentSessionActive()){say('End the active Agent listening session before switching to a queued track.');return false}try{const j=await secureJsonPost('queue.php',{action:'take',item_id:Number(itemId)});applyQueue(j.queue);const t=j.item?trackById(j.item.track_id):null;if(!t)return false;pushQueueHistory();play(t,0,'queue');return true}catch(e){say(e.message);return false}}
-  async function playNextFromQueue(){if(agentSessionActive()||!st.auth.authenticated)return false;try{const j=await secureJsonPost('queue.php',{action:'pop'});applyQueue(j.queue);const t=j.item?trackById(j.item.track_id):null;if(!t)return false;pushQueueHistory();play(t,0,'queue');return true}catch(_){return false}}
+  async function clearQueue(confirmFirst=true,announce=true){
+    if(!st.auth.authenticated)return 'Sign in to edit the saved queue.';
+    if(confirmFirst&&!confirm('Clear everything from Up Next?'))return 'Queue unchanged.';
+    try{const j=await secureJsonPost('queue.php',{action:'clear'});applyQueue(j.queue);if(!Array.isArray(j.queue?.items)||j.queue.items.length)return 'The server did not confirm an empty queue.';if(announce&&!confirmFirst)say('Up Next is clear.');return 'Up Next is clear.'}
+    catch(e){if(announce)say(e.message);return 'The queue was not cleared: '+e.message}
+  }
+  async function restoreQueueTrack(trackId){
+    if(!trackId)return;
+    try{const restored=await secureJsonPost('queue.php',{action:'add',track_id:String(trackId),placement:'next'});applyQueue(restored.queue)}
+    catch(_){void loadQueue(true)}
+  }
+  async function takeQueueItem(itemId){
+    if(agentSessionActive()){say('End the active Agent listening session before switching to a queued track.');return false}
+    invalidatePlayback();audio.pause();const token=playbackLifecycle.token();
+    try{
+      const j=await secureJsonPost('queue.php',{action:'take',item_id:Number(itemId)});
+      if(!playbackLifecycle.isCurrent(token)){
+        if(j.item?.track_id)await restoreQueueTrack(j.item.track_id);
+        return false;
+      }
+      applyQueue(j.queue);const t=j.item?trackById(j.item.track_id):null;if(!t)return false;
+      pushQueueHistory();const started=await play(t,0,'queue');
+      if(!started)await restoreQueueTrack(j.item.track_id);
+      return started;
+    }catch(e){say(e.message);return false}
+  }
+  async function playNextFromQueue(expectedToken=null){
+    if(agentSessionActive()||!st.auth.authenticated||queueAdvancePending)return false;
+    const token=expectedToken??playbackLifecycle.token();queueAdvancePending=true;
+    try{
+      const j=await secureJsonPost('queue.php',{action:'pop'});
+      if(!playbackLifecycle.isCurrent(token)){
+        // A user action took over while the server responded: restore the popped item.
+        if(j.item?.track_id)await restoreQueueTrack(j.item.track_id);
+        else void loadQueue(true);
+        return false;
+      }
+      applyQueue(j.queue);
+      const t=j.item?trackById(j.item.track_id):null;if(!t)return false;
+      pushQueueHistory();const started=await play(t,0,'queue');
+      if(!started)await restoreQueueTrack(j.item.track_id);
+      return started;
+    }catch(_){return false}
+    finally{queueAdvancePending=false}
+  }
   function renderQueueDrawer(){
     if(!queueContent)return;
     const temp=isTemporaryPlaylist(),rows=st.queue.items||[],mix=st.playlistPlayback;
     const title=document.getElementById('queueDrawerTitle');if(title)title.textContent=temp?'Your Playlist':'Up Next';
     if(queueClear)queueClear.hidden=!rows.length;
-    const playlistHtml=temp?`<section class="temporary-playlist" aria-label="Temporary song playlist"><div class="temporary-playlist-head"><div><span class="drawer-kicker">TEMPORARY PLAYLIST · NOT SAVED</span><h3>${esc(mix.playlistName)}</h3></div><span>${mix.trackIds.length} SONGS</span></div>${mix.trackIds.map((id,i)=>{const t=trackById(id);if(!t)return '';const current=i===mix.index;return `<article class="queue-item temporary-playlist-item ${current?'is-current':''}" ${current?'aria-current="true"':''}><button type="button" class="queue-item-play" data-temp-play="${i}" aria-label="Play ${esc(t.title)}">${current&&!audio.paused?'♫':'▶'}</button><div><strong>${String(i+1).padStart(2,'0')} · ${esc(t.title)}</strong><small>${esc(t.release||'Stonefellow')} · ${time(t.duration)}</small></div><span class="temporary-playlist-state">${current?(audio.ended?'FINISHED':audio.paused?'READY':'NOW PLAYING'):''}</span></article>`}).join('')}</section>`:'';
+    const playlistHtml=temp?`<section class="temporary-playlist" aria-label="Temporary song playlist"><div class="temporary-playlist-head"><div><span class="drawer-kicker">TEMPORARY PLAYLIST · ${currentMixSaved()?'SAVED':'NOT SAVED'}</span><h3>${esc(mix.playlistName)}</h3></div><span>${mix.trackIds.length} SONGS</span></div>${mix.trackIds.map((id,i)=>{const t=trackById(id);if(!t)return '';const current=i===mix.index;return `<article class="queue-item temporary-playlist-item ${current?'is-current':''}" ${current?'aria-current="true"':''}><button type="button" class="queue-item-play" data-temp-play="${i}" aria-label="Play ${esc(t.title)}">${current&&!audio.paused?'♫':'▶'}</button><div><strong>${String(i+1).padStart(2,'0')} · ${esc(t.title)}</strong><small>${esc(t.release||'Stonefellow')} · ${time(t.duration)}</small></div><span class="temporary-playlist-state">${current?(audio.ended?'FINISHED':audio.paused?'READY':'NOW PLAYING'):''}</span></article>`}).join('')}${currentMixSaved()?'':`<button type="button" class="buy-primary" data-queue-save>Save this playlist</button>`}</section>`:'';
     const savedHtml=rows.length?`<section class="persistent-queue"><h3>${temp?'UP NEXT · SAVED QUEUE':'UP NEXT'}</h3>${rows.map((x,i)=>`<article class="queue-item"><button type="button" class="queue-item-play" data-queue-play="${x.item_id}" aria-label="Play ${esc(x.title)}">▶</button><div><strong>${esc(x.title)}</strong><small>${esc(x.release||'')} · ${time(x.duration)}</small></div><div class="queue-item-actions"><button type="button" data-queue-move="${x.item_id}" data-dir="-1" ${i===0?'disabled':''}>↑</button><button type="button" data-queue-move="${x.item_id}" data-dir="1" ${i===rows.length-1?'disabled':''}>↓</button><button type="button" data-queue-remove="${x.item_id}" aria-label="Remove ${esc(x.title)}">×</button></div></article>`).join('')}</section>`:'';
-    queueContent.innerHTML=playlistHtml+savedHtml||'<p class="drawer-empty">Your Up Next queue is empty.</p>';
+    const deviceHtml=guestSavedPlaylists.length?`<section class="persistent-queue guest-device-playlists"><div class="drawer-kicker">GUEST MUSIC · THIS BROWSER ONLY</div><h3>Saved on this device</h3>${guestSavedPlaylists.slice().reverse().map(p=>`<article class="queue-item"><button type="button" class="queue-item-play" data-guest-playlist-load="${esc(p.id)}" aria-label="Load ${esc(p.name)}">▶</button><div><strong>${esc(p.name)}</strong><small>${p.track_ids.length} SONGS · SAVED HERE</small></div><button type="button" class="queue-guest-remove" data-guest-playlist-remove="${esc(p.id)}" aria-label="Remove saved playlist ${esc(p.name)}">×</button></article>`).join('')}</section>`:'';
+    queueContent.innerHTML=playlistHtml+savedHtml+deviceHtml||'<section class="queue-empty-workspace"><div class="drawer-kicker">STONEFELLOW / PLAYLIST STUDIO</div><h3>Nothing in the queue yet</h3><p>Ask Stonefellow to create a playlist, or start a random mix right here.</p><button class="buy-primary" type="button" data-queue-create-random>Create random playlist</button></section>';
+    queueContent.querySelector('[data-queue-create-random]')?.addEventListener('click',()=>void startRandomTemporaryPlaylist().then(result=>popupEntry('notice',result)));
+    queueContent.querySelector('[data-queue-save]')?.addEventListener('click',()=>void saveTemporaryPlaylist().then(result=>popupEntry('assistant',result)));
+    Array.from(queueContent.querySelectorAll('[data-guest-playlist-load]')).forEach(b=>b.onclick=()=>void loadGuestSavedPlaylist(b.dataset.guestPlaylistLoad));
+    Array.from(queueContent.querySelectorAll('[data-guest-playlist-remove]')).forEach(b=>b.onclick=()=>{
+      if(b.dataset.confirmRemove!=='yes'){b.dataset.confirmRemove='yes';b.textContent='Confirm ×';b.setAttribute('aria-label','Confirm removal of saved playlist');return;}
+      const next=guestSavedPlaylists.filter(p=>p.id!==b.dataset.guestPlaylistRemove);
+      try{localStorage.setItem(guestSavedPlaylistsKey,JSON.stringify(next))}catch(_){popupEntry('notice','Could not update device storage.');return;}
+      guestSavedPlaylists=next;updateQueueUi();popupEntry('notice','Removed the playlist saved on this device.');
+    });
     Array.from(queueContent.querySelectorAll('[data-temp-play]')).forEach(b=>b.onclick=()=>playTemporaryTrack(Number(b.dataset.tempPlay)));
     Array.from(queueContent.querySelectorAll('[data-queue-play]')).forEach(b=>b.onclick=()=>takeQueueItem(b.dataset.queuePlay));
     Array.from(queueContent.querySelectorAll('[data-queue-remove]')).forEach(b=>b.onclick=()=>removeQueueItem(b.dataset.queueRemove));
@@ -850,12 +1315,18 @@
     if(queueDrawerCount)queueDrawerCount.textContent=n+' track'+(n===1?'':'s');
   }
   async function openQueue(){
-    if(!st.auth.authenticated&&!isTemporaryPlaylist()){say('Sign in to use a persistent Up Next queue.',()=>navigate('login'));return}
-    if(st.auth.authenticated)await loadQueue(true);
+    // The queue is a right-hand canvas drawer, never a /music page or page modal.
+    if(canvas?.id==='sfAgentNativePage'&&window.SFPublicAgentCanvas?.active?.()){
+      window.SFPublicAgentCanvas.closePage?.(true);canvas=mainCanvas;setUrl('home',{});
+    }
+    if(notificationDrawer&&!notificationDrawer.hidden)closeNotificationDrawer();
+    if(queueDrawer?.hidden)queueReturnFocus=document.activeElement;
     st.queue.open=true;if(queueDrawer)queueDrawer.hidden=false;if(queueBackdrop)queueBackdrop.hidden=false;
     playerQueueButton?.setAttribute('aria-expanded','true');document.body.classList.add('queue-open');renderQueueDrawer();
+    queueClose?.focus({preventScroll:true});
+    if(st.auth.authenticated)void loadQueue(true);
   }
-  function closeQueue(){st.queue.open=false;if(queueDrawer)queueDrawer.hidden=true;if(queueBackdrop)queueBackdrop.hidden=true;playerQueueButton?.setAttribute('aria-expanded','false');document.body.classList.remove('queue-open')}
+  function closeQueue(){st.queue.open=false;if(queueDrawer)queueDrawer.hidden=true;if(queueBackdrop)queueBackdrop.hidden=true;playerQueueButton?.setAttribute('aria-expanded','false');document.body.classList.remove('queue-open');if(queueReturnFocus?.isConnected)queueReturnFocus.focus({preventScroll:true});queueReturnFocus=null}
   async function loadPersonalization(force=false){
     if(!st.auth.authenticated){st.personalization={loaded:true,favorites:{tracks:[],releases:[]},continue_listening:[],history:[],recommendations:{personalized:false,summary:'Sign in and listen to make recommendations personal.',signals:{},items:[]}};return st.personalization}
     if(st.personalization.loaded&&!force)return st.personalization;
@@ -886,12 +1357,20 @@
   function agentSessionActive(){return !!(st.agentSession?.id&&st.agentSession.status==='active')}
   function agentSessionVisible(){return !!(st.agentSession?.id&&st.agentSession.status!=='ended')}
   function sessionTrackIds(){return (st.agentSession?.tracks||[]).map(x=>x.track_id).filter(id=>trackById(id))}
-  function startAgentListeningSession(session){if(!session||!session.id)return;st.agentSession={id:session.id,title:session.title||'Agent Listening Session',mode:session.mode||'mix',status:session.status||'active',currentIndex:Number(session.current_index||0),tracks:session.tracks||[]};const ids=sessionTrackIds();if(!ids.length){say('That listening session has no playable tracks.');return}const idx=Math.max(0,Math.min(ids.length-1,st.agentSession.currentIndex));st.playlistPlayback={playlistId:'agent-session:'+session.id,playlistName:st.agentSession.title,trackIds:ids,index:idx};const t=trackById(ids[idx]);if(t)play(t,0,'agent_session',true);renderAgentSessionPanel()}
+  async function startAgentListeningSession(session){
+    if(!session?.id)return false;
+    st.agentSession={id:session.id,title:session.title||'Agent Listening Session',mode:session.mode||'mix',status:session.status||'active',currentIndex:Number(session.current_index||0),tracks:session.tracks||[]};
+    const ids=sessionTrackIds();if(!ids.length){renderAgentSessionPanel();return false}
+    const idx=Math.max(0,Math.min(ids.length-1,st.agentSession.currentIndex));
+    st.playlistPlayback={playlistId:'agent-session:'+session.id,playlistName:st.agentSession.title,trackIds:ids,index:idx};
+    const t=trackById(ids[idx]);const started=t?await play(t,0,'agent_session',true):false;
+    renderAgentSessionPanel();return started;
+  }
   function renderAgentSessionPanel(){let panel=$('#agentSessionPanel');if(!agentSessionVisible()){panel?.remove();return}if(!panel){panel=document.createElement('section');panel.id='agentSessionPanel';panel.className='agent-session-panel';document.body.appendChild(panel)}const ids=sessionTrackIds(),i=Math.max(0,Number(st.agentSession.currentIndex||0)),current=trackById(ids[i]),feedback=((st.personalization.track_feedback||{})[current?.id||'']||{}).sentiment||'';panel.innerHTML=`<div><span class="agent-session-kicker">AGENT LISTENING</span><strong>${esc(st.agentSession.title)}</strong><small>${st.agentSession.status==='completed'?'Complete · ':''}${i+1} of ${ids.length}${current?' · '+esc(current.title):''}</small></div><div class="agent-session-actions">${st.agentSession.status==='active'? `<button type="button" data-session-feedback="like" class="${feedback==='like'?'active':''}">♥ Like</button><button type="button" data-session-feedback="dislike" class="${feedback==='dislike'?'active':''}">× Dislike</button>`:''}<button type="button" id="saveAgentListeningSession">Save playlist</button><button type="button" id="endAgentListeningSession">${st.agentSession.status==='completed'?'Close':'End'}</button></div>`;Array.from(panel.querySelectorAll('[data-session-feedback]')).forEach(b=>b.onclick=()=>submitSessionFeedback(b.dataset.sessionFeedback));$('#saveAgentListeningSession',panel).onclick=saveCurrentAgentSession;$('#endAgentListeningSession',panel).onclick=st.agentSession.status==='completed'?()=>{st.agentSession={id:'',title:'',mode:'',status:'',currentIndex:0,tracks:[]};renderAgentSessionPanel()}:endCurrentAgentSession}
   async function submitSessionFeedback(sentiment){if(!agentSessionActive()||!st.track)return;try{const j=await secureJsonPost('listening-sessions.php',{action:'feedback',session_id:st.agentSession.id,track_id:st.track.id,sentiment});st.agentSession={...st.agentSession,...(j.session||{})};await loadPersonalization(true);renderAgentSessionPanel();say(sentiment==='like'?'Got it. I’ll lean more in this direction.':'Got it. I’ll steer away from this direction.')}catch(e){say(e.message)}}
   async function saveCurrentAgentSession(){if(!agentSessionVisible())return;const name=prompt('Save this listening session as a playlist',st.agentSession.title||'Agent Listening Session');if(name===null)return;try{const j=await secureJsonPost('listening-sessions.php',{action:'save_playlist',session_id:st.agentSession.id,name});st.playlists={loaded:true,items:j.playlists||[]};say('Saved this listening session as a playlist.',()=>navigate('playlist',{id:j.playlist.id}))}catch(e){say(e.message)}}
   async function endCurrentAgentSession(){if(!agentSessionActive())return;try{const j=await secureJsonPost('listening-sessions.php',{action:'end',session_id:st.agentSession.id});st.agentSession={...st.agentSession,...(j.session||{}),status:'ended'};clearPlaylistPlayback();renderAgentSessionPanel();say('Listening session ended.')}catch(e){say(e.message)}}
-  async function advanceAgentSession(result='complete'){if(!agentSessionActive()||!st.track)return null;try{const j=await secureJsonPost('listening-sessions.php',{action:'advance',session_id:st.agentSession.id,track_id:st.track.id,result});st.agentSession={...st.agentSession,...(j.session||{}),currentIndex:Number(j.session?.current_index||0),tracks:j.session?.tracks||st.agentSession.tracks};return j.session||null}catch(_){return null}}
+  async function advanceAgentSession(result='complete',expectedToken=null){if(!agentSessionActive()||!st.track)return null;try{const j=await secureJsonPost('listening-sessions.php',{action:'advance',session_id:st.agentSession.id,track_id:st.track.id,result});if(expectedToken!==null&&!playbackLifecycle.isCurrent(expectedToken))return null;st.agentSession={...st.agentSession,...(j.session||{}),currentIndex:Number(j.session?.current_index||0),tracks:j.session?.tracks||st.agentSession.tracks};return j.session||null}catch(_){return null}}
   async function startTemporaryPlaylist(action){
     if(agentSessionActive())return 'End the active Agent listening session before starting a random playlist.';
     const ids=Array.isArray(action?.track_ids)?action.track_ids:[];
@@ -903,6 +1382,88 @@
     const started=await play(trackById(ids[0]),0,'temporary_playlist',true);
     await openQueue();
     return started?'Created a temporary '+ids.length+'-song playlist and started “'+st.track.title+'.” The song queue is open.':'Created a temporary '+ids.length+'-song playlist and opened the queue. Tap Play to start the music.';
+  }
+  function directRandomPlaylistCommand(message){
+    const q=String(message||'').trim().toLowerCase()
+      .replace(/^(?:(?:hey|hi|okay|ok)\s+)?stone[\s-]?fellow[,.:!?\s]*/,'')
+      .replace(/[.!?]+$/,'').trim();
+    return /^(?:please\s+)?(?:(?:make|create|build|generate|start|play|give|put together)(?:\s+me)?\s+(?:(?:a|an|the)\s+)?(?:(?:random|surprise|new)\s+)?(?:(?:stonefellow)\s+)?(?:playlist|mix)|surprise me with (?:a |some )?(?:playlist|mix))(?:\s+of\s+(?:stonefellow\s+)?(?:songs|music|tracks))?$/.test(q);
+  }
+  async function startRandomTemporaryPlaylist(){
+    const seen=new Set(),available=catalog.filter(track=>{
+      if(!track?.audio||!track.id||seen.has(track.id)||track.agent_discoverable===false)return false;
+      seen.add(track.id);return true;
+    });
+    if(!available.length)return 'No playable Stonefellow songs are currently available to create a playlist.';
+    for(let i=available.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));[available[i],available[j]]=[available[j],available[i]];
+    }
+    return startTemporaryPlaylist({name:'Stonefellow Random Mix',track_ids:available.slice(0,Math.min(8,available.length)).map(track=>track.id)});
+  }
+  async function saveTemporaryPlaylist(){
+    if(!isTemporaryPlaylist())return 'Create a temporary playlist first. Then I can save that mix.';
+    const ids=st.playlistPlayback.trackIds.slice(),name=st.playlistPlayback.playlistName||'Stonefellow Mix',signature=currentMixSignature();
+    if(currentMixSaved())return '“'+name+'” is already saved. Open the playlist drawer to listen again.';
+    if(st.auth.authenticated){
+      try{
+        const result=await secureJsonPost('playlists.php',{action:'create',name,description:'Made with the Stonefellow Agent.',visibility:'private',source_type:'agent',track_ids:ids});
+        if(!result.playlist?.id)return 'The account did not confirm saving this playlist.';
+        st.playlists={loaded:true,items:result.playlists||[]};lastSavedMixSignature=signature;
+      }catch(error){return 'The playlist could not be saved to your account: '+error.message}
+    }else{
+      const record={id:'guest-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),name,track_ids:ids,created_at:new Date().toISOString(),scope:'guest_local'};
+      const next=guestSavedPlaylists.concat(record).slice(-20);
+      try{localStorage.setItem(guestSavedPlaylistsKey,JSON.stringify(next))}catch(_){return 'Browser storage is unavailable, so the playlist was not saved.'}
+      guestSavedPlaylists=next;
+    }
+    updateQueueUi();
+    return 'Saved “'+name+'”. '+(st.auth.authenticated?'It is in your account playlists.':'It is available in this browser under Saved on this device.')+' Open the playlist drawer anytime.';
+  }
+  async function loadGuestSavedPlaylist(id){
+    const saved=guestSavedPlaylists.find(p=>p.id===id);
+    if(!saved)return;
+    const ids=saved.track_ids.filter(trackId=>trackById(trackId)?.audio);
+    if(!ids.length){popupEntry('notice','The songs in that saved mix are not currently available.');return;}
+    st.playlistPlayback={playlistId:'temporary:guest:'+saved.id,playlistName:saved.name||'Saved Mix',trackIds:ids,index:0,temporary:true};
+    updateQueueUi();
+    const started=await play(trackById(ids[0]),0,'guest_saved_playlist',true);
+    popupEntry(started?'assistant':'notice',started?'Loaded your saved mix and started “'+st.track.title+'”.':'Loaded the saved mix. Choose a song to play.');
+  }
+  async function playWelcomeLatest(){
+    const selected=trackById(welcomeLatestTrackId);
+    if(!selected?.audio)return playLatestRelease();
+    if(st.track?.id===selected.id&&!audio.paused)return '“'+selected.title+'” is already playing.';
+    if(st.track?.id===selected.id){
+      try{await audio.play();return 'Playing “'+selected.title+'”.'}catch(_){return 'I could not resume “'+selected.title+'”.'}
+    }
+    const started=await play(selected,0,'welcome_latest_release',true);
+    return started?'Playing “'+selected.title+'”.':'I could not start “'+selected.title+'”.';
+  }
+  async function playLatestRelease(){
+    await refreshSiteData();
+    const published=releases.filter(release=>(release.state||'published')==='published'&&release.public_visible!==false&&release.agent_discoverable!==false)
+      .sort((a,b)=>String(b.release_date||'').localeCompare(String(a.release_date||'')));
+    const latest=published.find(release=>(release.track_ids||[]).some(id=>trackById(id)?.audio));
+    if(!latest)return 'There isn’t a playable published release right now. I can make you a random playlist instead.';
+    const tracks=(latest.track_ids||[]).map(trackById).filter(track=>track?.audio&&track.agent_discoverable!==false);
+    if(!tracks.length)return 'That release has no playable songs yet.';
+    st.playlistPlayback={playlistId:'release:'+latest.id,playlistName:latest.title,trackIds:tracks.map(track=>track.id),index:0};
+    updateQueueUi();
+    const started=await play(tracks[0],0,'welcome_latest_release',true);
+    if(!started){clearPlaylistPlayback();return 'The latest release was found, but its audio could not start. Try the playlist button.'}
+    welcomeLatestTrackId=tracks[0].id;syncWelcomeActions();
+    return 'Now playing “'+tracks[0].title+'” from the latest release, “'+latest.title+'”. Enjoy!';
+  }
+  async function handleWelcomeAction(action,recordUser=true){
+    if(!['latest-release','welcome-play','random-playlist','save-playlist','open-saved-queue'].includes(action))return;
+    if(recordUser)popupEntry('user',({'latest-release':'Play the latest release','welcome-play':'Play','random-playlist':'Make me a playlist','save-playlist':'Save playlist','open-saved-queue':'Show my saved playlist'})[action]);
+    let result='';
+    if(action==='latest-release')result=await playLatestRelease();
+    else if(action==='welcome-play')result=await playWelcomeLatest();
+    else if(action==='random-playlist')result=await startRandomTemporaryPlaylist();
+    else if(action==='save-playlist')result=await saveTemporaryPlaylist();
+    else{await openQueue();result='Your playlist is open. Choose a track to play.'}
+    await say(result);
   }
   function playTemporaryTrack(index){
     if(!isTemporaryPlaylist()||!Number.isInteger(index)||index<0||index>=st.playlistPlayback.trackIds.length)return;
@@ -1013,8 +1574,93 @@
     }
     await opening;
   }
+  function syncDrawerChrome(){
+    if(!notificationDrawer)return;
+    const mode=st.drawer.mode||'activity';
+    if(drawerTitle)drawerTitle.textContent={activity:'Activity',music:'Music Library',commerce:'Merch & Tickets'}[mode]||'Stonefellow';
+    $$('[data-drawer-group]',notificationDrawer).forEach(group=>group.hidden=group.dataset.drawerGroup!==mode);
+    $$('[data-drawer-tab]',notificationDrawer).forEach(button=>{
+      const active=button.dataset.drawerTab===st.drawer.tab;
+      button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));
+    });
+    if(drawerTools)drawerTools.hidden=mode!=='activity';
+    if(drawerCartCount){const count=st.cart.reduce((sum,item)=>sum+(item.type==='merch'?Number(item.quantity||1):1),0);drawerCartCount.textContent=count?'('+count+')':'';}
+    notificationDrawer.dataset.drawerMode=mode;
+  }
+  function drawerDetail(view,params={}){closeNotificationDrawer();void navigate(view,params)}
+  function drawerFeedback(message){const feedback=$('[data-drawer-feedback]',drawerContent);if(feedback)feedback.textContent=String(message||'')}
+  function renderMusicDrawer(tab){
+    const songs=catalog.filter(track=>track.public_visible!==false&&!['draft','private','archived'].includes(String(track.state||'')));
+    const albums=releases.filter(release=>(release.state||'published')==='published'&&release.public_visible!==false);
+    if(tab==='songs'){
+      drawerContent.innerHTML='<div class="sf-drawer-intro"><span>THE CATALOG / '+songs.length+' SONGS</span><p>Play a song here or open its full recording page.</p></div><div data-drawer-feedback class="sf-drawer-feedback" role="status"></div>'+(songs.length?songs.map(track=>'<article class="sf-drawer-entity"><div class="sf-drawer-entity-copy"><strong>'+esc(track.title)+'</strong><small>'+esc(track.release||'Stonefellow')+(Number(track.duration)?' · '+time(track.duration):'')+'</small></div><div class="sf-drawer-entity-actions"><button type="button" data-drawer-play="'+esc(track.id)+'" aria-label="Play '+esc(track.title)+'">▶ Play</button><button type="button" data-drawer-track="'+esc(track.id)+'">Details</button></div></article>').join(''):'<p class="drawer-empty">No public songs available.</p>')+'<button type="button" class="sf-drawer-page-link" data-drawer-page="music">Full music page ↗</button>';
+      $$('[data-drawer-play]',drawerContent).forEach(button=>button.onclick=async()=>{const track=trackById(button.dataset.drawerPlay);if(!track)return;try{const started=await play(track,0,'music_drawer');drawerFeedback(started?'Playing “'+track.title+'”.':'The player could not start “'+track.title+'”. Check its published audio.')}catch(error){drawerFeedback('Could not start this song: '+String(error.message||'Try again.'))}});
+      $$('[data-drawer-track]',drawerContent).forEach(button=>button.onclick=()=>drawerDetail('track',{id:button.dataset.drawerTrack}));
+    }else{
+      drawerContent.innerHTML='<div class="sf-drawer-intro"><span>RELEASES / '+albums.length+' ALBUMS & EPS</span><p>Browse published releases and play their tracklists.</p></div><div data-drawer-feedback class="sf-drawer-feedback" role="status"></div>'+(albums.length?albums.map(release=>{const cover=typeof release.artwork==='object'?(release.artwork?.cover||''):typeof release.artwork==='string'?release.artwork:'';const tracks=(release.track_ids||[]).map(trackById).filter(Boolean);return '<article class="sf-drawer-entity album"><div class="sf-drawer-album-art">'+(cover?'<img src="'+esc(cover)+'" alt="">':'SF')+'</div><div class="sf-drawer-entity-copy"><strong>'+esc(release.title)+'</strong><small>'+esc(release.type||'Release')+' · '+tracks.length+' songs</small><div class="sf-drawer-entity-actions"><button type="button" data-drawer-play-album="'+esc(release.id)+'" '+(tracks.length?'':'disabled')+'>▶ Play</button><button type="button" data-drawer-album="'+esc(release.id)+'">Details</button></div></div></article>'}).join(''):'<p class="drawer-empty">No public releases available.</p>')+'<button type="button" class="sf-drawer-page-link" data-drawer-page="releases">Full releases page ↗</button>';
+      $$('[data-drawer-play-album]',drawerContent).forEach(button=>button.onclick=async()=>{const release=albums.find(r=>String(r.id)===button.dataset.drawerPlayAlbum),tracks=(release?.track_ids||[]).map(trackById).filter(Boolean);if(!tracks.length)return;st.playlistPlayback={playlistId:'release:'+release.id,playlistName:release.title,trackIds:tracks.map(t=>t.id),index:0};try{const started=await play(tracks[0],0,'release',true);if(!started)clearPlaylistPlayback();drawerFeedback(started?'Playing “'+release.title+'”.':'The player could not start this release. Check its published audio.')}catch(error){clearPlaylistPlayback();drawerFeedback(String(error.message||'Could not play this release.'))}});
+      $$('[data-drawer-album]',drawerContent).forEach(button=>button.onclick=()=>drawerDetail('release',{id:button.dataset.drawerAlbum}));
+    }
+    $$('[data-drawer-page]',drawerContent).forEach(button=>button.onclick=()=>drawerDetail(button.dataset.drawerPage));
+  }
+  async function renderCommerceDrawer(tab,token){
+    if(tab==='merch'){
+      drawerContent.innerHTML='<p class="drawer-empty">Loading the merchandise catalog…</p>';
+      try{
+        const data=await api('storefront.php');if(token!==drawerRenderSequence||notificationDrawer.hidden||st.drawer.tab!=='merch')return;
+        st.storefrontProducts=data.products||[];
+        const products=st.storefrontProducts.filter(product=>product.kind==='merch');
+        drawerContent.innerHTML='<div class="sf-drawer-intro"><span>STONEFELLOW / MERCHANDISE</span><p>Select a size or edition and add it to your cart.</p></div><div data-drawer-feedback class="sf-drawer-feedback" role="status"></div>'+(products.length?products.map(product=>'<article class="sf-drawer-entity merchandise">'+(product.image?'<div class="sf-drawer-album-art"><img src="'+esc(product.image)+'" alt=""></div>':'')+'<div class="sf-drawer-entity-copy"><strong>'+esc(product.label)+'</strong><small>'+esc(product.category||'Merch')+' · '+money(product.price_cents||0)+'</small>'+(product.description?'<p>'+esc(product.description)+'</p>':'')+merchVariantOptions(product)+'<div class="sf-drawer-entity-actions"><button type="button" data-drawer-add-merch="'+esc(product.id)+'" '+(product.available?'':'disabled')+'>'+(product.available?'Add to cart':'Sold out')+'</button><button type="button" data-drawer-merch="'+esc(product.slug||product.id)+'">Details</button></div></div></article>').join(''):'<p class="drawer-empty">No merchandise is currently listed.</p>')+'<button type="button" class="sf-drawer-page-link" data-drawer-page="store">Full merch store ↗</button>';
+        $$('[data-drawer-add-merch]',drawerContent).forEach(button=>button.onclick=()=>{const id=button.dataset.drawerAddMerch,selector=$('[data-merch-variant="'+CSS.escape(id)+'"]',drawerContent);addMerchToCart(id,selector?Number(selector.value):null,1)});
+        $$('[data-drawer-merch]',drawerContent).forEach(button=>button.onclick=()=>drawerDetail('store',{slug:button.dataset.drawerMerch}));
+      }catch(error){if(token===drawerRenderSequence)drawerContent.innerHTML='<p class="drawer-empty">'+esc(error.message||'Merchandise is unavailable right now.')+'</p><button type="button" class="sf-drawer-page-link" data-drawer-page="store">Open store page ↗</button>';}
+    }else if(tab==='tickets'){
+      drawerContent.innerHTML='<p class="drawer-empty">Loading tickets and VIP access…</p>';
+      try{
+        const data=await api('ticketing.php');if(token!==drawerRenderSequence||notificationDrawer.hidden||st.drawer.tab!=='tickets')return;
+        const offers=data.offers||[],reservations=data.reservations||[];
+        drawerContent.innerHTML='<div class="sf-drawer-intro"><span>LIVE / TICKETS & VIP</span><p>View active offers and your existing reservations.</p></div><div data-drawer-feedback class="sf-drawer-feedback" role="status"></div>'+(reservations.length?'<h3 class="sf-drawer-subhead">My reservations</h3>'+reservations.map(ticketReservationCard).join(''):'')+'<h3 class="sf-drawer-subhead">Available offers</h3>'+(offers.length?offers.map(ticketOfferCard).join(''):'<p class="drawer-empty">No ticket or VIP offers are listed right now.</p>')+'<button type="button" class="sf-drawer-page-link" data-drawer-page="tickets">Full tickets page ↗</button>';
+        $$('[data-ticket-reserve]',drawerContent).forEach(button=>button.onclick=async()=>{if(!st.auth.authenticated){drawerDetail('login');return}const id=Number(button.dataset.ticketReserve),qty=Number($('[data-ticket-qty="'+id+'"]',drawerContent)?.value||1),request_id='ticket_'+id+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);button.disabled=true;try{const response=await secureJsonPost('ticketing.php',{action:'reserve',offer_id:id,quantity:qty,request_id,source:'public_ticketing'});await renderCommerceDrawer('tickets',++drawerRenderSequence);drawerFeedback('Reservation confirmed: '+response.reservation.confirmation_code+'.');}catch(error){drawerFeedback(error.message||'Reservation unavailable.')}finally{button.disabled=false}});
+        $$('[data-ticket-cancel]',drawerContent).forEach(button=>button.onclick=async()=>{if(!confirm('Cancel this reservation and release its capacity?'))return;try{await secureJsonPost('ticketing.php',{action:'cancel',reservation_id:Number(button.dataset.ticketCancel)});await renderCommerceDrawer('tickets',++drawerRenderSequence);drawerFeedback('Reservation cancelled.')}catch(error){drawerFeedback(error.message)}});
+        $$('[data-view]',drawerContent).forEach(button=>button.onclick=()=>drawerDetail(button.dataset.view));
+      }catch(error){if(token===drawerRenderSequence)drawerContent.innerHTML='<p class="drawer-empty">'+esc(error.message||'Ticketing unavailable.')+'</p>';}
+    }else if(tab==='cart'){
+      const count=st.cart.reduce((sum,item)=>sum+(item.type==='merch'?Number(item.quantity||1):1),0);
+      drawerContent.innerHTML='<div class="sf-drawer-intro"><span>YOUR CART / '+count+' ITEMS</span><p>Review your selections here. Checkout remains a full-page secure step.</p></div>'+(st.cart.length?'<div class="sf-drawer-cart-lines">'+st.cart.map(cartItemMarkup).join('')+'</div><div id="sfDrawerQuote" class="sf-drawer-quote" role="status">Calculating order total…</div><div class="sf-drawer-cart-actions"><button type="button" data-drawer-checkout>Review & checkout ↗</button><button type="button" data-drawer-clear>Clear cart</button></div>':'<p class="drawer-empty">Your cart is empty. Add merchandise or music to begin.</p><button type="button" class="sf-drawer-page-link" data-drawer-switch="merch">Browse merch ↗</button>');
+      $$('[data-remove]',drawerContent).forEach(button=>button.onclick=()=>{st.cart.splice(Number(button.dataset.remove),1);persistCart()});
+      $$('[data-merch-cart-qty]',drawerContent).forEach(field=>field.onchange=()=>{const item=st.cart[Number(field.dataset.merchCartQty)];if(item?.type==='merch'){item.quantity=Math.max(1,Math.min(50,Number(field.value)||1));persistCart()}});
+      const clear=$('[data-drawer-clear]',drawerContent);if(clear)clear.onclick=()=>{st.cart=[];persistCart()};
+      const checkout=$('[data-drawer-checkout]',drawerContent);if(checkout)checkout.onclick=()=>drawerDetail('checkout');
+      const browse=$('[data-drawer-switch]',drawerContent);if(browse)browse.onclick=()=>openExperienceDrawer('commerce',browse.dataset.drawerSwitch);
+      if(st.cart.length)try{
+        const quote=await quoteCart();if(token!==drawerRenderSequence||notificationDrawer.hidden||st.drawer.tab!=='cart')return;
+        const discount=Number(quote.member_discount_cents||0)+Number(quote.campaign_discount_cents||0);
+        const host=$('#sfDrawerQuote',drawerContent);
+        if(host)host.innerHTML='<div><span>Subtotal</span><strong>'+money(quote.subtotal_cents||0)+'</strong></div><div><span>Shipping</span><strong>'+(quote.shipping_cents?money(quote.shipping_cents):'—')+'</strong></div><div><span>Discounts</span><strong>'+(discount?'-'+money(discount):'—')+'</strong></div><div class="sf-drawer-quote-total"><span>Total</span><strong>'+money(quote.total_cents||0)+'</strong></div>';
+      }catch(error){if(token===drawerRenderSequence){
+        const host=$('#sfDrawerQuote',drawerContent);
+        if(host)host.innerHTML='<span>'+esc(error.message||'Order total unavailable.')+'</span><button type="button" class="sf-drawer-page-link" data-drawer-retry-quote>Retry total</button>';
+        const retry=$('[data-drawer-retry-quote]',drawerContent);if(retry)retry.onclick=renderDrawer;
+        const checkout=$('[data-drawer-checkout]',drawerContent);if(checkout)checkout.disabled=true;
+      }}
+    }
+    $$('[data-drawer-page]',drawerContent).forEach(button=>button.onclick=()=>drawerDetail(button.dataset.drawerPage));
+  }
+  function renderSiteDrawer(){
+    const token=++drawerRenderSequence;
+    if(st.drawer.mode==='music')renderMusicDrawer(st.drawer.tab);
+    else if(st.drawer.mode==='commerce')void renderCommerceDrawer(st.drawer.tab,token);
+  }
   function renderDrawer(){
-    if(!drawerContent||!st.drawer.data)return;
+    if(!drawerContent)return;
+    syncDrawerChrome();
+    if(st.drawer.mode!=='activity'){renderSiteDrawer();return;}
+    if(!st.auth.authenticated){
+      drawerContent.innerHTML='<div class="drawer-empty drawer-signin"><strong>Your Stonefellow activity</strong><p>Sign in to see notifications, listening history and Agent Brain updates.</p><button id="drawerSignIn" type="button" class="text-control">Sign in</button></div>';
+      $('#drawerSignIn',drawerContent).onclick=()=>{closeNotificationDrawer();navigate('login')};
+      return;
+    }
+    if(!st.drawer.data){drawerContent.innerHTML='<p class="drawer-empty">Loading Activity…</p>';return;}
     const d=st.drawer.data||{},tab=st.drawer.tab;
     $$('[data-drawer-tab]').forEach(b=>b.classList.toggle('active',b.dataset.drawerTab===tab));
     if(tab==='notifications'){
@@ -1031,9 +1677,26 @@
       Array.from(drawerContent.querySelectorAll('[data-notification-account]')).forEach(b=>b.onclick=()=>{const id=Number(b.dataset.notificationAccount);closeNotificationDrawer();void recordNotificationInteraction(id);navigate('account')});
     }else if(tab==='history'){const rows=d.history||[],listens=d.listening_preview||[];drawerContent.innerHTML=(listens.length?`<div class="drawer-section-title">Recent listening</div>${listens.map(r=>drawerItem(r.title,(r.event_type||'listen')+' · '+fmtWhen(r.created_at),r.release||'')).join('')}<button class="drawer-history-link" type="button" id="drawerOpenHistory">Open full listening history</button>`:'')+(rows.length?`<div class="drawer-section-title">Account activity</div>${rows.map(r=>drawerItem(r.title,(r.event_type||'activity')+' · '+fmtWhen(r.created_at),r.entity_type?`${r.entity_type}${r.entity_id?' · '+r.entity_id:''}`:'' )).join('')}`:'')||'<p class="drawer-empty">Your Stonefellow history will appear here.</p>';const open=$('#drawerOpenHistory',drawerContent);if(open)open.onclick=()=>{closeNotificationDrawer();navigate('history')}}else{const rows=d.brain||[];drawerContent.innerHTML=rows.length?rows.map(r=>`<article class="drawer-item brain"><strong>${esc(r.route||r.phase||'Agent decision')}</strong><p>${esc(r.request_excerpt||r.response_excerpt||'')}</p><small>${esc(r.phase||'')} · ${esc(r.action||'none')} · ${esc(fmtWhen(r.created_at))}</small></article>`).join(''):'<p class="drawer-empty">No Agent Brain events yet.</p>'}}
   function updateNotificationBadge(count){if(!notificationBadge)return;const n=Math.max(0,Number(count)||0);notificationBadge.textContent=n>99?'99+':String(n);notificationBadge.hidden=n===0;if(drawerUnreadCount)drawerUnreadCount.textContent=n?`(${n})`:''}
-  async function loadNotificationDrawer(){if(!st.auth.authenticated||!notificationDrawer)return;try{const [r]=await Promise.all([fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),loadPlaylists(true)]),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'Could not load activity.');st.drawer.data=j;if(j.csrf)st.auth.csrf=j.csrf;updateNotificationBadge(j.unread||0);renderDrawer()}catch(e){if(drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(e.message)}</p>`}}
-  function openNotificationDrawer(){if(!notificationDrawer)return;notificationDrawer.hidden=false;if(notificationBackdrop)notificationBackdrop.hidden=false;document.body.classList.add('drawer-open');notificationButton?.setAttribute('aria-expanded','true');loadNotificationDrawer()}
-  function closeNotificationDrawer(){if(!notificationDrawer)return;notificationDrawer.hidden=true;if(notificationBackdrop)notificationBackdrop.hidden=true;document.body.classList.remove('drawer-open');notificationButton?.setAttribute('aria-expanded','false')}
+  async function loadNotificationDrawer(){if(!st.auth.authenticated||!notificationDrawer)return;try{const [r]=await Promise.all([fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),loadPlaylists(true)]),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'Could not load activity.');st.drawer.data=j;if(j.csrf)st.auth.csrf=j.csrf;updateNotificationBadge(j.unread||0);if(st.drawer.mode==='activity')renderDrawer()}catch(e){if(st.drawer.mode==='activity'&&drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(e.message)}</p>`}}
+  function openExperienceDrawer(mode='activity',tab=''){
+    if(!notificationDrawer)return;
+    // A purchase can originate inside a full-screen product detail modal.
+    // Return to the persistent Agent Canvas before opening its cart drawer.
+    if(canvas?.id==='sfAgentNativePage'&&window.SFPublicAgentCanvas?.active?.()){
+      window.SFPublicAgentCanvas.closePage?.(true);canvas=mainCanvas;setUrl('home',{});
+    }
+    if(notificationDrawer.hidden)drawerReturnFocus=document.activeElement;
+    const defaults={activity:'notifications',music:'songs',commerce:'merch'};
+    st.drawer.mode=Object.hasOwn(defaults,mode)?mode:'activity';
+    st.drawer.tab=tab||defaults[st.drawer.mode];
+    if(st.queue.open)closeQueue();
+    notificationDrawer.hidden=false;if(notificationBackdrop)notificationBackdrop.hidden=false;
+    document.body.classList.add('drawer-open');notificationButton?.setAttribute('aria-expanded',String(st.drawer.mode==='activity'));
+    renderDrawer();if(st.drawer.mode==='activity'&&st.auth.authenticated)void loadNotificationDrawer();
+    notificationClose?.focus({preventScroll:true});
+  }
+  function openNotificationDrawer(){openExperienceDrawer('activity','notifications')}
+  function closeNotificationDrawer(){if(!notificationDrawer)return;drawerRenderSequence++;notificationDrawer.hidden=true;if(notificationBackdrop)notificationBackdrop.hidden=true;document.body.classList.remove('drawer-open');notificationButton?.setAttribute('aria-expanded','false');if(drawerReturnFocus?.isConnected)drawerReturnFocus.focus({preventScroll:true});drawerReturnFocus=null}
   async function markNotification(id){try{const j=await secureJsonPost('notifications.php',{action:'read',id});updateNotificationBadge(j.unread||0);await loadNotificationDrawer()}catch(_){}}
   async function openNotification(id){try{const j=await secureJsonPost('notifications.php',{action:'click',id});updateNotificationBadge(j.unread||0);closeNotificationDrawer();if(j.link_url)location.href=j.link_url}catch(e){say(e.message)}}
   async function dismissNotification(id){try{const j=await secureJsonPost('notifications.php',{action:'dismiss',id});updateNotificationBadge(j.unread||0);await loadNotificationDrawer()}catch(e){say(e.message)}}
@@ -1067,6 +1730,9 @@
     st.selectedPlanId=selected;
     canvas.innerHTML=`<article class="module auth-module"><div class="module-kicker">CREATE ACCOUNT + FREE TRIAL</div><h2>Join the listening room.</h2><p class="player-note">Choose a plan, create your account, and your trial Active Tokens are added immediately.</p><form id="registerForm" class="auth-form"><label>Plan<select name="plan_id">${st.plans.map(p=>`<option value="${p.id}" ${Number(p.id)===selected?'selected':''}>${esc(p.name)}${p.trial_days?' — '+p.trial_days+' day trial':''}</option>`).join('')}</select></label><label>Name<input name="display_name" autocomplete="name" required maxlength="100"></label><label>Email<input name="email" type="email" autocomplete="email" required maxlength="190"></label><label>Password<input name="password" type="password" minlength="10" autocomplete="new-password" required></label><label>Confirm password<input name="confirm" type="password" minlength="10" autocomplete="new-password" required></label><p id="authError" class="auth-error" role="alert"></p><div class="auth-actions"><button class="buy-primary" type="submit">Create account + start trial</button><button class="text-control" type="button" data-view="plans">Compare plans</button><button class="text-control" type="button" data-view="login">Already have an account</button></div></form></article>`;
     bind(canvas);
+    const suggestedName=validGuestName(guestProfile?.display_name);
+    const nameInput=$('#registerForm input[name="display_name"]');
+    if(suggestedName&&nameInput)nameInput.value=suggestedName;
     $('#registerForm').onsubmit=async e=>{
       e.preventDefault();const f=new FormData(e.currentTarget),er=$('#authError');er.textContent='';
       try{
@@ -1090,6 +1756,7 @@
     const billingActions=`<div class="player-controls">${paidManaged?'<button class="text-control" id="manageBilling" type="button">Manage billing</button>':''}${sub.status&&sub.status!=='none'&&!sub.cancel_at_period_end?'<button class="text-control" id="cancelSubscription" type="button">Cancel at period end</button>':''}${Number(sub.cancel_at_period_end)?'<button class="text-control" id="resumeSubscription" type="button">Resume subscription</button>':''}</div>`;
     canvas.innerHTML=`<article class="module auth-module"><div class="module-kicker">MY STONEFELLOW</div><div class="account-header"><div><h2>${esc(j.user.display_name)}</h2><div class="account-meta">${esc(j.user.email)} · ${life.email_verified?'Verified':'Unverified'}<br>${j.user.role==='admin'?'Administrator · ':''}Member since ${esc((j.user.created_at||'').slice(0,10))}</div></div></div>${verifyNotice}<div class="token-panel"><div class="token-stat"><strong>${j.user.role==='admin'?'Unlimited':Number(ent.balance||0).toLocaleString()}</strong><span>Active Tokens</span></div><div class="token-stat"><strong>${esc(sub.package_name||'No package')}</strong><span>Plan</span></div><div class="token-stat"><strong>${esc(sub.status||'none')}</strong><span>Status</span></div>${sub.current_period_end?`<div class="token-stat"><strong>${esc(sub.current_period_end.slice(0,10))}</strong><span>${Number(sub.cancel_at_period_end)?'Access ends':'Renews'}</span></div>`:''}${sub.trial_ends_at?`<div class="token-stat"><strong>${esc(sub.trial_ends_at.slice(0,10))}</strong><span>Trial ends</span></div>`:''}</div>${membership.active?`<section class="account-membership-panel"><div><div class="module-kicker">MEMBERSHIP</div><h3>${esc(membership.badge||membership.package_name||'Stonefellow Member')}</h3><p>${membershipBenefitText(membership.benefits||{})}</p></div><button class="buy-primary" type="button" data-view="membership">Open membership</button></section>`:''}<div class="player-controls"><button class="text-control" data-view="library" type="button">My Library</button><button class="text-control" data-view="plans" type="button">Plans</button><button class="text-control" id="editProfile" type="button">Edit profile</button><button class="text-control" data-view="account-privacy" type="button">Privacy & data</button><button class="text-control" id="saveCurrentBuild" type="button">Save current build</button></div>${billingActions}<div class="account-orders"><div class="module-kicker">BILLING + RECEIPTS</div>${invoices.length?invoices.map(i=>`<div class="account-order"><div><strong>${esc(i.provider_invoice_id)}</strong><small>${esc((i.paid_at||i.created_at||'').replace('T',' ').slice(0,19))} · ${esc(i.status)}</small></div><div><strong>${new Intl.NumberFormat('en-US',{style:'currency',currency:i.currency||'USD'}).format((i.amount_paid_cents||0)/100)}</strong>${i.hosted_invoice_url?`<a class="text-control inline-link" href="${esc(i.hosted_invoice_url)}" target="_blank" rel="noopener">Receipt</a>`:''}${i.invoice_pdf?`<a class="text-control inline-link" href="${esc(i.invoice_pdf)}" target="_blank" rel="noopener">PDF</a>`:''}</div></div>`).join(''):'<p class="player-note">Subscription receipts will appear here after billing begins.</p>'}</div><div class="account-orders account-library-portal"><div class="module-kicker account-section-head"><span>MY LIBRARY</span><button class="text-control" type="button" data-view="library">Open My Library</button></div><p class="player-note">Your saved tracks and releases, playlists, owned music, custom-media builds, Continue Listening, history, and Collections now live in one library workspace.</p><div class="account-library-summary"><button type="button" data-view="library" data-tab="tracks"><strong>${Number(myLibrary.summary?.tracks||0)}</strong><span>Tracks</span></button><button type="button" data-view="library" data-tab="releases"><strong>${Number(myLibrary.summary?.releases||0)}</strong><span>Releases</span></button><button type="button" data-view="library" data-tab="playlists"><strong>${Number(myLibrary.summary?.playlists||0)}</strong><span>Playlists</span></button><button type="button" data-view="library" data-tab="purchases"><strong>${Number(myLibrary.summary?.purchases||0)}</strong><span>Purchases</span></button><button type="button" data-view="library" data-tab="collections"><strong>${Number(myLibrary.summary?.collections||0)}</strong><span>Collections</span></button></div></div>${notificationPrefsHtml}${fanPrefsHtml}<div class="account-orders"><div class="module-kicker">SECURITY + SESSIONS</div><div class="player-controls"><button class="text-control" type="button" id="revokeOtherSessions">Sign out other sessions</button></div>${sessions.length?sessions.map(x=>`<div class="account-order"><div><strong>${x.current?'Current browser':'Signed-in session'}</strong><small>Last active ${esc(String(x.last_seen_at||'').replace('T',' ').slice(0,19))} · Expires ${esc(String(x.expires_at||'').slice(0,10))}</small></div>${x.current?'<span class="account-badge">current</span>':`<button class="text-control" type="button" data-revoke-session="${esc(x.id)}">Sign out</button>`}</div>`).join(''):'<p class="player-note">No persistent sessions are active.</p>'}</div><div class="account-orders"><div class="module-kicker">PURCHASES</div>${orders.length?orders.map(o=>`<div class="account-order"><div><strong>${esc(o.id)}</strong><small>${esc((o.created_at||'').replace('T',' ').slice(0,19))} · ${(o.items||[]).map(i=>esc(i.label)).join(', ')}</small></div><div><div class="account-badge">${esc(o.fulfillment?.status&&o.fulfillment.status!=='not_required'?o.fulfillment.status:o.status)}</div>${o.vinyl_production?`<small class="order-vinyl-status">Vinyl production: ${esc(String(o.vinyl_production.status||'').replaceAll('_',' '))}</small>`:''}${o.fulfillment?.tracking_number?`<small>${esc(o.fulfillment.carrier||'')} ${esc(o.fulfillment.tracking_number)}</small>`:''}<strong>${new Intl.NumberFormat('en-US',{style:'currency',currency:o.currency||'USD'}).format((o.total_cents||0)/100)}</strong><button class="text-control" type="button" data-order-id="${esc(o.id)}">View details</button></div></div>`).join(''):'<p class="player-note">No purchases yet.</p>'}</div><p class="tiny-note">Account navigation, logout, and Admin access are available from the ••• menu.</p></article>`;
     bind(canvas);Array.from(canvas.querySelectorAll('[data-view="library"][data-tab]')).forEach(b=>b.onclick=()=>navigate('library',{tab:b.dataset.tab||'all'}));$('#editProfile').onclick=()=>renderProfileForm();$('#saveCurrentBuild').onclick=saveCurrentBuildToAccount;$$('[data-load-build]',canvas).forEach(b=>b.onclick=()=>loadAccountBuild(Number(b.dataset.loadBuild),saved));$$('[data-delete-build]',canvas).forEach(b=>b.onclick=()=>deleteAccountBuild(Number(b.dataset.deleteBuild)));const resend=$('#resendVerification');if(resend)resend.onclick=resendVerification;const manage=$('#manageBilling');if(manage)manage.onclick=manageBilling;const cancel=$('#cancelSubscription');if(cancel)cancel.onclick=cancelSubscription;const resume=$('#resumeSubscription');if(resume)resume.onclick=resumeSubscription;$$('[data-order-id]',canvas).forEach(b=>b.onclick=()=>navigate('order',{id:b.dataset.orderId}));const revokeOthers=$('#revokeOtherSessions');if(revokeOthers)revokeOthers.onclick=revokeOtherSessions;$$('[data-revoke-session]',canvas).forEach(b=>b.onclick=()=>revokeSession(b.dataset.revokeSession));$$('[data-favorite-track-open]',canvas).forEach(b=>b.onclick=()=>navigate('track',{id:b.dataset.favoriteTrackOpen}));$$('[data-favorite-release-open]',canvas).forEach(b=>b.onclick=()=>navigate('release',{id:b.dataset.favoriteReleaseOpen}));const createPlaylist=$('#createPlaylist');if(createPlaylist)createPlaylist.onclick=createPlaylistPrompt;const saveAgentSession=$('#saveAgentSession');if(saveAgentSession)saveAgentSession.onclick=saveAgentSessionPrompt;$$('[data-playlist-open]',canvas).forEach(b=>b.onclick=()=>navigate('playlist',{id:b.dataset.playlistOpen}));Array.from(canvas.querySelectorAll('[data-resume-track]')).forEach(b=>b.onclick=()=>resumeTrack(b.dataset.resumeTrack,Number(b.dataset.resumePosition||0)));Array.from(canvas.querySelectorAll('[data-recommend-play]')).forEach(b=>b.onclick=()=>{const t=trackById(b.dataset.recommendPlay);if(t)play(t,0,'recommendation')});const clearHistory=$('#clearListeningHistory');if(clearHistory)clearHistory.onclick=clearListeningHistory;const saveNotificationPrefs=$('#saveNotificationPreferences');if(saveNotificationPrefs)saveNotificationPrefs.onclick=saveNotificationPreferences;const saveFanPrefs=$('#saveFanPreferences');if(saveFanPrefs)saveFanPrefs.onclick=saveFanPreferences;
+    renderGuestMigrationOffer();
   }
   async function saveFanPreferences(){try{await secureJsonPost('fan-preferences.php',{marketing_opt_in:!!$('#fanNewsletterOptIn',canvas)?.checked,agent_auto_engage:!!$('#fanAutoEngage',canvas)?.checked});st.fanEngagementLoaded=false;say('Fan and Agent preferences saved.',()=>renderAccount())}catch(e){say(e.message)}}
   async function saveNotificationPreferences(){const rows=$('[data-notification-category]',canvas).map(row=>({category:row.dataset.notificationCategory,in_app_enabled:!!$('[data-notification-in-app]',row)?.checked,email_enabled:!!$('[data-notification-email]',row)?.checked}));try{const j=await secureJsonPost('notifications.php',{action:'preferences',preferences:rows});if(st.drawer.data)st.drawer.data.preferences=j.preferences||rows;say('Notification preferences saved.',()=>renderAccount())}catch(e){say(e.message)}}
@@ -1202,7 +1869,39 @@
       return {type:'song_capture_analyze',question:String(message).trim().slice(0,700)};
     return null;
   }
+  // One bounded, canonical browser snapshot serves typed chat and the live
+  // Speech Engine bridge. Queue/playlist entries are IDs, not model-written
+  // song titles; the PHP agent resolves them against the published catalog.
+  function agentClientState(){
+    const u=new URL(location.href),current=observedPlayer();
+    const view=history.state?.view||window.STONEFELLOW_INITIAL_ROUTE?.view||u.searchParams.get('view')||(String(u.pathname).replace(/\/+$/,'').endsWith('/search')?'search':'home');
+    const ids=values=>(Array.isArray(values)?values:[]).map(String).filter(Boolean).slice(0,20);
+    return {
+      view,route_id:history.state?.params?.id||u.searchParams.get('id')||'',
+      active_track_id:current.track?.id||'',active_release_title:current.track?.release||'',
+      timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
+      ...playerState(),builder_format:st.builder.format,
+      builder_side_a_count:st.builder.A.length,builder_side_b_count:st.builder.B.length,
+      builder_side_a_seconds:sideTime('A'),builder_side_b_seconds:sideTime('B'),
+      builder_limit_seconds:limit(),builder_draft_id:Number(st.builderDrafts.activeId||0),
+      playlist_name:st.playlistPlayback.playlistName||'',
+      playlist_track_ids:ids(st.playlistPlayback.trackIds),
+      playlist_index:Math.max(0,Number(st.playlistPlayback.index)||0),
+      agent_listening_session_id:agentSessionVisible()?st.agentSession.id:'',
+      queue_track_ids:ids(st.queue.items.map(item=>item.track_id)),
+      queue_count:st.queue.items.length,home_suggestion_kind:st.home.data?.suggestion?.kind||'',
+      home_suggestion_title:st.home.data?.suggestion?.title||'',
+      notification_unread:Number(st.drawer.data?.unread||0),
+      latest_notification_title:st.drawer.data?.notifications?.[0]?.title||'',
+      search_query:$('#siteSearchInput',canvas)?.value||$('#catalogSearch',canvas)?.value||''
+    };
+  }
   async function liveAgent(text){
+    if(directRandomPlaylistCommand(text)){
+      const result=await startRandomTemporaryPlaylist();
+      await say(result);
+      return;
+    }
     const directAction=directSongListeningCommand(text);
     if(directAction){
       try{
@@ -1233,24 +1932,7 @@
         }else await say(privateResult);
         return;
       }
-      const u=new URL(location.href);
-      const view=history.state?.view||window.STONEFELLOW_INITIAL_ROUTE?.view||u.searchParams.get('view')||(String(u.pathname).replace(/\/+$/,'').endsWith('/search')?'search':'home');
-      const client_state={
-        view,route_id:history.state?.params?.id||u.searchParams.get('id')||'',
-        active_track_id:st.track?.id||'',active_release_title:st.track?.release||'',
-        timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
-        ...playerState(),builder_format:st.builder.format,
-        builder_side_a_count:st.builder.A.length,builder_side_b_count:st.builder.B.length,
-        builder_side_a_seconds:sideTime('A'),builder_side_b_seconds:sideTime('B'),
-        builder_limit_seconds:limit(),builder_draft_id:Number(st.builderDrafts.activeId||0),
-        playlist_id:st.playlistPlayback.playlistId||null,playlist_name:st.playlistPlayback.playlistName||'',
-        agent_listening_session_id:agentSessionVisible()?st.agentSession.id:'',
-        queue_count:st.queue.items.length,home_suggestion_kind:st.home.data?.suggestion?.kind||'',
-        home_suggestion_title:st.home.data?.suggestion?.title||'',
-        notification_unread:Number(st.drawer.data?.unread||0),
-        latest_notification_title:st.drawer.data?.notifications?.[0]?.title||'',
-        search_query:$('#siteSearchInput',canvas)?.value||$('#catalogSearch',canvas)?.value||''
-      };
+      const client_state=agentClientState();
       const j=await secureJsonPost('agent-chat.php',{message:text,conversation_id:st.conversationId,client_state});
       st.conversationId=j.conversation_id||st.conversationId;
       if(st.conversationId)localStorage.setItem('stonefellow.agent.conversation',st.conversationId);
@@ -1272,6 +1954,7 @@
       if(e.payload?.error==='active_tokens_required'){
         await say(e.message||'You are out of Active Tokens.',()=>navigate('plans'));return;
       }
+      if(e.payload?.reference){await say(e.message);return;}
       await say('The live agent is unavailable right now. '+e.message);
     }
   }
@@ -1378,7 +2061,7 @@
   async function claimCampaignOffer(slugValue,nodeId){const result=$('[data-offer-result="'+CSS.escape(nodeId)+'"]',canvas);try{const j=await api('campaign.php',{action:'claim',slug:slugValue,node_id:nodeId}),o=j.offer||{},p=o.payload||{};if(o.type==='offer_download'&&o.download_url){result.innerHTML='<a class="buy-primary button-link" href="'+esc(o.download_url)+'">Download song</a>'}else if(o.type==='offer_discount'){st.campaignCode=o.code||'';localStorage.setItem('stonefellow.campaign.code',st.campaignCode);result.innerHTML='<strong>Code '+esc(o.code)+'</strong><p>Applied to your Stonefellow cart.</p><button class="text-control" type="button" data-view="store">Open store</button>';bind(result)}else if(o.type==='offer_vip'||o.type==='offer_exclusive'){result.innerHTML=(p.access_code?'<strong>Access code: '+esc(p.access_code)+'</strong>':'')+(p.url?'<a class="buy-primary button-link" data-campaign-outbound="'+esc(nodeId)+'" href="'+esc(p.url)+'" target="_blank" rel="noopener">Open offer</a>':'');const link=$('[data-campaign-outbound]',result);if(link)link.onclick=()=>api('campaign.php',{action:'event',slug:slugValue,event_type:'link_clicked',node_id:nodeId}).catch(()=>{})}else result.textContent='Offer claimed: '+(o.code||'confirmed');}catch(x){if(result)result.textContent=x.message}}
   function merchPriceHtml(p){const price=Number(p.price_cents||0),compare=Number(p.compare_at_price_cents||0);return '<span class="merch-price">'+(compare>price?'<del>'+money(compare)+'</del>':'')+'<strong>'+money(price)+'</strong></span>'}
   function merchVariantOptions(p){const rows=(p.variants||[]).filter(v=>v.status==='active');return rows.length?'<select data-merch-variant="'+esc(p.id)+'">'+rows.map(v=>'<option value="'+v.id+'" '+(!v.available?'disabled':'')+'>'+esc(v.title)+' · '+money(v.price_cents)+(v.available?(v.low_stock&&v.inventory_qty!==null?' · '+v.inventory_qty+' left':''):' · SOLD OUT')+'</option>').join('')+'</select>':''}
-  function addMerchToCart(productId,variantId,quantity=1){const p=(st.storefrontProducts||[]).find(x=>x.kind==='merch'&&x.id===productId);if(!p)return say('That product is unavailable.');const v=(p.variants||[]).find(x=>Number(x.id)===Number(variantId))||null;if((p.variants||[]).length&&!v)return say('Choose an available option.');const max=Math.max(1,Number(p.max_per_order||10)),qty=Math.max(1,Math.min(max,Number(quantity)||1)),existing=st.cart.find(x=>x.type==='merch'&&x.product_id===productId&&Number(x.variant_id||0)===Number(variantId||0));if(existing)existing.quantity=Math.min(max,Number(existing.quantity||1)+qty);else st.cart.push({type:'merch',product_id:productId,variant_id:v?Number(v.id):null,quantity:qty,label:p.label,variant_label:v?.title||''});persistCart();say('Added '+p.label+(v?' · '+v.title:'')+' to your cart.',renderCart)}
+  function addMerchToCart(productId,variantId,quantity=1){const p=(st.storefrontProducts||[]).find(x=>x.kind==='merch'&&x.id===productId);if(!p)return say('That product is unavailable.');const v=(p.variants||[]).find(x=>Number(x.id)===Number(variantId))||null;if((p.variants||[]).length&&!v)return say('Choose an available option.');const max=Math.max(1,Number(p.max_per_order||10)),qty=Math.max(1,Math.min(max,Number(quantity)||1)),existing=st.cart.find(x=>x.type==='merch'&&x.product_id===productId&&Number(x.variant_id||0)===Number(variantId||0));if(existing)existing.quantity=Math.min(max,Number(existing.quantity||1)+qty);else st.cart.push({type:'merch',product_id:productId,variant_id:v?Number(v.id):null,quantity:qty,label:p.label,variant_label:v?.title||''});persistCart();showCartAfterAdd('Added '+p.label+(v?' · '+v.title:'')+' to your cart.')}
   function merchDetailHtml(p){return '<article class="module merch-detail-module"><div class="module-kicker">STONEFELLOW STORE · '+esc(String(p.category||'MERCH').toUpperCase())+'</div><div class="merch-detail-grid">'+(p.image?'<div class="merch-detail-art"><img src="'+esc(p.image)+'" alt="'+esc(p.label)+'"></div>':'<div class="merch-detail-art placeholder">SF</div>')+'<div><h2>'+esc(p.label)+'</h2>'+merchPriceHtml(p)+(p.description?'<p class="player-note">'+esc(p.description)+'</p>':'')+merchVariantOptions(p)+'<div class="merch-buy-row"><input type="number" min="1" max="'+Number(p.max_per_order||10)+'" value="1" data-merch-qty="'+esc(p.id)+'" aria-label="Quantity"><button class="buy-primary" type="button" data-merch-add="'+esc(p.id)+'" '+(p.available?'':'disabled')+'>'+(p.available?'Add to cart':'Sold out')+'</button>'+shareButton('store',p.id,p.label,p.slug||p.id)+'</div>'+(p.low_stock&&p.inventory_qty!==null?'<em class="stock-note">Only '+Number(p.inventory_qty)+' left</em>':'')+'<button class="text-control" type="button" data-view="store">Back to store</button></div></div></article>'}
   async function renderStore(params={}){
     starters.hidden=true;let data={products:[],releases:[]};
@@ -1448,13 +2131,36 @@
       audio,
       player:footerPlayer,
       initialConversation:popupEntries.at(-1)||null,
-      isCapturing:()=>!!(songCaptureSkill?.status()?.active||songListeningSkill?.status()?.active),
+      isCapturing:()=>!!(songCaptureSkill?.status()?.active||songListeningSkill?.status()?.active||vocalStudio?.status()?.active),
+      isVocalRecording:()=>!!vocalStudio?.status()?.active,
       hasTemporaryPlaylist:()=>isTemporaryPlaylist(),
       onOpenQueue:()=>void openQueue(),
+      onOpenMoments:()=>songMoments?.open(),
+      onOpenLibrary:()=>openExperienceDrawer('music','songs'),
+      onOpenCommerce:()=>openExperienceDrawer('commerce','merch'),
       isConversationActive:()=>st.conversationOn,
+      onStopSpeaking:()=>stopAgentSpeaking(),
       needsVoiceGesture:()=>iosVoiceNeedsGesture,
       // Keep the microphone start inside this click's user-activation turn.
-      onStartChat:()=>{if(!st.conversationOn||iosVoiceNeedsGesture)void handleVoiceClick();},
+      onStartChat:()=>{beginWelcome();if(!st.conversationOn||iosVoiceNeedsGesture)void handleVoiceClick();},
+      onGuestName:name=>{if(!validGuestName(name)){popupEntry('notice','Please enter your name, using up to three words.');return}popupEntry('user',name);void acceptVisitorName(name);},
+      onSkipGuestName:()=>void skipVisitorName(),
+      onWelcomeAction:action=>{void handleWelcomeAction(action);},
+      onTourOpen:()=>{
+        if(st.queue.open)closeQueue();
+        if(notificationDrawer&&!notificationDrawer.hidden)closeNotificationDrawer();
+        closeMenu();voiceInteractionStarted=true;
+      },
+      onTourStep:step=>{
+        const description=step.title+'. '+step.description;
+        popupEntry('assistant',description);
+        agent('responding',description);
+        if(voiceRepliesEnabled&&!speechPilotActive)void agentSpeak(description);
+      },
+      onTourClose:()=>{
+        if(voicePlaybackPending)interruptVoicePlayback();
+        agent(st.playing?'playing':'idle');
+      },
       onOpenChat:()=>{void openChatPopup();input?.focus();},
       onNavigate:view=>void navigate(view),
       onClosePage:()=>{
@@ -1471,18 +2177,22 @@
         const reply=await executeSongCaptureAction({type:'song_capture_stop'});
         if(reply&&!window.StonefellowSongExperience?.active?.())popupEntry('notice',String(reply));
       },
-      onStartCapture:async()=>{
-        const reply=await executeSongCaptureAction({type:'song_capture_start'});
-        if(reply){popupEntry('notice',String(reply));if(!window.StonefellowSongExperience?.active?.())agent('idle',String(reply));}
-      }
+      onStartCapture:()=>openVocalStudio('vocal')
     });
-    if(mounted)agent(st.playing?'playing':'idle','Welcome to Stonefellow. Play a song, then ask me to listen and interpret its lyrics, or record a clip.');
+    if(mounted){
+      songMoments?.attachOrb?.();
+      syncWelcomeActions();
+      agent(st.playing?'playing':'idle','Welcome to Stonefellow. Play a song, then ask me to listen and interpret its lyrics, or record a clip.');
+    }
     return mounted;
   }
   async function renderHome(){
     window.SFPublicAgentCanvas?.unmount?.();
     document.body.classList.remove('sf-agent-canvas-active');
     if(homepageTemplate==='agent_canvas'&&await renderAgentCanvas())return;
+    // Legacy landing templates stay in the repository for historical content,
+    // but are never used as a public fallback when the agent fails to mount.
+    throw new Error('The Stonefellow Agent Canvas could not initialize.');
     if(artistHomepageEnabled&&await renderArtistHomepage())return;document.body.classList.remove('artist-home-active','artist-home-chat-hidden');canvas.innerHTML='';starters.hidden=false;agent(st.playing?'playing':'idle','Hey, I’m Stonefellow. I can play you something, tell you about the music, help you make your own record, or sell you the music directly.');
     if(!st.auth.authenticated){canvas.innerHTML=newsletterSignupHtml(false);bindNewsletterForms(canvas);return;}
     await loadPersonalization();const home=await loadHome(true);
@@ -1866,7 +2576,29 @@
     };
   }
 
+  function showNativePageNotice(title,message,view,params){
+    if(canvas?.id!=='sfAgentNativePage')return;
+    canvas.innerHTML=`<article class="module sf-agent-page-empty" role="status"><div class="module-kicker">STONEFELLOW / PAGE WORKSPACE</div><h2>${esc(title)}</h2><p class="player-note">${esc(message)}</p><button class="buy-primary" type="button" data-agent-retry-page>Try again</button></article>`;
+    canvas.querySelector('[data-agent-retry-page]')?.addEventListener('click',()=>void navigate(view,params,false));
+  }
   async function navigate(view='home',params={},push=true){
+    try{
+      await renderNavigation(view,params,push);
+      if(canvas?.id==='sfAgentNativePage'&&(!canvas.hasChildNodes()||canvas.querySelector('.sf-agent-page-loading'))){
+        showNativePageNotice('Page is empty','This page did not return any content. You can retry without leaving the Agent Canvas.',view,params);
+        return false;
+      }
+      return true;
+    }catch(error){
+      console.error('[Stonefellow] Page render failed:',view,error);
+      if(canvas?.id==='sfAgentNativePage'){
+        showNativePageNotice('Page unavailable','The page could not be loaded. Your Agent Canvas and music are still here.',view,params);
+        return false;
+      }
+      throw error;
+    }
+  }
+  async function renderNavigation(view='home',params={},push=true){
     closeMenu();hide();
     if(view==='home'&&window.SFPublicAgentCanvas?.active?.()){
       window.SFPublicAgentCanvas.closePage?.();
@@ -1883,23 +2615,27 @@
     }
     const nativePanel=view!=='home'&&view!=='builder'&&homepageTemplate==='agent_canvas'&&window.SFPublicAgentCanvas?.active?.();
     canvas=nativePanel?(window.SFPublicAgentCanvas.openPage?.(view)||mainCanvas):mainCanvas;
-    document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='capture'){await renderCreativeCapture()}else if(view==='team'){await renderTeamWorkspace()}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
-  function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}
+    document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='checkout'){await renderCheckout()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='capture'){await renderCreativeCapture()}else if(view==='team'){await renderTeamWorkspace()}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
+  async function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}
 
     if(homepageTemplate==='agent_canvas'&&view!=='home'&&view!=='builder'&&!window.SFPublicAgentCanvas?.active?.()){
       canvas=mainCanvas;
-      void renderHome().then(()=>navigate(view,params,false));
-    }else void navigate(view,params,false);
+      await renderHome();
+      return navigate(view,params,false);
+    }
+    return navigate(view,params,false);
   }
 
   function updateFooterPlayer(){
     window.StonefellowTurntable?.sync?.(st.track,st.playing,st.builder);
     if(!st.track){
       footerPlayer.hidden=true;
+      songMoments?.setTrack(null);
       window.SFPublicAgentCanvas?.syncPlayer?.();
       return;
     }
     footerPlayer.hidden=false;
+    songMoments?.setTrack(st.track);
     playerTitle.textContent=st.track.title;
     playerRelease.textContent=st.track.release||'Stonefellow';
     playerToggle.textContent=st.playing?'Ⅱ':'▶';
@@ -1919,14 +2655,110 @@
     const fileDuration=Number.isFinite(audio.duration)?audio.duration:played;
     return published>=40&&played>=2&&Math.max(played,fileDuration)<published-Math.max(15,published*.08);
   }
-  function play(t,resumeAt=0,source='player',keepPlaylist=false){if(!t)return Promise.resolve(false);const changing=!st.track||st.track.id!==t.id;if(changing){songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');}if(changing&&st.track&&st.playing){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}if(!keepPlaylist)clearPlaylistPlayback();st.playSource=source||'player';st.track=t;updateQueueUi();if(changing){audio.pause();audio.src=t.audio||'';audio.load()}const startAt=Math.max(0,Number(resumeAt)||0);const applyResume=()=>{if(startAt>0&&Number.isFinite(audio.duration)&&audio.duration>startAt+1)audio.currentTime=startAt};if(changing&&startAt>0)audio.addEventListener('loadedmetadata',applyResume,{once:true});else if(!changing&&keepPlaylist&&startAt===0)try{audio.currentTime=0}catch(_){}else applyResume();st.playing=true;updateFooterPlayer();return audio.play().then(()=>{recordListen(startAt>0?'resume':'start');agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');updateFooterPlayer();return true}).catch(()=>{st.playing=false;updateFooterPlayer();agent('idle','The catalog entry is ready, but this browser could not play its audio file. Add or verify '+(t.audio||'the track file')+'.');return false})}
-  function toggle(){if(!st.track)return;if(st.playing){recordListen('pause');audio.pause();st.playing=false;agent('idle','Paused “'+st.track.title+'.”')}else{audio.play().then(()=>{recordListen('resume');st.playing=true;agent('playing','Playing “'+st.track.title+'.”');updateFooterPlayer()}).catch(()=>{st.playing=false;updateFooterPlayer()})}updateFooterPlayer()}
-  function stepTrack(delta){
-    if(agentSessionActive()&&delta>0){advanceAgentSession('skip').then(session=>{if(!session||session.status!=='active'){renderAgentSessionPanel();return}const ids=sessionTrackIds();st.playlistPlayback.index=Number(session.current_index||0);const t=trackById(ids[st.playlistPlayback.index]);if(t)play(t,0,'agent_session',true);renderAgentSessionPanel()});return}
-    if(st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length){const ids=st.playlistPlayback.trackIds;let i=st.playlistPlayback.index;if(i<0)i=Math.max(0,ids.indexOf(st.track?.id));i=(i+delta+ids.length)%ids.length;st.playlistPlayback.index=i;updateQueueUi();const t=trackById(ids[i]);if(t)play(t,0,isTemporaryPlaylist()?'temporary_playlist':'playlist',true);return}
-    if(delta>0&&st.auth.authenticated&&st.queue.items.length){playNextFromQueue();return}
-    if(delta<0&&st.queue.history.length){const id=st.queue.history.shift();localStorage.setItem('stonefellow.queue.history.v1',JSON.stringify(st.queue.history));const t=trackById(id);if(t){play(t,0,'queue_history');return}}
-    if(!st.track||!catalog.length)return;let i=catalog.findIndex(t=>t.id===st.track.id);if(i<0)i=0;i=(i+delta+catalog.length)%catalog.length;play(catalog[i])
+  function setPlaybackStatus(message='',phase=''){
+    if(playerPlaybackStatus){playerPlaybackStatus.textContent=message;playerPlaybackStatus.hidden=!message}
+    if(footerPlayer){if(phase)footerPlayer.dataset.playbackPhase=phase;else delete footerPlayer.dataset.playbackPhase}
+  }
+  function clearPlaybackBufferWatch(){if(playbackBufferTimer!==null){clearTimeout(playbackBufferTimer);playbackBufferTimer=null}}
+  function cancelNetworkRecovery(){
+    if(!pendingNetworkRecovery)return;
+    clearTimeout(pendingNetworkRecovery.timer);
+    audio.removeEventListener('loadedmetadata',pendingNetworkRecovery.ready);
+    pendingNetworkRecovery=null;
+  }
+  function invalidatePlayback(){
+    playbackWantsAudio=false;playbackLifecycle.begin();clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
+  }
+  function playbackProblem(message){
+    playbackWantsAudio=false;st.playing=false;clearPlaybackBufferWatch();cancelNetworkRecovery();
+    setPlaybackStatus(message,'error');updateFooterPlayer();
+  }
+  function recoverNetworkPlayback(){
+    const token=playbackLifecycle.token(),code=Number(audio.error?.code||0);
+    if(!playbackWantsAudio||!st.track?.audio||!playbackLifecycle.allowNetworkRetry(token,code))return false;
+    const id=String(st.track.id),source=String(st.track.audio),position=Math.max(0,Number(audio.currentTime)||0);
+    clearPlaybackBufferWatch();setPlaybackStatus('Connection interrupted · resuming…','buffering');
+    const ready=()=>{
+      const recovery=pendingNetworkRecovery;if(!recovery||recovery.token!==token)return;
+      cancelNetworkRecovery();
+      if(!playbackWantsAudio||!playbackLifecycle.isCurrent(token)||String(st.track?.id)!==id)return;
+      const duration=Number(audio.duration||0);
+      if(position>0&&Number.isFinite(duration)&&duration>position+1)try{audio.currentTime=position}catch(_){}
+      audio.play().then(()=>{
+        if(!playbackLifecycle.isCurrent(token)||String(st.track?.id)!==id)return;
+        st.playing=!audio.paused;setPlaybackStatus();updateFooterPlayer();
+      }).catch(()=>{if(playbackLifecycle.isCurrent(token))playbackProblem('Playback paused · tap Play to retry.')});
+    };
+    const timer=setTimeout(()=>{if(playbackLifecycle.isCurrent(token))playbackProblem('Audio connection timed out · tap Play to retry.')},12000);
+    pendingNetworkRecovery={token,timer,ready};
+    audio.addEventListener('loadedmetadata',ready,{once:true});
+    audio.pause();audio.src=source;audio.load();
+    return true;
+  }
+  function play(t,resumeAt=0,source='player',keepPlaylist=false){
+    if(!t?.audio)return Promise.resolve(false);
+    const changing=!st.track||String(st.track.id)!==String(t.id)||audio.getAttribute('src')!==String(t.audio);
+    if(changing){songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');}
+    if(changing&&st.track&&!audio.paused){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}
+    const token=playbackLifecycle.begin();cancelNetworkRecovery();clearPlaybackBufferWatch();setPlaybackStatus();
+    if(!keepPlaylist)clearPlaylistPlayback();
+    st.playSource=source||'player';st.track=t;playbackWantsAudio=true;st.playing=false;updateQueueUi();
+    if(changing){audio.pause();audio.src=t.audio;audio.load()}
+    const startAt=Math.max(0,Number(resumeAt)||0);
+    const applyResume=()=>{
+      if(playbackLifecycle.isCurrent(token)&&startAt>0&&Number.isFinite(audio.duration)&&audio.duration>startAt+1)
+        try{audio.currentTime=startAt}catch(_){}
+    };
+    if(changing&&startAt>0)audio.addEventListener('loadedmetadata',applyResume,{once:true});
+    else if(!changing&&keepPlaylist&&startAt===0)try{audio.currentTime=0}catch(_){}
+    else applyResume();
+    updateFooterPlayer();
+    let attempt;try{attempt=audio.play()}catch(error){attempt=Promise.reject(error)}
+    return Promise.resolve(attempt).then(()=>{
+      if(!playbackLifecycle.isCurrent(token)||String(st.track?.id)!==String(t.id)||audio.paused)return false;
+      st.playing=true;recordListen(startAt>0?'resume':'start');
+      agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');
+      updateFooterPlayer();return true;
+    }).catch(()=>{
+      if(!playbackLifecycle.isCurrent(token))return false;
+      playbackProblem('Playback unavailable · tap Play to retry.');
+      agent('idle','The browser could not start “'+t.title+'.” Check its audio in Media Health.');return false;
+    });
+  }
+  function toggle(){
+    if(!st.track)return;
+    if(!audio.paused){recordListen('pause');invalidatePlayback();audio.pause();st.playing=false;agent('idle','Paused “'+st.track.title+'.”');updateFooterPlayer();return}
+    void play(st.track,Number(audio.currentTime)||0,st.playSource,!!st.playlistPlayback.playlistId);
+  }
+  async function stepTrack(delta){
+    // Await the real media outcome before the Agent records a successful skip.
+    if(agentSessionActive()&&delta>0){
+      invalidatePlayback();audio.pause();const token=playbackLifecycle.token();
+      const session=await advanceAgentSession('skip',token);
+      if(!playbackLifecycle.isCurrent(token))return false;
+      if(!session||session.status!=='active'){renderAgentSessionPanel();return false}
+      const ids=sessionTrackIds();st.playlistPlayback.index=Number(session.current_index||0);
+      const next=trackById(ids[st.playlistPlayback.index]);
+      const played=next?await play(next,0,'agent_session',true):false;
+      renderAgentSessionPanel();return played;
+    }
+    if(st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length){
+      const ids=st.playlistPlayback.trackIds;let i=st.playlistPlayback.index;
+      if(i<0)i=Math.max(0,ids.indexOf(st.track?.id));
+      i=(i+delta+ids.length)%ids.length;st.playlistPlayback.index=i;updateQueueUi();
+      const next=trackById(ids[i]);return next?play(next,0,isTemporaryPlaylist()?'temporary_playlist':'playlist',true):false;
+    }
+    if(delta>0&&st.auth.authenticated&&st.queue.items.length){
+      invalidatePlayback();audio.pause();return playNextFromQueue(playbackLifecycle.token());
+    }
+    if(delta<0&&st.queue.history.length){
+      const id=st.queue.history.shift();localStorage.setItem('stonefellow.queue.history.v1',JSON.stringify(st.queue.history));
+      const previous=trackById(id);if(previous)return play(previous,0,'queue_history');
+    }
+    if(!st.track||!catalog.length)return false;
+    let i=catalog.findIndex(t=>t.id===st.track.id);if(i<0)i=0;
+    i=(i+delta+catalog.length)%catalog.length;
+    return play(catalog[i]);
   }
   function bindTrackButtons(r=document){$$('[data-play-track]',r).forEach(b=>b.onclick=e=>{e.stopPropagation();const t=trackById(b.dataset.playTrack);if(t)play(t)})}
   function bindQueueTrackButtons(r=document){Array.from(r.querySelectorAll('[data-queue-track]')).forEach(b=>b.onclick=e=>{e.stopPropagation();const t=trackById(b.dataset.queueTrack);if(t)addTrackToQueue(t,b.dataset.queuePlacement==='next'?'next':'end')})}
@@ -1956,20 +2788,20 @@
       say('That package is already in your cart.');return;
     }
     st.cart.push({type,...(type==='vinyl_license_pack'?{track_id:id}:{release_id:id}),licenses:amount});
-    persistCart();say('Added '+amount+' vinyl print license'+(amount===1?'':'s')+' to your cart. Streaming and downloads remain separate.',renderCart);
+    persistCart();showCartAfterAdd('Added '+amount+' vinyl print license'+(amount===1?'':'s')+' to your cart. Streaming and downloads remain separate.');
   }
   function addAlbumVinylToCart(release){
     if(!release?.vinyl_enabled||!(Number(release.vinyl_price_cents)>=50)){say('This album vinyl edition is not on sale yet.');return;}
     if(st.cart.some(x=>x.type==='album_vinyl'&&x.release_id===release.id)){say('This album pressing is already in your cart.');return;}
     st.cart.push({type:'album_vinyl',release_id:release.id});persistCart();
-    say('Added a print-on-demand locked album. Every song needs one unused vinyl print license.',renderCart);
+    showCartAfterAdd('Added a print-on-demand locked album. Every song needs one unused vinyl print license.');
   }
   function addDigitalAlbumToCart(r){
     if(st.cart.some(x=>x.type==='release'&&x.release_id===r.id)){say('The digital album is already in your cart.');return;}
     st.cart.push({type:'release',release_id:r.id});persistCart();
-    say('Added digital album. Purchase includes one vinyl print license per song.',renderCart);
+    showCartAfterAdd('Added digital album. Purchase includes one vinyl print license per song.');
   }
-  function addTrackToCart(t){if(!t)return;if(t.digital_purchase_enabled===false){say('This song is available for listening only. Paid downloads are not enabled.');return;}if(st.cart.some(x=>x.type==='track'&&x.track_id===t.id)){say('“'+t.title+'” is already in your cart.');return}st.cart.push({type:'track',track_id:t.id});persistCart();say('Added the digital track “'+t.title+'” to your cart.',renderCart)}
+  function addTrackToCart(t){if(!t)return;if(t.digital_purchase_enabled===false){say('This song is available for listening only. Paid downloads are not enabled.');return;}if(st.cart.some(x=>x.type==='track'&&x.track_id===t.id)){say('“'+t.title+'” is already in your cart.');return}st.cart.push({type:'track',track_id:t.id});persistCart();showCartAfterAdd('Added the digital track “'+t.title+'” to your cart.')}
   function renderPlayer(t){renderStory(t)}
 
   function siteSearchTypeLabel(type){return ({track:'Song',release:'Release',show:'Show',story:'Story',video:'Video',photo:'Photos',product:'Store',campaign:'Offer'})[type]||'Result'}
@@ -2013,7 +2845,7 @@
      const track=trackById(id);
      if(!track)throw Error('Song no longer available.');
      addTrackToCart(track);
-     navigate('cart');
+     if(!window.SFPublicAgentCanvas?.active?.())navigate('cart');
    },
    library:()=>navigate('library'),
    vinyl:()=>navigate('builder'),
@@ -2075,12 +2907,36 @@
   function add(t,preferred){if(!t||has(t.id))return {ok:false,why:'already'};const sides=preferred?[preferred,preferred==='A'?'B':'A']:['A','B'];for(const side of sides){if(sideTime(side)+Number(t.duration||0)<=limit()){st.builder[side].push(t.id);persist();return {ok:true,side}}}return {ok:false,why:'full'}}
   function remove(id){st.builder.A=st.builder.A.filter(x=>x!==id);st.builder.B=st.builder.B.filter(x=>x!==id);persist()}
   function move(side,index,delta){const arr=st.builder[side],to=index+delta;if(to<0||to>=arr.length)return;[arr[index],arr[to]]=[arr[to],arr[index]];persist()}
-  function relocateTrack(id,from,to,toIndex=null){if(!['A','B'].includes(from)||!['A','B'].includes(to))return false;const t=trackById(id);if(!t)return false;if(from!==to&&sideTime(to)+Number(t.duration||0)>limit()){say('That track will not fit on Side '+to+'.');return false}const source=st.builder[from],sourceIndex=source.indexOf(id);if(sourceIndex<0)return false;source.splice(sourceIndex,1);const target=st.builder[to];let index=toIndex===null?target.length:Number(toIndex);if(from===to&&sourceIndex<index)index--;index=Math.max(0,Math.min(target.length,index));target.splice(index,0,id);persist();return true}
+  function relocateTrack(id,from,to,toIndex=null,announce=true){if(!['A','B'].includes(from)||!['A','B'].includes(to))return false;const t=trackById(id);if(!t)return false;if(from!==to&&sideTime(to)+Number(t.duration||0)>limit()){if(announce)say('That track will not fit on Side '+to+'.');return false}const source=st.builder[from],sourceIndex=source.indexOf(id);if(sourceIndex<0)return false;source.splice(sourceIndex,1);const target=st.builder[to];let index=toIndex===null?target.length:Number(toIndex);if(from===to&&sourceIndex<index)index--;index=Math.max(0,Math.min(target.length,index));target.splice(index,0,id);persist();return true}
   function transfer(id,from,to=from==='A'?'B':'A'){if(relocateTrack(id,from,to,null))renderBuilder()}
-  function moveBuilderTrackToSide(id,side){const from=st.builder.A.includes(id)?'A':(st.builder.B.includes(id)?'B':'');if(!from){say('That track is not on the current build.');return}if(from===side){say('That track is already on Side '+side+'.');return}if(relocateTrack(id,from,side,null)){renderBuilder();say('Moved “'+(trackById(id)?.title||id)+'” to Side '+side+'.')}}
+  function moveBuilderTrackToSide(id,side,announce=true){
+    const from=st.builder.A.includes(id)?'A':(st.builder.B.includes(id)?'B':'');
+    let result='';
+    if(!from)result='That track is not on the current build.';
+    else if(!['A','B'].includes(side))result='Choose Side A or Side B.';
+    else if(from===side)result='That track is already on Side '+side+'.';
+    else if(relocateTrack(id,from,side,null,false)){renderBuilder();result='Moved “'+(trackById(id)?.title||id)+'” to Side '+side+'.'}
+    else result='That track does not fit on Side '+side+'. The record is unchanged.';
+    if(announce)say(result);return result;
+  }
   function localFillOrder(){const rec=new Map((st.personalization.recommendations?.items||[]).map((x,i)=>[x.track_id,1000-i*10+Number(x.score||0)]));const chosen=selectedBuildIds().map(trackById).filter(Boolean),seed=chosen.at(-1)||st.track||catalog[0];return catalog.filter(t=>t.podEligible&&!has(t.id)).map((t,index)=>{const keys=new Set([...(seed?.mood||[]),...(seed?.themes||[])]),similarity=[...(t.mood||[]),...(t.themes||[])].filter(v=>keys.has(v)).length*3-Math.abs(Number(t.energy||3)-Number(seed?.energy||3));return {t,score:(rec.get(t.id)||0)+similarity,index}}).sort((x,y)=>y.score-x.score||x.index-y.index).map(x=>x.t)}
   function localFill(side='both'){const targets=side==='both'?['A','B']:[side],added=[];for(const target of targets){for(const t of localFillOrder()){if(has(t.id))continue;if(Number(t.duration||0)<=remainingTime(target)){st.builder[target].push(t.id);added.push(t.id);if(remainingTime(target)<30)break}}}persist();return added}
-  async function fillBuild(side='both'){if(!['A','B','both'].includes(side))side='both';try{if(st.auth.authenticated){const j=await secureJsonPost('builds.php',{action:'suggest',build:st.builder,side});st.builder={...defaultBuild(),...(j.build||st.builder),version:4};persist();renderBuilder();const count=(j.added?.A?.length||0)+(j.added?.B?.length||0);say(count?(j.personalized?'Filled the remaining time using your Stonefellow listening profile.':'Filled the remaining time with the best-fitting eligible tracks.'):'There is no eligible track that fits the remaining time.');return}await loadPersonalization();const added=localFill(side);renderBuilder();say(added.length?'Filled the remaining time. Sign in to make this personalized.':'There is no eligible track that fits the remaining time.')}catch(e){say(e.message)}}
+  async function fillBuild(side='both',announce=true){
+    if(!['A','B','both'].includes(side))side='both';
+    try{
+      let result='';
+      if(st.auth.authenticated){
+        const j=await secureJsonPost('builds.php',{action:'suggest',build:st.builder,side});
+        st.builder={...defaultBuild(),...(j.build||st.builder),version:4};persist();renderBuilder();
+        const count=(j.added?.A?.length||0)+(j.added?.B?.length||0);
+        result=count?(j.personalized?'Filled the remaining time using your Stonefellow listening profile.':'Filled the remaining time with the best-fitting eligible tracks.'):'There is no eligible track that fits the remaining time.';
+      }else{
+        await loadPersonalization();const added=localFill(side);renderBuilder();
+        result=added.length?'Filled the remaining time. Sign in to make this personalized.':'There is no eligible track that fits the remaining time.';
+      }
+      if(announce)say(result);return result;
+    }catch(e){if(announce)say(e.message);return 'The record was not filled: '+e.message}
+  }
   async function loadBuilderDrafts(force=false){if(!st.auth.authenticated){st.builderDrafts={...st.builderDrafts,loaded:true,items:[],activeId:0};localStorage.removeItem('stonefellow.build.draft.id');return[]}if(st.builderDrafts.loaded&&!force)return st.builderDrafts.items;try{const j=await api('builds.php');if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf;const items=j.builds||[];let activeId=Number(st.builderDrafts.activeId||0);if(activeId&&!items.some(x=>Number(x.id)===activeId)){activeId=0;localStorage.removeItem('stonefellow.build.draft.id')}st.builderDrafts={...st.builderDrafts,loaded:true,items,activeId};return st.builderDrafts.items}catch(_){st.builderDrafts={...st.builderDrafts,loaded:true,items:[]};return[]}}
   // Draft comparisons exclude local savedAt timestamps and preserve the full design payload.
   const builderDraftFingerprint=build=>JSON.stringify({
@@ -2397,12 +3253,32 @@
     localStorage.setItem('stonefellow.lastorder.v051',JSON.stringify(r));window.StonefellowTurntable?.invalidate?.();st.cart=[];st.campaignCode='';localStorage.removeItem('stonefellow.campaign.code');persistCart();renderConfirmation(r)}catch(ex){err.textContent=ex.message;btn.disabled=false}}
   function renderConfirmation(r){const cash=r.payment_method==='cash'||r.status==='paid_cash_simulated';canvas.innerHTML=`<article class="module confirmation-module"><div class="module-kicker">${cash?'CASH PURCHASE SIMULATED':'ORDER CREATED'}</div><h2>${esc(r.order_id)}</h2><p class="player-note">${cash?'Cash payment simulated successfully. No money was collected; the normal order and fulfillment records were created.':r.mode==='test'?'Test payment approved. The order record and POD handoff were written on the server.':'Your order was created and is awaiting payment.'}</p><div class="confirmation-data"><div><span>Status</span><strong>${esc(r.status)}</strong></div><div><span>Payment</span><strong>${esc(r.payment_method||'test')}</strong></div><div><span>Total</span><strong>${money(r.total_cents)}</strong></div><div><span>POD handoffs</span><strong>${r.pod?.length||0}</strong></div></div><p class="tiny-note">Keep this order number for testing. Simulated cash orders are never real charges.</p><button class="text-control" id="downloadReceipt" type="button">Download test receipt</button></article>`;$('#downloadReceipt',canvas).onclick=()=>download(r.order_id+'-receipt.json',r);say('Order '+r.order_id+' is recorded'+(cash?' as a simulated cash purchase':'')+'. '+(r.pod?.length?'The manufacturing handoff is ready.':''))}
 
-  function bind(r=document){$$('[data-command]',r).forEach(b=>b.onclick=()=>command(b.dataset.command));$$('[data-view]',r).forEach(b=>b.onclick=e=>{if(e)e.preventDefault();navigate(b.dataset.view||'home')})}
+  function bind(r=document){$$('[data-command]',r).forEach(b=>b.onclick=()=>command(b.dataset.command));$$('[data-view]',r).forEach(b=>b.onclick=e=>{
+    if(e)e.preventDefault();const view=b.dataset.view||'home';
+    // Top-level links now begin in the lightweight drawer. The dedicated
+    // detail/full-page actions still go through the native modal renderer.
+    if(window.SFPublicAgentCanvas?.active?.()&&canvas?.id!=='sfAgentNativePage'){
+      const quickViews={music:['music','songs'],releases:['music','albums'],store:['commerce','merch'],tickets:['commerce','tickets'],cart:['commerce','cart']};
+      if(quickViews[view]){openExperienceDrawer(...quickViews[view]);return;}
+    }
+    navigate(view);
+  })}
   async function publicKnowledgeAnswer(q){try{const r=await fetch((cfg.apiBase||'api')+'/knowledge-search.php?q='+encodeURIComponent(q),{cache:'no-store'}),j=await r.json();if(j.ok&&j.hits?.length){const h=j.hits[0];say('From the Stonefellow knowledge base: '+(h.snippet||h.name));return true}}catch(_){}return false}
   function releaseAnswer(q){const n=norm(q);const r=releases.find(x=>n.includes(norm(x.title)))||releases.find(x=>(x.state||'published')==='published'&&x.agent_discoverable!==false);if(!r)return false;openRelease(r.id,true);say('Here is “'+r.title+'.”');return true}
   async function command(raw){const text=String(raw||'').trim(),q=norm(text);if(!text)return;popupEntry('user',text);hide();input.value='';closeMenu();const atmosphereChoice=window.SFPublicAgentCanvas?.active?.() && window.SFPublicAgentCanvas.applyCommand?.(text);
     if(atmosphereChoice){say('Atmosphere set to '+({ember:'Ember',mesh:'Blue Mesh',violet:'Violet Signal'}[atmosphereChoice])+'.');return}
-    const named=findTitle(q);if(directSongListeningCommand(text)){await liveAgent(text);return}await loadAuth();if(st.auth.authenticated){await liveAgent(text);return}
+    if(/^(?:(?:start|show|open|take me through)\s+(?:the\s+)?)?(?:guided\s+)?(?:tour|tutorial|walkthrough)(?:\s+of\s+(?:the\s+)?(?:canvas|site))?$/i.test(text)){
+      window.SFPublicAgentCanvas?.startGuide?.();return;
+    }
+    if(isTemporaryPlaylist()&&/^(?:please\s+)?save\s+(?:(?:this|my|the|current)\s+)?(?:playlist|mix)(?:\s+for\s+later)?[.!?]?$/i.test(text)){
+      await say(await saveTemporaryPlaylist());return;
+    }
+    if(!st.auth.authenticated&&nameFromTurn(text)){await acceptVisitorName(text);return}
+    if(welcomeWaitingForName&&/^(?:skip|not now|prefer not to say)$/i.test(text)){await skipVisitorName();return}
+    if(/^(?:(?:play|listen to|put on|show me)\s+(?:the\s+)?)?(?:latest|newest)\s+release(?:\s+music)?[.!?]?$/i.test(text)){
+      await handleWelcomeAction('latest-release',false);return;
+    }
+    const named=findTitle(q);if(directSongListeningCommand(text)||directRandomPlaylistCommand(text)){await liveAgent(text);return}await loadAuth();if(st.auth.authenticated){await liveAgent(text);return}
     if(q.includes('artist world')||q.includes('explore the world')||q.includes('connected stories')){navigate('world');return}if(q.includes('community')){if(fanCommunityEnabled){navigate('community')}else{say('The fan community is not open yet. CRM and the Stonefellow newsletter are still active.',()=>navigate('newsletter'))}return}if(q.includes('newsletter')||q.includes('mailing list')){navigate('newsletter');return}if(q.includes('merch')||q.includes('shop')||q.includes('store')){navigate('store');return}if(q.includes('ticket')||q.includes('rsvp')||q.includes('vip')||q.includes('presale')){navigate('tickets');return}if(q.includes('tour')||q.includes('show dates')||q.includes('shows')){navigate('shows');return}
     if(q.includes('album')||q.includes('release')||q.includes('ep')||q.includes('single')){if(releaseAnswer(q))return}
     if(q.includes('knowledge')||q.includes('notes')||q.includes('document')||q.includes('photo')||q.includes('image')){if(await publicKnowledgeAnswer(text))return}
@@ -2427,7 +3303,26 @@
 
   function closeQuickMenu(restoreFocus=false){if(!quickMenu)return;quickMenu.hidden=true;quickButton?.setAttribute('aria-expanded','false');if(restoreFocus)quickButton?.focus({preventScroll:true})}
   function openQuickMenu(){if(!quickMenu)return;closeMenu();closeChatPopup();quickMenu.hidden=false;quickButton?.setAttribute('aria-expanded','true');quickMenu.querySelector('[data-quick-action]')?.focus({preventScroll:true})}
-  function handleQuickAction(action){closeQuickMenu();if(action==='record'){navigate('builder');return}if(action==='playlist'){loadAuth().then(()=>st.auth.authenticated?createPlaylistPrompt():navigate('login'));return}if(action==='shows'){navigate('shows');return}if(action==='store'){navigate('store');return}if(action==='membership'){navigate('membership');return}if(action==='tickets'){navigate('tickets');return}if(action==='community'){fanCommunityEnabled?navigate('community'):navigate('newsletter');return}if(action==='newsletter'){navigate('newsletter');return}}
+  function handleQuickAction(action){closeQuickMenu();if(action==='record'){navigate('builder');return}if(action==='playlist'){void startRandomTemporaryPlaylist().then(result=>popupEntry('notice',result));return}if(action==='shows'){navigate('shows');return}if(action==='store'){window.SFPublicAgentCanvas?.active?.()?openExperienceDrawer('commerce','merch'):navigate('store');return}if(action==='membership'){navigate('membership');return}if(action==='tickets'){window.SFPublicAgentCanvas?.active?.()?openExperienceDrawer('commerce','tickets'):navigate('tickets');return}if(action==='community'){fanCommunityEnabled?navigate('community'):navigate('newsletter');return}if(action==='newsletter'){navigate('newsletter');return}}
+  // Both screen sizes launch with the composer hidden. Desktop zzz and the
+  // small restore chip can reveal it; mobile users have an explicit hide X.
+  function setChatFooterHidden(hidden){
+    if(hidden){closeChatPopup();closeQuickMenu()}
+    document.body.classList.toggle('sf-agent-chatbar-collapsed',!!hidden);
+  }
+  // The server renders the collapsed class before CSS and JS arrive, so the
+  // footer cannot flash on first paint. A zzz reveal lasts for this page only.
+  document.body.classList.add('sf-agent-chatbar-collapsed');
+  if(chatFooterRestore)chatFooterRestore.onclick=()=>setChatFooterHidden(false);
+  if(chatFooterHide)chatFooterHide.onclick=()=>setChatFooterHidden(true);
+  let zSequence=0,lastZ=0;
+  window.addEventListener('keydown',event=>{
+    if(!document.body.classList.contains('sf-agent-canvas-active')||!window.matchMedia('(min-width:721px)').matches)return;
+    if(event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.target?.closest?.('input,textarea,select,[contenteditable="true"],[role="textbox"]')){zSequence=0;return}
+    if(event.key.toLowerCase()!=='z'){zSequence=0;return}
+    const now=Date.now();zSequence=now-lastZ<1000?zSequence+1:1;lastZ=now;
+    if(zSequence===3){zSequence=0;event.preventDefault();setChatFooterHidden(!document.body.classList.contains('sf-agent-chatbar-collapsed'))}
+  },true);
   form.onsubmit=e=>{e.preventDefault();if(voiceTurnBusy){showTranscript('Finishing the previous voice reply. Your typed message is still in the bar.','waiting');return}voiceInteractionStarted=true;command(input.value).catch(err=>say('I could not process that message. '+err.message))};if(quickButton)quickButton.onclick=e=>{e.stopPropagation();quickMenu?.hidden?openQuickMenu():closeQuickMenu()};if(chatToggle)chatToggle.onclick=()=>chatPopup?.hidden?openChatPopup():closeChatPopup();if(chatPopupClose)chatPopupClose.onclick=closeChatPopup;if(chatPopupNew)chatPopupNew.onclick=()=>{st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');popupEntries=[];popupHistoryLoaded=true;renderPopupEntries();input.focus()};if(orb)orb.onclick=()=>{if(document.body.classList.contains('artist-home-chat-hidden')){document.body.classList.remove('artist-home-chat-hidden');syncAgentDockLayout()}chatPopup?.hidden?openChatPopup():closeChatPopup()};if(agentInterrupt)agentInterrupt.onclick=interruptVoicePlayback;$$('[data-quick-action]',quickMenu||document).forEach(b=>b.onclick=()=>handleQuickAction(b.dataset.quickAction));document.addEventListener('click',e=>{if(quickMenu&&!quickMenu.hidden&&!quickMenu.contains(e.target)&&e.target!==quickButton)closeQuickMenu()});bind();syncAuthMenu();syncAgentDockLayout();
   function updateVoiceReplyToggle(){if(!voiceReplyToggle)return;voiceReplyToggle.textContent=voiceRepliesEnabled?'Voice on':'Voice off';voiceReplyToggle.setAttribute('aria-pressed',String(voiceRepliesEnabled));voiceReplyToggle.title=voiceRepliesEnabled?'Mute spoken Agent replies':'Enable spoken Agent replies'}
   updateVoiceReplyToggle();
@@ -2447,37 +3342,109 @@
     $('#menuButton')?.setAttribute('aria-expanded',String(menu.open));
     if(menu.open)closeQuickMenu();
   })}else{$('#menuButton').onclick=()=>{const open=!menu.classList.contains('open');menu.classList.toggle('open',open);menu.setAttribute('aria-hidden',String(!open));$('#menuButton').setAttribute('aria-expanded',String(open))}};$('#menuClose').onclick=closeMenu;
+  document.addEventListener('click',event=>{
+    if(menu?.open&&!menu.contains(event.target))closeMenu();
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&menu?.open){closeMenu();$('#menuButton')?.focus({preventScroll:true})}
+  });
   menu?.addEventListener('click',event=>{
     const choice=event.target.closest?.('[data-sf-atmosphere]');
     if(!choice)return;
     if(window.SFPublicAgentCanvas?.setAtmosphere?.(choice.dataset.sfAtmosphere))closeMenu();
   });
-  if(notificationButton){notificationButton.onclick=openNotificationDrawer;notificationClose.onclick=closeNotificationDrawer;if(notificationBackdrop)notificationBackdrop.onclick=closeNotificationDrawer;$$('[data-drawer-tab]').forEach(b=>b.onclick=()=>{st.drawer.tab=b.dataset.drawerTab;renderDrawer()});const markAll=$('#markAllNotifications');if(markAll)markAll.onclick=markAllNotifications;const refresh=$('#refreshNotifications');if(refresh)refresh.onclick=loadNotificationDrawer;loadNotificationDrawer();setInterval(loadNotificationDrawer,60000)}
-  playerToggle.onclick=toggle;playerPrev.onclick=()=>stepTrack(-1);playerNext.onclick=()=>stepTrack(1);if(playerQueueButton)playerQueueButton.onclick=openQueue;if(queueClose)queueClose.onclick=closeQueue;if(queueBackdrop)queueBackdrop.onclick=closeQueue;if(queueClear)queueClear.onclick=()=>clearQueue(true);playerClose.onclick=()=>{songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');audio.pause();audio.removeAttribute('src');audio.load();st.track=null;st.playing=false;st.playSource='player';clearPlaylistPlayback();footerPlayer.hidden=true;window.SFPublicAgentCanvas?.syncPlayer?.();document.body.classList.remove('has-player');agent('idle','Player closed. Your place in the site is unchanged.')};
+  if(notificationDrawer){
+    if(notificationButton)notificationButton.onclick=openNotificationDrawer;
+    notificationClose.onclick=closeNotificationDrawer;
+    if(notificationBackdrop)notificationBackdrop.onclick=closeNotificationDrawer;
+    $$('[data-drawer-tab]',notificationDrawer).forEach(button=>button.onclick=()=>{st.drawer.tab=button.dataset.drawerTab;renderDrawer()});
+    const markAll=$('#markAllNotifications');if(markAll)markAll.onclick=markAllNotifications;
+    const refresh=$('#refreshNotifications');if(refresh)refresh.onclick=loadNotificationDrawer;
+    if(st.auth.authenticated){void loadNotificationDrawer();setInterval(loadNotificationDrawer,60000)}
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!notificationDrawer.hidden){event.preventDefault();event.stopPropagation();closeNotificationDrawer()}});
+  }
+  playerToggle.onclick=toggle;playerPrev.onclick=()=>stepTrack(-1);playerNext.onclick=()=>stepTrack(1);if(playerQueueButton)playerQueueButton.onclick=openQueue;if(queueClose)queueClose.onclick=closeQueue;if(queueBackdrop)queueBackdrop.onclick=closeQueue;if(queueClear)queueClear.onclick=()=>clearQueue(true);playerClose.onclick=()=>{songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');invalidatePlayback();audio.pause();audio.removeAttribute('src');audio.load();st.track=null;st.playing=false;st.playSource='player';songMoments?.setTrack(null);clearPlaylistPlayback();footerPlayer.hidden=true;window.SFPublicAgentCanvas?.syncPlayer?.();document.body.classList.remove('has-player');agent('idle','Player closed. Your place in the site is unchanged.')};
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&queueDrawer&&!queueDrawer.hidden){event.preventDefault();closeQueue()}});
   playerTitle.onclick=playerArtwork.onclick=()=>{if(st.track){renderStory(st.track);setUrl('track',{id:st.track.id})}};
   playerSeek.oninput=()=>{if(Number.isFinite(audio.duration)&&audio.duration>0){if(songCaptureSkill?.status().active)songCaptureSkill.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('seek');audio.currentTime=(Number(playerSeek.value)/1000)*audio.duration}};
   audio.addEventListener('loadedmetadata',()=>{playerDuration.textContent=time(audio.duration);updateFooterPlayer()});
   audio.addEventListener('timeupdate',()=>{songCaptureSkill?.playbackPosition();playerCurrent.textContent=time(audio.currentTime);playerDuration.textContent=time(audio.duration||st.track?.duration||0);playerSeek.value=audio.duration?String(Math.round((audio.currentTime/audio.duration)*1000)):'0';const now=Date.now();if(st.track&&st.playing&&now-st.lastProgressAt>30000){st.lastProgressAt=now;recordListen('progress')}});
   audio.addEventListener('seeking',()=>{if(songCaptureSkill?.status().active)songCaptureSkill.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('seek')});
-  audio.addEventListener('play',()=>{st.playing=true;updateFooterPlayer();updateQueueUi();syncConversationMusic()});audio.addEventListener('pause',()=>{if(!audio.ended){st.playing=false;updateFooterPlayer()}updateQueueUi();if(songCaptureSkill?.status().active)void songCaptureSkill.stop('pause');if(songListeningSkill?.status().active)void songListeningSkill.stop('pause');syncConversationMusic()});
-  audio.addEventListener('ended',()=>{if(songCaptureSkill?.status().active)void songCaptureSkill.stop('end');if(songListeningSkill?.status().active)void songListeningSkill.stop('end');
+  audio.addEventListener('waiting',()=>{
+    if(!playbackWantsAudio||audio.paused||!st.track)return;
+    clearPlaybackBufferWatch();setPlaybackStatus('Buffering audio…','buffering');
+    const token=playbackLifecycle.token(),at=Number(audio.currentTime)||0;
+    playbackBufferTimer=setTimeout(()=>{
+      playbackBufferTimer=null;
+      if(playbackLifecycle.isCurrent(token)&&playbackWantsAudio&&!audio.paused&&Math.abs((Number(audio.currentTime)||0)-at)<0.25)
+        setPlaybackStatus('Still buffering · checking the connection','buffering');
+    },9000);
+  });
+  audio.addEventListener('stalled',()=>{
+    if(playbackWantsAudio&&!audio.paused&&st.track)setPlaybackStatus('Audio connection stalled · waiting to resume','buffering');
+  });
+  audio.addEventListener('playing',()=>{clearPlaybackBufferWatch();setPlaybackStatus()});
+  audio.addEventListener('canplay',()=>{if(!pendingNetworkRecovery){clearPlaybackBufferWatch();if(footerPlayer?.dataset.playbackPhase==='buffering')setPlaybackStatus()}});
+  audio.addEventListener('play',()=>{st.playing=true;updateFooterPlayer();updateQueueUi();syncConversationMusic();scheduleSpeechContextSync()});
+  audio.addEventListener('pause',()=>{if(!audio.ended){st.playing=false;updateFooterPlayer()}updateQueueUi();if(!pendingNetworkRecovery){if(songCaptureSkill?.status().active)void songCaptureSkill.stop('pause');if(songListeningSkill?.status().active)void songListeningSkill.stop('pause')}syncConversationMusic();scheduleSpeechContextSync()});
+  audio.addEventListener('ended',()=>{
+    const endedToken=playbackLifecycle.token();
+    if(!st.track||!playbackLifecycle.claimEnded(endedToken))return;
+    playbackWantsAudio=false;clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
+    if(songCaptureSkill?.status().active)void songCaptureSkill.stop('end');if(songListeningSkill?.status().active)void songListeningSkill.stop('end');
     if(playbackEndedEarly()){
       st.playing=false;updateFooterPlayer();
-      agent('idle','“'+(st.track?.title||'This song')+'” ended at '+time(audio.currentTime)+' of the published '+time(st.track.duration)+'. The uploaded audio file or stream may be incomplete. Check the original in Media Library.');
+      setPlaybackStatus('Audio ended early · check Media Health','error');
+      agent('idle','“'+(st.track?.title||'This song')+'” ended at '+time(audio.currentTime)+' of the published '+time(st.track.duration)+'. The uploaded audio file or stream may be incomplete. Check Media Health.');
       return;
     }
     recordListen('complete');st.playing=false;updateFooterPlayer();
-    if(agentSessionActive()){advanceAgentSession('complete').then(session=>{if(!session)return;if(session.status==='active'){const ids=sessionTrackIds(),idx=Number(session.current_index||0),next=trackById(ids[idx]);st.playlistPlayback.index=idx;st.playlistPlayback.trackIds=ids;if(next){const previous=st.track,comment=st.agentSession.mode==='guided_release'&&previous?.story?'That was “'+previous.title+'.” '+String(previous.story).slice(0,180):'Next up: “'+next.title+'.”';agent('thinking',comment);setTimeout(()=>play(next,0,'agent_session',true),650)}renderAgentSessionPanel()}else{clearPlaylistPlayback();renderAgentSessionPanel();if(st.queue.items.length){playNextFromQueue();return}agent('idle','Finished “'+st.agentSession.title+'.” You can save it as a playlist from the listening session panel.')}});return}
+    if(agentSessionActive()){advanceAgentSession('complete',endedToken).then(session=>{if(!session||!playbackLifecycle.isCurrent(endedToken))return;if(session.status==='active'){const ids=sessionTrackIds(),idx=Number(session.current_index||0),next=trackById(ids[idx]);st.playlistPlayback.index=idx;st.playlistPlayback.trackIds=ids;if(next){const previous=st.track,comment=st.agentSession.mode==='guided_release'&&previous?.story?'That was “'+previous.title+'.” '+String(previous.story).slice(0,180):'Next up: “'+next.title+'.”';agent('thinking',comment);setTimeout(()=>{if(playbackLifecycle.isCurrent(endedToken))void play(next,0,'agent_session',true)},650)}renderAgentSessionPanel()}else{clearPlaylistPlayback();renderAgentSessionPanel();if(st.queue.items.length){void playNextFromQueue(endedToken);return}agent('idle','Finished “'+st.agentSession.title+'.” You can save it as a playlist from the listening session panel.')}});return}
     if(st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length&&st.playlistPlayback.index<st.playlistPlayback.trackIds.length-1){st.playlistPlayback.index++;updateQueueUi();const t=trackById(st.playlistPlayback.trackIds[st.playlistPlayback.index]);if(t){play(t,0,isTemporaryPlaylist()?'temporary_playlist':'playlist',true);return}}
     if(isTemporaryPlaylist()&&st.queue.items.length===0){updateQueueUi();agent('idle','Finished “'+st.playlistPlayback.playlistName+'.” Open the playlist icon to replay any song.');return}
-    const finished=st.playlistPlayback.playlistName;clearPlaylistPlayback();if(st.queue.items.length){playNextFromQueue();return}agent('idle',finished?'Finished “'+finished+'.”':'That was “'+(st.track?.title||'the song')+'.” Want another, the story, or should we put it on a record?')
+    const finished=st.playlistPlayback.playlistName;clearPlaylistPlayback();if(st.queue.items.length){void playNextFromQueue(endedToken);return}agent('idle',finished?'Finished “'+finished+'.”':'That was “'+(st.track?.title||'the song')+'.” Want another, the story, or should we put it on a record?')
   });
-  audio.addEventListener('error',()=>{songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('error');if(st.track){st.playing=false;updateFooterPlayer();agent('idle','The player could not load “'+st.track.title+'.” Check the installed audio file.')}});
+  audio.addEventListener('error',()=>{
+    if(!st.track)return;
+    if(recoverNetworkPlayback())return;
+    songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('error');
+    const code=Number(audio.error?.code||0);
+    playbackProblem(code===3?'Audio decode failed · check Media Health':code===4?'Audio source unavailable · check Media Health':'Audio connection failed · tap Play to retry.');
+    agent('idle','The player could not finish loading “'+st.track.title+'.” Review its audio in Media Health.');
+  });
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&chatPopup&&!chatPopup.hidden){closeChatPopup();chatToggle?.focus();return}const tag=String(e.target?.tagName||'').toLowerCase(),editing=['input','textarea','select'].includes(tag)||e.target?.isContentEditable;if((e.key==='/'&&!editing)||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();if(new URL(location.href).searchParams.get('view')!=='search'&&!String(location.pathname).replace(/\/+$/,'').endsWith('/search'))navigate('search',{});else $('#siteSearchInput',canvas)?.focus()}});
   window.addEventListener('popstate',routeFromLocation);
   const R=window.SpeechRecognition||window.webkitSpeechRecognition;
   const isIOSVoiceBrowser=/iPad|iPhone|iPod/i.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   const voiceEngineKey='stonefellow.voice.engine.v1.'+String(window.STONEFELLOW_AUTH_BOOTSTRAP?.user?.id||'guest');
+  let speechContextInterval=null,speechContextDebounce=null,speechContextInFlight=false,speechContextConversationId='',speechContextEpoch=0;
+  async function pushSpeechContext(){
+    if(!speechPilotActive||!window.StonefellowSpeechEngine?.active||speechContextInFlight)return;
+    speechContextInFlight=true;const epoch=speechContextEpoch;
+    try{
+      const result=await secureJsonPost('speech-engine.php',{
+        action:'sync_context',conversation_id:speechContextConversationId,client_state:agentClientState()
+      });
+      if(epoch===speechContextEpoch&&speechPilotActive&&typeof result.conversation_id==='string')
+        speechContextConversationId=result.conversation_id;
+    }
+    catch(error){console.warn('[Stonefellow] Live voice context unavailable:',error?.message||'sync failed')}
+    finally{speechContextInFlight=false}
+  }
+  function scheduleSpeechContextSync(delay=240){
+    if(!speechPilotActive||!window.StonefellowSpeechEngine?.active)return;
+    clearTimeout(speechContextDebounce);
+    speechContextDebounce=setTimeout(()=>{speechContextDebounce=null;void pushSpeechContext()},delay);
+  }
+  function startSpeechContextSync(){
+    stopSpeechContextSync();scheduleSpeechContextSync(0);
+    speechContextInterval=setInterval(()=>void pushSpeechContext(),9000);
+  }
+  function stopSpeechContextSync(){
+    speechContextEpoch++;speechContextConversationId='';
+    if(speechContextInterval!==null)clearInterval(speechContextInterval);
+    speechContextInterval=null;clearTimeout(speechContextDebounce);speechContextDebounce=null;
+  }
   // iOS Safari's SpeechRecognition owns the microphone. Do not open another
   // getUserMedia/AudioContext stream concurrently for barge-in monitoring.
   const musicWakePhrase=/^(?:(?:hey|hi|okay|ok)\s+)?stone[\s-]?fellow(?:\s*[,.:!?]\s*|\s+|$)/i;
@@ -2504,8 +3471,8 @@
     // a muted session, or a browser where the user disabled greetings.
     if(voiceGreetingDelivered||!voiceRepliesEnabled||localStorage.getItem('stonefellow.voice.greeting.v1')==='off')return false;
     voiceGreetingDelivered=true;
-    const greeting='Hi, I’m Stonefellow. What would you like to explore?';
-    popupEntry('assistant',greeting);
+    if(!welcomeStarted)beginWelcome();
+    const greeting=welcomeGreeting;
     showTranscript('Stonefellow: '+greeting,'responding');
     void agentSpeak(greeting);
     return true;
@@ -2532,7 +3499,7 @@
       return;
     }stopConversation();showTranscript(isIOSVoiceBrowser?'Safari could not start speech recognition. Reopen Safari and tap the mic again; ensure Siri is enabled in iPhone Settings.':'The microphone could not start. Click the mic to retry.','error')}
   }
-  function stopConversation(){voiceGreetingArmed=false;iosVoiceNeedsGesture=false;iosProcessedFinalIndex=-1;if(speechPilotActive){speechPilotActive=false;void window.StonefellowSpeechEngine?.stop();}st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;setVoiceInputActive(false);setSpeechPilotSpeaking(false);interruptVoicePlayback();conversationBargeIn?.close();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
+  function stopConversation(){voiceGreetingArmed=false;iosVoiceNeedsGesture=false;iosProcessedFinalIndex=-1;stopSpeechContextSync();if(speechPilotActive){speechPilotActive=false;void window.StonefellowSpeechEngine?.stop();}st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;setVoiceInputActive(false);setSpeechPilotSpeaking(false);interruptVoicePlayback();conversationBargeIn?.close();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
   async function submitVoiceTurn(spoken){
     const turn=++voiceTurnGeneration;
     voiceTurnBusy=true;clearTimeout(conversationRestartTimer);setVoiceInputActive(false);
@@ -2564,16 +3531,17 @@
       updateConversationButton();showTranscript('Reconnecting microphone…','connecting');startConversationListen();return;
     }
     if(st.conversationOn){stopConversation();return}
+    beginWelcome();
     // Read the last server-synced preference without awaiting network I/O.
     // On iOS WebKit, SpeechRecognition/startSession must begin in the tap turn.
     if((window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP||localStorage.getItem(voiceEngineKey))==='speech_engine'){
       voiceInteractionStarted=true;speechPilotActive=true;st.conversationOn=true;updateConversationButton();showTranscript('Connecting ElevenLabs Speech Engine…','connecting');agent('connecting','Connecting…');
       try{await window.StonefellowSpeechEngine.start({
-        onStatus(value){if(value==='disconnected'){speechPilotActive=false;st.conversationOn=false;setSpeechPilotSpeaking(false);updateConversationButton();agent('idle','Voice connection ended.');showTranscript('Speech Engine disconnected. Click the microphone to reconnect.','waiting');return}if(value==='ready'){agent('listening','Speech Engine connected.');showTranscript('Listening · Speech Engine pilot','listening')}},
+        onStatus(value){if(value==='disconnected'){stopSpeechContextSync();speechPilotActive=false;st.conversationOn=false;setSpeechPilotSpeaking(false);updateConversationButton();agent('idle','Voice connection ended.');showTranscript('Speech Engine disconnected. Click the microphone to reconnect.','waiting');return}if(value==='ready'){startSpeechContextSync();agent('listening','Speech Engine connected.');showTranscript('Listening · Speech Engine pilot','listening')}},
         onMode(mode){if(!speechPilotActive)return;const speaking=mode==='speaking';setSpeechPilotSpeaking(speaking);window.StonefellowSpeechEngine?.setInputMuted?.(speaking);agent(speaking?'speaking':'listening');showTranscript(mode==='speaking'?'Stonefellow is speaking…':'Listening · Speech Engine pilot',mode==='speaking'?'responding':'listening')},
-        onMessage(data){const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');if(!user)void deliverSpeechEngineAction()},
+        onMessage(data){const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);if(user&&!st.auth.authenticated){const name=nameFromTurn(content);if(name){saveVisitorName(name);welcomeWaitingForName=false;syncWelcomeActions()}}showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');scheduleSpeechContextSync();if(!user)void deliverSpeechEngineAction()},
         onError(message){popupEntry('notice',String(message));showTranscript(String(message),'error')}
-      });}catch(error){speechPilotActive=false;st.conversationOn=false;setSpeechPilotSpeaking(false);updateConversationButton();agent('idle','Speech Engine unavailable.');showTranscript(error.message||'Speech Engine could not connect. Select the original voice engine in Account Settings to use fallback.','error')}
+      });}catch(error){stopSpeechContextSync();speechPilotActive=false;st.conversationOn=false;setSpeechPilotSpeaking(false);updateConversationButton();agent('idle','Speech Engine unavailable.');showTranscript(error.message||'Speech Engine could not connect. Select the original voice engine in Account Settings to use fallback.','error')}
       return;
     }
     if(!recognition){showTranscript('Voice recognition is unavailable here. Select Speech Engine in Account Settings or type a message.','error');return}
@@ -2585,7 +3553,17 @@
       const envelope=await window.StonefellowSpeechEngine.takeAction();
       if(!speechPilotActive||!envelope?.action)return;
       const result=await dispatchAgentBrowserAction(String(envelope.message||''),envelope.action,envelope.audio_resolution,false);
+      // The Speech Engine dispatches through the same local player as typed
+      // chat; report the actual outcome to its own conversation history.
+      const receipt=envelope.receipt;
+      if(typeof result==='string'&&result.trim()&&receipt&&Number.isSafeInteger(Number(receipt.message_id))&&Number(receipt.message_id)>0){
+        try{await secureJsonPost('agent-action-receipt.php',{
+          conversation_id:String(receipt.conversation_id||''),message_id:Number(receipt.message_id),
+          action_type:String(receipt.action_type||''),text:result.trim()
+        })}catch(_){/* No invented success if the receipt cannot be saved. */}
+      }
       if(result)popupEntry('notice',String(result));
+      scheduleSpeechContextSync();
     }catch(error){if(speechPilotActive)popupEntry('notice','Voice action could not complete: '+String(error.message||'Unknown error'))}
   }
   voice.onclick=()=>{void handleVoiceClick()};
@@ -2666,14 +3644,33 @@
     };
     updateConversationButton();
   }else{voice.title='Original voice recognition is unavailable; Speech Engine pilot may be available in Account Settings';showTranscript('Original voice recognition is not supported here. You can still use chat or an enabled Speech Engine pilot.','waiting')}
-  window.addEventListener('pagehide',()=>conversationBargeIn?.close());
+  window.addEventListener('pagehide',()=>{stopSpeechContextSync();conversationBargeIn?.close()});
   document.addEventListener('stonefellow:navigation',event=>{
-    if(event.detail?.view!=='home'){
+    if(event.detail?.view==='builder'){
       window.SFPublicAgentCanvas?.unmount?.();
       document.body.classList.remove('sf-agent-canvas-active');
     }
   });
   if(splash){const revision=splash.dataset.revision||'1',key='stonefellow.splash.seen.'+revision;if(sessionStorage.getItem(key)==='1')splash.hidden=true;const enter=$('#splashEnter');if(enter)enter.onclick=()=>{sessionStorage.setItem(key,'1');splash.hidden=true;input?.focus()}}
   $$('.social-links [data-social]').forEach(a=>{const u=cfg.socials?.[a.dataset.social];if(u&&u!=='#'){a.href=u;a.target='_blank';a.rel='noopener'}else a.onclick=e=>e.preventDefault()});
-  bind(document); loadStore(); Promise.allSettled([loadAuth(true).then(()=>Promise.allSettled([loadAgentListeningSession(),loadQueue(true)])),loadPlans(),refreshSiteData()]).finally(()=>{routeFromLocation();setTimeout(()=>loadFanEngagement(false),900)});
+  bind(document);loadStore();window.StonefellowBoot?.step(32,'Connecting to Stonefellow');
+  Promise.allSettled([loadAuth(true).then(()=>Promise.allSettled([loadAgentListeningSession(),loadQueue(true)])),loadPlans(),refreshSiteData()]).finally(async()=>{
+    try{
+      window.StonefellowBoot?.step(68,'Building Agent Canvas');
+      await routeFromLocation();
+      window.StonefellowBoot?.step(88,'Loading atmosphere');
+      const activeAtmosphere=window.SFPublicAgentCanvas?.active?.()?window.SFPublicAgentCanvas.getAtmosphere?.():null;
+      const atmosphereAsset=activeAtmosphere==='lunar'?'assets/images/agent-atmosphere-lunar.webp':activeAtmosphere==='ember'?'assets/images/agent-atmosphere-ember.webp':null;
+      if(atmosphereAsset){
+        await Promise.race([new Promise(resolve=>{
+          const preload=new Image();preload.onload=preload.onerror=resolve;preload.src=atmosphereAsset;
+        }),new Promise(resolve=>setTimeout(resolve,4000))]);
+      }
+      if(document.fonts?.ready)await Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,2200))]);
+      // Two frames let CSS atmosphere, particle orb and controls lay out before reveal.
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      window.StonefellowBoot?.finish();
+    }catch(error){console.error('[Stonefellow] Agent Canvas boot failed:',error);window.StonefellowBoot?.fail()}
+    setTimeout(()=>loadFanEngagement(false),900);
+  });
 })();

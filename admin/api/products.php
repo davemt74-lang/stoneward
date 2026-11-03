@@ -17,8 +17,14 @@ try{
         sf_agent_brain_log((int)$me['id'],'admin_commerce','product_save',['route'=>'store_products','action'=>'save_product','context_profile'=>'commerce','needs_llm'=>false,'requires_confirmation'=>$p['status']==='active','status'=>'completed','request'=>'Save merch product '.$p['title'],'response'=>'Product '.$p['id'].' saved as '.$p['status'].'.']);
         sf_json_response(['ok'=>true,'product'=>$p,'summary'=>sf_commerce_summary()]);
     }
-    if($action==='archive'){
-        $id=sf_clean_text($b['id']??'',120);$ok=sf_commerce_delete_product($id);if($ok){sf_log_admin_action((int)$me['id'],'store_product_archived','store_product',$id);sf_agent_brain_log((int)$me['id'],'admin_commerce','product_archive',['route'=>'store_products','action'=>'archive_product','context_profile'=>'commerce','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','request'=>'Archive merch product '.$id,'response'=>'Product archived or removed if unused.']);}sf_json_response(['ok'=>$ok,'summary'=>sf_commerce_summary()]);
+    if($action==='lifecycle'||$action==='archive'){
+        $id=sf_clean_text($b['id']??'',120);$next=$action==='archive'?'archived':(string)($b['status']??'');
+        if(!in_array($next,['active','hidden','archived','deleted'],true))throw new InvalidArgumentException('Invalid product lifecycle status.');
+        if(empty($b['confirmed']))throw new InvalidArgumentException('Confirm the merchandise lifecycle change.');
+        $before=sf_commerce_product($id,false);if(!$before)throw new InvalidArgumentException('Product not found.');
+        if(!sf_commerce_set_product_status($id,$next))throw new RuntimeException('Could not update product status.');
+        sf_log_admin_action((int)$me['id'],'store_product_lifecycle_changed','store_product',$id,['from'=>$before['status'],'to'=>$next]);
+        sf_json_response(['ok'=>true,'product'=>sf_commerce_product($id,false),'summary'=>sf_commerce_summary()]);
     }
     if($action==='adjust_inventory'){
         $id=sf_clean_text($b['product_id']??'',120);$variantId=max(0,(int)($b['variant_id']??0));$delta=(int)($b['delta']??0);$reason=sf_clean_text($b['reason']??'admin_adjustment',120);$r=sf_commerce_adjust_inventory($id,$variantId?:null,$delta,$reason,(int)$me['id']);
