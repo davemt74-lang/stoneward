@@ -14,7 +14,13 @@ function sf_fan_discovery_public(array $catalog):array {
  $rows=[];
  foreach($catalog as $track){
   $id=(string)($track['id']??'');
-  if($id===''||!sf_track_is_public($track))continue;
+  // Preserve the public-visibility boundary in standalone test contexts too.
+  // Production uses bootstrap's canonical guard; the fallback is equally restrictive.
+  if($id==='')continue;
+  $visible=function_exists('sf_track_is_public')?sf_track_is_public($track):
+   (($track['public_visible']??true)!==false
+    && !in_array((string)($track['state']??'published'),['draft','private','hidden','archived','deleted'],true));
+  if(!$visible)continue;
   if(function_exists('sf_seo_public_track')&&!sf_seo_public_track($id))continue;
   $rows[]=$track;
  }
