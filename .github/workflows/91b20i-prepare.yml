@@ -1,0 +1,50 @@
+name: Prepare 91B20I branch integration
+on:
+  push:
+    branches: [codex/91b20i-style-mood-boards]
+    paths: [.github/workflows/91b20i-prepare.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: github.repository == 'davemt74-lang/stoneward' && github.ref == 'refs/heads/codex/91b20i-style-mood-boards'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply narrow verified-source integration
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 9760450e7e1f20174f96ea5d9bb7b75d43140d92 HEAD
+          python .github/91b20i-integrate.py
+          node --check admin/assets/image-generation.js
+          node --check admin/assets/image-moodboards.js
+          node --test tests/section91b20i-style-moodboards.test.cjs
+          php -l api/image-studio-styles.php
+          php -l admin/api/image-generation.php
+          php tests/section91b20i-style-moodboards.php
+      - name: Commit only to the working branch, then remove this one-time helper
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          branch=codex/91b20i-style-mood-boards
+          actual="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          test "$actual" = "$EXPECTED_HEAD"
+          rm .github/workflows/91b20i-prepare.yml .github/91b20i-integrate.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(91B20I): integrate private style boards, consent reset and v1.3.235'
+          git push origin "HEAD:refs/heads/$branch"

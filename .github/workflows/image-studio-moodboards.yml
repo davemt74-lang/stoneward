@@ -1,0 +1,64 @@
+name: Image Studio Mood Board Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  moodboard-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Node contracts and SQLite behavior
+        run: |
+          node --test tests/section91b20i-style-moodboards.test.cjs
+          php tests/section91b20i-style-moodboards.php
+      - name: Start disposable MySQL
+        run: |
+          set -euo pipefail
+          pass="$(openssl rand -hex 24)"
+          root_pass="$(openssl rand -hex 24)"
+          echo "::add-mask::$pass"
+          echo "::add-mask::$root_pass"
+          echo "SF_MOODBOARD_DB_PASS=$pass" >> "$GITHUB_ENV"
+          docker run --detach --name moodboard-mysql --publish 127.0.0.1:3307:3306 \
+            --env MYSQL_DATABASE=stonefellow_moodboard_test --env MYSQL_USER=stonefellow \
+            --env MYSQL_PASSWORD="$pass" --env MYSQL_ROOT_PASSWORD="$root_pass" mysql:8.0
+          for attempt in {1..45}; do
+            if docker exec moodboard-mysql mysql -h127.0.0.1 -ustonefellow -p"$pass" stonefellow_moodboard_test -e 'SELECT 1' >/dev/null 2>&1; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Real MySQL concurrency and rollback
+        run: SF_MOODBOARD_DB=mysql php tests/section91b20i-style-moodboards.php
+      - name: Chromium desktop and mobile-width interaction
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+          SF_BROWSER_OUTPUT=dist/moodboard-browser python tests/section91b20i-style-moodboards-browser.py
+      - name: Browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moodboard-browser-evidence
+          path: dist/moodboard-browser/
+          if-no-files-found: ignore
+      - name: Remove disposable MySQL
+        if: always()
+        run: docker rm --force moodboard-mysql || true
