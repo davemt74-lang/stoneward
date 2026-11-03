@@ -17,19 +17,24 @@ function sf_upgrade_csrf(): string {
 }
 function sf_upgrade_csrf_valid(string $v): bool {return $v!==''&&hash_equals(sf_upgrade_csrf(),$v);}
 function sf_upgrade_admin_from_session(): ?array {
-    sf_user_session();$id=(int)($_SESSION['sf_user_id']??0);if($id<1)return null;
+    sf_user_session();
+    // Upgrade must also honor persistent-token revocation, without newer lifecycle columns.
+    $id=sf_auth_restore_user_id();
+    if($id<1){unset($_SESSION['sf_user_id']);return null;}
     try{
         $q=sf_db()->prepare('SELECT id,email,display_name,role,status FROM users WHERE id=? LIMIT 1');$q->execute([$id]);$u=$q->fetch();
         if(!$u||($u['status']??'')!=='active'||($u['role']??'')!=='admin')return null;
+        if((int)($_SESSION['sf_user_id']??0)!==$id){session_regenerate_id(true);$_SESSION['sf_user_id']=$id;$_SESSION['sf_upgrade_csrf']=bin2hex(random_bytes(32));}
         return $u;
     }catch(Throwable $e){return null;}
 }
-function sf_upgrade_admin_login(string $email,string $password): ?array {
-    $email=strtolower(trim($email));if(!filter_var($email,FILTER_VALIDATE_EMAIL)||$password==='')return null;
-    $q=sf_db()->prepare('SELECT id,email,display_name,role,status,password_hash FROM users WHERE email=? LIMIT 1');$q->execute([$email]);$u=$q->fetch();
-    if(!$u||($u['status']??'')!=='active'||($u['role']??'')!=='admin'||!password_verify($password,(string)$u['password_hash']))return null;
-    sf_user_session();session_regenerate_id(true);$_SESSION['sf_user_id']=(int)$u['id'];$_SESSION['sf_csrf']=bin2hex(random_bytes(32));$_SESSION['sf_upgrade_csrf']=bin2hex(random_bytes(32));
-    unset($u['password_hash']);return $u;
+function sf_upgrade_admin_login(string $email,string $password): array {
+    $result=sf_auth_password_check($email,$password,'upgrade');
+    if(!$result['ok'])return $result;
+    $u=$result['user'];sf_user_session();session_regenerate_id(true);
+    sf_auth_issue_persistent_session((int)$u['id']);
+    $_SESSION['sf_user_id']=(int)$u['id'];$_SESSION['sf_csrf']=bin2hex(random_bytes(32));$_SESSION['sf_upgrade_csrf']=bin2hex(random_bytes(32));
+    return $result;
 }
 function sf_upgrade_lock_acquire() {
     $path=SF_ROOT.'/storage/upgrade-running.lock';$dir=dirname($path);if(!is_dir($dir))@mkdir($dir,0770,true);
@@ -52,10 +57,12 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'&&$fatal===''){
     $action=(string)($_POST['action']??'');
     if(!sf_upgrade_csrf_valid((string)($_POST['csrf']??''))){$message='The upgrade security token expired. Reload this page and try again.';$messageType='error';}
     elseif($action==='login'){
-        try{$admin=sf_upgrade_admin_login((string)($_POST['email']??''),(string)($_POST['password']??''));if(!$admin){usleep(250000);$message='Administrator email or password is incorrect.';$messageType='error';}}
-        catch(Throwable $e){$message='Administrator authentication could not be completed. Review protected server logs.';$messageType='error';}
+        try{$result=sf_upgrade_admin_login((string)($_POST['email']??''),(string)($_POST['password']??''));}
+        catch(Throwable $e){error_log('Stonefellow upgrade login failed: '.get_class($e));$result=sf_login_unavailable();}
+        if($result['ok']){$admin=$result['user'];}
+        else{sf_login_error_headers($result);$message=$result['message'];$messageType='error';}
     }elseif($action==='logout'){
-        sf_user_session();unset($_SESSION['sf_user_id'],$_SESSION['sf_csrf'],$_SESSION['sf_upgrade_csrf']);session_regenerate_id(true);$admin=null;$message='Upgrade session signed out.';$messageType='info';
+        sf_logout_user();$admin=null;$message='Upgrade session signed out.';$messageType='info';
     }elseif($action==='run'){
         $admin=sf_upgrade_admin_from_session();
         if(!$admin){$message='Administrator authentication is required.';$messageType='error';}

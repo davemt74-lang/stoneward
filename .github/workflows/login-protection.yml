@@ -1,0 +1,41 @@
+name: Unified Login Protection Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  login-security-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-ci-only
+          MYSQL_DATABASE: stonefellow_login_test
+        ports: ['33306:3306']
+        options: --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pisolated-ci-only" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql
+          coverage: none
+      - name: Endpoint contracts and input normalization
+        run: php tests/section91b21b1-login-contract.php
+      - name: SQLite concurrent admission and upgrade sessions
+        env:
+          SF_TEST_DRIVER: sqlite
+        run: php tests/section91b21b1-login-runtime.php
+      - name: MySQL concurrent admission and upgrade sessions
+        env:
+          SF_TEST_DRIVER: mysql
+          SF_TEST_MYSQL_PASSWORD: isolated-ci-only
+        run: php tests/section91b21b1-login-runtime.php
+      - name: HTTP controllers, cookie sessions, CSRF and cooldown recovery
+        run: python3 tests/section91b21b1-login-http.py

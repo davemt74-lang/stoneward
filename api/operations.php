@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/login-security.php';
 
 function sf_ops_ensure_schema(): void {
     static $done=false;
@@ -99,15 +100,17 @@ function sf_listening_users(int $days=30): array {
 function sf_ops_recent_admin_audit(int $limit=100): array {sf_ops_ensure_schema();$limit=max(1,min(250,$limit));$q=sf_db()->query("SELECT a.*,u.display_name,u.email FROM admin_audit_log a LEFT JOIN users u ON u.id=a.admin_user_id ORDER BY a.id DESC LIMIT ".$limit);return $q->fetchAll();}
 function sf_ops_recent_site_events(int $limit=100): array {sf_ops_ensure_schema();$limit=max(1,min(250,$limit));return sf_db()->query("SELECT * FROM site_event_log ORDER BY id DESC LIMIT ".$limit)->fetchAll();}
 function sf_auth_attempt_hash(string $email): string {return hash('sha256',strtolower(trim($email)));}
-function sf_auth_ip_hash(): string {return hash('sha256',(string)($_SERVER['REMOTE_ADDR']??''));}
+function sf_auth_ip_hash(): string {return hash('sha256',sf_login_source_ip());}
+/** Compatibility read only; password endpoints use atomic sf_auth_password_check admission. */
 function sf_auth_login_allowed(string $email): array {
-    sf_ops_ensure_schema();$hash=sf_auth_attempt_hash($email);$ip=sf_auth_ip_hash();$since=gmdate('c',time()-15*60);$q=sf_db()->prepare('SELECT COUNT(*) FROM auth_attempts WHERE identifier_hash=? AND success=0 AND created_at>=?');$q->execute([$hash,$since]);$emailFails=(int)$q->fetchColumn();$q=sf_db()->prepare('SELECT COUNT(*) FROM auth_attempts WHERE ip_hash=? AND success=0 AND created_at>=?');$q->execute([$ip,$since]);$ipFails=(int)$q->fetchColumn();$blocked=$emailFails>=8||$ipFails>=30;
-    return ['ok'=>!$blocked,'failures'=>$emailFails,'ip_failures'=>$ipFails,'retry_after_seconds'=>$blocked?900:0];
+    sf_login_security_schema();$db=sf_db();$now=time();
+    $retry=max(sf_login_bucket_delay($db,'identifier_hash',sf_auth_attempt_hash($email),SF_LOGIN_ACCOUNT_LIMIT,$now),
+        sf_login_bucket_delay($db,'ip_hash',sf_auth_ip_hash(),SF_LOGIN_IP_LIMIT,$now));
+    return $retry>0?sf_login_retry_result($retry):['ok'=>true,'retry_after_seconds'=>0];
 }
 function sf_auth_record_attempt(string $email,bool $success): void {
-    sf_ops_ensure_schema();$q=sf_db()->prepare('INSERT INTO auth_attempts(identifier_hash,ip_hash,success,created_at) VALUES(?,?,?,?)');$q->execute([sf_auth_attempt_hash($email),sf_auth_ip_hash(),$success?1:0,gmdate('c')]);
-    // Keep the table bounded.
-    if(random_int(1,50)===1){$cut=gmdate('c',time()-30*86400);sf_db()->prepare('DELETE FROM auth_attempts WHERE created_at<?')->execute([$cut]);}
+    sf_login_security_schema();$q=sf_db()->prepare('INSERT INTO auth_attempts(identifier_hash,ip_hash,success,created_at) VALUES(?,?,?,?)');
+    $q->execute([sf_auth_attempt_hash($email),sf_auth_ip_hash(),$success?1:0,gmdate('c')]);
 }
 function sf_order_request_claim(string $key,?int $userId): array {sf_ops_ensure_schema();if(!preg_match('/^[A-Za-z0-9._:-]{16,128}$/',$key))return ['state'=>'none','order_id'=>''];$pdo=sf_db();try{$q=$pdo->prepare('INSERT INTO order_request_keys(request_key,user_id,order_id,created_at) VALUES(?,?,?,?)');$q->execute([$key,$userId?:null,'',gmdate('c')]);return ['state'=>'new','order_id'=>''];}catch(Throwable $e){$q=$pdo->prepare('SELECT order_id,created_at FROM order_request_keys WHERE request_key=? LIMIT 1');$q->execute([$key]);$r=$q->fetch();if(!$r)return ['state'=>'none','order_id'=>''];if((string)($r['order_id']??'')!=='')return ['state'=>'existing','order_id'=>(string)$r['order_id']];if(strtotime((string)($r['created_at']??''))<time()-300){$pdo->prepare("UPDATE order_request_keys SET user_id=?,created_at=? WHERE request_key=? AND order_id=''")->execute([$userId?:null,gmdate('c'),$key]);return ['state'=>'new','order_id'=>''];}return ['state'=>'in_progress','order_id'=>''];}}
 function sf_order_request_complete(string $key,string $orderId): void {if(!preg_match('/^[A-Za-z0-9._:-]{16,128}$/',$key))return;sf_ops_ensure_schema();$q=sf_db()->prepare('UPDATE order_request_keys SET order_id=? WHERE request_key=?');$q->execute([$orderId,$key]);}
