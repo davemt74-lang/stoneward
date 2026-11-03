@@ -144,4 +144,27 @@ check(sf_user_by_email('user9@example.invalid')['password_hash']===$old,'Failed 
 check(sf_account_action_token_lookup('password_reset',$token)!==null,'Failed reset preserves retryable reset token');
 $pdo->exec('DROP TRIGGER reject_revoke');
 if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
+
+$checkout=['id'=>'cs_trial_first','mode'=>'subscription','payment_status'=>'no_payment_required','customer'=>'cus_9','subscription'=>'sub_9','metadata'=>['stonefellow_user_id'=>9,'stonefellow_package_id'=>100]];
+sf_billing_process_stripe_event(['id'=>'evt_checkout_first','type'=>'checkout.session.completed','data'=>['object'=>$checkout]]);
+$trialFirst=$trial;$trialFirst['id']='sub_9';$trialFirst['customer']='cus_9';$trialFirst['metadata']['stonefellow_user_id']=9;
+sf_billing_process_stripe_event(['id'=>'evt_trial_second','type'=>'customer.subscription.created','data'=>['object'=>$trialFirst]]);
+check(sf_membership_state(9)['active']&&row(9)['status']==='trialing','Checkout-before-creation cannot strand a valid Stripe trial');
+$renewed=row(8);$oldCreation=['id'=>'sub_8','customer'=>'cus_8','status'=>'active','metadata'=>['stonefellow_user_id'=>8,'stonefellow_package_id'=>100],'current_period_start'=>time()-7200,'current_period_end'=>time()-3600];
+sf_billing_process_stripe_event(['id'=>'evt_old_creation','type'=>'customer.subscription.created','data'=>['object'=>$oldCreation]]);
+check(row(8)['current_period_end']===$renewed['current_period_end'],'Delayed creation cannot rewind a paid renewal period');
+$rosterSource=file_get_contents($root.'/admin/api/membership.php');$a=strpos($rosterSource,'function sf_admin_membership_members(');$b=strpos($rosterSource,"if(\$method==='GET')",$a);
+if($a===false||$b===false)throw new RuntimeException('Cannot isolate production Admin roster helper');
+eval(substr($rosterSource,$a,$b-$a));
+$future=gmdate('c',time()+3600);$past=gmdate('c',time()-3600);
+seed(1);seed(2,['status'=>'trialing','trial_ends_at'=>$past]);seed(3,['status'=>'trialing','trial_ends_at'=>$future]);
+seed(4,['cancel_at_period_end'=>1,'current_period_end'=>$past]);seed(5,['package_id'=>101,'current_period_end'=>$past]);
+seed(6,['current_period_end'=>$past]);seed(7,['status'=>'past_due','grace_ends_at'=>$future]);
+seed(8,['provider'=>'stripe','provider_customer_id'=>'cus_8','provider_subscription_id'=>'sub_8']);
+seed(9,['current_period_end'=>null]);seed(10,['status'=>'trialing','trial_ends_at'=>'invalid']);
+$expected=[1=>true,2=>false,3=>true,4=>false,5=>true,6=>false,7=>true,8=>true,9=>false,10=>false];
+$members=sf_admin_membership_members();check(count($members)===10,'Admin roster returns all isolated membership fixtures');
+foreach($members as $member){$uid=(int)$member['user_id'];check($member['active']===$expected[$uid]&&$member['status']===sf_membership_state($uid)['status'],'Admin roster and member access agree for user '.$uid);}
+$summary=sf_membership_summary();check($summary['active_members']===5&&array_sum($summary['tiers'])===5,'Dashboard totals count current paid, trial, free and grace periods consistently');
+
 echo "91B21A $driver runtime: $checks assertions passed\n";

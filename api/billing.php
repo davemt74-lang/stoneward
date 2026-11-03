@@ -138,14 +138,22 @@ function sf_billing_event_identity(array $obj): array {
 }
 function sf_billing_bind_stripe_subscription(int $uid,int $pkg,string $customer,string $subId,string $status,string $now): void {
     if($uid<=0||$customer===''||$subId==='')throw new InvalidArgumentException('Complete Stripe subscription identity is required.');
-    $pdo=sf_db();$q=$pdo->prepare('SELECT * FROM user_subscriptions WHERE user_id=?');$q->execute([$uid]);$bound=$q->fetch();
-    if($bound&&sf_subscription_provider_linked($bound)){
-        if((string)$bound['provider_subscription_id']!==$subId||(string)$bound['provider_customer_id']!==$customer)
-            throw new RuntimeException('A different Stripe billing relationship already exists. Reconcile before binding another subscription.');
-        return;
-    }
-    if($bound){$pdo->prepare("UPDATE user_subscriptions SET package_id=CASE WHEN ? > 0 THEN ? ELSE package_id END,status=?,provider='stripe',provider_customer_id=?,provider_subscription_id=?,cancel_at_period_end=0,canceled_at=NULL,updated_at=? WHERE user_id=?")->execute([$pkg,$pkg,$status,$customer,$subId,$now,$uid]);}
-    else{$pdo->prepare("INSERT INTO user_subscriptions(user_id,package_id,status,trial_started_at,trial_ends_at,current_period_start,current_period_end,created_at,updated_at,provider,provider_customer_id,provider_subscription_id,cancel_at_period_end) VALUES(?,?,?,NULL,NULL,NULL,NULL,?,?,'stripe',?,?,0)")->execute([$uid,$pkg?:null,$status,$now,$now,$customer,$subId]);}
+    sf_billing_ensure_schema();$pdo=sf_db();$pdo->beginTransaction();
+    try{
+        sf_subscription_lock_user($pdo,$uid);
+        $q=$pdo->prepare('SELECT * FROM user_subscriptions WHERE user_id=?');$q->execute([$uid]);$bound=$q->fetch();
+        if($bound&&sf_subscription_provider_linked($bound)){
+            if((string)$bound['provider_subscription_id']!==$subId||(string)$bound['provider_customer_id']!==$customer)
+                throw new RuntimeException('A different Stripe billing relationship already exists. Reconcile before binding another subscription.');
+        }elseif($bound){
+            $pdo->prepare("UPDATE user_subscriptions SET package_id=CASE WHEN ? > 0 THEN ? ELSE package_id END,status=?,provider='stripe',provider_customer_id=?,provider_subscription_id=?,trial_started_at=NULL,trial_ends_at=NULL,current_period_start=NULL,current_period_end=NULL,cancel_at_period_end=0,canceled_at=NULL,grace_ends_at=NULL,updated_at=? WHERE user_id=?")
+                ->execute([$pkg,$pkg,$status,$customer,$subId,$now,$uid]);
+        }else{
+            $pdo->prepare("INSERT INTO user_subscriptions(user_id,package_id,status,trial_started_at,trial_ends_at,current_period_start,current_period_end,created_at,updated_at,provider,provider_customer_id,provider_subscription_id,cancel_at_period_end) VALUES(?,?,?,NULL,NULL,NULL,NULL,?,?,'stripe',?,?,0)")
+                ->execute([$uid,$pkg?:null,$status,$now,$now,$customer,$subId]);
+        }
+        $pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     if(function_exists('sf_membership_sync_crm'))sf_membership_sync_crm($uid);
 }
 function sf_billing_process_stripe_event(array $event,string $payloadHash=''): void {
@@ -176,7 +184,12 @@ function sf_billing_process_stripe_event(array $event,string $payloadHash=''): v
             [$uid,$pkg]=sf_billing_event_identity($obj);if($uid<=0)$uid=(int)($obj['client_reference_id']??0);$customer=(string)($obj['customer']??'');$subId=(string)($obj['subscription']??'');$status=((string)($obj['payment_status']??''))==='paid'?'active':'pending_payment';if($uid>0){sf_billing_bind_stripe_subscription($uid,$pkg,$customer,$subId,$status,$now);sf_billing_log($uid,'checkout_completed','stripe',(string)($obj['id']??''),['package_id'=>$pkg]);}
         }
         elseif($type==='customer.subscription.created'){
-            [$uid,$pkg]=sf_billing_event_identity($obj);$subId=(string)($obj['id']??'');$customer=is_string($obj['customer']??null)?(string)$obj['customer']:'';$status=(string)($obj['status']??'active');if($uid>0){sf_billing_bind_stripe_subscription($uid,$pkg,$customer,$subId,$status,$now);$start=sf_timestamp_iso($obj['current_period_start']??0);$end=sf_timestamp_iso($obj['current_period_end']??0);$pdo->prepare('UPDATE user_subscriptions SET current_period_start=COALESCE(?,current_period_start),current_period_end=COALESCE(?,current_period_end),trial_started_at=COALESCE(?,trial_started_at),trial_ends_at=COALESCE(?,trial_ends_at),updated_at=? WHERE user_id=?')->execute([$start,$end,sf_timestamp_iso($obj['trial_start']??0),sf_timestamp_iso($obj['trial_end']??0),$now,$uid]);sf_billing_log($uid,'customer.subscription.created','stripe',$subId,['package_id'=>$pkg,'status'=>$status]);}
+            [$uid,$pkg]=sf_billing_event_identity($obj);
+            $subId=(string)($obj['id']??'');$customer=is_string($obj['customer']??null)?$obj['customer']:'';
+            if($uid>0){
+                sf_billing_bind_stripe_subscription($uid,$pkg,$customer,$subId,(string)($obj['status']??'pending_payment'),$now);
+                sf_subscription_record_creation($uid,$obj);
+            }
         }
         elseif(in_array($type,['invoice.paid','invoice.payment_succeeded'],true)){
             sf_subscription_apply_paid_invoice($obj);

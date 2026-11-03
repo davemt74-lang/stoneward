@@ -31,3 +31,6 @@ No real customer data, Stripe settings, live provider requests or actual charges
 https://docs.stripe.com/api/events/types
 https://docs.stripe.com/webhooks
 https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end
+
+## Final review additions
+Admin roster and dashboard queries include all effective-date/provider/price fields and are behavior-tested against member access. Initial provider binding uses the same user lock as local assignments and resets inherited local dates. Checkout-before-trial creation is supported; delayed creation cannot rewind a paid renewal. A missing package is not inferred to be free.

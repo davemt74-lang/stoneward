@@ -42,4 +42,5 @@ $ambiguous=sf_subscription_provider_periods(['items'=>['data'=>[['current_period
 check(!isset($ambiguous['current_period_end']),'Mixed intervals are not guessed');
 $legacy=sf_subscription_provider_periods(['current_period_start'=>$now-10,'current_period_end'=>$now+3600]);
 check($legacy['current_period_end']===$now+3600,'Legacy subscription periods preserved');
+check(!sf_subscription_access_active(['status'=>'active','monthly_price_cents'=>null]),'Missing package price is not a free plan');
 echo "91B21A pure policy: $checks checks passed\n";

@@ -28,7 +28,7 @@ function sf_subscription_effective_status(array $sub,?int $now=null): string {
     if (!empty($sub['cancel_at_period_end'])) return 'canceled';
     // Only an explicitly free, unlinked local plan renews without a payment.
     if (!sf_subscription_provider_linked($sub)
-        && array_key_exists('monthly_price_cents',$sub) && (int)$sub['monthly_price_cents']===0) return 'active';
+        && isset($sub['monthly_price_cents']) && (int)$sub['monthly_price_cents']===0) return 'active';
     return 'expired';
 }
 function sf_subscription_access_active(array $sub,?int $now=null): bool {
@@ -209,4 +209,28 @@ function sf_subscription_provider_periods(array $object): array {
         [$object['current_period_start'],$object['current_period_end']]=array_values($periods)[0];
     }
     return $object;
+}
+
+/** Creation may supply a pending trial's dates but must not rewind a paid renewal. */
+function sf_subscription_record_creation(int $uid,array $object): void {
+    $pdo=sf_db();$pdo->beginTransaction();
+    try {
+        sf_subscription_lock_user($pdo,$uid);
+        $q=$pdo->prepare('SELECT * FROM user_subscriptions WHERE user_id=?');$q->execute([$uid]);$sub=$q->fetch();
+        if(!$sub||(string)$sub['provider_subscription_id']!==(string)($object['id']??'')
+            ||(string)$sub['provider_customer_id']!==(string)($object['customer']??''))
+            throw new RuntimeException('Subscription creation has a conflicting billing identity.');
+        $start=(int)($object['current_period_start']??0);$end=(int)($object['current_period_end']??0);
+        $currentEnd=sf_subscription_deadline($sub['current_period_end']??null);
+        if(!in_array((string)$sub['status'],['canceled','incomplete_expired'],true)
+            && $start>0 && $end>$start && ($currentEnd===0||$end>=$currentEnd)){
+            $status=(string)$sub['status'];
+            // Checkout can arrive before a trial's creation event. Only advance pending -> trial.
+            if($status==='pending_payment'&&($object['status']??'')==='trialing'&&(int)($object['trial_end']??0)>time())$status='trialing';
+            $pdo->prepare('UPDATE user_subscriptions SET status=?,current_period_start=?,current_period_end=?,trial_started_at=COALESCE(?,trial_started_at),trial_ends_at=COALESCE(?,trial_ends_at),updated_at=? WHERE user_id=?')
+                ->execute([$status,gmdate('c',$start),gmdate('c',$end),sf_timestamp_iso($object['trial_start']??0),sf_timestamp_iso($object['trial_end']??0),gmdate('c'),$uid]);
+        }
+        sf_billing_log($uid,'customer.subscription.created','stripe',(string)$object['id'],['status'=>$sub['status']]);
+        $pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 }
