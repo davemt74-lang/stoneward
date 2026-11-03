@@ -12,20 +12,26 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Summarize specific failed job
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import urllib.request, os, re
+          import urllib.request, urllib.error, os, re
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self,*args,**kwargs): return None
           req=urllib.request.Request('https://api.github.com/repos/davemt74-lang/stoneward/actions/jobs/126044061790/logs',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
-          data=urllib.request.urlopen(req,timeout=60).read().decode('utf-8-sig')
-          lines=data.splitlines()
+          try: data=urllib.request.build_opener(NoRedirect).open(req,timeout=60).read()
+          except urllib.error.HTTPError as e:
+            if e.code!=302: raise
+            data=urllib.request.urlopen(e.headers['Location'],timeout=60).read()
+          lines=data.decode('utf-8-sig').splitlines()
           hits=[i for i,s in enumerate(lines) if re.search(r'AssertionError|not ok |FAIL|Expected|did not match|at .*tests/',s)]
           for i in hits[:25]:
             print('\nDIAGNOSTIC LINE',i)
             for s in lines[max(0,i-2):i+4]: print(s[:900])
           print('\nTAIL')
-          for s in lines[-35:]:print(s[:500])
+          for s in lines[-25:]:print(s[:500])
           PY
       - uses: actions/checkout@v4
       - name: Package exact branch source for local regression
