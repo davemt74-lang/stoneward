@@ -5,7 +5,7 @@ on:
     types: [completed]
     branches: [main]
 permissions:
-  contents: read
+  contents: write
 jobs:
   package:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
@@ -31,3 +31,26 @@ jobs:
             dist/stonefellow-deploy.zip.sha256
           if-no-files-found: error
           retention-days: 30
+      - name: Publish direct ZIP and checksum as release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CERTIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          version="$(grep -oE "'stonefellow'=>'[0-9]+[.][0-9]+[.][0-9]+'" version.php | head -n 1 | cut -d "'" -f 4)"
+          if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo '::error::Invalid Stonefellow release version'; exit 1
+          fi
+          tag="stonefellow-v${version}-${CERTIFIED_SHA:0:8}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Direct-release tag $tag already exists; leaving published files immutable."
+          else
+            gh release create "$tag" dist/stonefellow-deploy.zip dist/stonefellow-deploy.zip.sha256 \
+              --target "$CERTIFIED_SHA" --title "Stonefellow v${version} (${CERTIFIED_SHA:0:8})" \
+              --notes "Direct deployment ZIP from certified commit $CERTIFIED_SHA. GitHub Release Gate and SHA-256 verification passed. Unpack only stonefellow-deploy.zip on the server."
+          fi
+          gh release view "$tag" --json assets --jq '.assets[].name' | grep -Fx stonefellow-deploy.zip
+          gh release view "$tag" --json assets --jq '.assets[].name' | grep -Fx stonefellow-deploy.zip.sha256
+          echo "Direct ZIP: https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/stonefellow-deploy.zip" >> "$GITHUB_STEP_SUMMARY"
+          echo "Checksum: https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/stonefellow-deploy.zip.sha256" >> "$GITHUB_STEP_SUMMARY"
