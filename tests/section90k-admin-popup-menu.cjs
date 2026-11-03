@@ -29,7 +29,7 @@ const elements=new Map();
 const element=(id,extra={})=>{
  const attributes={};
  const el={id,hidden:false,innerHTML:'',textContent:'',scrollTop:0,scrollHeight:300,
-  classList:{toggle:(name,on)=>{el.classes[name]=on}},classes:{},
+  classList:{toggle:(name,on)=>{el.classes[name]=on}},classes:{},querySelectorAll:()=>[],
   setAttribute:(name,value)=>{attributes[name]=value},getAttribute:name=>attributes[name],...extra};
  elements.set(id,el);return el;
 };

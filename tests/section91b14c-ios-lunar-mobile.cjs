@@ -41,7 +41,7 @@ check('Start Chat begins voice listening and hides while an active microphone is
   assert.match(canvas,/chatStart\.hidden=active/);
   assert.match(canvas,/Resume Chat':'◉ Start Chat'/);
   assert.match(canvas,/if\(action==='start-chat'\)options\.onStartChat\?\.\(\)/);
-  assert.match(app,/onStartChat:\(\)=>\{if\(!st\.conversationOn\|\|iosVoiceNeedsGesture\)void handleVoiceClick\(\);\}/);
+  assert.match(app,/onStartChat:\(\)=>\{beginWelcome\(\);if\(!st\.conversationOn\|\|iosVoiceNeedsGesture\)void handleVoiceClick\(\);\}/);
   assert.match(app,/SFPublicAgentCanvas\?\.syncVoice\?\.\(\)/);
   assert.match(canvas,/data-orbit-action="player"[^>]*data-tip="Music Player"/);
 });

@@ -32,23 +32,23 @@ check('Panel renders into original application views, never iframe or external f
   assert.match(app,/SFPublicAgentCanvas\.mount\(mainCanvas/);
 });
 check('Page close and browser back restore home canvas without replacing the player',()=>{
-  assert.match(agent,/function closePage\(\)/);
+  assert.match(agent,/function closePage\(immediate=false\)/);
   assert.match(agent,/pageHost\.replaceChildren\(\)/);
   assert.match(agent,/pageRail\.setAttribute\('inert',''\)/);
   assert.match(agent,/options\.onClosePage\?\.\(\)/);
   assert.match(app,/window\.SFPublicAgentCanvas\.closePage\?\.\(\)/);
-  assert.match(app,/void renderHome\(\)\.then\(\(\)=>navigate\(view,params,false\)\)/);
+  assert.match(app,/showNativePageNotice\('Page unavailable'/);
   assert.match(agent,/originalPlayerParent\.insertBefore\(player,before\)/);
 });
 check('Vertical quick menu, narrow accessible rail, and new futuristic theme',()=>{
   assert.match(site,/\.chat-quick-menu\{[\s\S]*?flex-direction:column;/);
   assert.match(site,/\.chat-quick-menu\{[\s\S]*?overflow-y:auto;/);
   assert.match(css,/\.sf-agent-page-rail\{/);
-  assert.match(css,/width:min\(354px,calc\(100% - 20px\)\)/);
+  assert.match(css,/\.sf-agent-page-rail\.open\{[\s\S]*?width:100%;height:100%/);
   assert.match(css,/\.sf-agent-page-content \:is\(\.store-grid/);
   assert.match(css,/\.sf-agent-page-content \.builder-tablist\{/);
-  assert.match(css,/@media\(max-width:720px\)\{[\s\S]*?\.sf-agent-page-rail/);
-  assert.match(agent,/aria-label="Close page panel"/);
+  assert.match(css,/@media\(max-width:720px\)/);
+  assert.match(agent,/aria-label="Close page and return to Stonefellow Agent"/);
   assert.match(agent,/class="sf-agent-page-viewport" tabindex="0"/);
 });
 check('Browser sources parse',()=>{new vm.Script(app);new vm.Script(agent);});

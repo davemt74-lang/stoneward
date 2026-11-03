@@ -92,6 +92,6 @@ $route=(string)file_get_contents(dirname(__DIR__).'/api/agent-song-annotations.p
 $runtime=(string)file_get_contents(dirname(__DIR__).'/api/agent-runtime.php');
 $check(str_contains($route,"\$action==='share'")&&str_contains($route,'sf_require_user(false,$method===\'POST\')'),
     'Sharing endpoint requires authenticated CSRF-protected writes');
-$check(str_contains($runtime,'sf_song_annotation_agent_context($userId,$message')&&str_contains($runtime,"if(\$sharedSongNotes==='')"),
+$check(str_contains($runtime,'sf_song_annotation_agent_context($userId,$message')&&str_contains($runtime,"if(\$sharedSongNotes===''&&"),
     'Signed-in chat uses scoped context and skips secondary LLM evaluation on private-note turns');
 echo "Section 91B8F: $passes sharing and privacy assertions passed\n";

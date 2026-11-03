@@ -52,7 +52,7 @@ async function main(){
   });
   check('Agent context excludes unshared drafts and secondary evaluator',()=>{
     assert.match(runtime,/sf_song_annotation_agent_context\(\$userId,\$message/);
-    assert.ok(runtime.includes("if($sharedSongNotes==='')"));
+    assert.match(runtime,/if\(\$sharedSongNotes===\x27\x27&&/);
     assert.match(runtime,/sf_agent_jev_evaluate\(\$message,\$evaluationContext/);
   });
   check('App remains syntactically parseable',()=>new vm.Script(app));

@@ -31,7 +31,7 @@ function voiceHarness(ios,engine){
       async isSelected(){remoteLookups++;throw Error('This must not run in the click handler')},
       start(){speechStarts++;return Promise.resolve()}
     }},
-    recognition:{},showTranscript(){},agent(){},updateConversationButton(){},syncConversationMusic(){},
+    recognition:{},beginWelcome(){},showTranscript(){},agent(){},updateConversationButton(){},syncConversationMusic(){},
     conversationBargeIn:{prepare(){monitorPrepare++;return Promise.resolve()}},
     startConversationListen(){originalStarts++},stopConversation(){stopCount++}
   };

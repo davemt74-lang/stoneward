@@ -37,7 +37,7 @@ check('Original header and footer are preserved in PHP',()=>{
 check('New experience mounts only on the selected public Home, leaving classic logic intact',()=>{
   assert.match(app,/homepageTemplate==='agent_canvas'&&await renderAgentCanvas\(\)/);
   assert.match(app,/if\(artistHomepageEnabled&&await renderArtistHomepage\(\)\)/);
-  assert.match(app,/if\(event\.detail\?\.view!=='home'\)/);
+  assert.match(app,/if\(event\.detail\?\.view==='builder'\)/);
   assert.match(app,/SFPublicAgentCanvas\?\.unmount/);
 });
 check('Original agent lifecycle informs the new orb without changing speech backend',()=>{
@@ -45,9 +45,9 @@ check('Original agent lifecycle informs the new orb without changing speech back
   assert.match(app,/onOpenChat:\(\)=>\{void openChatPopup\(\)/);
   assert.match(moduleSource,/data-mode="idle"/);
 });
-check('Real lyric capture is invoked by the new agent, not reimplemented',()=>{
-  assert.match(app,/onStartCapture:async\(\)=>\{/);
-  assert.match(app,/executeSongCaptureAction\(\{type:'song_capture_start'\}\)/);
+check('Real recording launches the dedicated vocal studio while listening stays delegated',()=>{
+  assert.match(app,/onStartCapture:\(\)=>openVocalStudio\('vocal'\)/);
+  assert.match(app,/onListenInterpret:async\(\)=>/);
   assert.match(app,/SFPublicAgentCanvas\?\.syncSongExperience/);
   assert.match(moduleSource,/StonefellowSongExperience\.mount\(smallSession\)/);
   assert.match(moduleSource,/StonefellowSongExperience\.mount\(bigSession\)/);
@@ -121,7 +121,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   }
   const selectors=['.sf-agent-landing','.sf-agent-floater','.sf-agent-visual','.sf-agent-sphere','.sf-agent-state',
     '.sf-agent-mesh','.sf-agent-cloud','.sf-agent-points','.sf-agent-workspace','.sf-agent-panel',
-    '.sf-agent-session','.sf-agent-expanded-session','.sf-agent-player-dock','.sf-agent-chat-start'];
+    '.sf-agent-session','.sf-agent-expanded-session','.sf-agent-page-rail','.sf-agent-page-title','.sf-agent-page-viewport','.sf-agent-page-content','.sf-agent-player-dock','.sf-agent-chat-start'];
   const elements={};for(const key of selectors)elements[key]=new Element(key);
   elements['.sf-agent-landing'].clientWidth=950;elements['.sf-agent-landing'].clientHeight=650;
   const rootElement=elements['.sf-agent-landing'];
@@ -134,7 +134,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   const window={matchMedia:()=>({matches:true}),addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type),
     setTimeout:(fn,delay)=>{const id=++nextTimer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),devicePixelRatio:1,
     StonefellowSongExperience:{active:()=>true,mount:host=>{mountCalls++;host.mounted=true;}}};
-  const scope={window,document:{body:{dataset:{}},querySelectorAll:()=>[]},ResizeObserver:class{observe(){}disconnect(){}},
+  const scope={window,document:{body:new Element('body'),querySelectorAll:()=>[],createElement:tag=>new Element(tag)},ResizeObserver:class{observe(){}disconnect(){}},
     requestAnimationFrame:()=>1,cancelAnimationFrame(){},performance:{now:()=>1000}};
   vm.runInNewContext(moduleSource,scope);
   check('Initial UI mounts with a real capture/report card in both agent and workspace',()=>{
@@ -164,7 +164,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   });
   capturing=true;window.SFPublicAgentCanvas.setState('recording');window.SFPublicAgentCanvas.syncSongExperience();
   assert.equal(elements['.sf-agent-floater'].dataset.mode,'recording');
-  assert.equal(captureButtons[0].hidden,true);
+  assert.equal(captureButtons[0].hidden,false); // Studio stays available while lyric listening is active
   fireAction('close-panel');assert.equal(elements['.sf-agent-panel'].hidden,true);
   window.SFPublicAgentCanvas.setState('recording');window.SFPublicAgentCanvas.syncSongExperience();
   assert.equal(elements['.sf-agent-panel'].hidden,false);
