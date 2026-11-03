@@ -18,8 +18,8 @@ check('Unpublished or unavailable audio blocked',()=>assert.equal(skill.resolveP
 check('Missing track blocked',()=>assert.equal(skill.resolvePublished('Play something from Happier Than Hey',tracks.slice(1),{type:'play_track',track_id:'hands'},receipt).action.type,'none'));
 const app=read('assets/js/app.js'),api=read('api/agent-runtime.php'),ops=read('api/operations.php');
 check('Browser sends IANA time zone on chat requests',()=>assert.match(app,/timezone:Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone/));
-check('Browser sends active release for conversational references',()=>assert.match(app,/active_release_title:st\.track\?\.release/));
-check('Song play recorded after successful audio play promise',()=>assert.match(app,/audio\.play\(\)\.then\(\(\)=>\{recordListen\(startAt>0\?'resume':'start'\)/));
+check('Browser sends active release for conversational references',()=>assert.match(app,/active_release_title:current\.track\?\.release/));
+check('Song play recorded only after confirmed audio play promise',()=>{assert.match(app,/Promise\.resolve\(attempt\)\.then\(\(\)=>\{/);assert.match(app,/if\(!playbackLifecycle\.isCurrent\(token\)/);assert.match(app,/recordListen\(startAt>0\?'resume':'start'\)/)});
 check('Server persists UTC playback timestamps',()=>assert.match(ops,/source,created_at\) VALUES\(\?,\?,\?,\?,\?,\?,\?,\?\)/));
 check('Server provides verified album playback receipt',()=>assert.match(api,/method'=>'release_catalog','status'=>'verified'/));
 check('Server injects listening context into relevant LLM conversation',()=>assert.match(api,/sf_agent_listening_context\(\$timeInsights\)/));
