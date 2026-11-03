@@ -103,7 +103,7 @@ check('Stonefellow introduces itself by name once through the existing echo-safe
   const runtime=read('api/agent-runtime.php');
   assert.match(runtime,/You are Stonefellow, the music-site conversational agent/);
   assert.match(runtime,/Do not repeat the introduction in ordinary follow-up replies/);
-  assert.match(app,/const greeting='Hi, I’m Stonefellow\. What would you like to explore\?'/);
+  assert.match(app,/const greeting=welcomeGreeting/);
   assert.match(app,/if\(voiceGreetingDelivered\|\|!voiceRepliesEnabled/);
   assert.match(app,/voiceGreetingDelivered=true/);
   assert.match(app,/void agentSpeak\(greeting\)/);
