@@ -3,7 +3,7 @@
   const ctx=window.STONEFELLOW_ADMIN_CONTEXT;if(!ctx)return;
   const {api,app,canvas,head,esc,say,openView}=ctx;
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  let state={settings:{},openai:{},jobs:[],models:[],presets:[],dashboard:{}};
+  let state={settings:{},openai:{},jobs:[],models:[],presets:[],styles:[],dashboard:{}};
   let pendingDraft=null,busy=false,incomingBrief=null,composerCache=null,referenceAssets=[];
   let placementOverlay=null,compareOverlay=null,galleryQuery='',galleryFilter='all',referenceQuery='';
   const publishablePlacements=new Set(['song_cover','release','story','campaign','site']);
@@ -20,7 +20,7 @@
   const fmt=n=>Number(n||0).toLocaleString();
   const usd=cents=>'$'+(Number(cents||0)/100).toFixed(2);
   const imageUrl=uuid=>uuid?'../api/media.php?id='+encodeURIComponent(uuid):'';
-  async function refresh(){const r=await api('image-generation.php');state={settings:r.settings||{},openai:r.openai||{},jobs:r.jobs||[],models:r.models||[],presets:r.presets||[],dashboard:r.dashboard||{}};referenceAssets=r.references||[];}
+  async function refresh(){const r=await api('image-generation.php');state={settings:r.settings||{},openai:r.openai||{},jobs:r.jobs||[],models:r.models||[],presets:r.presets||[],styles:r.styles||[],dashboard:r.dashboard||{}};referenceAssets=r.references||[];}
   function galleryHtml(){
     const withAssets=state.jobs.filter(j=>j.asset_uuid);
     if(!withAssets.length)return '<p class="empty">Generated artwork will appear here after the first approved paid request.</p>';
@@ -213,8 +213,8 @@
   }
   function render(){
     const s=state.settings,o=state.openai,d=state.dashboard||{},c=d.counts||{},providerReady=!!(o.enabled&&o.key_configured);
-    const presets=state.presets||[];
-    canvas.innerHTML=head('91B20E · IMAGE GENERATION','AI Image Studio','Searchable variation gallery, transparent backgrounds, targeted edits and invoice reconciliation. Every paid request and publication remains separately approved.',
+    const presets=state.presets||[],styles=state.styles||[];
+    canvas.innerHTML=head('91B20H · IMAGE STUDIO','AI Image Studio','Visual Style Library, variations, transparent backgrounds, targeted edits and invoice reconciliation. Every paid request and publication remains separately approved.',
       '<button class="secondary" type="button" id="imagegenBackMedia">Media Library</button>')+
       '<div class="stats imagegen-stats">'+
       '<div class="stat"><strong>'+fmt(d.total)+'</strong><span>Image concepts</span></div>'+
@@ -227,6 +227,22 @@
       '<div class="imagegen-model-activity"><strong>Model activity · last 30 days</strong><p>'+((d.model_activity_30d||[]).map(m=>esc(m.model)+' · '+fmt(m.total)+' request(s)').join('  ·  ')||'No paid image requests yet.')+' · '+fmt(d.variation_attempts_30d)+' variation attempts.</p>'+
       '<p>Image API reported: '+fmt(d.usage_30d?.['image-generation']?.input_tokens)+' input / '+fmt(d.usage_30d?.['image-generation']?.output_tokens)+' output tokens. Agent text prompt refinement: '+fmt(d.usage_30d?.['image-prompt-composer']?.input_tokens)+' input / '+fmt(d.usage_30d?.['image-prompt-composer']?.output_tokens)+' output tokens.</p></div><p class="hint">The dashboard counts provider-reported tokens, not fabricated dollar amounts. Provider billing is separate from customer Active Tokens. '+fmt(d.cost_reconciled_jobs)+' requests manually reconciled · '+fmt(d.cost_unreconciled_jobs)+' pending · '+usd(d.cost_recorded_cents)+' recorded from invoices (not a provider-sourced total).</p><div class="actions"><button type="button" class="secondary" id="imagegenExportAudit">Download recent usage and invoice audit CSV (up to 150 jobs)</button></div></section>'+
       '<section class="panel imagegen-gallery"><div class="panel-title"><div><h2>Image variation gallery</h2><p>Browse original imagery and all saved variations grouped by artwork family. Compare versions without making an API request.</p></div></div><div class="imagegen-gallery-toolbar"><label class="field">Search generated images<input type="search" id="imagegenGallerySearch" placeholder="Prompt, model, job ID or reference title" value="'+esc(galleryQuery)+'"></label><label class="field">Show<select id="imagegenGalleryFilter"><option value="all">All generated images</option><option value="variation">Variations only</option><option value="ready">Approved images</option><option value="needs_review">Awaiting approval</option></select></label></div><div id="imagegenGalleryGroups">'+galleryHtml()+'</div></section>'+
+      '<section class="panel imagegen-style-library"><div class="panel-title"><div><h2>Visual Style Library</h2><p>Reusable identity, mood, and color palettes. Pick a style for this image concept, then preview and edit the prompt. Style thumbnails remain private.</p></div><span class="badge good">91B20H · NO GENERATION CHARGE</span></div>'+
+      '<div class="imagegen-style-cards">'+styles.map(s=>'<div class="imagegen-style-tile"><button type="button" class="imagegen-style-card" data-imagegen-style="'+Number(s.id)+'">'+
+        (s.inspiration_uuid?'<img class="imagegen-style-inspiration" src="'+imageUrl(s.inspiration_uuid)+'" alt="Private style reference" loading="lazy">':'')+
+        '<span class="imagegen-style-swatches"><i style="background:'+esc(s.primary_hex)+'"></i><i style="background:'+esc(s.secondary_hex)+'"></i><i style="background:'+esc(s.accent_hex)+'"></i></span>'+
+        '<strong>'+esc(s.name)+'</strong><small>'+esc(s.mood)+'</small><span>'+esc(s.guidance).slice(0,135)+'</span></button>'+
+        (!s.is_builtin?'<button type="button" class="secondary imagegen-style-archive" data-imagegen-archive-style="'+Number(s.id)+'">Archive custom style</button>':'')+'</div>').join('')+'</div>'+
+      '<details class="imagegen-custom-preset"><summary>Add a custom visual style</summary><form id="imagegenCustomStyle" class="form-grid">'+
+      '<label class="field">Style name<input name="name" maxlength="100" required placeholder="My signature artist world"></label>'+
+      '<label class="field">Mood / theme<input name="mood" maxlength="80" required placeholder="Nocturnal / dreamy"></label>'+
+      '<label class="field span3">Art direction<textarea name="guidance" minlength="30" maxlength="1200" required rows="3" placeholder="Lighting, atmosphere, camera, texture, recurring motifs and visual boundaries..."></textarea></label>'+
+      '<label class="field">Primary color<input type="color" name="primary_hex" value="#12243b" aria-label="Primary palette color"></label>'+
+      '<label class="field">Secondary color<input type="color" name="secondary_hex" value="#657c94" aria-label="Secondary palette color"></label>'+
+      '<label class="field">Accent color<input type="color" name="accent_hex" value="#83d5e3" aria-label="Accent palette color"></label>'+
+      '<label class="field span3">Inspiration thumbnail (optional)<select name="inspiration_asset_id"><option value="0">No thumbnail</option>'+referenceAssets.map(a=>'<option value="'+Number(a.id)+'">'+esc(a.title||a.original_name)+'</option>').join('')+'</select></label>'+
+      '<p class="hint span3">The thumbnail is for private visual review only. Selecting a style never sends thumbnail bytes to a provider, and never publishes or generates an image.</p>'+
+      '<div class="actions"><button type="submit" class="secondary">Save style to library</button></div></form></details></section>'+
       '<section class="panel"><div class="panel-title"><div><h2>Visual presets</h2><p>Start from a reusable production style, then edit the resulting prompt. Presets do not trigger API charges.</p></div></div>'+
       '<div class="imagegen-presets">'+presets.map(p=>'<button type="button" class="imagegen-preset" data-imagegen-preset="'+esc(p.slug)+'"><small>'+esc(p.category)+'</small><strong>'+esc(p.name)+'</strong><span>'+esc(p.guidance).slice(0,155)+'</span><small>'+esc(p.default_size)+' · '+esc(p.default_quality)+'</small></button>').join('')+'</div>'+
       '<details class="imagegen-custom-preset"><summary>Create a custom visual preset</summary><form id="imagegenCustomPreset" class="form-grid">'+
@@ -247,9 +263,10 @@
       <p class="hint span3">API charges come from the OpenAI developer organization; ChatGPT subscription credits are separate. ${providerReady?'OpenAI key configured.':'Enable your existing OpenAI provider and its API key first.'} This is an Admin-only initial phase.</p></form></section>
       <section class="panel"><div class="panel-title"><div><h2>Compose an image</h2><p>Write a visual concept, select a preset, and ask Stonefellow to draft or refine the prompt. Generation is a later, separately approved step.</p></div></div>
       <div class="imagegen-brief"><label class="field">Starting preset<select id="imagegenPresetSelect">${presets.map(p=>`<option value="${esc(p.slug)}">${esc(p.category+' · '+p.name)}</option>`).join('')}</select></label>
+      <label class="field">Visual identity style<select id="imagegenStyleSelect"><option value="0">Use preset direction only</option>${styles.map(s=>'<option value="'+Number(s.id)+'">'+esc(s.mood+' · '+s.name)+'</option>').join('')}</select></label>
       <label class="field">Scene / concept<textarea id="imagegenConcept" rows="3" maxlength="1800" placeholder="Describe the artist, song, place, mood, framing and things to exclude..."></textarea></label>
       <div class="actions"><button class="secondary" type="button" id="imagegenApplyPreset">Apply preset locally · free</button><button class="secondary" type="button" id="imagegenAgentRefine">Ask Stonefellow Agent to refine · text API</button></div>
-      <p class="hint">Agent refinement sends only your entered concept and selected preset to the configured text-model provider. It may incur a text-API charge; it does not generate an image, save a draft or publish anything.</p></div>
+      <p class="hint">Agent refinement sends your entered concept, selected preset, and selected style text/colors to the configured text-model provider. Style thumbnail bytes remain private. It may incur a text-API charge; it does not generate an image, save a draft or publish anything.</p></div>
       <form id="imagegenDraftForm" class="form-grid"><label class="field span3">Editable generation prompt<textarea name="prompt" rows="6" maxlength="3000" minlength="16" required placeholder="Apply a preset or write a detailed image-generation prompt. Review every word before saving."></textarea></label>
       <label class="field">Aspect / size<select name="size"><option value="1536x1024">Landscape · 1536×1024</option><option value="1024x1024">Square · 1024×1024</option><option value="1024x1536">Portrait · 1024×1536</option></select></label>
       <label class="field">Quality<select name="quality"><option value="low">Low · draft</option><option value="medium" selected>Medium · preview</option><option value="high">High · final concept</option></select></label>
@@ -265,6 +282,7 @@
     // creative brief or editable prompt.
     if(composerCache){
       if(presets.some(p=>p.slug===composerCache.preset_slug))$('#imagegenPresetSelect').value=composerCache.preset_slug;
+      if(styles.some(s=>Number(s.id)===Number(composerCache.style_id)))$('#imagegenStyleSelect').value=String(composerCache.style_id);
       $('#imagegenConcept').value=composerCache.concept;
       $('#imagegenDraftForm [name="prompt"]').value=composerCache.prompt;
       $('#imagegenDraftForm [name="size"]').value=composerCache.size;
@@ -307,7 +325,7 @@
     if(composerCache){$('#imagegenMaskConsent').checked=!!composerCache.mask_consent;if(composerCache.mask_asset_id)$('#imagegenMaskSelect').value=String(composerCache.mask_asset_id);populateMasks()}
     renderReferenceBrowser();
     const rememberComposer=()=>{composerCache={
-      preset_slug:$('#imagegenPresetSelect').value,concept:$('#imagegenConcept').value,
+      preset_slug:$('#imagegenPresetSelect').value,style_id:Number($('#imagegenStyleSelect').value||0),concept:$('#imagegenConcept').value,
       prompt:$('#imagegenDraftForm [name="prompt"]').value,
       size:$('#imagegenDraftForm [name="size"]').value,
       quality:$('#imagegenDraftForm [name="quality"]').value,
@@ -318,7 +336,7 @@
       reference_query:referenceQuery
     }};
     rememberCurrentComposer=rememberComposer;
-    for(const field of [$('#imagegenPresetSelect'),$('#imagegenConcept'),$('#imagegenDraftForm [name="prompt"]'),
+    for(const field of [$('#imagegenPresetSelect'),$('#imagegenStyleSelect'),$('#imagegenConcept'),$('#imagegenDraftForm [name="prompt"]'),
       $('#imagegenDraftForm [name="size"]'),$('#imagegenDraftForm [name="quality"]'),$('#imagegenDraftForm [name="background"]'),
       $('#imagegenReferenceSelect'),$('#imagegenReferenceConsent'),$('#imagegenMaskSelect'),$('#imagegenMaskConsent')]){
       field.addEventListener('input',rememberComposer);field.addEventListener('change',rememberComposer);
@@ -376,7 +394,31 @@
       const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
       const link=document.createElement('a');link.href=url;link.download='stonefellow-image-generation-audit.csv';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
-    $$('[data-imagegen-preset]',canvas).forEach(btn=>btn.onclick=()=>{
+    $('[data-imagegen-style]',canvas).forEach(btn=>btn.onclick=()=>{
+      $('#imagegenStyleSelect').value=String(btn.dataset.imagegenStyle);
+      rememberComposer();
+      $('#imagegenConcept').focus();
+      say('Visual style selected. Apply preset locally to preview editable guidance.');
+    });
+    $('#imagegenCustomStyle').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;const f=new FormData(e.currentTarget);
+      try{
+        const result=await api('image-generation.php',{action:'save_style',name:f.get('name'),mood:f.get('mood'),
+          guidance:f.get('guidance'),primary_hex:f.get('primary_hex'),secondary_hex:f.get('secondary_hex'),
+          accent_hex:f.get('accent_hex'),inspiration_asset_id:Number(f.get('inspiration_asset_id')||0)});
+        rememberComposer();composerCache.style_id=Number(result.style.id);
+        await refresh();render();say('Style saved and selected. No image request made.');
+      }catch(err){alert(err.message)}finally{busy=false}
+    };
+    $('[data-imagegen-archive-style]',canvas).forEach(btn=>btn.onclick=async()=>{
+      if(busy||!confirm('Archive this custom style? Existing prompt drafts and generated artwork will be preserved.'))return;
+      busy=true;
+      try{rememberComposer();const removed=Number(btn.dataset.imagegenArchiveStyle);
+        await api('image-generation.php',{action:'archive_style',style_id:removed,confirmed:true});
+        if(Number(composerCache.style_id)===removed)composerCache.style_id=0;
+        await refresh();render();say('Custom visual style archived.');
+      }catch(err){alert(err.message)}finally{busy=false}
+    });
+    $('[data-imagegen-preset]',canvas).forEach(btn=>btn.onclick=()=>{
       $('#imagegenPresetSelect').value=btn.dataset.imagegenPreset;
       const p=presets.find(x=>x.slug===btn.dataset.imagegenPreset);
       if(p){$('#imagegenDraftForm [name="size"]').value=p.default_size;$('#imagegenDraftForm [name="quality"]').value=p.default_quality;}
@@ -385,7 +427,7 @@
     });
     $('#imagegenApplyPreset').onclick=async()=>{if(busy)return;busy=true;
       const status=$('#imagegenStatus');status.textContent='Preparing local prompt…';
-      try{const r=await api('image-generation.php',{action:'local_prompt',concept:$('#imagegenConcept').value,preset_slug:$('#imagegenPresetSelect').value});
+      try{const r=await api('image-generation.php',{action:'local_prompt',concept:$('#imagegenConcept').value,preset_slug:$('#imagegenPresetSelect').value,style_id:Number($('#imagegenStyleSelect').value||0)});
         $('#imagegenDraftForm [name="prompt"]').value=r.suggestion.prompt;
         $('#imagegenDraftForm [name="size"]').value=r.suggestion.preset.default_size;
         $('#imagegenDraftForm [name="quality"]').value=r.suggestion.preset.default_quality;
@@ -393,10 +435,10 @@
       }catch(err){status.textContent=err.message}finally{busy=false}
     };
     $('#imagegenAgentRefine').onclick=async()=>{if(busy)return;
-      const concept=$('#imagegenConcept').value,preset_slug=$('#imagegenPresetSelect').value;
-      if(!confirm('Send this concept and visual preset to your configured text-model provider? This may incur a separate text-API charge; no image will be generated.'))return;
+      const concept=$('#imagegenConcept').value,preset_slug=$('#imagegenPresetSelect').value,style_id=Number($('#imagegenStyleSelect').value||0);
+      if(!confirm('Send this concept, visual preset and selected style text/colors to your configured text-model provider? This may incur a separate text-API charge; no image will be generated.'))return;
       busy=true;const status=$('#imagegenStatus');status.textContent='Agent is refining the image prompt…';
-      try{const r=await api('image-generation.php',{action:'compose_prompt',confirmed:true,concept,preset_slug});
+      try{const r=await api('image-generation.php',{action:'compose_prompt',confirmed:true,concept,preset_slug,style_id});
         $('#imagegenDraftForm [name="prompt"]').value=r.suggestion.prompt;
         $('#imagegenDraftForm [name="size"]').value=r.suggestion.preset.default_size;
         $('#imagegenDraftForm [name="quality"]').value=r.suggestion.preset.default_quality;

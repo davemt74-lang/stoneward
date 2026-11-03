@@ -1,6 +1,6 @@
-Stonefellow v1.3.233 — Section 91B20G Reviewed Image Apply & Restore
-Base release: v1.3.232, merged as Stoneward PR #332; direct GitHub ZIP releases added in PR #333
-Scope: reviewed public image replacement on five existing editor surfaces; role/approval/stale-previews guards, durable Admin audit receipts, Agent Brain receipts, prior managed-image restore, plus the v1.3.232 Visual Mask Editor
+Stonefellow v1.3.234 — Section 91B20H Visual Style Library
+Base release: v1.3.233, merged as Stoneward PR #334; direct GitHub ZIP releases added in PR #333
+Scope: named visual identities and mood palettes, user-created style cards and private inspiration thumbnail, Admin-governed archive, style-to-editable-prompt routing for local/Agent text composer; 91B20G reviewed apply/restore and prior Visual Mask Editor retained
 Production artifact: generated only by the GitHub Release Gate after full PR certification; this manifest is not a claim of deployment
 Private data: configuration/secrets, storage/media originals and host-specific settings are not bundled as mutable application source
 Mask permissions: original reference rights, mask rights, exact prompt approval, paid generation approval, generated asset approval, and public publication remain separate explicit steps
@@ -10,3 +10,7 @@ Limits: browser editor supports source dimensions up to 4096 × 4096 and 16 MP; 
 Data integrity: all edit gestures are local until the Admin explicitly reviews and uploads the private PNG; no image-generation or public media mutation is automatic
 Tests: section91b20f-visual-mask-editor.test.cjs and section91b20a-e image suite are part of permanent release-gate.yml
 Certification: automated GitHub PR and post-merge workflows required; live OpenAI edit fidelity, Admin upload and iPhone visual QA remain an operator deployment check
+
+Style Library: palette guidance and style metadata are assembled into editable drafts; inspiration image bytes are preview-only and never automatically sent to a provider.
+Style permissions: creation/archival requires Admin CSRF and is audited; paid generation, generated-asset approval, and public publication remain independently authorized.
+Tests: section91b20h-visual-style-library.test.cjs now runs in the permanent Release Gate.

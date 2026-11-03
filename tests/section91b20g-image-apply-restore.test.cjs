@@ -55,5 +55,6 @@ test('Responsive editorial controls and permanent release gate are included',()=
   assert.match(css,/\.imagegen-placement-publish\[hidden\]/);
   assert.match(css,/@media\(max-width:720px\)/);
   assert.match(read('.github/workflows/release-gate.yml'),/node --test tests\/section91b20g-image-apply-restore\.test\.cjs/);
-  assert.match(read('version.php'),/'stonefellow'=>'1\.3\.233'/);
+  const version=read('version.php').match(/'stonefellow'=>'1\.3\.(\d+)'/)?.[1];
+  assert.ok(version&&Number(version)>=233,'image publication release must not regress below v1.3.233');
 });
