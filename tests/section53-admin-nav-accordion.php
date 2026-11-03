@@ -5,12 +5,12 @@ $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $html=$read('admin/index.php');$js=$read('admin/assets/sidebar-accordion.js');$css=$read('admin/assets/admin.css');$admin=$read('admin/assets/admin.js');
 $groups=[
  'overview'=>['dashboard','analytics','calendar'],
- 'music'=>['catalog','media','uploads','templates','releases','shows'],
+ 'music'=>['catalog','media','uploads','templates','releases','song-moments','shows'],
  'publishing'=>['distribution','press','rights'],
- 'audience'=>['crm','customer','campaigns','automations'],
+ 'audience'=>['crm','song-moderation','customer','campaigns','automations'],
  'commerce'=>['products','orders','fulfillment','pod','membership','ticketing','packages'],
- 'agent'=>['brain','production-review','knowledge','ai'],
- 'administration'=>['users','team','operations','settings']
+ 'agent'=>['brain','production-review','knowledge','ai','image-generation'],
+ 'administration'=>['users','user-create','team','operations','settings']
 ];
 preg_match_all('/<details class="admin-nav-category" data-nav-category="([^"]+)"( open)?>\s*<summary[^>]*>(.*?)<\/summary>\s*<div class="admin-nav-items">(.*?)<\/div>\s*<\/details>/s',$html,$parts,PREG_SET_ORDER);
 $check=[];
@@ -23,7 +23,7 @@ foreach($parts as $index=>$match){
  $check['Category '.($key?:$index).' has a caret icon and named summary']=str_contains($match[3],'admin-nav-chevron')&&str_contains($match[3],'aria-hidden="true"');
  $check['Only Overview starts expanded in server HTML']=($index===0)===(trim($match[2])==='open');
 }
-$check['All 31 routes remain unique and reachable']=count($all)===31&&count(array_unique($all))===31;
+$check['All 31 routes remain unique and reachable']=count($all)===35&&count(array_unique($all))===35;
 $check['Native details and summary preserve keyboard accessibility']=str_contains($html,'<details class="admin-nav-category"')&&str_contains($html,'<summary class="admin-nav-summary"');
 $check['Browser state persistence key is versioned']=str_contains($js,'stonefellow.admin.navigation.categories.v1');
 $check['Saved state ignores unknown keys and supports independent groups']=str_contains($js,'hasOwnProperty.call(saved,key)')&&str_contains($js,'currentState(groups)');
