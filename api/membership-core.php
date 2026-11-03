@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/subscription-policy.php';
 
 function sf_membership_json(array $v): string {return json_encode($v,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}';}
 function sf_membership_decode(mixed $v,array $fallback=[]): array {$d=is_array($v)?$v:json_decode((string)$v,true);return is_array($d)?$d:$fallback;}
@@ -34,14 +35,12 @@ function sf_membership_package(array $p): array {
     return ['enabled'=>!empty($p['membership_enabled']),'rank'=>max(0,(int)($p['membership_rank']??0)),'badge'=>(string)($p['membership_badge']??''),'benefits'=>$benefits];
 }
 function sf_membership_status_active(array $sub): bool {
-    $status=(string)($sub['status']??'');if(in_array($status,['active','trialing'],true))return true;
-    if($status==='past_due'&&!empty($sub['grace_ends_at'])&&strtotime((string)$sub['grace_ends_at'])>=time())return true;
-    return false;
+    return sf_subscription_access_active($sub);
 }
 function sf_membership_state(int $userId,bool $syncCrm=false): array {
     sf_membership_ensure_schema();$sub=function_exists('sf_billing_subscription_row')?sf_billing_subscription_row($userId):null;$package=null;$membership=['enabled'=>false,'rank'=>0,'badge'=>'','benefits'=>sf_membership_benefits([])];
     if($sub&&!empty($sub['package_id'])){$package=sf_package((int)$sub['package_id']);if($package)$membership=sf_membership_package($package);}
-    $active=(bool)($sub&&$membership['enabled']&&sf_membership_status_active($sub));$state=['active'=>$active,'status'=>(string)($sub['status']??'none'),'package_id'=>(int)($sub['package_id']??0),'package_name'=>(string)($sub['package_name']??($package['name']??'')),'package_slug'=>(string)($sub['package_slug']??($package['slug']??'')),'rank'=>(int)$membership['rank'],'badge'=>(string)$membership['badge'],'benefits'=>$membership['benefits'],'current_period_end'=>$sub['current_period_end']??null,'trial_ends_at'=>$sub['trial_ends_at']??null,'cancel_at_period_end'=>!empty($sub['cancel_at_period_end']),'grace_ends_at'=>$sub['grace_ends_at']??null];
+    $active=(bool)($sub&&$membership['enabled']&&sf_membership_status_active($sub));$state=['active'=>$active,'status'=>$sub?sf_subscription_effective_status($sub):'none','package_id'=>(int)($sub['package_id']??0),'package_name'=>(string)($sub['package_name']??($package['name']??'')),'package_slug'=>(string)($sub['package_slug']??($package['slug']??'')),'rank'=>(int)$membership['rank'],'badge'=>(string)$membership['badge'],'benefits'=>$membership['benefits'],'current_period_end'=>$sub['current_period_end']??null,'trial_ends_at'=>$sub['trial_ends_at']??null,'cancel_at_period_end'=>!empty($sub['cancel_at_period_end']),'grace_ends_at'=>$sub['grace_ends_at']??null];
     if($syncCrm)sf_membership_sync_crm($userId,$state);return $state;
 }
 function sf_membership_sync_crm(int $userId,?array $state=null): void {
@@ -83,7 +82,7 @@ function sf_membership_public_content(?int $userId): array {
     $rows=[];foreach(sf_membership_content_list(true) as $c){$access=sf_membership_content_access($userId,$c);$media=function_exists('sf_media_public_links')?sf_media_public_links('member_content',(string)$c['id']):[];$rows[]=['id'=>(int)$c['id'],'slug'=>(string)$c['slug'],'title'=>(string)$c['title'],'content_type'=>(string)$c['content_type'],'teaser'=>(string)$c['teaser'],'body_text'=>$access['allowed']?(string)$c['body_text']:'','external_url'=>$access['allowed']?(string)$c['external_url']:'','featured'=>!empty($c['featured']),'access'=>$access,'media'=>$access['allowed']?$media:[]];}return $rows;
 }
 function sf_membership_summary(): array {
-    sf_membership_ensure_schema();$pdo=sf_db();$active=0;$byTier=[];$q=$pdo->query("SELECT s.user_id,s.package_id,s.status,s.grace_ends_at,p.name,p.membership_enabled FROM user_subscriptions s LEFT JOIN subscription_packages p ON p.id=s.package_id WHERE p.membership_enabled=1");foreach($q->fetchAll() as $r){if(sf_membership_status_active($r)){$active++;$name=(string)($r['name']??'Membership');$byTier[$name]=($byTier[$name]??0)+1;}}return ['active_members'=>$active,'tiers'=>$byTier,'content'=>(int)$pdo->query("SELECT COUNT(*) FROM membership_content")->fetchColumn(),'published_content'=>(int)$pdo->query("SELECT COUNT(*) FROM membership_content WHERE status='published'")->fetchColumn()];
+    sf_membership_ensure_schema();$pdo=sf_db();$active=0;$byTier=[];$q=$pdo->query("SELECT s.*,p.monthly_price_cents,p.name,p.membership_enabled FROM user_subscriptions s LEFT JOIN subscription_packages p ON p.id=s.package_id WHERE p.membership_enabled=1");foreach($q->fetchAll() as $r){if(sf_membership_status_active($r)){$active++;$name=(string)($r['name']??'Membership');$byTier[$name]=($byTier[$name]??0)+1;}}return ['active_members'=>$active,'tiers'=>$byTier,'content'=>(int)$pdo->query("SELECT COUNT(*) FROM membership_content")->fetchColumn(),'published_content'=>(int)$pdo->query("SELECT COUNT(*) FROM membership_content WHERE status='published'")->fetchColumn()];
 }
 function sf_membership_agent_context(int $userId): string {
     $s=sf_membership_state($userId,false);if(!$s['active'])return "MEMBERSHIP\n- no active Stonefellow membership";$b=$s['benefits'];$benefits=[];if($b['merch_discount_percent'])$benefits[]=$b['merch_discount_percent'].'% merch discount';if($b['early_access_days'])$benefits[]=$b['early_access_days'].' days early access';foreach(['vip_access'=>'VIP access','priority_presale'=>'priority presale','member_content'=>'member content','exclusive_downloads'=>'exclusive downloads','member_only_offers'=>'member-only offers'] as $k=>$label)if(!empty($b[$k]))$benefits[]=$label;return "MEMBERSHIP\n- ".$s['package_name'].' | '.($s['badge']?:'member').' | status '.$s['status']."\n- benefits ".implode(', ',$benefits);

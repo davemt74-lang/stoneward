@@ -82,7 +82,7 @@ function sf_connect_webhook_setup(string $account):bool {
     if(!str_starts_with($url,'https://'))throw new RuntimeException('Stripe webhooks require HTTPS.');
     $types=['payment_intent.payment_failed','checkout.session.completed','checkout.session.async_payment_succeeded',
        'checkout.session.expired','refund.created','refund.updated','refund.failed',
-       'invoice.payment_succeeded','invoice.payment_failed',
+       'invoice.paid','invoice.payment_succeeded','invoice.payment_failed',
        'customer.subscription.created','customer.subscription.updated',
        'customer.subscription.deleted'];
     $data=['url'=>$url,'description'=>'Stonefellow ecommerce + subscriptions'];

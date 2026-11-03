@@ -109,9 +109,12 @@ if($action==='password'){
     if(!$full||!password_verify($current,(string)$full['password_hash'])) sf_json_response(['ok'=>false,'message'=>'Current password is incorrect.'],401);
     if(!sf_valid_password($next)) sf_json_response(['ok'=>false,'message'=>'Use a new password of at least 10 characters.'],422);
     if($next!==$confirm) sf_json_response(['ok'=>false,'message'=>'New passwords do not match.'],422);
-    $q=sf_db()->prepare('UPDATE users SET password_hash=?,updated_at=? WHERE id=?');
+    sf_auth_ensure_schema();$pdo=sf_db();$pdo->beginTransaction();
+    try {
+    $q=$pdo->prepare('UPDATE users SET password_hash=?,updated_at=? WHERE id=?');
     $q->execute([password_hash($next,PASSWORD_DEFAULT),gmdate('c'),(int)$u['id']]);
-    sf_auth_revoke_all_user_sessions((int)$u['id']);
+    sf_auth_revoke_all_user_sessions((int)$u['id']);$pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     session_regenerate_id(true);
     $_SESSION['sf_user_id']=(int)$u['id'];
     $_SESSION['sf_csrf']=bin2hex(random_bytes(32));
