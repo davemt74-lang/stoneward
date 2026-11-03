@@ -37,3 +37,5 @@ jobs:
           SF_TEST_DRIVER: mysql
           SF_TEST_MYSQL_PASSWORD: isolated-ci-only
         run: php tests/section91b21b1-login-runtime.php
+      - name: HTTP controllers, cookie sessions, CSRF and cooldown recovery
+        run: python3 tests/section91b21b1-login-http.py
