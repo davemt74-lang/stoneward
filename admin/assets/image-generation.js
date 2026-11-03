@@ -98,7 +98,7 @@
     };
     const overlay=document.createElement('div');overlay.className='imagegen-placement-backdrop';placementOverlay=overlay;
     overlay.innerHTML='<div class="imagegen-placement-dialog" role="dialog" aria-modal="true" aria-labelledby="imagegenPlacementTitle">'+
-      '<header class="imagegen-placement-header"><div><small>91B20G · REVIEW & APPLY</small><h2 id="imagegenPlacementTitle">Preview image placements</h2><p>Stage privately, then explicitly apply approved artwork to supported primary image fields. A separate Restore option preserves existing Media Library relationships.</p></div><button type="button" class="secondary" data-placement-close>Close ×</button></header>'+
+      '<header class="imagegen-placement-header"><div><small>91B20G · REVIEW & APPLY</small><h2 id="imagegenPlacementTitle">Preview image placements</h2><p>Preview and private staging do not publish or charge. No publishing or provider request is performed here without separate, explicit Apply authorization. Managed prior images can be restored.</p></div><button type="button" class="secondary" data-placement-close>Close ×</button></header>'+
       '<div class="imagegen-placement-controls"><label class="field">Where to preview<select data-placement-kind>'+Object.entries(placementSpecs).map(([id,s])=>'<option value="'+id+'">'+esc(s.label)+'</option>').join('')+'</select></label>'+
       '<label class="field">Existing content<select data-placement-target></select></label><label class="field">Device<select data-placement-device><option value="desktop">Desktop</option><option value="mobile">Mobile</option></select></label></div>'+
       '<p class="imagegen-placement-note" data-placement-note></p><div class="imagegen-placement-compare" data-placement-compare></div>'+
@@ -138,7 +138,7 @@
       try{
         const params='entity_type='+encodeURIComponent(s.type)+'&entity_id='+encodeURIComponent(entityId);
         const [r,h]=await Promise.all([
-          api('media.php?'+params),
+          api('media.php?entity_type='+encodeURIComponent(s.type)+'&entity_id='+encodeURIComponent(entityId)),
           canApply?api('media.php?mode=image_placement_history&'+params+'&role='+encodeURIComponent(s.role)):Promise.resolve({current_link_id:0,entries:[]})
         ]);
         if(seq!==refreshNonce||!overlay.isConnected)return;
