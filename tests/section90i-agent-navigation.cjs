@@ -17,7 +17,7 @@ check('Explicit public intent overrides advisory model route',()=>{
   assert.match(php,/case 'page_navigate':/);
 });
 check('Public route stays inside existing SPA with music player intact',()=>{
-  assert.match(publicAgent,/case'open_view':navigate\(a\.view\|\|'home'/);
+  assert.match(publicAgent,/case 'open_view':\{/);assert.match(publicAgent,/return await navigate\(view,\{slug:a\.slug\|\|''/);
   assert.match(publicAgent,/async function navigate\(view='home'/);
 });
 check('Page targets are fixed server-side, with no URL navigation',()=>{
