@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.237';
+  window.STONEFELLOW_APP_BUILD='1.3.238';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -159,13 +159,14 @@
         if(!st.track)return 'There is no music to stop.';
         if(!audio.paused)recordListen('pause');
         invalidatePlayback();audio.pause();try{audio.currentTime=0}catch(_){}
+        playbackLifecycle.remember(playbackLifecycle.token(),0);
         st.playing=false;musicFollowupUntil=0;setVoiceInputActive(false);updateFooterPlayer();syncConversationMusic();
         return 'Stopped “'+st.track.title+'.”';
       case 'load_temporary_playlist':return startTemporaryPlaylist(action);
       case 'resume_player':
         if(!st.track)return 'There is no song loaded. Tell me which Stonefellow song to play.';
         if(!audio.paused)return '“'+st.track.title+'” is already playing.';
-        return await play(st.track,Number(audio.currentTime)||0,st.playSource,!!st.playlistPlayback.playlistId)
+        return await play(st.track,savedPlaybackPosition(),st.playSource,!!st.playlistPlayback.playlistId)
           ?'Resumed “'+st.track.title+'.”':'The browser could not confirm playback. Tap Play or check Media Health.';
       case 'play_track':{
         const track=trackById(action.track_id);
@@ -2649,11 +2650,20 @@
     // A Media Library preview intentionally ends before the master duration.
     // Other large mismatches mean the published file or stream is incomplete;
     // never log a full listen or loop/advance a truncated song silently.
+    const actual=Number(audio.duration),position=Number(audio.currentTime)||0;
+    if(Number.isFinite(actual)&&actual>=10&&position<actual-Math.max(5,actual*.02))return true;
     if(['preview_only','preview_master_split'].includes(st.track?.audio_publishing_mode))return false;
     const published=Number(st.track?.duration||0);
     const played=Number(audio.currentTime||0);
     const fileDuration=Number.isFinite(audio.duration)?audio.duration:played;
     return published>=40&&played>=2&&Math.max(played,fileDuration)<published-Math.max(15,published*.08);
+  }
+  function rememberPlaybackPosition(){
+    if(!pendingNetworkRecovery&&!audio.error&&!audio.seeking&&Number(audio.readyState)>=2)
+      playbackLifecycle.remember(playbackLifecycle.token(),Number(audio.currentTime));
+  }
+  function savedPlaybackPosition(){
+    return Math.max(playbackLifecycle.position(playbackLifecycle.token()),Number(audio.currentTime)||0);
   }
   function setPlaybackStatus(message='',phase=''){
     if(playerPlaybackStatus){playerPlaybackStatus.textContent=message;playerPlaybackStatus.hidden=!message}
@@ -2662,12 +2672,11 @@
   function clearPlaybackBufferWatch(){if(playbackBufferTimer!==null){clearTimeout(playbackBufferTimer);playbackBufferTimer=null}}
   function cancelNetworkRecovery(){
     if(!pendingNetworkRecovery)return;
-    clearTimeout(pendingNetworkRecovery.timer);
-    audio.removeEventListener('loadedmetadata',pendingNetworkRecovery.ready);
-    pendingNetworkRecovery=null;
+    const recovery=pendingNetworkRecovery;pendingNetworkRecovery=null;
+    recovery.controller?.cancel();recovery.reject?.(new Error('Playback action replaced'));
   }
   function invalidatePlayback(){
-    playbackWantsAudio=false;playbackLifecycle.begin();clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
+    playbackWantsAudio=false;playbackLifecycle.begin(savedPlaybackPosition());clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
   }
   function playbackProblem(message){
     playbackWantsAudio=false;st.playing=false;clearPlaybackBufferWatch();cancelNetworkRecovery();
@@ -2676,47 +2685,60 @@
   function recoverNetworkPlayback(){
     const token=playbackLifecycle.token(),code=Number(audio.error?.code||0);
     if(!playbackWantsAudio||!st.track?.audio||!playbackLifecycle.allowNetworkRetry(token,code))return false;
-    const id=String(st.track.id),source=String(st.track.audio),position=Math.max(0,Number(audio.currentTime)||0);
-    clearPlaybackBufferWatch();setPlaybackStatus('Connection interrupted · resuming…','buffering');
-    const ready=()=>{
-      const recovery=pendingNetworkRecovery;if(!recovery||recovery.token!==token)return;
-      cancelNetworkRecovery();
-      if(!playbackWantsAudio||!playbackLifecycle.isCurrent(token)||String(st.track?.id)!==id)return;
-      const duration=Number(audio.duration||0);
-      if(position>0&&Number.isFinite(duration)&&duration>position+1)try{audio.currentTime=position}catch(_){}
-      audio.play().then(()=>{
-        if(!playbackLifecycle.isCurrent(token)||String(st.track?.id)!==id)return;
-        st.playing=!audio.paused;setPlaybackStatus();updateFooterPlayer();
-      }).catch(()=>{if(playbackLifecycle.isCurrent(token))playbackProblem('Playback paused · tap Play to retry.')});
+    const id=String(st.track.id),source=String(st.track.audio);
+    // MediaError can reset currentTime before error dispatch. Keep the last verified progress.
+    const position=Math.max(playbackLifecycle.position(token),Number(audio.currentTime)||0);
+    clearPlaybackBufferWatch();setPlaybackStatus('Connection interrupted · restoring '+time(position)+'…','buffering');
+    const recovery={token,position,controller:null};
+    pendingNetworkRecovery=recovery;
+    const current=()=>pendingNetworkRecovery===recovery&&playbackWantsAudio&&playbackLifecycle.isCurrent(token)&&String(st.track?.id)===id;
+    const failed=()=>{
+      if(!current())return;
+      playbackProblem('Cannot resume at '+time(position)+' yet · tap Play to retry. Your position is saved.');
     };
-    const timer=setTimeout(()=>{if(playbackLifecycle.isCurrent(token))playbackProblem('Audio connection timed out · tap Play to retry.')},12000);
-    pendingNetworkRecovery={token,timer,ready};
-    audio.addEventListener('loadedmetadata',ready,{once:true});
+    recovery.controller=window.StonefellowPlaybackLifecycle.restorePosition({audio,position,isCurrent:current,
+      onFailure:failed,
+      onRestored:()=>{
+        if(!current())return;
+        let attempt;try{attempt=audio.play()}catch(_){failed();return;}
+        Promise.resolve(attempt).then(()=>{
+          if(!current())return;
+          if(audio.paused){failed();return;}
+          cancelNetworkRecovery();st.playing=true;setPlaybackStatus();updateFooterPlayer();
+        }).catch(failed);
+      }});
     audio.pause();audio.src=source;audio.load();
     return true;
   }
   function play(t,resumeAt=0,source='player',keepPlaylist=false){
     if(!t?.audio)return Promise.resolve(false);
     const changing=!st.track||String(st.track.id)!==String(t.id)||audio.getAttribute('src')!==String(t.audio);
+    const reloading=changing||!!audio.error||footerPlayer?.dataset.playbackPhase==='error';
     if(changing){songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');}
     if(changing&&st.track&&!audio.paused){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}
-    const token=playbackLifecycle.begin();cancelNetworkRecovery();clearPlaybackBufferWatch();setPlaybackStatus();
+    const token=playbackLifecycle.begin(Math.max(0,Number(resumeAt)||0));cancelNetworkRecovery();clearPlaybackBufferWatch();setPlaybackStatus();
     if(!keepPlaylist)clearPlaylistPlayback();
     st.playSource=source||'player';st.track=t;playbackWantsAudio=true;st.playing=false;updateQueueUi();
-    if(changing){audio.pause();audio.src=t.audio;audio.load()}
+    if(reloading){audio.pause();audio.src=t.audio;audio.load()}
     const startAt=Math.max(0,Number(resumeAt)||0);
-    const applyResume=()=>{
-      if(playbackLifecycle.isCurrent(token)&&startAt>0&&Number.isFinite(audio.duration)&&audio.duration>startAt+1)
-        try{audio.currentTime=startAt}catch(_){}
-    };
-    if(changing&&startAt>0)audio.addEventListener('loadedmetadata',applyResume,{once:true});
-    else if(!changing&&keepPlaylist&&startAt===0)try{audio.currentTime=0}catch(_){}
-    else applyResume();
+    if(!reloading&&keepPlaylist&&startAt===0)try{audio.currentTime=0}catch(_){}
+    const resumeNeeded=startAt>0&&(reloading||!Number.isFinite(audio.currentTime)||Math.abs(audio.currentTime-startAt)>0.35||audio.seeking);
     updateFooterPlayer();
-    let attempt;try{attempt=audio.play()}catch(error){attempt=Promise.reject(error)}
+    let attempt;
+    if(resumeNeeded){
+      // Manual resume uses the same verified-seek gate as automatic network recovery.
+      attempt=new Promise((resolve,reject)=>{
+        const recovery={token,position:startAt,controller:null,reject};pendingNetworkRecovery=recovery;
+        const current=()=>pendingNetworkRecovery===recovery&&playbackWantsAudio&&playbackLifecycle.isCurrent(token)&&String(st.track?.id)===String(t.id);
+        recovery.controller=window.StonefellowPlaybackLifecycle.restorePosition({audio,position:startAt,isCurrent:current,
+          onFailure:()=>{if(current())reject(new Error('Saved position is not seekable yet'));},
+          onRestored:()=>{if(current()){try{Promise.resolve(audio.play()).then(resolve,reject)}catch(error){reject(error)}}}});
+        recovery.controller.check();
+      });
+    }else{try{attempt=audio.play()}catch(error){attempt=Promise.reject(error)}}
     return Promise.resolve(attempt).then(()=>{
       if(!playbackLifecycle.isCurrent(token)||String(st.track?.id)!==String(t.id)||audio.paused)return false;
-      st.playing=true;recordListen(startAt>0?'resume':'start');
+      cancelNetworkRecovery();st.playing=true;rememberPlaybackPosition();recordListen(startAt>0?'resume':'start');
       agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');
       updateFooterPlayer();return true;
     }).catch(()=>{
@@ -2728,7 +2750,7 @@
   function toggle(){
     if(!st.track)return;
     if(!audio.paused){recordListen('pause');invalidatePlayback();audio.pause();st.playing=false;agent('idle','Paused “'+st.track.title+'.”');updateFooterPlayer();return}
-    void play(st.track,Number(audio.currentTime)||0,st.playSource,!!st.playlistPlayback.playlistId);
+    void play(st.track,savedPlaybackPosition(),st.playSource,!!st.playlistPlayback.playlistId);
   }
   async function stepTrack(delta){
     // Await the real media outcome before the Agent records a successful skip.
@@ -3368,7 +3390,8 @@
   playerTitle.onclick=playerArtwork.onclick=()=>{if(st.track){renderStory(st.track);setUrl('track',{id:st.track.id})}};
   playerSeek.oninput=()=>{if(Number.isFinite(audio.duration)&&audio.duration>0){if(songCaptureSkill?.status().active)songCaptureSkill.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('seek');audio.currentTime=(Number(playerSeek.value)/1000)*audio.duration}};
   audio.addEventListener('loadedmetadata',()=>{playerDuration.textContent=time(audio.duration);updateFooterPlayer()});
-  audio.addEventListener('timeupdate',()=>{songCaptureSkill?.playbackPosition();playerCurrent.textContent=time(audio.currentTime);playerDuration.textContent=time(audio.duration||st.track?.duration||0);playerSeek.value=audio.duration?String(Math.round((audio.currentTime/audio.duration)*1000)):'0';const now=Date.now();if(st.track&&st.playing&&now-st.lastProgressAt>30000){st.lastProgressAt=now;recordListen('progress')}});
+  audio.addEventListener('timeupdate',()=>{rememberPlaybackPosition();songCaptureSkill?.playbackPosition();playerCurrent.textContent=time(audio.currentTime);playerDuration.textContent=time(audio.duration||st.track?.duration||0);playerSeek.value=audio.duration?String(Math.round((audio.currentTime/audio.duration)*1000)):'0';const now=Date.now();if(st.track&&st.playing&&now-st.lastProgressAt>30000){st.lastProgressAt=now;recordListen('progress')}});
+  audio.addEventListener('seeked',rememberPlaybackPosition);
   audio.addEventListener('seeking',()=>{if(songCaptureSkill?.status().active)songCaptureSkill.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('seek')});
   audio.addEventListener('waiting',()=>{
     if(!playbackWantsAudio||audio.paused||!st.track)return;
@@ -3388,6 +3411,7 @@
   audio.addEventListener('play',()=>{st.playing=true;updateFooterPlayer();updateQueueUi();syncConversationMusic();scheduleSpeechContextSync()});
   audio.addEventListener('pause',()=>{if(!audio.ended){st.playing=false;updateFooterPlayer()}updateQueueUi();if(!pendingNetworkRecovery){if(songCaptureSkill?.status().active)void songCaptureSkill.stop('pause');if(songListeningSkill?.status().active)void songListeningSkill.stop('pause')}syncConversationMusic();scheduleSpeechContextSync()});
   audio.addEventListener('ended',()=>{
+    if(pendingNetworkRecovery)return;
     const endedToken=playbackLifecycle.token();
     if(!st.track||!playbackLifecycle.claimEnded(endedToken))return;
     playbackWantsAudio=false;clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
