@@ -27,7 +27,10 @@ check('Panel renders into original application views, never iframe or external f
   assert.match(agent,/<div id="sfAgentNativePage" class="sf-agent-page-content"><\/div>/);
   assert.doesNotMatch(agent,/<iframe|srcdoc|contentWindow|fetch\(/i);
   assert.match(agent,/function openPage\(view\)/);
-  assert.match(agent,/return pageHost/);
+  // Lyrics reuse the rail but have their own host, leaving normal route renderers unchanged.
+  assert.match(agent,/return view==='lyrics'\?lyricHost:pageHost/);
+  assert.match(agent,/pageHost\.hidden=view==='lyrics';lyricHost\.hidden=view!=='lyrics'/);
+  assert.match(agent,/function openLyrics\(\)/);
   assert.match(app,/let canvas=mainCanvas/);
   assert.match(app,/SFPublicAgentCanvas\.mount\(mainCanvas/);
 });

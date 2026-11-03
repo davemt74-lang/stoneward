@@ -61,6 +61,10 @@
           </button>
         </div>
         <div class="sf-agent-state" role="status">AGENT READY</div>
+        <div class="sf-agent-lyric-controls" hidden aria-label="Lyric listening controls">
+          <button type="button" data-agent-action="open-lyrics">Show lyrics</button>
+          <button type="button" data-agent-action="stop-lyrics">Stop</button>
+        </div>
         <div class="sf-agent-live-feed" aria-label="Live transcription and Agent Chat">
           <div class="sf-agent-live-transcript-slot"></div>
           <div class="sf-agent-live-preview"><span class="sf-agent-live-label">AGENT CHAT</span><span class="sf-agent-live-message">Ready for a conversation</span></div>
@@ -101,6 +105,8 @@
     const orbitTools = by(root, '.sf-agent-orbit-tools');
     const sphere = by(root, '.sf-agent-sphere');
     const status = by(root, '.sf-agent-state');
+    const lyricControls = by(root, '.sf-agent-lyric-controls');
+    const lyricStop = by(lyricControls, '[data-agent-action="stop-lyrics"]');
     const liveHost = by(root, '.sf-agent-live-feed');
     const liveSlot = by(root, '.sf-agent-live-transcript-slot');
     const liveMessage = by(root, '.sf-agent-live-message');
@@ -113,6 +119,9 @@
     const pageTitle = by(root, '.sf-agent-page-title');
     const pageViewport = by(root, '.sf-agent-page-viewport');
     const pageHost = by(root, '.sf-agent-page-content');
+    const lyricHost=document.createElement('div');lyricHost.className='sf-agent-lyric-workspace';lyricHost.hidden=true;
+    pageViewport.appendChild(lyricHost);
+    let pageView='',baseMode='idle',baseLabel='';
     // The page is a true modal over the *unchanged* Agent Canvas. Keeping it
     // under the stage clipped it below the fixed header on mobile, and making
     // the entire landing fixed obscured the canvas instead of layering it.
@@ -331,17 +340,20 @@
     playerObserver?.observe(player, {attributes:true,attributeFilter:['hidden']});
     function state(next,label) {
       const map={playing:'music',recording:'recording',listening:'listening',thinking:'thinking',speaking:'speaking',responding:'speaking',music:'music'};
-      mode=map[next] || 'idle';
+      baseMode=next;baseLabel=label||'';
+      const lyric=window.StonefellowSongExperience?.snapshot?.();
+      const hearing=lyric?.listening_mode==='recognition'&&['capturing','stopping'].includes(lyric.phase);
+      mode=hearing?'listening':map[next] || 'idle';
       if(mode==='recording')remotePanelDismissed=false;
       floater.dataset.mode=mode;
-      status.textContent=label || ({idle:'AGENT READY',music:'MUSIC PLAYING',listening:'LISTENING',thinking:'THINKING',speaking:'RESPONDING',recording:'CAPTURING LYRICS'}[mode]);
+      status.textContent=hearing?(lyric.phase==='stopping'?'STOPPING LYRIC TRANSCRIPTION':'TRANSCRIBING LYRICS'):label || ({idle:'AGENT READY',music:'MUSIC PLAYING',listening:'LISTENING',thinking:'THINKING',speaking:'RESPONDING',recording:'CAPTURING LYRICS'}[mode]);
       sphere.setAttribute('aria-label',mode==='speaking'?'Stop Stonefellow speaking':'Expand Stonefellow Agent canvas');
       sphere.title=mode==='speaking'?'Stop speaking':'Expand Agent Canvas';
       syncListeningButtons();
     }
     function positionOrbitTools(){
       if(!orbitTools)return;
-      const visible=Array.from(orbitTools.querySelectorAll('button')).filter(button=>!button.hidden);
+      const visible=Array.from(orbitTools.querySelectorAll('button')).filter(button=>button.dataset.orbitAction!=='stop');
       const count=visible.length, radius=visual.offsetWidth*.5+(visual.offsetWidth>175?78:58);
       const spread=count<2?0:Math.min(168,56+(count-2)*42);
       visible.forEach((button,index)=>{
@@ -353,29 +365,45 @@
     }
     function syncListeningButtons() {
       const capturing=!!options.isCapturing?.();
+      const lyric=window.StonefellowSongExperience?.snapshot?.();
+      const lyricBusy=lyric?.listening_mode==='recognition'&&['capturing','stopping'].includes(lyric.phase);
       const playable=!!(audio && (audio.currentSrc || audio.src) && !audio.paused);
       for(const action of ['listen-interpret'])for(const button of root.querySelectorAll(`[data-agent-action="${action}"]`)){
-        button.hidden=capturing;
-        button.disabled=!playable;
+        button.hidden=capturing&&!lyricBusy;
+        button.disabled=!lyricBusy&&(!playable||capturing);
+        button.setAttribute('aria-pressed',String(lyricBusy));
         button.title=!playable?'Play a Stonefellow song to use this tool.':'Listen & Interpret';
       }
       // The studio must be accessible before a song plays so a listener can
       // connect a Focusrite and review settings without starting capture.
       for(const button of root.querySelectorAll('[data-agent-action="capture"]')){
-        button.hidden=false;button.disabled=false;button.title='Record Studio · Vocal overdub or song clip';
+        button.hidden=false;button.disabled=lyricBusy;button.title=lyricBusy?'Stop lyric listening before opening Record Studio.':'Record Studio · Vocal overdub or song clip';
       }
-      for(const button of root.querySelectorAll('[data-agent-action="stop-listening"]'))button.hidden=!capturing||!!options.isVocalRecording?.();
+      for(const button of root.querySelectorAll('[data-agent-action="stop-listening"]'))button.hidden=!capturing||!!options.isVocalRecording?.()||lyricBusy;
+      lyricControls.hidden=!lyric||lyric.listening_mode!=='recognition';
+      lyricStop.hidden=!lyricBusy;lyricStop.disabled=lyric?.phase==='stopping';
+      lyricStop.textContent=lyric?.phase==='stopping'?'Stopping…':'Stop';
       for(const button of root.querySelectorAll('[data-orbit-action="player"]'))button.hidden=!player||player.hidden;
       // The playlist tool belongs to the ring even before a mix is created.
       for(const button of root.querySelectorAll('[data-orbit-action="playlist"]'))button.hidden=false;
       positionOrbitTools();
+      const stopSlot=by(orbitTools,'[data-orbit-action="stop"]'),listenSlot=by(orbitTools,'[data-orbit-action="listen"]');
+      if(stopSlot&&listenSlot){stopSlot.style.left=listenSlot.style.left;stopSlot.style.top=listenSlot.style.top;}
     }
     function session() {
       const active=!!window.StonefellowSongExperience?.active?.();
       if (!active) { panel.hidden=true; smallSession.replaceChildren(); bigSession.replaceChildren(); updateDock(); return; }
-      if (!remotePanelDismissed) panel.hidden=false;
-      window.StonefellowSongExperience.mount(smallSession);
-      window.StonefellowSongExperience.mount(bigSession);
+      const lyric=window.StonefellowSongExperience?.snapshot?.();
+      if(lyric?.listening_mode==='recognition'){
+        panel.hidden=true;smallSession.replaceChildren();bigSession.replaceChildren();
+        // Updates never reopen a dismissed rail or replace another native page.
+        if(pageView==='lyrics'&&!pageRail.hidden&&!pageRail.hasAttribute('inert'))window.StonefellowSongExperience.mount(lyricHost);
+        state(baseMode,baseLabel);
+      }else{
+        if (!remotePanelDismissed) panel.hidden=false;
+        window.StonefellowSongExperience.mount(smallSession);
+        window.StonefellowSongExperience.mount(bigSession);
+      }
       updateDock();
       syncListeningButtons();
     }
@@ -580,6 +608,7 @@
       window.clearTimeout(pageTimer);
       cancelAnimationFrame(pageFrame);
       const alreadyOpen=pageRail.classList.contains('open');
+      pageView=view;pageRail.dataset.view=view;pageHost.hidden=view==='lyrics';lyricHost.hidden=view!=='lyrics';
       if(workspace.classList.contains('open'))closeWorkspace();
       if(!alreadyOpen){
         const from=sphere.getBoundingClientRect();
@@ -587,7 +616,7 @@
         pageRail.style.setProperty('--sf-page-from-y',from.top+'px');
         pageRail.style.setProperty('--sf-page-from-size',from.width+'px');
       }
-      pageTitle.textContent=pageLabels[view]||String(view||'PAGE').replaceAll('-',' ').toUpperCase();
+      pageTitle.textContent=(view==='lyrics'?'LISTEN & INTERPRET':pageLabels[view])||String(view||'PAGE').replaceAll('-',' ').toUpperCase();
       pageHost.replaceChildren();
       pageHost.innerHTML='<div class="sf-agent-page-loading" role="status">OPENING PAGE…</div>';
       pageViewport.scrollTop=0;
@@ -606,7 +635,12 @@
       pageTimer=window.setTimeout(()=>{
         if(!destroyed&&!pageRail.hidden)by(pageRail,'[data-agent-action="close-page"]')?.focus({preventScroll:true});
       },alreadyOpen?0:800);
-      return pageHost;
+      return view==='lyrics'?lyricHost:pageHost;
+    }
+    function openLyrics(){
+      const host=pageView==='lyrics'&&!pageRail.hidden&&!pageRail.hasAttribute('inert')?lyricHost:openPage('lyrics');
+      window.StonefellowSongExperience?.mount?.(host);
+      return host;
     }
     function closePage(immediate=false){
       window.clearTimeout(pageTimer);
@@ -614,10 +648,12 @@
       if(pageRail.hidden)return;
       pageRail.setAttribute('inert','');
       pageRail.classList.remove('open');
+      state(baseMode,baseLabel);
       const finish=()=>{
         pageRail.hidden=true;
         pageRail.classList.remove('growing');
-        pageHost.replaceChildren();
+        pageHost.replaceChildren();lyricHost.replaceChildren();
+        pageView='';
         root.classList.remove('has-native-page');
         if(pagePortal!==root){pagePortal.classList.remove('has-native-page');pagePortal.hidden=true;}
         document.body?.classList?.remove('sf-agent-page-open');
@@ -641,6 +677,8 @@
       if(action==='capture')options.onStartCapture?.();
       if(action==='song-moments')options.onOpenMoments?.();
       if(action==='listen-interpret')options.onListenInterpret?.();
+      if(action==='open-lyrics')openLyrics();
+      if(action==='stop-lyrics'&&!lyricStop.disabled)options.onStopListening?.();
       if(action==='stop-listening')options.onStopListening?.();
       if(action==='show-player')showPlayer();
       if(action==='show-queue')options.onOpenQueue?.();
@@ -724,7 +762,7 @@
     resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();syncVoice();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);orbDraw(0);}
-    current={root,state,session,syncPlayer,syncVoice,syncPlaylist:syncListeningButtons,openPage,closePage,startGuide,syncTranscript,showConversation,setWelcomeState,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
+    current={root,state,session,syncPlayer,syncVoice,syncPlaylist:syncListeningButtons,openPage,openLyrics,closePage,startGuide,syncTranscript,showConversation,setWelcomeState,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
       destroyed=true;cancelAnimationFrame(raf);cancelAnimationFrame(pageFrame);window.clearTimeout(pageTimer);window.clearTimeout(workspaceTimer);pausePlayerHide();
       closeGuide(false);guideLayer.remove();
       document.body?.classList?.remove('sf-agent-page-open');
@@ -752,5 +790,5 @@
     const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':['moonlit horizon','moonlight'].includes(match[1])?'lunar':match[1];
     return current?.setAtmosphere(named)||null;
   }
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncPlaylist:()=>current?.syncPlaylist(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),setWelcomeState:state=>current?.setWelcomeState(state),startGuide:()=>current?.startGuide(),openPage:view=>current?.openPage(view),closePage:(immediate=false)=>current?.closePage(immediate),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncPlaylist:()=>current?.syncPlaylist(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),setWelcomeState:state=>current?.setWelcomeState(state),startGuide:()=>current?.startGuide(),openPage:view=>current?.openPage(view),openLyrics:()=>current?.openLyrics(),closePage:(immediate=false)=>current?.closePage(immediate),active:()=>!!current});
 })();

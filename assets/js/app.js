@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.238';
+  window.STONEFELLOW_APP_BUILD='1.3.239';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -294,13 +294,13 @@
   const songListeningSkill=window.StonefellowSongListening?.create({
     audio,getTrack:()=>st.track,
     onUpdate:part=>{
-      if(songExperience?.listening_mode!=='recognition'||songExperience.track_id!==part.track_id)return;
+      if(songExperience?.listening_mode!=='recognition'||songExperience.phase==='stopping'||songExperience.track_id!==part.track_id)return;
       updateSongExperience({phase:'capturing',transcript:[part.text,part.interim].filter(Boolean).join(' '),
         end_ms:null,live_enabled:true,message:'Live words are provisional and may be inaccurate. Stop listening to interpret; no song clip is being saved.'});
     },
     onFinish:async result=>{
       if(songExperience?.listening_mode!=='recognition')return result.text;
-      if(!result.ok||!result.receipt||st.track?.id!==result.receipt.track_id){
+      if(!result.ok||!result.receipt||String(st.track?.id)!==String(result.receipt.track_id)){
         updateSongExperience({phase:'discarded',live_enabled:false,end_ms:Math.round((audio.currentTime||0)*1000),
           message:result.reason==='error'?(result.error||'Player-track recognition failed. No recording was saved.'):result.text},true);
         return result.error||result.text;
@@ -383,7 +383,9 @@
     mount:target=>window.SFSongExperienceUI?.mount(target,songExperience&&{
       ...songExperience,canAnalyze:!!currentSongDraft()
     },songExperienceAction),
-    active:()=>!!songExperience
+    active:()=>!!songExperience,
+    snapshot:()=>songExperience?{listening_mode:songExperience.listening_mode,phase:songExperience.phase,
+      track_id:songExperience.track_id,start_ms:songExperience.start_ms}:null
   });
   async function transcribeLastCapturedSong(retried=false,interpretAfter=false){
     const captured=songCaptureSkill?.getCapture();
@@ -461,30 +463,42 @@
     if(vocalStudio?.status()?.active&&['song_capture_start','song_capture_live_start'].includes(action.type))
       return 'Finish your vocal recording before starting song lyric listening or a separate song clip.';
     if(action.type==='song_capture_live_start'){
+      if(songTranscriptionBusy||songAnalysisBusy)return 'Finish the current lyric request before starting another.';
       if(songCaptureSkill?.status().active)return 'Record Clip is active. Stop that recording before choosing Listen & Interpret.';
       if(!songListeningSkill)return 'Live player-track recognition is unavailable. No audio recording was started.';
-      if(songListeningSkill.status().active)return 'Already listening to the song. Select Stop listening to interpret.';
+      if(songListeningSkill.status().active){window.SFPublicAgentCanvas?.openLyrics?.();return 'Already listening to the song. Select Stop listening to review the lyrics.';}
       const started=songListeningSkill.begin();
-      if(!started.ok)return started.text;
-            songListeningReceipt=null;songLyricDraft=null;songLyricReport=null;songLyricCorrected='';songPersonalNote='';
+      if(!started.ok){
+        // Unsupported devices must not silently switch to Record Song or the microphone.
+        songExperience={phase:'unavailable',listening_mode:'recognition',title:st.track?.title||'Listen & Interpret',
+          track_id:String(st.track?.id||''),start_ms:Math.round((audio.currentTime||0)*1000),end_ms:null,
+          transcript:'',corrected:'',reports:[],live_enabled:false,message:started.text};
+        updateSongExperience({});window.SFPublicAgentCanvas?.openLyrics?.();return started.text;
+      }
+      songListeningReceipt=null;songLyricDraft=null;songLyricReport=null;songLyricCorrected='';songPersonalNote='';
       songExperience={phase:'capturing',listening_mode:'recognition',title:st.track?.title||'Song section',
         track_id:songListeningSkill.status().track_id,start_ms:songListeningSkill.status().start_ms,
         end_ms:null,transcript:'',corrected:'',reports:[],saved_note_id:null,live_enabled:true,
         auto_interpret:!!action.interpret_on_stop,
         message:'Listening to the song through the browser speech service. No recording is retained.'};
       updateSongExperience({},true);
+      window.SFPublicAgentCanvas?.openLyrics?.();
       return started.text;
     }
-    if(action.type==='song_capture_stop'&&songListeningSkill?.status().active)
+    if(action.type==='song_capture_stop'&&songListeningSkill?.status().active){
+      updateSongExperience({phase:'stopping',message:'Stopping lyric listening…'});
       return (await songListeningSkill.stop()).text;
+    }
     if(!songCaptureSkill)return 'Song-section audio capture is unavailable. Playback was not changed.';
     if(action.type==='song_capture_start'){
+      if(songTranscriptionBusy||songAnalysisBusy)return 'Finish the current lyric request before starting Record Clip.';
       if(songListeningSkill?.status().active)return 'Listen & Interpret is active. Stop listening before starting Record Clip.';
       return songCaptureSkill.begin().text;
     }
     if(action.type==='song_capture_stop')return (await songCaptureSkill.stop()).text;
     if(action.type==='song_capture_transcribe')return await transcribeLastCapturedSong();
     if(action.type==='song_capture_analyze')return await analyzeLastSongDraft(action.question);
+    if(songListeningSkill?.status().active)return 'Transcribing lyrics from the player. Select Stop listening to review; no song clip is recorded.';
     const snapshot=songCaptureSkill.status();
     if(snapshot.active)return 'I am recording the current song from '+Math.round(snapshot.start_ms/1000)+' seconds. Stop Record Clip to finish.';
     return snapshot.last?'The last song section is recorded and ready for optional transcription.':'There is no song listening or recording session in progress.';
@@ -1860,7 +1874,7 @@
     const q=String(message||'').trim()
       .replace(/^(?:(?:hey|hi|ok|okay)\s+)?stone[\s-]?fellow[,.:!?\s]*/i,'')
       .replace(/[.!?]+$/,'').trim();
-    if(/^(?:please\s+)?listen(?:\s+(?:to|in\s+on)\s+(?:this\s+|the\s+)?(?:song|music|verse|chorus|section))?\s+and\s+(?:then\s+)?(?:interpret|analy[sz]e)(?:\s+(?:the|this|its)\s+(?:lyrics|song|verse|chorus|section))?$/i.test(q))
+    if(/^(?:please\s+)?listen(?:\s+(?:to|in\s+on)\s+(?:this\s+|the\s+)?(?:song|music|verse|chorus|section))?\s+(?:and|&)\s+(?:then\s+)?(?:interpret|analy[sz]e)(?:\s+(?:the|this|its)\s+(?:lyrics|song|verse|chorus|section))?$/i.test(q))
       return {type:'song_capture_live_start',interpret_on_stop:true};
     if(/^(?:please\s+)?(?:(?:start|begin|enable|activate|turn\s+on)\s+(?:the\s+)?(?:live\s+)?(?:song\s+|lyric\s+)?(?:transcription|transcribing|captions|lyrics)|transcribe\s+live)$/i.test(q))
       return {type:'song_capture_live_start',interpret_on_stop:false};

@@ -61,7 +61,10 @@ check('Two song actions are now icon-only and sit above the orb',()=>{
   assert.ok(canvas.indexOf('class="sf-agent-orbit-tools"')<canvas.indexOf('class="sf-agent-sphere"'));
   assert.match(canvas,/function positionOrbitTools\(\)/);
   assert.match(canvas,/Math\.min\(168,56\+\(count-2\)\*42\)/);
-  assert.match(canvas,/\.filter\(button=>!button\.hidden\)/);
+  // Hidden controls retain their slots; hiding a tool must not shuffle the ring.
+  assert.match(canvas,/\.filter\(button=>button\.dataset\.orbitAction!=='stop'\)/);
+  assert.match(canvas,/stopSlot\.style\.left=listenSlot\.style\.left/);
+  assert.match(canvas,/stopSlot\.style\.top=listenSlot\.style\.top/);
   assert.match(css,/\.sf-agent-orbit-tools button svg/);
   assert.match(css,/\.sf-agent-orbit-tools button:focus-visible/);
 });
@@ -69,10 +72,24 @@ check('Toolbar keeps its existing player, stop and direct listening actions',()=
   assert.match(canvas,/action==='listen-interpret'/);
   assert.match(canvas,/action==='capture'/);
   assert.match(canvas,/action==='stop-listening'/);
-  assert.match(canvas,/button\.hidden=capturing/);
+  assert.match(canvas,/button\.hidden=capturing&&!lyricBusy/);
   assert.match(canvas,/button\.hidden=!capturing/);
   assert.match(canvas,/positionOrbitTools\(\);/);
   assert.match(app,/executeSongCaptureAction\(\{type:'song_capture_live_start',interpret_on_stop:true\}\)/);
+});
+check('Production orbital positioning keeps existing tools fixed across hidden and visible states',()=>{
+  const start=canvas.indexOf('    function positionOrbitTools(){');
+  const end=canvas.indexOf('    function syncListeningButtons()',start);
+  assert.ok(start>=0&&end>start);
+  const buttons=['listen','record','player','playlist','stop'].map(orbitAction=>({dataset:{orbitAction},style:{},hidden:false}));
+  const ctx={orbitTools:{querySelectorAll:()=>buttons},visual:{offsetWidth:210}};
+  vm.createContext(ctx);vm.runInContext(canvas.slice(start,end),ctx);
+  ctx.positionOrbitTools();
+  const before=buttons.map(button=>({...button.style}));
+  buttons[0].hidden=true;buttons[2].hidden=true;buttons[4].hidden=false;
+  ctx.positionOrbitTools();
+  assert.deepEqual(buttons.map(button=>({...button.style})),before);
+  assert.equal(buttons[4].style.left,undefined,'Stop is overlaid in the Listen slot by syncListeningButtons, never allocated another slot');
 });
 check('Ember uses ivory and gold tokens through the footer, player and notification bell',()=>{
   assert.match(site,/--accent:#ffe9be;--accent-rgb:255,233,190/);
