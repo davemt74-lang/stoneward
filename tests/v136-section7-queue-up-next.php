@@ -35,7 +35,7 @@ ok(str_contains($app,'function clearQueue'),'client clear queue is wired');
 ok(str_contains($app,'function takeQueueItem'),'client can play an exact queued item');
 ok(str_contains($app,'function playNextFromQueue'),'player can consume the queue head');
 ok(str_contains($app,"play(t,0,'queue')"),'queued playback uses dedicated telemetry source');
-ok(str_contains($app,"play(t,0,'queue_history')"),'Queue Previous uses local playback history');
+ok(str_contains($app,"play(previous,0,'queue_history')"),'Queue Previous uses local playback history');
 ok(str_contains($app,'agentSessionActive()&&delta>0'),'Agent session remains highest-priority Next behavior');
 ok(str_contains($app,'st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length'),'playlist/release playback remains ahead of Up Next');
 ok(str_contains($app,'delta>0&&st.auth.authenticated&&st.queue.items.length'),'manual Next consumes Up Next after session/playlist context');
