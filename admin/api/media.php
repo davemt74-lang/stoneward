@@ -45,9 +45,60 @@ function sf_admin_media_publish_image(string $entityType,string $entityId,int $l
     return ['asset'=>$asset,'url'=>$url,'role'=>$role,'links'=>sf_media_links($entityType,$entityId)];
 }
 
+
+/** 91B20G: verified image placement, published-asset history and guarded restore. */
+function sf_admin_image_studio_target(string $type,string $id,string $role): void {
+    $allowed=['track'=>['artwork'],'release'=>['cover'],'story_entry'=>['hero'],'campaign'=>['hero'],'site'=>['hero']];
+    if(!isset($allowed[$type])||!in_array($role,$allowed[$type],true)||$id==='')throw new InvalidArgumentException('Select a supported primary artwork placement.');
+    if($type==='site'){if($id!=='public')throw new InvalidArgumentException('Select the public site workspace.');return;}
+    if($type==='track'){foreach(sf_catalog() as $row)if((string)($row['id']??'')===$id)return;}
+    if($type==='release'){foreach(sf_admin_releases() as $row)if((string)($row['id']??'')===$id)return;}
+    if($type==='story_entry'){require_once SF_ROOT.'/api/story-core.php';if(ctype_digit($id)&&sf_story_get((int)$id,false))return;}
+    if($type==='campaign'){require_once SF_ROOT.'/api/campaign-core.php';if(ctype_digit($id)&&sf_campaign_get((int)$id))return;}
+    throw new InvalidArgumentException('The selected artwork target no longer exists.');
+}
+function sf_admin_image_studio_current_link(string $type,string $id,string $role): int {
+    $actualRole=$type==='track'?'primary_artwork':$role;
+    $q=sf_db()->prepare('SELECT id FROM media_links WHERE entity_type=? AND entity_id=? AND role=? AND public_visible=1 ORDER BY featured DESC,id DESC LIMIT 1');
+    $q->execute([$type,$id,$actualRole]);return (int)($q->fetchColumn()?:0);
+}
+function sf_admin_image_studio_validate_link(int $linkId,string $type,string $id,string $role): array {
+    if($linkId<1)throw new InvalidArgumentException('Choose an attached image.');
+    $row=sf_admin_media_link_row($linkId,$type,$id);
+    if(($row['category']??'')!=='image'||!in_array((string)$row['role'],[$role,$type==='track'?'primary_artwork':$role],true))
+        throw new InvalidArgumentException('The image is not attached in the requested placement.');
+    sf_media_guard_generated_image_approval((int)$row['asset_id']);
+    return $row;
+}
+function sf_admin_image_studio_publish_link(string $type,string $id,int $linkId,string $role): array {
+    if($type==='track')return sf_media_publish_track_artwork($id,$linkId);
+    return sf_admin_media_publish_image($type,$id,$linkId,$role);
+}
+function sf_admin_image_studio_history(string $type,string $id,string $role): array {
+    sf_admin_image_studio_target($type,$id,$role);
+    sf_ops_ensure_schema();
+    $q=sf_db()->prepare("SELECT id,admin_user_id,action,details_json,created_at FROM admin_audit_log WHERE entity_type=? AND entity_id=? AND action IN ('image_studio_placement_applied','image_studio_placement_restored') ORDER BY id DESC LIMIT 80");
+    $q->execute([$type,$id]);$items=[];
+    foreach($q->fetchAll() as $r){
+        $d=json_decode((string)($r['details_json']??'{}'),true);
+        if(!is_array($d)||($d['role']??'')!==$role)continue;
+        $items[]=['id'=>(int)$r['id'],'action'=>(string)$r['action'],'actor_id'=>(int)$r['admin_user_id'],
+            'created_at'=>(string)$r['created_at'],'previous_link_id'=>(int)($d['previous_link_id']??0),
+            'new_link_id'=>(int)($d['new_link_id']??0),'previous_uuid'=>(string)($d['previous_uuid']??''),
+            'new_uuid'=>(string)($d['new_uuid']??''),'previous_title'=>(string)($d['previous_title']??''),
+            'new_title'=>(string)($d['new_title']??'')];
+        if(count($items)>=12)break;
+    }
+    return ['current_link_id'=>sf_admin_image_studio_current_link($type,$id,$role),'entries'=>$items];
+}
+
 if($method==='GET'){
     $assetId=max(0,(int)($_GET['asset_id']??0));if($assetId){$asset=sf_media_asset($assetId);if(!$asset)sf_json_response(['ok'=>false,'message'=>'Media asset not found.'],404);sf_json_response(['ok'=>true,'asset'=>$asset,'usage'=>sf_media_usage($assetId),'capabilities'=>sf_media_capabilities()]);}
-    $mode=sf_clean_text($_GET['mode']??'',40);if($mode==='dashboard'){$cfg=sf_store_config();$products=[];foreach((array)($cfg['products']??[]) as $id=>$p)$products[]=['id'=>(string)$id,'label'=>(string)($p['label']??$id),'format'=>(string)($p['format']??''),'kind'=>'builder'];if(function_exists('sf_commerce_products'))foreach(sf_commerce_products(false) as $p)$products[]=['id'=>(string)$p['id'],'label'=>(string)$p['title'],'format'=>'merch','kind'=>'merch'];sf_json_response(['ok'=>true,'completeness'=>sf_media_completeness(),'store_products'=>$products,'site'=>sf_site_settings(),'capabilities'=>sf_media_capabilities()]);}
+    $mode=sf_clean_text($_GET['mode']??'',40);
+    if($mode==='image_placement_history'){
+        $type=sf_clean_text($_GET['entity_type']??'',40);$id=sf_clean_text($_GET['entity_id']??'',160);$role=sf_clean_text($_GET['role']??'',60);
+        sf_json_response(['ok'=>true]+sf_admin_image_studio_history($type,$id,$role));
+    }if($mode==='dashboard'){$cfg=sf_store_config();$products=[];foreach((array)($cfg['products']??[]) as $id=>$p)$products[]=['id'=>(string)$id,'label'=>(string)($p['label']??$id),'format'=>(string)($p['format']??''),'kind'=>'builder'];if(function_exists('sf_commerce_products'))foreach(sf_commerce_products(false) as $p)$products[]=['id'=>(string)$p['id'],'label'=>(string)$p['title'],'format'=>'merch','kind'=>'merch'];sf_json_response(['ok'=>true,'completeness'=>sf_media_completeness(),'store_products'=>$products,'site'=>sf_site_settings(),'capabilities'=>sf_media_capabilities()]);}
     $entityType=sf_clean_text($_GET['entity_type']??'',40);$entityId=sf_clean_text($_GET['entity_id']??'',160);if($entityType!==''&&$entityId!=='')sf_json_response(['ok'=>true,'links'=>sf_media_links($entityType,$entityId),'publication'=>$entityType==='track'?sf_track_media_publication_status($entityId):null,'capabilities'=>sf_media_capabilities()]);
     $category=sf_clean_text($_GET['category']??'',40);$q=sf_clean_text($_GET['q']??'',180);sf_json_response(['ok'=>true,'assets'=>sf_media_list($category,$q,500),'completeness'=>sf_media_completeness(),'capabilities'=>sf_media_capabilities()]);
 }
@@ -88,5 +139,63 @@ try{
         if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_media','media_publish',['route'=>'universal_media','action'=>'publish_entity_media','context_profile'=>'catalog','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','request'=>'Publish '.$role.' media for '.$entityType.' '.$entityId,'response'=>'Published '.$r['asset']['uuid'].' as '.$role.'.']);
         sf_json_response(['ok'=>true]+$r);
     }
+
+    if($action==='image_studio_apply'||$action==='image_studio_restore'){
+        if(empty($b['confirmed']))throw new InvalidArgumentException('Confirm the artwork change before publication.');
+        if(!array_key_exists('expected_current_link_id',$b))throw new InvalidArgumentException('Refresh the artwork preview before applying changes.');
+        $type=sf_clean_text($b['entity_type']??'',40);$entityId=sf_clean_text($b['entity_id']??'',160);
+        $role=sf_clean_text($b['role']??'',60);
+        sf_admin_image_studio_target($type,$entityId,$role);
+        $current=sf_admin_image_studio_current_link($type,$entityId,$role);
+        if($current!==max(0,(int)$b['expected_current_link_id']))
+            throw new RuntimeException('The published artwork changed. Refresh the comparison before applying.');
+        $receiptId=0;$sourceJobId=0;$linkId=0;
+        if($action==='image_studio_apply'){
+            require_once SF_ROOT.'/api/image-generation-core.php';
+            $sourceJobId=max(0,(int)($b['job_id']??0));$job=sf_image_gen_job($sourceJobId);
+            if(!$job||($job['status']??'')!=='ready'||(int)($job['asset_approved_by']??0)<1)
+                throw new RuntimeException('Only an approved image-generation result may be applied.');
+            $linkId=max(0,(int)($b['link_id']??0));$link=sf_admin_image_studio_validate_link($linkId,$type,$entityId,$role);
+            if((int)$link['asset_id']!==(int)$job['media_asset_id'])
+                throw new InvalidArgumentException('The staged image no longer matches this approved result.');
+            if(!empty($link['public_visible'])||$linkId===$current)
+                throw new RuntimeException('This image is already publicly applied. Refresh the placement.');
+        }else{
+            $receiptId=max(0,(int)($b['receipt_id']??0));sf_ops_ensure_schema();
+            $q=sf_db()->prepare("SELECT details_json FROM admin_audit_log WHERE id=? AND entity_type=? AND entity_id=? AND action IN ('image_studio_placement_applied','image_studio_placement_restored')");
+            $q->execute([$receiptId,$type,$entityId]);$row=$q->fetch();
+            $details=$row?json_decode((string)$row['details_json'],true):null;
+            if(!is_array($details)||($details['role']??'')!==$role)
+                throw new InvalidArgumentException('The selected restore receipt is unavailable.');
+            if($current!==(int)($details['new_link_id']??0))
+                throw new RuntimeException('Another image revision is active. Refresh before restoring.');
+            $linkId=(int)($details['previous_link_id']??0);
+            if($linkId<1)throw new RuntimeException('This revision has no managed previous image to restore.');
+            sf_admin_image_studio_validate_link($linkId,$type,$entityId,$role);
+        }
+        $previous=$current?sf_admin_media_link_row($current,$type,$entityId):null;
+        $next=sf_admin_media_link_row($linkId,$type,$entityId);
+        // Use the SAME authoritative publishers as the Media Library and catalog editors.
+        $published=sf_admin_image_studio_publish_link($type,$entityId,$linkId,$role);
+        $after=sf_admin_image_studio_current_link($type,$entityId,$role);
+        if($after!==$linkId)throw new RuntimeException('Artwork publication was not confirmed by the Media Library.');
+        $auditAction=$action==='image_studio_apply'?'image_studio_placement_applied':'image_studio_placement_restored';
+        sf_log_admin_action((int)$me['id'],$auditAction,$type,$entityId,[
+            'role'=>$role,'source_job_id'=>$sourceJobId,'restore_receipt_id'=>$receiptId,
+            'previous_link_id'=>$current,'new_link_id'=>$after,
+            'previous_uuid'=>(string)($previous['uuid']??''),'new_uuid'=>(string)$next['uuid'],
+            'previous_title'=>(string)($previous['title']??''),'new_title'=>(string)($next['title']??'')
+        ]);
+        if(function_exists('sf_agent_brain_log')){
+            try{sf_agent_brain_log((int)$me['id'],'admin_media',$auditAction,
+                ['route'=>'image_studio','action'=>$auditAction,'context_profile'=>'catalog','needs_llm'=>false,
+                 'requires_confirmation'=>true,'status'=>'completed','request'=>'Review '.$type.' artwork placement',
+                 'response'=>'Applied reviewed Media Library artwork '.$next['uuid'].' as '.$role.'.']);}
+            catch(Throwable $brainError){error_log('[Image Studio publish brain receipt] '.get_class($brainError));}
+        }
+        sf_json_response(['ok'=>true,'published'=>true,'current_link_id'=>$after,
+            'history'=>sf_admin_image_studio_history($type,$entityId,$role)]);
+    }
+
     sf_json_response(['ok'=>false,'error'=>'unknown_action'],400);
 }catch(Throwable $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}
