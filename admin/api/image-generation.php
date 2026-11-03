@@ -56,6 +56,10 @@ try{
         sf_log_admin_action((int)$me['id'],'image_style_archived','image_studio_style',(string)$styleId);
         sf_json_response(['ok'=>true]);
     }
+    if(in_array($action,['board_add','board_remove','board_move'],true)){
+        $items=sf_image_studio_moodboard_change((int)$me['id'],(int)($body['style_id']??0),$action,$body);
+        sf_json_response(['ok'=>true,'items'=>$items,'private'=>true]);
+    }
     if($action==='local_prompt'){
         sf_json_response(['ok'=>true,'suggestion'=>sf_image_studio_local_prompt((string)($body['concept']??''),(string)($body['preset_slug']??''),(int)($body['style_id']??0))]);
     }

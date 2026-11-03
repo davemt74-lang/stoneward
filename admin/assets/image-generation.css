@@ -78,3 +78,19 @@ body.imagegen-placement-open{overflow:hidden}
 .imagegen-style-archive{font-size:12px;min-height:36px}
 @media(max-width:680px){.imagegen-style-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.imagegen-style-card{padding:9px}.imagegen-style-inspiration{height:86px}}
 @media(max-width:380px){.imagegen-style-cards{grid-template-columns:1fr}.imagegen-style-inspiration{height:120px}}
+
+
+/* 91B20I — ordered private style references; one page scrollbar. */
+.imagegen-board-workspace{margin-top:16px;padding:14px;border:1px solid #7bbfdc52;border-radius:13px;min-width:0}
+.imagegen-board-workspace p{font-size:.8rem;line-height:1.5}
+.imagegen-board-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:10px;margin:12px 0}
+.imagegen-board-item{display:flex;flex-direction:column;min-width:0;margin:0;padding:8px;border:1px solid #8cc0dc40;border-radius:11px}
+.imagegen-board-item img{display:block;width:100%;height:150px;flex:none;object-fit:cover;border-radius:7px}
+.imagegen-board-item figcaption{margin:7px 0;display:grid;gap:4px;font-size:.8rem;overflow-wrap:anywhere}
+.imagegen-board-actions{display:flex;flex-wrap:wrap;gap:5px}
+.imagegen-board-actions button{flex:1 1 45%;min-height:44px;font-size:.75rem;padding:6px}
+.imagegen-board-add{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:9px;align-items:end}
+.imagegen-board-add select,.imagegen-board-add input{min-width:0;max-width:100%;width:100%}
+.imagegen-board-workspace button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+@media(max-width:680px){.imagegen-board-workspace{padding:10px}.imagegen-board-add{grid-template-columns:1fr}.imagegen-board-add button{width:100%}.imagegen-board-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:380px){.imagegen-board-gallery{grid-template-columns:1fr}}

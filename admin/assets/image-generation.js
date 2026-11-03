@@ -214,7 +214,7 @@
   function render(){
     const s=state.settings,o=state.openai,d=state.dashboard||{},c=d.counts||{},providerReady=!!(o.enabled&&o.key_configured);
     const presets=state.presets||[],styles=state.styles||[];
-    canvas.innerHTML=head('91B20H · IMAGE STUDIO','AI Image Studio','Visual Style Library, variations, transparent backgrounds, targeted edits and invoice reconciliation. Every paid request and publication remains separately approved.',
+    canvas.innerHTML=head('91B20I · IMAGE STUDIO','AI Image Studio','Visual Style Library, variations, transparent backgrounds, targeted edits and invoice reconciliation. Every paid request and publication remains separately approved.',
       '<button class="secondary" type="button" id="imagegenBackMedia">Media Library</button>')+
       '<div class="stats imagegen-stats">'+
       '<div class="stat"><strong>'+fmt(d.total)+'</strong><span>Image concepts</span></div>'+
@@ -346,6 +346,7 @@
       $('#imagegenReferenceConsent').checked=false;
       $('#imagegenMaskConsent').checked=false;
       composerCache={...composerCache,mask_asset_id:0};
+      $('#imagegenMaskSelect').value='';
       updateReference();pendingDraft=null;rememberComposer();
     });
     $('#imagegenMaskSelect').addEventListener('change',()=>{
@@ -394,7 +395,7 @@
       const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
       const link=document.createElement('a');link.href=url;link.download='stonefellow-image-generation-audit.csv';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
-    $('[data-imagegen-style]',canvas).forEach(btn=>btn.onclick=()=>{
+    $$('[data-imagegen-style]',canvas).forEach(btn=>btn.onclick=()=>{
       $('#imagegenStyleSelect').value=String(btn.dataset.imagegenStyle);
       rememberComposer();
       $('#imagegenConcept').focus();
@@ -409,7 +410,7 @@
         await refresh();render();say('Style saved and selected. No image request made.');
       }catch(err){alert(err.message)}finally{busy=false}
     };
-    $('[data-imagegen-archive-style]',canvas).forEach(btn=>btn.onclick=async()=>{
+    $$('[data-imagegen-archive-style]',canvas).forEach(btn=>btn.onclick=async()=>{
       if(busy||!confirm('Archive this custom style? Existing prompt drafts and generated artwork will be preserved.'))return;
       busy=true;
       try{rememberComposer();const removed=Number(btn.dataset.imagegenArchiveStyle);
@@ -418,7 +419,7 @@
         await refresh();render();say('Custom visual style archived.');
       }catch(err){alert(err.message)}finally{busy=false}
     });
-    $('[data-imagegen-preset]',canvas).forEach(btn=>btn.onclick=()=>{
+    $$('[data-imagegen-preset]',canvas).forEach(btn=>btn.onclick=()=>{
       $('#imagegenPresetSelect').value=btn.dataset.imagegenPreset;
       const p=presets.find(x=>x.slug===btn.dataset.imagegenPreset);
       if(p){$('#imagegenDraftForm [name="size"]').value=p.default_size;$('#imagegenDraftForm [name="quality"]').value=p.default_quality;}
@@ -499,6 +500,15 @@
       busy=true;try{await api('image-generation.php',{action:'reconcile_cost',id:job.id,amount_usd:amount,invoice_reference:invoice,confirmed:true});await refresh();render();say('Invoice reconciliation recorded.');}
       catch(err){alert(err.message)}finally{busy=false}
     });
+    window.SFImageMoodBoards?.mount({canvas,styles,references:referenceAssets,api,isBusy:()=>busy,
+      onUseReference:assetId=>{
+        if(busy||!referenceAssets.some(a=>Number(a.id)===assetId))return false;
+        $('#imagegenReferenceSelect').value=String(assetId);
+        $('#imagegenReferenceSelect').dispatchEvent(new Event('change'));
+        $('#imagegenDraftForm').scrollIntoView({behavior:'smooth',block:'start'});
+        say('Mood-board reference selected. Review separate image-use permission before saving.');
+        return true;
+      }});
   }
   async function act(action,id,success){
     busy=true;const button=$(`[data-imagegen-${action==='approve_prompt'?'approve-prompt':action==='approve_asset'?'approve-asset':'generate'}="${id}"]`,canvas);
