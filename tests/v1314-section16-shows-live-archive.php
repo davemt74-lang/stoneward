@@ -16,7 +16,7 @@ ok(str_contains($boot,"require_once __DIR__ . '/live-core.php'"),'live archive c
 ok(str_contains($site,"'shows'=>\$shows")&&str_contains($site,'sf_live_public_shows()'),'site-data exposes canonical public shows');
 ok(str_contains($api,"stonefellow.show.v1")&&str_contains($api,"'setlist_track_ids'")&&str_contains($api,"'live_recording_track_ids'"),'Admin API persists canonical show/setlist/live-recording records');
 ok(str_contains($api,"'message'=>'Unknown '.\$label.' track: '.\$tid")&&str_contains($api,"'setlist_track_ids'")&&str_contains($api,"'live_recording_track_ids'")&&str_contains($api,"'setlist'")&&str_contains($api,"'live recording'"),'show writes reject unknown catalog track references');
-ok(str_contains($api,"['scheduled','completed','cancelled','postponed','archived']"),'show lifecycle states are governed server-side');
+ok(str_contains($api,"['scheduled','completed','cancelled','postponed','hidden','archived','deleted']"),'show lifecycle states are governed server-side');
 ok(str_contains($adminHtml,'data-view="shows"')&&str_contains($adminHtml,'Shows + Live'),'Admin has a dedicated Shows + Live workspace');
 ok(str_contains($admin,'function renderShows()')&&str_contains($admin,'function renderShowForm('),'Admin can browse and author show records');
 ok(str_contains($admin,'showSetlist')&&str_contains($admin,'showLiveRecordings')&&str_contains($admin,'showMedia'),'Admin edits setlists, live recordings and show archive media');
