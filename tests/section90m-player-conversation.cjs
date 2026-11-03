@@ -20,7 +20,7 @@ async function run(){
   const audio={paused:false,volume:0.8,duration:200,currentTime:75,src:'assets/night-drive.mp3',
     play:async()=>{if(failToPlay)throw Error('autoplay rejected');audio.paused=false},
     pause:()=>{audio.paused=true}};
-  const st={track:{id:'song-1',title:'Night Drive',release:'Moonlight',duration:200},playing:true,conversationOn:false};
+  const st={track:{id:'song-1',title:'Night Drive',release:'Moonlight',duration:200},playing:true,conversationOn:false,playlistPlayback:{playlistId:null},playSource:'player'};
   const sandbox={audio,st,musicOriginalVolume:null,voicePlaybackPending:false,voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,lastAudibleVolume:0.7,
     recordListen:type=>events.push(type),invalidatePlayback:()=>{},updateFooterPlayer:()=>events.push('render'),
     stepTrack:delta=>events.push('step:'+delta),
