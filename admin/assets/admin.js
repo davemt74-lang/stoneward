@@ -298,12 +298,28 @@
   const openExistingAdminView=openView;
   openView=function(view){
     if(view!=='song-moments'&&view!=='song-moderation')return openExistingAdminView(view);
+    return openSongMoments(view);
+  };
+  function openSongMoments(view,trackId){
     window.SFStoriesAdmin?.close?.(true);
     app.view=view;viewTitle.textContent=view==='song-moderation'?'Comment Moderation':'Song Moments & Timeline';
-    $$('#adminNav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+    $$('#adminNav [data-view]').forEach(button=>{
+      const active=button.dataset.view===view;
+      button.classList.toggle('active',active);
+      if(active)button.setAttribute('aria-current','page');
+      else button.removeAttribute('aria-current');
+    });
     $('#sidebar').classList.remove('open');
-    return window.SFSongMomentsAdmin?.open?.(view==='song-moderation'?'moderation':'timeline')||say('Song Moments module unavailable.');
-  };
+    return window.SFSongMomentsAdmin?.open?.(view==='song-moderation'?'moderation':'timeline',trackId)||say('Song Moments module unavailable.');
+  }
+  async function openSongTimeline(trackId){
+    const form=$('#trackForm',canvas);
+    if(form?.dataset.lyricReviewDirty==='1'){
+      const confirmed=await window.SFAdminConfirm.ask({title:'Open the lyric timeline?',description:'Unsaved changes in this catalog editor will be discarded.',actionLabel:'Open timeline'});
+      if(!confirmed||!form.isConnected)return;
+    }
+    return openSongMoments('song-moments',trackId);
+  }
   const openExistingImageView=openView;
   openView=function(view){
     if(view!=='image-generation')return openExistingImageView(view);
@@ -312,7 +328,7 @@
     $('#sidebar').classList.remove('open');
     return window.SFImageGenerationAdmin?.open?.()||say('AI Image Studio module unavailable.');
   };
-  window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,openCatalogTrack,reloadCore,toggleAdminSpeech,updateAdminVoiceControl};
+  window.STONEFELLOW_ADMIN_CONTEXT={app,api,uploadApi,canvas,head,say,esc,slug,money,openView,openCatalogTrack,openSongTimeline,reloadCore,toggleAdminSpeech,updateAdminVoiceControl};
   function renderDashboard(){
     const d=app.dashboard||{},s=d.stats||{},listening=d.listening||{},notifications=d.notification_analytics||{},search=d.search_analytics||{},library=d.library_analytics||{},crm=d.crm_summary||{},recentNotificationEvents=d.recent_notification_events||[],recentSearchEvents=d.recent_search_events||[],daily=listening.daily||[],topTracks=listening.tracks||[],recentUsers=d.recent_users||[],recentOrders=d.recent_orders||[],recentActivity=d.recent_activity||[],recentListening=d.recent_listening||[],recentBrain=d.recent_brain||[],maxDay=Math.max(1,...daily.map(x=>Number(x.listens||0)));
     canvas.innerHTML=head('STONEFELLOW OPERATIONS','Dashboard','Recent customers, purchases, listening, activity, Agent Brain, catalog health, and launch operations in one place.',`<button class="secondary" id="dashboardRefresh" type="button">Refresh</button>`)+
@@ -736,7 +752,21 @@
   renderCatalogEditor=function(id){
     renderCatalogEditorBase(id);
     const track=app.catalog.find(row=>row.id===id);
-    if(track&&$('#trackForm'))bindTrackLifecycle(track);
+    const form=$('#trackForm',canvas);
+    if(!track||!form)return;
+    bindTrackLifecycle(track);
+    form.insertAdjacentHTML('beforebegin','<section id="sfCatalogLyricsImport" class="panel sf-moment-admin-import" aria-label="Song lyrics import"></section>');
+    const target=$('#sfCatalogLyricsImport',canvas);
+    const publicTrack=track.public_visible!==false&&!['draft','private','hidden','archived','deleted'].includes(String(track.state||'published'));
+    const listeningCopy=/^api\/media\.php\?id=M[A-F0-9]{20}(?:&variant=original)?$/.test(track.audio||'')&&track.audio!==track.private_master_audio;
+    if(publicTrack&&listeningCopy&&window.SFSongMomentsAdmin?.mountCatalogImport){
+      const markDirty=()=>{form.dataset.lyricReviewDirty='1';};
+      form.addEventListener('input',markDirty);
+      form.addEventListener('change',markDirty);
+      void window.SFSongMomentsAdmin.mountCatalogImport(target,String(track.id));
+    }else{
+      target.innerHTML='<h2>Song lyrics</h2><p>'+((publicTrack&&listeningCopy)?'Lyric import controls are unavailable. Reload the admin page.':'Publish an MP3 or PCM WAV listening copy from the Media Library to import lyrics.')+'</p>';
+    }
   };
   const renderCatalogRowsBase=renderCatalogRows;
   renderCatalogRows=function(){
