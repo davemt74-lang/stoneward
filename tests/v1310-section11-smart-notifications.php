@@ -89,7 +89,7 @@ ok(str_contains($agent,"return 'notification_preferences'"),'Agent routes notifi
 ok(str_contains($agent,"'type'=>'open_notifications'"),'Agent emits drawer-open action');
 ok(str_contains($agent,"'notification_unread'"),'Agent routing state receives unread count');
 ok(str_contains($agent,"'latest_notification_title'"),'Agent routing state receives latest notification context');
-ok(str_contains($app,"case'open_notifications'"),'client executes Agent notification drawer action');
+ok(preg_match("/case\s*'open_notifications'/",$app),'client executes Agent notification drawer action');
 ok(str_contains($app,'notification_unread:Number('),'client sends unread notification count to Agent');
 ok(str_contains($app,'latest_notification_title:'),'client sends latest notification title to Agent');
 
