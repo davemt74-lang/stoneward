@@ -582,6 +582,8 @@ jobs:
           node --test tests/section91b20f-visual-mask-editor.test.cjs
           node --test tests/section91b20g-image-apply-restore.test.cjs
           node --test tests/section91b20h-visual-style-library.test.cjs
+          node --test tests/section91b20i-style-moodboards.test.cjs
+          php tests/section91b20i-style-moodboards.php
           node --check admin/assets/image-mask-editor.js
           php tests/section91b13e-lyric-review-gate.php
           php tests/section91b13c-grounded-agent-replies.php

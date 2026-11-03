@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__.'/image-studio-moodboards.php';
+
 /** 91B20H — Admin-only visual identity library. Style metadata is never an image-generation command. */
 function sf_image_studio_seed_styles(): array {
     return [
@@ -27,6 +29,7 @@ function sf_image_studio_style_schema(): void {
         is_active TINYINT(1) NOT NULL DEFAULT 1,created_by BIGINT UNSIGNED NULL,
         created_at VARCHAR(40) NOT NULL,updated_at VARCHAR(40) NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    sf_image_studio_moodboard_schema($pdo,$sqlite);
     $now=gmdate('c');
     $q=$pdo->prepare(($sqlite?'INSERT OR IGNORE':'INSERT IGNORE').' INTO image_studio_styles
         (slug,name,mood,guidance,primary_hex,secondary_hex,accent_hex,is_builtin,is_active,created_at,updated_at)
@@ -43,6 +46,7 @@ function sf_image_studio_style_public(array $row): array {
         if($asset&&($asset['category']??'')==='image')
             $row['inspiration_uuid']=(string)($asset['uuid']??'');
     }
+    $row['moodboard']=sf_image_studio_moodboard_items((int)$row['id']);
     unset($row['created_by'],$row['created_at'],$row['updated_at']);
     return $row;
 }
@@ -92,6 +96,7 @@ function sf_image_studio_save_style(int $adminId,array $input): array {
     return sf_image_studio_style((int)sf_db()->lastInsertId())?:[];
 }
 function sf_image_studio_archive_style(int $id): void {
+    sf_image_studio_style_schema();
     if($id<1)throw new InvalidArgumentException('Choose a custom style.');
     $q=sf_db()->prepare('UPDATE image_studio_styles SET is_active=0,updated_at=?
         WHERE id=? AND is_builtin=0 AND is_active=1');

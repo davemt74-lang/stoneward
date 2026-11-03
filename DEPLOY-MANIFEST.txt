@@ -1,4 +1,4 @@
-Stonefellow v1.3.234 — Section 91B20H Visual Style Library
+Stonefellow v1.3.235 — Section 91B20H Visual Style Library
 Base release: v1.3.233, merged as Stoneward PR #334; direct GitHub ZIP releases added in PR #333
 Scope: named visual identities and mood palettes, user-created style cards and private inspiration thumbnail, Admin-governed archive, style-to-editable-prompt routing for local/Agent text composer; 91B20G reviewed apply/restore and prior Visual Mask Editor retained
 Production artifact: generated only by the GitHub Release Gate after full PR certification; this manifest is not a claim of deployment
@@ -14,3 +14,5 @@ Certification: automated GitHub PR and post-merge workflows required; live OpenA
 Style Library: palette guidance and style metadata are assembled into editable drafts; inspiration image bytes are preview-only and never automatically sent to a provider.
 Style permissions: creation/archival requires Admin CSRF and is audited; paid generation, generated-asset approval, and public publication remain independently authorized.
 Tests: section91b20h-visual-style-library.test.cjs now runs in the permanent Release Gate.
+
+91B20I: Private Style Mood Boards; scoped audited references; no provider requests.
