@@ -20,7 +20,7 @@ try{
         }
         sf_json_response(['ok'=>true,'settings'=>sf_image_gen_settings(),
             'openai'=>sf_ai_provider_public('openai'),'models'=>sf_image_gen_models(),
-            'jobs'=>sf_image_gen_jobs(),'presets'=>sf_image_studio_presets(),
+            'jobs'=>sf_image_gen_jobs(),'presets'=>sf_image_studio_presets(),'styles'=>sf_image_studio_styles(),
             'dashboard'=>sf_image_studio_dashboard(),'references'=>sf_image_gen_available_references()]);
     }
     $body=sf_request_json();$action=(string)($body['action']??'');
@@ -43,21 +43,34 @@ try{
         sf_log_admin_action((int)$me['id'],'image_preset_archived','image_studio_preset',(string)$presetId);
         sf_json_response(['ok'=>true]);
     }
+    if($action==='save_style'){
+        $style=sf_image_studio_save_style((int)$me['id'],$body);
+        sf_log_admin_action((int)$me['id'],'image_style_created','image_studio_style',(string)$style['id'],
+            ['name'=>$style['name'],'mood'=>$style['mood'],'inspiration_asset_id'=>$style['inspiration_asset_id']]);
+        sf_json_response(['ok'=>true,'style'=>$style]);
+    }
+    if($action==='archive_style'){
+        if(empty($body['confirmed']))throw new InvalidArgumentException('Confirm archiving this custom style.');
+        $styleId=(int)($body['style_id']??0);
+        sf_image_studio_archive_style($styleId);
+        sf_log_admin_action((int)$me['id'],'image_style_archived','image_studio_style',(string)$styleId);
+        sf_json_response(['ok'=>true]);
+    }
     if($action==='local_prompt'){
-        sf_json_response(['ok'=>true,'suggestion'=>sf_image_studio_local_prompt((string)($body['concept']??''),(string)($body['preset_slug']??''))]);
+        sf_json_response(['ok'=>true,'suggestion'=>sf_image_studio_local_prompt((string)($body['concept']??''),(string)($body['preset_slug']??''),(int)($body['style_id']??0))]);
     }
     if($action==='compose_prompt'){
         if(empty($body['confirmed']))sf_json_response(['ok'=>false,'message'=>'Confirm sending this creative brief to your configured text model.'],422);
         require_once SF_ROOT.'/api/agent-runtime.php';
         try{
-            $suggestion=sf_image_studio_agent_prompt($me,(string)($body['concept']??''),(string)($body['preset_slug']??''));
+            $suggestion=sf_image_studio_agent_prompt($me,(string)($body['concept']??''),(string)($body['preset_slug']??''),(int)($body['style_id']??0));
         }catch(InvalidArgumentException $e){throw $e;}
         catch(Throwable $e){
             error_log('[Stonefellow image prompt composer] '.get_class($e));
             sf_json_response(['ok'=>false,'message'=>'Agent prompt refinement did not complete. It will not retry automatically; you can use the local preset instead.'],503);
         }
         sf_log_admin_action((int)$me['id'],'image_prompt_agent_suggested','image_studio_preset',(string)$suggestion['preset']['id'],
-            ['source'=>'text_model','provider'=>$suggestion['usage']['provider'],'model'=>$suggestion['usage']['model']]);
+            ['source'=>'text_model','provider'=>$suggestion['usage']['provider'],'model'=>$suggestion['usage']['model'],'style_id'=>(int)($suggestion['style']['id']??0)]);
         sf_json_response(['ok'=>true,'suggestion'=>$suggestion]);
     }
     if($action==='save_draft'){
