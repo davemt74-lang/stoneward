@@ -121,6 +121,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
   }
   const selectors=['.sf-agent-landing','.sf-agent-floater','.sf-agent-visual','.sf-agent-sphere','.sf-agent-state',
     '.sf-agent-mesh','.sf-agent-cloud','.sf-agent-points','.sf-agent-workspace','.sf-agent-panel',
+    '.sf-agent-orbit-tools','.sf-agent-lyric-controls','[data-agent-action="stop-lyrics"]',
     '.sf-agent-session','.sf-agent-expanded-session','.sf-agent-page-rail','.sf-agent-page-title','.sf-agent-page-viewport','.sf-agent-page-content','.sf-agent-player-dock','.sf-agent-chat-start'];
   const elements={};for(const key of selectors)elements[key]=new Element(key);
   elements['.sf-agent-landing'].clientWidth=950;elements['.sf-agent-landing'].clientHeight=650;
