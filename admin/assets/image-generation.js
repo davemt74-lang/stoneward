@@ -207,7 +207,7 @@
       <label class="field">Output background<select name="background"><option value="auto">Automatic</option><option value="opaque">Opaque</option><option value="transparent">Transparent · PNG/WebP output</option></select></label>
       <div class="imagegen-reference span3"><div><label class="field">Reference image (optional)<select name="reference_asset_id" id="imagegenReferenceSelect"><option value="">Generate from text only</option>${referenceAssets.map(a=>'<option value="'+Number(a.id)+'">'+esc(a.title||a.original_name)+' · '+esc(String(a.uuid).slice(0,9))+'</option>').join('')}</select></label><label class="field">Search reference library<input type="search" id="imagegenReferenceSearch" value="${esc(referenceQuery)}" placeholder="Search title or filename"></label><p class="hint">PNG, WebP or JPEG, up to 10 MB. Select an approved image or a library original. Variations make one separately approved paid Image Edits API call.</p><label class="check-field"><input type="checkbox" name="reference_consent" id="imagegenReferenceConsent"> I own or have permission to send this reference image to OpenAI for this variation.</label></div><div class="imagegen-reference-preview" id="imagegenReferencePreview"><span>No image reference selected</span></div></div>
       <div class="imagegen-reference-browser span3" id="imagegenReferenceBrowser" aria-label="Searchable reference image choices"></div>
-      <div class="imagegen-mask span3"><div><label class="field">Targeted edit mask (optional)<select name="mask_asset_id" id="imagegenMaskSelect"><option value="">No mask · edit the entire source</option></select></label><p class="hint">Choose a PNG with transparent edit areas that matches the selected reference dimensions. Upload masks through Media Library first. The source and mask remain saved as separate originals.</p><label class="check-field"><input type="checkbox" name="mask_consent" id="imagegenMaskConsent"> I have permission to send this mask image to OpenAI for this edit.</label></div><div id="imagegenMaskPreview" class="imagegen-reference-preview"><span>No edit mask selected</span></div></div>
+      <div class="imagegen-mask span3"><div><label class="field">Targeted edit mask (optional)<select name="mask_asset_id" id="imagegenMaskSelect"><option value="">No mask · edit the entire source</option></select></label><p class="hint">Choose a PNG with transparent edit areas that matches the selected reference dimensions. Upload masks through Media Library first, or draw one with the private Visual Mask Editor. The source and mask remain saved as separate originals.</p><button type="button" class="secondary imagegen-mask-launch" id="imagegenDrawMask" disabled>Open Visual Mask Editor · brush / crop</button><label class="check-field"><input type="checkbox" name="mask_consent" id="imagegenMaskConsent"> I have permission to send this mask image to OpenAI for this edit.</label></div><div id="imagegenMaskPreview" class="imagegen-reference-preview"><span>No edit mask selected</span></div></div>
       <div class="actions"><button class="primary" type="submit">Save prompt draft</button></div>
       <p class="status-line span3" id="imagegenStatus" role="status"></p></form></section>
       <div class="imagegen-list-head"><div><h2>Generation history & review queue</h2><p>${state.jobs.length} recent jobs · latest first · saved originals stay immutable</p></div><label class="field imagegen-history-filter">Status<select id="imagegenStatusFilter"><option value="">All statuses</option>${['draft','approved','generating','needs_review','ready','failed'].map(x=>`<option value="${x}">${x.replaceAll('_',' ')}</option>`).join('')}</select></label></div>
@@ -243,6 +243,7 @@
       $('#imagegenReferenceConsent').disabled=!asset;
       if(!asset){$('#imagegenReferenceConsent').checked=false;holder.innerHTML='<span>No image reference selected</span>'}
       else holder.innerHTML='<img src="../api/media.php?id='+encodeURIComponent(asset.uuid)+'" alt="Selected private reference image"><small>'+esc(asset.title||asset.original_name)+' · '+Number(asset.width||0)+'×'+Number(asset.height||0)+'</small>';
+      const launch=$('#imagegenDrawMask');if(launch){launch.disabled=!asset||Number(asset.width)<1||Number(asset.height)<1;launch.title=asset?'Paint a private PNG mask using this source image.':'Select a reference image first.';}
       populateMasks();
     }
     function renderReferenceBrowser(){
@@ -285,6 +286,23 @@
       populateMasks();pendingDraft=null;rememberComposer();
     });
     $('#imagegenReferenceSearch').oninput=e=>{referenceQuery=e.target.value;renderReferenceBrowser();rememberComposer()};
+    $('#imagegenDrawMask').onclick=()=>{
+      const refId=Number($('#imagegenReferenceSelect').value||0),reference=referenceAssets.find(x=>Number(x.id)===refId);
+      if(!reference){say('Select a Media Library reference image before opening the mask editor.');return;}
+      if(!window.SFImageMaskEditor?.open){say('Visual Mask Editor is unavailable. Reload Admin and try again.');return;}
+      rememberComposer();
+      window.SFImageMaskEditor.open({reference,getCsrf:()=>app.csrf,onSaved:async maskAsset=>{
+        // The mask is uploaded as a private Media Library original; generation is never automatic.
+        composerCache={...composerCache,mask_asset_id:Number(maskAsset.id),mask_consent:false};
+        pendingDraft=null;
+        await refresh();render();
+        const selected=$('#imagegenMaskSelect');
+        if(selected&&Array.from(selected.options).some(option=>Number(option.value)===Number(maskAsset.id))){
+          selected.value=String(maskAsset.id);$('#imagegenMaskConsent').checked=false;populateMasks();rememberCurrentComposer?.();
+          say('Private mask uploaded. Confirm separate mask permission before saving your prompt.');
+        }else{say('Mask uploaded to Media Library, but it is outside the current reference list. Open Media Library to review it.');}
+      }});
+    };
     $('#imagegenBackMedia').onclick=()=>openView('media');
     $('#imagegenRefresh').onclick=async()=>{try{await refresh();render();say('Image history refreshed.')}catch(err){alert(err.message)}};
     $('#imagegenGalleryFilter').value=galleryFilter;
