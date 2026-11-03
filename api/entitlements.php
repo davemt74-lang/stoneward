@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/subscription-policy.php';
 
 function sf_entitlements_ensure_schema(): void {
     $pdo=sf_db();$driver=(string)(sf_db_config()['driver']??'');
@@ -41,7 +42,7 @@ function sf_packages(bool $publicOnly=true): array {sf_entitlements_ensure_schem
 function sf_package(int $id): ?array {sf_entitlements_ensure_schema();if(function_exists('sf_billing_ensure_schema'))sf_billing_ensure_schema();if(function_exists('sf_membership_ensure_schema'))sf_membership_ensure_schema();$q=sf_db()->prepare('SELECT * FROM subscription_packages WHERE id=? LIMIT 1');$q->execute([$id]);$r=$q->fetch();return $r?:null;}
 function sf_token_balance(int $userId): int {sf_entitlements_ensure_schema();$q=sf_db()->prepare('SELECT balance FROM user_token_balances WHERE user_id=?');$q->execute([$userId]);$v=$q->fetchColumn();return $v===false?0:(int)$v;}
 function sf_token_source_exists(int $userId,string $type,string $source): bool {
-    sf_entitlements_ensure_schema();$q=sf_db()->prepare('SELECT id FROM token_ledger WHERE user_id=? AND entry_type=? AND source=? LIMIT 1');$q->execute([$userId,$type,$source]);return $q->fetchColumn()!==false;
+    if(!sf_db()->inTransaction())sf_entitlements_ensure_schema();$q=sf_db()->prepare('SELECT id FROM token_ledger WHERE user_id=? AND entry_type=? AND source=? LIMIT 1');$q->execute([$userId,$type,$source]);return $q->fetchColumn()!==false;
 }
 /**
  * All balance mutations serialize per user. Credit sources are idempotent,
@@ -88,25 +89,14 @@ function sf_token_adjust(int $userId,int $delta,string $type,string $source='',a
     }catch(Throwable $e){if($ownsTransaction&&$pdo->inTransaction())$pdo->rollBack();throw $e;}
 }
 function sf_enroll_user(int $userId,?int $packageId=null): array {
-    sf_entitlements_ensure_schema();$pdo=sf_db();$p=$packageId?sf_package($packageId):null;if(!$p){$rows=sf_packages(true);$p=$rows[0]??null;}if(!$p)throw new RuntimeException('No active subscription package is available.');if(empty($p['is_active'])||empty($p['is_public']))throw new InvalidArgumentException('Selected package is not available.');
-    $now=gmdate('c');$requestedTrialDays=max(0,(int)$p['trial_days']);$trialTokens=max(0,(int)$p['trial_tokens']);$price=(int)$p['monthly_price_cents'];
-    $t=$pdo->prepare('SELECT user_id FROM user_trial_history WHERE user_id=? LIMIT 1');$t->execute([$userId]);$trialRedeemed=$t->fetchColumn()!==false;
-    $trialDays=$trialRedeemed?0:$requestedTrialDays;
-    $status=$trialDays>0?'trialing':($price===0?'active':'pending_payment');$trialEnd=$trialDays>0?gmdate('c',time()+$trialDays*86400):null;$periodEnd=$status==='active'?gmdate('c',strtotime('+1 month')):null;
-    if($trialDays>0){$mark=$pdo->prepare('INSERT INTO user_trial_history(user_id,first_trial_package_id,first_trial_started_at) VALUES(?,?,?)');$mark->execute([$userId,(int)$p['id'],$now]);}
-    $q=$pdo->prepare('SELECT id FROM user_subscriptions WHERE user_id=?');$q->execute([$userId]);if($q->fetchColumn()!==false){$u=$pdo->prepare("UPDATE user_subscriptions SET package_id=?,status=?,trial_started_at=?,trial_ends_at=?,current_period_start=?,current_period_end=?,provider='local',cancel_at_period_end=0,canceled_at=NULL,grace_ends_at=NULL,updated_at=? WHERE user_id=?");$u->execute([(int)$p['id'],$status,$trialDays?$now:null,$trialEnd,$status==='active'?$now:null,$periodEnd,$now,$userId]);}else{$u=$pdo->prepare("INSERT INTO user_subscriptions(user_id,package_id,status,trial_started_at,trial_ends_at,current_period_start,current_period_end,created_at,updated_at,provider,cancel_at_period_end) VALUES(?,?,?,?,?,?,?,?,?,'local',0)");$u->execute([$userId,(int)$p['id'],$status,$trialDays?$now:null,$trialEnd,$status==='active'?$now:null,$periodEnd,$now,$now]);}
-    $grant=$trialDays>0?$trialTokens:($status==='active'?(int)$p['monthly_tokens']:0);if($grant>0)sf_token_adjust($userId,$grant,$trialDays>0?'trial_grant':'monthly_grant','package:'.$p['slug'],[],($trialDays>0?'Free trial':'Monthly').' allocation');return sf_entitlement_state($userId);
+    return sf_subscription_enroll_user($userId,$packageId);
 }
 function sf_entitlement_state(int $userId): array {
-    sf_entitlements_ensure_schema();if(function_exists('sf_billing_ensure_schema'))sf_billing_ensure_schema();$q=sf_db()->prepare('SELECT s.*,p.name package_name,p.slug package_slug,p.monthly_price_cents,p.monthly_tokens,p.trial_days,p.trial_tokens,p.provider_price_id FROM user_subscriptions s LEFT JOIN subscription_packages p ON p.id=s.package_id WHERE s.user_id=? LIMIT 1');$q->execute([$userId]);$s=$q->fetch()?:null;if($s&&$s['status']==='trialing'&&!empty($s['trial_ends_at'])&&strtotime((string)$s['trial_ends_at'])<time()){$status=((int)$s['monthly_price_cents']===0)?'active':'trial_expired';$now=gmdate('c');$u=sf_db()->prepare('UPDATE user_subscriptions SET status=?,updated_at=? WHERE user_id=?');$u->execute([$status,$now,$userId]);if($status==='active'&&(int)$s['monthly_tokens']>0)sf_token_adjust($userId,(int)$s['monthly_tokens'],'monthly_grant','package:'.$s['package_slug'],[],'First monthly allocation after trial');$s['status']=$status;}
-    if($s&&$s['status']==='active'&&($s['provider']??'local')!=='stripe'&&!empty($s['current_period_end'])&&strtotime((string)$s['current_period_end'])<=time()){
-        $now=gmdate('c');
-        if(!empty($s['cancel_at_period_end'])){
-            sf_db()->prepare("UPDATE user_subscriptions SET status='canceled',canceled_at=?,updated_at=? WHERE user_id=?")->execute([$now,$now,$userId]);$s['status']='canceled';$s['canceled_at']=$now;
-        }else{
-            $monthly=max(0,(int)($s['monthly_tokens']??0));$oldPeriodEnd=(string)$s['current_period_end'];$start=$now;$end=gmdate('c',strtotime('+1 month'));$u=sf_db()->prepare('UPDATE user_subscriptions SET current_period_start=?,current_period_end=?,updated_at=? WHERE user_id=?');$u->execute([$start,$end,$start,$userId]);$renewalSource='local_renewal:'.$oldPeriodEnd;if($monthly>0&&!sf_token_source_exists($userId,'monthly_grant',$renewalSource))sf_token_adjust($userId,$monthly,'monthly_grant',$renewalSource,[],'Monthly package renewal');$s['current_period_start']=$start;$s['current_period_end']=$end;
-        }
-    }
+    sf_entitlements_ensure_schema();sf_billing_ensure_schema();
+    sf_subscription_refresh_local($userId);
+    $q=sf_db()->prepare('SELECT s.*,p.name package_name,p.slug package_slug,p.monthly_price_cents,p.monthly_tokens,p.trial_days,p.trial_tokens,p.provider_price_id FROM user_subscriptions s LEFT JOIN subscription_packages p ON p.id=s.package_id WHERE s.user_id=? LIMIT 1');
+    $q->execute([$userId]);$s=$q->fetch()?:null;
+    if($s){$s['stored_status']=$s['status'];$s['status']=sf_subscription_effective_status($s);}
     $ledger=sf_db()->prepare('SELECT delta,balance_after,entry_type,source,provider,model,input_tokens,output_tokens,voice_chars,note,created_at FROM token_ledger WHERE user_id=? ORDER BY id DESC LIMIT 20');$ledger->execute([$userId]);$out=['balance'=>sf_token_balance($userId),'subscription'=>$s,'ledger'=>$ledger->fetchAll()];if(function_exists('sf_membership_state'))$out['membership']=sf_membership_state($userId,true);return $out;
 }
 function sf_can_use_ai(array $user,int $estimated=1): array {if(($user['role']??'')==='admin')return ['ok'=>true,'unlimited'=>true,'balance'=>PHP_INT_MAX];$state=sf_entitlement_state((int)$user['id']);if(!$state['subscription'])$state=sf_enroll_user((int)$user['id'],null);return ['ok'=>$state['balance']>=$estimated,'unlimited'=>false,'balance'=>$state['balance'],'state'=>$state];}
@@ -130,12 +120,13 @@ function sf_activate_package(int $userId,int $packageId,string $source='admin'):
             $lock=$pdo->prepare('SELECT id FROM users WHERE id=? FOR UPDATE');$lock->execute([$userId]);
             if($lock->fetchColumn()===false)throw new InvalidArgumentException('User not found.');
         }
-        $q=$pdo->prepare('SELECT id,package_id,status,current_period_end FROM user_subscriptions WHERE user_id=? LIMIT 1');$q->execute([$userId]);$existing=$q->fetch()?:null;
+        $q=$pdo->prepare('SELECT * FROM user_subscriptions WHERE user_id=? LIMIT 1');$q->execute([$userId]);$existing=$q->fetch()?:null;
+        sf_subscription_guard_local_assignment($existing);
         // A locked subscription check prevents two concurrent assignments from
         // each granting the same billing-period allocation.
         $alreadyActive=$existing&&(int)$existing['package_id']===$packageId&&($existing['status']??'')==='active'&&!empty($existing['current_period_end'])&&strtotime((string)$existing['current_period_end'])>time();
         if(!$alreadyActive){
-            if($existing){$u=$pdo->prepare("UPDATE user_subscriptions SET package_id=?,status='active',trial_started_at=NULL,trial_ends_at=NULL,current_period_start=?,current_period_end=?,provider='local',provider_customer_id='',provider_subscription_id='',cancel_at_period_end=0,canceled_at=NULL,grace_ends_at=NULL,updated_at=? WHERE user_id=?");$u->execute([$packageId,$now,$end,$now,$userId]);}
+            if($existing){$u=$pdo->prepare("UPDATE user_subscriptions SET package_id=?,status='active',trial_started_at=NULL,trial_ends_at=NULL,current_period_start=?,current_period_end=?,provider='local',cancel_at_period_end=0,canceled_at=NULL,grace_ends_at=NULL,updated_at=? WHERE user_id=?");$u->execute([$packageId,$now,$end,$now,$userId]);}
             else{$u=$pdo->prepare("INSERT INTO user_subscriptions(user_id,package_id,status,trial_started_at,trial_ends_at,current_period_start,current_period_end,created_at,updated_at,provider,provider_customer_id,provider_subscription_id,cancel_at_period_end) VALUES(?,?,'active',NULL,NULL,?,?,?,?,'local','','',0)");$u->execute([$userId,$packageId,$now,$end,$now,$now]);}
             $tokens=max(0,(int)$p['monthly_tokens']);
             if($tokens>0)sf_token_adjust($userId,$tokens,'monthly_grant',$source.':'.$p['slug'].':'.bin2hex(random_bytes(12)),[],'Monthly package activation');

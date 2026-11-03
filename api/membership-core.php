@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/subscription-policy.php';
 
 function sf_membership_json(array $v): string {return json_encode($v,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?:'{}';}
 function sf_membership_decode(mixed $v,array $fallback=[]): array {$d=is_array($v)?$v:json_decode((string)$v,true);return is_array($d)?$d:$fallback;}
@@ -34,14 +35,12 @@ function sf_membership_package(array $p): array {
     return ['enabled'=>!empty($p['membership_enabled']),'rank'=>max(0,(int)($p['membership_rank']??0)),'badge'=>(string)($p['membership_badge']??''),'benefits'=>$benefits];
 }
 function sf_membership_status_active(array $sub): bool {
-    $status=(string)($sub['status']??'');if(in_array($status,['active','trialing'],true))return true;
-    if($status==='past_due'&&!empty($sub['grace_ends_at'])&&strtotime((string)$sub['grace_ends_at'])>=time())return true;
-    return false;
+    return sf_subscription_access_active($sub);
 }
 function sf_membership_state(int $userId,bool $syncCrm=false): array {
     sf_membership_ensure_schema();$sub=function_exists('sf_billing_subscription_row')?sf_billing_subscription_row($userId):null;$package=null;$membership=['enabled'=>false,'rank'=>0,'badge'=>'','benefits'=>sf_membership_benefits([])];
     if($sub&&!empty($sub['package_id'])){$package=sf_package((int)$sub['package_id']);if($package)$membership=sf_membership_package($package);}
-    $active=(bool)($sub&&$membership['enabled']&&sf_membership_status_active($sub));$state=['active'=>$active,'status'=>(string)($sub['status']??'none'),'package_id'=>(int)($sub['package_id']??0),'package_name'=>(string)($sub['package_name']??($package['name']??'')),'package_slug'=>(string)($sub['package_slug']??($package['slug']??'')),'rank'=>(int)$membership['rank'],'badge'=>(string)$membership['badge'],'benefits'=>$membership['benefits'],'current_period_end'=>$sub['current_period_end']??null,'trial_ends_at'=>$sub['trial_ends_at']??null,'cancel_at_period_end'=>!empty($sub['cancel_at_period_end']),'grace_ends_at'=>$sub['grace_ends_at']??null];
+    $active=(bool)($sub&&$membership['enabled']&&sf_membership_status_active($sub));$state=['active'=>$active,'status'=>$sub?sf_subscription_effective_status($sub):'none','package_id'=>(int)($sub['package_id']??0),'package_name'=>(string)($sub['package_name']??($package['name']??'')),'package_slug'=>(string)($sub['package_slug']??($package['slug']??'')),'rank'=>(int)$membership['rank'],'badge'=>(string)$membership['badge'],'benefits'=>$membership['benefits'],'current_period_end'=>$sub['current_period_end']??null,'trial_ends_at'=>$sub['trial_ends_at']??null,'cancel_at_period_end'=>!empty($sub['cancel_at_period_end']),'grace_ends_at'=>$sub['grace_ends_at']??null];
     if($syncCrm)sf_membership_sync_crm($userId,$state);return $state;
 }
 function sf_membership_sync_crm(int $userId,?array $state=null): void {

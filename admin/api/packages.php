@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);require __DIR__.'/bootstrap.php';$write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';sf_admin_require_auth($write);sf_entitlements_ensure_schema();sf_billing_ensure_schema();sf_membership_ensure_schema();
+declare(strict_types=1);require __DIR__.'/bootstrap.php';$write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';$me=sf_admin_require_auth($write);sf_entitlements_ensure_schema();sf_billing_ensure_schema();sf_membership_ensure_schema();
 if(!$write){$rows=sf_packages(false);foreach($rows as &$r){$r['features']=json_decode((string)($r['features_json']??'[]'),true)?:[];$r['membership']=sf_membership_package($r);}unset($r);sf_json_response(['ok'=>true,'packages'=>$rows]);}
 $b=sf_request_json();$action=(string)($b['action']??'save');
 if($action==='delete'){$id=(int)($b['id']??0);if($id<1)sf_json_response(['ok'=>false,'message'=>'Invalid package.'],422);$q=sf_db()->prepare('SELECT COUNT(*) FROM user_subscriptions WHERE package_id=?');$q->execute([$id]);if((int)$q->fetchColumn()>0)sf_json_response(['ok'=>false,'message'=>'This package is assigned to users and cannot be deleted. Disable it instead.'],422);$q=sf_db()->prepare('DELETE FROM subscription_packages WHERE id=?');$q->execute([$id]);sf_json_response(['ok'=>true]);}

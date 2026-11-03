@@ -83,12 +83,11 @@ function sf_auth_revoke_cookie_token(): void {
     sf_auth_forget_cookie();
 }
 function sf_auth_revoke_all_user_sessions(int $userId): void {
-    try{
-        sf_auth_ensure_schema();
-        $q=sf_db()->prepare('DELETE FROM user_sessions WHERE user_id=?');
-        $q->execute([$userId]);
-    }catch(Throwable $e){}
-    sf_auth_forget_cookie();
+    sf_auth_ensure_schema();
+    sf_db()->prepare('DELETE FROM user_sessions WHERE user_id=?')->execute([$userId]);
+    if((int)($_SESSION['sf_user_id']??0)===$userId){
+        unset($_SESSION['sf_user_id'],$_SESSION['sf_csrf']);sf_auth_forget_cookie();
+    }
 }
 function sf_auth_sessions(int $userId): array {
     sf_auth_ensure_schema();$current=sf_auth_cookie_value();$currentHash=$current!==''?hash('sha256',$current):'';
@@ -129,18 +128,18 @@ function sf_auth_restore_user_id(): int {
     try{
         sf_auth_ensure_schema();
         $hash=hash('sha256',$token);
-        $q=sf_db()->prepare('SELECT user_id,expires_at,user_agent_hash FROM user_sessions WHERE token_hash=? LIMIT 1');
+        $q=sf_db()->prepare('SELECT user_id,expires_at,user_agent_hash,last_seen_at FROM user_sessions WHERE token_hash=? LIMIT 1');
         $q->execute([$hash]);
         $row=$q->fetch();
         if(!$row){sf_auth_forget_cookie();return 0;}
-        if(strtotime((string)$row['expires_at'])<time()){
+        if(strtotime((string)$row['expires_at'])<=time()){
             sf_db()->prepare('DELETE FROM user_sessions WHERE token_hash=?')->execute([$hash]);
             sf_auth_forget_cookie();
             return 0;
         }
         // User-Agent is retained as session metadata, not a hard binding. Browser updates and
         // embedded webviews can legitimately change it and should not log a customer out.
-        sf_db()->prepare('UPDATE user_sessions SET last_seen_at=?,user_agent_hash=? WHERE token_hash=?')->execute([gmdate('c'),sf_auth_user_agent_hash(),$hash]);
+        if(strtotime((string)($row['last_seen_at']??''))<=time()-60)sf_db()->prepare('UPDATE user_sessions SET last_seen_at=?,user_agent_hash=? WHERE token_hash=?')->execute([gmdate('c'),sf_auth_user_agent_hash(),$hash]);
         return (int)$row['user_id'];
     }catch(Throwable $e){return 0;}
 }
@@ -158,15 +157,14 @@ function sf_current_user(): ?array {
     if(!sf_installed()) return null;
     if(function_exists('sf_customer_lifecycle_ensure_schema'))sf_customer_lifecycle_ensure_schema();
     sf_user_session();
-    $id=(int)($_SESSION['sf_user_id']??0);
-    if($id<1){
-        $id=sf_auth_restore_user_id();
-        if($id>0){
-            $_SESSION['sf_user_id']=$id;
-            $_SESSION['sf_csrf']=bin2hex(random_bytes(32));
-        }
+    $cachedId=(int)($_SESSION['sf_user_id']??0);
+    $id=sf_auth_restore_user_id();
+    if($id<1){unset($_SESSION['sf_user_id'],$_SESSION['sf_csrf']);return null;}
+    if($cachedId!==$id){
+        session_regenerate_id(true);
+        $_SESSION['sf_user_id']=$id;
+        $_SESSION['sf_csrf']=bin2hex(random_bytes(32));
     }
-    if($id<1) return null;
     $q=sf_db()->prepare('SELECT id,email,display_name,role,status,created_at,updated_at,last_login_at,email_verified_at,email_verification_sent_at FROM users WHERE id=? LIMIT 1');
     $q->execute([$id]);
     $u=$q->fetch();
