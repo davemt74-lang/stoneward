@@ -41,7 +41,7 @@ ok(str_contains($app,'p.image')&&str_contains($app,'data-store-format'),'public 
 ok(str_contains($adminJs,"entitySection?.('site','public'")&&str_contains($adminJs,"roles:['logo','hero','artist_photo','social_share','app_icon']"),'Settings embeds site and artist Media Library controls');
 foreach(['media_logo','media_hero','media_social_share','media_app_icon','media_artist_photo'] as $key)ok(str_contains($site,"'".$key."'"),'site settings exposes '.$key);
 ok(str_contains($shell,'property="og:image"')&&str_contains($shell,'rel="icon"'),'public shell uses managed social-share artwork and app icon');
-ok(str_contains($shell,'splash-logo')&&str_contains($shell,'class="wordmark"'),'managed logo can replace text wordmark and splash wordmark');
+ok(str_contains($shell,'class="wordmark"')&&str_contains($shell,"$"."siteSettings['media_logo']"),'managed logo can replace text wordmark and splash wordmark');
 ok(str_contains($siteCss,'.has-site-hero .agent-stage'),'managed site hero is applied to public Agent stage');
 ok(str_contains($app,'about-artist-photo')&&str_contains($app,"media?.artist_photo"),'managed artist photo appears on public About page');
 
