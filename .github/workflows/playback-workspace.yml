@@ -1,0 +1,20 @@
+name: Playback source verification workspace
+on:
+  push:
+    branches: [codex/91b21b2-mobile-playback]
+    paths: [.github/workflows/playback-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - run: git archive --format=zip HEAD > /tmp/stoneward-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playback-source-workspace
+          path: /tmp/stoneward-source.zip
+          retention-days: 1
