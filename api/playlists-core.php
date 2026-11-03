@@ -18,7 +18,14 @@ function sf_playlists_ensure_schema(): void {
 function sf_playlist_clean_visibility(string $visibility): string {return $visibility==='public'?'public':'private';}
 function sf_playlist_clean_source(string $source): string {return in_array($source,['user','agent','agent_session'],true)?$source:'user';}
 function sf_playlist_track_payload(string $trackId): ?array {
-    $t=sf_track_map()[$trackId]??null;if(!$t||!sf_track_is_public($t))return null;
+    $t=sf_track_map()[$trackId]??null;
+    if(!$t)return null;
+    // Standalone playlist-core consumers must enforce the same public boundary
+    // even when bootstrap.php was not loaded (as in the pure behavior suite).
+    $public=function_exists('sf_track_is_public')?sf_track_is_public($t):
+        (($t['public_visible']??true)!==false
+         && !in_array((string)($t['state']??'published'),['draft','private','hidden','archived','deleted'],true));
+    if(!$public)return null;
     return ['id'=>$trackId,'title'=>(string)($t['title']??$trackId),'release'=>(string)($t['release']??''),'artwork'=>(string)($t['artwork']??''),'duration'=>(int)($t['duration']??0),'audio'=>(string)($t['audio']??'')];
 }
 function sf_playlist_row(int $playlistId): ?array {sf_playlists_ensure_schema();$q=sf_db()->prepare('SELECT * FROM user_playlists WHERE id=? LIMIT 1');$q->execute([$playlistId]);$r=$q->fetch();return $r?:null;}
