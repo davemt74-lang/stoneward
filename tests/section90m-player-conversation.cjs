@@ -55,7 +55,7 @@ async function run(){
   assert.equal(await sandbox.run({type:'resume_player'}),'Resumed “Night Drive.”');
   assert.equal(st.playing,true);
   audio.pause();failToPlay=true;
-  assert.match(await sandbox.run({type:'resume_player'}),/browser blocked playback/);
+  assert.match(await sandbox.run({type:'resume_player'}),/could not confirm playback/);
   failToPlay=false;
   assert.match(await sandbox.run({type:'play_track',track_id:'song-2'}),/Playing “Northern Sky.”/);
   assert.match(await sandbox.run({type:'play_track',track_id:'missing'}),/could not find/);
