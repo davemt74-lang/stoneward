@@ -127,6 +127,9 @@ function sf_agent_song_catalog_publish(int $owner,string $key,string $expectedHa
             $rows=sf_catalog();$found=false;
             foreach($rows as $row)if(($row['id']??'')===$id){$found=true;break;}
             if(!$found)throw new RuntimeException('Publication receipt exists but catalog track is missing; review required.');
+            if(function_exists('sf_track_is_public'))try{
+                require_once __DIR__.'/song-lyrics-import.php';sf_song_lyrics_import_on_publish($owner,$id,$rows);
+            }catch(Throwable $e){error_log('[Song lyric import activation] '.get_class($e));}
             return ['changed'=>false,'track_id'=>$id,'draft'=>$draft];
         }
         $catalogPath=SF_ROOT.'/data/catalog.json';
@@ -169,6 +172,9 @@ function sf_agent_song_catalog_publish(int $owner,string $key,string $expectedHa
         if(file_put_contents($tmp,$json,LOCK_EX)===false)throw new RuntimeException('Could not finalize private publication receipt.');
         chmod($tmp,0600);
         if(!rename($tmp,$path)){@unlink($tmp);throw new RuntimeException('Could not finalize song publication receipt.');}
+        if(function_exists('sf_track_is_public'))try{
+            require_once __DIR__.'/song-lyrics-import.php';sf_song_lyrics_import_on_publish($owner,$id,$decision['catalog']);
+        }catch(Throwable $e){error_log('[Song lyric import activation] '.get_class($e));}
         return ['changed'=>true,'track_id'=>$id,'draft'=>$draft,'created'=>$decision['created']];
     }finally{flock($lock,LOCK_UN);fclose($lock);}
 }

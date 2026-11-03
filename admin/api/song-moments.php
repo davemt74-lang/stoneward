@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/song-moments-core.php';
+require_once SF_ROOT.'/api/song-lyrics-catalog.php';
 $method=(string)($_SERVER['REQUEST_METHOD']??'GET');
 if(!in_array($method,['GET','POST'],true))sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $admin=sf_admin_require_auth($method==='POST');
@@ -10,6 +11,11 @@ try{
       'entries'=>sf_song_moments_admin_list(sf_clean_text($_GET['track_id']??'',180)),
       'references'=>sf_song_moments_admin_refs(),'csrf'=>sf_admin_csrf()]);
     $body=sf_request_json();$action=(string)($body['action']??'');
+    if($action==='apply_lyrics'){
+        $result=sf_song_lyrics_apply_catalog((string)($body['track_id']??''),(int)$admin['id'],!empty($body['confirmed']));
+        sf_log_admin_action((int)$admin['id'],'song_lyrics_reviewed','track',(string)$result['track_id'],['segments'=>$result['segments'],'source_fingerprint'=>$result['source_fingerprint']]);
+        sf_json_response(['ok'=>true,'lyrics'=>$result]);
+    }
     if($action==='save')sf_json_response(['ok'=>true,'entry'=>sf_song_moments_admin_save((int)$admin['id'],(array)($body['entry']??[]))]);
     if(in_array($action,['approve','reject','remove'],true)){
         if(empty($body['confirmed']))throw new InvalidArgumentException('Confirm the public moderation decision.');
@@ -19,4 +25,5 @@ try{
     }
     sf_json_response(['ok'=>false,'error'=>'unsupported_action'],422);
 }catch(InvalidArgumentException $e){sf_json_response(['ok'=>false,'error'=>'invalid_song_moment','message'=>$e->getMessage()],422);}
+catch(SFSongMomentConflict $e){sf_json_response(['ok'=>false,'error'=>'song_moment_conflict','message'=>$e->getMessage()],409);}
 catch(Throwable $e){error_log('[Admin song moments] '.get_class($e));sf_json_response(['ok'=>false,'error'=>'song_moment_failed','message'=>'Could not complete the song moment action.'],503);}

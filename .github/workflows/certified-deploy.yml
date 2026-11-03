@@ -21,6 +21,10 @@ jobs:
       - name: Show integrity results
         run: |
           (cd dist && sha256sum -c stonefellow-deploy.zip.sha256)
+          test -n "$(unzip -p dist/stonefellow-deploy.zip config/store.default.php)"
+          if unzip -Z1 dist/stonefellow-deploy.zip | grep -E '^(storage/|uploads/|data/|config/(store|database|secrets)\.php$|\.env($|\.))' >/dev/null; then
+            echo '::error::Deployment ZIP contains host configuration or runtime data'; exit 1
+          fi
           unzip -l dist/stonefellow-deploy.zip | tail -2
       - name: Publish deployment package
         uses: actions/upload-artifact@v4

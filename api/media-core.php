@@ -202,12 +202,28 @@ function sf_media_publish_track_audio(string $trackId,int $linkId,?string $expec
     if(sf_media_protected_master_asset((int)$r['asset_id'])||$r['role']==='master_audio')
         throw new RuntimeException('A private master cannot also become the public preview.');
     $catalog=sf_catalog();$idx=null;foreach($catalog as $i=>$t)if((string)($t['id']??'')===$trackId){$idx=$i;break;}if($idx===null)throw new InvalidArgumentException('Track not found.');
-    $old=(string)($catalog[$idx]['audio']??'');$new='api/media.php?id='.rawurlencode((string)$r['uuid']);$catalog[$idx]['audio']=$new;
+    $old=(string)($catalog[$idx]['audio']??'');$new='api/media.php?id='.rawurlencode((string)$r['uuid']);
+    if($old!==$new&&($catalog[$idx]['metadata']['lyrics_source']['kind']??'')==='reviewed_timeline'){
+        $oldAsset=null;
+        if(preg_match('/\Aapi\/media\.php\?id=(M[A-F0-9]{20})(?:&variant=original)?\z/',$old,$match))$oldAsset=sf_media_asset($match[1]);
+        if(!$oldAsset||!hash_equals((string)($oldAsset['sha256']??''),(string)$r['sha256'])){
+            $catalog[$idx]['lyrics']='';unset($catalog[$idx]['metadata']['lyrics_source']);
+        }
+    }
+    $catalog[$idx]['audio']=$new;
     $catalog[$idx]['audio_publishing_mode']='preview_master_split';
     if((float)$r['duration_seconds']>0)$catalog[$idx]['duration']=(int)round((float)$r['duration_seconds']);$catalog[$idx]['media_primary_asset']=(int)$r['asset_id'];if(!function_exists('sf_admin_write_catalog'))throw new RuntimeException('Catalog writer unavailable.');
     if($expectedCatalogHash!==null)sf_admin_write_catalog($catalog,$expectedCatalogHash);
     else sf_admin_write_catalog($catalog);
-    sf_db()->prepare("UPDATE media_links SET role='audio_candidate',public_visible=0,updated_at=? WHERE entity_type='track' AND entity_id=? AND role='primary_audio' AND id<>?")->execute([gmdate('c'),$trackId,$linkId]);sf_db()->prepare("UPDATE media_links SET public_visible=1,role='primary_audio',updated_at=? WHERE id=?")->execute([gmdate('c'),$linkId]);return ['track'=>$catalog[$idx],'previous_audio'=>$old,'asset'=>sf_media_asset((int)$r['asset_id'])];
+    sf_db()->prepare("UPDATE media_links SET role='audio_candidate',public_visible=0,updated_at=? WHERE entity_type='track' AND entity_id=? AND role='primary_audio' AND id<>?")->execute([gmdate('c'),$trackId,$linkId]);sf_db()->prepare("UPDATE media_links SET public_visible=1,role='primary_audio',updated_at=? WHERE id=?")->execute([gmdate('c'),$linkId]);
+    $q->closeCursor();
+    try{if(function_exists('sf_current_user')&&function_exists('sf_track_is_public')&&sf_track_is_public($catalog[$idx])){
+        $actor=sf_current_user();if(($actor['role']??'')==='admin'){
+            require_once __DIR__.'/song-lyrics-import.php';
+            sf_song_lyrics_import_on_publish((int)$actor['id'],$trackId,$catalog);
+        }
+    }}catch(Throwable $e){error_log('[Song lyric import activation] '.get_class($e));}
+    return ['track'=>$catalog[$idx],'previous_audio'=>$old,'asset'=>sf_media_asset((int)$r['asset_id'])];
 }
 
 

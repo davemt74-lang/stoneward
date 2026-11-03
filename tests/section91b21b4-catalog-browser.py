@@ -116,9 +116,9 @@ with sync_playwright() as p:
           window.songCaptureSkill={status:()=>({active:false}),getCapture:()=>null,begin(){recordings++;throw Error('Record Clip fallback')}};
           window.renderPopupEntries=()=>{};window.openChatPopup=()=>{};window.loadAuth=async()=>{};
           window.response=value=>({ok:true,status:200,json:async()=>value});
-          window.ready=()=>response({ok:true,available:true,provider:'openai',model:'gpt-transcribe',max_seconds:90,source_fingerprint:'a'.repeat(64)});
+          window.ready=()=>response({ok:true,available:true,source:'saved-catalog-lyrics',max_seconds:90,source_fingerprint:'a'.repeat(64)});
           window.fetch=(url,options={})=>{
-            if(String(url).includes('agent-song-catalog-transcribe.php?')){
+            if(String(url).includes('song-lyrics-section.php?')){
               gets.push(String(url));
               if(deferReady)return new Promise((resolve,reject)=>{
                 pendingReady.push(()=>resolve(ready()));
@@ -126,7 +126,7 @@ with sync_playwright() as p:
               });
               return Promise.resolve(ready());
             }
-            if(String(url).endsWith('agent-song-catalog-transcribe.php')&&options.method==='POST'){
+            if(String(url).endsWith('song-lyrics-section.php')&&options.method==='POST'){
               const payload=JSON.parse(options.body);posts.push(payload);
               if(options.headers['X-CSRF-Token']!=='fixture-csrf')throw Error('Missing CSRF token');
               return new Promise((resolve,reject)=>{
@@ -138,7 +138,9 @@ with sync_playwright() as p:
           };
           window.reply=(index,text='Words from the selected song')=>{
             const request=pending[index];request.resolve(response({ok:true,transcript:{...request.payload,
-              source:'catalog-audio',provider:'openai',model:'gpt-transcribe',review_status:'unverified',
+              source:'saved-catalog-lyrics',provider:'stored',model:'',review_status:'approved',timing:'saved_segments',
+              selected_start_ms:request.payload.start_ms,selected_end_ms:request.payload.end_ms,
+              segments:[{start_ms:request.payload.start_ms,end_ms:request.payload.end_ms,text,lyric_state:'approved',timing_source:'catalog_chunk_estimate'}],
               title:'Testing song',text}}));
           };
         }''')
@@ -177,10 +179,10 @@ with sync_playwright() as p:
         check(page.evaluate('recordings===0&&mics===0&&captures===0&&posts.length===0'), label + ': selection starts without recording, microphone or paid request')
         check(page.evaluate('gets.length===1&&gets[0].includes("source_ref=")'), label + ': readiness binds current player source')
         details = capture_evidence(page, width, 'selection')
-        expected_phase = 'Selecting song section · Stop converts it into text'
+        expected_phase = 'Selecting song section · Stop retrieves saved lyrics'
         check(visible_text(page.locator('.sf-agent-lyric-workspace .song-experience-phase')) == expected_phase
               and details['phaseLabel']['textContent'] == expected_phase,
-              label + ': sidebar explains selected-section conversion')
+              label + ': sidebar explains saved-lyrics lookup')
         page.locator('.sf-agent-page-rail [data-agent-action="close-page"]').click()
         check(page.evaluate('songListeningSkill.status().active') and not page.locator('.sf-agent-page-rail').is_visible(), label + ': closing sidebar preserves selection')
         check(visible_text(page.locator('.sf-agent-state')) == 'SELECTING SONG SECTION', label + ': selection state stays truthful')
@@ -190,13 +192,13 @@ with sync_playwright() as p:
         page.locator('[data-agent-action="stop-lyrics"]').click()
         page.wait_for_function('posts.length===1')
         check(page.evaluate('posts[0].start_ms===60000&&posts[0].end_ms===68000&&posts[0].source_fingerprint==="a".repeat(64)'), label + ': Stop submits the selected source/time window once')
-        check(visible_text(page.locator('.sf-agent-state')) == 'TRANSCRIBING LYRICS', label + ': processing state remains visible after sidebar closes')
+        check(visible_text(page.locator('.sf-agent-state')) == 'LOADING SAVED LYRICS', label + ': processing state remains visible after sidebar closes')
         check(visible_text(page.locator('[data-agent-action="stop-lyrics"]')) == 'Stop waiting', label + ': processing has an explicit Stop waiting control')
         check(page.locator('[data-orbit-action="record"]').is_disabled(), label + ': Record Studio cannot compete with transcription')
         box = page.locator('.sf-agent-lyric-controls').bounding_box()
         check(box and box['x'] >= 0 and box['x']+box['width'] <= width and box['y']+box['height'] <= 850, label + ': transcription controls fit viewport')
         page.evaluate('SFPublicAgentCanvas.setState("music");SFPublicAgentCanvas.syncSongExperience()')
-        check(visible_text(page.locator('.sf-agent-state')) == 'TRANSCRIBING LYRICS' and not page.locator('.sf-agent-page-rail').is_visible(), label + ': player updates preserve transcription status and closed rail')
+        check(visible_text(page.locator('.sf-agent-state')) == 'LOADING SAVED LYRICS' and not page.locator('.sf-agent-page-rail').is_visible(), label + ': player updates preserve transcription status and closed rail')
         page.screenshot(path=str(OUT / f'catalog-transcribing-{BROWSER}-{width}.png'), full_page=True)
         page.evaluate('reply(0)')
         page.wait_for_function('songExperience?.phase === "draft"')
@@ -206,7 +208,7 @@ with sync_playwright() as p:
         page.locator('[data-agent-action="open-lyrics"]').click()
         wait_open_rail(page, width)
         check('Words from the selected song' in visible_text(page.locator('.sf-agent-lyric-workspace')), label + ': reopening displays completed lyric draft')
-        check(page.evaluate('interpretations===0&&posts.length===1'), label + ': completion never auto-interprets or repeats transcription')
+        check(page.evaluate('interpretations===0&&posts.length===1'), label + ': completion never auto-interprets or repeats the lookup')
         page.locator('.sf-agent-lyric-workspace [aria-label="Edit lyric draft"]').click()
         page.locator('.sf-agent-lyric-workspace textarea').fill('Corrected lyric words')
         page.locator('.sf-agent-lyric-workspace button', has_text='Save lyric correction').click()
@@ -223,7 +225,7 @@ with sync_playwright() as p:
         page.wait_for_function('posts.length===2')
         page.locator('[data-agent-action="stop-lyrics"]').click()
         page.wait_for_function('!songListeningSkill.status().active')
-        check(page.evaluate('songExperience.phase==="discarded"&&songExperience.message.includes("may still complete")'), label + ': Stop waiting explains already-submitted work')
+        check(page.evaluate('songExperience.phase==="discarded"&&songExperience.message.includes("No audio was sent and no transcription was charged")'), label + ': Stop waiting discards the read-only lookup')
         page.locator('[data-orbit-action="listen"]').click(force=True)
         page.wait_for_function('songExperience?.phase === "capturing"')
         wait_open_rail(page, width)
@@ -251,4 +253,4 @@ with sync_playwright() as p:
         context.close()
     browser.close()
 print(json.dumps({'checks':len(checks),'passed':len(checks),'browser':BROWSER,
-                  'scope':'Production controller/actions/UI with synthetic playback/provider responses; no physical-device or paid-provider acceptance'}))
+                  'scope':'Production controller/actions/UI with synthetic playback and saved-lyric responses; no physical-device or paid-provider acceptance'}))

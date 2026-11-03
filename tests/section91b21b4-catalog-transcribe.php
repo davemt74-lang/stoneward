@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
-/** Real application bootstrap, PDO, auth, media authorization and token escrow.
- * Provider responses are injected; the HTTP fixture uses an undecryptable key so
- * its production controller cannot contact a paid service. Disposable DBs only.
+/** Legacy transcription core regressions: bootstrap, PDO, media authorization,
+ * duplicate claims and token escrow with injected provider responses. The old
+ * HTTP route now resolves stored lyrics only. Disposable DBs only.
  */
 $source=dirname(__DIR__);$worker=($argv[1]??'')==='worker';
 $driver=getenv('SF_TEST_DRIVER')?:'sqlite';
@@ -201,10 +201,9 @@ try{
     sort($statuses);check($statuses===[200,409],'Concurrent duplicate submissions admit exactly one provider operation'.($statuses===[200,409]?'':': '.json_encode($diagnostics,JSON_UNESCAPED_SLASHES)));
     check(substr_count((string)file_get_contents($tmp.'/provider-calls'),'call')===1&&sf_token_balance(4)===988,'Concurrent duplicate submissions debit once across workers');
     clearClaims();
-    // The real endpoint and real bootstrap run over HTTP against the isolated site.
+    // The retired HTTP URL still enforces auth/CSRF, but cannot trigger paid work.
     $router='<?php define("SF_ROOT",'.var_export($tmp,true).'); session_save_path(SF_ROOT."/sessions");'.
         '$path=parse_url($_SERVER["REQUEST_URI"],PHP_URL_PATH); if($path==="/ping"){echo "ready";return;}'.
-        'register_shutdown_function(static function(){file_put_contents(SF_ROOT."/http-session-state",(string)session_status());});'.
         'if($path==="/login"){require '.var_export($source.'/api/bootstrap.php',true).';sf_login_user(sf_user_by_email("fixture1@example.invalid"));sf_json_response(["csrf"=>sf_user_csrf()]);}'.
         'require '.var_export($source.'/api/agent-song-catalog-transcribe.php',true).';';
     file_put_contents($tmp.'/router.php',$router);
@@ -217,18 +216,18 @@ try{
     check(httpRequest($base,$query)['status']===401,'HTTP readiness requires an authenticated account');
     check(httpRequest($base,'/transcribe','PUT')['status']===405,'HTTP controller rejects unsupported methods');
     $jar=$tmp.'/cookies';$login=httpRequest($base,'/login','GET',null,$jar);$csrf=$login['body']['csrf']??'';check(strlen($csrf)===64,'Actual account login provides a CSRF token');
-    $r=httpRequest($base,$query,'GET',null,$jar);check($r['status']===200&&!empty($r['body']['available'])&&$r['body']['source_fingerprint']===$fingerprint,'Authenticated HTTP readiness uses the canonical source');
+    $r=httpRequest($base,$query,'GET',null,$jar);check($r['status']===200&&($r['body']['available']??null)===false&&$r['body']['source_fingerprint']===$fingerprint,'Old URL checks the canonical source and cannot start a fresh transcript');
     check(httpRequest($base,'/transcribe','POST',json_encode(req()),$jar)['status']===403,'HTTP submission without CSRF is rejected');
     check(httpRequest($base,'/transcribe','POST',json_encode(req()),$jar,str_repeat('0',64))['status']===403,'HTTP submission with a forged CSRF token is rejected');
     check(httpRequest($base,'/transcribe','POST',str_repeat('x',8193),$jar,$csrf)['status']===413,'HTTP payload cap rejects oversized JSON');
     check(httpRequest($base,'/transcribe','POST','[]',$jar,$csrf)['status']===422,'HTTP JSON list cannot masquerade as a section object');
     check(httpRequest($base,'/transcribe?track_id[]=fixture-song&source_ref=x','GET',null,$jar)['status']===422,'HTTP query arrays cannot bypass strict identity parsing');
     $r=httpRequest($base,'/transcribe','POST',json_encode(req(['end_ms'=>1001])),$jar,$csrf);
-    check($r['status']===422&&(int)file_get_contents($tmp.'/http-session-state')===PHP_SESSION_NONE,'POST releases the authenticated PHP session before core processing');
-    $db->exec("UPDATE ai_provider_settings SET secret_payload='undecryptable-fixture'");$before=sf_token_balance(1);$files=glob(sys_get_temp_dir().'/sf-lyric-*')?:[];
+    check($r['status']===422,'Old URL rejects invalid playback ranges before lookup');
+    $db->exec("UPDATE ai_provider_settings SET secret_payload='undecryptable-fixture'");$before=sf_token_balance(1);$files=glob(sys_get_temp_dir().'/sf-lyric-*')?:[];$reservations=sqlCount('ai_token_reservations');
     $r=httpRequest($base,'/transcribe','POST',json_encode(req()),$jar,$csrf);
-    check($r['status']===503&&($r['body']['error']??'')==='transcription_failed','Actual controller handles a preparation failure without a live provider call');
-    check(sf_token_balance(1)===$before&&(glob(sys_get_temp_dir().'/sf-lyric-*')?:[])===$files,'HTTP failure refunds escrow and deletes temporary audio before JSON exit');
+    check($r['status']===404&&($r['body']['error']??'')==='saved_lyrics_unavailable','Cached clients get missing stored lyrics rather than a new transcription');
+    check(sf_token_balance(1)===$before&&sqlCount('ai_token_reservations')===$reservations&&sqlCount('song_lyric_requests')===0&&(glob(sys_get_temp_dir().'/sf-lyric-*')?:[])===$files,'Retired HTTP route creates no provider claim, reservation, debit or temporary audio');
     check(!str_contains($r['raw'],$tmp)&&!str_contains($r['raw'],'undecryptable-fixture'),'HTTP error response does not reveal file paths or key material');
     echo "91B21B4 catalog transcription $driver: $checks assertions passed\n";
 }finally{
