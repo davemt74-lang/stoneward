@@ -22,7 +22,7 @@ async function run(){
     pause:()=>{audio.paused=true}};
   const st={track:{id:'song-1',title:'Night Drive',release:'Moonlight',duration:200},playing:true,conversationOn:false};
   const sandbox={audio,st,musicOriginalVolume:null,voicePlaybackPending:false,voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,lastAudibleVolume:0.7,
-    recordListen:type=>events.push(type),updateFooterPlayer:()=>events.push('render'),
+    recordListen:type=>events.push(type),invalidatePlayback:()=>{},updateFooterPlayer:()=>events.push('render'),
     stepTrack:delta=>events.push('step:'+delta),
     play:async track=>{st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;return !failToPlay},
     trackById:id=>id==='song-1'?st.track?.id==='song-1'?st.track:{id,title:'Night Drive',release:'Moonlight',duration:200,audio:'assets/night-drive.mp3'}:id==='song-2'?{id,title:'Northern Sky',audio:'assets/northern-sky.mp3'}:null,
