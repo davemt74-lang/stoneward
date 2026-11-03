@@ -25,10 +25,10 @@ async function run(){
     recordListen:type=>events.push(type),updateFooterPlayer:()=>events.push('render'),
     stepTrack:delta=>events.push('step:'+delta),
     play:async track=>{st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;return !failToPlay},
-    trackById:id=>id==='song-2'?{id,title:'Northern Sky',audio:'assets/northern-sky.mp3'}:null,
+    trackById:id=>id==='song-1'?st.track?.id==='song-1'?st.track:{id,title:'Night Drive',release:'Moonlight',duration:200,audio:'assets/night-drive.mp3'}:id==='song-2'?{id,title:'Northern Sky',audio:'assets/northern-sky.mp3'}:null,
     time:seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`};
   vm.createContext(sandbox);
-  const code=['syncConversationMusic','playerVolume','setPlayerVolume','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
+  const code=['syncConversationMusic','playerVolume','setPlayerVolume','observedPlayer','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
   vm.runInContext(code+';globalThis.run=executePlayerAgentAction;',sandbox);
   assert.match(await sandbox.run({type:'player_status'}),/“Night Drive”.*playing.*1:15 of 3:20.*80 percent/);
   assert.equal((await sandbox.run({type:'set_player_volume',mode:'set',percent:30})), 'Stonefellow player volume is now 30 percent.');
