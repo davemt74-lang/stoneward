@@ -26,7 +26,7 @@ function sf_seo_public_release(string $id): ?array {
     foreach(sf_seo_release_rows() as $r){if((string)($r['id']??'')!==$id)continue;if(($r['state']??'published')!=='published'||($r['public_visible']??true)===false)return null;return $r;}return null;
 }
 function sf_seo_public_track(string $id): ?array {
-    $t=sf_track_map()[$id]??null;if(!$t||($t['public_visible']??true)===false||in_array((string)($t['state']??''),['draft','private','archived'],true))return null;
+    $t=sf_track_map()[$id]??null;if(!$t||!sf_track_is_public($t))return null;
     $releaseId=(string)($t['release_id']??'');$release=null;
     if($releaseId!==''){$release=sf_seo_public_release($releaseId);if(!$release)return null;}
     if(!$release&&($t['release']??'')!==''){foreach(sf_seo_release_rows() as $r)if((string)($r['title']??'')===(string)$t['release']&&($r['state']??'published')==='published'&&($r['public_visible']??true)!==false){$release=$r;break;}}

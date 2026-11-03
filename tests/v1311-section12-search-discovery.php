@@ -133,7 +133,7 @@ ok(str_contains($agent,'sf_catalog_search(['),'Agent executes canonical catalog 
 ok(str_contains($agent,"'type'=>'open_search'"),'Agent emits open-search action');
 ok(str_contains($agent,"'catalog_search'=>'Asks to find/search"),'JEV criteria include catalog search');
 ok(str_contains($agent,"'current_search_query'"),'Agent routing state receives current search context');
-ok(str_contains($app,"case'open_search'"),'client executes Agent open-search action');
+ok(preg_match("/case\\s*'open_search'/",$app),'client executes Agent open-search action');
 ok(str_contains($app,"search_query:$('#siteSearchInput'")&&str_contains($app,"||$('#catalogSearch'"),'client sends active site-wide or catalog search query to Agent');
 
 ok(str_contains($core,'function sf_search_analytics'),'search intelligence analytics exists');

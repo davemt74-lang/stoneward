@@ -128,7 +128,19 @@ function sf_media_protected_master_asset(int $assetId):bool {
     $q->execute([$assetId]);
     return (bool)$q->fetchColumn();
 }
+function sf_media_guard_generated_image_approval(int $assetId): void {
+    // Check the existing asset's provenance, not the UI that initiated the
+    // attachment. Every Media Library path must respect Image Studio review.
+    $asset=sf_media_asset($assetId);
+    if(!$asset||($asset['technical']['source']??'')!=='openai_image_generation')return;
+    $jobId=(int)($asset['technical']['image_job_id']??0);
+    if($jobId<1)throw new RuntimeException('Generated image has no approval record.');
+    $q=sf_db()->prepare('SELECT status FROM image_generation_jobs WHERE id=? AND media_asset_id=?');
+    $q->execute([$jobId,$assetId]);
+    if($q->fetchColumn()!=='ready')throw new RuntimeException('Approve this generated image in AI Image Studio before attaching or publishing it.');
+}
 function sf_media_guard_link_exposure(int $assetId,string $role,bool $public,bool $download):void {
+    sf_media_guard_generated_image_approval($assetId);
     if($role==='master_audio'||$role==='stem_audio'){
         if($public||$download)throw new RuntimeException('Original masters cannot be publicly visible or downloadable.');
         $q=sf_db()->prepare('SELECT 1 FROM media_links WHERE asset_id=? AND (public_visible=1 OR download_allowed=1) LIMIT 1');
@@ -160,7 +172,17 @@ function sf_media_update_link(int $id,array $p): void {
         throw new RuntimeException('Change the published original using the master action, not a role toggle.');
     sf_media_guard_link_exposure($assetId,$role,$public,$download);
     $sets=[];$args=[];foreach(['featured','public_visible','download_allowed'] as $k)if(array_key_exists($k,$p)){$sets[]="$k=?";$args[]=!empty($p[$k])?1:0;}if(array_key_exists('role',$p)){$sets[]='role=?';$args[]=sf_clean_text($p['role'],60);}if(array_key_exists('sort_order',$p)){$sets[]='sort_order=?';$args[]=(int)$p['sort_order'];}if(!$sets)return;$sets[]='updated_at=?';$args[]=gmdate('c');$args[]=$id;sf_db()->prepare('UPDATE media_links SET '.implode(',',$sets).' WHERE id=?')->execute($args);}
-function sf_media_delete_asset(int $id): bool {$asset=sf_media_asset($id);if(!$asset)return false;$q=sf_db()->prepare('SELECT COUNT(*) FROM media_links WHERE asset_id=?');$q->execute([$id]);if((int)$q->fetchColumn()>0)throw new RuntimeException('Detach this asset everywhere before deleting it.');$paths=[(string)$asset['stored_path']];foreach((array)$asset['variants'] as $v)if(!empty($v['path']))$paths[]=(string)$v['path'];$q=sf_db()->prepare('DELETE FROM media_assets WHERE id=?');$q->execute([$id]);if($q->rowCount())foreach($paths as $p){$abs=realpath(SF_ROOT.'/'.ltrim($p,'/'));$root=realpath(SF_ROOT.'/storage/media');if($abs&&$root&&str_starts_with($abs,$root.DIRECTORY_SEPARATOR))@unlink($abs);}return $q->rowCount()>0;}
+function sf_media_delete_asset(int $id): bool {$asset=sf_media_asset($id);if(!$asset)return false;$q=sf_db()->prepare('SELECT COUNT(*) FROM media_links WHERE asset_id=?');$q->execute([$id]);if((int)$q->fetchColumn()>0)throw new RuntimeException('Detach this asset everywhere before deleting it.');
+    // Reference originals are part of immutable paid-generation provenance.
+    // Keep them in managed storage while a variation still points at them.
+    if(($asset['category']??'')==='image'){
+        require_once __DIR__.'/image-generation-core.php';sf_image_gen_schema();
+        $q=sf_db()->prepare('SELECT COUNT(*) FROM image_generation_references WHERE source_asset_id=?');$q->execute([$id]);
+        if((int)$q->fetchColumn()>0)throw new RuntimeException('This image is used as a generation reference. Preserve it to keep variation history intact.');
+        $q=sf_db()->prepare('SELECT COUNT(*) FROM image_generation_options WHERE mask_asset_id=?');$q->execute([$id]);
+        if((int)$q->fetchColumn()>0)throw new RuntimeException('This PNG is used as an edit mask. Preserve it to keep image-edit history intact.');
+    }
+    $paths=[(string)$asset['stored_path']];foreach((array)$asset['variants'] as $v)if(!empty($v['path']))$paths[]=(string)$v['path'];$q=sf_db()->prepare('DELETE FROM media_assets WHERE id=?');$q->execute([$id]);if($q->rowCount())foreach($paths as $p){$abs=realpath(SF_ROOT.'/'.ltrim($p,'/'));$root=realpath(SF_ROOT.'/storage/media');if($abs&&$root&&str_starts_with($abs,$root.DIRECTORY_SEPARATOR))@unlink($abs);}return $q->rowCount()>0;}
 function sf_media_list(string $category='',string $q='',int $limit=300): array {sf_media_ensure_schema();$where=['1=1'];$args=[];if($category!==''){$where[]='category=?';$args[]=$category;}if($q!==''){$where[]='(title LIKE ? OR original_name LIKE ? OR caption LIKE ?)';$like='%'.$q.'%';array_push($args,$like,$like,$like);}$sql='SELECT a.*,(SELECT COUNT(*) FROM media_links l WHERE l.asset_id=a.id) link_count FROM media_assets a WHERE '.implode(' AND ',$where).' ORDER BY a.id DESC LIMIT '.max(1,min(1000,$limit));$st=sf_db()->prepare($sql);$st->execute($args);$rows=$st->fetchAll();foreach($rows as &$r){$r['technical']=sf_media_decode($r['technical_json']??'',[]);$r['variants']=sf_media_decode($r['variants_json']??'',[]);}unset($r);return $rows;}
 function sf_media_public_links(string $entityType,string $entityId): array {
     $rows=sf_media_links($entityType,$entityId);$out=[];
@@ -171,17 +193,20 @@ function sf_media_public_links(string $entityType,string $entityId): array {
 }
 function sf_media_publish_track_artwork(string $trackId,int $linkId): array {
     sf_media_ensure_schema();$q=sf_db()->prepare("SELECT l.*,a.* FROM media_links l JOIN media_assets a ON a.id=l.asset_id WHERE l.id=? AND l.entity_type='track' AND l.entity_id=?");$q->execute([$linkId,$trackId]);$r=$q->fetch();if(!$r||$r['category']!=='image')throw new InvalidArgumentException('Choose an image asset attached to this track.');$catalog=sf_catalog();$idx=null;foreach($catalog as $i=>$t)if((string)($t['id']??'')===$trackId){$idx=$i;break;}if($idx===null)throw new InvalidArgumentException('Track not found.');
+    sf_media_guard_generated_image_approval((int)$r['asset_id']);
     $old=(string)($catalog[$idx]['artwork']??'');$new='api/media.php?id='.rawurlencode((string)$r['uuid']).'&variant=large';$catalog[$idx]['artwork']=$new;$catalog[$idx]['media_primary_artwork_asset']=(int)$r['asset_id'];if(function_exists('sf_admin_write_catalog'))sf_admin_write_catalog($catalog);else throw new RuntimeException('Catalog writer unavailable.');
     sf_db()->prepare("UPDATE media_links SET role='artwork',featured=0,public_visible=0,updated_at=? WHERE entity_type='track' AND entity_id=? AND role='primary_artwork' AND id<>?")->execute([gmdate('c'),$trackId,$linkId]);sf_db()->prepare("UPDATE media_links SET public_visible=1,featured=1,role='primary_artwork',updated_at=? WHERE id=?")->execute([gmdate('c'),$linkId]);return ['track'=>$catalog[$idx],'previous_artwork'=>$old,'asset'=>sf_media_asset((int)$r['asset_id'])];
 }
-function sf_media_publish_track_audio(string $trackId,int $linkId): array {
+function sf_media_publish_track_audio(string $trackId,int $linkId,?string $expectedCatalogHash=null): array {
     sf_media_ensure_schema();$q=sf_db()->prepare("SELECT l.*,a.* FROM media_links l JOIN media_assets a ON a.id=l.asset_id WHERE l.id=? AND l.entity_type='track' AND l.entity_id=?");$q->execute([$linkId,$trackId]);$r=$q->fetch();if(!$r||$r['category']!=='audio')throw new InvalidArgumentException('Choose an audio asset attached to this track.');
     if(sf_media_protected_master_asset((int)$r['asset_id'])||$r['role']==='master_audio')
         throw new RuntimeException('A private master cannot also become the public preview.');
     $catalog=sf_catalog();$idx=null;foreach($catalog as $i=>$t)if((string)($t['id']??'')===$trackId){$idx=$i;break;}if($idx===null)throw new InvalidArgumentException('Track not found.');
     $old=(string)($catalog[$idx]['audio']??'');$new='api/media.php?id='.rawurlencode((string)$r['uuid']);$catalog[$idx]['audio']=$new;
     $catalog[$idx]['audio_publishing_mode']='preview_master_split';
-    if((float)$r['duration_seconds']>0)$catalog[$idx]['duration']=(int)round((float)$r['duration_seconds']);$catalog[$idx]['media_primary_asset']=(int)$r['asset_id'];if(function_exists('sf_admin_write_catalog'))sf_admin_write_catalog($catalog);else throw new RuntimeException('Catalog writer unavailable.');
+    if((float)$r['duration_seconds']>0)$catalog[$idx]['duration']=(int)round((float)$r['duration_seconds']);$catalog[$idx]['media_primary_asset']=(int)$r['asset_id'];if(!function_exists('sf_admin_write_catalog'))throw new RuntimeException('Catalog writer unavailable.');
+    if($expectedCatalogHash!==null)sf_admin_write_catalog($catalog,$expectedCatalogHash);
+    else sf_admin_write_catalog($catalog);
     sf_db()->prepare("UPDATE media_links SET role='audio_candidate',public_visible=0,updated_at=? WHERE entity_type='track' AND entity_id=? AND role='primary_audio' AND id<>?")->execute([gmdate('c'),$trackId,$linkId]);sf_db()->prepare("UPDATE media_links SET public_visible=1,role='primary_audio',updated_at=? WHERE id=?")->execute([gmdate('c'),$linkId]);return ['track'=>$catalog[$idx],'previous_audio'=>$old,'asset'=>sf_media_asset((int)$r['asset_id'])];
 }
 

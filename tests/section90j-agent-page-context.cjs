@@ -28,7 +28,7 @@ check('Only publicly published track and release records are eligible',()=>{
 });
 check('Detail navigation uses an existing internal view and validated ID',()=>{
   assert.match(runtime,/\['type'=>'open_view','view'=>\$detail\['kind'\],'id'=>\$detail\['id'\]\]/);
-  assert.match(publicUi,/case'open_view':navigate\(a\.view\|\|'home'/);
+  assert.match(publicUi,/case 'open_view':\{/);assert.match(publicUi,/return await navigate\(view,\{slug:a\.slug\|\|''/);
 });
 check('Client forwards route identifier without full page contents or private data',()=>{
   assert.match(publicUi,/route_id:history\.state\?\.params\?\.id\|\|u\.searchParams\.get\('id'\)\|\|''/);

@@ -11,11 +11,22 @@ $admin=false;$u=null;try{$u=sf_current_user();$admin=$u&&($u['role']??'')==='adm
 if(!$admin){$q=sf_db()->prepare('SELECT entity_type,entity_id,public_visible,download_allowed FROM media_links WHERE asset_id=? AND public_visible=1');$q->execute([(int)$asset['id']]);$links=$q->fetchAll();$viewAllowed=false;$downloadAllowed=false;foreach($links as $link){$allowed=true;if(($link['entity_type']??'')==='member_content'){$content=function_exists('sf_membership_content_get')?sf_membership_content_get((int)$link['entity_id']):null;$access=$content&&function_exists('sf_membership_content_access')?sf_membership_content_access($u?(int)$u['id']:null,$content):['allowed'=>false];$allowed=!empty($access['allowed']);}if($allowed){$viewAllowed=true;if(!empty($link['download_allowed']))$downloadAllowed=true;}}if(!$viewAllowed){http_response_code(404);exit('Media not available.');}if($download&&!$downloadAllowed){http_response_code(403);exit('Download not allowed.');}}
 $rel=(string)$asset['stored_path'];if($variant!=='original'&&!empty($asset['variants'][$variant]['path']))$rel=(string)$asset['variants'][$variant]['path'];$root=realpath(SF_ROOT.'/storage/media');$file=realpath(SF_ROOT.'/'.ltrim($rel,'/'));if(!$root||!$file||!str_starts_with($file,$root.DIRECTORY_SEPARATOR)||!is_file($file)){http_response_code(404);exit('Media file missing.');}$size=filesize($file)?:0;$mime=$variant==='original'?(string)$asset['mime_type']:(str_ends_with($file,'.webp')?'image/webp':'image/jpeg');if($variant==='original'&&strtolower((string)$asset['extension'])==='vtt')$mime='text/vtt';
 if($size<1){http_response_code(404);exit('Media file empty.');}
+// Byte-range Content-Length must describe the raw file, not a compressed or
+// buffered PHP response. Especially important for long MP3s on shared hosts.
+@ini_set('zlib.output_compression','0');
+if(function_exists('apache_setenv'))@apache_setenv('no-gzip','1');
+if(function_exists('set_time_limit'))@set_time_limit(0);
+while(ob_get_level()>0){
+    $state=ob_get_status();
+    if(!((int)($state['flags']??0)&PHP_OUTPUT_HANDLER_REMOVABLE))break;
+    @ob_end_clean();
+}
 try{$range=sf_media_stream_range($download?'':(string)($_SERVER['HTTP_RANGE']??''),$size);}
 catch(InvalidArgumentException $e){header('Content-Range: bytes */'.$size);http_response_code(416);exit;}
 http_response_code($range['partial']?206:200);
 header('Content-Type: '.$mime);
 header('Accept-Ranges: bytes');
+header('X-Content-Type-Options: nosniff');
 // Avoid on-the-fly compression of byte-range audio, which invalidates offsets.
 header('Cache-Control: '.($admin?'private, no-store':'public, max-age=3600').', no-transform');
 header('Content-Length: '.$range['length']);
@@ -27,5 +38,6 @@ while($left>0&&!feof($fh)&&!connection_aborted()){
     $chunk=fread($fh,min(65536,$left));
     if($chunk===false||$chunk==='')break;
     echo $chunk;$left-=strlen($chunk);
+    if(function_exists('flush'))@flush();
 }
 fclose($fh);exit;

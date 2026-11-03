@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.204');
+define('SF_BUILD', '1.3.231');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -69,32 +69,52 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/agent-song-capture.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/public-agent-canvas.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/fan-vocal-studio.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/song-moments.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/turntable-builder.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/artist-world.css?v=<?=rawurlencode(SF_BUILD)?>">
   <style id="stonefellowTheme"><?=sf_theme_css($activeTheme)?></style>
+  <style id="stonefellowBootStyle">
+    body.sf-site-booting{background:#000!important;overflow:hidden}
+    body.sf-site-booting>:not(#sfSiteBoot):not(script){visibility:hidden!important}
+    #sfSiteBoot{position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;background:#000;color:#f7ecd5;font-family:system-ui,-apple-system,sans-serif;transition:opacity .58s ease,visibility .58s ease}
+    #sfSiteBoot.is-ready{opacity:0;visibility:hidden;pointer-events:none}
+    #sfSiteBoot[hidden]{display:none!important}
+    .sf-boot-center{width:min(340px,calc(100vw - 54px));display:flex;align-items:center;flex-direction:column;text-align:center;gap:18px}
+    .sf-boot-brand{letter-spacing:.4em;font-size:13px;font-weight:800;color:#fff5df}
+    .sf-boot-orb{width:84px;height:84px;border-radius:50%;position:relative;border:1px solid #f2cd854d;background:radial-gradient(circle at 37% 29%,#ffedba 1%,#da9746 5%,#57331c 33%,#090806 72%);box-shadow:0 0 45px #ecab553b,inset 0 0 32px #000;animation:sfBootBreathe 2.8s ease-in-out infinite}
+    .sf-boot-orb:before,.sf-boot-orb:after{content:"";position:absolute;inset:-16px;border:1px solid #efd4a37a;border-radius:50%;transform:rotate(-28deg) scaleY(.62);animation:sfBootOrbit 4s linear infinite}
+    .sf-boot-orb:after{inset:-26px;border-color:#d9b88652;animation-duration:6s;animation-direction:reverse;transform:rotate(36deg) scaleY(.7)}
+    .sf-boot-status{font:600 10px/1.6 ui-monospace,monospace;letter-spacing:.16em;text-transform:uppercase;color:#c6bba8;min-height:17px}
+    .sf-boot-track{width:100%;height:2px;background:#38302a;border-radius:99px;overflow:hidden}
+    #sfBootBar{height:100%;width:8%;border-radius:99px;background:linear-gradient(90deg,#b78650,#fff1cb);box-shadow:0 0 16px #f2cc95;transition:width .45s ease}
+    #sfBootRetry{background:transparent;border:1px solid #b99764;color:#fff1cd;border-radius:99px;padding:10px 19px;font:600 12px system-ui;cursor:pointer}
+    #sfBootRetry[hidden]{display:none}
+    @keyframes sfBootBreathe{50%{filter:brightness(1.25);transform:scale(1.04)}}
+    @keyframes sfBootOrbit{to{transform:rotate(332deg) scaleY(.62)}}
+    @media(prefers-reduced-motion:reduce){.sf-boot-orb,.sf-boot-orb:before,.sf-boot-orb:after{animation:none}#sfSiteBoot,#sfBootBar{transition:none}}
+  </style>
 </head>
-<body class="<?=sf_h(trim(sf_theme_body_classes($activeTheme).' '.(($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':'')))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
+<body class="<?=sf_h(trim('sf-site-booting sf-agent-canvas-active sf-agent-chatbar-collapsed '.sf_theme_body_classes($activeTheme).' '.(($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!=='')?'has-announcement ':'').(!empty($siteSettings['media_hero'])?'has-site-hero':'')))?>"<?=!empty($siteSettings['media_hero'])?' style="--site-hero-image:url(\''.sf_h($siteSettings['media_hero']).'\')"':''?>>
+  <section id="sfSiteBoot" role="status" aria-live="polite" aria-label="Loading Stonefellow">
+    <div class="sf-boot-center"><div class="sf-boot-brand">STONEFELLOW</div><div class="sf-boot-orb" aria-hidden="true"></div><div id="sfBootStatus" class="sf-boot-status">Preparing Agent Canvas</div><div class="sf-boot-track" aria-hidden="true"><div id="sfBootBar"></div></div><button id="sfBootRetry" type="button" hidden onclick="location.reload()">Retry loading</button></div>
+  </section>
+  <script>
+    window.StonefellowBoot=(()=>{const layer=document.getElementById('sfSiteBoot'),status=document.getElementById('sfBootStatus'),bar=document.getElementById('sfBootBar'),retry=document.getElementById('sfBootRetry');let completed=false;
+      const watchdog=setTimeout(()=>{if(!completed){status.textContent='Stonefellow is taking longer than expected.';retry.hidden=false;}},18000);
+      return {step(percent,label){if(completed)return;bar.style.width=Math.max(8,Math.min(98,Number(percent)||8))+'%';if(label)status.textContent=label},finish(){if(completed)return;completed=true;clearTimeout(watchdog);bar.style.width='100%';status.textContent='Agent ready';document.body.classList.remove('sf-site-booting');layer.classList.add('is-ready');setTimeout(()=>{layer.hidden=true},650)},fail(){if(completed)return;clearTimeout(watchdog);status.textContent='Unable to start the Agent Canvas.';retry.hidden=false}};
+    })();
+  </script>
 <a class="skip-link" href="#mainContent">Skip to main content</a>
   <div id="a11yStatus" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <?php if($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!==''): ?><div class="site-announcement"><?=sf_h($siteSettings['announcement_text'])?></div><?php endif; ?>
-<?php if($siteSettings['splash_enabled']): ?>
-  <section id="splashScreen" class="splash-screen" data-revision="<?=sf_h((string)$siteSettings['splash_revision'])?>" aria-label="Stonefellow welcome">
-    <div class="splash-inner">
-<?php if(!empty($siteSettings['media_logo'])): ?><img class="splash-logo" src="<?=sf_h($siteSettings['media_logo'])?>" alt="Stonefellow"><?php else: ?><div class="splash-wordmark">STONEFELLOW</div><?php endif; ?>
-      <div class="splash-orb" aria-hidden="true"><span></span></div>
-      <p>Listen. Explore the catalog. Make something of your own.</p>
-      <button id="splashEnter" type="button">Enter</button>
-    </div>
-  </section>
-<?php endif; ?>
+<?php // Legacy $siteSettings['splash_enabled'] is retained for compatibility, but the old splash is not rendered. ?>
   <header class="topbar">
     <a class="wordmark" href="./" id="homeLink" aria-label="Stonefellow home"><?php if(!empty($siteSettings['media_logo'])): ?><img src="<?=sf_h($siteSettings['media_logo'])?>" alt="Stonefellow"><?php else: ?>STONEFELLOW<?php endif; ?></a>
     <div class="header-actions">
-<?php if($currentUser): ?>
       <button id="notificationButton" class="notification-button" type="button" aria-label="Open notifications and history" aria-expanded="false">
         <span class="notification-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></span><span id="notificationBadge" class="notification-badge" hidden>0</span>
       </button>
-<?php endif; ?>
     <details id="menuPanel" class="menu-details">
       <summary id="menuButton" class="menu-button" aria-label="Open menu">•••</summary>
       <div class="menu-sheet">
@@ -109,7 +129,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           </div>
         </div>
         <nav>
-          <a href="./" data-view="home"><?=($siteSettings['homepage_template']??'classic')==='agent_canvas'?'Agent Canvas':(!empty($siteSettings['artist_homepage_enabled'])?'Home':'Agent')?></a>
+          <a href="./" data-view="home">Agent Canvas</a>
           <a href="world" data-view="world">Artist World</a>
           <a href="music" data-view="music">Music</a>
           <a href="search" data-view="search">Search</a>
@@ -164,25 +184,32 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   </header>
 
 
-<?php if($currentUser): ?>
   <div id="notificationBackdrop" class="drawer-backdrop" hidden></div>
   <aside id="notificationDrawer" class="notification-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="activityDrawerTitle">
     <div class="drawer-head">
       <div><span class="drawer-kicker">STONEFELLOW</span><h2 id="activityDrawerTitle">Activity</h2></div>
       <button id="notificationClose" type="button" aria-label="Close activity drawer">×</button>
     </div>
-    <div class="drawer-tabs" role="tablist" aria-label="Activity views">
+    <div class="drawer-tabs" data-drawer-group="activity" role="tablist" aria-label="Activity views">
       <button type="button" class="active" data-drawer-tab="notifications" role="tab">Notifications <span id="drawerUnreadCount"></span></button>
       <button type="button" data-drawer-tab="history" role="tab">History</button>
       <button type="button" data-drawer-tab="brain" role="tab">Agent Brain</button>
     </div>
-    <div class="drawer-tools"><button id="markAllNotifications" type="button">Mark all read</button><button id="refreshNotifications" type="button">Refresh</button></div>
+    <div class="drawer-tabs" data-drawer-group="music" role="tablist" aria-label="Music library views" hidden>
+      <button type="button" data-drawer-tab="songs" role="tab">Songs</button>
+      <button type="button" data-drawer-tab="albums" role="tab">Albums</button>
+    </div>
+    <div class="drawer-tabs" data-drawer-group="commerce" role="tablist" aria-label="Shop and tickets views" hidden>
+      <button type="button" data-drawer-tab="merch" role="tab">Merch</button>
+      <button type="button" data-drawer-tab="tickets" role="tab">Tickets</button>
+      <button type="button" data-drawer-tab="cart" role="tab">Cart <span id="drawerCartCount"></span></button>
+    </div>
+    <div class="drawer-tools" id="activityDrawerTools"><button id="markAllNotifications" type="button">Mark all read</button><button id="refreshNotifications" type="button">Refresh</button></div>
     <div id="drawerContent" class="drawer-content"><p class="drawer-empty">Loading…</p></div>
   </aside>
-<?php endif; ?>
 
   <main id="mainContent" class="stage" tabindex="-1">
-    <section id="dynamicCanvas" class="dynamic-canvas" aria-live="polite"><?=sf_seo_server_html($seo)?></section>
+    <section id="dynamicCanvas" class="dynamic-canvas" aria-live="polite"><?php if($initialView!==''): ?><?=sf_seo_server_html($seo)?><?php endif; ?></section>
   </main>
   <!-- Keep the floating companion outside the scrolling page and player layers. -->
     <section class="agent-stage" aria-label="Stonefellow Agent">
@@ -210,17 +237,49 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
     <div id="queueContent" class="queue-content"><p class="drawer-empty">Your queue is empty.</p></div>
   </aside>
 
+  <div id="vocalStudioBackdrop" class="sf-vocal-backdrop" hidden></div>
+  <aside id="vocalStudioDrawer" class="sf-vocal-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="vocalStudioTitle">
+    <div class="sf-vocal-drawer-head">
+      <div><small>STONEFELLOW / RECORDING</small><h2 id="vocalStudioTitle">Record Studio</h2></div>
+      <button id="vocalStudioClose" type="button" aria-label="Close recording studio">×</button>
+    </div>
+    <div class="sf-vocal-tabs" role="tablist" aria-label="Recording mode">
+      <button type="button" role="tab" class="active" data-vocal-tab="vocal" aria-selected="true">Vocal Overdub</button>
+      <button type="button" role="tab" data-vocal-tab="clip" aria-selected="false">Song Clip</button>
+    </div>
+    <div class="sf-vocal-drawer-body">
+      <section data-vocal-panel="vocal" role="tabpanel" aria-label="Vocal overdub">
+        <div class="sf-vocal-intro"><span>01 / RECORD WITH THE SONG</span><p>Sing over the Stonefellow track in the player. We record your microphone as a separate vocal take and create a combined mix you can preview. Recordings stay in this browser until you download them.</p></div>
+        <div class="sf-vocal-current-track"><span>NOW PLAYING</span><strong id="vocalSong">Load a song from the music library</strong></div>
+        <div class="sf-vocal-device"><label for="vocalMicSelect">MICROPHONE / USB INTERFACE</label><select id="vocalMicSelect"><option value="">System default microphone</option></select><button type="button" id="vocalMicConnect">Enable microphone</button><small id="vocalMicLabel">Permission is requested only when you enable a microphone.</small><div class="sf-vocal-meter" aria-label="Microphone input level"><span id="vocalMicMeter"></span></div></div>
+        <p class="sf-vocal-device-note">Connect your Focusrite through USB and select it from this list. Use headphones to prevent the song from leaking into the microphone. Direct monitoring can be enabled on your interface.</p>
+        <div class="sf-vocal-mix-controls"><label>VOCAL LEVEL<input id="vocalInputLevel" type="range" min="0" max="200" value="100" step="5" disabled></label><label>SONG LEVEL<input id="vocalSongLevel" type="range" min="0" max="200" value="85" step="5" disabled></label></div>
+        <div class="sf-vocal-record-controls"><button type="button" id="vocalStart">● Start vocal take</button><button type="button" id="vocalStop" disabled>■ Stop &amp; finish</button><span id="vocalTimer" aria-label="Recording duration">0:00</span></div>
+        <div id="vocalStudioRecording" class="sf-vocal-live" hidden><span></span> RECORDING YOUR VOCAL + SONG MIX</div>
+        <div id="vocalStudioStatus" class="sf-vocal-feedback" role="status" aria-live="polite"></div>
+        <section id="vocalResults" class="sf-vocal-results" hidden><h3>Your take is ready</h3><label>COMBINED SONG + VOCAL<audio id="vocalMixPreview" controls preload="none"></audio></label><a id="vocalMixDownload" class="sf-vocal-download" download>↓ Download the mix</a><label>VOCAL TRACK ONLY<audio id="vocalDryPreview" controls preload="none"></audio></label><a id="vocalDryDownload" class="sf-vocal-download" download>↓ Download vocal stem</a><p>Downloads include audio from this session. Nothing is uploaded to Stonefellow or published automatically.</p></section>
+      </section>
+      <section data-vocal-panel="clip" role="tabpanel" aria-label="Song clip recorder" hidden>
+        <div class="sf-vocal-intro"><span>02 / CAPTURE A SONG EXCERPT</span><p>This is the original Record Clip feature. It captures part of the song from the player, without using a microphone. It is separate from your vocal overdubs.</p></div>
+        <div class="sf-vocal-record-controls"><button id="vocalClipStart" type="button">● Record song clip</button><button id="vocalClipStop" type="button">■ Stop song clip</button></div>
+        <p id="vocalClipStatus" class="sf-vocal-feedback" role="status">Play a song to start a clip.</p>
+      </section>
+    </div>
+  </aside>
+
   <footer class="chat-footer">
     <div id="footerPlayer" class="footer-player" hidden aria-label="Music player">
       <button id="playerArtwork" class="player-artwork" type="button" aria-label="View current song"><span>SF</span></button>
       <div class="player-track-meta">
         <button id="playerTitle" class="player-title" type="button">Nothing playing</button>
         <span id="playerRelease" class="player-release">Stonefellow</span>
+        <span id="playerPlaybackStatus" class="player-playback-status" role="status" hidden></span>
       </div>
       <button id="playerPrev" class="player-icon" type="button" aria-label="Previous song">‹</button>
       <button id="playerToggle" class="player-toggle" type="button" aria-label="Play">▶</button>
       <button id="playerNext" class="player-icon" type="button" aria-label="Next song">›</button>
       <button id="playerQueueButton" class="player-queue-button" type="button" aria-label="Open Up Next queue" aria-expanded="false">Queue <span id="playerQueueCount">0</span></button>
+      <button id="playerMomentsButton" class="player-queue-button sf-player-moments-button" type="button" aria-label="Open Song Moments timeline">Moments <span aria-hidden="true">✧</span></button>
       <div class="player-timeline">
         <span id="playerCurrent">0:00</span>
         <input id="playerSeek" type="range" min="0" max="1000" value="0" aria-label="Song position">
@@ -242,6 +301,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button type="button" data-quick-action="newsletter">Newsletter</button>
     </nav>
     <div class="chat-composer-shell">
+      <button id="chatFooterHide" class="sf-chat-footer-hide" type="button" aria-label="Hide chat footer" title="Hide chat">×</button>
       <div id="voiceTranscript" class="voice-transcript" role="status" aria-live="polite" hidden><span class="voice-transcript-dot" aria-hidden="true"></span><span id="voiceTranscriptText"></span></div>
       <section id="agentChatPopup" class="agent-chat-popup" aria-label="Stonefellow conversation" hidden>
         <header class="agent-chat-popup-head"><div><strong>Stonefellow</strong><span id="agentChatPopupState" role="status">Ready</span></div><div class="agent-chat-popup-tools"><button id="agentVoiceReplyToggle" type="button" aria-pressed="true" title="Toggle spoken Agent replies">Voice on</button><button id="agentChatNew" type="button">New chat</button><button id="agentChatClose" type="button" aria-label="Close Agent Chat">×</button></div></header>
@@ -263,6 +323,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <a href="#" data-social="spotify">Spotify</a>
     </div>
   </footer>
+  <button id="chatFooterRestore" class="sf-chat-footer-restore" type="button" aria-label="Show chat footer" title="Show chat footer · zzz on desktop">Chat <span>zzz</span></button>
 
   <script>window.STONEFELLOW_BUILD=<?=json_encode(SF_BUILD)?>;window.STONEFELLOW_THEME_PREVIEW=<?=json_encode($themePreview)?>;window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP=<?=json_encode($voiceEngineBootstrap)?>;window.STONEFELLOW_AUTH_BOOTSTRAP=<?=json_encode(['authenticated'=>(bool)$currentUser,'user'=>sf_user_public($currentUser)],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;window.STONEFELLOW_SITE=<?=json_encode(['artistHomepageEnabled'=>(bool)($siteSettings['artist_homepage_enabled']??false),'homepageTemplate'=>$siteSettings['homepage_template']??'classic','fanCommunityEnabled'=>(bool)($siteSettings['fan_community_enabled']??false),'socials'=>['instagram'=>$siteSettings['social_instagram'],'youtube'=>$siteSettings['social_youtube'],'bandcamp'=>$siteSettings['social_bandcamp'],'spotify'=>$siteSettings['social_spotify']],'privacy'=>$siteSettings['privacy_text'],'terms'=>$siteSettings['terms_text'],'appearance'=>['mode'=>$activeTheme['mode'],'preset'=>$activeTheme['preset'],'density'=>$activeTheme['density'],'corner_style'=>$activeTheme['corner_style'],'max_width'=>$activeTheme['max_width']],'media'=>['logo'=>$siteSettings['media_logo']??'','hero'=>$siteSettings['media_hero']??'','social_share'=>$siteSettings['media_social_share']??'','app_icon'=>$siteSettings['media_app_icon']??'','artist_photo'=>$siteSettings['media_artist_photo']??'']],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)?>;</script>
   <script>window.STONEFELLOW_INITIAL_ROUTE=<?=json_encode($initialRoute,JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?>;</script>
@@ -283,7 +344,10 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/speech-segments.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-audio-player-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-song-capture-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/fan-vocal-studio.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/song-moments.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-song-listening-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/player-playback-lifecycle.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/account-voice-engine.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/speech-engine-conversation.js?v=<?=rawurlencode(SF_BUILD)?>"></script>

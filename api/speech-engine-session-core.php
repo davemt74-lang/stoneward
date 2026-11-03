@@ -15,6 +15,51 @@ function sf_speech_session_schema():void {
     }
 }
 
+/** Short-lived browser observations for a bound, owner-only voice session. */
+function sf_speech_context_schema():void {
+    sf_speech_session_schema();$pdo=sf_db();
+    if($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='sqlite'){
+        $pdo->exec('CREATE TABLE IF NOT EXISTS speech_engine_browser_context(conversation_id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,context_json TEXT NOT NULL,updated_at TEXT NOT NULL,expires_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)');
+    }else{
+        $pdo->exec('CREATE TABLE IF NOT EXISTS speech_engine_browser_context(conversation_id VARCHAR(128) NOT NULL PRIMARY KEY,user_id BIGINT UNSIGNED NOT NULL,context_json TEXT NOT NULL,updated_at VARCHAR(40) NOT NULL,expires_at BIGINT NOT NULL,INDEX idx_speech_context_owner(user_id,expires_at),CONSTRAINT fk_speech_context_owner FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+    }
+}
+
+/** First bind identifies exactly one recently started session. Later syncs
+ *  carry the returned CID; parallel devices never silently share state. */
+function sf_speech_sync_browser_context(int $userId,array $state,string $conversationId='',int $now=0):string {
+    if(!sf_speech_session_authorized($userId))throw new RuntimeException('Voice context is not authorized.');
+    sf_speech_context_schema();$now=$now?:time();$pdo=sf_db();
+    $pdo->prepare('DELETE FROM speech_engine_browser_context WHERE expires_at<?')->execute([$now]);
+    if($conversationId!==''){
+        if(!preg_match('/^[A-Za-z0-9_-]{12,128}$/D',$conversationId))throw new InvalidArgumentException('Invalid voice session.');
+        $q=$pdo->prepare('SELECT conversation_id FROM speech_engine_sessions WHERE conversation_id=? AND user_id=? AND expires_at>?');
+        $q->execute([$conversationId,$userId,$now]);
+        if($q->fetchColumn()===false)throw new RuntimeException('Voice session has ended.');
+    }else{
+        $q=$pdo->prepare('SELECT conversation_id FROM speech_engine_sessions WHERE user_id=? AND expires_at>? AND created_at>=? ORDER BY created_at DESC LIMIT 2');
+        $q->execute([$userId,$now,gmdate('c',$now-300)]);
+        $matches=$q->fetchAll(PDO::FETCH_COLUMN);
+        if(count($matches)!==1)throw new RuntimeException('Voice session is not uniquely bound yet.');
+        $conversationId=(string)$matches[0];
+    }
+    $json=json_encode($state,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+    if(!is_string($json)||strlen($json)>4096)throw new InvalidArgumentException('Voice context is too large.');
+    $pdo->prepare('REPLACE INTO speech_engine_browser_context(conversation_id,user_id,context_json,updated_at,expires_at) VALUES(?,?,?,?,?)')
+        ->execute([$conversationId,$userId,$json,gmdate('c',$now),$now+35]);
+    return $conversationId;
+}
+
+function sf_speech_read_browser_context(int $userId,string $conversationId,int $now=0):array {
+    if($userId<1||$conversationId==='')return [];
+    sf_speech_context_schema();$now=$now?:time();
+    sf_db()->prepare('DELETE FROM speech_engine_browser_context WHERE expires_at<?')->execute([$now]);
+    $q=sf_db()->prepare('SELECT context_json FROM speech_engine_browser_context WHERE conversation_id=? AND user_id=? AND expires_at>?');
+    $q->execute([$conversationId,$userId,$now]);
+    $json=$q->fetchColumn();if(!is_string($json))return [];
+    $state=json_decode($json,true);return is_array($state)?$state:[];
+}
+
 function sf_speech_session_authorized(int $userId):bool {
     return $userId>0&&sf_speech_engine_user_choice($userId)==='speech_engine'&&sf_speech_engine_pilot_config()['ready'];
 }
@@ -76,7 +121,8 @@ function sf_speech_bound_user(string $conversationId,int $now=0):?array {
 }
 
 function sf_speech_close_conversation(string $conversationId):void {
-    sf_speech_session_schema();sf_db()->prepare('DELETE FROM speech_engine_sessions WHERE conversation_id=?')->execute([$conversationId]);
+    sf_speech_context_schema();sf_db()->prepare('DELETE FROM speech_engine_browser_context WHERE conversation_id=?')->execute([$conversationId]);
+    sf_db()->prepare('DELETE FROM speech_engine_sessions WHERE conversation_id=?')->execute([$conversationId]);
 }
 
 function sf_speech_bridge_signature(string $raw,int $timestamp,string $secret):string {

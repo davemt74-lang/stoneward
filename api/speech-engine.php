@@ -29,6 +29,13 @@ try {
         sf_speech_bind_account($uid,(string)($body['conversation_id']??''),(string)($body['bind_token']??''));
         sf_json_response(['ok'=>true,'bound'=>true]);
     }
+    if($action==='sync_context'){
+        require_once __DIR__.'/agent-runtime.php';
+        $raw=is_array($body['client_state']??null)?$body['client_state']:[];
+        $state=sf_agent_normalize_client_state($raw);
+        $cid=sf_speech_sync_browser_context($uid,$state,(string)($body['conversation_id']??''));
+        sf_json_response(['ok'=>true,'conversation_id'=>$cid,'expires_in'=>35]);
+    }
     if($action==='take_action'){
         $envelope=sf_speech_take_action($uid,(string)($body['conversation_id']??''));
         sf_json_response(['ok'=>true,'action_envelope'=>$envelope]);

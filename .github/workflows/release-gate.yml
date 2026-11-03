@@ -79,6 +79,7 @@ jobs:
       - name: Admin JavaScript syntax
         run: |
           node --check admin/assets/admin.js
+          node --check admin/assets/image-generation.js
           node --check admin/assets/stripe-connect.js
           node --check admin/assets/commerce-ops.js
           node --check admin/assets/agent-canvas.js
@@ -577,6 +578,7 @@ jobs:
           node tests/section91b14c-ios-lunar-mobile.cjs
           php tests/section91b14d-media-stream-range.php
           node tests/section91b14d-playback-completion.cjs
+          node --test tests/section91b20a-image-generation.test.cjs tests/section91b20b-image-dashboard.test.cjs tests/section91b20c-image-placements.test.cjs tests/section91b20d-image-variations.test.cjs tests/section91b20e-image-gallery-masks.test.cjs
           php tests/section91b13e-lyric-review-gate.php
           php tests/section91b13c-grounded-agent-replies.php
           php tests/section91b8f-selective-song-memory.php

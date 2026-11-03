@@ -1,5 +1,17 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/user-usage-report.php';
+/** Only aggregated ledger facts are suitable for this Admin Agent read. */
+function sf_agent_admin_user_usage_brief(array $report): string {
+    $days=(int)($report['days']??30);$accounts=(array)($report['accounts']??[]);$usage=(array)($report['usage']??[]);
+    return 'Across all Stonefellow accounts in the last '.$days.' days: '
+        .number_format((int)($usage['tokens_consumed']??0)).' Active Tokens consumed, '
+        .number_format((int)($usage['free_tokens_granted']??0)).' complimentary tokens granted, and '
+        .number_format((int)($usage['package_tokens_granted']??0)).' package tokens allocated. '
+        .number_format((int)($accounts['active']??0)).' active accounts, '
+        .number_format((int)($accounts['low_balance']??0)).' with 1,000 or fewer Active Tokens. '
+        .'Open Manage Users for individual balances and audited transactions; no account was changed.';
+}
 /** Section 91B2A: bounded, deterministic Admin catalog/release reads. */
 function sf_agent_admin_read_label(mixed $value,int $limit=140):string {
     if(!is_scalar($value) && $value!==null)return '';

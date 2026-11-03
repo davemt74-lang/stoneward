@@ -4,6 +4,23 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'){sf_admin_require_auth(false);sf_
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST') sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $me=sf_admin_require_auth(true);$body=sf_request_json();$id=(string)($body['id']??'');$catalog=sf_catalog();$idx=null;foreach($catalog as $i=>$t)if((string)($t['id']??'')===$id){$idx=$i;break;}if($idx===null)sf_json_response(['ok'=>false,'message'=>'Track not found.'],404);
 $track=$catalog[$idx];$patch=is_array($body['track']??null)?$body['track']:[];
+if(($body['action']??'')==='lifecycle'){
+  $next=(string)($body['state']??'');
+  if(!in_array($next,['published','hidden','archived','deleted'],true))sf_json_response(['ok'=>false,'message'=>'Invalid song lifecycle state.'],422);
+  if(empty($body['confirmed']))sf_json_response(['ok'=>false,'message'=>'Confirm this song lifecycle change.'],422);
+  $before=(string)($track['state']??'published');
+  $track['state']=$next;
+  $track['public_visible']=$next==='published';
+  $track['lifecycle_updated_at']=gmdate('c');
+  $track['lifecycle_updated_by']=(int)$me['id'];
+  if($next==='deleted')$track['deleted_at']=gmdate('c');else unset($track['deleted_at']);
+  $catalog[$idx]=$track;
+  // Keep the canonical ID, media, downloads and listening history intact.
+  // "Delete" is a recoverable Trash state, never an unguarded file removal.
+  sf_admin_write_catalog($catalog);
+  sf_log_admin_action((int)$me['id'],'song_lifecycle_changed','track',$id,['from'=>$before,'to'=>$next]);
+  sf_json_response(['ok'=>true,'track'=>$track]);
+}
 foreach(['title','release','lyrics','story','artwork'] as $k)if(array_key_exists($k,$patch))$track[$k]=sf_clean_text($patch[$k],$k==='lyrics'||$k==='story'?10000:240);
 if(array_key_exists('duration',$patch))$track['duration']=max(0,(int)$patch['duration']);
 if(array_key_exists('year',$patch))$track['year']=max(0,(int)$patch['year']);

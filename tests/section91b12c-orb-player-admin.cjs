@@ -25,7 +25,7 @@ test('Audio panel sits beneath orb and embeds the action buttons',()=>{
   assert.equal((shell.match(/id="persistentAudio"/g)||[]).length,1);
 });
 test('Movement pauses on pointer hover and focus and resumes from current position',()=>{
-  assert.match(js,/hovered\|\|workspace\.classList\.contains\('open'\)/);
+  assert.match(js,/hovered\|\|guideIndex>=0\|\|workspace\.classList\.contains\('open'\)/);
   assert.match(js,/on\(floater,'pointerenter',\(\)=>\{hovered=true;/);
   assert.match(js,/on\(floater,'pointerleave',\(\)=>\{hovered=false;roam\.start=0;/);
   assert.match(js,/on\(floater,'focusin'/);

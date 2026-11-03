@@ -19,14 +19,14 @@ check('Arbitrary music URLs are never accepted',()=>assert.equal(skill.validate(
 check('Stop and pause have separate speech intents',()=>{assert.equal(skill.command('stop the music').type,'stop_player');assert.equal(skill.command('pause music').type,'pause_player')});
 check('Temporary playlist intent is not converted into an unverified track title',()=>assert.equal(skill.resolvePublished('play random playlist',[],temp).action.type,'load_temporary_playlist'));
 check('Temporary playlist queues inside existing drawer with per-song replay',()=>{assert.match(app,/async function startTemporaryPlaylist\(action\)/);assert.match(app,/await openQueue\(\)/);assert.match(app,/data-temp-play/);assert.match(app,/function playTemporaryTrack\(index\)/)});
-check('Temporary playlist opens queue for guests without a saved playlist',()=>assert.match(app,/!st\.auth\.authenticated&&!isTemporaryPlaylist\(\)/));
-check('Orb provides a dedicated playlist button and adapts its ring',()=>{assert.match(orb,/data-orbit-action="playlist"/);assert.match(orb,/options\.hasTemporaryPlaylist\?\.\(\)/);assert.match(orb,/options\.onOpenQueue\?\.\(\)/);assert.match(app,/onOpenQueue:\(\)=>void openQueue\(\)/)});
-check('Queue displays unsaved status and ordered tracks with themed styling',()=>{assert.match(app,/TEMPORARY PLAYLIST · NOT SAVED/);assert.match(app,/NOW PLAYING/);assert.match(css,/\.temporary-playlist-item\.is-current/)});
+check('Guest playlists stay available in the queue without exposing an account queue',()=>{assert.match(app,/const deviceHtml=guestSavedPlaylists\.length/);assert.match(app,/if\(!st\.auth\.authenticated\)\{st\.queue=\{\.\.\.st\.queue,loaded:true,items:\[\]\}/);});
+check('Orb keeps the playlist button on the ring even before a mix exists',()=>{assert.match(orb,/data-orbit-action="playlist"/);assert.match(orb,/for\(const button of root\.querySelectorAll\('\[data-orbit-action="playlist"\]'\)\)button\.hidden=false/);assert.match(orb,/options\.onOpenQueue\?\.\(\)/);assert.match(app,/onOpenQueue:\(\)=>void openQueue\(\)/)});
+check('Queue displays unsaved status and ordered tracks with themed styling',()=>{assert.match(app,/TEMPORARY PLAYLIST · \$\{currentMixSaved\(\)\?'SAVED':'NOT SAVED'\}/);assert.match(app,/NOW PLAYING/);assert.match(css,/\.temporary-playlist-item\.is-current/)});
 check('Song transitions and previous-next update playlist visual order',()=>{assert.match(app,/st\.playlistPlayback\.index\+\+;updateQueueUi\(\)/);assert.match(app,/st\.playlistPlayback\.index=i;updateQueueUi\(\)/)});
 check('Music follow-up window is consulted while playing',()=>assert.match(app,/!woke&&Date\.now\(\)>=musicFollowupUntil/));
 check('Stop resets playback position and listening follow-up',()=>{assert.match(app,/case 'stop_player':/);assert.match(app,/audio\.currentTime=0/);assert.match(app,/musicFollowupUntil=0/)});
 check('Load album phrase uses installed page route',()=>assert.match(read('api/agent-navigation.php'),/open\|load\|show me/));
-check('Current version markers stay synchronized',()=>{assert.match(read('stonefellow-v120.php'),/1\.3\.204/);assert.match(read('service-worker.js'),/1\.3\.204/)});
+check('Current version markers stay synchronized',()=>{assert.match(read('stonefellow-v120.php'),/1\.3\.231/);assert.match(read('service-worker.js'),/1\.3\.231/)});
 (async()=>{
   const invoked=[];const adapter=skill.create({invoke:async action=>{invoked.push(action);return 'Queue opened.'}});
   const reply=await adapter.dispatch(temp);

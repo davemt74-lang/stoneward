@@ -25,14 +25,14 @@ ok(str_contains($migrations,"'user_playlists','user_playlist_tracks'"),'integrit
 ok(str_contains($agent,"return 'playlist_create'")&&str_contains($agent,"case 'playlist_create'"),'agent playlist-create route and policy exist');
 ok(str_contains($agent,"return 'playlist_save_session'")&&str_contains($agent,"case 'playlist_save_session'"),'agent save-session route and policy exist');
 ok(str_contains($agent,"'playlist_create'=>'Asks the agent to create")&&str_contains($agent,"'playlist_save_session'=>'Asks to save"),'JEV routing criteria include playlist actions');
-ok(str_contains($js,"case'create_playlist'")&&str_contains($js,"case'save_agent_session'"),'client executes authorized agent playlist actions');
+ok(preg_match("/case\\s*'create_playlist'/",$js)&&preg_match("/case\\s*'save_agent_session'/",$js),'client executes authorized agent playlist actions');
 ok(str_contains($js,"function renderPlaylist(id)")&&str_contains($libraryJs,"playlists:'Playlists'")&&str_contains($libraryJs,'data-library-open-playlist'),'playlist editor and My Library playlist surface exist');
 ok(str_contains($js,'data-move-item')&&str_contains($js,"action:'reorder'"),'playlist reorder UI is wired');
 ok(str_contains($js,'data-remove-playlist-item')&&str_contains($js,"action:'remove_item'"),'playlist removal UI is wired');
 ok(str_contains($js,'id="addPlaylistTrack"')&&str_contains($js,"action:'add_track'"),'playlist add-track UI is wired');
 ok(str_contains($js,'function playPlaylist(')&&str_contains($js,'playlistPlayback'),'playlist playback context exists');
 ok(str_contains($js,"st.playlistPlayback.index++")&&str_contains($js,"play(t,0,'playlist',true)"),'playlist auto-advances on track completion');
-ok(str_contains($js,"source:st.playSource||'player'")&&str_contains($js,"play(t,0,'agent')"),'agent playback is tagged for session capture');
+ok(str_contains($js,"source:st.playSource||'player'")&&str_contains($js,"await play(track,0,'agent')"),'agent playback is tagged for session capture');
 ok(str_contains($js,'copyPlaylistLink')&&str_contains($js,"p.visibility==='public'"),'public playlists expose a share-link control');
 ok(str_contains($css,'.playlist-track-row')&&str_contains($css,'.playlist-summary')&&str_contains($css,'.playlist-card'),'playlist responsive styles exist');
 ok(str_contains($version,"'playlists'=>'ordered-public-private-agent'"),'version endpoint retains v1.3 Section 2 playlist capability');

@@ -35,6 +35,15 @@ function sf_catalog(): array {
     return $catalog;
 }
 
+/** The public player, archive and Agent must share this visibility boundary. */
+function sf_track_is_public(array $track): bool {
+    return ($track['public_visible']??true)!==false
+        && !in_array((string)($track['state']??'published'),['draft','private','hidden','archived','deleted'],true);
+}
+function sf_public_catalog(): array {
+    return array_values(array_filter(sf_catalog(),'sf_track_is_public'));
+}
+
 function sf_track_map(): array {
     $out=[]; foreach(sf_catalog() as $t) if(isset($t['id'])) $out[(string)$t['id']]=$t; return $out;
 }
@@ -58,6 +67,7 @@ function sf_validate_builder(array $b, string $format, int $userId=0): array {
             $seen[$id]=true;
             $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
+            if(!sf_track_is_public($t)){$errors[]="Track {$t['title']} is not publicly available.";continue;}
             if(empty($t['podEligible'])){$errors[]="Track {$t['title']} is not eligible for custom media.";continue;}
             if(($t['audio_publishing_mode']??'')==='preview_only'){
                 $errors[]="Track {$t['title']} needs a separate private production original for vinyl.";continue;
@@ -237,6 +247,7 @@ require_once __DIR__ . '/automation-core.php';
 require_once __DIR__ . '/privacy-core.php';
 require_once __DIR__ . '/personalization-core.php';
 require_once __DIR__ . '/playlists-core.php';
+require_once __DIR__ . '/guest-migration-core.php';
 require_once __DIR__ . '/listening-sessions-core.php';
 require_once __DIR__ . '/queue-core.php';
 require_once __DIR__ . '/home-core.php';

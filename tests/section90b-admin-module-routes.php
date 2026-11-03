@@ -41,7 +41,7 @@ foreach($cases as $query=>[$type,$view]){
     $plan=sf_admin_agent_plan($query);
     $check($plan['type']===$type && $plan['view']===$view && !$plan['requires_confirmation'],"Routes '$query' to $view");
 }
-$check(count(sf_admin_agent_module_routes())===23,'Exactly 23 known Admin navigation intents');
+$check(count(sf_admin_agent_module_routes())===24,'Exactly 24 known Admin navigation intents');
 foreach(sf_admin_agent_module_routes() as $intent=>$route){
     $contract=sf_agent_orchestration_contract('admin',$intent);
     $check($contract['registered'] && $contract['tool_id']==='admin_module_navigate'

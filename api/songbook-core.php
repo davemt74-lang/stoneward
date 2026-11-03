@@ -6,12 +6,25 @@ function sf_songbook_decode(mixed $v,array $fallback=[]): array { $d=is_array($v
 function sf_songbook_track(string $trackId): ?array { foreach(sf_catalog() as $t)if((string)($t['id']??'')===$trackId)return $t;return null; }
 function sf_songbook_public_track(string $trackId): ?array {
     if(function_exists('sf_seo_public_track'))return sf_seo_public_track($trackId);
-    $t=sf_songbook_track($trackId);if(!$t||($t['public_visible']??true)===false||in_array((string)($t['state']??''),['draft','private','archived'],true))return null;return $t;
+    $t=sf_songbook_track($trackId);if(!$t||($t['public_visible']??true)===false||in_array((string)($t['state']??''),['draft','private','hidden','archived','deleted'],true))return null;return $t;
 }
 function sf_songbook_lines(string $lyrics): array { return preg_split('/\R/u',str_replace(["\r\n","\r"],"\n",$lyrics)) ?: []; }
 function sf_songbook_is_heading_line(string $line): bool { return (bool)preg_match('/^\[?(?:intro|verse(?:\s+\d+)?|pre[- ]?chorus|chorus|refrain|hook|bridge|breakdown|instrumental|solo|outro)\]?$/i',trim($line)); }
 
-function sf_songbook_public_catalog_rows(array $catalog): array { $out=[];foreach($catalog as $track){if(!is_array($track))continue;unset($track['lyrics']);$out[]=$track;}return $out; }
+function sf_songbook_public_catalog_rows(array $catalog): array {
+    $out=[];
+    foreach($catalog as $track){
+        if(!is_array($track))continue;
+        // The generated public catalog is a real exposure boundary: hidden,
+        // archived and trashed songs must not reappear in the initial JS bundle.
+        if(function_exists('sf_track_is_public')){
+            if(!sf_track_is_public($track))continue;
+        }elseif(($track['public_visible']??true)===false||in_array((string)($track['state']??'published'),['draft','private','hidden','archived','deleted'],true))continue;
+        unset($track['lyrics']);
+        $out[]=$track;
+    }
+    return $out;
+}
 function sf_songbook_refresh_public_catalog_asset(): void { $path=SF_ROOT.'/data/catalog.json';if(!is_file($path))return;$catalog=json_decode((string)file_get_contents($path),true);if(!is_array($catalog))return;$rows=sf_songbook_public_catalog_rows($catalog);$json=json_encode(array_values($rows),JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);if($json===false)throw new RuntimeException('Could not encode public catalog.');$target=SF_ROOT.'/assets/js/catalog.js';$tmp=$target.'.tmp.'.bin2hex(random_bytes(3));if(file_put_contents($tmp,"window.STONEFELLOW_CATALOG = ".$json.";\n",LOCK_EX)===false)throw new RuntimeException('Could not write public catalog JavaScript.');if(!rename($tmp,$target)){@unlink($tmp);throw new RuntimeException('Could not finalize public catalog JavaScript.');} }
 
 function sf_songbook_ensure_schema(): void {

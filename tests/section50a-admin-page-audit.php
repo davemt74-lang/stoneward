@@ -5,7 +5,7 @@ $read=static fn(string $path):string=>(string)file_get_contents($root.'/'.$path)
 $shell=$read('admin/index.php');$ui=$read('admin/assets/unified-ui.js');
 $css=$read('admin/assets/unified-ui.css');$doc=$read('docs/section50-admin-ui-audit.md');
 preg_match_all('/<button type="button" data-view="([^"]+)"/',$shell,$matches);
-$nav=$matches[1];$expected=['dashboard','analytics','calendar','catalog','media','uploads','templates','releases','shows','distribution','press','rights','crm','customer','campaigns','automations','products','orders','fulfillment','pod','membership','ticketing','packages','brain','production-review','knowledge','ai','users','team','operations','settings'];
+$nav=$matches[1];$expected=['dashboard','analytics','calendar','catalog','media','uploads','templates','releases','song-moments','shows','distribution','press','rights','crm','song-moderation','customer','campaigns','automations','products','orders','fulfillment','pod','membership','ticketing','packages','brain','production-review','knowledge','ai','image-generation','users','user-create','team','operations','settings'];
 $checks=[
  'All legacy views plus AI Production Review accounted for'=>count($nav)===count($expected) && $nav===$expected,
  'Sidebar has no duplicate navigation routes'=>count(array_unique($nav))===count($nav),

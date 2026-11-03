@@ -24,9 +24,9 @@ check('Audio upload offers optional authenticated Media Library',()=>{
 });
 check('Every PHP route view is a known Admin module destination',()=>{
   const phpViews=[...php.matchAll(/'([a-z_]+)'=>\['view'=>'([a-z-]+)'/g)].map(x=>x[2]);
-  assert.equal(phpViews.length,23);
+  assert.equal(phpViews.length,24);
   const labelsSource=js.match(/const adminModuleLabels=\{([^}]+)\};/)[1];
-  for(const view of phpViews){assert.match(labelsSource,new RegExp('(?:^|,)'+view+':'));}
+  for(const view of phpViews){assert.match(labelsSource,new RegExp("(?:^|,)['\\\"]?"+view+"['\\\"]?:"));}
 });
 check('All actions remain within original Admin view callback',()=>{
   assert.match(js,/const adminModuleViews=new Set\(Object\.keys\(adminModuleLabels\)\)/);

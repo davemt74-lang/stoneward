@@ -76,8 +76,11 @@
       const messages=Array.isArray(response.messages)?response.messages:[];
       transcript.innerHTML=(messages.length?messages.map(m=>
         '<article class="admin-chat-popup-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+
-        (m.role==='assistant'?'Stonefellow Admin Agent':'You')+'</strong><p>'+esc(m.content||'')+'</p></article>'
+        (m.role==='assistant'?'Stonefellow Admin Agent':'You')+'</strong><p>'+esc(m.content||'')+'</p>'+
+        (m.role==='assistant'&&m.action?.type==='image_prompt_draft'&&m.action?.draft?
+          '<button type="button" class="secondary" data-agent-image-draft="'+Number(m.id)+'">Review in Image Studio</button>':'')+'</article>'
       ).join(''):'')+localPlayerMarkup();
+      bindImageStudioDrafts(transcript,messages);
       if(!transcript.innerHTML)transcript.innerHTML='<p class="admin-chat-popup-empty">Your Admin conversation will appear here. Use the bar below to ask your Agent.</p>';
       if(typeof document.createElement==='function'&&typeof transcript.appendChild==='function'){
         const proof=document.createElement('section');proof.className='admin-proof-inline';proof.id='adminChatPopupProof';
@@ -699,6 +702,9 @@
     else if(m.role==='assistant'&&moduleRoute){
       next='<button type="button" data-admin-agent-action="'+esc(action.view)+'" class="secondary">Open '+esc(adminModuleLabels[action.view]||'Admin workspace')+'</button>';
     }
+    else if(m.role==='assistant'&&action.type==='image_prompt_draft'&&action.draft){
+      next='<button type="button" class="primary" data-agent-image-draft="'+Number(m.id)+'">Review prompt in Image Studio</button>';
+    }
     else if(m.role==='assistant'&&action.type==='prepare_campaign')next='<button type="button" data-admin-agent-action="campaigns" class="secondary">Prepare exact-review campaign draft</button>';
     else if(m.role==='assistant'&&action.type==='prepare_journey')next='<button type="button" data-admin-agent-action="journey" class="secondary">Prepare exact-review journey draft</button>';
     else if(m.role==='assistant'&&action.type==='production_editorial_status')next='<button type="button" data-agent-show-calendar class="secondary">Show production calendar here</button>';
@@ -760,7 +766,7 @@
     const evidence=brief.map(i=>'<li><strong>'+esc(i.title)+'</strong> — '+esc(i.reason)+'</li>').join('');
     return '<article class="admin-agent-message '+(m.role==='assistant'?'agent':'human')+'"><strong>'+who+'</strong><p>'+esc(m.content||'')+'</p>'+(stageCards?'<div class="admin-agent-stages"><strong>Governed mission steps</strong><ul>'+stageCards+'</ul><p>Inspect the relevant editor before separately approving any changes.</p></div>':'')+(evidence?'<div class="admin-agent-insights"><strong>Evidence-backed opportunities</strong><ul>'+evidence+'</ul></div>':'')+next+feedback+'</article>';
   }
-  const adminModuleLabels={dashboard:'Dashboard',uploads:'Folder Scan & Upload',media:'Media Library',templates:'Metadata Templates',catalog:'Catalog',releases:'Releases',distribution:'Distribution',press:'EPK + Press',shows:'Shows + Live',crm:'Fans + CRM',automations:'Segments + Automations',campaigns:'Campaigns',products:'Merch & Products',payments:'Payments & Stripe',knowledge:'Knowledge Base',orders:'Orders','commerce-ops':'Commerce Operations',fulfillment:'Fulfillment & Care',pod:'POD Handoffs',users:'Users & Tokens',team:'Team Workspace','production-review':'AI Production Review',packages:'Monthly Packages',membership:'Membership + VIP',ticketing:'Tickets + VIP',ai:'AI Providers',brain:'Agent Brain','agent-chat':'Admin Agent Chat',customer:'Customer Lifecycle',analytics:'Performance Intelligence',calendar:'Operating Calendar',rights:'Rights & Licensing',operations:'Operations',settings:'Site Settings'};
+  const adminModuleLabels={dashboard:'Dashboard',uploads:'Folder Scan & Upload',media:'Media Library',templates:'Metadata Templates',catalog:'Catalog',releases:'Releases',distribution:'Distribution',press:'EPK + Press',shows:'Shows + Live',crm:'Fans + CRM',automations:'Segments + Automations',campaigns:'Campaigns',products:'Merch & Products',payments:'Payments & Stripe',knowledge:'Knowledge Base',orders:'Orders','commerce-ops':'Commerce Operations',fulfillment:'Fulfillment & Care',pod:'POD Handoffs',users:'Manage Users','user-create':'Create User',team:'Team Workspace','production-review':'AI Production Review',packages:'Monthly Packages',membership:'Membership + VIP',ticketing:'Tickets + VIP',ai:'AI Providers','image-generation':'AI Image Studio',brain:'Agent Brain','agent-chat':'Admin Agent Chat',customer:'Customer Lifecycle',analytics:'Performance Intelligence',calendar:'Operating Calendar',rights:'Rights & Licensing',operations:'Operations',settings:'Site Settings'};
   const adminModuleViews=new Set(Object.keys(adminModuleLabels));
   function newSongKey(){
     const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
@@ -1053,6 +1059,7 @@
     if(['crm','automations','analytics','commerce-ops'].includes(type))c.openView(type);
   }
   function bindActions(root){
+    bindImageStudioDrafts(root,window.SFAdminAgentCanvas?.commerceMessages||[]);
     root.querySelectorAll('[data-agent-song-start]').forEach(b=>b.onclick=startSongIntake);
     root.querySelectorAll('[data-admin-agent-action]').forEach(b=>b.onclick=()=>action(b.dataset.adminAgentAction));
     root.querySelectorAll('video[data-agent-scene-start]').forEach(video=>{
@@ -1503,6 +1510,14 @@
       try{await c.api('agent-feedback.php',{message_id:Number(button.dataset.messageId),rating:button.dataset.adminAgentFeedback});c.say('Private response feedback saved.');}
       catch(e){c.say('Feedback could not be saved.');}
       finally{button.disabled=false;}
+    });
+  }
+  function bindImageStudioDrafts(root,messages){
+    root.querySelectorAll('[data-agent-image-draft]').forEach(button=>button.onclick=()=>{
+      const item=(messages||[]).find(m=>Number(m.id)===Number(button.dataset.agentImageDraft));
+      const draft=item?.action?.draft;
+      if(draft&&item.action?.type==='image_prompt_draft')
+        window.SFImageGenerationAdmin?.openWithDraft?.(draft);
     });
   }
   async function render(){

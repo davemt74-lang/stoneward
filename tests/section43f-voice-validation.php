@@ -14,6 +14,6 @@ foreach($cases as $name=>[$payload,$expected]){
  if(!$ok)exit(1);
 }
 $endpoint=(string)file_get_contents(dirname(__DIR__).'/api/agent-voice.php');
-$verified=strpos($endpoint,'sf_agent_voice_valid_mp3($audio)')<strpos($endpoint,'sf_consume_ai($u,$cost');
+$verified=strpos($endpoint,'sf_agent_voice_valid_mp3($audio)')<strpos($endpoint,'sf_ai_finish_reservation($u,$reservation,$cost');
 if(!$verified){fwrite(STDERR,"FAIL validation must precede token debit\n");exit(1);}
 echo "PASS validation precedes token debit\n";

@@ -8,7 +8,7 @@ function sf_live_shows(): array {
     return is_array($rows)?array_values(array_filter($rows,'is_array')):[];
 }
 function sf_live_public_shows(): array {
-    $rows=array_values(array_filter(sf_live_shows(),fn($s)=>($s['public_visible']??true)!==false));
+    $rows=array_values(array_filter(sf_live_shows(),fn($s)=>($s['public_visible']??true)!==false&&!in_array((string)($s['status']??'scheduled'),['hidden','deleted'],true)));
     usort($rows,fn($a,$b)=>strcmp((string)($a['date']??''),(string)($b['date']??''))?:strcmp((string)($a['venue']??''),(string)($b['venue']??'')));
     return $rows;
 }

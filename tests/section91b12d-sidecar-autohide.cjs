@@ -48,7 +48,9 @@ test('Playback, interaction, and cleanup preserve the single authoritative playe
   assert.match(js,/on\(audio,'play',\(\)=>\{state\('music'\);showPlayer\(\);\}\)/);
   assert.match(js,/on\(playerDock,'pointerenter',pausePlayerHide\)/);
   assert.match(js,/on\(visual,'pointerenter',\(\)=>\{showPlayer\(\);pausePlayerHide\(\);\}\)/);
-  assert.match(js,/pausePlayerHide\(\);\s*resizeObserver\?\.disconnect/);
+  assert.match(js,/pausePlayerHide\(\)/);
+  assert.match(js,/resizeObserver\?\.disconnect\(\)/);
+  assert.match(js,/playerObserver\?\.disconnect\(\)/);
   assert.match(js,/originalPlayerParent\.insertBefore\(player,before\)/);
   assert.equal((php.match(/id="persistentAudio"/g)||[]).length,1);
 });

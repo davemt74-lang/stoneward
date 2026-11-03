@@ -35,7 +35,7 @@ ok32(str_contains($core,'function sf_seo_resolve'),'central server SEO resolver 
 ok32(str_contains($core,"'robots'=>'index,follow,max-image-preview:large'")&&str_contains($core,"'noindex,nofollow,noarchive'"),'SEO resolver has explicit index/noindex policies');
 ok32(str_contains($core,"(\$k['status']??'')!=='published'")&&str_contains($core,"empty(\$k['readiness']['ready'])"),'private/draft/unready EPKs cannot resolve as public SEO pages');
 ok32(str_contains($core,"(\$r['state']??'published')!=='published'")&&str_contains($core,"(\$r['public_visible']??true)===false"),'draft/hidden releases are excluded');
-ok32(str_contains($core,"in_array((string)(\$t['state']??''),['draft','private','archived'],true)"),'non-public track states are excluded');
+ok32(str_contains($core,"sf_track_is_public(\$t)"),'non-public track states are excluded');
 ok32(str_contains($core,'sf_commerce_products(true)'),'product SEO uses public commerce records');
 ok32(str_contains($core,'sf_campaign_by_slug($slug,true)')&&str_contains($core,'sf_campaign_is_live($c)'),'campaign SEO requires public live campaign');
 foreach(['MusicGroup','MusicAlbum','MusicRecording','MusicEvent','Product','ProfilePage'] as $type)ok32(str_contains($core,"'@type'=>'".$type."'"),'structured data includes '.$type);

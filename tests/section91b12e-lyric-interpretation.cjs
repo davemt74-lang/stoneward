@@ -62,7 +62,7 @@ check('Listen & Interpret and Record Clip are independent orb actions',()=>{
   assert.match(canvas,/action==='stop-listening'/);
   assert.match(app,/onListenInterpret:async\(\)=>/);
   assert.match(app,/song_capture_live_start',interpret_on_stop:true/);
-  assert.match(app,/onStartCapture:async\(\)=>/);
+  assert.match(app,/onStartCapture:\(\)=>openVocalStudio\('vocal'\)/);
   assert.match(app,/song_capture_start/);
   assert.match(app,/songListeningSkill\.begin\(\)/);
   assert.match(app,/songListeningReceipt=result\.receipt/);

@@ -1,0 +1,47 @@
+/* Section 91B17P — recording drawer follows the active Agent Canvas atmosphere. */
+.sf-vocal-backdrop{position:fixed;inset:0;z-index:650;background:rgba(2,5,12,.56);backdrop-filter:brightness(.8)}
+.sf-vocal-backdrop[hidden],.sf-vocal-drawer[hidden],.sf-vocal-drawer [hidden]{display:none!important}
+body.sf-vocal-studio-open{overflow:hidden}
+.sf-vocal-drawer{position:fixed;z-index:651;right:0;top:0;bottom:0;width:min(440px,100vw);display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;color:var(--sf-atmo-text,#fff8e8);background:linear-gradient(165deg,rgba(27,31,37,.98),rgba(10,15,23,.99));border-left:1px solid var(--sf-atmo-border,rgba(255,226,183,.25));box-shadow:-20px 0 80px rgba(0,0,0,.5);font-family:var(--body-font,system-ui,sans-serif)}
+body[data-sf-atmosphere="lunar"] .sf-vocal-drawer{background:linear-gradient(150deg,#172636,#081521)}
+body[data-sf-atmosphere="violet"] .sf-vocal-drawer{background:linear-gradient(150deg,#201b32,#0b0c19)}
+body[data-sf-atmosphere="mesh"] .sf-vocal-drawer{background:linear-gradient(150deg,#102538,#08131f)}
+.sf-vocal-drawer *{box-sizing:border-box}
+.sf-vocal-drawer-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:27px 23px 19px;border-bottom:1px solid rgba(var(--sf-atmo-rgb,255,214,153),.18)}
+.sf-vocal-drawer-head small,.sf-vocal-intro span,.sf-vocal-current-track>span,.sf-vocal-device>label,.sf-vocal-mix-controls label,.sf-vocal-results>label{font:600 10px/1.35 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;color:var(--sf-atmo-accent,#ffe9c5)}
+.sf-vocal-drawer-head h2{font-size:27px;font-weight:400;line-height:1.1;margin:6px 0 0}
+.sf-vocal-drawer-head>button{border:0;background:none;font-size:28px;min-width:44px;min-height:44px;cursor:pointer;color:inherit}
+.sf-vocal-tabs{display:flex;gap:0;border-bottom:1px solid rgba(var(--sf-atmo-rgb,255,214,153),.18)}
+.sf-vocal-tabs button{flex:1;min-height:47px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--sf-atmo-text,#fff8e8);opacity:.65;font:600 11px/1.3 system-ui;letter-spacing:.07em;text-transform:uppercase;cursor:pointer}
+.sf-vocal-tabs button.active{opacity:1;color:var(--sf-atmo-accent,#ffdfac);border-color:var(--sf-atmo-accent,#ffdfac)}
+.sf-vocal-drawer-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:22px 23px max(30px,env(safe-area-inset-bottom,0px))}
+.sf-vocal-intro{margin-bottom:21px}.sf-vocal-intro p{font-size:12px;line-height:1.65;margin:7px 0 0;color:var(--sf-atmo-text,#fff8e8);opacity:.83}
+.sf-vocal-current-track,.sf-vocal-device,.sf-vocal-results{display:grid;gap:11px;padding:15px;border-radius:14px;border:1px solid rgba(var(--sf-atmo-rgb,255,214,153),.25);background:rgba(var(--sf-atmo-rgb,255,214,153),.055);margin-bottom:18px}
+.sf-vocal-current-track strong{font-size:15px;font-weight:500;line-height:1.35}
+.sf-vocal-device select,.sf-vocal-device>button,.sf-vocal-record-controls button,.sf-vocal-download{min-height:43px;border:1px solid rgba(var(--sf-atmo-rgb,255,214,153),.45);border-radius:10px;padding:10px 12px;background:#101722;color:var(--sf-atmo-text,#fff8e8);font-size:14px;cursor:pointer}
+.sf-vocal-device select{font-size:16px;width:100%;max-width:100%}
+.sf-vocal-device>button,.sf-vocal-record-controls button:first-child{border-color:var(--sf-atmo-accent,#ffe6b8);background:var(--sf-atmo-accent,#ffe6b8);color:#171517;font-weight:650}
+.sf-vocal-device>small{font-size:11px;line-height:1.55;opacity:.78}
+.sf-vocal-meter{height:7px;border:1px solid rgba(var(--sf-atmo-rgb,255,214,153),.3);border-radius:99px;overflow:hidden;background:rgba(0,0,0,.5)}
+.sf-vocal-meter>span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#b8d3ac,var(--sf-atmo-accent,#ffe8ba));transition:width 85ms linear}
+.sf-vocal-device-note{margin:-5px 0 21px;font-size:11px;line-height:1.6;color:var(--sf-atmo-text,#fff8e8);opacity:.72}
+.sf-vocal-mix-controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.sf-vocal-mix-controls label{display:grid;gap:8px}
+.sf-vocal-mix-controls input{width:100%;accent-color:var(--sf-atmo-accent,#ffe0a8)}
+.sf-vocal-record-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:16px}
+.sf-vocal-record-controls button{flex:1;min-width:128px;white-space:nowrap;font-size:12px}
+.sf-vocal-drawer button:disabled{opacity:.42;cursor:not-allowed}
+.sf-vocal-record-controls>span{font:600 15px ui-monospace,SFMono-Regular,monospace;min-width:45px;text-align:center}
+.sf-vocal-live{display:flex;align-items:center;gap:9px;color:#ffbeab;font:700 10px ui-monospace,monospace;letter-spacing:.08em;margin:12px 0}
+.sf-vocal-live span{height:9px;width:9px;background:#ff836d;border-radius:50%;box-shadow:0 0 12px #ff836d;animation:sfVocalBlink .9s ease-in-out infinite alternate}
+@keyframes sfVocalBlink{to{opacity:.2;box-shadow:0 0 3px #ff836d}}
+.sf-vocal-feedback{min-height:45px;font-size:12px;line-height:1.55;white-space:normal;color:var(--sf-atmo-text,#fff8e8);opacity:.85}
+.sf-vocal-results{margin-top:22px;padding:17px;gap:13px}
+.sf-vocal-results h3{font-size:17px;font-weight:550;margin:0}
+.sf-vocal-results>label{display:grid;gap:7px}
+.sf-vocal-results audio{display:block;width:100%;height:44px}
+.sf-vocal-download{display:block;min-height:0;text-align:center;text-decoration:none;font-weight:600;background:rgba(var(--sf-atmo-rgb,255,214,153),.12);font-size:12px}
+.sf-vocal-results p{margin:0;font-size:11px;line-height:1.55;opacity:.72}
+.sf-vocal-drawer button:focus-visible,.sf-vocal-drawer select:focus-visible,.sf-vocal-drawer a:focus-visible{outline:2px solid var(--sf-atmo-accent,#ffdda0);outline-offset:3px}
+@media(max-width:720px){.sf-vocal-drawer{width:100vw;max-width:none;height:100dvh;bottom:auto;border-left:0}.sf-vocal-drawer-head{padding:calc(14px + env(safe-area-inset-top,0px)) 17px 12px}.sf-vocal-drawer-body{padding:16px 17px max(28px,env(safe-area-inset-bottom,0px))}.sf-vocal-record-controls button{min-width:115px}}
+@media(prefers-reduced-motion:reduce){.sf-vocal-live span{animation:none}}

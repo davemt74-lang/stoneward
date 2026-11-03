@@ -1,0 +1,37 @@
+/* Section 91B17E/91B17G — confirmation adopts the active Admin theme. */
+.sf-admin-confirm {
+  box-sizing:border-box;
+  width:min(420px,calc(100vw - 28px));
+  max-height:min(88dvh,600px);
+  margin:auto;
+  padding:0;
+  border:1px solid var(--line2,#304b6d);
+  border-radius:16px;
+  overflow:auto;
+  background:linear-gradient(155deg,var(--panel2,#162440),var(--panel,#0b1426) 76%);
+  box-shadow:0 32px 120px #000b,0 0 45px rgba(96,170,255,.12);
+  color:var(--ink,#eaf3ff);
+  font-family:var(--body-font,Inter,system-ui,sans-serif);
+  color-scheme:dark;
+}
+.sf-admin-confirm::backdrop {
+  background:rgba(3,7,16,.78);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+}
+.sf-admin-confirm-inner{padding:23px clamp(18px,4vw,30px) 29px;}
+.sf-admin-confirm-head{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.sf-admin-confirm-head span{font:700 10px/1.3 ui-monospace,monospace;letter-spacing:.16em;color:var(--accent,#9ed8ff);}
+.sf-admin-confirm-x{border:0;background:transparent;color:var(--ink,#eaf3ff);font-size:25px;line-height:1;padding:2px 7px;cursor:pointer;}
+.sf-admin-confirm-icon{display:grid;place-items:center;width:45px;height:45px;margin:25px 0 14px;border:1px solid var(--line2,#36597e);border-radius:50%;background:rgba(117,177,252,.1);color:var(--accent,#a1d9ff);font-size:24px;font-weight:300;}
+.sf-admin-confirm h2{margin:0 0 12px;font:400 clamp(23px,5vw,30px)/1.13 Georgia,serif;color:var(--ink,#f0f7ff);}
+.sf-admin-confirm p{margin:0;color:var(--muted,#a9bed8);font-size:14px;line-height:1.6;overflow-wrap:anywhere;}
+.sf-admin-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:28px;}
+.sf-admin-confirm-actions button{min-height:45px;border-radius:10px;font-weight:650;font-size:13px;}
+.sf-admin-confirm-actions .secondary{border:1px solid var(--line2,#36597e);background:rgba(122,168,235,.08);color:var(--ink,#eaf3ff);cursor:pointer;}
+.sf-admin-confirm-accept{border:1px solid var(--accent,#9ed8ff);background:var(--accent,#9ed8ff);color:var(--bg,#081429);cursor:pointer;}
+.sf-admin-confirm.is-danger{border-color:var(--bad,#d2877c);}
+.sf-admin-confirm.is-danger .sf-admin-confirm-icon{color:var(--bad,#d2877c);background:rgba(211,112,105,.12);border-color:var(--bad,#d2877c);}
+.sf-admin-confirm.is-danger .sf-admin-confirm-accept{border-color:var(--bad,#d2877c);background:var(--bad,#d2877c);color:var(--bg,#081429);}
+.sf-admin-confirm button:focus-visible{outline:2px solid var(--accent,#9ed8ff);outline-offset:3px;}
+@media(max-width:480px){.sf-admin-confirm-inner{padding:19px 19px 24px;}.sf-admin-confirm-actions{gap:8px;}}

@@ -62,8 +62,8 @@ ok(str_contains($agent,"'type'=>'builder_move_track'"),'Agent emits move-track a
 ok(str_contains($agent,"if(in_array(\$side,['A','B'],true))")&&str_contains($agent,"\$action['side']=\$side"),'Agent honors requested Side A/B when adding a track');
 ok(str_contains($agent,"'type'=>'builder_fill'"),'Agent emits personalized fill action');
 ok(str_contains($agent,"'type'=>'builder_dedupe'")&&str_contains($agent,"'type'=>'builder_save'"),'Agent emits dedupe/save actions');
-ok(str_contains($app,"case'builder_move_track'")&&str_contains($app,"case'builder_fill'"),'client executes Agent move/fill');
-ok(str_contains($app,"case'builder_dedupe'")&&str_contains($app,"case'builder_save'"),'client executes Agent dedupe/save');
+ok(preg_match("/case\s*'builder_move_track'/",$app)&&preg_match("/case\s*'builder_fill'/",$app),'client executes Agent move/fill');
+ok(preg_match("/case\s*'builder_dedupe'/",$app)&&preg_match("/case\s*'builder_save'/",$app),'client executes Agent dedupe/save');
 ok(str_contains($agent,"builder_side_a_seconds")&&str_contains($agent,"builder_limit_seconds"),'Agent receives builder timing state');
 
 ok(!preg_match('/(?<!\\$)\\$\\([^\\n)]*\\)\\.forEach/',$app),'no list controls call forEach on the single-element selector helper');

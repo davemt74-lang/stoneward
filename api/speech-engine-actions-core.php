@@ -57,6 +57,13 @@ function sf_speech_queue_action(int $userId,string $conversationId,array $reply,
     $q->execute([$userId,$conversationId,$now]);
     if((int)$q->fetchColumn()>=5)return false;
     $envelope=['action'=>$action,'message'=>substr($message,0,4000)];
+    // Voice actions use the same owner-scoped conversation receipt as typed
+    // chat. The browser adds a result only after its player adapter finishes.
+    $receiptId=(int)($reply['action_receipt_id']??0);
+    $receiptConversation=(string)($reply['conversation_id']??'');
+    if($receiptId>0&&preg_match('/^[A-Za-z0-9_-]{12,80}$/D',$receiptConversation)){
+        $envelope['receipt']=['conversation_id'=>$receiptConversation,'message_id'=>$receiptId,'action_type'=>$action['type']];
+    }
     if(is_array($reply['audio_resolution']??null)){
         $receipt=$reply['audio_resolution'];$envelope['audio_resolution']=[
             'method'=>substr((string)($receipt['method']??''),0,32),

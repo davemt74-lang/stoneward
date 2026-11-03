@@ -4,7 +4,7 @@
   if(!ctx)return;
   const {app,api,canvas,head,say,esc,openView,openCatalogTrack,reloadCore}=ctx;
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const state={assets:[],category:'',query:'',trackId:'',trackLinks:[],publication:null,capabilities:{},completeness:{},dashboard:{},entityConfigs:new Map()};
+  const state={assets:[],category:'',query:'',aiOnly:false,trackId:'',trackLinks:[],publication:null,capabilities:{},completeness:{},dashboard:{},entityConfigs:new Map(),health:null,healthBusy:false,healthStatus:''};
   const roles={
     audio_candidate:{label:'Audio',category:'audio',accept:'.mp3,.wav,audio/mpeg,audio/wav',multiple:true},
     alternate_audio:{label:'Alternate audio',category:'audio',accept:'.mp3,.wav,audio/mpeg,audio/wav',multiple:true},
@@ -56,24 +56,91 @@
       issue('Songs missing audio',m.track_audio,'catalog')+issue('Songs missing artwork',m.track_artwork,'catalog')+issue('Releases missing cover',m.release_cover,'releases')+issue('Shows missing poster',m.show_poster,'shows')+issue('Campaigns missing hero',m.campaign_hero,'campaigns')+issue('Store products missing media',m.store_media,'media')+issue('Broken stored assets',d.broken_assets,'media')+issue('Public/private mismatches',d.public_private_mismatch,'media')+
       '</div><div class="media-site-gaps"><strong>Site media still missing:</strong> '+((m.site_roles||[]).length?(m.site_roles||[]).map(x=>'<span>'+esc(String(x).replaceAll('_',' '))+'</span>').join(''):'<span>none</span>')+'</div></section>';
   }
+  const healthStatusLabel={ready:'Ready',legacy_ready:'Legacy file found',no_audio:'No audio reference',reference_missing:'Missing media record',missing_file:'File missing',storage_unavailable:'Storage unavailable',unsafe_path:'Unsafe storage path',unreadable_file:'Empty or unreadable file',empty_file:'Empty file',size_mismatch:'File size mismatch',unpublished_link:'Public media link missing',legacy_missing:'Legacy file missing',external_unverified:'External URL · unverified',invalid_url:'Invalid audio URL',preview_shorter_than_master:'Public preview shorter than private original'};
+  function mediaHealthHtml(){
+    const report=state.health,summary=report?.summary||{},problem=report?.tracks?.filter(t=>t.public&&!['ready','legacy_ready'].includes(t.status))||[];
+    const action='<button class="secondary" type="button" data-health-scan '+(state.healthBusy?'disabled':'')+'>'+(state.healthBusy?'Checking server files…':report?'Re-run audit':'Run media audit')+'</button>';
+    return '<section class="panel media-health" id="mediaHealthPanel"><div class="panel-title"><div><div class="eyebrow">91B17H · STORAGE &amp; PLAYER</div><h2>Media Health</h2><p>Checks this server’s song references and managed media files. Nothing is repaired automatically.</p></div>'+action+'</div>'+
+      (state.healthStatus?'<p class="media-health-message" role="status">'+esc(state.healthStatus)+'</p>':'')+
+      (!report?'<div class="notice">Run a read-only audit to see missing audio, unpublished links, invalid paths and eligible recovery files.</div>':
+      '<div class="media-health-stats"><span><strong>'+Number(summary.ready_public_tracks||0)+'</strong> ready public songs</span><span><strong>'+Number(summary.public_issues||0)+'</strong> audio issues</span><span><strong>'+Number(summary.broken_assets||0)+'</strong> broken managed files</span><span><strong>'+Number(summary.candidate_audio||0)+'</strong> available recovery assets</span></div>'+
+      (summary.truncated?'<p class="notice">Audit limit reached. Only '+Number(summary.checked_tracks)+' songs and '+Number(summary.checked_assets)+' assets were checked; review the remainder separately.</p>':'')+
+      '<p class="hint">Checked '+Number(summary.checked_tracks)+' song records and '+Number(summary.checked_assets)+' managed assets · '+esc(report.audited_at||'')+'. External URLs are not fetched or assumed broken.</p>'+
+      (problem.length?'<div class="media-health-issues">'+problem.map(t=>'<div class="media-health-issue"><div><strong>'+esc(t.title)+'</strong><small>'+esc(t.id)+' · '+esc(healthStatusLabel[t.status]||t.status)+'</small><code title="Current audio reference">'+esc(t.audio||'No audio reference')+'</code></div>'+(t.can_relink?'<button type="button" class="secondary" data-health-relink="'+esc(t.id)+'" '+(!report.candidates?.length?'disabled':'')+'>Relink existing file</button>':'<span class="media-health-passive">Inspect external source</span>')+'</div>').join('')+'</div>':'<div class="media-health-ok">No public song reference issues detected in the checked catalog.</div>')+
+      ((report.broken_assets||[]).length?'<details class="media-health-broken"><summary>Managed files needing attention ('+report.broken_assets.length+')</summary><div>'+report.broken_assets.slice(0,100).map(a=>'<p><strong>'+esc(a.name)+'</strong> · '+esc(a.category)+' · '+esc(healthStatusLabel[a.status]||a.status)+'<small>'+esc(a.stored_path)+'</small></p>').join('')+'</div></details>':''))+'</section>';
+  }
+  function bindMediaHealth(){
+    const panel=$('#mediaHealthPanel',canvas);if(!panel)return;
+    const scan=$('[data-health-scan]',panel);if(scan)scan.onclick=runMediaHealth;
+    $$('[data-health-relink]',panel).forEach(button=>button.onclick=()=>{
+      const row=state.health?.tracks?.find(t=>t.id===button.dataset.healthRelink);
+      if(row&&row.can_relink)openMediaHealthRelink(row);
+    });
+  }
+  function updateMediaHealth(){const panel=$('#mediaHealthPanel',canvas);if(panel){panel.outerHTML=mediaHealthHtml();bindMediaHealth()}}
+  async function runMediaHealth(){
+    if(state.healthBusy)return;
+    state.healthBusy=true;state.healthStatus='';updateMediaHealth();
+    try{state.health=await api('media-health.php')}
+    catch(error){state.healthStatus='Media audit could not run: '+(error.message||'Unknown error')}
+    finally{state.healthBusy=false;updateMediaHealth()}
+  }
+  function openMediaHealthRelink(track){
+    const candidates=state.health?.candidates||[];
+    if(!track.can_relink||!candidates.length)return;
+    const overlay=document.createElement('div');overlay.className='media-modal media-health-modal';
+    overlay.innerHTML='<div class="media-modal-card" role="dialog" aria-modal="true" aria-label="Relink song audio"><div class="panel-title"><div><div class="eyebrow">MEDIA HEALTH · MANUAL RECOVERY</div><h2>Relink '+esc(track.title)+'</h2><p>'+esc(healthStatusLabel[track.status]||track.status)+'</p></div><button class="secondary" type="button" data-health-close>✕ Close</button></div>'+
+      '<p class="notice">This changes the PUBLIC listening audio for this published song. The song ID, catalog metadata, play history, existing assets and older attachments are preserved. Private source masters are not eligible.</p>'+
+      '<form data-health-form><label class="field">Choose an existing, verified audio file<select name="asset_id" required><option value="">Select a server file…</option>'+candidates.map(a=>'<option value="'+Number(a.id)+'">'+esc(a.title)+' · '+esc(a.original_name)+' · '+fmtBytes(a.size_bytes)+'</option>').join('')+'</select></label>'+
+      '<label class="check-field"><input type="checkbox" name="confirmed" required> I confirm this is the correct public audio for '+esc(track.title)+'.</label>'+
+      '<div class="actions"><button class="primary" type="submit">Confirm relink</button><button class="secondary" type="button" data-health-close>Cancel</button></div><p class="status-line" role="status" data-health-result></p></form></div>';
+    document.body.appendChild(overlay);
+    $$('[data-health-close]',overlay).forEach(button=>button.onclick=()=>overlay.remove());
+    const form=$('[data-health-form]',overlay);form.onsubmit=async event=>{
+      event.preventDefault();const assetId=Number(form.elements.asset_id.value),submit=form.querySelector('[type="submit"]'),status=$('[data-health-result]',form);
+      if(!form.elements.confirmed.checked||!candidates.some(a=>Number(a.id)===assetId))return;
+      submit.disabled=true;status.textContent='Verifying and relinking the selected server file…';
+      try{
+        await api('media-health.php',{action:'relink_track_audio',track_id:track.id,asset_id:assetId,expected_audio:track.audio,confirmed:true});
+        overlay.remove();await reloadCore();await runMediaHealth();
+        state.healthStatus='Relinked '+track.title+'. The previous reference and media asset were preserved.';updateMediaHealth();
+        say('Public song audio relinked. Existing song identity and media history preserved.');
+      }catch(error){status.textContent=error.message||'Relink failed. No successful change was confirmed.';submit.disabled=false}
+    };
+  }
   function storeMediaHtml(products){
     if(!products?.length)return'';
     return '<section class="panel"><div class="panel-title"><div><h2>Store product media</h2><p>Attach reusable product imagery without editing store configuration files.</p></div></div><div class="media-store-grid">'+products.map(p=>'<button type="button" class="media-store-card" data-store-media="'+esc(p.id)+'" data-store-label="'+esc(p.label)+'"><strong>'+esc(p.label)+'</strong><span>'+esc((p.format||'product').toUpperCase())+'</span><small>Manage imagery</small></button>').join('')+'</div></section>';
   }
   async function renderMediaLibrary(){
     try{await loadAssets(state.category,state.query);state.dashboard=await api('media.php?mode=dashboard');state.completeness=state.dashboard.completeness||state.completeness}catch(e){canvas.innerHTML=head('MEDIA LIBRARY','Unavailable',e.message);return}
-    const rows=state.assets,counts={audio:0,image:0,video:0,document:0};rows.forEach(a=>{counts[a.category]=(counts[a.category]||0)+1});const d=state.completeness||{};
-    canvas.innerHTML=head('ASSET MANAGEMENT','Media Library','One reusable asset system for songs, releases, shows, campaigns, store products and the public site.','<button class="primary" id="mediaUploadLibrary" type="button">Upload media</button>')+
+    const rows=state.aiOnly?state.assets.filter(a=>a.technical?.source==='openai_image_generation'):state.assets,counts={audio:0,image:0,video:0,document:0};rows.forEach(a=>{counts[a.category]=(counts[a.category]||0)+1});const d=state.completeness||{};
+    canvas.innerHTML=head('ASSET MANAGEMENT','Media Library','One reusable asset system for songs, releases, shows, campaigns, store products and the public site.','<button class="secondary" id="mediaOpenImageStudio" type="button">Create with AI</button> <button class="primary" id="mediaUploadLibrary" type="button">Upload media</button>')+
       '<div class="stats media-stats"><div class="stat"><strong>'+Number(d.assets||rows.length)+'</strong><span>Total assets</span></div><div class="stat"><strong>'+fmtBytes(d.storage_bytes||0)+'</strong><span>Managed storage</span></div><div class="stat"><strong>'+Number(d.unused_assets||0)+'</strong><span>Unused</span></div><div class="stat"><strong>'+(state.capabilities.ffprobe?'FFprobe':'Built-in')+'</strong><span>Audio analyzer</span></div></div><div class="notice media-capability-note">Audio metadata: '+(state.capabilities.ffprobe?'FFprobe available; built-in MP3/WAV fallback also enabled.':'built-in MP3 frame/ID3 and WAV RIFF parser active.')+' Image derivatives: '+(state.capabilities.gd?'enabled via GD.':'original-only; GD is unavailable.')+' Effective upload ceiling: '+esc(state.capabilities.upload_max_label||'server-defined')+'.</div>'+
-      completenessHtml()+storeMediaHtml(state.dashboard.store_products||[])+'<section class="panel" id="videoHubPanel"><div class="empty compact">Loading Public Video Hub…</div></section><section class="panel" id="photoGalleriesPanel"><div class="empty compact">Loading Photo Galleries…</div></section>'+
-      '<section class="panel"><div class="panel-title"><div><h2>Asset library</h2><p>Search, inspect usage, edit metadata and remove unused files.</p></div></div><div class="toolbar media-toolbar"><input id="mediaSearch" type="search" placeholder="Search filename, title or caption" value="'+esc(state.query)+'"><div class="media-filters">'+['','audio','image','video','document'].map(k=>'<button type="button" data-media-category="'+k+'" class="'+(state.category===k?'active':'')+'">'+(k||'all')+'</button>').join('')+'</div></div><div id="mediaLibraryGrid" class="media-library-grid">'+(rows.length?rows.map(assetCard).join(''):'<div class="empty">No media assets match this filter.</div>')+'</div></section>';
-    $('#mediaUploadLibrary').onclick=()=>pickUploadFiles('', '', '');
+      completenessHtml()+mediaHealthHtml()+storeMediaHtml(state.dashboard.store_products||[])+'<section class="panel" id="videoHubPanel"><div class="empty compact">Loading Public Video Hub…</div></section><section class="panel" id="photoGalleriesPanel"><div class="empty compact">Loading Photo Galleries…</div></section>'+
+      '<section class="panel"><div class="panel-title"><div><h2>Asset library</h2><p>Search, inspect usage, edit metadata and remove unused files. Generated images remain private until approved in Image Studio.</p></div></div><div class="toolbar media-toolbar"><input id="mediaSearch" type="search" placeholder="Search filename, title or caption" value="'+esc(state.query)+'"><div class="media-filters">'+['','audio','image','video','document'].map(k=>'<button type="button" data-media-category="'+k+'" class="'+(state.category===k?'active':'')+'">'+(k||'all')+'</button>').join('')+'<button type="button" id="mediaGeneratedOnly" class="'+(state.aiOnly?'active':'')+'">AI generated</button></div></div><div id="mediaLibraryGrid" class="media-library-grid">'+(rows.length?rows.map(assetCard).join(''):'<div class="empty">No media assets match this filter.</div>')+'</div></section>';
+    $('#mediaUploadLibrary').onclick=()=>pickUploadFiles('', '', '');bindMediaHealth();
+    $('#mediaOpenImageStudio').onclick=()=>openView('image-generation');
+    $('#mediaGeneratedOnly').onclick=()=>{state.aiOnly=!state.aiOnly;if(state.aiOnly)state.category='image';renderMediaLibrary()};
     $('#mediaSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();state.query=e.currentTarget.value.trim();renderMediaLibrary()}};
     $$('[data-media-category]',canvas).forEach(b=>b.onclick=()=>{state.category=b.dataset.mediaCategory;renderMediaLibrary()});
     $$('[data-media-edit]',canvas).forEach(b=>b.onclick=()=>editAsset(Number(b.dataset.mediaEdit)));
     $$('[data-media-add-catalog]',canvas).forEach(b=>b.onclick=()=>addCatalogAsset(Number(b.dataset.mediaAddCatalog)));
     $$('[data-media-open-catalog]',canvas).forEach(b=>b.onclick=()=>openCatalogTrack(b.dataset.mediaOpenCatalog));
     $$('[data-media-delete]',canvas).forEach(b=>b.onclick=()=>deleteAsset(Number(b.dataset.mediaDelete)));
+    $$('[data-media-preview-ai]',canvas).forEach(b=>b.onclick=()=>window.SFImageGenerationAdmin?.previewByJobId?.(Number(b.dataset.mediaPreviewAi)));
+    $$('[data-media-vary]',canvas).forEach(b=>b.onclick=async()=>{
+      const a=state.assets.find(x=>Number(x.id)===Number(b.dataset.mediaVary));if(!a)return;
+      try{
+        const available=await api('image-generation.php');
+        if(!(available.references||[]).some(x=>Number(x.id)===Number(a.id))){
+          alert('This image is not currently eligible as a reference. Approve generated images in AI Image Studio first, or choose an eligible image from the reference picker.');
+          return;
+        }
+      }catch(err){alert('Could not verify permission to reuse this reference image: '+err.message);return}
+      window.SFImageGenerationAdmin?.openWithDraft?.({preset_slug:'artist_world',reference_asset_id:Number(a.id),
+        concept:'Create a new Stonefellow image variation using '+(a.title||a.original_name)+' as an authorized visual reference. Preserve its recognizable visual identity while adjusting the scene, lighting and composition. No overlaid text.'});
+    });
     $$('[data-media-jump]',canvas).forEach(b=>b.onclick=()=>openView(b.dataset.mediaJump));
     $$('[data-store-media]',canvas).forEach(b=>b.onclick=()=>openEntityManager('store',b.dataset.storeMedia,b.dataset.storeLabel,{roles:['product_primary','product_gallery'],publishRoles:['product_primary']}));window.SFVideoAdmin?.renderInto?.('videoHubPanel');window.SFPhotoGalleriesAdmin?.renderInto?.('photoGalleriesPanel');
   }
@@ -90,7 +157,7 @@
     const existing=audio?(app.catalog||[]).find(t=>Number(t.media_primary_asset||0)===Number(a.id)||Number(t.media_private_master_asset||0)===Number(a.id)||(t.audio||'').includes('api/media.php?id='+a.uuid)):null;
     const catalogAction=audio?(existing?'<button class="secondary" type="button" data-media-open-catalog="'+esc(existing.id)+'">In Catalog</button>':
       '<button class="primary media-add-catalog-btn" type="button" data-media-add-catalog="'+a.id+'">Add to Catalog</button>'):'';
-    return '<article class="media-asset-card" data-asset-id="'+a.id+'"><div class="media-asset-preview">'+assetPreview(a)+'</div><div class="media-asset-main"><div class="media-asset-kicker">'+esc(String(a.category||'media').toUpperCase())+' · '+esc(sourceLabel(a))+'</div><strong>'+esc(a.title||a.original_name)+'</strong><small>'+esc(a.original_name)+'</small><p>'+esc(technicalLine(a))+'</p>'+(tags.artist||tags.album?'<p>'+esc([tags.artist,tags.album].filter(Boolean).join(' · '))+'</p>':'')+'<div class="media-asset-foot"><span>'+fmtBytes(a.size_bytes)+'</span><span>'+Number(a.link_count||0)+' use'+(Number(a.link_count||0)===1?'':'s')+'</span></div></div><div class="media-asset-actions">'+catalogAction+'<button class="secondary" type="button" data-media-edit="'+a.id+'">Edit</button>'+(Number(a.link_count||0)===0?'<button class="danger" type="button" data-media-delete="'+a.id+'">Delete</button>':'')+'</div></article>';
+    return '<article class="media-asset-card" data-asset-id="'+a.id+'"><div class="media-asset-preview">'+assetPreview(a)+'</div><div class="media-asset-main"><div class="media-asset-kicker">'+esc(String(a.category||'media').toUpperCase())+' · '+esc(sourceLabel(a))+'</div><strong>'+esc(a.title||a.original_name)+'</strong><small>'+esc(a.original_name)+'</small><p>'+esc(technicalLine(a))+'</p>'+(a.technical?.source==='openai_image_generation'?'<p class="hint">Generated image · approval managed in AI Image Studio · job #'+Number(a.technical.image_job_id||0)+'</p>':'')+(tags.artist||tags.album?'<p>'+esc([tags.artist,tags.album].filter(Boolean).join(' · '))+'</p>':'')+'<div class="media-asset-foot"><span>'+fmtBytes(a.size_bytes)+'</span><span>'+Number(a.link_count||0)+' use'+(Number(a.link_count||0)===1?'':'s')+'</span></div></div><div class="media-asset-actions">'+catalogAction+(a.category==='image'&&['image/png','image/jpeg','image/webp'].includes(a.mime_type)&&Number(a.size_bytes)<=10*1024*1024?'<button class="secondary" type="button" data-media-vary="'+Number(a.id)+'">Create variation</button>':'')+(a.technical?.source==='openai_image_generation'&&Number(a.technical.image_job_id||0)>0?'<button class="secondary" type="button" data-media-preview-ai="'+Number(a.technical.image_job_id)+'">Preview placements</button>':'')+'<button class="secondary" type="button" data-media-edit="'+a.id+'">Edit</button>'+(Number(a.link_count||0)===0?'<button class="danger" type="button" data-media-delete="'+a.id+'">Delete</button>':'')+'</div></article>';
   }
   async function addCatalogAsset(id){
     const asset=state.assets.find(a=>Number(a.id)===id);
@@ -180,9 +247,12 @@
   }
   async function deleteAsset(id){if(!confirm('Permanently delete this unused media asset and its stored file?'))return;try{await api('media.php',{action:'delete_asset',id});say('Media asset deleted.');renderMediaLibrary()}catch(e){alert(e.message)}}
 
-  function trackSection(){return '<div class="track-media-toolbar"><button class="primary" type="button" data-track-media-upload="audio_candidate">Upload audio</button><button class="secondary" type="button" id="trackReplaceSourceAudio">Replace source audio</button><button class="secondary" type="button" data-track-media-upload="artwork">Upload artwork</button><button class="secondary" type="button" data-track-media-upload="photo">Upload photos</button><button class="secondary" type="button" data-track-media-upload="video">Upload video</button><button class="secondary" type="button" data-track-media-upload="document">Upload documents</button><button class="secondary" type="button" data-track-media-upload="archive">Upload archive media</button><button class="secondary" type="button" id="trackMediaChoose">Choose from Library</button></div><div class="media-publishing-hint">Use separate Media Library files for the public preview and the private purchased original. Your existing uploader and media attachments are used.</div><div id="trackMasterHistory" class="track-master-history"></div><div id="trackPublicationStatus" class="media-publication-status" role="status"></div><div id="trackMediaStatus" class="status-line"></div><div id="trackMediaGroups" class="track-media-groups"><div class="empty compact">Loading attached media…</div></div>'}
+  function trackSection(){return '<div class="track-media-toolbar"><button class="primary" type="button" data-track-media-upload="audio_candidate">Upload audio</button><button class="secondary" type="button" id="trackReplaceSourceAudio">Replace source audio</button><button class="secondary" type="button" data-track-media-upload="artwork">Upload artwork</button><button class="secondary" type="button" id="trackCreateAiArtwork">Create artwork with AI</button><button class="secondary" type="button" data-track-media-upload="photo">Upload photos</button><button class="secondary" type="button" data-track-media-upload="video">Upload video</button><button class="secondary" type="button" data-track-media-upload="document">Upload documents</button><button class="secondary" type="button" data-track-media-upload="archive">Upload archive media</button><button class="secondary" type="button" id="trackMediaChoose">Choose from Library</button></div><div class="media-publishing-hint">Use separate Media Library files for the public preview and the private purchased original. Your existing uploader and media attachments are used.</div><div id="trackMasterHistory" class="track-master-history"></div><div id="trackPublicationStatus" class="media-publication-status" role="status"></div><div id="trackMediaStatus" class="status-line"></div><div id="trackMediaGroups" class="track-media-groups"><div class="empty compact">Loading attached media…</div></div>'}
   async function bindTrackMedia(trackId){
-    state.trackId=trackId;$$('[data-track-media-upload]',canvas).forEach(b=>b.onclick=()=>pickUploadFiles('track',trackId,b.dataset.trackMediaUpload));const choose=$('#trackMediaChoose',canvas);if(choose)choose.onclick=()=>chooseExisting('track',trackId,'archive');const replace=$('#trackReplaceSourceAudio',canvas);if(replace)replace.onclick=()=>replaceSourceAudio(trackId);await refreshTrackMedia(trackId);
+    state.trackId=trackId;$$('[data-track-media-upload]',canvas).forEach(b=>b.onclick=()=>pickUploadFiles('track',trackId,b.dataset.trackMediaUpload));const choose=$('#trackMediaChoose',canvas);if(choose)choose.onclick=()=>chooseExisting('track',trackId,'archive');const replace=$('#trackReplaceSourceAudio',canvas);if(replace)replace.onclick=()=>replaceSourceAudio(trackId);
+    const ai=$('#trackCreateAiArtwork',canvas);if(ai)ai.onclick=()=>{const t=(app.catalog||[]).find(x=>String(x.id)===String(trackId));
+      window.SFImageGenerationAdmin?.openWithDraft?.({preset_slug:'album_cover',concept:'Create a cinematic song artwork concept for '+(t?.title||'this track')+'. Preserve a cohesive Stonefellow artist-world visual identity. No typography or interface overlays.'});};
+    await refreshTrackMedia(trackId);
   }
   async function refreshTrackMedia(trackId){
     try{const j=await api('media.php?entity_type=track&entity_id='+encodeURIComponent(trackId));state.trackLinks=j.links||[];state.publication=j.publication||{};state.capabilities=j.capabilities||state.capabilities;renderTrackGroups(trackId)}catch(e){const s=$('#trackMediaStatus',canvas);if(s)s.textContent=e.message}
@@ -283,12 +353,17 @@
   function entitySection(entityType,entityId,config={}){
     if(!entityId)return '<div class="notice">Save this '+esc(entityType)+' first, then its reusable Media Library controls will appear here.</div>';
     const roleList=config.roles||['photo','video','document','archive'];const key=entityType+':'+entityId;
-    return '<div class="universal-media" data-universal-media="'+esc(key)+'"><div class="track-media-toolbar">'+roleList.map((role,i)=>'<button class="'+(i===0?'primary':'secondary')+'" type="button" data-entity-media-upload="'+esc(role)+'">Upload '+esc(roleLabel(role))+'</button>').join('')+'<button class="secondary" type="button" data-entity-media-choose>Choose from Library</button></div><div class="status-line" data-entity-media-status></div><div class="track-media-groups" data-entity-media-host><div class="empty compact">Loading attached media…</div></div></div>';
+    return '<div class="universal-media" data-universal-media="'+esc(key)+'"><div class="track-media-toolbar">'+roleList.map((role,i)=>'<button class="'+(i===0?'primary':'secondary')+'" type="button" data-entity-media-upload="'+esc(role)+'">Upload '+esc(roleLabel(role))+'</button>').join('')+'<button class="secondary" type="button" data-entity-media-choose>Choose from Library</button><button class="secondary" type="button" data-entity-media-ai>Create with AI</button></div><div class="status-line" data-entity-media-status></div><div class="track-media-groups" data-entity-media-host><div class="empty compact">Loading attached media…</div></div></div>';
   }
   async function bindEntityMedia(entityType,entityId,config={},root=canvas){
     if(!entityId)return;const key=entityType+':'+entityId;state.entityConfigs.set(key,{...config,root});
     $$('[data-universal-media="'+CSS.escape(key)+'"] [data-entity-media-upload]',root).forEach(b=>b.onclick=()=>pickUploadFiles(entityType,entityId,b.dataset.entityMediaUpload,()=>refreshEntityMedia(entityType,entityId)));
     const choose=$('[data-universal-media="'+CSS.escape(key)+'"] [data-entity-media-choose]',root);if(choose)choose.onclick=()=>chooseExisting(entityType,entityId,(config.roles||['archive'])[0],config.roles||null,()=>refreshEntityMedia(entityType,entityId));
+    const ai=$('[data-universal-media="'+CSS.escape(key)+'"] [data-entity-media-ai]',root);if(ai)ai.onclick=()=>{
+      ai.closest('.media-modal')?.remove();
+      const preset=['site','campaign'].includes(entityType)?'site_hero':entityType==='story_entry'?'song_moment':entityType==='store'?'merch_art':'album_cover';
+      window.SFImageGenerationAdmin?.openWithDraft?.({preset_slug:preset,concept:'Create an original visual concept for '+entityType.replaceAll('_',' ')+' '+entityId+'. Use a cinematic Stonefellow aesthetic. No typography unless explicitly requested.'});
+    };
     await refreshEntityMedia(entityType,entityId);
   }
   async function refreshEntityMedia(entityType,entityId){

@@ -27,6 +27,7 @@ require_once __DIR__.'/story-director-core.php';
 require_once __DIR__.'/story-agent-brain-bridge.php';
 require_once __DIR__.'/agent-navigation.php';
 require_once __DIR__.'/agent-admin-llm-router.php';
+require_once __DIR__.'/image-studio-presets.php';
 /**
  * Administrator Agent Brain. A separate operational scope, NEVER a fan memory
  * or conversation table. Every read/write uses the authenticated Admin ID.
@@ -163,7 +164,8 @@ function sf_admin_agent_module_routes(): array {
       'products_manager'=>['view'=>'products','label'=>'Merch + Products','pattern'=>'/\b(?:merchandise|merch products?|product catalog|store products?)\b/i','reply'=>'I can open Merch & Products to review listings, variations, pricing and stock before any customer-facing changes.'],
       'ticketing_manager'=>['view'=>'ticketing','label'=>'Tickets + VIP','pattern'=>'/\b(?:ticketing|ticket offers?|vip reservations?|guest lists?|rsvp)\b/i','reply'=>'I can open ticketing and VIP offers to inspect capacities, guest lists and reservations. Confirmed changes use the ticketing workflow.'],
       'membership_manager'=>['view'=>'membership','label'=>'Membership + VIP','pattern'=>'/\b(?:memberships?|vip benefits?|member content)\b/i','reply'=>'I can open Membership & VIP to review levels, benefits and member-facing content.'],
-      'account_manager'=>['view'=>'users','label'=>'Users + Tokens','pattern'=>'/\b(?:user accounts?|manage users?|token grants?|active tokens?|user permissions?)\b/i','reply'=>'I can open Users & Tokens to inspect accounts, roles and token grants. Account and permission changes remain protected by the existing administrator controls.'],
+      'create_user'=>['view'=>'user-create','label'=>'Create User','pattern'=>'/\b(?:create|add|invite|register)\b.{0,45}\b(?:new )?(?:user|account)\b/i','reply'=>'I can open Create User so you can enter their email, role, package and complimentary tokens. The administrator must review and submit the account; no user was created by this conversation.'],
+      'account_manager'=>['view'=>'users','label'=>'Manage Users','pattern'=>'/\b(?:user accounts?|manage users?|token grants?|active tokens?|user permissions?|tokens? (?:has|for|by) (?:someone|a user|[a-z]+))\b/i','reply'=>'I can open Manage Users to inspect accounts, roles and token grants. Search for the specific account before viewing its individual usage. Changes remain protected by administrator controls.'],
       'team_manager'=>['view'=>'team','label'=>'Team Workspace','pattern'=>'/\b(?:team workspace|team members?|role assignments?|staff permissions?)\b/i','reply'=>'I can open Team Workspace to review assignments and permissions. I will use the signed-in administrator’s authority for protected edits.'],
       'ai_settings'=>['view'=>'ai','label'=>'AI Providers','pattern'=>'/\b(?:ai providers?|llm settings?|openai settings?|claude settings?|elevenlabs settings?|voice provider settings?)\b/i','reply'=>'I can open AI Providers to review the configured model, voice and routing settings. Provider credentials stay server-side and are never included in model replies.'],
       'site_settings'=>['view'=>'settings','label'=>'Site Settings','pattern'=>'/\b(?:site settings?|website settings?|homepage settings?|appearance settings?)\b/i','reply'=>'I can open Site Settings to adjust Stonefellow’s branding, homepage and site preferences through the normal reviewed controls.'],
@@ -176,6 +178,12 @@ function sf_admin_agent_module_routes(): array {
 }
 function sf_admin_agent_plan(string $message): array {
     $m=strtolower(trim($message));$type='research';$view='brain';
+    // Aggregate token reporting is a server-local authenticated read. Named
+    // account questions require opening Manage Users for exact identification.
+    if(preg_match('/\b(?:how many|count|total|summary|report|overview|usage|consumed|spent|low balance)\b/i',$message)
+        && preg_match('/\b(?:tokens?|credits?|ai usage)\b/i',$message)
+        && !preg_match('/\b(?:for|by|has|did)\s+(?!all\b|the\b|users?\b|this\b|last\b)[a-z][a-z0-9._%+-]*/i',$message))
+        return ['type'=>'user_usage_summary_read','view'=>'users','requires_confirmation'=>false,'execution'=>'authenticated_read'];
     // Preserve existing exact-review campaign and journey contracts even when
     // a sentence also mentions an album, song, release or another module.
     if(preg_match('/\b(draft|create|prepare|build)\b.*\b(newsletter|campaign|discount|vip|offer)\b|\b(newsletter|campaign)\b.*\b(draft|create|prepare|build)\b/',$m))
@@ -377,6 +385,17 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
     $threadId=sf_admin_agent_thread($adminId,$threadId);
     $prior=sf_admin_agent_thread_messages($adminId,$threadId);
     sf_admin_agent_save_message($adminId,$threadId,'user',$message);
+    // An image request in chat produces a local, editable handoff only. It
+    // never invokes the paid image endpoint or saves an approved prompt.
+    $imageDraft=sf_image_studio_chat_handoff($message);
+    if($imageDraft!==null){
+        $text='I prepared a visual brief for AI Image Studio. Open it to review the preset and prompt. Saving, approving and generating are separate administrator actions; no image was generated or charged here.';
+        $action=['type'=>'image_prompt_draft','view'=>'image-generation',
+            'requires_confirmation'=>true,'draft'=>$imageDraft];
+        sf_admin_agent_save_message($adminId,$threadId,'assistant',$text,$action);
+        return ['conversation_id'=>$threadId,'text'=>$text,'action'=>$action,
+            'brain'=>['scope'=>'admin','owner_id'=>$adminId,'tool_decision'=>'image_prompt_draft','status'=>'proposal_only']];
+    }
     $catalogTitle=sf_agent_admin_catalog_editor_request($message);
     if($catalogTitle!==null){
         $matches=sf_agent_exact_title_matches($catalogTitle,sf_catalog());
@@ -425,6 +444,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
     if($missionPlan!==null){$missionPlan=sf_agent_mission_apply_admin_facts($missionPlan,$context);
         $missionPlan=sf_agent_mission_plan_save('admin',$adminId,$threadId,$message,$missionPlan);}
     $types=[
+      'user_usage_summary_read'=>'User and AI token usage overview is unavailable. No account was changed.',
       'catalog_inventory_read'=>'Private catalog inventory is unavailable; no changes made.',
       'release_inventory_read'=>'Private releases inventory is unavailable; no changes made.',
       'shows_inventory_read'=>'Private live-show inventory is unavailable; no changes made.',
@@ -474,6 +494,14 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
             $commerceRead=sf_admin_agent_commerce_read($plan['type']);
             $text=$commerceRead['brief'];
         }catch(Throwable $e){/* Never claim a missing or unauthorized read succeeded. */}
+    }
+    if($plan['type']==='user_usage_summary_read'){
+        try{
+            $contract=sf_agent_orchestration_contract('admin','user_usage_summary_read');
+            if(!$contract['may_read_or_navigate'])throw new RuntimeException('User usage reporting is not authorized.');
+            $read=sf_admin_user_usage_report(30);
+            $text=sf_agent_admin_user_usage_brief($read);
+        }catch(Throwable $e){$text='User and AI token usage overview is unavailable. No account was changed.';}
     }
     if($plan['type']==='catalog_inventory_read'){
         try{$read=sf_agent_admin_catalog_read(sf_catalog(),sf_agent_admin_catalog_filter($message));
@@ -877,7 +905,7 @@ function sf_admin_agent_reply(int $adminId,string $threadId,string $message,arra
         if($research!==null)$text=$research;
     }
     $action=['type'=>$plan['type'],'view'=>$plan['view'],'requires_confirmation'=>$contract['requires_exact_approval'],'tool_contract'=>$contract,'mission_plan'=>$missionPlan,'insights'=>$brief];
-    if(in_array($plan['type'],['catalog_inventory_read','release_inventory_read','shows_inventory_read','knowledge_inventory_read','media_inventory_read','media_attachment_read'],true) && !empty($read))$action['read_evidence']=$read;
+    if(in_array($plan['type'],['user_usage_summary_read','catalog_inventory_read','release_inventory_read','shows_inventory_read','knowledge_inventory_read','media_inventory_read','media_attachment_read'],true) && !empty($read))$action['read_evidence']=$read;
     if(!empty($commerceRead))$action['read_evidence']=$commerceRead;
     $navigation=sf_agent_admin_page_target($message);
     if($navigation!==null && $navigation['view']===$plan['view'] &&

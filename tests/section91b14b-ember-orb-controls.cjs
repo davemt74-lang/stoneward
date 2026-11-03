@@ -56,7 +56,7 @@ check('Old drag hint and redundant footer transcript row are gone from Agent Can
 check('Two song actions are now icon-only and sit above the orb',()=>{
   assert.match(canvas,/class="sf-agent-orbit-tools"/);
   assert.match(canvas,/data-orbit-action="listen"[^>]*data-tip="Listen &amp; Interpret"/);
-  assert.match(canvas,/data-orbit-action="record"[^>]*data-tip="Record Clip"/);
+  assert.match(canvas,/data-orbit-action="record"[^>]*data-tip="Record Studio"/);
   assert.match(canvas,/data-orbit-action="stop"[^>]*data-tip="Stop listening"/);
   assert.ok(canvas.indexOf('class="sf-agent-orbit-tools"')<canvas.indexOf('class="sf-agent-sphere"'));
   assert.match(canvas,/function positionOrbitTools\(\)/);
@@ -103,7 +103,7 @@ check('Stonefellow introduces itself by name once through the existing echo-safe
   const runtime=read('api/agent-runtime.php');
   assert.match(runtime,/You are Stonefellow, the music-site conversational agent/);
   assert.match(runtime,/Do not repeat the introduction in ordinary follow-up replies/);
-  assert.match(app,/const greeting='Hi, I’m Stonefellow\. What would you like to explore\?'/);
+  assert.match(app,/const greeting=welcomeGreeting/);
   assert.match(app,/if\(voiceGreetingDelivered\|\|!voiceRepliesEnabled/);
   assert.match(app,/voiceGreetingDelivered=true/);
   assert.match(app,/void agentSpeak\(greeting\)/);

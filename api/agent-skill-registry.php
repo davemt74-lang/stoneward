@@ -14,6 +14,7 @@ function sf_agent_skill_definitions(): array {
       'published_site_search'=>['label'=>'Search published site','contexts'=>['public','customer','admin'],'tool'=>'public_site_search','intents'=>['public_site_search']],
       'published_artist_facts'=>['label'=>'Research published Stonefellow music and artist information','contexts'=>['public','customer','admin'],'tool'=>'public_artist_facts','intents'=>['public_artist_research']],
       'admin_catalog_status'=>['label'=>'Read actual Admin catalog visibility and missing metadata','contexts'=>['admin'],'tool'=>'admin_catalog_inventory','intents'=>['catalog_inventory_read']],
+      'admin_user_usage_summary'=>['label'=>'Read aggregate user accounts and AI token usage','contexts'=>['admin'],'tool'=>'admin_user_usage_summary','intents'=>['user_usage_summary_read']],
       'admin_release_status'=>['label'=>'Read actual Admin release states and scheduled entries','contexts'=>['admin'],'tool'=>'admin_release_inventory','intents'=>['release_inventory_read']],
       'admin_show_status'=>['label'=>'Read actual Admin live-show schedule and status','contexts'=>['admin'],'tool'=>'admin_show_inventory','intents'=>['shows_inventory_read']],
       'admin_knowledge_status'=>['label'=>'Read the Admin Knowledge Base inventory and Agent visibility','contexts'=>['admin'],'tool'=>'admin_knowledge_inventory','intents'=>['knowledge_inventory_read']],
@@ -43,7 +44,7 @@ function sf_agent_skill_definitions(): array {
         'navigate_admin_page','open_catalog_record','page_context','bulk_music_import','upload_audio','metadata_templates','media_library','catalog_manager',
         'release_manager','shows_manager','rights_manager','distribution_manager','press_manager',
         'knowledge_manager','products_manager','ticketing_manager','membership_manager',
-        'account_manager','team_manager','ai_settings','site_settings','operating_calendar',
+        'account_manager','create_user','team_manager','ai_settings','site_settings','operating_calendar',
         'payments_manager','fulfillment_manager','pod_manager','customer_lifecycle'
       ]],
       'admin_catalog_metadata'=>['label'=>'Prepare exact reviewed music catalog metadata edits','contexts'=>['admin'],'tool'=>'catalog_metadata_update','intents'=>['edit_catalog_metadata']],

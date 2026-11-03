@@ -36,3 +36,31 @@
 .media-catalog-modal .check-field{line-height:1.5}
 .media-catalog-modal .status-line{white-space:normal;overflow-wrap:anywhere}
 @media(max-width:680px){.media-catalog-modal .media-modal-card{max-height:calc(100dvh - 16px)}.media-asset-actions button{flex:1}}
+
+/* Section 91B17H — Media Health and deliberate, non-destructive audio relinking. */
+.media-health{margin:14px 0;border-color:var(--line2)}
+.media-health .panel-title{align-items:center;gap:12px}
+.media-health .panel-title>div{min-width:0}
+.media-health-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.media-health-stats>span{display:grid;gap:5px;padding:12px;background:var(--surface2,#0d0c0a);border:1px solid var(--line);font-size:.68rem;color:var(--muted)}
+.media-health-stats strong{font:400 1.35rem Georgia,serif;color:var(--ink)}
+.media-health-issues{display:grid;gap:7px;margin:14px 0}
+.media-health-issue{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;background:var(--surface2,#0d0c0a);border:1px solid var(--line)}
+.media-health-issue>div{display:grid;gap:4px;min-width:0}
+.media-health-issue strong{font-size:.83rem;color:var(--ink)}
+.media-health-issue small,.media-health-issue code{font-size:.68rem;color:var(--muted);overflow-wrap:anywhere}
+.media-health-issue code{max-width:42rem;white-space:normal}
+.media-health-issue button{flex-shrink:0}
+.media-health-passive,.media-health-ok{font-size:.7rem;color:var(--muted)}
+.media-health-ok{padding:14px;border-left:2px solid var(--accent)}
+.media-health-broken{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+.media-health-broken summary{cursor:pointer;font-size:.75rem;color:var(--ink)}
+.media-health-broken p{padding:8px 0;border-bottom:1px solid var(--line);font-size:.7rem;color:var(--muted)}
+.media-health-broken strong{color:var(--ink)}
+.media-health-broken small{display:block;overflow-wrap:anywhere}
+.media-health-message{margin:10px 0;font-size:.75rem;color:var(--accent)}
+.media-health-modal .media-modal-card{width:min(680px,96vw)}
+.media-health-modal .check-field{margin:12px 0;line-height:1.5}
+.media-health-modal select{width:100%}
+@media(max-width:900px){.media-health-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.media-health .panel-title,.media-health-issue{flex-direction:column;align-items:stretch}.media-health-stats{grid-template-columns:1fr 1fr}.media-health-issue button{width:100%}}

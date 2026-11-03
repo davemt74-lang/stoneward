@@ -46,13 +46,13 @@ function sf_personalization_history(int $userId,int $limit=80): array {
     return $out;
 }
 function sf_personalization_clear_history(int $userId): array {
-    sf_personalization_ensure_schema();sf_ops_ensure_schema();$pdo=sf_db();$q=$pdo->prepare('UPDATE listening_events SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$events=$q->rowCount();$pdo->prepare('DELETE FROM user_listening_progress WHERE user_id=?')->execute([$userId]);$pdo->prepare("DELETE FROM user_activity WHERE user_id=? AND event_type IN ('listen_start','listen_complete')")->execute([$userId]);sf_log_user_activity($userId,'listening_history_cleared','Cleared personal listening history','account',(string)$userId,['anonymized_events'=>$events]);return ['anonymized_events'=>$events];
+    sf_personalization_ensure_schema();sf_ops_ensure_schema();$pdo=sf_db();$q=$pdo->prepare('UPDATE listening_events SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$events=$q->rowCount();$pdo->prepare('DELETE FROM user_listening_progress WHERE user_id=?')->execute([$userId]);if(function_exists('sf_guest_migration_ensure_schema')){sf_guest_migration_ensure_schema();$pdo->prepare('DELETE FROM user_guest_recent_signals WHERE user_id=?')->execute([$userId]);}$pdo->prepare("DELETE FROM user_activity WHERE user_id=? AND event_type IN ('listen_start','listen_complete')")->execute([$userId]);sf_log_user_activity($userId,'listening_history_cleared','Cleared personal listening history','account',(string)$userId,['anonymized_events'=>$events]);return ['anonymized_events'=>$events];
 }
 
 function sf_personalization_recommendation_profile(int $userId): array {
     sf_personalization_ensure_schema();sf_ops_ensure_schema();sf_playlists_ensure_schema();sf_listening_sessions_ensure_schema();
     if(function_exists('sf_privacy_personalization_enabled')&&!sf_privacy_personalization_enabled($userId))return ['personalized'=>false,'signal_count'=>0,'favorite_count'=>0,'listening_event_count'=>0,'playlist_track_count'=>0,'seed_scores'=>[],'seen_counts'=>[],'favorite_track_ids'=>[],'favorite_release_ids'=>[],'moods'=>[],'themes'=>[],'releases'=>[],'feedback'=>[],'preferred_energy'=>null];
-    $tracks=sf_track_map();$seed=[];$moods=[];$themes=[];$releases=[];$seen=[];$favoriteTrackIds=[];$favoriteReleaseIds=[];$favoriteCount=0;$listenCount=0;$playlistCount=0;$energyWeight=0.0;$energyTotal=0.0;
+    $tracks=sf_track_map();$seed=[];$moods=[];$themes=[];$releases=[];$seen=[];$favoriteTrackIds=[];$favoriteReleaseIds=[];$favoriteCount=0;$listenCount=0;$playlistCount=0;$recentSignalCount=0;$energyWeight=0.0;$energyTotal=0.0;
     $q=sf_db()->prepare('SELECT item_type,item_id FROM user_favorites WHERE user_id=?');$q->execute([$userId]);
     foreach($q->fetchAll() as $r){
         $type=(string)$r['item_type'];$id=(string)$r['item_id'];$favoriteCount++;
@@ -62,6 +62,11 @@ function sf_personalization_recommendation_profile(int $userId): array {
     $q=sf_db()->prepare("SELECT track_id,COUNT(*) AS events,SUM(CASE WHEN event_type='complete' THEN 5 WHEN event_type='resume' THEN 3 WHEN event_type='start' THEN 2 WHEN event_type='pause' THEN 1 ELSE 0 END) AS affinity FROM listening_events WHERE user_id=? AND event_type IN ('start','resume','pause','complete') GROUP BY track_id");
     $q->execute([$userId]);
     foreach($q->fetchAll() as $r){$id=(string)$r['track_id'];if(!isset($tracks[$id]))continue;$events=(int)$r['events'];$affinity=min(24,max(0,(int)$r['affinity']));$seen[$id]=$events;$seed[$id]=($seed[$id]??0)+$affinity;$listenCount+=$events;}
+    // These are expressly imported, untimestamped recency hints, NOT new play events.
+    if(function_exists('sf_guest_migration_recent_for_user'))foreach(sf_guest_migration_recent_for_user($userId) as $hint){
+        $id=(string)$hint['track_id'];if(!isset($tracks[$id]))continue;
+        $seed[$id]=($seed[$id]??0)+max(2,8-intdiv((int)$hint['ordinal'],5));$recentSignalCount++;
+    }
     $feedback=sf_track_feedback_map($userId);
     foreach($feedback as $id=>$row){
         if(!isset($tracks[$id]))continue;$sent=(string)($row['sentiment']??'');
@@ -77,9 +82,9 @@ function sf_personalization_recommendation_profile(int $userId): array {
         $release=trim((string)($t['release']??''));if($release!=='')$releases[$release]=($releases[$release]??0)+$w*.55;
         $energy=max(1,min(5,(int)($t['energy']??3)));$energyWeight+=$energy*$w;$energyTotal+=$w;
     }
-    arsort($moods);arsort($themes);arsort($releases);$signalCount=$favoriteCount+$listenCount+$playlistCount;
+    arsort($moods);arsort($themes);arsort($releases);$signalCount=$favoriteCount+$listenCount+$playlistCount+$recentSignalCount;
     return [
-        'personalized'=>$signalCount>0,'signal_count'=>$signalCount,'favorite_count'=>$favoriteCount,'listening_event_count'=>$listenCount,'playlist_track_count'=>$playlistCount,
+        'personalized'=>$signalCount>0,'signal_count'=>$signalCount,'favorite_count'=>$favoriteCount,'listening_event_count'=>$listenCount,'playlist_track_count'=>$playlistCount,'guest_recent_signal_count'=>$recentSignalCount,
         'seed_scores'=>$seed,'seen_counts'=>$seen,'favorite_track_ids'=>$favoriteTrackIds,'favorite_release_ids'=>$favoriteReleaseIds,
         'moods'=>$moods,'themes'=>$themes,'releases'=>$releases,'feedback'=>$feedback,'preferred_energy'=>$energyTotal>0?round($energyWeight/$energyTotal,2):null,
     ];
@@ -87,7 +92,7 @@ function sf_personalization_recommendation_profile(int $userId): array {
 function sf_personalization_rank_catalog(array $catalog,array $profile,int $limit=8,array $excludeIds=[]): array {
     $limit=max(1,min(30,$limit));$exclude=array_fill_keys(array_map('strval',$excludeIds),true);$personalized=!empty($profile['personalized']);$rows=[];
     foreach($catalog as $index=>$t){
-        $id=(string)($t['id']??'');if($id===''||isset($exclude[$id]))continue;$score=0.0;$reasons=[];$bestMood='';$bestMoodScore=0.0;$bestTheme='';$bestThemeScore=0.0;
+        $id=(string)($t['id']??'');if($id===''||isset($exclude[$id])||!sf_track_is_public($t))continue;$score=0.0;$reasons=[];$bestMood='';$bestMoodScore=0.0;$bestTheme='';$bestThemeScore=0.0;
         foreach((array)($t['mood']??[]) as $tag){$v=(float)($profile['moods'][(string)$tag]??0);$score+=$v*1.15;if($v>$bestMoodScore){$bestMoodScore=$v;$bestMood=(string)$tag;}}
         foreach((array)($t['themes']??[]) as $tag){$v=(float)($profile['themes'][(string)$tag]??0);$score+=$v;if($v>$bestThemeScore){$bestThemeScore=$v;$bestTheme=(string)$tag;}}
         $release=(string)($t['release']??'');$releaseScore=(float)($profile['releases'][$release]??0);$score+=$releaseScore*.8;
@@ -108,8 +113,8 @@ function sf_personalization_rank_catalog(array $catalog,array $profile,int $limi
 }
 function sf_personalization_recommendations(int $userId,int $limit=8,array $excludeIds=[]): array {
     $profile=sf_personalization_recommendation_profile($userId);$items=sf_personalization_rank_catalog(sf_catalog(),$profile,$limit,$excludeIds);
-    $summary=$profile['personalized']?'Based on your favorites, playlists, and listening history.':'Start listening or save favorites and playlists to make these recommendations personal.';
-    return ['personalized'=>(bool)$profile['personalized'],'summary'=>$summary,'signals'=>['favorites'=>(int)$profile['favorite_count'],'listening_events'=>(int)$profile['listening_event_count'],'playlist_tracks'=>(int)$profile['playlist_track_count']],'items'=>$items];
+    $summary=$profile['personalized']?'Based on your favorites, playlists, and listening preferences.':'Start listening or save favorites and playlists to make these recommendations personal.';
+    return ['personalized'=>(bool)$profile['personalized'],'summary'=>$summary,'signals'=>['favorites'=>(int)$profile['favorite_count'],'listening_events'=>(int)$profile['listening_event_count'],'playlist_tracks'=>(int)$profile['playlist_track_count'],'guest_recent_songs'=>(int)($profile['guest_recent_signal_count']??0)],'items'=>$items];
 }
 
 function sf_personalization_state(int $userId): array {return ['favorites'=>sf_personalization_favorites($userId),'continue_listening'=>sf_personalization_continue_listening($userId),'history'=>sf_personalization_history($userId),'recommendations'=>sf_personalization_recommendations($userId),'track_feedback'=>sf_track_feedback_map($userId)];}

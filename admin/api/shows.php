@@ -9,10 +9,22 @@ if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sf_json_response(['ok'=>false,'erro
 $me=sf_admin_require_auth(true);
 $b=sf_request_json();$action=(string)($b['action']??'save');$rows=sf_admin_shows();
 
-if($action==='delete'){
-    $id=sf_admin_slug((string)($b['id']??''),'');
-    $rows=array_values(array_filter($rows,fn($s)=>(string)($s['id']??'')!==$id));
-    sf_admin_write_shows($rows);sf_log_admin_action((int)$me['id'],'live_show_deleted','show',$id);sf_json_response(['ok'=>true]);
+if($action==='lifecycle'||$action==='delete'){
+    $id=sf_admin_slug((string)($b['id']??''),'');$status=$action==='delete'?'deleted':(string)($b['status']??'');
+    if(!in_array($status,['restore','hidden','archived','deleted'],true))sf_json_response(['ok'=>false,'message'=>'Invalid show lifecycle status.'],422);
+    if(empty($b['confirmed']))sf_json_response(['ok'=>false,'message'=>'Confirm this show lifecycle change.'],422);
+    foreach($rows as $i=>$show)if((string)($show['id']??'')===$id){
+        $before=(string)($show['status']??'scheduled');
+        $next=$status==='restore'?(string)($show['lifecycle_previous_status']??'scheduled'):$status;
+        if(!in_array($next,['scheduled','completed','cancelled','postponed','hidden','archived','deleted'],true))$next='scheduled';
+        if($status!=='restore'&&!in_array($before,['hidden','archived','deleted'],true))$rows[$i]['lifecycle_previous_status']=$before;
+        $rows[$i]['status']=$next;
+        $rows[$i]['public_visible']=$status==='restore';$rows[$i]['updated_at']=gmdate('c');
+        sf_admin_write_shows($rows);
+        sf_log_admin_action((int)$me['id'],'live_show_lifecycle_changed','show',$id,['from'=>$before,'to'=>$next]);
+        sf_json_response(['ok'=>true,'show'=>$rows[$i]]);
+    }
+    sf_json_response(['ok'=>false,'message'=>'Show not found.'],404);
 }
 
 $raw=is_array($b['show']??null)?$b['show']:[];
@@ -22,7 +34,7 @@ if(!preg_match('/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?$/',$date))sf_json_response(
 $id=sf_admin_slug((string)($raw['id']??($date.'-'.$venue)),'show');
 $idx=null;foreach($rows as $i=>$s)if((string)($s['id']??'')===$id){$idx=$i;break;}$old=$idx===null?[]:$rows[$idx];
 
-$status=(string)($raw['status']??'scheduled');if(!in_array($status,['scheduled','completed','cancelled','postponed','archived'],true))$status='scheduled';
+$status=(string)($raw['status']??'scheduled');if(!in_array($status,['scheduled','completed','cancelled','postponed','hidden','archived','deleted'],true))$status='scheduled';if($status==='deleted'&&($old['status']??'')!=='deleted')sf_json_response(['ok'=>false,'message'=>'Use the confirmed Delete action to move a show to Trash.'],422);
 $catalog=sf_catalog();$trackMap=[];foreach($catalog as $t)if(!empty($t['id']))$trackMap[(string)$t['id']]=$t;
 $normalizeTrackIds=function(mixed $value,string $label)use($trackMap):array{$ids=[];foreach((array)$value as $tid){$tid=sf_clean_text($tid,100);if($tid===''||in_array($tid,$ids,true))continue;if(!isset($trackMap[$tid]))sf_json_response(['ok'=>false,'message'=>'Unknown '.$label.' track: '.$tid],422);$ids[]=$tid;}return $ids;};
 $media=[];foreach((array)($raw['media']??[]) as $m){if(!is_array($m))continue;$url=sf_clean_text($m['url']??'',500);if($url==='')continue;$media[]=['type'=>sf_clean_text($m['type']??'link',40),'title'=>sf_clean_text($m['title']??'Live archive item',180),'url'=>$url,'caption'=>sf_clean_text($m['caption']??'',500)];if(count($media)>=80)break;}
@@ -37,6 +49,7 @@ $show=[
  'live_recording_track_ids'=>$normalizeTrackIds($raw['live_recording_track_ids']??[],'live recording'),
  'media'=>$media,'created_at'=>$old['created_at']??gmdate('c'),'updated_at'=>gmdate('c')
 ];
+if(isset($old['lifecycle_previous_status']))$show['lifecycle_previous_status']=$old['lifecycle_previous_status'];
 if($idx===null)$rows[]=$show;else$rows[$idx]=$show;
 sf_admin_write_shows($rows);
 sf_log_admin_action((int)$me['id'],$idx===null?'live_show_created':'live_show_updated','show',$id,

@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-feedback-core.php';
 require_once __DIR__.'/agent-customer-brain.php';
 require_once __DIR__.'/agent-customer-context.php';
+require_once __DIR__.'/agent-conversation-memory.php';
 require_once __DIR__.'/fan-discovery-paths.php';
 require_once __DIR__.'/fan-commerce-advisor.php';
 require_once __DIR__.'/agent-navigation.php';
@@ -172,7 +173,74 @@ function sf_agent_context(string $query,string $profile='catalog',int $userId=0)
 }
 
 function sf_agent_history(int $userId,string $conversationId,int $limit=10): array {
-    $q=sf_db()->prepare('SELECT role,content FROM agent_messages WHERE conversation_id=? AND user_id=? ORDER BY id DESC LIMIT '.max(1,min(30,$limit)));$q->execute([$conversationId,$userId]);return array_reverse($q->fetchAll());
+    // An action request is not an outcome. A missing/delayed browser receipt
+    // must not become conversational evidence that playback failed or trigger
+    // unsolicited corrections. Retain confirmed browser results in history.
+    $limit=max(1,min(30,$limit));
+    $q=sf_db()->prepare("SELECT role,content FROM agent_messages WHERE conversation_id=? AND user_id=? AND (provider IS NULL OR provider NOT LIKE 'agent-action-pending:%') ORDER BY id DESC LIMIT ".$limit);
+    $q->execute([$conversationId,$userId]);return array_reverse($q->fetchAll());
+}
+/** Historical outcomes are opt-in, owner-scoped and never action authority. */
+function sf_agent_recent_confirmed_actions(int $userId,string $conversationId,int $limit=6): string {
+    if($userId<1||!function_exists('sf_privacy_personalization_enabled')||!sf_privacy_personalization_enabled($userId))return '';
+    $limit=max(1,min(8,$limit));
+    $q=sf_db()->prepare("SELECT content,created_at FROM agent_messages WHERE user_id=? AND conversation_id<>? AND role='assistant' AND provider LIKE 'agent-action-receipt:%' ORDER BY id DESC LIMIT ".$limit);
+    $q->execute([$userId,$conversationId]);
+    $lines=[];
+    foreach($q->fetchAll() as $row){
+        $result=trim(preg_replace('/\s+/u',' ',(string)($row['content']??''))??'');
+        if($result==='')continue;
+        $lines[]='- '.substr((string)($row['created_at']??''),0,24).' | '.substr($result,0,260);
+    }
+    return $lines?"RECENT CONFIRMED BROWSER ACTIONS (historical, not proof of current playback; account-owner consent enabled)\n".implode("\n",$lines):'';
+}
+
+/** Only request-relevant, owner-scoped notification headlines enter chat. */
+function sf_agent_recent_notification_context(int $userId,string $message): string {
+    if($userId<1||!preg_match('/\b(?:notifications?|alerts?|activity|reminders?|what did i miss|what.?s new|updates?)\b/i',$message)
+        ||!function_exists('sf_smart_user_notifications'))return '';
+    $rows=sf_smart_user_notifications($userId,5);$lines=[];
+    foreach($rows as $row){
+        $title=trim((string)($row['title']??''));if($title==='')continue;
+        $lines[]='- '.substr((string)($row['created_at']??''),0,24).' | '.
+            substr((string)($row['kind']??'activity'),0,40).' | '.substr($title,0,160).
+            (!empty($row['is_read'])?' | read':' | unread');
+    }
+    return $lines?"RECENT ACCOUNT NOTIFICATIONS (verified, current owner; headlines only, no automatic action)\n".implode("\n",$lines):'';
+}
+
+/** Exact current song and queue context shared by text and voice. */
+function sf_agent_browser_music_context(array $client): string {
+    $byId=[];foreach(sf_agent_public_catalog() as $track){$id=(string)($track['id']??'');if($id!=='')$byId[$id]=$track;}
+    $id=(string)($client['active_track_id']??'');$active=$byId[$id]??null;
+    $sections=[];
+    if($active){
+        $m=(array)($active['metadata']??[]);
+        $sections[]='LIVE BROWSER PLAYER (observed by the signed-in music player; track ID resolved against the published catalog): '.
+            (!empty($client['player_is_playing'])?'playing':'paused').'; current song '.(string)$active['title'].
+            '; catalog track ID '.(string)$active['id'].'; release '.(string)($active['release']??'').
+            '; position '.(int)($client['player_position_seconds']??0).' seconds of '.(int)($client['player_duration_seconds']??0).
+            ' seconds; player volume '.(int)($client['player_volume_percent']??0).' percent. This is valid evidence of the current player state, not authorization for a new action.';
+        $fields=['words by'=>$m['words_by']??'','music by'=>$m['music_by']??'',
+            'producer'=>$m['producer']??'','co-producer'=>$m['co_producer']??'',
+            'ISRC'=>$m['isrc']??'','published story'=>$active['story']??''];
+        $facts=[];foreach($fields as $label=>$value)if(is_scalar($value)&&trim((string)$value)!=='')$facts[]=$label.': '.substr(trim((string)$value),0,$label==='published story'?360:160);
+        if($facts)$sections[]="EXACT CURRENT SONG FACTS (published catalog, not inferred from transcript)\n".implode("\n",$facts);
+    }
+    $playlist=[];foreach((array)($client['playlist_track_ids']??[]) as $trackId){
+        if(is_string($trackId)&&isset($byId[$trackId]))$playlist[]=(string)$byId[$trackId]['title'].' ['.$trackId.']';
+    }
+    if($playlist){
+        $index=min(count($playlist)-1,max(0,(int)($client['playlist_index']??0)));
+        $sections[]='LIVE BROWSER PLAYLIST (temporary or saved; user/browser state, not proof of saved account ownership): '.
+            substr((string)($client['playlist_name']??'Playlist'),0,100).'; '.count($playlist).' published songs; '.
+            'position '.($index+1).'. Ordered titles: '.implode(' → ',$playlist).'.';
+    }
+    $queue=[];foreach((array)($client['queue_track_ids']??[]) as $trackId){
+        if(is_string($trackId)&&isset($byId[$trackId]))$queue[]=(string)$byId[$trackId]['title'].' ['.$trackId.']';
+    }
+    if($queue)$sections[]='LIVE BROWSER UP NEXT (ordered, not a saved playlist): '.implode(' → ',$queue).'.';
+    return implode("\n\n",$sections);
 }
 function sf_agent_save_message(int $userId,string $conversationId,string $role,string $content,array $usage=[]): int {
     $pdo=sf_db();$now=gmdate('c');$q=$pdo->prepare('SELECT id FROM agent_conversations WHERE id=? AND user_id=?');$q->execute([$conversationId,$userId]);
@@ -800,19 +868,41 @@ function sf_anthropic_call(array $provider,string $system,array $history,string 
  */
 function sf_agent_normalize_client_state(array $raw): array {
     $out=[];
-    $text=['active_track_id'=>180,'route_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120,'timezone'=>70,'active_release_title'=>180];
+    $text=['active_track_id'=>180,'route_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120,'timezone'=>70,'active_release_title'=>180,'playlist_name'=>120];
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);
     }
-    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'song_capture_active'=>1,'song_capture_live_enabled'=>1,'song_capture_available'=>1,'song_lyric_draft_available'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400];
+    $numbers=['builder_side_a_count'=>200,'builder_side_b_count'=>200,'builder_side_a_seconds'=>360000,'builder_side_b_seconds'=>360000,'builder_limit_seconds'=>360000,'builder_draft_id'=>2147483647,'queue_count'=>200,'notification_unread'=>9999,'player_is_playing'=>1,'song_capture_active'=>1,'song_capture_live_enabled'=>1,'song_capture_available'=>1,'song_lyric_draft_available'=>1,'player_volume_percent'=>100,'player_position_seconds'=>86400,'player_duration_seconds'=>86400,'playlist_index'=>20];
     foreach($numbers as $key=>$max){
         if(isset($raw[$key])&&is_numeric($raw[$key]))$out[$key]=max(0,min($max,(int)$raw[$key]));
+    }
+    foreach(['playlist_track_ids','queue_track_ids'] as $field){
+        if(!is_array($raw[$field]??null))continue;
+        $ids=[];foreach($raw[$field] as $id){
+            if(!is_string($id)||strlen($id)>180||!preg_match('/^[A-Za-z0-9_-]{1,180}$/D',$id)||in_array($id,$ids,true))continue;
+            $ids[]=$id;if(count($ids)>=20)break;
+        }
+        $out[$field]=$ids;
     }
     return $out;
 }
 
 function sf_agent_reply(array $user,string $conversationId,string $message,array $client=[]): array {
     sf_entitlements_ensure_schema();$client=sf_agent_normalize_client_state($client);$userId=(int)$user['id'];$isAdmin=(($user['role']??'')==='admin');$history=sf_agent_history($userId,$conversationId,10);sf_agent_save_message($userId,$conversationId,'user',$message);
+    // Owner-scoped memory requests are local, not provider prompts or actions.
+    $memoryCommand=sf_agent_customer_memory_command($message);
+    if($memoryCommand!==null){
+        $reply=sf_agent_customer_memory_execute($userId,$memoryCommand);
+        sf_agent_save_message($userId,$conversationId,'assistant',$reply,['provider'=>'local-memory','model'=>'owner-command']);
+        return ['text'=>$reply,'provider'=>'local-memory','model'=>'owner-command','input_tokens'=>0,'output_tokens'=>0,'active_tokens_used'=>0,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>'customer_memory','action'=>['type'=>'none'],'requires_confirmation'=>false,'brain'=>['route'=>'customer_memory','source'=>'owner_command','needs_llm'=>false]];
+    }
+    if(sf_agent_customer_memory_query_requested($message)){
+        $reply=sf_agent_customer_memory_query_response($userId,$conversationId,$message);
+        // Do not put retrieved excerpts into the chat ledger: a subsequent
+        // ordinary AI turn includes prior assistant messages in its prompt.
+        sf_agent_save_message($userId,$conversationId,'assistant','Private chat search handled locally. Open My Agent Brain to search again.',['provider'=>'local-memory','model'=>'owner-search']);
+        return ['text'=>$reply,'provider'=>'local-memory','model'=>'owner-search','input_tokens'=>0,'output_tokens'=>0,'active_tokens_used'=>0,'active_tokens_remaining'=>$isAdmin?null:sf_token_balance($userId),'conversation_id'=>$conversationId,'decision'=>'customer_memory_search','action'=>['type'=>'none'],'requires_confirmation'=>false,'brain'=>['route'=>'customer_memory_search','source'=>'owner_search','needs_llm'=>false]];
+    }
     $client['_authorized_admin']=$isAdmin;
     $explicitCapture=sf_agent_explicit_song_capture_route($message,$client);
     $catalogListRequest=sf_agent_catalog_list_requested($message);
@@ -885,16 +975,36 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
         $listeningContext=sf_agent_listening_context($timeInsights);
         if($listeningContext!=='')$context.="\n\n".$listeningContext;
     }
-    $playingTrack=sf_agent_find_track('',(string)($client['active_track_id']??''));
-    if($playingTrack){$context.="\n\nBROWSER PLAYER (transient state reported by the signed-in page, not an authorization source): ".($client['player_is_playing']??0?'playing':'paused').'; current published song '.(string)$playingTrack['title'].'; release '.(string)($playingTrack['release']??'').'; position '.(int)($client['player_position_seconds']??0).' seconds of '.(int)($client['player_duration_seconds']??0).' seconds; player volume '.(int)($client['player_volume_percent']??0).' percent.';}
-    $personalMemory=sf_agent_customer_memory_context($userId);if($personalMemory!=='')$context.="\n\n".$personalMemory;
-    // An independent response evaluator is never given private shared lyrics.
+    $liveMusic=sf_agent_browser_music_context($client);
+    if($liveMusic!=='')$context.="\n\n".$liveMusic;
+    // The external quality evaluator sees approved public and current-player
+    // evidence, never cross-conversation owner memory or saved action history.
     $evaluationContext=$context;
+    $recentActions=sf_agent_recent_confirmed_actions($userId,$conversationId);
+    if($recentActions!=='')$context.="\n\n".$recentActions;
+    $recentNotifications=sf_agent_recent_notification_context($userId,$message);
+    if($recentNotifications!=='')$context.="\n\n".$recentNotifications;
+    $personalMemory=sf_agent_customer_memory_context($userId);if($personalMemory!=='')$context.="\n\n".$personalMemory;
+    // An independent response evaluator is never given private memory or shared lyrics.
     require_once __DIR__.'/agent-song-annotations-core.php';
     $sharedSongNotes=sf_song_annotation_agent_context($userId,$message,(string)($client['active_track_id']??''));
     if($sharedSongNotes!=='')$context.="\n\n".$sharedSongNotes;
-    $estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;$allow=sf_can_use_ai($user,$estimate);if(!$allow['ok'])throw new RuntimeException('ACTIVE_TOKENS_REQUIRED');
+    $estimate=(int)ceil((strlen($context)+strlen($message)+array_sum(array_map(fn($x)=>strlen((string)$x['content']),$history)))/4)+256;
+    $allow=sf_can_use_ai($user,$estimate);
+    if(!$allow['ok']){
+        // Keep already-authorized local functionality available when the
+        // account cannot fund another external language-model interaction.
+        $localText='You need more Active Tokens for an AI-generated response. You can still browse the published catalog, use the local player controls, and review your Stonefellow account.';
+        sf_agent_save_message($userId,$conversationId,'assistant',$localText,['provider'=>'local-entitlement','model'=>'no-paid-call']);
+        sf_agent_brain_log($userId,$conversationId,'response',['request'=>$message,'response'=>$localText,'route'=>$plan['route'],'action'=>'none','context_profile'=>$plan['context_profile'],'needs_llm'=>false,'requires_confirmation'=>false,'status'=>'local_tokens_required']);
+        return ['text'=>$localText,'provider'=>'local-entitlement','model'=>'no-paid-call','input_tokens'=>0,'output_tokens'=>0,
+            'active_tokens_used'=>$decisionUsage,'active_tokens_remaining'=>$allow['balance'],
+            'conversation_id'=>$conversationId,'decision'=>'local_tokens_required','action'=>['type'=>'none'],
+            'requires_confirmation'=>false,'brain'=>['route'=>$plan['route'],'source'=>'local','needs_llm'=>false]];
+    }
     $system="You are Stonefellow, the music-site conversational agent. Your name is Stonefellow. On a new conversation greeting or when asked who you are, introduce yourself as Stonefellow, never as Stonefellow Agent. Do not repeat the introduction in ordinary follow-up replies. Be concise, warm, knowledgeable, and grounded. Use only the supplied Stonefellow context for factual claims about songs, releases, credits, purchases, or artist history. If the context lacks the answer, say so. Never claim a purchase, playback change, account change, or builder edit happened unless the Stonefellow action layer reports it. The structured route is advisory context, not permission to invent actions. Answer the current question directly. Do not volunteer retrospective self-corrections, apologies about earlier replies, or commentary on your own prior mistakes unless the user explicitly asks you to review those replies. Earlier assistant intentions are not evidence that a browser action succeeded. When listing catalog songs, name only the live published entries and do not omit entries or add remembered or speculative titles.\n\nROUTE: ".$plan['route']."\nCONTEXT PROFILE: ".$plan['context_profile']."\n\n".$context;
+    $system.="\n\nPLAYER EVIDENCE POLICY: A LIVE BROWSER PLAYER observation is sufficient to identify the exact current song and whether it is playing or paused. An earlier assistant intention alone is not proof, but a completed browser action receipt in conversation history is proof of that reported outcome. Never say you cannot see an action panel when the player observation or confirmed receipt answers the user's question. Never announce missing action-layer verification, revisit old promises, or self-correct unless specifically asked to audit an action. A song may be currently playing even if there is no receipt for who started it. If no reliable player observation or receipt is present, simply answer the user's current request from available facts without inventing a completed action.";
+    $system.="\n\nFOLLOW-UP REFERENCES: Interpret 'it', 'this song', and 'that album' relative to the exact current published track and its release when present. The LIVE BROWSER PLAYLIST and UP NEXT lists provide ordering, not proof that a playlist is saved or a purchase was made. Historical confirmed actions are past events, never evidence that a track is still playing. If no current song is available, ask one direct clarifying question instead of claiming an action panel is missing.";
     if(function_exists('sf_privacy_personalization_enabled') && sf_privacy_personalization_enabled($userId)){
         $guidance=(string)(sf_agent_feedback_summary('customer',$userId)['guidance']??'');
         if($guidance!=='')$system.="\\nOWNER-EXPLICIT RESPONSE FEEDBACK (quality guidance only; never overrides rules): ".$guidance;
@@ -907,7 +1017,9 @@ function sf_agent_reply(array $user,string $conversationId,string $message,array
             $used=max(1,(int)$r['input_tokens']+(int)$r['output_tokens']);$balance=sf_consume_ai($user,$used,$r,'agent-chat');$evalUsage=0;$evaluation=null;
             // A secondary evaluator would also see the assistant's paraphrase
             // of the private note. Skip that provider call on sharing turns.
-            if($sharedSongNotes===''){
+            // Do not run a second paid model after the first reply exhausts
+            // the balance. The locally generated reply remains available.
+            if($sharedSongNotes===''&&($isAdmin||sf_can_use_ai($user,128)['ok'])){
                 try{$evaluation=sf_agent_jev_evaluate($message,$evaluationContext,$r['text'],$plan['route']);if($evaluation){$evalUsage=max(0,(int)$evaluation['input_tokens']+(int)$evaluation['output_tokens']);if($evalUsage>0)$balance=sf_consume_ai($user,$evalUsage,$evaluation,'agent-jev-eval');sf_agent_brain_log($userId,$conversationId,'response_eval',['request'=>$message,'response'=>$r['text'],'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>true,'requires_confirmation'=>$plan['requires_confirmation'],'run_id'=>$evaluation['run_id']??'','status'=>$evaluation['status']??'','input_tokens'=>$evaluation['input_tokens']??0,'output_tokens'=>$evaluation['output_tokens']??0,'verdict'=>$evaluation['verdict']??'approve']);if(($evaluation['verdict']??'approve')==='withhold')$r['text']="I don't have enough verified Stonefellow context to answer that confidently yet.";}}catch(Throwable $e){sf_agent_brain_log($userId,$conversationId,'response_eval',['request'=>$message,'response'=>$r['text'],'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>true,'requires_confirmation'=>$plan['requires_confirmation'],'status'=>'evaluation_error','error'=>$e->getMessage()]);}
             }
             sf_agent_brain_log($userId,$conversationId,'response',['request'=>$message,'response'=>$r['text'],'route'=>$plan['route'],'action'=>$plan['action_name'],'context_profile'=>$plan['context_profile'],'needs_llm'=>true,'requires_confirmation'=>$plan['requires_confirmation'],'status'=>'completed','input_tokens'=>$r['input_tokens'],'output_tokens'=>$r['output_tokens'],'llm_provider'=>$r['provider'],'llm_model'=>$r['model']]);

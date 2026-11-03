@@ -15,7 +15,7 @@ $assert($coverage['schema']==='stonefellow.agent-integration-coverage.v1' && $co
 $assert($coverage['checks_passed'] && $coverage['registry_passed'],'Existing registry contracts and coverage pass');
 $assert($coverage['registered_tools']===count(sf_agent_tool_registry()) && $coverage['registered_skills']===count(sf_agent_skill_definitions()),'Complete live tool and skill counts');
 $assert(!$coverage['missing_skill_bindings'] && !$coverage['invalid_skill_bindings'],'Every exposed tool has a valid skill');
-$assert($coverage['admin_navigation_only_count']===count(sf_admin_agent_module_routes()) && $coverage['admin_navigation_only_count']===23,'All 23 module routes inventoried');
+$assert($coverage['admin_navigation_only_count']===count(sf_admin_agent_module_routes()) && $coverage['admin_navigation_only_count']===24,'All 24 module routes inventoried');
 $assert(!$coverage['invalid_module_contracts'],'All module routes resolve to bounded navigation');
 $assert(count(array_filter($coverage['admin_module_routes'],static fn($row)=>$row['conversation_integration']!=='navigation_only' || $row['record_read_verified'] || $row['record_write_verified']))===0,'Navigation is never reported as CRUD');
 $assert(count($coverage['reviewed_action_eligible'])===9,'Nine explicitly allowlisted reviewed executors, no unapproved writes');

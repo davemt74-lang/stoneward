@@ -43,8 +43,50 @@ function sf_token_balance(int $userId): int {sf_entitlements_ensure_schema();$q=
 function sf_token_source_exists(int $userId,string $type,string $source): bool {
     sf_entitlements_ensure_schema();$q=sf_db()->prepare('SELECT id FROM token_ledger WHERE user_id=? AND entry_type=? AND source=? LIMIT 1');$q->execute([$userId,$type,$source]);return $q->fetchColumn()!==false;
 }
-function sf_token_adjust(int $userId,int $delta,string $type,string $source='',array $usage=[],string $note=''): int {
-    sf_entitlements_ensure_schema();$pdo=sf_db();$pdo->beginTransaction();try{$q=$pdo->prepare('SELECT balance FROM user_token_balances WHERE user_id=?');$q->execute([$userId]);$v=$q->fetchColumn();$before=$v===false?0:(int)$v;$after=max(0,$before+$delta);$now=gmdate('c');if($v===false){$u=$pdo->prepare('INSERT INTO user_token_balances(user_id,balance,updated_at) VALUES(?,?,?)');$u->execute([$userId,$after,$now]);}else{$u=$pdo->prepare('UPDATE user_token_balances SET balance=?,updated_at=? WHERE user_id=?');$u->execute([$after,$now,$userId]);}$l=$pdo->prepare('INSERT INTO token_ledger(user_id,delta,balance_after,entry_type,source,provider,model,input_tokens,output_tokens,voice_chars,note,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');$l->execute([$userId,$after-$before,$after,$type,$source,(string)($usage['provider']??''),(string)($usage['model']??''),(int)($usage['input_tokens']??0),(int)($usage['output_tokens']??0),(int)($usage['voice_chars']??0),sf_clean_text($note,255),$now]);$pdo->commit();return $after;}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}}
+/**
+ * All balance mutations serialize per user. Credit sources are idempotent,
+ * including retries that arrive in parallel on different PHP workers.
+ * $applied is false when an earlier matching credit is returned unchanged.
+ */
+function sf_token_adjust(int $userId,int $delta,string $type,string $source='',array $usage=[],string $note='',?bool &$applied=null): int {
+    $pdo=sf_db();$ownsTransaction=!$pdo->inTransaction();
+    if($ownsTransaction)sf_entitlements_ensure_schema();
+    $driver=(string)(sf_db_config()['driver']??'');
+    $applied=false;if($ownsTransaction)$pdo->beginTransaction();
+    try{
+        $now=gmdate('c');
+        if($driver==='sqlite'){
+            // First statement takes SQLite's writer lock, including when the
+            // balance row already exists. No stale SELECT can precede it.
+            $lock=$pdo->prepare('INSERT OR IGNORE INTO user_token_balances(user_id,balance,updated_at) VALUES(?,0,?)');
+            $lock->execute([$userId,$now]);
+        }else{
+            // The users row exists before any balance row. Its InnoDB lock
+            // serializes first credits and debits across concurrent workers.
+            $lock=$pdo->prepare('SELECT id FROM users WHERE id=? FOR UPDATE');$lock->execute([$userId]);
+            if($lock->fetchColumn()===false)throw new InvalidArgumentException('Token account does not exist.');
+        }
+        $q=$pdo->prepare('SELECT balance FROM user_token_balances WHERE user_id=?');$q->execute([$userId]);
+        $v=$q->fetchColumn();$before=$v===false?0:(int)$v;
+        $credit=in_array($type,['trial_grant','monthly_grant','admin_grant'],true)&&$delta>0;
+        if($credit){
+            if($source==='')throw new InvalidArgumentException('Token credit requires a unique source.');
+            $prior=$pdo->prepare('SELECT delta,note FROM token_ledger WHERE user_id=? AND entry_type=? AND source=? ORDER BY id DESC LIMIT 1');
+            $prior->execute([$userId,$type,$source]);$old=$prior->fetch();
+            if($old){
+                if($type==='admin_grant'&&((int)$old['delta']!==$delta||(string)$old['note']!==sf_clean_text($note,255)))
+                    throw new InvalidArgumentException('Grant request conflicts with a previous credit.');
+                if($ownsTransaction)$pdo->commit();return $before;
+            }
+        }
+        $after=max(0,$before+$delta);
+        if($v===false){$u=$pdo->prepare('INSERT INTO user_token_balances(user_id,balance,updated_at) VALUES(?,?,?)');$u->execute([$userId,$after,$now]);}
+        else{$u=$pdo->prepare('UPDATE user_token_balances SET balance=?,updated_at=? WHERE user_id=?');$u->execute([$after,$now,$userId]);}
+        $l=$pdo->prepare('INSERT INTO token_ledger(user_id,delta,balance_after,entry_type,source,provider,model,input_tokens,output_tokens,voice_chars,note,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
+        $l->execute([$userId,$after-$before,$after,$type,$source,(string)($usage['provider']??''),(string)($usage['model']??''),(int)($usage['input_tokens']??0),(int)($usage['output_tokens']??0),(int)($usage['voice_chars']??0),sf_clean_text($note,255),$now]);
+        if($ownsTransaction)$pdo->commit();$applied=true;return $after;
+    }catch(Throwable $e){if($ownsTransaction&&$pdo->inTransaction())$pdo->rollBack();throw $e;}
+}
 function sf_enroll_user(int $userId,?int $packageId=null): array {
     sf_entitlements_ensure_schema();$pdo=sf_db();$p=$packageId?sf_package($packageId):null;if(!$p){$rows=sf_packages(true);$p=$rows[0]??null;}if(!$p)throw new RuntimeException('No active subscription package is available.');if(empty($p['is_active'])||empty($p['is_public']))throw new InvalidArgumentException('Selected package is not available.');
     $now=gmdate('c');$requestedTrialDays=max(0,(int)$p['trial_days']);$trialTokens=max(0,(int)$p['trial_tokens']);$price=(int)$p['monthly_price_cents'];
@@ -68,18 +110,37 @@ function sf_entitlement_state(int $userId): array {
     $ledger=sf_db()->prepare('SELECT delta,balance_after,entry_type,source,provider,model,input_tokens,output_tokens,voice_chars,note,created_at FROM token_ledger WHERE user_id=? ORDER BY id DESC LIMIT 20');$ledger->execute([$userId]);$out=['balance'=>sf_token_balance($userId),'subscription'=>$s,'ledger'=>$ledger->fetchAll()];if(function_exists('sf_membership_state'))$out['membership']=sf_membership_state($userId,true);return $out;
 }
 function sf_can_use_ai(array $user,int $estimated=1): array {if(($user['role']??'')==='admin')return ['ok'=>true,'unlimited'=>true,'balance'=>PHP_INT_MAX];$state=sf_entitlement_state((int)$user['id']);if(!$state['subscription'])$state=sf_enroll_user((int)$user['id'],null);return ['ok'=>$state['balance']>=$estimated,'unlimited'=>false,'balance'=>$state['balance'],'state'=>$state];}
-function sf_consume_ai(array $user,int $amount,array $usage,string $source='agent'): int {if(($user['role']??'')==='admin')return PHP_INT_MAX;return sf_token_adjust((int)$user['id'],-max(0,$amount),'usage',$source,$usage,'AI interaction');}
+function sf_consume_ai(array $user,int $amount,array $usage,string $source='agent'): int {
+    // Unlimited administrators are still metered for real provider activity.
+    // Their ledger records provider usage with a zero charge to their balance.
+    $admin=($user['role']??'')==='admin';
+    $balance=sf_token_adjust((int)$user['id'],$admin?0:-max(0,$amount),'usage',$source,$usage,$admin?'Unlimited admin AI interaction':'AI interaction');
+    return $admin?PHP_INT_MAX:$balance;
+}
 
 function sf_activate_package(int $userId,int $packageId,string $source='admin'): array {
     sf_entitlements_ensure_schema();
     $p=sf_package($packageId);if(!$p||empty($p['is_active']))throw new InvalidArgumentException('Package is unavailable.');
     $pdo=sf_db();$now=gmdate('c');$end=gmdate('c',strtotime('+1 month'));
-    $q=$pdo->prepare('SELECT id,package_id,status,current_period_end FROM user_subscriptions WHERE user_id=? LIMIT 1');$q->execute([$userId]);$existing=$q->fetch()?:null;
-    // Re-selecting the same already-active package inside its current billing period is idempotent.
-    // This prevents duplicate monthly Active Token grants from double-clicks/retries/Admin reassignment.
-    if($existing&&(int)$existing['package_id']===$packageId&&($existing['status']??'')==='active'&&!empty($existing['current_period_end'])&&strtotime((string)$existing['current_period_end'])>time()) return sf_entitlement_state($userId);
-    if($existing){$u=$pdo->prepare("UPDATE user_subscriptions SET package_id=?,status='active',trial_started_at=NULL,trial_ends_at=NULL,current_period_start=?,current_period_end=?,provider='local',provider_customer_id='',provider_subscription_id='',cancel_at_period_end=0,canceled_at=NULL,grace_ends_at=NULL,updated_at=? WHERE user_id=?");$u->execute([$packageId,$now,$end,$now,$userId]);}
-    else{$u=$pdo->prepare("INSERT INTO user_subscriptions(user_id,package_id,status,trial_started_at,trial_ends_at,current_period_start,current_period_end,created_at,updated_at,provider,provider_customer_id,provider_subscription_id,cancel_at_period_end) VALUES(?,?,'active',NULL,NULL,?,?,?,?,'local','','',0)");$u->execute([$userId,$packageId,$now,$end,$now,$now]);}
-    $tokens=max(0,(int)$p['monthly_tokens']);if($tokens>0)sf_token_adjust($userId,$tokens,'monthly_grant',$source.':'.$p['slug'],[],'Monthly package activation');
+    $pdo->beginTransaction();
+    try{
+        if((string)(sf_db_config()['driver']??'')==='sqlite'){
+            $lock=$pdo->prepare('INSERT OR IGNORE INTO user_token_balances(user_id,balance,updated_at) VALUES(?,0,?)');$lock->execute([$userId,$now]);
+        }else{
+            $lock=$pdo->prepare('SELECT id FROM users WHERE id=? FOR UPDATE');$lock->execute([$userId]);
+            if($lock->fetchColumn()===false)throw new InvalidArgumentException('User not found.');
+        }
+        $q=$pdo->prepare('SELECT id,package_id,status,current_period_end FROM user_subscriptions WHERE user_id=? LIMIT 1');$q->execute([$userId]);$existing=$q->fetch()?:null;
+        // A locked subscription check prevents two concurrent assignments from
+        // each granting the same billing-period allocation.
+        $alreadyActive=$existing&&(int)$existing['package_id']===$packageId&&($existing['status']??'')==='active'&&!empty($existing['current_period_end'])&&strtotime((string)$existing['current_period_end'])>time();
+        if(!$alreadyActive){
+            if($existing){$u=$pdo->prepare("UPDATE user_subscriptions SET package_id=?,status='active',trial_started_at=NULL,trial_ends_at=NULL,current_period_start=?,current_period_end=?,provider='local',provider_customer_id='',provider_subscription_id='',cancel_at_period_end=0,canceled_at=NULL,grace_ends_at=NULL,updated_at=? WHERE user_id=?");$u->execute([$packageId,$now,$end,$now,$userId]);}
+            else{$u=$pdo->prepare("INSERT INTO user_subscriptions(user_id,package_id,status,trial_started_at,trial_ends_at,current_period_start,current_period_end,created_at,updated_at,provider,provider_customer_id,provider_subscription_id,cancel_at_period_end) VALUES(?,?,'active',NULL,NULL,?,?,?,?,'local','','',0)");$u->execute([$userId,$packageId,$now,$end,$now,$now]);}
+            $tokens=max(0,(int)$p['monthly_tokens']);
+            if($tokens>0)sf_token_adjust($userId,$tokens,'monthly_grant',$source.':'.$p['slug'].':'.bin2hex(random_bytes(12)),[],'Monthly package activation');
+        }
+        $pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     return sf_entitlement_state($userId);
 }

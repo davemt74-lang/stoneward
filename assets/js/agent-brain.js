@@ -19,6 +19,9 @@
       (cards||'<p>No saved memories yet.</p>')+
       (brain.personalization_enabled?'<form id="brainRemember" class="auth-form"><label>Memory label<input name="label" maxlength="60" required placeholder="music preference"></label><label>What would you like the Agent to remember?<textarea name="text" maxlength="1200" required rows="3" placeholder="I enjoy acoustic recordings…"></textarea></label><button class="buy-primary" type="submit">Save preference</button></form>':'')+
       '<p id="brainMemoryStatus" role="status" class="player-note"></p></section>'+
+      '<section class="privacy-panel brain-recall-panel"><h3>Find something from an earlier chat</h3><p>Search your recent private conversations for something you told Stonefellow. Results are previous statements, not proof an action succeeded. This search stays on Stonefellow’s server and is not sent to the online LLM.</p>'+
+      (brain.personalization_enabled?'<form id="brainRecallSearch" class="brain-recall-form"><label for="brainRecallQuery">Search earlier conversations</label><div class="brain-recall-controls"><input id="brainRecallQuery" name="query" type="search" maxlength="180" required placeholder="E.g. the playlist we discussed"><button type="submit" class="buy-primary">Find</button></div></form>':'<p>Turn on Personalization in Privacy settings to search previous conversations.</p>')+
+      '<div id="brainRecallResults" class="brain-recall-results" role="status" aria-live="polite"></div></section>'+
       '<section class="privacy-panel"><h3>My conversations</h3>'+(conversations||'<p>Your conversations will appear here after chatting with Stonefellow.</p>')+'</section>'+
       '<section class="privacy-panel"><h3>Published music suggestion</h3><p>Opt in by saving a preference labeled “proactive suggestions” with the text “yes”. You can forget it anytime. Existing CRM engagement consent is also required.</p>'+(suggestion?'<p><strong>'+esc(suggestion.title)+'</strong> — '+esc(suggestion.reason)+'</p>':'<p>No opted-in suggestion available.</p>')+'</section>'+ 
       '<section class="privacy-panel"><h3>Feedback &amp; recovery</h3><p>'+Number(feedbackSummary.total||0)+' rated responses · '+Number(recovery.pending_approval||0)+' planned actions awaiting your approval. Your feedback stays in your account; nothing retries automatically.</p></section>'+ 
@@ -28,6 +31,27 @@
     const one=q=>canvas.querySelector(q),all=q=>Array.from(canvas.querySelectorAll(q));
     one('#brainAccountPrivacy').onclick=()=>navigate('account-privacy');
     all('[data-resume]').forEach(button=>button.onclick=()=>{chooseConversation(button.dataset.resume);navigate('agent-chat');});
+    const findChats=one('#brainRecallSearch');
+    if(findChats)findChats.onsubmit=async event=>{
+      event.preventDefault();
+      const q=String(findChats.elements.query.value||'').trim();if(!q)return;
+      const button=findChats.querySelector('button'),results=one('#brainRecallResults');
+      button.disabled=true;results.textContent='Searching your recent conversations…';
+      try{
+        const found=await api('agent-brain.php?memory_query='+encodeURIComponent(q));
+        const rows=found.brain?.recalled_conversation_excerpts||[];
+        results.replaceChildren();
+        if(!rows.length){results.textContent='No matching earlier statements found in your recent conversations.';return;}
+        rows.forEach(row=>{
+          const item=document.createElement('div');item.className='brain-recall-result';
+          const p=document.createElement('p');p.textContent=(row.date||'Earlier chat')+' · “'+String(row.excerpt||'')+'”';item.append(p);
+          const open=document.createElement('button');open.type='button';open.className='text-control';open.textContent='Open conversation';
+          open.onclick=()=>{chooseConversation(String(row.conversation_id||''));navigate('agent-chat');};
+          item.append(open);results.append(item);
+        });
+      }catch(e){results.textContent=e.message||'Could not search your conversations.';}
+      finally{button.disabled=false;}
+    };
     all('[data-forget]').forEach(button=>button.onclick=async()=>{
       button.disabled=true;try{await post('agent-brain.php',{action:'forget',label:button.dataset.forget});await render({canvas,api,post,esc,chooseConversation,navigate});}
       catch(e){button.disabled=false;one('#brainMemoryStatus').textContent=e.message||'Could not change memory.';}
