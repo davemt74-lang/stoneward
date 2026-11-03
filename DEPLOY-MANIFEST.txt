@@ -1,12 +1,12 @@
-Stonefellow v1.3.231 — Section 91B20E candidate deployment
-Recovered base source commit (historical reference): 16d9097579c328151f5be1dbc58951b70fefecc7
-Scope: Stonefellow PHP/JS source, with local 91B20A/B/C/D/E updates beyond the recovered base commit
-Git metadata: unavailable in this source snapshot; no new commit, pull request or merge is claimed
-Verification: 92/92 focused Node regression checks and JS syntax checks passed; deployment ZIP integrity is checked separately
-Certification: PHP/MySQL/OpenAI staging, provider invoice reconciliation and desktop/mobile visual QA remain required
-Private data: config/secrets, storage and host settings are not included
-Schema: image_generation_references, image_generation_options and image_generation_cost_reviews tables are initialized by sf_image_gen_schema; inspect upgrade.php and api/migrations.php before deployment
-Reference controls: explicit rights acknowledgment, immutable source hash and parent lineage; source-original deletion blocked; approved paid edit only; no automatic publication
-91B20E controls: optional background and alpha-mask editing, hash-pinned mask consent, searchable family gallery, manual invoice USD audits and recent CSV export
-Pilot readiness: Section 83 local source tests do not constitute external Stripe, POD or mailer acceptance
-Safety: no Stripe live payment activation
+Stonefellow v1.3.232 — Section 91B20F Visual Mask Editor
+Base release: v1.3.231, reconciled and merged as Stoneward PR #331 (merge 8412ea9f1dcf562cf2e5eac96de5fde72f7f1275)
+Scope: Admin Image Studio browser-only mask painting, touch/pen/mouse drawing, undo/redo, crop/focus, private PNG upload, responsive dialog and focused tests
+Production artifact: generated only by the GitHub Release Gate after full PR certification; this manifest is not a claim of deployment
+Private data: configuration/secrets, storage/media originals and host-specific settings are not bundled as mutable application source
+Mask permissions: original reference rights, mask rights, exact prompt approval, paid generation approval, generated asset approval, and public publication remain separate explicit steps
+Mask format: black opaque pixels protect the reference; transparent alpha pixels mark editable areas; the PNG is always original reference dimensions
+API: existing Admin-authenticated CSRF-protected media-upload.php stores the mask privately; existing Image Studio PHP verifies source hash, mask hash, geometry and alpha before a paid Image Edits request
+Limits: browser editor supports source dimensions up to 4096 × 4096 and 16 MP; mask output must fit Media Library's 10 MB limit
+Data integrity: all edit gestures are local until the Admin explicitly reviews and uploads the private PNG; no image-generation or public media mutation is automatic
+Tests: section91b20f-visual-mask-editor.test.cjs and section91b20a-e image suite are part of permanent release-gate.yml
+Certification: automated GitHub PR and post-merge workflows required; live OpenAI edit fidelity, Admin upload and iPhone visual QA remain an operator deployment check
