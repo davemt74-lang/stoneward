@@ -113,7 +113,7 @@ ok(str_contains($agent,"return 'library_open'"),'Agent routes My Library/saved-c
 ok(str_contains($agent,"case 'library_open'"),'Agent policy handles My Library');
 ok(str_contains($agent,"'type'=>'open_library'"),'Agent emits first-class library navigation action');
 ok(str_contains($agent,"'library_open'=>'Asks for My Library"),'JEV criteria include My Library');
-ok(str_contains($app,"case'open_library'"),'client executes Agent library navigation');
+ok(preg_match("/case\s*'open_library'/",$app),'client executes Agent library navigation');
 ok(str_contains($agent,"str_contains(\$mq,'collection')"),'Agent chooses Collections tab when requested');
 ok(str_contains($agent,"str_contains(\$mq,'purchase')"),'Agent chooses Purchases tab when requested');
 
