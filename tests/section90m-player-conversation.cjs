@@ -62,7 +62,7 @@ async function run(){
   await sandbox.run({type:'next_track'});await sandbox.run({type:'previous_track'});
   assert.ok(events.includes('step:1')&&events.includes('step:-1'));
   st.track=null;
-  assert.match(await sandbox.run({type:'player_status'}),/No song is loaded/);
+  assert.match(await sandbox.run({type:'player_status'}),/No published song is loaded/);
   assert.match(await sandbox.run({type:'resume_player'}),/no song loaded/);
   assert.equal(await sandbox.run({type:'open_view'}),null,'unrelated Agent actions still use existing dispatcher');
   assert.match(app,/\.\.\.playerState\(\)/,'voice and typed Agent receive current playback state');
