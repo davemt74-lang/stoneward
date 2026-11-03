@@ -27,6 +27,7 @@
     const heading = el('h3', '', state.title || 'Current song section');
     const meta = el('p', 'song-experience-meta', clock(state.start_ms) + ' – ' + (state.end_ms == null ? 'Live' : clock(state.end_ms)));
     const phaseLabels = {
+      starting: 'Starting lyric listening…', stopping: 'Stopping lyric listening…', unavailable: 'Player-track recognition unavailable',
       capturing: 'Listening now', captured: 'Recorded · ready to transcribe',
       transcribing: 'Creating an unverified lyric draft…', draft: 'Unverified transcript ready',
       analyzing: 'Reviewing lyrics and Stonefellow song notes…', report: 'Lyric interpretation ready',

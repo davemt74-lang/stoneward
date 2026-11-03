@@ -502,6 +502,8 @@ function sf_agent_local_route(string $message,array $client=[]): string {
     return 'general_conversation';
 }
 function sf_agent_policy(string $route,string $message,array $client=[],?int $userId=null): array {
+    if($route==='song_capture_start'&&sf_agent_explicit_song_capture_route($message,$client)==='song_capture_live_start')
+        $route='song_capture_live_start';
     $active=(string)($client['active_track_id']??'');
     // Player-owned capture actions operate on the browser's reported state.
     // They must not require a catalog lookup or a private DB read just to

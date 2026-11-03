@@ -896,3 +896,20 @@ body.sf-agent-canvas-active .notification-drawer .drawer-tabs button{font-size:1
   .notification-drawer .sf-drawer-entity:not(.album):not(.merchandise){flex-direction:column;}
   .notification-drawer .sf-drawer-entity-actions{justify-content:flex-start;}
 }
+
+/* 91B21B3 — lyric sidebar and persistent controls; no second recording UI. */
+.sf-agent-lyric-controls[hidden]{display:none!important}
+.sf-agent-landing .sf-agent-lyric-controls{display:flex;justify-content:center;gap:8px;margin:8px auto;max-width:100%;pointer-events:auto}
+.sf-agent-landing .sf-agent-lyric-controls button{min-height:44px;padding:9px 14px;border:1px solid var(--sf-atmo-border,#8bb9df);border-radius:10px;color:inherit;background:#102034;white-space:nowrap}
+.sf-agent-landing .sf-agent-lyric-controls button[hidden]{display:none!important}
+.sf-agent-landing .sf-agent-lyric-controls button:disabled{opacity:.65}
+.sf-agent-landing .sf-agent-lyric-controls button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.sf-agent-landing .sf-agent-lyric-workspace{min-width:0;padding:12px}
+.sf-agent-landing .sf-agent-lyric-workspace[hidden]{display:none!important}
+.sf-agent-landing .sf-agent-lyric-workspace .song-experience-card{margin:0;max-width:100%;overflow-wrap:anywhere}
+.sf-agent-landing .sf-agent-lyric-workspace .song-experience-transcript,.sf-agent-landing .sf-agent-lyric-workspace .song-experience-report{max-height:none;overflow:visible}
+.sf-agent-landing .sf-agent-lyric-workspace textarea,.sf-agent-landing .sf-agent-lyric-workspace input{font-size:16px;max-width:100%;box-sizing:border-box}
+.sf-agent-landing .sf-agent-lyric-workspace .song-experience-actions{flex-wrap:wrap}
+.sf-agent-landing .sf-agent-lyric-workspace button{min-height:44px}
+
+.sf-agent-landing .sf-agent-page-rail.open[data-view="lyrics"]{width:min(460px,100%);left:0;top:0;height:100%;border-radius:0}

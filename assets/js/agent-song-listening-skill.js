@@ -144,7 +144,7 @@
       if (active !== session) return { ok: false, text: session.reason || 'Could not start player-track recognition.' };
       emit();
       return { ok: true, text: 'Listening to “' + session.title +
-        '” through the player (browser speech service; no clip saved). Select Stop listening for Claude interpretation.' };
+        '” through the player (browser speech service; no clip saved). Select Stop listening to review the lyric draft before interpretation.' };
     }
     async function stop(reason = 'user') {
       const session = active;
