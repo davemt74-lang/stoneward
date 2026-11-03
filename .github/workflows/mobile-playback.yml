@@ -1,0 +1,43 @@
+name: Mobile Playback Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  mobile-playback-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recovery behavior and existing early-end/range regressions
+        run: |
+          node --check assets/js/app.js
+          node --check assets/js/player-playback-lifecycle.js
+          node --test tests/section91b21b2-playback.cjs
+          node tests/section91b14d-playback-completion.cjs
+          php tests/section91b14d-media-stream-range.php
+      - name: Production media HTTP route and same-session concurrency
+        run: python3 tests/section91b21b2-media-http.py
+      - name: Browser dependencies
+        run: |
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          python3 -m pip install playwright==1.57.0
+          python3 -m playwright install --with-deps chromium
+      - name: Real MP3 decode, quarter-track recovery and full completion
+        env:
+          CHROMIUM_EXECUTABLE: /nonexistent/use-playwright-chromium
+        run: python3 tests/section91b21b2-browser.py

@@ -1,0 +1,44 @@
+name: Prepare 91B21B2 integration
+on:
+  push:
+    branches: [codex/91b21b2-mobile-playback]
+    paths: [.github/workflows/91b21b2-prepare.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: github.repository == 'davemt74-lang/stoneward' && github.ref == 'refs/heads/codex/91b21b2-mobile-playback'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply hash-checked source edits and test
+        run: |
+          set -euo pipefail
+          python3 .github/91b21b2-integrate.py
+          node --check assets/js/app.js
+          node --test tests/section91b21b2-playback.cjs
+          node tests/section91b14d-playback-completion.cjs
+          php -l api/media.php
+          python3 tests/section91b21b2-media-http.py
+      - name: Commit only application integration on this branch
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          branch=codex/91b21b2-mobile-playback
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$EXPECTED_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .htaccess admin/index.php api/media.php assets/css/turntable-builder.css assets/js/app.js service-worker.js stonefellow-v120.php version.php tests/section91b14c-ios-lunar-mobile.cjs tests/section91b20h-visual-style-library.test.cjs
+          git commit -m 'fix(91B21B2): verified mobile resume and session-unlocked media (v1.3.238)'
+          git push origin "HEAD:refs/heads/$branch"
