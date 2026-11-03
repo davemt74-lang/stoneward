@@ -146,7 +146,7 @@
         const matching=links.filter(x=>x.role===s.role||(s.type==='track'&&s.role==='artwork'&&x.role==='primary_artwork'));
         const old=matching.find(x=>Number(x.public_visible)===1&&Number(x.featured)===1)||matching.find(x=>Number(x.public_visible)===1)||null;
         const oldUrl=old?.uuid?'../api/media.php?id='+encodeURIComponent(old.uuid):'';
-        compare.innerHTML=currentView('Current published media',oldUrl,s.shape,false)+currentView('Proposed',imageUrl,s.shape,true);
+        compare.innerHTML=currentView('Current',oldUrl,s.shape,false)+currentView('Proposed',imageUrl,s.shape,true);
         currentLinkId=canApply?Number(h.current_link_id||0):0;
         const candidate=links.find(x=>Number(x.asset_id)===Number(job.media_asset_id)&&x.role===s.role);
         candidateLinkId=candidate?Number(candidate.id):0;
