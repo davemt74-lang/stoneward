@@ -39,7 +39,7 @@ ok(str_contains($app,"play(previous,0,'queue_history')"),'Queue Previous uses lo
 ok(str_contains($app,'agentSessionActive()&&delta>0'),'Agent session remains highest-priority Next behavior');
 ok(str_contains($app,'st.playlistPlayback.playlistId&&st.playlistPlayback.trackIds.length'),'playlist/release playback remains ahead of Up Next');
 ok(str_contains($app,'delta>0&&st.auth.authenticated&&st.queue.items.length'),'manual Next consumes Up Next after session/playlist context');
-ok(str_contains($app,"if(st.queue.items.length){playNextFromQueue();return}"),'track completion falls through to Up Next');
+ok(str_contains($app,"if(st.queue.items.length){void playNextFromQueue(endedToken);return}"),'track completion falls through to Up Next');
 ok(str_contains($app,'loadQueue(true)')&&str_contains($app,'loadAgentListeningSession()'),'queue and Agent session both restore after reload');
 ok(str_contains($app,'queue_count:st.queue.items.length'),'Agent client state includes queue count');
 ok(str_contains($app,'data-queue-placement="next"')&&str_contains($app,'data-queue-placement="end"'),'track page exposes Play Next and Add to Queue');
