@@ -90,7 +90,8 @@ function sf_crm_upsert_contact(string $email,string $name='',string $source='acc
     return sf_crm_contact_by_id((int)sf_db()->lastInsertId())?:[];
 }
 function sf_crm_sync_user(int $userId): ?array {
-    if($userId<1)return null;$q=sf_db()->prepare('SELECT id,email,display_name,status FROM users WHERE id=?');$q->execute([$userId]);$u=$q->fetch();if(!$u)return null;
+    if($userId<1)return null;$q=sf_db()->prepare('SELECT id,email,display_name,status FROM users WHERE id=?');$q->execute([$userId]);$u=$q->fetch();$q->closeCursor();if(!$u)return null;
+    // The nested upsert writes; do not carry a SQLite read cursor into it.
     $contact=sf_crm_upsert_contact((string)$u['email'],(string)$u['display_name'],'account',$userId,null,'');
     return $contact?:null;
 }

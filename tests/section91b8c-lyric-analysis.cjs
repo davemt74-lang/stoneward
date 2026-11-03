@@ -14,9 +14,9 @@ const capture={track_id:'track-1',start_ms:12100,end_ms:27700};
 const draft={track_id:'track-1',start_ms:12100,end_ms:27700,captured_at:'2026-10-30T10:12:35Z',
   text:'Recognized but unverified words',title:'Genius of Unhumankind',review_status:'unverified'};
 const requests=[];const messages=[];const experienceUpdates=[];
-let available=capture,mode='ok';
+let available=capture,mode='ok',listening=false;
 const context={songAnalysisBusy:false,songLyricReport:null,songLyricDraft:draft,songLyricCorrected:'',
-  songCaptureSkill:{getCapture:()=>available},currentSongSource:()=>available,Intl,
+  songCaptureSkill:{getCapture:()=>available},songListeningSkill:{status:()=>({active:listening})},currentSongSource:()=>available,Intl,
   popupEntry:(role,text)=>messages.push({role,text}),
   updateSongExperience:(state)=>experienceUpdates.push(state),songExperience:{reports:[]},
   secureJsonPost:async(api,payload)=>{requests.push({api,payload});if(mode==='fail')throw Error('Provider unavailable');
@@ -28,7 +28,11 @@ vm.createContext(context);
 vm.runInContext(app.slice(start,end)+'\nthis.analyze=analyzeLastSongDraft;this.getReport=()=>songLyricReport;',context);
 async function main(){
   check('No background provider request occurs',()=>assert.equal(requests.length,0));
-  const response=await context.analyze('Explain the word choice in this verse');
+  listening=true;const whileListening=await context.analyze('Explain these words');
+  check('Active lyric selection cannot disclose the previous draft for interpretation',()=>{
+    assert.match(whileListening,/stop lyric listening/i);assert.equal(requests.length,0);
+  });
+  listening=false;const response=await context.analyze('Explain the word choice in this verse');
   check('Explicit analysis returns only lyrical interpretation without spoken metadata',()=>{
     assert.match(response,/metaphor/i);
     assert.doesNotMatch(response,/unverified transcript|no live web sources|credit|timestamp/i);

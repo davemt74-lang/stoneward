@@ -1,0 +1,82 @@
+name: Mobile Catalog Lyrics Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  catalog-lyrics-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-ci-only
+          MYSQL_DATABASE: stonefellow_lyrics_test
+        ports: ['33306:3306']
+        options: --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pisolated-ci-only" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, curl, fileinfo
+          coverage: none
+      - name: Catalog listening lifecycle and legacy lyric routing
+        run: |
+          node --test tests/section91b21b4-catalog-listening.cjs
+          node --test tests/section91b21b3-lyrics.test.cjs
+          node tests/section91b13b-player-track-listening.cjs
+          node tests/section91b13e-lyric-review-gate.cjs
+      - name: Codec fixtures and independent audio decoder
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
+          SF_REQUIRE_AUDIO_DECODE_TESTS=1 php tests/section91b21b4-audio-excerpt.php
+      - name: SQLite catalog authorization, duplicate requests, and token settlement
+        env:
+          SF_TEST_DRIVER: sqlite
+        run: php tests/section91b21b4-catalog-transcribe.php
+      - name: MySQL catalog authorization, duplicate requests, and token settlement
+        env:
+          SF_TEST_DRIVER: mysql
+          SF_TEST_MYSQL_PASSWORD: isolated-ci-only
+        run: php tests/section91b21b4-catalog-transcribe.php
+  catalog-lyrics-browser:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Browser dependencies
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps ${{ matrix.browser }}
+      - name: Production lyric controls with synthetic provider responses
+        env:
+          SF_LYRICS_BROWSER: ${{ matrix.browser }}
+          SF_LYRICS_EVIDENCE: catalog-lyric-evidence
+        run: python tests/section91b21b4-catalog-browser.py
+      - name: Retain screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalog-lyrics-${{ matrix.browser }}
+          path: catalog-lyric-evidence
+          if-no-files-found: ignore

@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.239';
+  window.STONEFELLOW_APP_BUILD='1.3.240';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -190,8 +190,8 @@
     invoke:executePlayerAgentAction,
     getState:()=>({...playerState(),track_id:observedPlayer().track?.id||'',title:observedPlayer().track?.title||''})
   });
-  // Independent browser paths: Listen & Interpret recognizes a player track
-  // without making an audio clip. Record Clip is the only MediaRecorder path.
+  // Listen & Interpret owns lyric drafts. Record Clip remains the independent
+  // browser recording path; mobile lyric excerpts are created on the server.
   let songExperience=null;
   let songListeningReceipt=null;
   const songCaptureSkill=window.StonefellowSongCapture?.create({
@@ -288,42 +288,72 @@
     }
   });
   $('#playerMomentsButton')?.addEventListener('click',()=>songMoments?.open());
-  // VP3-style live speech recognition from the player's actual audio track.
-  // This is distinct from Record Clip: no MediaRecorder, Blob or OpenAI call.
-  // The browser's recognition service may process song audio online.
-  const songListeningSkill=window.StonefellowSongListening?.create({
+  async function finishSongListening(result){
+    const mode=result.listening_mode||'recognition';
+    if(songExperience?.listening_mode!==mode||
+        (mode==='catalog'&&songExperience.request_id!==result.request_id))return result.text;
+    if(!result.ok||!result.receipt||String(st.track?.id)!==String(result.receipt.track_id)){
+      updateSongExperience({phase:'discarded',live_enabled:false,end_ms:Math.round((audio.currentTime||0)*1000),
+        message:result.error||result.text},true);
+      return result.error||result.text;
+    }
+    const draft=Object.freeze({...result.receipt});
+    songListeningReceipt=draft;songLyricDraft=draft;
+    songLyricCorrected='';songPersonalNote='';songLyricReport=null;
+    updateSongExperience({phase:'draft',live_enabled:false,start_ms:draft.start_ms,end_ms:draft.end_ms,
+      transcript:draft.text,corrected:'',reports:[],saved_note_id:null,
+      message:mode==='catalog'?'The temporary song section has been converted into an unverified lyric draft. Review or correct the words before interpretation.':
+        'Unverified browser-recognized lyrics are ready. No song clip was created or saved.'},true);
+    // Even a Listen & Interpret command first offers the listener a chance
+    // to correct the draft. Interpretation is a separate explicit request.
+    if(songExperience.auto_interpret){
+      updateSongExperience({message:'Review these words or tap the pencil to correct them, then select Review & interpret lyrics.'},true);
+      return 'Lyric draft ready. Review or correct the words, then select Review & interpret lyrics.';
+    }
+    return 'An unverified lyric transcript is ready for “'+draft.title+'.” Select Interpret lyrics when ready.';
+  }
+  // Desktop browsers with player-track recognition keep their existing path.
+  const browserSongListeningSkill=window.StonefellowSongListening?.create({
     audio,getTrack:()=>st.track,
     onUpdate:part=>{
       if(songExperience?.listening_mode!=='recognition'||songExperience.phase==='stopping'||songExperience.track_id!==part.track_id)return;
       updateSongExperience({phase:'capturing',transcript:[part.text,part.interim].filter(Boolean).join(' '),
         end_ms:null,live_enabled:true,message:'Live words are provisional and may be inaccurate. Stop listening to interpret; no song clip is being saved.'});
     },
-    onFinish:async result=>{
-      if(songExperience?.listening_mode!=='recognition')return result.text;
-      if(!result.ok||!result.receipt||String(st.track?.id)!==String(result.receipt.track_id)){
-        updateSongExperience({phase:'discarded',live_enabled:false,end_ms:Math.round((audio.currentTime||0)*1000),
-          message:result.reason==='error'?(result.error||'Player-track recognition failed. No recording was saved.'):result.text},true);
-        return result.error||result.text;
-      }
-      const draft=Object.freeze({...result.receipt});
-      songListeningReceipt=result.receipt;
-      songLyricDraft=draft;
-      songLyricCorrected='';songPersonalNote='';songLyricReport=null;
-      updateSongExperience({phase:'draft',live_enabled:false,end_ms:draft.end_ms,
-        transcript:draft.text,corrected:'',reports:[],saved_note_id:null,
-        message:'Unverified browser-recognized lyrics are ready. No song clip was created or saved.'},true);
-      // Stop first shows the draft to the listener. Even when the original
-      // command was Listen & Interpret, never submit estimated words before
-      // the listener has a chance to correct them with the pencil control.
-      if(songExperience.auto_interpret){
-        updateSongExperience({message:'Review these words or tap the pencil to correct them, then select Review & interpret lyrics.'},true);
-        return 'Lyric draft ready. Review or correct the words, then select Review & interpret lyrics.';
-      }
-      return 'An unverified lyric transcript is ready for “'+draft.title+'.” Select Interpret lyrics when ready.';
-    }
+    onFinish:finishSongListening
+  });
+  const catalogSongListeningSkill=window.StonefellowCatalogListening?.create({
+    audio,getTrack:()=>st.track,
+    prepare:async(trackId,sourceRef,signal)=>{
+      const response=await fetch((cfg.apiBase||'api')+'/agent-song-catalog-transcribe.php?track_id='+encodeURIComponent(trackId)+'&source_ref='+encodeURIComponent(sourceRef),
+        {credentials:'same-origin',signal});
+      const payload=await response.json().catch(()=>({ok:false,message:'Song transcription availability could not be checked.'}));
+      if(response.status===401)throw new Error('Sign in to convert a song section into a lyric draft.');
+      if(!response.ok||payload.ok!==true)throw new Error(payload.message||'Song transcription is unavailable.');
+      return payload;
+    },
+    submit:(payload,signal)=>secureJsonPost('agent-song-catalog-transcribe.php',payload,false,signal),
+    onUpdate:part=>{
+      if(songExperience?.listening_mode!=='catalog'||String(songExperience.track_id)!==part.track_id)return;
+      if(songExperience.request_id&&songExperience.request_id!==part.request_id)return;
+      const changes={phase:part.phase,request_id:part.request_id,start_ms:part.start_ms,
+        end_ms:part.phase==='transcribing'?part.end_ms:null,live_enabled:false};
+      if(part.text)changes.message=part.text;
+      updateSongExperience(changes);
+    },
+    onFinish:finishSongListening
+  });
+  const songListeningSkill=window.StonefellowCatalogListening?.combine(browserSongListeningSkill,catalogSongListeningSkill,()=>{
+    return !!window.StonefellowSongListening?.supportsPlayerTrack?.()&&
+      typeof(audio?.captureStream||audio?.mozCaptureStream)==='function';
+  })||browserSongListeningSkill;
+  window.addEventListener('pagehide',()=>{
+    if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');
   });
   function currentSongSource(){
-    if(songLyricDraft?.provider==='browser-speech-recognition')return songListeningReceipt;
+    if(songLyricDraft?.provider==='browser-speech-recognition'||songLyricDraft?.source==='catalog-audio'){
+      return songListeningReceipt;
+    }
     return songCaptureSkill?.getCapture();
   }
   let songTranscriptionBusy=false;
@@ -340,7 +370,7 @@
     renderPopupEntries();
     window.SFCustomerAgentChat?.onSongExperience?.();
     window.SFPublicAgentCanvas?.syncSongExperience?.();
-    window.SFPublicAgentCanvas?.setState?.(songExperience.phase==='capturing'?(songExperience.listening_mode==='recognition'?'listening':'recording'):
+    window.SFPublicAgentCanvas?.setState?.(songExperience.phase==='capturing'?(songExperience.listening_mode==='catalog'?'listening':songExperience.listening_mode==='recognition'?'listening':'recording'):
       ['transcribing','analyzing'].includes(songExperience.phase)?'thinking':st.playing?'playing':'idle');
     // Agent Canvas displays transcript and analysis in its attached orb panel.
     // Keep the chat popup under the visitor's explicit control in that template.
@@ -429,6 +459,7 @@
     finally{songTranscriptionBusy=false}
   }
   async function analyzeLastSongDraft(question){
+    if(songListeningSkill?.status().active)return 'Stop lyric listening and review the finished draft before requesting interpretation.';
     const captured=currentSongSource(),draft=songLyricDraft;
     if(!captured||!draft||draft.track_id!==captured.track_id||draft.start_ms!==captured.start_ms||draft.end_ms!==captured.end_ms)
       return 'Please capture and transcribe a song section before asking me to analyze it.';
@@ -465,28 +496,35 @@
     if(action.type==='song_capture_live_start'){
       if(songTranscriptionBusy||songAnalysisBusy)return 'Finish the current lyric request before starting another.';
       if(songCaptureSkill?.status().active)return 'Record Clip is active. Stop that recording before choosing Listen & Interpret.';
-      if(!songListeningSkill)return 'Live player-track recognition is unavailable. No audio recording was started.';
+      if(!songListeningSkill)return 'Song lyric listening is unavailable. No audio recording was started.';
       if(songListeningSkill.status().active){window.SFPublicAgentCanvas?.openLyrics?.();return 'Already listening to the song. Select Stop listening to review the lyrics.';}
-      const started=songListeningSkill.begin();
+      const previousExperience=songExperience,mode=songListeningSkill.mode?.()||'recognition';
+      const attempt={phase:'starting',listening_mode:mode,title:st.track?.title||'Listen & Interpret',
+        track_id:String(st.track?.id||''),start_ms:Math.round((audio.currentTime||0)*1000),end_ms:null,
+        transcript:'',corrected:'',reports:[],live_enabled:false,auto_interpret:!!action.interpret_on_stop,
+        message:mode==='catalog'?'Checking song transcription availability…':'Starting lyric listening…'};
+      songExperience=attempt;updateSongExperience({});window.SFPublicAgentCanvas?.openLyrics?.();
+      const started=await songListeningSkill.begin();
+      if(songExperience!==attempt)return started.text;
       if(!started.ok){
-        // Unsupported devices must not silently switch to Record Song or the microphone.
-        songExperience={phase:'unavailable',listening_mode:'recognition',title:st.track?.title||'Listen & Interpret',
-          track_id:String(st.track?.id||''),start_ms:Math.round((audio.currentTime||0)*1000),end_ms:null,
-          transcript:'',corrected:'',reports:[],live_enabled:false,message:started.text};
-        updateSongExperience({});window.SFPublicAgentCanvas?.openLyrics?.();return started.text;
+        // A readiness failure must not erase a previously reviewed lyric draft.
+        if(previousExperience?.transcript&&String(previousExperience.track_id)===String(st.track?.id))songExperience=previousExperience;
+        updateSongExperience({phase:songExperience===previousExperience?songExperience.phase:started.canceled?'discarded':'unavailable',message:started.text});
+        return started.text;
       }
+      if(!songListeningSkill.status().active)return started.text;
       songListeningReceipt=null;songLyricDraft=null;songLyricReport=null;songLyricCorrected='';songPersonalNote='';
-      songExperience={phase:'capturing',listening_mode:'recognition',title:st.track?.title||'Song section',
+      Object.assign(songExperience,{phase:'capturing',listening_mode:mode,title:st.track?.title||'Song section',
         track_id:songListeningSkill.status().track_id,start_ms:songListeningSkill.status().start_ms,
-        end_ms:null,transcript:'',corrected:'',reports:[],saved_note_id:null,live_enabled:true,
+        end_ms:null,transcript:'',corrected:'',reports:[],saved_note_id:null,live_enabled:mode==='recognition',
         auto_interpret:!!action.interpret_on_stop,
-        message:'Listening to the song through the browser speech service. No recording is retained.'};
+        message:mode==='catalog'?'Selecting this song section. Stop converts a temporary excerpt to text with OpenAI. Your microphone and Record Clip remain off.':
+          'Listening to the song through the browser speech service. No recording is retained.'});
       updateSongExperience({},true);
-      window.SFPublicAgentCanvas?.openLyrics?.();
       return started.text;
     }
     if(action.type==='song_capture_stop'&&songListeningSkill?.status().active){
-      updateSongExperience({phase:'stopping',message:'Stopping lyric listening…'});
+      if(songExperience?.listening_mode!=='catalog')updateSongExperience({phase:'stopping',message:'Stopping lyric listening…'});
       return (await songListeningSkill.stop()).text;
     }
     if(!songCaptureSkill)return 'Song-section audio capture is unavailable. Playback was not changed.';
@@ -498,7 +536,9 @@
     if(action.type==='song_capture_stop')return (await songCaptureSkill.stop()).text;
     if(action.type==='song_capture_transcribe')return await transcribeLastCapturedSong();
     if(action.type==='song_capture_analyze')return await analyzeLastSongDraft(action.question);
-    if(songListeningSkill?.status().active)return 'Transcribing lyrics from the player. Select Stop listening to review; no song clip is recorded.';
+    if(songListeningSkill?.status().active)return songExperience?.listening_mode==='catalog'
+      ?songExperience.phase==='transcribing'?'The selected song section is being converted into text. Stop waiting discards the local result.':'Selecting the current song section. Stop sends its temporary audio excerpt to OpenAI for a lyric draft.'
+      :'Transcribing lyrics from the player. Select Stop listening to review; no song clip is recorded.';
     const snapshot=songCaptureSkill.status();
     if(snapshot.active)return 'I am recording the current song from '+Math.round(snapshot.start_ms/1000)+' seconds. Stop Record Clip to finish.';
     return snapshot.last?'The last song section is recorded and ready for optional transcription.':'There is no song listening or recording session in progress.';
@@ -507,8 +547,9 @@
   // corrected lyrics and personal notes never enter a routine LLM prompt.
   // Both typed and spoken turns use liveAgent(), so their behavior is identical.
   function currentSongDraft(){
+    if(songListeningSkill?.status().active)return null;
     const capture=currentSongSource(),draft=songLyricDraft;
-    return capture&&draft&&st.track?.id===draft.track_id&&
+    return capture&&draft&&String(st.track?.id)===String(draft.track_id)&&
       capture.track_id===draft.track_id&&capture.start_ms===draft.start_ms&&
       capture.end_ms===draft.end_ms?draft:null;
   }
@@ -1206,11 +1247,13 @@
     }
     return j;
   }
-  async function secureJsonPost(path,payload,retried=false){
+  async function secureJsonPost(path,payload,retried=false,signal){
+    if(signal?.aborted)throw new Error('The request was canceled.');
     if(!st.auth.csrf)await loadAuth(true);
-    const r=await fetch((cfg.apiBase||'api')+'/'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':st.auth.csrf||''},body:JSON.stringify(payload||{})});
+    if(signal?.aborted)throw new Error('The request was canceled.');
+    const r=await fetch((cfg.apiBase||'api')+'/'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':st.auth.csrf||''},body:JSON.stringify(payload||{}),signal});
     let j={};try{j=await r.json()}catch(_){throw new Error('The server returned an invalid response.')}
-    if(r.status===403&&j.error==='csrf_failed'&&!retried){await loadAuth(true);return secureJsonPost(path,payload,true)}
+    if(r.status===403&&j.error==='csrf_failed'&&!retried){await loadAuth(true);return secureJsonPost(path,payload,true,signal)}
     if(!r.ok||j.ok===false){const e=new Error(j.message||j.error||'Request failed.');e.payload=j;e.status=r.status;throw e}
     return j;
   }

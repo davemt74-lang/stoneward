@@ -7,7 +7,8 @@ assert.ok(start>0&&end>start,'Private annotation commands exist before LLM dispa
 let passes=0;const check=(name,fn)=>{fn();passes++;console.log('91B8E PASS: '+name)};
 const capture={track_id:'one',start_ms:10000,end_ms:24000,captured_at:'2026-10-29T10:12:35Z'};
 const draft={...capture,title:'First Track',text:'Unverified guess',review_status:'unverified'};
-const post=[],notes=[],scope={songCaptureSkill:{getCapture:()=>capture},currentSongSource:()=>capture,songLyricDraft:draft,
+let listening=false;
+const post=[],notes=[],scope={songCaptureSkill:{getCapture:()=>capture},songListeningSkill:{status:()=>({active:listening})},currentSongSource:()=>capture,songLyricDraft:draft,
   songLyricCorrected:'',songLyricReport:null,songPersonalNote:'',st:{track:{id:'one'},conversationId:'old'},
   updateSongExperience:()=>{},
   localStorage:{removeItem:()=>{}},
@@ -19,7 +20,9 @@ const post=[],notes=[],scope={songCaptureSkill:{getCapture:()=>capture},currentS
 vm.createContext(scope);vm.runInContext(app.slice(start,end)+'\nthis.command=executePrivateAnnotationCommand;',scope);
 async function main(){
   check('No private upload happens on startup',()=>assert.equal(post.length,0));
-  let r=await scope.command('Correct the lyrics to Better words here');
+  listening=true;let r=await scope.command('Save this lyric note');
+  check('Active lyric listening cannot save the previous draft',()=>{assert.match(r,/no current/i);assert.equal(post.length,0);});
+  listening=false;r=await scope.command('Correct the lyrics to Better words here');
   check('Correction stays in browser and keeps original draft',()=>{
     assert.match(r,/original machine draft is preserved/i);
     assert.equal(scope.songLyricCorrected,'Better words here');assert.equal(scope.songLyricDraft.text,'Unverified guess');
