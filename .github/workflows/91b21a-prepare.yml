@@ -1,0 +1,53 @@
+name: Prepare 91B21A integration
+on:
+  push:
+    branches: [codex/91b21a-subscription-session-correctness]
+    paths:
+      - '.github/workflows/91b21a-prepare.yml'
+      - '.github/91b21a-integrate.py'
+      - 'api/subscription-policy.php'
+      - 'tests/section91b21a-*'
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: github.repository == 'davemt74-lang/stoneward' && github.ref == 'refs/heads/codex/91b21a-subscription-session-correctness'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - name: Apply source integration and execute real SQLite acceptance
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor d881aa4814d641fb894b44cef159144dcd3e3c95 HEAD
+          python .github/91b21a-integrate.py
+          git diff --check
+          php -l api/subscription-policy.php
+          git diff --name-only -- '*.php' | xargs -r -n1 php -l
+          php tests/section91b21a-policy.php
+          SF_TEST_DRIVER=sqlite php tests/section91b21a-runtime.php
+      - name: Commit tested application changes to the working branch only
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          branch=codex/91b21a-subscription-session-correctness
+          actual="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          test "$actual" = "$EXPECTED_HEAD"
+          git rm .github/91b21a-integrate.py
+          git add api admin assets tests .htaccess service-worker.js stonefellow-v120.php version.php
+          if git diff --cached --name-only | grep -q '^.github/workflows/'; then
+            echo 'Unexpected workflow change in application integration'; exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(91B21A): enforce subscription periods and revocable sessions (v1.3.236)'
+          git push origin "HEAD:refs/heads/$branch"
