@@ -32,7 +32,7 @@ ok(str_contains($js,'data-remove-playlist-item')&&str_contains($js,"action:'remo
 ok(str_contains($js,'id="addPlaylistTrack"')&&str_contains($js,"action:'add_track'"),'playlist add-track UI is wired');
 ok(str_contains($js,'function playPlaylist(')&&str_contains($js,'playlistPlayback'),'playlist playback context exists');
 ok(str_contains($js,"st.playlistPlayback.index++")&&str_contains($js,"play(t,0,'playlist',true)"),'playlist auto-advances on track completion');
-ok(str_contains($js,"source:st.playSource||'player'")&&str_contains($js,"play(t,0,'agent')"),'agent playback is tagged for session capture');
+ok(str_contains($js,"source:st.playSource||'player'")&&str_contains($js,"await play(track,0,'agent')"),'agent playback is tagged for session capture');
 ok(str_contains($js,'copyPlaylistLink')&&str_contains($js,"p.visibility==='public'"),'public playlists expose a share-link control');
 ok(str_contains($css,'.playlist-track-row')&&str_contains($css,'.playlist-summary')&&str_contains($css,'.playlist-card'),'playlist responsive styles exist');
 ok(str_contains($version,"'playlists'=>'ordered-public-private-agent'"),'version endpoint retains v1.3 Section 2 playlist capability');
