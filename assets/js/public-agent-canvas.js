@@ -348,7 +348,7 @@
       floater.dataset.mode=mode;
       status.textContent=hearing?(lyric.phase==='starting'?'PREPARING LYRIC LISTENING':
         lyric.phase==='stopping'?'STOPPING LYRIC TRANSCRIPTION':
-          lyric.listening_mode==='catalog'&&lyric.phase==='capturing'?'SELECTING SONG SECTION':'TRANSCRIBING LYRICS'):
+          lyric.listening_mode==='catalog'&&lyric.phase==='capturing'?'SELECTING SONG SECTION':lyric.lyrics_source==='saved-catalog-lyrics'?'LOADING SAVED LYRICS':'TRANSCRIBING LYRICS'):
         label || ({idle:'AGENT READY',music:'MUSIC PLAYING',listening:'LISTENING',thinking:'THINKING',speaking:'RESPONDING',recording:'CAPTURING LYRICS'}[mode]);
       sphere.setAttribute('aria-label',mode==='speaking'?'Stop Stonefellow speaking':'Expand Stonefellow Agent canvas');
       sphere.title=mode==='speaking'?'Stop speaking':'Expand Agent Canvas';
@@ -387,7 +387,7 @@
       lyricStop.hidden=!lyricBusy;lyricStop.disabled=lyric?.phase==='stopping';
       lyricStop.textContent=lyric?.phase==='stopping'?'Stopping…':lyric?.listening_mode==='catalog'&&lyric?.phase==='transcribing'?'Stop waiting':'Stop';
       lyricStop.title=lyric?.listening_mode==='catalog'&&lyric?.phase==='transcribing'
-        ?'Discard the local result. An already submitted transcription may still use Active Tokens.':'Finish this lyric selection';
+        ?(lyric.lyrics_source==='saved-catalog-lyrics'?'Discard this saved lyric lookup.':'Discard the local result. An already submitted transcription may still use Active Tokens.'):'Finish this lyric selection';
       for(const button of root.querySelectorAll('[data-orbit-action="player"]'))button.hidden=!player||player.hidden;
       // The playlist tool belongs to the ring even before a mix is created.
       for(const button of root.querySelectorAll('[data-orbit-action="playlist"]'))button.hidden=false;

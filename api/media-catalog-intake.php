@@ -251,8 +251,13 @@ function sf_media_catalog_publish_draft(int $owner,string $key,string $expectedH
         $id=sf_agent_song_catalog_track_id($key);
         if(($draft['status']??'')==='published'){
             if(($draft['published_track_id']??'')!==$id)throw new RuntimeException('Inconsistent publication receipt.');
-            foreach(sf_catalog() as $row)if(($row['id']??'')===$id)
+            $rows=sf_catalog();
+            foreach($rows as $row)if(($row['id']??'')===$id){
+                if(function_exists('sf_track_is_public'))try{
+                    require_once __DIR__.'/song-lyrics-import.php';sf_song_lyrics_import_on_publish($owner,$id,$rows);
+                }catch(Throwable $e){error_log('[Song lyric import activation] '.get_class($e));}
                 return ['changed'=>false,'track_id'=>$id,'publication'=>'published'];
+            }
             throw new RuntimeException('Published receipt has no Catalog record.');
         }
         if(($draft['status']??'')!=='draft')throw new RuntimeException('Use the prepared Catalog review for this song.');
@@ -331,6 +336,9 @@ function sf_media_catalog_publish_draft(int $owner,string $key,string $expectedH
         if(file_put_contents($tmp,$json,LOCK_EX)===false)throw new RuntimeException('Could not save publication receipt.');
         chmod($tmp,0600);
         if(!rename($tmp,$path)){@unlink($tmp);throw new RuntimeException('Could not finalize publication receipt.');}
+        if(function_exists('sf_track_is_public'))try{
+            require_once __DIR__.'/song-lyrics-import.php';sf_song_lyrics_import_on_publish($owner,$id,$catalog);
+        }catch(Throwable $e){error_log('[Song lyric import activation] '.get_class($e));}
         return ['changed'=>true,'track_id'=>$id,'publication'=>'published','preview_only'=>!$split];
     }finally{flock($lock,LOCK_UN);fclose($lock);}
 }

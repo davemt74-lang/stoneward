@@ -7,7 +7,8 @@ if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sf_json_response(['ok'=>false,'erro
 $user=sf_require_user(false,true);
 header('Cache-Control: no-store');
 try{
-    $request=sf_song_analysis_request(sf_request_json(),sf_agent_public_catalog());
+    $raw=sf_request_json();
+    $request=sf_song_analysis_saved_lyrics(sf_song_analysis_request($raw,sf_agent_public_catalog()),$raw,($user['role']??'')==='admin');
     $userId=(int)$user['id'];
     // The listener explicitly authorizes this report per request. Only public
     // knowledge plus THIS account's consented listening summary may be sent.

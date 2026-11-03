@@ -657,13 +657,26 @@ jobs:
           SF_REQUIRE_AUDIO_DECODE_TESTS=1 php tests/section91b21b4-audio-excerpt.php
           php tests/section91b21b4-catalog-transcribe.php
 
+      - name: Saved song lyrics and host settings preservation
+        env:
+          SF_TEST_DRIVER: sqlite
+        run: |
+          node --test tests/section91b22a-lyric-timeline.cjs tests/section91b22a-admin-lyrics.cjs tests/section91b22a-saved-listening.cjs
+          php tests/section91b22a-lyric-timeline.php
+          php tests/section91b22a-lyrics-import.php
+          php tests/section91b22a-saved-section.php
+          php tests/deploy-store-config.php
+          python3 tests/deploy-config-preservation.py
+
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           mkdir -p dist/deploy
           git archive HEAD | tar -x -C dist/deploy
-          rm -rf dist/deploy/.github dist/deploy/tests dist/deploy/storage
+          rm -rf dist/deploy/.github dist/deploy/tests dist/deploy/storage dist/deploy/uploads dist/deploy/data dist/deploy/speech-gateway
+          rm -f dist/deploy/config/store.php dist/deploy/config/database.php dist/deploy/config/secrets.php dist/deploy/.env dist/deploy/.env.local
+          test -s dist/deploy/config/store.default.php
           # These root documents are historical snapshots from older releases.
           # Replace the misleading v1.3.2 manifest with the actual source commit.
           rm -f dist/deploy/AUDIT-REPORT.md dist/deploy/RELEASE-NOTES.md \

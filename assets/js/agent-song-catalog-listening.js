@@ -1,6 +1,7 @@
-/* 91B21B4 — mobile song-section selection and server transcription.
+/* 91B22A — catalog section selection, with stored lyrics lookup for the main application.
  * Only catalog identity and playback times leave this controller. The server
- * creates a temporary bounded audio excerpt after Stop. This module never
+ * retrieves saved lyrics after Stop in savedLyrics mode; the legacy opt-in path
+ * can create a bounded audio excerpt. This module never
  * opens a microphone or the separate Record Clip workflow.
  */
 (() => {
@@ -10,10 +11,12 @@
   const position = audio => Number.isFinite(Number(audio?.currentTime))
     ? Math.max(0, Math.round(Number(audio.currentTime) * 1000)) : null;
   const message = error => String(error?.message || 'Song transcription could not complete.');
+  const savedText = text => typeof text === 'string' && text.length <= 4200 && !!text.trim() &&
+    new TextEncoder().encode(text).length <= 4200;
 
   function create({ audio, getTrack, prepare, submit, onUpdate = () => {}, onFinish = () => {},
     now = () => new Date(), monotonic = () => performance.now(), crypto = window.crypto,
-    eventTarget = window, maxSeconds = 90, requestTimeoutMs = 75000 } = {}) {
+    eventTarget = window, maxSeconds = 90, requestTimeoutMs = 75000, savedLyrics = false } = {}) {
     if (!audio || typeof getTrack !== 'function' || typeof prepare !== 'function' || typeof submit !== 'function')
       throw new Error('Catalog lyric listening requires the current player and authenticated requests.');
     let active = null;
@@ -50,7 +53,7 @@
     }
     function discard(session, reason = 'cancel') {
       return finish(session, { ok: false, canceled: true, reason, receipt: null,
-        text: session.submitted
+        text: savedLyrics ? 'Lyric selection stopped. No audio was sent and no transcription was charged.' : session.submitted
           ? 'Stopped waiting for this lyric draft. The submitted transcription may still complete and use Active Tokens; its result will not replace this session.'
           : 'Lyric selection stopped. No audio was sent for transcription.' });
     }
@@ -110,14 +113,14 @@
         abort: typeof AbortController === 'function' ? new AbortController() : null };
       session.done = new Promise(resolve => { session.resolve = resolve; });
       active = session;
-      emit(session, 'Checking song transcription availability…');
+      emit(session, savedLyrics ? 'Checking saved song lyrics…' : 'Checking song transcription availability…');
       try {
         const ready = await boundedRequest(session, () => prepare(session.track_id, session.audio_ref, session.abort?.signal), 15000);
         if (active !== session || session.ended) return { ok: false, canceled: true, text: 'Lyric selection was canceled.' };
         if (!matches(session) || audio.paused || audio.seeking) {
           await discard(session, 'switch'); return { ok: false, canceled: true, text: 'Playback changed before lyric listening could start.' };
         }
-        if (ready?.ok !== true || ready.available !== true) throw new Error(ready?.message || 'Song transcription is unavailable.');
+        if (ready?.ok !== true || ready.available !== true) throw new Error(ready?.message || (savedLyrics ? 'Saved lyrics are not available for this song yet.' : 'Song transcription is unavailable.'));
         if(typeof ready.source_fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(ready.source_fingerprint))
           throw new Error('The server could not verify the currently playing song source.');
         session.source_fingerprint = ready.source_fingerprint;
@@ -129,9 +132,9 @@
         session.max_ms = Math.min(session.max_ms, Math.max(500, Number(ready.max_seconds || 90) * 1000));
         session.phase = 'capturing';
         session.deadline = setTimeout(() => { void stop('time_limit'); }, session.max_ms + 1000);
-        emit(session, 'Selecting this song section. Stop sends a temporary excerpt to OpenAI for a lyric draft; the microphone is not used.');
+        emit(session, savedLyrics ? 'Selecting this song section. Stop retrieves its saved lyrics; no audio is sent for transcription.' : 'Selecting this song section. Stop sends a temporary excerpt to OpenAI for a lyric draft; the microphone is not used.');
         return { ok: true, mode: 'catalog', request_id: session.request_id,
-          text: 'Listening to “' + session.title + '.” Select Stop to convert this song section into text with OpenAI, then review the draft before interpretation.' };
+          text: savedLyrics ? 'Selecting lyrics from “' + session.title + '.” Select Stop to retrieve the saved lyrics for this range.' : 'Listening to “' + session.title + '.” Select Stop to convert this song section into text with OpenAI, then review the draft before interpretation.' };
       } catch (error) {
         if (active !== session || session.ended) return { ok: false, canceled: true, text: 'Lyric selection was canceled.' };
         const text = message(error);
@@ -154,7 +157,7 @@
         return finish(session, { ok: false, receipt: null, reason: 'too_short', text: 'Listen for at least one second before selecting Stop. No audio was sent.' });
       session.end_ms = end; session.phase = 'transcribing'; session.submitted = true;
       clearTimeout(session.deadline);
-      emit(session, 'Transcribing lyrics with OpenAI. Stop waiting discards this result; an already submitted request may still use Active Tokens.');
+      emit(session, savedLyrics ? 'Retrieving saved lyrics for this song section… No audio upload or transcription charge.' : 'Transcribing lyrics with OpenAI. Stop waiting discards this result; an already submitted request may still use Active Tokens.');
       try {
         const payload = { track_id: session.track_id, start_ms: session.start_ms, end_ms: end,
           captured_at: session.captured_at, request_id: session.request_id,
@@ -163,8 +166,18 @@
         if (active !== session || session.ended) return session.done;
         if (!matches(session)) return discard(session, 'switch');
         const draft = result?.transcript;
-        if (result?.ok !== true || !draft || draft.review_status !== 'unverified' ||
-            draft.source !== 'catalog-audio' || draft.provider !== 'openai' || String(draft.track_id) !== session.track_id ||
+        const savedContract = !savedLyrics || (draft?.source === 'saved-catalog-lyrics' && draft?.provider === 'stored' &&
+          ['approved', 'corrected', 'unverified'].includes(draft.review_status) &&
+          draft.selected_start_ms === session.start_ms && draft.selected_end_ms === end &&
+          draft.start_ms === session.start_ms && draft.end_ms === end && draft.timing === 'saved_segments' && savedText(draft.text) &&
+          Array.isArray(draft.segments) && draft.segments.length > 0 && draft.segments.length <= 100 &&
+          draft.segments.every(segment => Number.isInteger(segment.start_ms) && Number.isInteger(segment.end_ms) &&
+            segment.start_ms >= 0 && segment.end_ms > segment.start_ms && segment.start_ms < end &&
+            segment.end_ms > session.start_ms && savedText(segment.text) && ['approved', 'corrected', 'unverified'].includes(segment.lyric_state) &&
+            (draft.review_status !== 'approved' || segment.lyric_state === 'approved') &&
+            ['whole_clip_estimate', 'catalog_chunk_estimate', 'manual', 'provider'].includes(segment.timing_source)));
+        const freshContract = savedLyrics || (draft?.review_status === 'unverified' && draft?.source === 'catalog-audio' && draft?.provider === 'openai');
+        if (result?.ok !== true || !draft || !savedContract || !freshContract || String(draft.track_id) !== session.track_id ||
             draft.source_fingerprint !== session.source_fingerprint ||
             typeof draft.text !== 'string' || !draft.text.trim() || draft.text.length > 4200 ||
             !Number.isInteger(draft.start_ms) || !Number.isInteger(draft.end_ms) ||
@@ -173,7 +186,7 @@
             draft.captured_at !== session.captured_at)
           throw new Error(result?.message || 'The server did not return a valid lyric draft for this song section.');
         return finish(session, { ok: true, receipt: Object.freeze({ ...draft }), reason,
-          text: 'Lyric draft ready. Review or correct the words before interpretation.' });
+          text: savedLyrics ? 'Saved lyrics ready. Review the words and their timing before interpretation.' : 'Lyric draft ready. Review or correct the words before interpretation.' });
       } catch (error) {
         if (active !== session || session.ended) return session.done;
         return finish(session, { ok: false, receipt: null, reason: 'error', error: message(error),

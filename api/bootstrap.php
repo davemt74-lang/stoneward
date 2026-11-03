@@ -21,7 +21,11 @@ function sf_request_json(): array {
 
 function sf_store_config(): array {
     static $cfg;
-    if ($cfg === null) $cfg = require SF_ROOT . '/config/store.php';
+    if ($cfg === null) {
+        // Existing host configuration always wins during source-only updates.
+        $path = SF_ROOT . '/config/store.php';
+        $cfg = require (is_file($path) ? $path : SF_ROOT . '/config/store.default.php');
+    }
     return $cfg;
 }
 

@@ -21,6 +21,7 @@
     target.hidden = !experience;
     if (!experience) return;
     const state = experience;
+    const savedLyrics = state.lyrics_source === 'saved-catalog-lyrics';
     const card = el('section', 'song-experience-card');
     card.setAttribute('aria-label', 'Song listening, transcript and analysis');
     const eyebrow = el('div', 'song-experience-kicker', 'SONG LISTENING SESSION');
@@ -34,7 +35,9 @@
       discarded: 'Listening ended without a usable excerpt'
     };
     const phase = el('p', 'song-experience-phase'+(state.live_enabled?' song-experience-live':''),
-      state.phase==='capturing'&&state.listening_mode==='catalog'?'Selecting song section · Stop converts it into text':
+      state.phase==='capturing'&&state.listening_mode==='catalog'?(savedLyrics?'Selecting song section · Stop retrieves saved lyrics':'Selecting song section · Stop converts it into text'):
+      savedLyrics&&state.phase==='transcribing'?'Loading saved song lyrics…':
+      savedLyrics&&state.phase==='draft'?'Saved lyric selection ready':
       state.phase==='capturing'&&state.live_enabled ? (state.auto_interpret?'Listening · live lyrics → review before interpretation':'Listening · provisional live lyrics') :
         phaseLabels[state.phase] || 'Session captured');
     phase.setAttribute('role', 'status');
@@ -49,7 +52,7 @@
       const canEdit = !!state.canAnalyze && !['capturing', 'transcribing', 'analyzing', 'discarded'].includes(state.phase);
       if (!canEdit && editor) { editors.delete(target); editor = null; }
       const isEditing = !!editor;
-      titleRow.append(el('h4', '', state.corrected ? 'Listener-edited draft · unverified' :
+      titleRow.append(el('h4', '', savedLyrics&&!state.corrected ? (state.review_status==='approved'?'Saved lyrics · administrator approved':'Saved lyric draft · unverified') : state.corrected ? 'Listener-edited draft · unverified' :
         state.canAnalyze ? 'Automated lyric draft · unverified' : 'Live lyric preview · provisional, unverified'));
       if (canEdit) {
         const editButton = el('button', 'song-experience-edit-icon', isEditing ? '×' : '✎');
@@ -64,6 +67,10 @@
         titleRow.append(editButton);
       }
       panel.append(titleRow);
+      if(savedLyrics&&state.lyric_segments?.length){
+        const ranges=state.lyric_segments.slice(0,8).map(segment=>clock(segment.start_ms)+'–'+clock(segment.end_ms));
+        panel.append(el('small','','Saved lyric blocks: '+ranges.join(', ')+(state.lyric_segments.length>8?'…':'')));
+      }
       if (isEditing) {
         const form = el('form', 'song-experience-lyric-editor');
         const label = el('label', '', 'Correct the recognized lyric words');
@@ -93,7 +100,7 @@
         panel.append(form);
       } else panel.append(el('p', 'song-experience-copy', visibleDraft));
       if (state.corrected) panel.append(el('small', '', 'Original machine draft retained in this session.'));
-      panel.append(el('small', '', 'Automated words can be wrong. Nothing is saved to Agent Brain automatically.'));
+      panel.append(el('small', '', savedLyrics ? 'Saved song lyrics are reused for this selection. Block timing is approximate unless manually aligned. Nothing is saved to Agent Brain automatically.' : 'Automated words can be wrong. Nothing is saved to Agent Brain automatically.'));
       if (state.live_enabled) panel.append(el('small', '',
         state.listening_mode==='recognition' ? 'Listening directly to the player. No song clip is being recorded.' :
            (Number(state.segments_completed)||0)+' section(s) transcribed. The final full-clip pass will replace these provisional words.'));
@@ -109,7 +116,7 @@
       if (Array.isArray(report.sources) && report.sources.length)
         details.append(el('small', 'song-experience-sources', 'Published sources: ' + report.sources.join(' · ')));
       else details.append(el('small', 'song-experience-sources', 'No song-specific published songwriter notes matched.'));
-      details.append(el('small', '', 'Interpretation of an unverified draft; no live web sources were searched.'));
+      details.append(el('small', '', report.draft_status==='approved_catalog_lyrics'?'Interpretation of reviewed song lyrics; no live web sources were searched.':'Interpretation of an unverified draft; no live web sources were searched.'));
       panel.append(details);
       card.append(panel);
     }
@@ -157,7 +164,7 @@
         if (question) onAction?.('ask', question);
       });
       card.append(form);
-      card.append(el('small', 'song-experience-consent', 'Interpret / Ask Agent sends the unverified excerpt and question to your configured AI provider. Review & interpret submits only after you select it; follow-up requests remain manual.'));
+      card.append(el('small', 'song-experience-consent', (savedLyrics?'Interpret / Ask Agent sends this saved lyric selection and question to your configured AI provider.':'Interpret / Ask Agent sends the unverified excerpt and question to your configured AI provider.')+' Review & interpret submits only after you select it; follow-up requests remain manual.'));
     }
     target.append(card);
   }
