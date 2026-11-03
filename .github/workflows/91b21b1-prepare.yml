@@ -1,0 +1,43 @@
+name: Prepare 91B21B1 integration
+on:
+  push:
+    branches: [codex/91b21b1-unified-login-protection]
+    paths: [.github/workflows/91b21b1-prepare.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: github.repository == 'davemt74-lang/stoneward' && github.ref == 'refs/heads/codex/91b21b1-unified-login-protection'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+      - name: Apply reviewed scoped patches and verify
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor fa404655ebb6ab339bfe2feb226731dfd17207f8 HEAD
+          python .github/91b21b1-integrate.py
+          for file in api/login-security.php api/operations.php api/auth.php admin/login.php upgrade.php; do php -l "$file"; done
+          php tests/section91b21b1-login-contract.php
+          php tests/section91b21b1-login-runtime.php
+      - name: Publish only application changes to the working branch
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          branch=codex/91b21b1-unified-login-protection
+          actual="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          test "$actual" = "$EXPECTED_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add api/operations.php api/auth.php admin/login.php upgrade.php version.php stonefellow-v120.php admin/index.php service-worker.js .htaccess assets/js/app.js assets/css/turntable-builder.css tests/section91b14c-ios-lunar-mobile.cjs tests/section91b20h-visual-style-library.test.cjs
+          git commit -m 'fix(91B21B1): unify login admission and upgrade session validation (v1.3.237)'
+          git push origin "HEAD:refs/heads/$branch"
