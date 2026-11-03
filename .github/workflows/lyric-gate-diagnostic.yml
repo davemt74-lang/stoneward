@@ -1,0 +1,37 @@
+name: Lyric gate diagnostic
+on:
+  push:
+    branches: [codex/91b21b3-lyrics-sidebar]
+    paths: [.github/workflows/lyric-gate-diagnostic.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Summarize specific failed job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import urllib.request, os, re
+          req=urllib.request.Request('https://api.github.com/repos/davemt74-lang/stoneward/actions/jobs/126044061790/logs',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          data=urllib.request.urlopen(req,timeout=60).read().decode('utf-8-sig')
+          lines=data.splitlines()
+          hits=[i for i,s in enumerate(lines) if re.search(r'AssertionError|not ok |FAIL|Expected|did not match|at .*tests/',s)]
+          for i in hits[:25]:
+            print('\nDIAGNOSTIC LINE',i)
+            for s in lines[max(0,i-2):i+4]: print(s[:900])
+          print('\nTAIL')
+          for s in lines[-35:]:print(s[:500])
+          PY
+      - uses: actions/checkout@v4
+      - name: Package exact branch source for local regression
+        run: git archive HEAD -o /tmp/lyric-audit-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lyric-audit-source
+          path: /tmp/lyric-audit-source.zip
+          retention-days: 3
