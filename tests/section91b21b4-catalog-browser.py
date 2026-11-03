@@ -58,6 +58,21 @@ def capture_evidence(page, width, stage):
     return details
 
 
+def wait_open_rail(page, width):
+    # Each intentional opening runs openPage's two animation frames, including
+    # reopening an existing draft. WebKit omits the still-transparent viewport
+    # from innerText until this transition reaches its visible state.
+    try:
+        page.wait_for_function('''() => {
+          const rail=document.querySelector('.sf-agent-page-rail');
+          const viewport=document.querySelector('.sf-agent-page-viewport');
+          return rail?.classList.contains('open')&&!rail.hidden&&viewport&&getComputedStyle(viewport).opacity==='1';
+        }''')
+    except Exception:
+        capture_evidence(page, width, 'opening-failure')
+        raise
+
+
 with sync_playwright() as p:
     launcher = getattr(p, BROWSER)
     launch = {'headless': True}
@@ -155,17 +170,7 @@ with sync_playwright() as p:
         before = page.locator('[data-orbit-action="listen"]').evaluate('(e)=>[e.style.left,e.style.top]')
         page.locator('[data-orbit-action="listen"]').click(force=True)
         page.wait_for_function('songExperience?.phase === "capturing"')
-        # The app's state can be ready before openPage's two animation frames.
-        # Assert the final visible slideout, not its still-growing shell.
-        try:
-            page.wait_for_function('''() => {
-              const rail=document.querySelector('.sf-agent-page-rail');
-              const viewport=document.querySelector('.sf-agent-page-viewport');
-              return rail?.classList.contains('open')&&viewport&&getComputedStyle(viewport).opacity==='1';
-            }''')
-        except Exception:
-            capture_evidence(page, width, 'opening-failure')
-            raise
+        wait_open_rail(page, width)
         check(page.evaluate('songListeningSkill.mode() === "catalog"'), label + ': iPhone UA uses server catalog path')
         check(page.locator('.sf-agent-page-rail[data-view="lyrics"]').is_visible(), label + ': opens existing lyric slideout')
         check(not page.locator('.sf-agent-panel').is_visible(), label + ': no duplicate recording panel')
@@ -199,6 +204,7 @@ with sync_playwright() as p:
         check(not page.locator('[data-agent-action="stop-lyrics"]').is_visible(), label + ': Stop clears on completion')
         check(page.evaluate('currentSongSource()===songLyricDraft&&currentSongDraft()===songLyricDraft'), label + ': catalog receipt integrates with existing draft gates')
         page.locator('[data-agent-action="open-lyrics"]').click()
+        wait_open_rail(page, width)
         check('Words from the selected song' in visible_text(page.locator('.sf-agent-lyric-workspace')), label + ': reopening displays completed lyric draft')
         check(page.evaluate('interpretations===0&&posts.length===1'), label + ': completion never auto-interprets or repeats transcription')
         page.locator('.sf-agent-lyric-workspace [aria-label="Edit lyric draft"]').click()
@@ -210,6 +216,7 @@ with sync_playwright() as p:
         page.keyboard.press('Escape')
         page.locator('[data-orbit-action="listen"]').click(force=True)
         page.wait_for_function('songExperience?.phase === "capturing"')
+        wait_open_rail(page, width)
         page.locator('.sf-agent-page-rail [data-agent-action="close-page"]').click()
         page.evaluate('advance(3000)')
         page.locator('[data-agent-action="stop-lyrics"]').click()
@@ -219,6 +226,7 @@ with sync_playwright() as p:
         check(page.evaluate('songExperience.phase==="discarded"&&songExperience.message.includes("may still complete")'), label + ': Stop waiting explains already-submitted work')
         page.locator('[data-orbit-action="listen"]').click(force=True)
         page.wait_for_function('songExperience?.phase === "capturing"')
+        wait_open_rail(page, width)
         request_id = page.evaluate('songExperience.request_id')
         page.evaluate('reply(1, "Obsolete result")')
         page.wait_for_timeout(20)
@@ -230,6 +238,7 @@ with sync_playwright() as p:
         page.evaluate('deferReady=true')
         page.locator('[data-orbit-action="listen"]').click(force=True)
         page.wait_for_function('songExperience?.phase === "starting"')
+        wait_open_rail(page, width)
         page.locator('.sf-agent-lyric-workspace button', has_text='Stop').click()
         page.wait_for_function('!songListeningSkill.status().active')
         page.evaluate('pendingReady.forEach(resolve=>resolve())')
