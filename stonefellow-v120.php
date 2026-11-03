@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.239');
+define('SF_BUILD', '1.3.240');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -347,6 +347,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/fan-vocal-studio.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/song-moments.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-song-listening-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/agent-song-catalog-listening.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/player-playback-lifecycle.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/account-voice-engine.js?v=<?=rawurlencode(SF_BUILD)?>"></script>

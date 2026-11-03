@@ -526,8 +526,8 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
             elseif($active===''||empty($client['player_is_playing']))$text='Play a published song first, then ask for live lyrics.';
             elseif(!empty($client['song_capture_live_enabled']))$text='Live lyric transcription is already active.';
             else{$action=['type'=>'song_capture_live_start','interpret_on_stop'=>$interpretAfter];$text=$interpretAfter
-                    ?'Listening, transcribing and preparing a songwriter-aware interpretation after you stop.'
-                    :'Enabling metered live transcription of the current player audio. Provisional lyrics will appear in chat.';}
+                    ?'Starting lyric listening. Stop to review the transcript, then choose interpretation.'
+                    :'Starting lyric listening for the current song. The mobile path converts the selected section to text when you stop.';}
             break;
         case 'song_capture_analyze':
             if(empty($client['song_lyric_draft_available']))$text='First capture and transcribe a song section. Then I can analyze or research the lyrics you heard.';

@@ -27,13 +27,14 @@
     const heading = el('h3', '', state.title || 'Current song section');
     const meta = el('p', 'song-experience-meta', clock(state.start_ms) + ' – ' + (state.end_ms == null ? 'Live' : clock(state.end_ms)));
     const phaseLabels = {
-      starting: 'Starting lyric listening…', stopping: 'Stopping lyric listening…', unavailable: 'Player-track recognition unavailable',
+      starting: 'Starting lyric listening…', stopping: 'Stopping lyric listening…', unavailable: 'Song lyric listening unavailable',
       capturing: 'Listening now', captured: 'Recorded · ready to transcribe',
       transcribing: 'Creating an unverified lyric draft…', draft: 'Unverified transcript ready',
       analyzing: 'Reviewing lyrics and Stonefellow song notes…', report: 'Lyric interpretation ready',
       discarded: 'Listening ended without a usable excerpt'
     };
     const phase = el('p', 'song-experience-phase'+(state.live_enabled?' song-experience-live':''),
+      state.phase==='capturing'&&state.listening_mode==='catalog'?'Selecting song section · Stop converts it into text':
       state.phase==='capturing'&&state.live_enabled ? (state.auto_interpret?'Listening · live lyrics → review before interpretation':'Listening · provisional live lyrics') :
         phaseLabels[state.phase] || 'Session captured');
     phase.setAttribute('role', 'status');
@@ -125,11 +126,13 @@
       button('Stop listening', 'stop');
       if (state.listening_mode==='record_clip') card.append(el('small', 'song-experience-consent',
         'Record Clip keeps a browser-local audio excerpt. It does not automatically transcribe or interpret.'));
-      else if (!state.live_enabled) {
+      else if (!state.live_enabled&&state.listening_mode!=='catalog') {
         button('Start live transcription', 'live');
       }
     }
-    if (state.phase === 'captured' && state.listening_mode !== 'recognition') button('Transcribe excerpt', 'transcribe');
+    if(state.phase==='starting'&&state.listening_mode==='catalog')button('Stop', 'stop');
+    if(state.phase==='transcribing'&&state.listening_mode==='catalog')button('Stop waiting', 'stop');
+    if (state.phase === 'captured' && !['recognition','catalog'].includes(state.listening_mode)) button('Transcribe excerpt', 'transcribe');
     if (state.transcript && !['transcribing', 'analyzing', 'discarded'].includes(state.phase)) {
       button(state.reports?.length ? 'Interpret again' : (state.auto_interpret ? 'Review & interpret lyrics' : 'Interpret lyrics'), 'analyze', !state.canAnalyze);
       button(state.saved_note_id ? 'Saved privately #' + state.saved_note_id : 'Save private note', 'save', !state.canAnalyze || !!state.saved_note_id);

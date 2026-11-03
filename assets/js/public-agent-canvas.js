@@ -342,11 +342,14 @@
       const map={playing:'music',recording:'recording',listening:'listening',thinking:'thinking',speaking:'speaking',responding:'speaking',music:'music'};
       baseMode=next;baseLabel=label||'';
       const lyric=window.StonefellowSongExperience?.snapshot?.();
-      const hearing=lyric?.listening_mode==='recognition'&&['capturing','stopping'].includes(lyric.phase);
-      mode=hearing?'listening':map[next] || 'idle';
+      const hearing=['recognition','catalog'].includes(lyric?.listening_mode)&&['starting','capturing','stopping','transcribing'].includes(lyric.phase);
+      mode=hearing?(lyric.phase==='transcribing'?'thinking':'listening'):map[next] || 'idle';
       if(mode==='recording')remotePanelDismissed=false;
       floater.dataset.mode=mode;
-      status.textContent=hearing?(lyric.phase==='stopping'?'STOPPING LYRIC TRANSCRIPTION':'TRANSCRIBING LYRICS'):label || ({idle:'AGENT READY',music:'MUSIC PLAYING',listening:'LISTENING',thinking:'THINKING',speaking:'RESPONDING',recording:'CAPTURING LYRICS'}[mode]);
+      status.textContent=hearing?(lyric.phase==='starting'?'PREPARING LYRIC LISTENING':
+        lyric.phase==='stopping'?'STOPPING LYRIC TRANSCRIPTION':
+          lyric.listening_mode==='catalog'&&lyric.phase==='capturing'?'SELECTING SONG SECTION':'TRANSCRIBING LYRICS'):
+        label || ({idle:'AGENT READY',music:'MUSIC PLAYING',listening:'LISTENING',thinking:'THINKING',speaking:'RESPONDING',recording:'CAPTURING LYRICS'}[mode]);
       sphere.setAttribute('aria-label',mode==='speaking'?'Stop Stonefellow speaking':'Expand Stonefellow Agent canvas');
       sphere.title=mode==='speaking'?'Stop speaking':'Expand Agent Canvas';
       syncListeningButtons();
@@ -366,7 +369,7 @@
     function syncListeningButtons() {
       const capturing=!!options.isCapturing?.();
       const lyric=window.StonefellowSongExperience?.snapshot?.();
-      const lyricBusy=lyric?.listening_mode==='recognition'&&['capturing','stopping'].includes(lyric.phase);
+      const lyricBusy=['recognition','catalog'].includes(lyric?.listening_mode)&&['starting','capturing','stopping','transcribing'].includes(lyric.phase);
       const playable=!!(audio && (audio.currentSrc || audio.src) && !audio.paused);
       for(const action of ['listen-interpret'])for(const button of root.querySelectorAll(`[data-agent-action="${action}"]`)){
         button.hidden=capturing&&!lyricBusy;
@@ -380,9 +383,11 @@
         button.hidden=false;button.disabled=lyricBusy;button.title=lyricBusy?'Stop lyric listening before opening Record Studio.':'Record Studio · Vocal overdub or song clip';
       }
       for(const button of root.querySelectorAll('[data-agent-action="stop-listening"]'))button.hidden=!capturing||!!options.isVocalRecording?.()||lyricBusy;
-      lyricControls.hidden=!lyric||lyric.listening_mode!=='recognition';
+      lyricControls.hidden=!lyric||!['recognition','catalog'].includes(lyric.listening_mode);
       lyricStop.hidden=!lyricBusy;lyricStop.disabled=lyric?.phase==='stopping';
-      lyricStop.textContent=lyric?.phase==='stopping'?'Stopping…':'Stop';
+      lyricStop.textContent=lyric?.phase==='stopping'?'Stopping…':lyric?.listening_mode==='catalog'&&lyric?.phase==='transcribing'?'Stop waiting':'Stop';
+      lyricStop.title=lyric?.listening_mode==='catalog'&&lyric?.phase==='transcribing'
+        ?'Discard the local result. An already submitted transcription may still use Active Tokens.':'Finish this lyric selection';
       for(const button of root.querySelectorAll('[data-orbit-action="player"]'))button.hidden=!player||player.hidden;
       // The playlist tool belongs to the ring even before a mix is created.
       for(const button of root.querySelectorAll('[data-orbit-action="playlist"]'))button.hidden=false;
@@ -394,7 +399,7 @@
       const active=!!window.StonefellowSongExperience?.active?.();
       if (!active) { panel.hidden=true; smallSession.replaceChildren(); bigSession.replaceChildren(); updateDock(); return; }
       const lyric=window.StonefellowSongExperience?.snapshot?.();
-      if(lyric?.listening_mode==='recognition'){
+      if(['recognition','catalog'].includes(lyric?.listening_mode)){
         panel.hidden=true;smallSession.replaceChildren();bigSession.replaceChildren();
         // Updates never reopen a dismissed rail or replace another native page.
         if(pageView==='lyrics'&&!pageRail.hidden&&!pageRail.hasAttribute('inert'))window.StonefellowSongExperience.mount(lyricHost);

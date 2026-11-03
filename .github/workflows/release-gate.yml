@@ -643,6 +643,20 @@ jobs:
           node --check admin/assets/stem-waveform.js
           node tests/section86a-waveform.cjs
 
+      - name: Mobile catalog lyric transcription runtime
+        env:
+          SF_TEST_DRIVER: sqlite
+        run: |
+          node --check assets/js/agent-song-catalog-listening.js
+          node --test tests/section91b21b4-catalog-listening.cjs
+          node --test tests/section91b21b3-lyrics.test.cjs
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
+          SF_REQUIRE_AUDIO_DECODE_TESTS=1 php tests/section91b21b4-audio-excerpt.php
+          php tests/section91b21b4-catalog-transcribe.php
+
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
         run: |
