@@ -25,7 +25,7 @@ ok(str_contains($migrations,"'user_playlists','user_playlist_tracks'"),'integrit
 ok(str_contains($agent,"return 'playlist_create'")&&str_contains($agent,"case 'playlist_create'"),'agent playlist-create route and policy exist');
 ok(str_contains($agent,"return 'playlist_save_session'")&&str_contains($agent,"case 'playlist_save_session'"),'agent save-session route and policy exist');
 ok(str_contains($agent,"'playlist_create'=>'Asks the agent to create")&&str_contains($agent,"'playlist_save_session'=>'Asks to save"),'JEV routing criteria include playlist actions');
-ok(str_contains($js,"case'create_playlist'")&&str_contains($js,"case'save_agent_session'"),'client executes authorized agent playlist actions');
+ok(preg_match("/case\\s*'create_playlist'/",$js)&&preg_match("/case\\s*'save_agent_session'/",$js),'client executes authorized agent playlist actions');
 ok(str_contains($js,"function renderPlaylist(id)")&&str_contains($libraryJs,"playlists:'Playlists'")&&str_contains($libraryJs,'data-library-open-playlist'),'playlist editor and My Library playlist surface exist');
 ok(str_contains($js,'data-move-item')&&str_contains($js,"action:'reorder'"),'playlist reorder UI is wired');
 ok(str_contains($js,'data-remove-playlist-item')&&str_contains($js,"action:'remove_item'"),'playlist removal UI is wired');
