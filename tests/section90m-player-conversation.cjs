@@ -24,7 +24,7 @@ async function run(){
   const sandbox={audio,st,musicOriginalVolume:null,voicePlaybackPending:false,voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,lastAudibleVolume:0.7,
     recordListen:type=>events.push(type),invalidatePlayback:()=>{},updateFooterPlayer:()=>events.push('render'),
     stepTrack:delta=>events.push('step:'+delta),
-    play:async track=>{st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;return !failToPlay},
+    play:async track=>{st.track=track;audio.src=track.audio||'';audio.paused=!!failToPlay;st.playing=!failToPlay;return !failToPlay},
     trackById:id=>id==='song-1'?st.track?.id==='song-1'?st.track:{id,title:'Night Drive',release:'Moonlight',duration:200,audio:'assets/night-drive.mp3'}:id==='song-2'?{id,title:'Northern Sky',audio:'assets/northern-sky.mp3'}:null,
     time:seconds=>`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`};
   vm.createContext(sandbox);
