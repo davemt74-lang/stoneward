@@ -8,6 +8,7 @@
   const automaticImports=new Set(),checkingPublishedTracks=new Set();
   const importsByTrack=new Map();
   let catalogPanel=null;
+  let preview=null;
   const clock=ms=>{const s=Math.max(0,Math.floor(Number(ms||0)/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
   const preciseClock=ms=>clock(ms)+'.'+String(Math.max(0,Math.round(Number(ms)||0))%1000).padStart(3,'0');
   const parsePosition=value=>{const m=String(value||'').trim().match(/^(\d{1,3}):([0-5]\d)(?:\.(\d{1,3}))?$/);return m?(Number(m[1])*60+Number(m[2]))*1000+Number((m[3]||'').padEnd(3,'0')):null;};
@@ -205,6 +206,78 @@
     ['PENDING APPROVAL',m.pending_comments||0],['PUBLIC COMMENTS',m.published_comments||0],
     ['PUBLISHED MOMENTS',m.published_artist_moments||0],['ARTIST DRAFTS',m.draft_artist_moments||0]
   ].map(([label,value])=>'<div><strong>'+Number(value)+'</strong><small>'+label+'</small></div>').join('')+'</div>';}
+  function stopPreview(){
+    const audio=preview;preview=null;
+    if(!audio)return;
+    audio.pause();audio.removeAttribute('src');audio.load();
+  }
+  window.addEventListener?.('pagehide',()=>preview?.pause());
+  function mountPreview(form,refs){
+    const audio=$('#sfMomentPreviewAudio',form);
+    if(!audio)return;
+    preview=audio;
+    const fields=form.elements,playhead=$('#sfMomentPlayhead',form),start=$('#sfMomentUsePlayhead',form),
+      end=$('#sfMomentUseEndPlayhead',form),jump=$('#sfMomentJumpToStart',form),show=$('#sfMomentShowCue',form),
+      message=$('[data-moment-preview-status]',form);
+    const cueHost=$('#sfMomentCuePreview',form);
+    const cue=window.SFSongMomentCuePreview?.mount(cueHost);
+    let source='',showCue=false;
+    const selectedTrack=()=>refs.tracks?.find(track=>String(track.id)===fields.track_id.value);
+    const ready=()=>preview===audio&&!!source&&audio.currentSrc===audio.src&&audio.readyState>=1&&!audio.error;
+    function updatePlayer(){
+      if(preview!==audio)return;
+      const loaded=ready(),duration=audio.duration,at=parsePosition(fields.position.value);
+      const usable=loaded&&!audio.seeking&&Number.isFinite(audio.currentTime);
+      playhead.textContent=loaded?preciseClock(Math.round(audio.currentTime*1000)):'—';
+      start.disabled=end.disabled=!usable;
+      end.hidden=fields.kind.value!=='lyric';
+      jump.disabled=!usable||at===null||!Number.isFinite(duration)||at>Math.round(duration*1000);
+      const detail=!source?'This song has no published listening copy available for preview.':
+        audio.error?'The listening copy could not be loaded. You can still enter a timestamp manually.':
+        loaded?'Play or scrub the song, then use the playhead to set your timestamp.':'Load the listening copy with the player to preview its timing.';
+      if(message.textContent!==detail)message.textContent=detail;
+    }
+    function updateCue(){
+      cue?.({kind:fields.kind.value,atMs:parsePosition(fields.position.value),title:fields.title.value,
+        trackId:fields.track_id.value,durationMs:selectedTrack()?.duration_ms,
+        story:refs.stories?.find(story=>String(story.id)===fields.story_id.value),
+        photo:refs.photos?.find(photo=>String(photo.uuid)===fields.media_uuid.value),visible:showCue});
+    }
+    function selectSource(){
+      const url=selectedTrack()?.preview_url;
+      // Resolve only the managed media route emitted by the Admin API.
+      source=typeof url==='string'&&/^api\/media\.php\?id=M[A-F0-9]{20}(?:&variant=original)?$/.test(url)?url:'';
+      audio.pause();
+      if(source)audio.src='../'+source;
+      else audio.removeAttribute('src');
+      audio.hidden=!source;
+      audio.load();
+      updatePlayer();updateCue();
+    }
+    function usePlayhead(field){
+      if(field.disabled||!ready()||audio.seeking||!Number.isFinite(audio.currentTime))return;
+      field.value=preciseClock(Math.round(audio.currentTime*1000));
+      field.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+    start.onclick=()=>usePlayhead(fields.position);
+    end.onclick=()=>usePlayhead(fields.end_position);
+    jump.onclick=()=>{
+      updatePlayer();
+      if(!jump.disabled)audio.currentTime=Math.min(audio.duration,parsePosition(fields.position.value)/1000);
+    };
+    show.disabled=!cue;
+    show.onclick=()=>{
+      showCue=!showCue;show.textContent=showCue?'Hide orb cue':'Preview orb cue';
+      cueHost.hidden=!showCue;show.setAttribute('aria-expanded',String(showCue));updateCue();
+    };
+    for(const event of ['loadedmetadata','timeupdate','seeking','seeked','error','emptied'])audio.addEventListener(event,updatePlayer);
+    form.addEventListener('input',()=>{updatePlayer();updateCue();});
+    form.addEventListener('change',event=>{
+      if(event.target===fields.track_id)selectSource();
+      else{updatePlayer();updateCue();}
+    });
+    selectSource();
+  }
   function editor(){const entries=artistEntries(),e=entries.find(x=>Number(x.id)===state.editing)||{id:0,track_id:state.track||state.data?.references?.tracks?.[0]?.id||'',at_ms:0,kind:'note',title:'',body:'',media_uuid:'',story_id:0,status:'draft',end_ms:1000,lyric_state:'unverified',confidence:null,timing_source:'manual',revision:0};
     const refs=state.data?.references||{},kind=e.kind||'note';
     const timingLabels={catalog_chunk_estimate:'Imported audio block / approximate timing',provider:'Provider timestamped segment',whole_clip_estimate:'Selected audio section / estimated alignment'};
@@ -225,6 +298,14 @@
       '<input name="revision" type="hidden" value="'+Number(e.revision||0)+'">'+
       '<label class="wide" data-moment-photo>PUBLIC MEDIA LIBRARY PHOTO<select name="media_uuid">'+opt('','Choose a public image',e.media_uuid||'')+(refs.photos||[]).map(x=>opt(x.uuid,x.title+' · '+x.uuid.slice(0,8),e.media_uuid)).join('')+'</select><small>Use Media Library to upload and publish photos first.</small></label>'+
       '<label class="wide" data-moment-story>LINK TO A PUBLISHED STORY<select name="story_id">'+opt('','Choose a published story',e.story_id||0)+(refs.stories||[]).map(x=>opt(x.id,x.title+(x.entity_id?' · '+refTitle(x.entity_id):''),e.story_id)).join('')+'</select><small>Reuses the original story; changes in Stories automatically carry through.</small></label></div>'+
+      '<section class="sf-moment-admin-preview" aria-labelledby="sfMomentPreviewTitle"><div><h2 id="sfMomentPreviewTitle">Song preview</h2>'+
+      '<audio id="sfMomentPreviewAudio" class="sf-moment-admin-preview__audio" controls preload="metadata" aria-label="Published song listening copy" hidden></audio>'+
+      '<p data-moment-preview-status role="status"></p><p>Playhead <output id="sfMomentPlayhead" aria-live="off">—</output></p>'+
+      '<div class="sf-moment-admin-preview__actions"><button type="button" id="sfMomentUsePlayhead" disabled>Use playhead for start</button>'+
+      '<button type="button" id="sfMomentUseEndPlayhead" disabled hidden>Use playhead for end</button>'+
+      '<button type="button" id="sfMomentJumpToStart" disabled>Jump to start</button>'+
+      '<button type="button" id="sfMomentShowCue" aria-expanded="false" aria-controls="sfMomentCuePreview">Preview orb cue</button></div></div>'+
+      '<div id="sfMomentCuePreview" hidden></div></section>'+
       '<div class="sf-moment-admin-actions"><button type="submit" class="primary">'+(e.id?'Save moment':'Add moment')+'</button><span id="sfMomentFormStatus" role="status"></span></div></form>';
   }
   function entryCard(e){const comment=e.kind==='comment',lyric=e.kind==='lyric',kind=comment?'FAN COMMENT':e.kind.toUpperCase();
@@ -238,6 +319,7 @@
   }
   function render(){const view=state.view;if(!currentView(view))return;const d=state.data||{entries:[],metrics:{},references:{tracks:[]}},all=artistEntries(),pending=all.filter(e=>e.kind==='comment'&&e.status==='pending'),rows=state.tab==='moderation'?all.filter(e=>e.kind==='comment'):
     all.filter(e=>(!state.track||String(e.track_id)===String(state.track))&&e.kind!=='comment').sort((a,b)=>Number(a.at_ms)-Number(b.at_ms));
+    stopPreview();
     canvas.innerHTML=head('MUSIC / FAN EXPERIENCE','Song Moments','Publish timed lyrics, photos, notes, and stories around the agent orb. Review lyric text and public listener comments before publication.')+
       metrics()+'<div class="sf-moment-admin-tabs"><button data-moment-tab="timeline" class="'+(state.tab==='timeline'?'active':'')+'">Song Timeline Editor</button><button data-moment-tab="moderation" class="'+(state.tab==='moderation'?'active':'')+'">Comment Approval <b>'+pending.length+'</b></button></div>'+
       (state.tab==='timeline'?'<section class="panel">'+editor()+'<div class="sf-moment-admin-list-title"><h2>Artist timeline</h2><select id="sfMomentFilterSong" aria-label="Filter moments by song">'+opt('','All songs',state.track)+(d.references?.tracks||[]).map(x=>opt(x.id,x.title,state.track)).join('')+'</select></div><div class="sf-moment-admin-list">'+(rows.length?rows.map(entryCard).join(''):'<p class="empty">No artist moments for this song yet. Add lyrics, a photo, story or note above.</p>')+'</div><div class="sf-moment-admin-actions"><button type="button" id="sfLyricsApplySong"'+(!state.track||view.applyBusy?' disabled':'')+'>Save approved lyrics to song</button><span id="sfLyricsApplyStatus" role="status">'+(!state.track?'Filter to a song to save its approved lyrics.':'')+'</span></div></section>':
@@ -265,6 +347,7 @@
       function invalidateLyric(timing=false,text=false){if(form.elements.kind.value!=='lyric')return;if(form.elements.lyric_state.value==='approved'||(text&&state.editing&&form.elements.lyric_state.value==='unverified'))form.elements.lyric_state.value='corrected';if(form.elements.status.value==='published')form.elements.status.value='draft';form.elements.confidence.value='';if(timing)form.elements.timing_source.value='manual';}
       showFields();form.elements.kind.onchange=()=>{showFields();invalidateLyric()};
       form.elements.body.oninput=()=>invalidateLyric(false,true);form.elements.position.oninput=()=>invalidateLyric(true);form.elements.end_position.oninput=()=>invalidateLyric(true);form.elements.track_id.onchange=()=>invalidateLyric(true);
+      mountPreview(form,d.references||{});
       $('#sfMomentReset',form).onclick=()=>{state.editing=0;render()};
       form.onsubmit=async ev=>{ev.preventDefault();if(state.busy)return;const f=new FormData(form),at=parsePosition(f.get('position'));const status=$('#sfMomentFormStatus',form);
         if(at===null){status.textContent='Enter a time like 1:24 or 1:24.250.';return;}
@@ -290,6 +373,7 @@
     });
   }
   async function open(tab='timeline',trackId=''){
+    stopPreview();
     const view=state.view={route:ctx.app?.view,applyBusy:false};
     state.tab=tab;state.track=validTrackId(trackId)?trackId:'';state.editing=0;state.editorDirty=false;
     canvas.innerHTML=head('MUSIC / FAN EXPERIENCE','Song Moments','Loading the song timeline and approval queue…');
@@ -305,5 +389,5 @@
       target.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>ctx.openView(b.dataset.view));
     }catch(e){if(target.isConnected)target.innerHTML='<div class="panel-title"><h2>Song Moments</h2><button data-view="song-moments" class="panel-link">Open editor →</button></div><p class="empty">Moment totals are unavailable.</p>';target.querySelector('button')?.addEventListener('click',()=>ctx.openView('song-moments'));}
   }
-  window.SFSongMomentsAdmin=Object.freeze({open,dashboard,mountCatalogImport,resumePublishedTrack});
+  window.SFSongMomentsAdmin=Object.freeze({open,dashboard,mountCatalogImport,resumePublishedTrack,stopPreview});
 })();

@@ -92,8 +92,9 @@ function sf_song_moments_audio_fingerprint(array $track): string {
     $releaseId=(string)($track['release_id']??'');
     if($releaseId!==''&&function_exists('sf_seo_public_release')&&!sf_seo_public_release($releaseId))return '';
     $reference=(string)($track['audio']??'');
-    if(!preg_match('/\Aapi\/media\.php\?id=(M[A-F0-9]{20})(?:&variant=original)?\z/',$reference,$match)
-        ||(!empty($track['private_master_audio'])&&$reference===$track['private_master_audio']))return '';
+    $managed='/\Aapi\/media\.php\?id=(M[A-F0-9]{20})(?:&variant=original)?\z/';
+    if(!preg_match($managed,$reference,$match))return '';
+    if(preg_match($managed,(string)($track['private_master_audio']??''),$master)&&$match[1]===$master[1])return '';
     $asset=sf_media_asset($match[1]);
     if(!$asset||($asset['category']??'')!=='audio'||!preg_match('/\A[a-f0-9]{64}\z/',(string)($asset['sha256']??''))
         ||(function_exists('sf_media_protected_master_asset')&&sf_media_protected_master_asset((int)$asset['id'])))return '';
@@ -259,14 +260,20 @@ function sf_song_moments_comment(int $userId,array $request): array {
     return ['id'=>(int)$db->lastInsertId(),'at_ms'=>$at,'status'=>'pending','message'=>'Submitted for administrator approval. Not public yet.'];
 }
 function sf_song_moments_admin_refs(): array {
-    $tracks=array_map(fn($t)=>['id'=>(string)$t['id'],'title'=>(string)$t['title'],'duration'=>(int)($t['duration']??0),'duration_ms'=>sf_song_moments_lyric_duration_ms($t)],sf_public_catalog());
-    $stories=[];foreach(sf_story_list(true,'',200) as $s)$stories[]=['id'=>(int)$s['id'],'title'=>(string)$s['title'],'entity_id'=>(string)($s['entity_id']??''),'slug'=>(string)$s['slug']];
+    $tracks=array_map(static function(array $track): array {
+        return ['id'=>(string)$track['id'],'title'=>(string)$track['title'],'duration'=>(int)($track['duration']??0),
+          'duration_ms'=>sf_song_moments_lyric_duration_ms($track),
+          'preview_url'=>sf_song_moments_audio_fingerprint($track)!==''?(string)$track['audio']:null];
+    },sf_public_catalog());
+    $stories=[];foreach(sf_story_list(true,'',200) as $s)$stories[]=['id'=>(int)$s['id'],'title'=>(string)$s['title'],
+      'entity_type'=>(string)($s['entity_type']??''),'entity_id'=>(string)($s['entity_id']??''),'slug'=>(string)$s['slug']];
     sf_media_ensure_schema();
     $photos=[];$q=sf_db()->query("SELECT DISTINCT a.id,a.uuid,a.title FROM media_assets a
       INNER JOIN media_links l ON l.asset_id=a.id AND l.public_visible=1 AND l.entity_type<>'member_content'
       WHERE a.category='image' AND NOT EXISTS (SELECT 1 FROM media_links p WHERE p.asset_id=a.id AND p.role IN ('master_audio','stem_audio'))
       ORDER BY a.id DESC LIMIT 250");
-    foreach($q->fetchAll() as $r)$photos[]=['uuid'=>(string)$r['uuid'],'title'=>(string)($r['title']?:'Photo '.$r['id']),'url'=>'api/media.php?id='.rawurlencode((string)$r['uuid'])];
+    foreach($q->fetchAll() as $r)$photos[]=['uuid'=>(string)$r['uuid'],'title'=>(string)($r['title']?:'Photo '.$r['id']),
+      'cue_title'=>(string)$r['title'],'url'=>'api/media.php?id='.rawurlencode((string)$r['uuid'])];
     return ['tracks'=>$tracks,'stories'=>$stories,'photos'=>$photos];
 }
 function sf_song_moments_admin_list(string $trackId=''): array {

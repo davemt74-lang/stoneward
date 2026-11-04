@@ -322,6 +322,7 @@
   }
   const openExistingImageView=openView;
   openView=function(view){
+    window.SFSongMomentsAdmin?.stopPreview?.();
     if(view!=='image-generation')return openExistingImageView(view);
     window.SFStoriesAdmin?.close?.(true);app.view=view;viewTitle.textContent='AI Image Studio';
     $$('#adminNav [data-view]').forEach(b=>{const active=b.dataset.view===view;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});

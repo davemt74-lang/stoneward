@@ -75,6 +75,11 @@ jobs:
           SF_LYRICS_BROWSER: ${{ matrix.browser }}
           SF_LYRICS_EVIDENCE: saved-lyric-evidence
         run: python tests/section91b22a-timeline-browser.py
+      - name: Admin Song Moments preview on mobile and desktop
+        env:
+          SF_LYRICS_BROWSER: ${{ matrix.browser }}
+          SF_LYRICS_EVIDENCE: saved-lyric-evidence
+        run: python tests/section91b22e-admin-moment-preview-browser.py
       - name: Retain browser evidence
         if: always()
         uses: actions/upload-artifact@v4
