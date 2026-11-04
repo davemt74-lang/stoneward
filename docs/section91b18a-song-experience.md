@@ -17,6 +17,8 @@ Each published song can have a timestamped timeline shared by the public player,
 - Enable **Show Song Moments around the agent orb during playback** under **Settings → Public Site**, then reload the listening page. It defaults off. The manual Song Timeline remains available either way.
 - The main admin sidebar has **Song Moments & Timeline** under Music and **Comment Moderation** under Fans & CRM.
 - Timeline editor: select a published song and timestamp; add or edit artist notes, select existing public Media Library photos, or link an already-published Story. Drafts are hidden from fans.
+- In **Song preview**, play or scrub the published Media Library listening copy and choose **Use playhead for start**. Lyric segments also have **Use playhead for end**. **Jump to start** seeks to the entered time. If the song has no eligible listening copy, you can enter timing manually.
+- Choose **Preview orb cue** to see how an unsaved story or photo will look to listeners. The preview stays in Admin. Use the existing save and publish controls when the moment is ready.
 - Moderation: review pending comments with the song and timestamp; explicitly approve, reject, or remove. Approved comments become public; removed comments disappear. An append-only moderation decision row records the administrator and state transition. Existing admin audit logging also receives the decision.
 - The Admin Dashboard shows **Awaiting Approval** and **Live Timeline** metrics, with each tile opening its appropriate sidebar destination.
 

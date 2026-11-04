@@ -8,6 +8,7 @@ $source=dirname(__DIR__);$driver=getenv('SF_TEST_DRIVER')?:'sqlite';
 if(!in_array($driver,['sqlite','mysql'],true)||!extension_loaded('pdo_'.$driver)||!extension_loaded('curl'))throw new RuntimeException('Required PDO/cURL test runtime unavailable.');
 $tmp=sys_get_temp_dir().'/sf-saved-lyrics-'.bin2hex(random_bytes(6));
 foreach(['config','storage/media','sessions','data'] as $dir)mkdir($tmp.'/'.$dir,0700,true);
+if(!symlink($source.'/api',$tmp.'/api'))throw new RuntimeException('Could not link the isolated Admin API fixture.');
 $cfg=$driver==='sqlite'?['driver'=>'sqlite','path'=>$tmp.'/test.sqlite']:
     ['driver'=>'mysql','host'=>'127.0.0.1','port'=>33306,'database'=>'stonefellow_lyrics_test','username'=>'root','password'=>(string)getenv('SF_TEST_MYSQL_PASSWORD')];
 if($driver==='mysql'&&$cfg['password']==='')throw new RuntimeException('Isolated MySQL password required.');
@@ -51,9 +52,18 @@ try{
     $q=$db->prepare('INSERT INTO media_assets(uuid,category,mime_type,extension,original_name,stored_path,sha256,size_bytes,title,caption,technical_json,variants_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
     $q->execute([$uuid,'audio','audio/wav','wav','fixture.wav','storage/media/fixture.wav',hash_file('sha256',$audio),filesize($audio),'Fixture','','{}','{}',$now,$now]);
     $asset=(int)$db->lastInsertId();sf_media_attach($asset,'track','fixture-song','primary_audio',['public_visible'=>true]);
+    $restrictedWav=substr($wav,0,-2).pack('v',300);$restrictedUuid='M'.str_repeat('D',20);
+    file_put_contents($tmp.'/storage/media/restricted.wav',$restrictedWav);
+    $q->execute([$restrictedUuid,'audio','audio/wav','wav','restricted.wav','storage/media/restricted.wav',hash('sha256',$restrictedWav),strlen($restrictedWav),'Restricted','','{}','{}',$now,$now]);
+    $restrictedAsset=(int)$db->lastInsertId();sf_media_attach($restrictedAsset,'member_content','fixture','primary_audio',['public_visible'=>true]);
     $catalog=[['id'=>'fixture-song','title'=>'Synthetic fixture','release'=>'Test release','duration'=>120,'audio'=>'api/media.php?id='.$uuid,'public_visible'=>true,'state'=>'published']];
     $otherSong=array_replace($catalog[0],['id'=>'other-song','title'=>'Other song']);
-    file_put_contents($tmp.'/data/catalog.json',json_encode([...$catalog,$otherSong,['id'=>'private-song','title'=>'Private','duration'=>120,'audio'=>$catalog[0]['audio'],'state'=>'private']]));
+    file_put_contents($tmp.'/data/catalog.json',json_encode([...$catalog,$otherSong,
+        ['id'=>'private-song','title'=>'Private','duration'=>120,'audio'=>$catalog[0]['audio'],'state'=>'private'],
+        ['id'=>'restricted-song','title'=>'Member-only','duration'=>120,'audio'=>'api/media.php?id='.$restrictedUuid,'state'=>'published'],
+        ['id'=>'external-song','title'=>'External audio','duration'=>120,'audio'=>'https://example.invalid/track.mp3','state'=>'published'],
+        ['id'=>'master-alias-song','title'=>'Private master alias','duration'=>120,'audio'=>$catalog[0]['audio'],
+         'private_master_audio'=>$catalog[0]['audio'].'&variant=original','state'=>'published']]));
     file_put_contents($tmp.'/data/releases.json','[]');
     $fingerprint=sf_song_catalog_source('fixture-song',$catalog,['id'=>1,'role'=>'user'],true)['fingerprint'];
     $publicText='Synthetic public saved lyrics: café déjà vu.';
@@ -107,6 +117,7 @@ try{
         '$path=parse_url($_SERVER["REQUEST_URI"],PHP_URL_PATH);if($path==="/ping"){echo function_exists("curl_exec")?"unsafe":"ready";return;}'.
         'if($path==="/login-user"||$path==="/login-admin"){require '.var_export($source.'/api/bootstrap.php',true).';sf_login_user(sf_user_by_email($path==="/login-admin"?"fixture2@example.invalid":"fixture1@example.invalid"));sf_json_response(["csrf"=>sf_user_csrf()]);}'.
         'if($path==="/analyze"){require '.var_export($source.'/api/agent-song-analyze.php',true).';return;}'.
+        'if($path==="/admin/moments"){require '.var_export($source.'/admin/api/song-moments.php',true).';return;}'.
         'if($path==="/moments"){require '.var_export($source.'/api/song-moments.php',true).';return;}'.
         'require '.var_export($source.'/api/song-lyrics-section.php',true).';';
     file_put_contents($tmp.'/router.php',$router);
@@ -179,6 +190,17 @@ try{
     check(http($base,'/lyrics','POST','[]',$jar,$csrf)['status']===422,'A JSON list cannot masquerade as a selection');
     check(http($base,'/lyrics?track_id[]=fixture-song&source_ref=x','GET',null,$jar)['status']===422,'Array query parameters cannot bypass strict identity checks');
     $adminJar=$tmp.'/admin-cookies';$adminLogin=http($base,'/login-admin','GET',null,$adminJar);$adminCsrf=$adminLogin['body']['csrf']??'';
+    check(http($base,'/admin/moments')['status']===401&&http($base,'/admin/moments','GET',null,$jar)['status']===403,
+        'Song Moments audio preview references require administrator authorization');
+    $adminMoments=http($base,'/admin/moments','GET',null,$adminJar);
+    $previewTracks=array_column($adminMoments['body']['references']['tracks']??[],null,'id');
+    $previewUrl=$previewTracks['fixture-song']['preview_url']??null;
+    check($adminMoments['status']===200&&is_string($previewUrl)&&str_starts_with($previewUrl,$catalog[0]['audio'])
+        &&!str_contains($adminMoments['raw'],$tmp),'Admin preview uses the managed published listening copy without exposing storage paths');
+    check(isset($previewTracks['restricted-song'],$previewTracks['external-song'],$previewTracks['master-alias-song'])
+        &&($previewTracks['restricted-song']['preview_url']??null)===null&&($previewTracks['external-song']['preview_url']??null)===null
+        &&($previewTracks['master-alias-song']['preview_url']??null)===null&&!isset($previewTracks['private-song']),
+        'Preview references exclude member-only, external, master-alias and hidden audio');
     $r=http($base,'/analyze','POST',json_encode($analysis),$adminJar,$adminCsrf);
     check($r['status']===503&&($r['body']['error']??'')==='analysis_provider_unavailable',
         'Analysis of an authorized saved range reaches the existing provider gate');
@@ -187,6 +209,10 @@ try{
     check($r['status']===200&&$r['body']['transcript']['review_status']==='unverified'&&str_contains($r['body']['transcript']['text'],'Unverified artist draft'),'Admin preview retains the unverified state');
     $db->prepare('UPDATE media_links SET public_visible=0 WHERE asset_id=?')->execute([$asset]);
     check(http($base,$query,'GET',null,$adminJar)['status']===404,'Administrator preview cannot bypass revoked listening-copy media access');
+    $adminMoments=http($base,'/admin/moments','GET',null,$adminJar);
+    $previewTracks=array_column($adminMoments['body']['references']['tracks']??[],null,'id');
+    check($adminMoments['status']===200&&array_key_exists('preview_url',$previewTracks['fixture-song']??[])
+        &&$previewTracks['fixture-song']['preview_url']===null,'Revoking a public listening link withdraws the preview source');
     $db->prepare('UPDATE media_links SET public_visible=1 WHERE asset_id=?')->execute([$asset]);
     $db->prepare('UPDATE media_assets SET sha256=? WHERE id=?')->execute([str_repeat('b',64),$asset]);
     check(http($base,'/lyrics','POST',json_encode(payload()),$jar,$csrf)['status']===409,'Replacing the source invalidates an in-flight section');
