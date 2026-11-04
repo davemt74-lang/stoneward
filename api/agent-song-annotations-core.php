@@ -186,6 +186,37 @@ function sf_song_annotation_share_history(int $userId,int $id): array {
       WHERE e.user_id=? AND e.annotation_id=? ORDER BY e.id DESC LIMIT 20');
     $q->execute([$userId,$id]);return $q->fetchAll(PDO::FETCH_ASSOC);
 }
+/** Prior listener reflections for a server-validated song selection, never lyric evidence. */
+function sf_song_annotation_section_context(int $userId,string $trackId,int $startMs,int $endMs): array {
+    if($userId<1||$trackId===''||$startMs<0||$endMs<=$startMs||
+        !function_exists('sf_privacy_personalization_enabled')||!sf_privacy_personalization_enabled($userId))return [];
+    sf_song_annotations_ensure_schema();
+    // The indexed equality narrows the search; require byte equality too on
+    // MySQL, where the table collation would accept another track's casing.
+    $exactTrack=(string)(sf_db_config()['driver']??'')==='sqlite'?'':' AND BINARY track_id=BINARY ?';
+    $q=sf_db()->prepare("SELECT start_ms,end_ms,user_note,analysis_report,agent_share_scope
+        FROM agent_song_annotations WHERE user_id=? AND track_id=? AND start_ms<? AND end_ms>?
+        AND start_ms>=0 AND end_ms>start_ms AND agent_share_scope IN ('summary','full') AND agent_shared_at<>''
+        AND (TRIM(user_note)<>'' OR TRIM(analysis_report)<>'')".$exactTrack.' ORDER BY id DESC LIMIT 2');
+    $args=[$userId,$trackId,$endMs,$startMs];if($exactTrack!=='')$args[]=$trackId;
+    $q->execute($args);$rows=$q->fetchAll(PDO::FETCH_ASSOC);$q->closeCursor();
+    $excerpt=static function(string $value): string {
+        $value=substr(trim($value),0,900);
+        // JSON must retain complete Unicode characters at the byte boundary.
+        for($i=0;$i<=3;$i++,$value=substr($value,0,-1))if(preg_match('//u',$value)===1)return $value;
+        return '';
+    };
+    $notes=[];
+    foreach($rows as $row){
+        $scope=(string)$row['agent_share_scope'];if(!in_array($scope,['summary','full'],true))continue;
+        $note=['start_ms'=>(int)$row['start_ms'],'end_ms'=>(int)$row['end_ms'],
+            'timing_source'=>'historical_listener_range','scope'=>$scope];
+        $personal=$excerpt((string)$row['user_note']);if($personal!=='')$note['personal_note']=$personal;
+        $report=$excerpt((string)$row['analysis_report']);if($report!=='')$note['interpretive_report_excerpt']=$report;
+        if(isset($note['personal_note'])||isset($note['interpretive_report_excerpt']))$notes[]=$note;
+    }
+    return $notes;
+}
 /** Minimal user-scoped context for the signed-in fan chat, never the public profile agent. */
 function sf_song_annotation_agent_context(int $userId,string $question,string $activeTrackId=''): string {
     if($userId<1||!function_exists('sf_privacy_personalization_enabled')||!sf_privacy_personalization_enabled($userId))return '';

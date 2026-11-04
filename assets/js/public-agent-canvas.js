@@ -7,6 +7,7 @@
   let current = null;
   const by = (root, selector) => root.querySelector(selector);
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const songMomentKinds = Object.freeze({ story: 'Story', photo: 'Photo', comment: 'Listener comment' });
   const html = `
     <section class="sf-agent-landing" aria-label="Stonefellow interactive Agent Canvas">
       <canvas class="sf-agent-mesh" aria-hidden="true"></canvas>
@@ -59,6 +60,12 @@
             <canvas class="sf-agent-points" aria-hidden="true"></canvas>
             <span class="sf-agent-core-fallback" aria-hidden="true"></span>
           </button>
+          <button class="sf-agent-song-cue" type="button" data-agent-action="open-song-moment" aria-haspopup="dialog" hidden>
+            <span class="sf-agent-song-cue-spark" aria-hidden="true">✧</span>
+            <span class="sf-agent-song-cue-copy"><span class="sf-agent-song-cue-stamp"></span><span class="sf-agent-song-cue-title"></span></span>
+            <span class="sf-agent-song-cue-arrow" aria-hidden="true">›</span>
+          </button>
+          <span class="sf-agent-song-cue-status sr-only" role="status" aria-atomic="true"></span>
         </div>
         <div class="sf-agent-state" role="status">AGENT READY</div>
         <div class="sf-agent-lyric-controls" hidden aria-label="Lyric listening controls">
@@ -104,6 +111,11 @@
     const visual = by(root, '.sf-agent-visual');
     const orbitTools = by(root, '.sf-agent-orbit-tools');
     const sphere = by(root, '.sf-agent-sphere');
+    const songMomentCue = by(visual, '.sf-agent-song-cue');
+    const songMomentStamp = by(songMomentCue, '.sf-agent-song-cue-stamp');
+    const songMomentTitle = by(songMomentCue, '.sf-agent-song-cue-title');
+    const songMomentStatus = by(visual, '.sf-agent-song-cue-status');
+    const songMomentsTool = by(orbitTools, '[data-orbit-action="moments"]');
     const status = by(root, '.sf-agent-state');
     const lyricControls = by(root, '.sf-agent-lyric-controls');
     const lyricStop = by(lyricControls, '[data-agent-action="stop-lyrics"]');
@@ -181,7 +193,7 @@
       {selector:'.sf-agent-sphere',title:'Meet your Stonefellow Agent',description:'I’m Stonefellow. This particle orb is our conversation center. Tap the orb while I am speaking to stop my voice. You can also drag it around the canvas.'},
       {selector:'[data-orbit-action="listen"]',title:'Listen & Interpret',description:'When a song is playing, this tool listens to a short lyric section, lets you correct the draft, then explores its meaning and songwriter context.'},
       {selector:'[data-orbit-action="record"]',title:'Record Studio',description:'Open the recording slideout, choose a USB microphone or your phone mic, and sing over the song. Preview your vocal mix and download it locally. The original song-only Record Clip remains a separate tab.'},
-      {selector:'[data-orbit-action="moments"]',title:'Song Moments & Timeline',description:'Each song has a timeline of published photos, artist notes, and linked stories. Approved listener comments also appear as the song reaches that timestamp. Tap to open the editor; all public comments require administrator approval.'},
+      {selector:'[data-orbit-action="moments"]',title:'Song Moments & Timeline',description:'Open the song timeline to browse published moments. As the song plays, tap the timestamp near the orb to open a story, photo or approved listener comment while the music continues.'},
       {selector:'[data-orbit-action="playlist"]',title:'Playlist & Queue',description:'Open the right-side playlist drawer to see what is playing next. Make a mix, choose a song, or save a temporary playlist for later.'},
       {selector:'[data-orbit-action="library"]',title:'Songs & Albums',description:'Browse Stonefellow songs and albums without leaving the agent canvas. Select a song to play or ask me about a release.'},
       {selector:'[data-orbit-action="commerce"]',title:'Merch & Tickets',description:'Explore merchandise, show tickets, and your cart in the right-side commerce drawer.'},
@@ -638,7 +650,8 @@
         });
       }
       pageTimer=window.setTimeout(()=>{
-        if(!destroyed&&!pageRail.hidden)by(pageRail,'[data-agent-action="close-page"]')?.focus({preventScroll:true});
+        if(!destroyed&&!pageRail.hidden&&!document.body?.classList?.contains('sf-song-moments-open'))
+          by(pageRail,'[data-agent-action="close-page"]')?.focus({preventScroll:true});
       },alreadyOpen?0:800);
       return view==='lyrics'?lyricHost:pageHost;
     }
@@ -667,6 +680,33 @@
       if(immediate||reduced())finish();
       else pageTimer=window.setTimeout(finish,770);
     }
+    function setSongMoment(moment){
+      if(typeof options.onOpenMoment!=='function')return false;
+      const kind=typeof moment?.kind==='string'&&Object.hasOwn(songMomentKinds,moment.kind)?songMomentKinds[moment.kind]:'';
+      const valid=!!kind&&Number.isSafeInteger(moment.id)&&moment.id>0&&
+        Number.isSafeInteger(moment.at_ms)&&moment.at_ms>=0&&(!moment.status||moment.status==='published');
+      const id=valid?String(moment.id):'';
+      if(songMomentCue.dataset.momentId!==id&&document.activeElement===songMomentCue)
+        songMomentsTool.focus({preventScroll:true});
+      songMomentCue.hidden=!valid;
+      if(!valid){
+        delete songMomentCue.dataset.momentId;
+        songMomentCue.removeAttribute('aria-label');
+        songMomentStamp.textContent='';songMomentTitle.textContent='';songMomentStatus.textContent='';
+        return moment==null;
+      }
+      const seconds=Math.floor(moment.at_ms/1000);
+      const at=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
+      const title=String(moment.title||moment.story?.title||moment.photo?.title||'').trim().slice(0,160);
+      const description='Song Moment at '+at+': '+kind+(title?' · '+title:'');
+      songMomentCue.dataset.momentId=id;
+      songMomentCue.setAttribute('aria-label','Open '+description);
+      songMomentStamp.textContent=at+' · '+kind;
+      songMomentTitle.textContent=title;
+      songMomentTitle.hidden=!title;
+      if(songMomentStatus.textContent!==description)songMomentStatus.textContent=description;
+      return true;
+    }
     function handleAction(event){
       const button=event.target.closest?.('[data-agent-action]');if(!button)return;
       const action=button.dataset.agentAction;
@@ -681,6 +721,8 @@
       if(action==='start-guide')startGuide();
       if(action==='capture')options.onStartCapture?.();
       if(action==='song-moments')options.onOpenMoments?.();
+      if(action==='open-song-moment'&&!button.hidden&&button.dataset.momentId)
+        options.onOpenMoment?.(Number(button.dataset.momentId),button);
       if(action==='listen-interpret')options.onListenInterpret?.();
       if(action==='open-lyrics')openLyrics();
       if(action==='stop-lyrics'&&!lyricStop.disabled)options.onStopListening?.();
@@ -703,7 +745,7 @@
     }));
     if(pagePortal!==root)cleanup.push(on(pagePortal,'click',handleAction));
     cleanup.push(on(window,'keydown',e=>{
-      if(pageRail.hidden)return;
+      if(pageRail.hidden||e.defaultPrevented||document.body?.classList?.contains('sf-song-moments-open'))return;
       if(e.key==='Escape'){
         e.preventDefault();closePage();options.onClosePage?.();return;
       }
@@ -756,7 +798,9 @@
     cleanup.push(on(floater,'focusin',()=>{hovered=true;}));
     cleanup.push(on(floater,'focusout',e=>{if(!floater.contains(e.relatedTarget)){hovered=false;roam.start=0;roam.delay=0;}}));
     cleanup.push(on(window,'pointermove',e=>gazeAt(e.clientX,e.clientY),{passive:true}));
-    cleanup.push(on(window,'keydown',e=>{if(e.key==='Escape'&&workspace.classList.contains('open'))closeWorkspace();}));
+    cleanup.push(on(window,'keydown',e=>{
+      if(e.key==='Escape'&&!e.defaultPrevented&&!document.body?.classList?.contains('sf-song-moments-open')&&workspace.classList.contains('open'))closeWorkspace();
+    }));
     cleanup.push(on(audio,'play',()=>{state('music');showPlayer();}));
     cleanup.push(on(audio,'pause',()=>{if(mode==='music')state('idle');}));
     cleanup.push(on(window,'resize',resize));
@@ -767,7 +811,7 @@
     resize();state(audio&&!audio.paused?'music':'idle');session();syncPlayer();syncVoice();
     if(!motionOff)raf=requestAnimationFrame(tick);
     else {meshDraw(0);cloudDraw(0);orbDraw(0);}
-    current={root,state,session,syncPlayer,syncVoice,syncPlaylist:syncListeningButtons,openPage,openLyrics,closePage,startGuide,syncTranscript,showConversation,setWelcomeState,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
+    current={root,state,session,syncPlayer,syncVoice,syncPlaylist:syncListeningButtons,openPage,openLyrics,closePage,startGuide,syncTranscript,showConversation,setWelcomeState,setSongMoment,setAtmosphere:applyAtmosphere,getAtmosphere:()=>atmosphere,destroy(){
       destroyed=true;cancelAnimationFrame(raf);cancelAnimationFrame(pageFrame);window.clearTimeout(pageTimer);window.clearTimeout(workspaceTimer);pausePlayerHide();
       closeGuide(false);guideLayer.remove();
       document.body?.classList?.remove('sf-agent-page-open');
@@ -795,5 +839,5 @@
     const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':['moonlit horizon','moonlight'].includes(match[1])?'lunar':match[1];
     return current?.setAtmosphere(named)||null;
   }
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncPlaylist:()=>current?.syncPlaylist(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),setWelcomeState:state=>current?.setWelcomeState(state),startGuide:()=>current?.startGuide(),openPage:view=>current?.openPage(view),openLyrics:()=>current?.openLyrics(),closePage:(immediate=false)=>current?.closePage(immediate),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncPlaylist:()=>current?.syncPlaylist(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),setWelcomeState:state=>current?.setWelcomeState(state),setSongMoment:moment=>current?.setSongMoment(moment)||false,startGuide:()=>current?.startGuide(),openPage:view=>current?.openPage(view),openLyrics:()=>current?.openLyrics(),closePage:(immediate=false)=>current?.closePage(immediate),active:()=>!!current});
 })();

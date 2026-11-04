@@ -474,6 +474,22 @@ body.sf-agent-canvas-active[data-sf-atmosphere="lunar"]{
 .sf-agent-landing .sf-agent-orbit-tools [data-orbit-action="stop"]{
   color:#ffcbad;border-color:#e5a683a6;
 }
+.sf-agent-landing .sf-agent-song-cue{
+  position:absolute;z-index:9;left:50%;bottom:-8px;transform:translateX(-50%);
+  display:flex;align-items:center;gap:8px;max-width:min(220px,calc(100vw - 32px));min-height:44px;
+  padding:5px 11px;border:1px solid var(--sf-atmo-border,#83ceff8c);border-radius:999px;
+  color:var(--sf-atmo-text,#eef7ff);background:#111722f5;box-shadow:0 4px 16px #06070d88;
+  text-align:left;white-space:nowrap;
+}
+.sf-agent-landing .sf-agent-song-cue:hover,.sf-agent-landing .sf-agent-song-cue:focus-visible{
+  border-color:var(--sf-atmo-accent,#a8dfff);outline:2px solid var(--sf-atmo-accent,#a8dfff);outline-offset:2px;
+}
+.sf-agent-landing .sf-agent-song-cue-spark,.sf-agent-landing .sf-agent-song-cue-arrow{
+  flex:none;color:var(--sf-atmo-accent,#a8dfff);font:600 18px/1 sans-serif;
+}
+.sf-agent-landing .sf-agent-song-cue-copy{min-width:0;display:grid;gap:2px}
+.sf-agent-landing .sf-agent-song-cue-stamp{font:700 11px/1.2 var(--body-font,system-ui,sans-serif)}
+.sf-agent-landing .sf-agent-song-cue-title{overflow:hidden;text-overflow:ellipsis;font:500 11px/1.2 var(--body-font,system-ui,sans-serif)}
 /* Live voice caption and recent Agent Chat share one compact floating slot.
    The existing #voiceTranscript is reparented, never duplicated. */
 .sf-agent-landing .sf-agent-live-feed{

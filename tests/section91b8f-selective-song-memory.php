@@ -41,6 +41,8 @@ $check(sf_song_annotation_list(1)[0]['agent_share_scope']==='private',
     'New saved notes default to private, with no implied LLM consent');
 $check(sf_song_annotation_agent_context(1,'What do my lyric notes say?')==='',
     'Private annotation is absent from future LLM context by default');
+$check(sf_song_annotation_section_context(1,'published-1',10000,24000)===[],
+    'Selected-section context also excludes private notes');
 try{sf_song_annotation_set_share_scope(1,$id,'public');$check(false,'Invalid public scope accepted');}
 catch(InvalidArgumentException){$check(true,'Public sharing scope is rejected');}
 try{sf_song_annotation_set_share_scope(2,$id,'full');$check(false,'Opt-out accepted');}
@@ -67,9 +69,23 @@ $check(($full['scope']??'')==='full'&&str_contains($ctx,'Listener edited secret 
     'Separate full-scope authorization permits relevant edited draft context');
 $check(str_contains($ctx,'listener_edited_unverified')&&str_contains($ctx,'untrusted'),
     'Model context labels edited drafts as unverified and untrusted data');
+$section=sf_song_annotation_section_context(1,'published-1',23000,25000);
+$check(count($section)===1&&$section[0]===['start_ms'=>10000,'end_ms'=>24000,
+    'timing_source'=>'historical_listener_range','scope'=>'full','personal_note'=>'Morning listening reminds me of Arizona',
+    'interpretive_report_excerpt'=>'Interpretive report, not verified song facts'],
+    'Overlapping historical notes disclose only reflection and report even on full shares');
+$check(sf_song_annotation_section_context(1,'published-1',24000,25000)===[]&&
+    sf_song_annotation_section_context(1,'published-1',9000,10000)===[]&&
+    sf_song_annotation_section_context(1,'published-1',10000,10000)===[],
+    'An adjacent or empty selection has no positive overlap');
+$check(sf_song_annotation_section_context(3,'published-1',10000,24000)===[]&&
+    sf_song_annotation_section_context(1,'PUBLISHED-1',10000,24000)===[],
+    'An opted-in account cannot read another owner’s note or a different track identifier');
 $consent[1]=false;
 $check(sf_song_annotation_agent_context(1,'What do my lyric notes mean?')==='',
     'Turning off account personalization suppresses previously shared content');
+$check(sf_song_annotation_section_context(1,'published-1',10000,24000)===[],
+    'Selected sections honor current personalization consent');
 $revoke=sf_song_annotation_set_share_scope(1,$id,'private');
 $check(($revoke['scope']??'')==='private'&&sf_song_annotation_list(1)[0]['agent_share_scope']==='private',
     'Revocation remains available after account consent is disabled');
@@ -84,10 +100,29 @@ $check(sf_song_annotation_update(1,$id,['corrected_transcript'=>'Different confi
     'Owner can change their saved correction');
 $check(sf_song_annotation_list(1)[0]['agent_share_scope']==='private',
     'Editing a shared note automatically revokes earlier consent');
+$check(sf_song_annotation_section_context(1,'published-1',10000,24000)===[],
+    'Selected sections honor revocation on edit');
 $check(sf_song_annotation_agent_context(1,'What does this verse mean?','published-1')==='',
     'Changed, unapproved lyrics cannot leak through the old sharing setting');
 $check(sf_song_annotation_delete(1,$id)&&sf_song_annotation_share_history(1,$id)===[],
     'Deleting a note also removes its private sharing audit entries');
+$share=static function(array $fields,string $scope='summary')use($payload,$catalog):int{
+    $id=sf_song_annotation_save(1,array_replace($payload,$fields),$catalog)['id'];
+    sf_song_annotation_set_share_scope(1,$id,$scope);return $id;
+};
+$share(['annotation'=>'Older eligible reflection']);
+$share(['annotation'=>'Second eligible reflection']);
+$unicode=$share(['annotation'=>str_repeat('a',899).'é','report'=>'Confirmed shared excerpt.']);
+$share(['annotation'=>'','report'=>'','question'=>'','mode'=>''],'full');
+$undated=$share(['annotation'=>'Missing explicit share timestamp']);
+$db->prepare("UPDATE agent_song_annotations SET agent_shared_at='' WHERE id=?")->execute([$undated]);
+$section=sf_song_annotation_section_context(1,'published-1',10000,24000);
+$check(count($section)===2&&$section[0]['scope']==='summary'&&strlen($section[0]['personal_note'])===899&&
+    $section[1]['personal_note']==='Second eligible reflection',
+    'Recent eligible notes are capped and UTF-8-safe; transcript-only and undated shares are skipped');
+$check(sf_song_annotation_delete(1,$unicode)&&
+    sf_song_annotation_section_context(1,'published-1',10000,24000)[0]['personal_note']==='Second eligible reflection',
+    'Deleted shared reflections disappear from selected-section context immediately');
 $route=(string)file_get_contents(dirname(__DIR__).'/api/agent-song-annotations.php');
 $runtime=(string)file_get_contents(dirname(__DIR__).'/api/agent-runtime.php');
 $check(str_contains($route,"\$action==='share'")&&str_contains($route,'sf_require_user(false,$method===\'POST\')'),

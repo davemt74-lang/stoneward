@@ -5,6 +5,7 @@ require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/agent-runtime.php';
 require_once __DIR__.'/agent-song-catalog-core.php';
 require_once __DIR__.'/song-moments-core.php';
+require_once __DIR__.'/song-section-context.php';
 
 $method=(string)($_SERVER['REQUEST_METHOD']??'GET');
 if(!in_array($method,['GET','POST'],true))sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
@@ -21,7 +22,7 @@ try{
         sf_json_response(['ok'=>true,'available'=>$count>0,'source'=>'saved-catalog-lyrics',
             'source_fingerprint'=>$source['fingerprint'],'max_seconds'=>90,'segments_available'=>$count,
             'message'=>$count>0?'Select a song section, then Stop to retrieve its saved lyrics.':
-                ($admin?'Import and review this song’s lyrics in Admin → Song Moments first.':'Reviewed lyrics are not available for this song yet.')]);
+                ($admin?'Open this song in Admin → Catalog to import its lyrics or check its review status.':'Reviewed lyrics are not available for this song yet.')]);
     }
     if((int)($_SERVER['CONTENT_LENGTH']??0)>8192)sf_song_catalog_error('invalid_song_section',413,'The lyric request is too large.');
     $stream=fopen('php://input','rb');
@@ -39,12 +40,13 @@ try{
         sf_song_catalog_error('saved_lyrics_unavailable',404,'No saved lyrics overlap this section. No transcription was requested or charged.');
     if(!hash_equals($source['fingerprint'],(string)$section['source_fingerprint']))
         sf_song_catalog_error('song_source_changed',409,'The saved lyrics belong to another song version. Reload the player.');
+    $context=sf_song_section_public_context($meta['track_id'],$meta['start_ms'],$meta['end_ms']);
     sf_json_response(['ok'=>true,'transcript'=>[
         'track_id'=>$meta['track_id'],'title'=>$meta['title'],'release'=>$meta['release'],
         'start_ms'=>$meta['start_ms'],'end_ms'=>$meta['end_ms'],'selected_start_ms'=>$meta['start_ms'],
         'selected_end_ms'=>$meta['end_ms'],'captured_at'=>$meta['captured_at'],'text'=>$section['text'],
         'origin'=>'saved_catalog_lyrics','review_status'=>$section['review_status'],
-        'timing'=>'saved_segments','segments'=>$section['segments'],'source'=>'saved-catalog-lyrics',
+        'timing'=>'saved_segments','segments'=>$section['segments'],'section_context'=>$context,'source'=>'saved-catalog-lyrics',
         'source_fingerprint'=>$source['fingerprint'],'provider'=>'stored','model'=>'',
         'timing_notice'=>'Saved blocks can extend beyond your selection. Approximate block boundaries are editable by the artist.'
     ]]);

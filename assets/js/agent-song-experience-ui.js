@@ -14,6 +14,48 @@
     const seconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
     return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
   };
+  const momentLabels = Object.freeze({story:'Story', photo:'Photo', comment:'Listener comment'});
+  const storyRoute = /^story\/([a-zA-Z0-9_-]{1,160})$/;
+  const photoRoute = /^api\/media\.php\?id=M[A-F0-9]{20}&variant=thumb$/;
+  function sectionContext(entries, onAction) {
+    if (!Array.isArray(entries)) return null;
+    const moments = entries.filter(item => item && Object.hasOwn(momentLabels, item.kind) &&
+      Number.isInteger(item.id) && item.id > 0 && Number.isInteger(item.at_ms) && item.at_ms >= 0 &&
+      typeof item.title === 'string' && typeof item.text === 'string').slice(0, 9);
+    if (!moments.length) return null;
+    const panel = el('details', 'song-experience-context');
+    panel.append(el('summary', '', 'Song context for this section (' + moments.length + ')'));
+    const list = el('ul', 'song-experience-context-list');
+    for (const moment of moments) {
+      const item = el('li', 'song-experience-context-item');
+      const label = momentLabels[moment.kind];
+      const copy = el('div', 'song-experience-context-copy');
+      copy.append(el('small', '', clock(moment.at_ms) + ' · ' + label));
+      const story = moment.kind === 'story' && typeof moment.href === 'string' && moment.href.match(storyRoute);
+      if (story) {
+        const link = el('a', '', moment.title || 'Read the story');
+        link.href = moment.href;
+        link.addEventListener('click', event => {
+          if (!onAction || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          onAction('story', story[1]);
+        });
+        copy.append(link);
+      } else if (moment.title && moment.title !== label) copy.append(el('strong', '', moment.title));
+      if (moment.text) copy.append(el('p', 'song-experience-copy', moment.text));
+      if (moment.kind === 'photo' && typeof moment.image_url === 'string' && photoRoute.test(moment.image_url)) {
+        const photo = el('img', 'song-experience-context-photo');
+        photo.loading = 'lazy';
+        photo.alt = typeof moment.alt === 'string' ? moment.alt : (moment.title || 'Song moment photo');
+        photo.src = moment.image_url;
+        item.append(photo);
+      }
+      item.append(copy);
+      list.append(item);
+    }
+    panel.append(list);
+    return panel;
+  }
   const editors = new WeakMap();
   function mount(target, experience, onAction) {
     if (!target) return;
@@ -105,6 +147,8 @@
         state.listening_mode==='recognition' ? 'Listening directly to the player. No song clip is being recorded.' :
            (Number(state.segments_completed)||0)+' section(s) transcribed. The final full-clip pass will replace these provisional words.'));
       card.append(panel);
+      const context = state.phase === 'discarded' ? null : sectionContext(state.section_context, onAction);
+      if (context) card.append(context);
     }
     for (const [index, report] of (state.reports || []).entries()) {
       const panel = el('section', 'song-experience-report');
@@ -116,6 +160,8 @@
       if (Array.isArray(report.sources) && report.sources.length)
         details.append(el('small', 'song-experience-sources', 'Published sources: ' + report.sources.join(' · ')));
       else details.append(el('small', 'song-experience-sources', 'No song-specific published songwriter notes matched.'));
+      if (Number.isInteger(report.shared_note_count) && report.shared_note_count > 0)
+        details.append(el('small', '', 'Shared listener notes available to this interpretation: ' + report.shared_note_count));
       details.append(el('small', '', report.draft_status==='approved_catalog_lyrics'?'Interpretation of reviewed song lyrics; no live web sources were searched.':'Interpretation of an unverified draft; no live web sources were searched.'));
       panel.append(details);
       card.append(panel);

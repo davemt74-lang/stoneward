@@ -94,8 +94,9 @@ with sync_playwright() as p:
             page.add_style_tag(content=(ROOT / name).read_text())
         page.add_style_tag(content='body{margin:0}#target{min-height:780px}.sf-agent-landing{height:780px!important;min-height:780px!important}')
         page.evaluate('''() => {
-          window.recordings=0;window.mics=0;window.captures=0;window.interpretations=0;
+          window.recordings=0;window.mics=0;window.captures=0;
           window.gets=[];window.posts=[];window.pending=[];window.pendingReady=[];window.deferReady=false;
+          window.interpretations=[];window.pendingInterpretations=[];window.navigations=[];
           window.fakeClock=0;window.playPosition=60;
           Object.defineProperty(performance,'now',{configurable:true,value:()=>fakeClock});
           window.MediaRecorder=class{constructor(){recordings++;throw Error('Record Clip activated')}};
@@ -115,6 +116,12 @@ with sync_playwright() as p:
           window.vocalStudio={status:()=>({active:false})};
           window.songCaptureSkill={status:()=>({active:false}),getCapture:()=>null,begin(){recordings++;throw Error('Record Clip fallback')}};
           window.renderPopupEntries=()=>{};window.openChatPopup=()=>{};window.loadAuth=async()=>{};
+          window.closeChatPopup=()=>{};window.popupEntry=()=>{};window.say=async()=>{};
+          window.navigate=async(view,params)=>{navigations.push({view,params})};
+          window.executePrivateAnnotationCommand=async command=>{
+            songLyricCorrected=command.replace(/^correct lyrics to /,'');
+            updateSongExperience({corrected:songLyricCorrected});return 'Updated the listener-edited';
+          };
           window.response=value=>({ok:true,status:200,json:async()=>value});
           window.ready=()=>response({ok:true,available:true,source:'saved-catalog-lyrics',max_seconds:90,source_fingerprint:'a'.repeat(64)});
           window.fetch=(url,options={})=>{
@@ -134,14 +141,29 @@ with sync_playwright() as p:
                 options.signal?.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true});
               });
             }
+            if(String(url).endsWith('agent-song-analyze.php')&&options.method==='POST'){
+              const payload=JSON.parse(options.body);interpretations.push(payload);
+              if(options.headers['X-CSRF-Token']!=='fixture-csrf')throw Error('Missing CSRF token');
+              return new Promise(resolve=>pendingInterpretations.push({payload,resolve}));
+            }
             throw Error('Unexpected provider or application request: '+url);
           };
           window.reply=(index,text='Words from the selected song')=>{
             const request=pending[index];request.resolve(response({ok:true,transcript:{...request.payload,
               source:'saved-catalog-lyrics',provider:'stored',model:'',review_status:'approved',timing:'saved_segments',
               selected_start_ms:request.payload.start_ms,selected_end_ms:request.payload.end_ms,
-              segments:[{start_ms:request.payload.start_ms,end_ms:request.payload.end_ms,text,lyric_state:'approved',timing_source:'catalog_chunk_estimate'}],
+              segments:[{id:34,start_ms:request.payload.start_ms,end_ms:request.payload.end_ms,text,lyric_state:'approved',timing_source:'catalog_chunk_estimate'}],
+              section_context:[
+                {id:1,kind:'story',at_ms:61000,title:'A story from this verse',text:'Published story summary',href:'story/this-verse'},
+                {id:2,kind:'photo',at_ms:62000,title:'Studio photo',text:'Public caption',image_url:'api/media.php?id=M0123456789ABCDEF0123&variant=thumb',alt:'The studio console'},
+                {id:3,kind:'comment',at_ms:63000,title:'',text:'<script>Listener memory</script>'},
+                {id:4,kind:'note',at_ms:64000,title:'Private note',text:'PRIVATE TEXT'}],
               title:'Testing song',text}}));
+          };
+          window.replyInterpretation=(index,section_context)=>{
+            const request=pendingInterpretations[index];request.resolve(response({ok:true,analysis:{...request.payload,
+              report:'The interpretation starts with the actual words.',writer_sources:[],draft_status:'unverified_user_supplied',
+              shared_note_count:1,section_context}}));
           };
         }''')
         for name in ('assets/js/agent-song-experience-ui.js', 'assets/js/agent-song-listening-skill.js',
@@ -151,18 +173,15 @@ with sync_playwright() as p:
         # implementation of the mobile lifecycle inside the fixture.
         page.add_script_tag(content='\n'.join((
             block('  async function finishSongListening(result){', '  let songTranscriptionBusy='),
-            block('  function updateSongExperience(changes={},open=false){', '  async function songExperienceAction('),
+            block('  function updateSongExperience(changes={},open=false){', '  window.StonefellowSongExperience='),
+            block('  async function analyzeLastSongDraft(question){', '  async function executeSongCaptureAction(action){'),
             block('  async function executeSongCaptureAction(action){', '  // Private annotation commands'),
             block('  function currentSongDraft(){', '  async function executePrivateAnnotationCommand'),
             block('  async function secureJsonPost(', '  function applyQueue('),
         )))
         page.evaluate('''() => {
           window.StonefellowSongExperience={active:()=>!!songExperience,snapshot:()=>songExperience,
-            mount:target=>SFSongExperienceUI.mount(target,songExperience&&{...songExperience,canAnalyze:!!currentSongDraft()},(action,text)=>{
-              if(action==='stop')void executeSongCaptureAction({type:'song_capture_stop'});
-              if(action==='edit'){songLyricCorrected=text;updateSongExperience({corrected:text})}
-              if(action==='analyze')interpretations++;
-            })};
+            mount:target=>SFSongExperienceUI.mount(target,songExperience&&{...songExperience,canAnalyze:!!currentSongDraft()},songExperienceAction)};
           SFPublicAgentCanvas.mount(document.querySelector('#target'),{audio,player:document.querySelector('#player'),
             isCapturing:()=>songListeningSkill.status().active,isVocalRecording:()=>false,
             onListenInterpret:()=>void executeSongCaptureAction({type:'song_capture_live_start',interpret_on_stop:true}),
@@ -208,13 +227,45 @@ with sync_playwright() as p:
         page.locator('[data-agent-action="open-lyrics"]').click()
         wait_open_rail(page, width)
         check('Words from the selected song' in visible_text(page.locator('.sf-agent-lyric-workspace')), label + ': reopening displays completed lyric draft')
-        check(page.evaluate('interpretations===0&&posts.length===1'), label + ': completion never auto-interprets or repeats the lookup')
+        check(page.evaluate('interpretations.length===0&&posts.length===1'), label + ': completion never auto-interprets or repeats the lookup')
+        workspace = page.locator('.sf-agent-lyric-workspace')
+        context_details = workspace.locator('.song-experience-context')
+        check(workspace.locator('.song-experience-transcript + .song-experience-context').count() == 1
+              and not context_details.evaluate('(details)=>details.open'), label + ': song context follows the saved words without crowding the mobile card')
+        context_details.locator('summary').click()
+        check(context_details.get_by_role('link', name='A story from this verse').is_visible()
+              and context_details.get_by_alt_text('The studio console').is_visible()
+              and '<script>Listener memory</script>' in visible_text(context_details)
+              and 'PRIVATE TEXT' not in context_details.text_content()
+              and context_details.locator('script').count() == 0, label + ': only public story, photo, and literal comment content is rendered')
+        context_details.get_by_role('link', name='A story from this verse').click()
+        check(page.evaluate('navigations[0].view==="story"&&navigations[0].params.slug==="this-verse"&&st.playing'), label + ': published story uses in-app navigation while playback continues')
+        context_details.locator('summary').click()
         page.locator('.sf-agent-lyric-workspace [aria-label="Edit lyric draft"]').click()
         page.locator('.sf-agent-lyric-workspace textarea').fill('Corrected lyric words')
         page.locator('.sf-agent-lyric-workspace button', has_text='Save lyric correction').click()
         check('Corrected lyric words' in visible_text(page.locator('.sf-agent-lyric-workspace')), label + ': listener may correct the draft')
         page.locator('.sf-agent-lyric-workspace button', has_text='Review & interpret lyrics').click()
-        check(page.evaluate('interpretations===1&&posts.length===1'), label + ': interpretation requires its own explicit action')
+        page.wait_for_function('interpretations.length===1')
+        check(page.evaluate('posts.length===1&&interpretations[0].transcript==="Corrected lyric words"&&interpretations[0].listener_edited&&interpretations[0].saved_lyric_ids[0]===34&&interpretations[0].source_fingerprint==="a".repeat(64)&&!("section_context" in interpretations[0])'),
+              label + ': explicit interpretation sends the edited words and saved identity without client-supplied context')
+        page.evaluate('''replyInterpretation(0,[
+          {id:5,kind:"comment",at_ms:65000,title:"",text:"Current approved comment"},
+          {id:6,kind:"story",at_ms:65000,title:"Unsafe route",text:"",href:"javascript:alert(1)"},
+          {id:7,kind:"photo",at_ms:65000,title:"External image",text:"",image_url:"//external.example/image.png"}])''')
+        page.wait_for_function('songExperience?.phase === "report"')
+        check('A story from this verse' not in workspace.text_content() and 'Current approved comment' in workspace.text_content()
+              and 'Shared listener notes available to this interpretation: 1' in workspace.text_content(),
+              label + ': fresh server context replaces the preview, with only a shared-note count shown')
+        check(context_details.locator('a,img').count() == 0, label + ': context cannot add an executable link or external image')
+        workspace.get_by_role('button', name='Interpret again').click()
+        page.wait_for_function('interpretations.length===2')
+        page.evaluate('''st.track.audio='api/media.php?id=replaced';replyInterpretation(1,[
+          {id:8,kind:'comment',at_ms:65000,title:'',text:'Outdated comment'}])''')
+        page.wait_for_function('songExperience?.phase === "discarded"')
+        check(context_details.count() == 0 and 'Outdated comment' not in workspace.text_content(),
+              label + ': a same-track source replacement discards late context and interpretation')
+        page.evaluate('st.track.audio="api/media.php?id=M123"')
         page.keyboard.press('Escape')
         page.locator('[data-orbit-action="listen"]').click(force=True)
         page.wait_for_function('songExperience?.phase === "capturing"')

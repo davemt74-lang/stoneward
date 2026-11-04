@@ -188,27 +188,32 @@ function sf_song_moments_lyric_section(string $trackId,int $startMs,int $endMs,b
 function sf_song_moments_public_image(string $uuid): ?array {
     if(!preg_match('/^[a-zA-Z0-9-]{8,80}$/D',$uuid))return null;
     $asset=sf_media_asset($uuid);
-    if(!$asset||($asset['category']??'')!=='image')return null;
-    $q=sf_db()->prepare('SELECT 1 FROM media_links WHERE asset_id=? AND public_visible=1 LIMIT 1');
-    $q->execute([(int)$asset['id']]);if(!$q->fetchColumn())return null;
-    return ['uuid'=>$uuid,'url'=>sf_media_managed_url($asset,'medium'),'thumb_url'=>sf_media_managed_url($asset,'thumb'),'title'=>(string)($asset['title']??'')];
+    if(!$asset||($asset['category']??'')!=='image'||sf_media_protected_master_asset((int)$asset['id']))return null;
+    $q=sf_db()->prepare("SELECT 1 FROM media_links WHERE asset_id=? AND public_visible=1 AND entity_type<>'member_content' LIMIT 1");
+    $q->execute([(int)$asset['id']]);$visible=(bool)$q->fetchColumn();$q->closeCursor();if(!$visible)return null;
+    return ['uuid'=>$uuid,'url'=>sf_media_managed_url($asset,'medium'),'thumb_url'=>sf_media_managed_url($asset,'thumb'),
+      'title'=>(string)($asset['title']??''),'caption'=>(string)($asset['caption']??''),'alt'=>(string)($asset['alt_text']??'')];
 }
 function sf_song_moments_public_row(array $row): ?array {
     $kind=(string)$row['kind'];$entry=[
       'id'=>(int)$row['id'],'track_id'=>(string)$row['track_id'],'at_ms'=>(int)$row['at_ms'],
       'kind'=>$kind,'title'=>(string)$row['title'],'body'=>(string)$row['body'],
       'display_name'=>$kind==='comment'?(string)$row['display_name']:'Stonefellow',
-      'created_at'=>(string)$row['created_at'],'story'=>null,'photo'=>null];
+      'created_at'=>(string)$row['created_at'],'story'=>null,'photo'=>null,'orb_eligible'=>false];
+    $published=($row['status']??'')==='published'&&(int)($row['source_annotation_id']??0)===0;
     if($kind==='photo'){
         $entry['photo']=sf_song_moments_public_image((string)$row['media_uuid']);
         if(!$entry['photo'])return null;
+        $entry['orb_eligible']=$published;
     }
     if($kind==='story'){
         $story=sf_story_get((int)$row['story_id'],true);
         if(!$story)return null;
         $entry['story']=['id'=>(int)$story['id'],'slug'=>(string)$story['slug'],'title'=>(string)$story['title'],'summary'=>(string)$story['summary']];
         if($entry['title']==='')$entry['title']=(string)$story['title'];
+        $entry['orb_eligible']=$published&&(($story['entity_type']??'')!=='track'||(string)$story['entity_id']===$entry['track_id']);
     }
+    if($kind==='comment')$entry['orb_eligible']=$published&&(int)($row['moderated_by']??0)>0&&trim((string)($row['moderated_at']??''))!=='';
     if($kind==='lyric'){
         if(($row['status']??'')!=='published'||($row['lyric_state']??'')!=='approved'||(int)($row['source_annotation_id']??0)>0)return null;
         foreach(['end_ms','revision'] as $field)$entry[$field]=(int)($row[$field]??0);
@@ -223,6 +228,7 @@ function sf_song_moments_public(string $trackId): array {
     $q=sf_db()->prepare("SELECT * FROM song_timeline_moments WHERE track_id=? AND status='published' AND source_annotation_id=0 AND (kind<>'lyric' OR lyric_state='approved') ORDER BY at_ms ASC,id ASC LIMIT 700");
     $q->execute([$trackId]);$rows=$q->fetchAll();$q->closeCursor();$out=[];$fingerprint=null;
     foreach($rows as $row){
+        if((string)$row['track_id']!==(string)$track['id'])continue;
         if($row['kind']==='lyric'){
             $fingerprint??=sf_song_moments_audio_fingerprint($track);
             if($fingerprint===''||!hash_equals($fingerprint,(string)$row['source_fingerprint']))continue;
@@ -256,7 +262,10 @@ function sf_song_moments_admin_refs(): array {
     $tracks=array_map(fn($t)=>['id'=>(string)$t['id'],'title'=>(string)$t['title'],'duration'=>(int)($t['duration']??0),'duration_ms'=>sf_song_moments_lyric_duration_ms($t)],sf_public_catalog());
     $stories=[];foreach(sf_story_list(true,'',200) as $s)$stories[]=['id'=>(int)$s['id'],'title'=>(string)$s['title'],'entity_id'=>(string)($s['entity_id']??''),'slug'=>(string)$s['slug']];
     sf_media_ensure_schema();
-    $photos=[];$q=sf_db()->query("SELECT DISTINCT a.id,a.uuid,a.title FROM media_assets a INNER JOIN media_links l ON l.asset_id=a.id AND l.public_visible=1 WHERE a.category='image' ORDER BY a.id DESC LIMIT 250");
+    $photos=[];$q=sf_db()->query("SELECT DISTINCT a.id,a.uuid,a.title FROM media_assets a
+      INNER JOIN media_links l ON l.asset_id=a.id AND l.public_visible=1 AND l.entity_type<>'member_content'
+      WHERE a.category='image' AND NOT EXISTS (SELECT 1 FROM media_links p WHERE p.asset_id=a.id AND p.role IN ('master_audio','stem_audio'))
+      ORDER BY a.id DESC LIMIT 250");
     foreach($q->fetchAll() as $r)$photos[]=['uuid'=>(string)$r['uuid'],'title'=>(string)($r['title']?:'Photo '.$r['id']),'url'=>'api/media.php?id='.rawurlencode((string)$r['uuid'])];
     return ['tracks'=>$tracks,'stories'=>$stories,'photos'=>$photos];
 }
