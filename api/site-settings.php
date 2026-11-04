@@ -41,6 +41,7 @@ function sf_site_settings(): array {
         'homepage_template'=>sf_meta_get('site.homepage_template','classic')==='agent_canvas'?'agent_canvas':'classic',
         'splash_revision'=>sf_meta_get('site.splash_revision','1'),
         'fan_community_enabled'=>sf_meta_get('site.fan_community_enabled','0')==='1',
+        'orb_song_moments_enabled'=>sf_meta_get('site.orb_song_moments_enabled','0')==='1',
         'announcement_enabled'=>sf_meta_get('site.announcement_enabled','0')==='1',
         'announcement_text'=>sf_meta_get('site.announcement_text',''),
         'maintenance_enabled'=>sf_meta_get('site.maintenance_enabled','0')==='1',
@@ -68,6 +69,9 @@ function sf_site_settings_update(array $data): array {
         sf_meta_set('site.splash_revision',(string)time());
     }
     foreach(['artist_homepage_enabled','fan_community_enabled','announcement_enabled','maintenance_enabled'] as $key) if(array_key_exists($key,$data)) sf_meta_set('site.'.$key,!empty($data[$key])?'1':'0');
+    if(array_key_exists('orb_song_moments_enabled',$data)){
+        sf_meta_set('site.orb_song_moments_enabled',$data['orb_song_moments_enabled']===true?'1':'0');
+    }
     if(array_key_exists('homepage_template',$data)){
         $template=(string)$data['homepage_template'];
         if(!in_array($template,['classic','agent_canvas'],true)) throw new InvalidArgumentException('Invalid homepage template.');

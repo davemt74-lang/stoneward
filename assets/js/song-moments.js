@@ -15,15 +15,16 @@
   function create(options={}){
     const audio=options.audio;
     if(!audio||!document.body)return null;
-    let track=null,moments=[],mine=[],canComment=false,loaded=false,loadToken=0,position=-0.25,lastShown=null,bubbleTimer=null,narrate=false;
+    let track=null,trackKey='',moments=[],orbRows=[],mine=[],canComment=false,loaded=false,loadToken=0,position=-0.25,narrate=false;
     let alive=true;
+    let orbMoment=null,returnFocus=null;
     const lyricNodes=new Map();
+    const momentNodes=new Map();
     const timeline=()=>normalize(moments);
-    let orbHost=null;
     try{narrate=window.localStorage?.getItem(key)==='on'}catch(_){}
     const backdrop=createElement('div','sf-song-moment-backdrop');backdrop.hidden=true;
     const drawer=createElement('aside','sf-song-moment-drawer');drawer.hidden=true;drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-labelledby','sfSongMomentsTitle');
-    drawer.innerHTML='<header class="sf-song-moment-head"><div><small>STONEFELLOW / SONG EXPERIENCE</small><h2 id="sfSongMomentsTitle">Song Timeline</h2><p id="sfSongMomentsTrack">Play a song to explore moments.</p></div><button type="button" id="sfSongMomentsClose" aria-label="Close song timeline">×</button></header><div class="sf-song-moment-scroll"><div class="sf-song-moment-intro">I’ll bring each published photo, story, note and approved fan comment to the orb as the song reaches that moment.</div><label class="sf-song-moment-narrate"><input id="sfSongMomentsNarrate" type="checkbox"> Narrate artist moments with Stonefellow’s voice <small>Off by default. Music may be gently lowered during speech.</small></label><div class="sf-song-moment-overview"><span>TRACK TIMELINE</span><div id="sfSongMomentsRail" class="sf-song-moment-rail"></div></div><div id="sfSongMomentsEntries" class="sf-song-moment-entries" aria-live="polite"></div><form id="sfSongMomentForm" class="sf-song-moment-form"><strong>Add your song moment</strong><p id="sfSongMomentSignIn">Comments become public only after an admin approves them.</p><label>POSITION <input id="sfSongMomentTime" type="text" pattern="[0-9]{1,3}:[0-5][0-9]" inputmode="numeric" placeholder="0:42" required></label><label>YOUR COMMENT<textarea id="sfSongMomentComment" rows="3" maxlength="800" placeholder="What does this moment mean to you?" required></textarea></label><button id="sfSongMomentSubmit" type="submit">Submit for approval</button><div id="sfSongMomentFormStatus" role="status" aria-live="polite"></div></form><section id="sfSongMomentMine" class="sf-song-moment-private" hidden></section></div>';
+    drawer.innerHTML='<header class="sf-song-moment-head"><div><small>STONEFELLOW / SONG EXPERIENCE</small><h2 id="sfSongMomentsTitle">Song Timeline</h2><p id="sfSongMomentsTrack">Play a song to explore moments.</p></div><button type="button" id="sfSongMomentsClose" aria-label="Close song timeline">×</button></header><div class="sf-song-moment-scroll"><div class="sf-song-moment-intro">Explore stories, photos, notes, lyrics and approved listener comments as you listen.</div><label class="sf-song-moment-narrate"><input id="sfSongMomentsNarrate" type="checkbox"> Narrate story and photo cues with Stonefellow’s voice <small>Off by default. Available when Orb Song Moments is enabled.</small></label><div class="sf-song-moment-overview"><span>TRACK TIMELINE</span><div id="sfSongMomentsRail" class="sf-song-moment-rail"></div></div><div id="sfSongMomentsEntries" class="sf-song-moment-entries" aria-live="polite"></div><form id="sfSongMomentForm" class="sf-song-moment-form"><strong>Add your song moment</strong><p id="sfSongMomentSignIn">Comments become public only after an admin approves them.</p><label>POSITION <input id="sfSongMomentTime" type="text" pattern="[0-9]{1,3}:[0-5][0-9]" inputmode="numeric" placeholder="0:42" required></label><label>YOUR COMMENT<textarea id="sfSongMomentComment" rows="3" maxlength="800" placeholder="What does this moment mean to you?" required></textarea></label><button id="sfSongMomentSubmit" type="submit">Submit for approval</button><div id="sfSongMomentFormStatus" role="status" aria-live="polite"></div></form><section id="sfSongMomentMine" class="sf-song-moment-private" hidden></section></div>';
     document.body.append(backdrop,drawer);
     const close=$('#sfSongMomentsClose'),entries=$('#sfSongMomentsEntries'),rail=$('#sfSongMomentsRail'),timeInput=$('#sfSongMomentTime'),commentInput=$('#sfSongMomentComment'),feedback=$('#sfSongMomentFormStatus'),form=$('#sfSongMomentForm'),narrateInput=$('#sfSongMomentsNarrate');
     function $(s,r=drawer){return r.querySelector(s)}
@@ -33,15 +34,15 @@
     function writeDraft(draft){if(!track)return;try{localStorage.setItem(draftPrefix+track.id,JSON.stringify(draft))}catch(_){feedback.textContent='Browser storage is unavailable; copy your comment before closing.'}}
     function clearDraft(){if(track)try{localStorage.removeItem(draftPrefix+track.id)}catch(_){}}
     function duration(){const d=Number(audio.duration);return Number.isFinite(d)&&d>0?d:Number(track?.duration)||0;}
-    function seek(ms){if(!track||!Number.isFinite(Number(ms)))return;const d=duration(),target=Math.max(0,Math.min(d||86400,Number(ms)/1000));audio.currentTime=target;position=target;}
-    function momentContent(moment,container,compact=false){
+    function seek(ms){if(!track||!Number.isFinite(Number(ms)))return;const d=duration(),target=Math.max(0,Math.min(d||86400,Number(ms)/1000));clearOrbMoment();audio.currentTime=target;position=target;}
+    function momentContent(moment,container){
       const header=createElement('div','sf-song-moment-card-head');header.append(createElement('span','',(moment.kind==='lyric'?range(moment):clock(moment.at_ms))+' / '+String(moment.kind||'moment').toUpperCase()));
       if(moment.kind==='comment')header.append(createElement('span','',moment.display_name||'Listener'));
       container.append(header);
       if(moment.title)container.append(createElement('strong','sf-song-moment-title',moment.title));
-      if(moment.kind==='story'&&moment.story)container.append(createElement('strong','sf-song-moment-title',moment.story.title));
+      if(moment.kind==='story'&&moment.story?.title&&moment.story.title!==moment.title)container.append(createElement('strong','sf-song-moment-title',moment.story.title));
       if(moment.photo?.url){const image=createElement('img','sf-song-moment-photo');image.src=moment.photo.url;image.alt=moment.title||moment.photo.title||'Stonefellow song photo';image.loading='lazy';container.append(image);}
-      if(moment.body)container.append(createElement('p','',moment.body.slice(0,compact?280:1600)));
+      if(moment.body)container.append(createElement('p','',moment.body.slice(0,1600)));
       if(moment.kind==='lyric'){
         const label=moment.lyric_state==='approved'?'Approved lyrics':moment.lyric_state==='corrected'?'Corrected draft · unverified':'Automated draft · unverified';
         container.append(createElement('small','sf-song-lyric-state',label+(moment.status==='private'?' · Private':'')));
@@ -50,28 +51,26 @@
         container.append(createElement('small','sf-song-lyric-evidence','Confidence: '+confidence+' · '+timing));
       }
       if(moment.kind==='story'&&moment.story){
-        const p=createElement('p','sf-song-moment-story-summary',String(moment.story.summary||'').slice(0,compact?140:400));container.append(p);
+        const p=createElement('p','sf-song-moment-story-summary',String(moment.story.summary||'').slice(0,400));container.append(p);
         const action=createElement('button','sf-song-moment-story-button','Open story ↗');action.type='button';action.addEventListener('click',()=>{closeDrawer();options.onStory?.(moment.story.slug)});container.append(action);
       }
     }
-    const bubble=createElement('article','sf-song-orb-card');bubble.hidden=true;bubble.setAttribute('role','status');bubble.setAttribute('aria-live','polite');
-    function attachOrb(){const target=document.querySelector('.sf-agent-floater')||document.querySelector('.agent-stage');if(target&&bubble.parentNode!==target){target.appendChild(bubble);orbHost=target;}}
-    function hideBubble(){if(bubbleTimer)clearTimeout(bubbleTimer);bubbleTimer=null;bubble.hidden=true;lastShown=null;}
-    function present(moment,explicit=false,following=[]){
-      if(!track||!moment)return;
-      attachOrb();lastShown=moment.id;
-      bubble.replaceChildren();
-      const badge=createElement('span','sf-song-orb-glow','✧');bubble.append(badge);
-      const content=createElement('div','sf-song-orb-copy');momentContent(moment,content,true);bubble.append(content);
-      const actions=createElement('div','sf-song-orb-actions');
-      const dismiss=createElement('button','', '×');dismiss.type='button';dismiss.setAttribute('aria-label','Dismiss moment');dismiss.addEventListener('click',hideBubble);
-      const all=createElement('button','','Timeline');all.type='button';all.addEventListener('click',open);
-      if(following.length){const next=createElement('button','','Next moment ('+following.length+')');next.type='button';next.addEventListener('click',()=>present(following[0],true,following.slice(1)));actions.append(next);}
-      actions.append(all,dismiss);bubble.append(actions);
-      bubble.hidden=false;
-      if(bubbleTimer)clearTimeout(bubbleTimer);
-      bubbleTimer=setTimeout(hideBubble,explicit?19000:12500);
-      if(!explicit){options.onPresent?.(moment);if(narrate&&moment.kind!=='comment')options.onNarrate?.(moment);}
+    function orbEnabled(){return alive&&options.orbEnabled?.()===true;}
+    function clearOrbMoment(){
+      if(!orbMoment)return;
+      orbMoment=null;options.onOrbMoment?.(null);
+    }
+    function getOrbMoment(){
+      if(!orbEnabled())clearOrbMoment();
+      return orbMoment;
+    }
+    function showOrbMoment(moment){
+      const kind=moment.kind;
+      const fallback=kind==='comment'?'Listener comment':kind==='story'?'Song story':'Song photo';
+      const title=String(moment.title||moment.story?.title||moment.photo?.title||'').trim().slice(0,160)||fallback;
+      orbMoment=Object.freeze({id:Number(moment.id),kind,at_ms:Number(moment.at_ms),track_id:String(track.id),title});
+      options.onOrbMoment?.(orbMoment);
+      if(narrate&&(kind==='story'||kind==='photo'))options.onNarrate?.(moment);
     }
     function drawSeekMarkers(){
       const seek=options.seekInput;if(!seek||!markerHost)return;
@@ -88,7 +87,7 @@
         button.dataset.index=String(index);markerHost.appendChild(button);
       });
     }
-    function seekMoment(m){seek(m.at_ms);syncLyricHighlight();present(m,true);}
+    function seekMoment(m){seek(m.at_ms);syncLyricHighlight();}
     function syncLyricHighlight(){
       const active=new Set(currentLyrics(timeline(),Math.round((Number(audio.currentTime)||0)*1000)).map(m=>String(m.id)));
       for(const [id,node] of lyricNodes){const selected=active.has(id);node.classList.toggle('sf-song-lyric-current',selected);if(selected)node.setAttribute('aria-current','true');else node.removeAttribute('aria-current');}
@@ -98,12 +97,13 @@
     const resize=()=>drawSeekMarkers();window.addEventListener('resize',resize);
     function render(){
       $('#sfSongMomentsTrack').textContent=track?String(track.title||'Song')+' · '+clock(duration()*1000):'Play a song to explore moments.';
-      entries.replaceChildren();rail.replaceChildren();lyricNodes.clear();
+      entries.replaceChildren();rail.replaceChildren();lyricNodes.clear();momentNodes.clear();
       if(!track){entries.append(createElement('p','sf-song-moment-empty','Load a Stonefellow song to explore its timeline.'));form.hidden=true;$('#sfSongMomentMine').hidden=true;drawSeekMarkers();return;}
       form.hidden=false;
       if(!timeline().length)entries.append(createElement('p','sf-song-moment-empty',loaded?'No moments or lyric ranges have been added to this song yet.':'Loading moments…'));
       const d=duration();for(const m of timeline()){
         const article=createElement('article','sf-song-moment-entry'+(m.kind==='lyric'?' sf-song-lyric-entry':''));momentContent(m,article);
+        momentNodes.set(Number(m.id),article);
         const jump=createElement('button','sf-song-moment-jump','▶ Jump to '+clock(m.at_ms));jump.type='button';jump.addEventListener('click',()=>seekMoment(m));article.append(jump);entries.append(article);
         if(m.kind==='lyric'){
           lyricNodes.set(String(m.id),article);
@@ -124,22 +124,66 @@
       drawSeekMarkers();
       syncLyricHighlight();
     }
-    async function load(id){const token=++loadToken;loaded=false;moments=[];mine=[];canComment=false;render();
+    async function load(id){
+      if(!alive)return;
+      const token=++loadToken;
+      clearOrbMoment();loaded=false;moments=[];orbRows=[];mine=[];canComment=false;render();
       if(!id)return;
       try{const response=await fetch((options.apiBase||'api')+'/song-moments.php?track_id='+encodeURIComponent(id),{credentials:'same-origin',cache:'no-store'}),data=await response.json();
         if(!alive||token!==loadToken||String(track?.id)!==String(id))return;if(!response.ok||data.ok===false)throw new Error(data.message||'Moments unavailable.');
-        moments=normalize(data.moments);mine=Array.isArray(data.mine)?data.mine:[];canComment=!!data.can_comment;loaded=true;render();
+        moments=normalize(data.moments);
+        orbRows=moments.filter(m=>m.orb_eligible===true&&['story','photo','comment'].includes(m.kind)&&
+          String(m.track_id)===id&&Number.isSafeInteger(Number(m.id))&&Number(m.id)>0&&
+          (m.status==null||m.status==='published'));
+        mine=Array.isArray(data.mine)?data.mine:[];canComment=!!data.can_comment;loaded=true;render();
       }catch(e){if(!alive||token!==loadToken||String(track?.id)!==String(id))return;loaded=true;feedback.textContent='Song moments could not be loaded: '+e.message;render();}
     }
     function setTrack(next){
-      const id=String(next?.id||'');if(String(track?.id||'')===id)return;
-      hideBubble();track=next||null;position=-0.25;lastShown=null;load(id);if(drawer.hidden)return;render();
+      const id=String(next?.id||'');
+      const key=id?JSON.stringify([id,String(next?.audio||'')]):'';
+      if(!alive||trackKey===key)return;
+      trackKey=key;track=next||null;position=-0.25;load(id);
     }
-    function open(){if(!track){options.onNeedTrack?.();return;}attachOrb();backdrop.hidden=false;drawer.hidden=false;document.body.classList.add('sf-song-moments-open');render();close.focus({preventScroll:true});}
-    function closeDrawer(){backdrop.hidden=true;drawer.hidden=true;document.body.classList.remove('sf-song-moments-open');}
+    function open(){
+      if(!track){options.onNeedTrack?.();return false;}
+      backdrop.hidden=false;drawer.hidden=false;document.body.classList.add('sf-song-moments-open');
+      render();close.focus({preventScroll:true});return true;
+    }
+    function openMoment(id,trigger){
+      const active=getOrbMoment();
+      if(!active||active.id!==Number(id)||!open())return false;
+      returnFocus={id:active.id,trigger};
+      const entry=momentNodes.get(active.id);
+      if(entry){entry.tabIndex=-1;entry.focus({preventScroll:true});entry.scrollIntoView?.({block:'nearest'});}
+      return true;
+    }
+    function closeDrawer(){
+      backdrop.hidden=true;drawer.hidden=true;document.body.classList.remove('sf-song-moments-open');
+      const previous=returnFocus;returnFocus=null;
+      if(!alive||!previous)return;
+      const trigger=previous.trigger;
+      if(trigger?.isConnected&&!trigger.hidden&&trigger.dataset?.momentId===String(previous.id)){
+        trigger.focus({preventScroll:true});return;
+      }
+      const fallback=document.querySelector('.sf-agent-landing [data-agent-action="song-moments"]')||document.querySelector('#playerMomentsButton');
+      fallback?.focus({preventScroll:true});
+    }
     close.addEventListener('click',closeDrawer);backdrop.addEventListener('click',closeDrawer);
-    function keyboard(event){if(event.key==='Escape'&&!drawer.hidden){event.preventDefault();closeDrawer();}}
-    window.addEventListener('keydown',keyboard);
+    function keyboard(event){
+      if(drawer.hidden)return;
+      if(event.key==='Escape'){
+        event.preventDefault();event.stopImmediatePropagation();closeDrawer();return;
+      }
+      if(event.key!=='Tab')return;
+      const controls=Array.from(drawer.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), a[href]'))
+        .filter(element=>element.getClientRects().length>0);
+      if(!controls.length)return;
+      const first=controls[0],last=controls[controls.length-1],active=document.activeElement;
+      if(!drawer.contains(active)||(event.shiftKey?active===first:active===last)){
+        event.preventDefault();(event.shiftKey?last:first).focus();
+      }
+    }
+    window.addEventListener('keydown',keyboard,true);
     form.addEventListener('submit',async event=>{
       event.preventDefault();if(!track)return;
       const found=timeInput.value.trim().match(/^(\d{1,3}):([0-5]\d)$/);const body=commentInput.value.trim();
@@ -149,19 +193,40 @@
       if(duration()&&at_ms>duration()*1000+2000){feedback.textContent='Choose a timestamp within the song.';return;}
       if(!canComment){writeDraft({at_ms,body});feedback.textContent='Saved privately on this device. Sign in to submit for public review.';return;}
       const button=$('#sfSongMomentSubmit');button.disabled=true;feedback.textContent='Submitting for admin review…';
-      try{await options.submit?.({action:'comment',track_id:track.id,at_ms,body});clearDraft();feedback.textContent='Submitted! Hidden from public until an admin approves it.';await load(String(track.id));}
-      catch(e){feedback.textContent=e.message||'Could not submit. Your comment was not published.';}finally{button.disabled=false;}
+      const submittedTrack=trackKey,submittedId=String(track.id),submittedLoad=loadToken;
+      try{
+        await options.submit?.({action:'comment',track_id:submittedId,at_ms,body});
+        if(!alive||trackKey!==submittedTrack||loadToken!==submittedLoad)return;
+        clearDraft();feedback.textContent='Submitted! Hidden from public until an admin approves it.';await load(submittedId);
+      }catch(e){if(alive&&trackKey===submittedTrack&&loadToken===submittedLoad)feedback.textContent=e.message||'Could not submit. Your comment was not published.';}
+      finally{button.disabled=false;}
     });
-    function playbackTick(){syncLyricHighlight();if(!track||!loaded)return;const now=Number(audio.currentTime);
-      if(!Number.isFinite(now)||audio.paused){position=now;return;}
-      const from=position,spokenMoments=moments.filter(m=>m.kind!=='lyric'),moment=crossed(spokenMoments,from,now);position=now;
-      if(moment){const companions=spokenMoments.filter(m=>m!==moment&&Number(m.at_ms)/1000>from&&Number(m.at_ms)/1000<=now);present(moment,false,companions);}
+    function playbackTick(){
+      syncLyricHighlight();
+      if(!track)return;
+      const enabled=orbEnabled();
+      if(!enabled)clearOrbMoment();
+      const now=Number(audio.currentTime);
+      if(!Number.isFinite(now)||now<0)return;
+      const from=position;
+      // A quick first timeline fetch can still show a cue at the song's start.
+      if(enabled&&!loaded&&!audio.seeking&&now>=from&&now-from<=3)return;
+      if(!audio.paused||now!==0||from>=0)position=now;
+      if(audio.seeking||now<from||now-from>3){clearOrbMoment();return;}
+      if(!enabled||!loaded||audio.paused)return;
+      const moment=crossed(orbRows,from,now);
+      if(moment)showOrbMoment(moment);
     }
-    function onSeek(){position=Number(audio.currentTime)||0;syncLyricHighlight();}
-    function onPlay(){if(position<0)position=(Number(audio.currentTime)||0)-.2;}
-    audio.addEventListener('timeupdate',playbackTick);audio.addEventListener('seeked',onSeek);audio.addEventListener('play',onPlay);audio.addEventListener('loadedmetadata',drawSeekMarkers);
-    function destroy(){alive=false;++loadToken;hideBubble();closeDrawer();drawer.remove();backdrop.remove();bubble.remove();markerHost.remove();window.removeEventListener('resize',resize);window.removeEventListener('keydown',keyboard);audio.removeEventListener('timeupdate',playbackTick);audio.removeEventListener('seeked',onSeek);audio.removeEventListener('play',onPlay);audio.removeEventListener('loadedmetadata',drawSeekMarkers);}
-    return Object.freeze({open,close:closeDrawer,setTrack,attachOrb,getContext:()=>({track_id:track?.id||'',at_ms:Math.round((audio.currentTime||0)*1000),moments:normalize(moments.filter(m=>m.kind!=='lyric'&&Math.abs(m.at_ms-(audio.currentTime||0)*1000)<7000)).slice(0,3),lyrics:currentLyrics(timeline(),Math.round((audio.currentTime||0)*1000)).slice(0,3)}),refresh:()=>load(String(track?.id||'')),destroy});
+    function onSeek(){position=Number(audio.currentTime)||0;clearOrbMoment();syncLyricHighlight();}
+    function onReset(){position=-0.25;clearOrbMoment();}
+    const audioEvents={timeupdate:playbackTick,seeking:onSeek,seeked:onSeek,pause:getOrbMoment,ended:onReset,emptied:onReset,loadedmetadata:drawSeekMarkers};
+    for(const [event,listener] of Object.entries(audioEvents))audio.addEventListener(event,listener);
+    function destroy(){
+      alive=false;++loadToken;clearOrbMoment();closeDrawer();drawer.remove();backdrop.remove();markerHost.remove();
+      window.removeEventListener('resize',resize);window.removeEventListener('keydown',keyboard,true);
+      for(const [event,listener] of Object.entries(audioEvents))audio.removeEventListener(event,listener);
+    }
+    return Object.freeze({open,openMoment,close:closeDrawer,setTrack,getOrbMoment,getContext:()=>({track_id:track?.id||'',at_ms:Math.round((audio.currentTime||0)*1000),moments:normalize(moments.filter(m=>m.kind!=='lyric'&&Math.abs(m.at_ms-(audio.currentTime||0)*1000)<7000)).slice(0,3),lyrics:currentLyrics(timeline(),Math.round((audio.currentTime||0)*1000)).slice(0,3)}),refresh:()=>load(String(track?.id||'')),destroy});
   }
   window.StonefellowSongMoments=Object.freeze({create,clock,stamp,range,normalize,crossed,currentLyrics});
 })();

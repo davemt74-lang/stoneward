@@ -514,20 +514,19 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
     $action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
         case 'song_capture_live_start':
-            // A model-selected route cannot itself authorize a metered audio
-            // upload. The user must ask for transcription, or for the agent
-            // to listen AND interpret the playing lyrics.
+            // A model-selected route must still be backed by an explicit
+            // listener request before opening a saved lyric selection.
             $interpretAfter=(bool)preg_match('/\blisten(?:ing)?\b.*\b(?:interpret\w*|analy[sz]\w*|lyric\s+meaning)\b/i',$message);
             if(sf_agent_explicit_song_capture_route($message,$client)!=='song_capture_live_start'||
                 (!preg_match('/\b(?:start|begin|enable|activate|turn\s+on|show|display|transcrib\w*|give|write)\b/i',$message)
                   &&!preg_match('/^\s*(?:live|real[- ]?time)\s+(?:lyric\s+|song\s+|audio\s+)?(?:captions|lyrics|transcription)\s*[.!?]*\s*$/i',$message)
                   &&!$interpretAfter))
-                $text='Say “start live transcription” or “listen and interpret the lyrics” to authorize metered audio processing.';
-            elseif($active===''||empty($client['player_is_playing']))$text='Play a published song first, then ask for live lyrics.';
-            elseif(!empty($client['song_capture_live_enabled']))$text='Live lyric transcription is already active.';
+                $text='Say “listen and interpret the lyrics” to start selecting a song section.';
+            elseif($active===''||empty($client['player_is_playing']))$text='Play a published song first, then ask to listen to its lyrics.';
+            elseif(!empty($client['song_capture_live_enabled']))$text='A lyric selection is already active.';
             else{$action=['type'=>'song_capture_live_start','interpret_on_stop'=>$interpretAfter];$text=$interpretAfter
                     ?'Starting lyric listening. Stop to review the transcript, then choose interpretation.'
-                    :'Starting lyric listening for the current song. The mobile path converts the selected section to text when you stop.';}
+                    :'Starting lyric listening for the current song. Stop to see the saved lyrics for your selection.';}
             break;
         case 'song_capture_analyze':
             if(empty($client['song_lyric_draft_available']))$text='First capture and transcribe a song section. Then I can analyze or research the lyrics you heard.';

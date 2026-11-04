@@ -583,7 +583,15 @@ body.artist-home-active.artist-home-chat-hidden .chat-footer .chat-quick-menu{di
 .song-experience-phase.song-experience-live::before{content:'●';display:inline-block;margin-right:7px;animation:sf-song-live-pulse 2s ease-in-out infinite}
 @keyframes sf-song-live-pulse{0%,100%{opacity:1}50%{opacity:.3}}
 @media(prefers-reduced-motion:reduce){.song-experience-phase.song-experience-live::before{animation:none}}
-.song-experience-transcript,.song-experience-report{background:rgba(var(--surface-rgb),.75);border:1px solid var(--line);border-radius:12px;padding:13px;margin:0 0 12px}
+.song-experience-transcript,.song-experience-report,.song-experience-context{background:rgba(var(--surface-rgb),.75);border:1px solid var(--line);border-radius:12px;padding:13px;margin:0 0 12px}
+.song-experience-context summary{color:var(--accent);font-size:.84rem;font-weight:700;line-height:26px;cursor:pointer}
+.song-experience-context-list{list-style:none;margin:8px 0 0;padding:0}
+.song-experience-context-item{display:flex;align-items:flex-start;gap:9px;border-top:1px solid var(--line);padding:8px 0}
+.song-experience-context-item:last-child{padding-bottom:0}
+.song-experience-context-copy{min-width:0;font-size:.84rem}
+.song-experience-context-copy a{color:var(--accent);font-weight:700;text-decoration:underline}
+.song-experience-context-copy .song-experience-copy{margin:3px 0 0}
+.song-experience-context-photo{flex:none;width:72px;height:54px;object-fit:cover;border-radius:7px}
 .song-experience-card h4{font-size:.87rem;margin:0 0 8px}
 .song-experience-transcript-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
 .song-experience-transcript-heading h4{margin:0;min-width:0}

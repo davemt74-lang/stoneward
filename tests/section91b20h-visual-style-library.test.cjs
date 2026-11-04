@@ -76,7 +76,10 @@ test('Style creation and archival are recorded in the official Admin audit',()=>
 });
 test('Section is versioned and part of permanent release certification',()=>{
   assert.match(read('.github/workflows/release-gate.yml'),/node --test tests\/section91b20h-visual-style-library\.test\.cjs/);
-  assert.match(read('version.php'),/'stonefellow'=>'1\.3\.242'/);
-  assert.match(read('admin/index.php'),/1\.3\.242/);
-  assert.match(read('service-worker.js'),/1\.3\.242/);
+  const release=read('version.php');
+  const version=release.match(/'stonefellow'=>'(1\.3\.\d+)'/)?.[1];
+  assert.ok(version);
+  assert.match(release,/'admin_image_studio'=>'91B20H:/);
+  assert.ok(read('admin/index.php').includes("define('SF_ADMIN_BUILD','"+version+"')"));
+  assert.ok(read('service-worker.js').includes("const BUILD='"+version+"'"));
 });

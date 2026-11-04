@@ -16,6 +16,7 @@ const draft={track_id:'track-1',start_ms:12100,end_ms:27700,captured_at:'2026-10
 const requests=[];const messages=[];const experienceUpdates=[];
 let available=capture,mode='ok',listening=false;
 const context={songAnalysisBusy:false,songLyricReport:null,songLyricDraft:draft,songLyricCorrected:'',
+  st:{track:{id:draft.track_id,audio:'api/media.php?id=fixture'}},
   songCaptureSkill:{getCapture:()=>available},songListeningSkill:{status:()=>({active:listening})},currentSongSource:()=>available,Intl,
   popupEntry:(role,text)=>messages.push({role,text}),
   updateSongExperience:(state)=>experienceUpdates.push(state),songExperience:{reports:[]},
@@ -55,7 +56,7 @@ async function main(){
   });
   available=null;const unavailable=await context.analyze('Explain that verse');
   check('Track change prevents stale draft disclosure',()=>{
-    assert.match(unavailable,/capture and transcribe/i);assert.equal(requests.length,2);
+    assert.match(unavailable,/select and review lyrics for the current song/i);assert.equal(requests.length,2);
   });
   check('Analysis action uses the same authorized agent execution path',()=>{
     assert.match(app,/song_lyric_draft_available:songLyricDraft\?1:0/);

@@ -6,7 +6,7 @@ sf_admin_require_auth($write);
 if(!$write) sf_json_response(['ok'=>true,'site'=>sf_site_settings(),'csrf'=>sf_admin_csrf()]);
 $body=sf_request_json();
 if(($body['action']??'')!=='save_site') sf_json_response(['ok'=>false,'error'=>'unknown_action'],400);
-$site=sf_site_settings_update([
+$changes=[
     'splash_enabled'=>!empty($body['splash_enabled']),
     'artist_homepage_enabled'=>!empty($body['artist_homepage_enabled']),
     'homepage_template'=>$body['homepage_template']??'classic',
@@ -23,6 +23,11 @@ $site=sf_site_settings_update([
     'social_spotify'=>$body['social_spotify']??'',
     'privacy_text'=>$body['privacy_text']??'',
     'terms_text'=>$body['terms_text']??'',
-]);
-sf_log_admin_action((int)sf_current_user()['id'],'site_settings_updated','site','public',['splash'=>$site['splash_enabled'],'artist_homepage'=>$site['artist_homepage_enabled'],'homepage_template'=>$site['homepage_template'],'fan_community'=>$site['fan_community_enabled'],'announcement'=>$site['announcement_enabled'],'maintenance'=>$site['maintenance_enabled']]);
+];
+if(array_key_exists('orb_song_moments_enabled',$body)){
+    if(!is_bool($body['orb_song_moments_enabled']))sf_json_response(['ok'=>false,'error'=>'invalid_orb_song_moments_setting','message'=>'Orb Song Moments must be on or off.'],422);
+    $changes['orb_song_moments_enabled']=$body['orb_song_moments_enabled'];
+}
+$site=sf_site_settings_update($changes);
+sf_log_admin_action((int)sf_current_user()['id'],'site_settings_updated','site','public',['splash'=>$site['splash_enabled'],'artist_homepage'=>$site['artist_homepage_enabled'],'homepage_template'=>$site['homepage_template'],'fan_community'=>$site['fan_community_enabled'],'orb_song_moments'=>$site['orb_song_moments_enabled'],'announcement'=>$site['announcement_enabled'],'maintenance'=>$site['maintenance_enabled']]);
 sf_json_response(['ok'=>true,'site'=>$site,'csrf'=>sf_admin_csrf()]);
