@@ -1,9 +1,14 @@
-"""Native host Audio + production sandbox/telemetry; no paid calls or authored play claims."""
+"""Native host Audio + production sandbox/telemetry; no paid calls or authored claims.
+
+Serve real loopback HTTP so browser Blob loading is never request-intercepted.
+"""
 import base64
 import hashlib
 import json
 import os
 from pathlib import Path
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 import shutil
 import subprocess
 import tempfile
@@ -11,7 +16,6 @@ import tempfile
 from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-SITE = 'https://fixture.test/independent/'
 BROWSER = os.environ.get('SF_AUDIO_BROWSER', 'chromium')
 if BROWSER not in ('chromium', 'webkit'):
     raise ValueError('SF_AUDIO_BROWSER must be chromium or webkit')
@@ -20,7 +24,12 @@ PROGRAM = r'''(async()=>{
  let player=null;
  const add=(label,run)=>{const button=document.createElement('button');button.textContent=label;button.onclick=async()=>{
   try{await run();status.textContent=label+' done';}catch(error){status.textContent=error.code||error.name;}};controls.append(button);};
- add('Get raw',async()=>{const asset=await api.getAudio('song-one');window.rawAudio=new Audio(asset.url);});
+ add('Get raw',async()=>{const asset=await api.getAudio('song-one');window.rawAsset=asset;
+  window.rawAssetInfo={type:asset.blob.type,size:asset.blob.size};window.rawAudio=new Audio(asset.url);});
+ add('Decode raw',async()=>{const context=new AudioContext();try{
+  const bytes=await rawAsset.blob.arrayBuffer();window.rawAssetInfo.prefix=Array.from(new Uint8Array(bytes).slice(0,16));
+  const decoded=await context.decodeAudioData(bytes);window.rawDecodedDuration=decoded.duration;
+ }finally{await context.close();}});
  add('Play raw',async()=>{await rawAudio.play();});
  add('Pause raw',async()=>{rawAudio.pause();});
  add('Create independent',async()=>{player=await api.createPlayer({track_id:'song-one',id:'song-one'});window.player=player;player.subscribe(state=>window.independentState=state);});
@@ -69,7 +78,7 @@ def check(value, label):
     print('PASS', label, flush=True)
 
 
-def run(page):
+def run(page,mp3_bytes):
     page.evaluate(SETUP, {'program': PROGRAM, 'hash': base64.b64encode(hashlib.sha256(PROGRAM.encode()).digest()).decode()})
     frame = page.locator('.sf-agent-scene-backdrop iframe').element_handle().content_frame()
     expect(frame.locator('.status')).to_have_text('ready')
@@ -81,9 +90,17 @@ def run(page):
         expect(frame.locator('.status')).to_have_text(result or label+' done')
 
     click('Get raw')
+    asset=frame.evaluate('()=>rawAssetInfo')
+    check(asset=={'type':'audio/mpeg','size':len(mp3_bytes)},
+          'authorized MP3 size and explicit MPEG MIME survive the opaque sandbox handoff')
+    # Exercise the original Blob URL before reading/materializing its bytes or
+    # opening an AudioContext, so decoding cannot conceal a media URL failure.
     click('Play raw')
     frame.wait_for_function('()=>rawAudio.currentTime>.35')
     click('Pause raw')
+    click('Decode raw')
+    check(frame.evaluate('()=>rawDecodedDuration>5&&rawDecodedDuration<7') and frame.evaluate('()=>rawAssetInfo.prefix')==list(mp3_bytes[:16]),
+          'opaque sandbox can read and decode the unchanged MP3 bytes for custom audio processing')
     check(page.evaluate('reports.length===0&&observed.length===0'), 'raw authorized MP3 playback/decoding has no host listening claims')
     click('Create independent')
     check(page.evaluate('observed.length===1&&reports.length===0&&observed[0].media.paused'), 'host metadata preload creates no play/start telemetry')
@@ -136,10 +153,52 @@ def run(page):
     check(page.evaluate('diagnostics.every(row=>!JSON.stringify(row).includes("blob:"))'), 'copyable diagnostics never expose host source URLs')
 
 
+class AudioFixtureHTTP(BaseHTTPRequestHandler):
+    sources={}
+
+    def log_message(self,*args):
+        pass
+
+    def do_GET(self):
+        value=self.sources.get(self.path)
+        if value is None:
+            self.send_error(404)
+            return
+        mime,body=value
+        if isinstance(body,str):body=body.encode()
+        self.send_response(200)
+        self.send_header('Content-Type',mime)
+        self.send_header('Content-Length',str(len(body)))
+        self.send_header('Cache-Control','no-store')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        if self.path!='/autoplay-result':
+            self.send_error(404)
+            return
+        # This result is observed by Playwright's native request listener before
+        # the test sends any script evaluation or user input to the document.
+        self.rfile.read(int(self.headers.get('Content-Length','0')))
+        self.send_response(200)
+        self.send_header('Content-Type','application/json')
+        self.send_header('Content-Length','2')
+        self.end_headers()
+        self.wfile.write(b'{}')
+
+
 with tempfile.TemporaryDirectory(prefix='stonefellow-independent-audio-') as temp:
     mp3 = Path(temp)/'native.mp3'
     subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:duration=6','-codec:a','libmp3lame','-q:a','6',str(mp3)],check=True)
-    with sync_playwright() as pw:
+    mp3_bytes=mp3.read_bytes()
+    AudioFixtureHTTP.sources={'/fixture.mp3':('audio/mpeg',mp3_bytes),
+        '/independent/':('text/html','<!doctype html><html><body><audio></audio><div id="player"></div><div id="target"></div></body></html>')}
+    server=ThreadingHTTPServer(('127.0.0.1',0),AudioFixtureHTTP)
+    thread=Thread(target=server.serve_forever,daemon=True);thread.start()
+    base='http://127.0.0.1:'+str(server.server_port)
+    site=base+'/independent/'
+    try:
+      with sync_playwright() as pw:
         launch = {'headless':True}
         chrome = os.environ.get('CHROMIUM_BIN') or shutil.which('chromium')
         if BROWSER=='chromium':
@@ -152,21 +211,20 @@ with tempfile.TemporaryDirectory(prefix='stonefellow-independent-audio-') as tem
             page.set_default_timeout(8000)
             errors=[]
             page.on('pageerror',lambda error: errors.append(str(error)))
-            def respond(route):
-                if route.request.url == SITE:
-                    route.fulfill(content_type='text/html',body='<!doctype html><html><body><audio></audio><div id="player"></div><div id="target"></div></body></html>')
-                elif route.request.url == 'https://fixture.test/fixture.mp3':
-                    route.fulfill(content_type='audio/mpeg',body=mp3.read_bytes())
-                else: route.fulfill(status=204)
-            context.route('**/*',respond)
-            page.goto(SITE)
+            page.goto(site)
             for name in ('assets/css/site.css','assets/css/public-agent-canvas.css'):
                 page.add_style_tag(content=(ROOT/name).read_text())
             for name in ('assets/js/canvas-audio-sdk.js','assets/js/listening-telemetry.js','assets/js/public-agent-canvas.js'):
                 page.add_script_tag(content=(ROOT/name).read_text())
-            try: run(page)
+            try: run(page,mp3_bytes)
             except BaseException:
                 print(page.evaluate('({reports,diagnostics,observed:observed.map(row=>({paused:row.media.paused,time:row.media.currentTime,active:row.settings.isActive(),context:row.context})),errors:[]})'))
+                print('Raw asset',page.locator('.sf-agent-scene-backdrop iframe').element_handle().content_frame().evaluate('''async()=>{
+                  const result={info:window.rawAssetInfo,decoded:window.rawDecodedDuration,mediaError:window.rawAudio?.error?.code};
+                  if(window.rawAsset){const context=new AudioContext();try{const bytes=await rawAsset.blob.arrayBuffer();
+                    result.prefix=Array.from(new Uint8Array(bytes).slice(0,16));result.decodeProbe=(await context.decodeAudioData(bytes)).duration;
+                  }catch(error){result.decodeError=error.name;}finally{await context.close();}}return result;
+                }'''))
                 raise
             check(not errors, BROWSER+'/'+str(width)+' production sandbox runs without uncaught errors: '+str(errors))
             context.close()
@@ -199,18 +257,10 @@ with tempfile.TemporaryDirectory(prefix='stonefellow-independent-audio-') as tem
         });("""+SETUP+")("+json.dumps({'program':auto_program,'hash':base64.b64encode(hashlib.sha256(auto_program.encode()).digest()).decode()})+");"
         sources={'/sdk.js':(ROOT/'assets/js/canvas-audio-sdk.js').read_text(),'/telemetry.js':(ROOT/'assets/js/listening-telemetry.js').read_text(),
                  '/renderer.js':(ROOT/'assets/js/public-agent-canvas.js').read_text(),'/init.js':initial}
-        def normal_response(route):
-            from urllib.parse import urlparse
-            path=urlparse(route.request.url).path
-            if route.request.url==SITE:
-                route.fulfill(content_type='text/html',body='<!doctype html><html><body><audio></audio><div id="player"></div><div id="target"></div>'+''.join('<script src="'+name+'"></script>' for name in sources)+'</body></html>')
-            elif path=='/autoplay-result':route.fulfill(content_type='application/json',body='{}')
-            elif path in sources:route.fulfill(content_type='text/javascript',body=sources[path])
-            elif path=='/fixture.mp3':route.fulfill(content_type='audio/mpeg',body=mp3.read_bytes())
-            else:route.fulfill(status=204)
-        context.route('**/*',normal_response)
-        with page.expect_request(lambda request:request.url=='https://fixture.test/autoplay-result',timeout=8000) as attempt:
-            page.goto(SITE)
+        AudioFixtureHTTP.sources.update({name:('text/javascript',source) for name,source in sources.items()})
+        AudioFixtureHTTP.sources['/autoplay/']=('text/html','<!doctype html><html><body><audio></audio><div id="player"></div><div id="target"></div>'+''.join('<script src="'+name+'"></script>' for name in sources)+'</body></html>')
+        with page.expect_request(lambda request:request.url==base+'/autoplay-result',timeout=8000) as attempt:
+            page.goto(base+'/autoplay/')
         result=attempt.value.post_data_json
         check(result=={'ok':False,'code':'audio_gesture_required','activation':False,'begins':0,'paused':True},
               'normal '+BROWSER+' policy rejects independent autoplay without any gesture or verified play: '+json.dumps(result))
@@ -220,4 +270,6 @@ with tempfile.TemporaryDirectory(prefix='stonefellow-independent-audio-') as tem
         check(page.evaluate('reports.filter(row=>row.action==="begin").length===1&&!observed[0].media.paused'),
               'a real user tap starts independent host playback after native autoplay rejection')
         context.close();browser.close()
+    finally:
+        server.shutdown();server.server_close();thread.join(timeout=5)
 print('PASS',checks,'native independent/synchronized audio checks; no paid calls')

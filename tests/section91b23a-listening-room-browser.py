@@ -914,13 +914,37 @@ with sync_playwright() as p:
         # Isolate authored background interaction from the intentionally movable host orb.
         expect(page.locator('.sf-agent-sphere')).not_to_be_visible()
         # A parsed heading can precede the new iframe's native load/input lifecycle.
-        geometry_frame = backdrop.element_handle().content_frame()
-        geometry_frame.wait_for_url('about:srcdoc', wait_until='load')
+        geometry_element = backdrop.element_handle()
+        geometry_frame = geometry_element.content_frame()
+        print('Native disclosure frame', json.dumps({
+            'width': width, 'browser_version': browser.version, 'frame_url': geometry_frame.url,
+            'document': geometry_frame.evaluate('''() => ({url:location.href,ready:document.readyState,
+              heading:document.querySelector('h1')?.textContent,open:document.querySelector('details')?.open})'''),
+            'element': geometry_element.evaluate('''element => ({connected:element.isConnected,
+              current:element===document.querySelector('.sf-agent-scene-backdrop iframe'),
+              count:document.querySelectorAll('.sf-agent-scene-backdrop iframe').length,
+              source_has_geometry:element.srcdoc.includes('Silent geometry'),rect:element.getBoundingClientRect().toJSON()})''')
+        }), flush=True)
+        geometry_frame.wait_for_load_state('load')
         expect(geometry_frame.get_by_role('heading', name='Silent geometry')).to_be_visible()
         disclosure = geometry_frame.locator('summary')
         # Activate the native label center, not a browser-specific disclosure-marker offset.
-        activate(disclosure)
-        expect(frame.locator('details.reveal')).to_have_attribute('open', '')
+        try:
+            activate(disclosure)
+            expect(geometry_frame.locator('details.reveal')).to_have_attribute('open', '')
+        except Exception:
+            print('Native disclosure input failure', json.dumps({
+                'frame_url': geometry_frame.url,
+                'document': geometry_frame.evaluate('''() => {const summary=document.querySelector('summary'),rect=summary.getBoundingClientRect();
+                  return {url:location.href,ready:document.readyState,open:summary.parentElement.open,
+                    active:document.activeElement?.outerHTML,rect:rect.toJSON(),
+                    target:document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)?.outerHTML};}'''),
+                'host': page.evaluate('''() => {const frame=document.querySelector('.sf-agent-scene-backdrop iframe');
+                  return {active:document.activeElement?.outerHTML.slice(0,240),scrollX,scrollY,
+                    frames:document.querySelectorAll('.sf-agent-scene-backdrop iframe').length,
+                    frame_rect:frame?.getBoundingClientRect().toJSON()};}''')
+            }), flush=True)
+            raise
         expect(frame.get_by_text('Private sketch content')).to_be_visible()
         check(frame.get_by_text('Private sketch content').is_visible() and backdrop.get_attribute('tabindex') == '0' and
               backdrop.get_attribute('sandbox') == '',
