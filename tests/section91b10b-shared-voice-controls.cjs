@@ -44,7 +44,9 @@ function testSavedPreferencePriority(){
 }
 
 function testPublicSync(){
-  const saved=[],events=[];const sandbox={voiceRepliesEnabled:true,
+  const saved=[],events=[];const sandbox={voiceRepliesEnabled:true,speechPilotActive:false,speechPilotReplyInProgress:true,
+    window:{StonefellowSpeechEngine:{setOutputMuted:muted=>events.push(['provider-muted',muted])}},
+    setSpeechPilotSpeaking:(speaking,immediate)=>events.push(['duck',speaking,immediate]),
     localStorage:{setItem:(k,v)=>saved.push([k,v])},
     interruptVoicePlayback:()=>events.push('stop'),updateVoiceReplyToggle:()=>events.push('render')};
   vm.createContext(sandbox);
@@ -55,6 +57,11 @@ function testPublicSync(){
   sandbox.setVoiceRepliesEnabled(true,false);
   assert.deepEqual(saved,[[sharedKey,'off']],'cross-tab synchronization does not write storage again');
   assert.equal(events.at(-1),'render');
+  sandbox.speechPilotActive=true;
+  sandbox.setVoiceRepliesEnabled(false,false);
+  assert.deepEqual(events.slice(-4),['stop',['provider-muted',true],['duck',false,true],'render']);
+  sandbox.setVoiceRepliesEnabled(true,false);
+  assert.deepEqual(events.slice(-3),[['provider-muted',false],['duck',true,true],'render']);
   assert.match(publicApp,/addEventListener\('storage',event=>/);
 }
 

@@ -86,7 +86,7 @@ async function overlappingBargeTurnCannotBeOverwritten(){
   let firstResolve,secondResolve,resumes=0,listenMessages=[];
   const context={
     voiceTurnGeneration:0,voiceTurnBusy:false,conversationRestartTimer:null,
-    recognition:{stop:()=>{}},st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,clearTimeout:()=>{},
+    recognition:{stop:()=>{}},st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,speechPilotActive:false,clearTimeout:()=>{},
     command:message=>new Promise(resolve=>{
       if(message==='first')firstResolve=resolve;else secondResolve=resolve;
     }),
@@ -106,10 +106,9 @@ async function overlappingBargeTurnCannotBeOverwritten(){
   assert.equal(resumes,1,'latest spoken reply owns the sole listening restart');
 }
 async function wiring(){
-  assert.match(app,/StonefellowBargeIn\.verifyAgentSpeech\(voicePlaybackText,window,signal\)/);
-  assert.match(app,/interruptVoicePlayback\(\);\s*const request=String\(spoken\|\|''\)\.trim\(\)/);
-  assert.match(app,/void submitVoiceTurn\(request\)/);
-  assert.match(app,/holdVoicePlaybackForBarge\(\)/);
+  assert.doesNotMatch(app,/conversationBargeIn|holdVoicePlaybackForBarge/);
+  assert.match(app,/StonefellowBargeIn\?\.createSpeechGuard/);
+  assert.match(app,/agentInterrupt\.onclick=interruptVoicePlayback/);
   assert.match(admin,/StonefellowBargeIn\.verifyAgentSpeech\(adminSpeechText,window,signal\)/);
   assert.match(admin,/stopAdminSpeech\(\);\s*const request=String\(spoken\|\|''\)\.trim\(\)/);
   assert.match(admin,/void submit\(request\)/);

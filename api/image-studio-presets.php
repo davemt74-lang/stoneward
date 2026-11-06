@@ -97,18 +97,15 @@ function sf_image_studio_agent_prompt(array $admin,string $concept,string $prese
     sf_consume_ai($admin,max(0,$usage['input_tokens']+$usage['output_tokens']),$usage,'image-prompt-composer');
     return ['prompt'=>$prompt,'preset'=>$local['preset'],'source'=>'admin_agent_text','usage'=>$usage];
 }
-function sf_image_studio_dashboard(): array {
-    sf_image_gen_schema();$pdo=sf_db();$rows=$pdo->query('SELECT status,COUNT(*) total FROM image_generation_jobs GROUP BY status')->fetchAll();
+function sf_image_studio_dashboard(int $adminId): array {
+    $quota=sf_image_gen_user_quota($adminId);$pdo=sf_db();$rows=$pdo->query('SELECT status,COUNT(*) total FROM image_generation_jobs GROUP BY status')->fetchAll();
     $counts=['draft'=>0,'approved'=>0,'generating'=>0,'needs_review'=>0,'ready'=>0,'failed'=>0];
     foreach($rows as $r)$counts[(string)$r['status']]=(int)$r['total'];
-    $today=gmdate('Y-m-d').'T00:00:00';$q=$pdo->prepare('SELECT COUNT(*) FROM image_generation_jobs WHERE started_at>=?');
-    $q->execute([$today]);$todayCount=(int)$q->fetchColumn();
     $variationCount=(int)$pdo->query('SELECT COUNT(*) FROM image_generation_references')->fetchColumn();
     $q=$pdo->prepare('SELECT COUNT(*) FROM image_generation_references r JOIN image_generation_jobs j ON j.id=r.job_id WHERE j.started_at>=?');
     $q->execute([gmdate('Y-m-d\T00:00:00',time()-29*86400)]);$variationAttempts30d=(int)$q->fetchColumn();
     $review=$pdo->query('SELECT COUNT(*) reconciled,COALESCE(SUM(actual_cost_cents),0) recorded_cents FROM image_generation_cost_reviews')->fetch()?:[];
     $unreconciled=(int)$pdo->query("SELECT COUNT(*) FROM image_generation_jobs j LEFT JOIN image_generation_cost_reviews c ON c.job_id=j.id WHERE j.started_at IS NOT NULL AND j.status IN ('ready','needs_review','failed') AND c.job_id IS NULL")->fetchColumn();
-    $s=sf_image_gen_settings();
     $q=$pdo->prepare('SELECT model,COUNT(*) total FROM image_generation_jobs WHERE started_at>=? GROUP BY model ORDER BY total DESC');
     $q->execute([gmdate('Y-m-d\T00:00:00',time()-29*86400)]);
     $models=$q->fetchAll();
@@ -124,12 +121,11 @@ function sf_image_studio_dashboard(): array {
             'output_tokens'=>(int)$row['output_tokens']];
     }catch(Throwable $e){/* A fresh installation may not have token ledger yet. */}
     return ['counts'=>$counts,'total'=>array_sum($counts),'reference_variations'=>$variationCount,
-        'variation_attempts_30d'=>$variationAttempts30d,'today_attempts'=>$todayCount,
+        'variation_attempts_30d'=>$variationAttempts30d,
         'cost_reconciled_jobs'=>(int)($review['reconciled']??0),
         'cost_recorded_cents'=>(int)($review['recorded_cents']??0),
         'cost_unreconciled_jobs'=>$unreconciled,
-        'today_remaining'=>max(0,$s['daily_cap']-$todayCount),'daily_cap'=>$s['daily_cap'],
-        'model_activity_30d'=>$models,'usage_30d'=>$usage,'as_of'=>gmdate('c')];
+        'model_activity_30d'=>$models,'usage_30d'=>$usage,'as_of'=>gmdate('c')] + $quota;
 }
 /** Server-local routing for Agent Chat. No model invocation and no database write. */
 function sf_image_studio_chat_handoff(string $message): ?array {

@@ -31,7 +31,7 @@ async function run(){
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../assets/js/player-playback-lifecycle.js'),'utf8'),sandbox);
   sandbox.playbackLifecycle=sandbox.window.StonefellowPlaybackLifecycle.create();
   sandbox.playbackLifecycle.remember(sandbox.playbackLifecycle.token(),75);
-  const code=['savedPlaybackPosition','syncConversationMusic','playerVolume','setPlayerVolume','observedPlayer','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
+  const code=['savedPlaybackPosition','syncConversationMusic','elementPlayerVolume','playerVolume','applyPlayerVolume','setPlayerVolume','observedPlayer','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
   vm.runInContext(code+';globalThis.run=executePlayerAgentAction;',sandbox);
   assert.match(await sandbox.run({type:'player_status'}),/“Night Drive”.*playing.*1:15 of 3:20.*80 percent/);
   assert.equal((await sandbox.run({type:'set_player_volume',mode:'set',percent:30})), 'Stonefellow player volume is now 30 percent.');
@@ -69,6 +69,13 @@ async function run(){
   assert.match(await sandbox.run({type:'player_status'}),/No published song is loaded/);
   assert.match(await sandbox.run({type:'resume_player'}),/no song loaded/);
   assert.equal(await sandbox.run({type:'open_view'}),null,'unrelated Agent actions still use existing dispatcher');
+  Object.defineProperty(audio,'volume',{get:()=>1,set:()=>{}});
+  audio.muted=false;
+  assert.match(await sandbox.run({type:'set_player_volume',mode:'set',percent:30}),/device volume buttons/);
+  assert.match(await sandbox.run({type:'set_player_volume',mode:'mute'}),/0 percent/);
+  assert.equal(audio.muted,true);
+  assert.match(await sandbox.run({type:'set_player_volume',mode:'unmute'}),/100 percent/);
+  assert.equal(audio.muted,false);
   assert.match(app,/\.\.\.playerState\(\)/,'voice and typed Agent receive current playback state');
   assert.match(app,/const shared=captured===null\?await publicAudioSkill\?\.dispatch\(verified\.action\):null/,'capture dispatch stays separate while named player action remains verified before reaching the local player');
   assert.match(app,/shared\?\.text\?\?await executePlayerAgentAction\(verified\.action\)/,'existing local player remains a safe fallback');

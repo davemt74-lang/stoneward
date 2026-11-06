@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.245');
+define('SF_ADMIN_BUILD','1.3.294');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -32,6 +32,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/stem-studio.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/video.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/gallery.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/canvas-gallery.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/products.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/automations.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/membership.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
@@ -114,6 +115,8 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
           <div class="admin-nav-items">
             <button type="button" data-view="brain"><span>24</span>Agent Brain</button>
             <button type="button" data-view="production-review"><span>24A</span>AI Production Review</button>
+            <button type="button" data-view="canvas-permissions"><span>24C</span>Canvas Permissions</button>
+            <button type="button" data-view="canvas-gallery"><span>24B</span>Canvas Catalog</button>
             <button type="button" data-view="knowledge"><span>15</span>Knowledge Base</button>
             <button type="button" data-view="ai"><span>23</span>AI Providers</button>
             <button type="button" data-view="image-generation"><span>23A</span>AI Image Studio</button>
@@ -262,6 +265,12 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/stem-studio.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/video.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/gallery.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/js/canvas-audio-sdk.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/js/vendor/acorn.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/js/canvas-preview-guard.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/js/public-agent-canvas.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/canvas-permissions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/canvas-gallery.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/products.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/turntable-modules.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/automations.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>

@@ -19,15 +19,29 @@ function extract(source,name){
   throw new Error('Unbalanced function '+name);
 }
 assert.match(read('stonefellow-v120.php'),/id="agentVoiceReplyToggle"/);
-assert.match(publicApp,/voiceInteractionStarted=true;command\(input\.value\)/);
+assert.match(publicApp,/voiceInteractionStarted=true;\s*command\(input\.value\)/);
 assert.match(publicApp,/voiceRepliesEnabled=localStorage\.getItem\('stonefellow\.voice\.replies\.v1'\)!=='off'/);
 assert.match(publicApp,/if\(voiceReplyToggle\)voiceReplyToggle\.onclick=/);
-assert.match(publicApp,/if\(\(agentSpeaking\|\|voiceInputActive\)&&!audio\.paused\)/);
-assert.doesNotMatch(publicApp,/if\(\(st\.conversationOn\|\|voicePlaybackPending\)&&!audio\.paused\)/,'silent microphone must not duck');
 assert.doesNotMatch(adminCanvas,/id="adminAgentSpeechToggle"/,'full Admin chat must not render a duplicate voice-output toggle');
 assert.match(read('admin/index.php'),/id="adminChatPopupVoice"/,'the shared Admin voice toggle remains accessible in the chat popup');
 assert.match(adminApp,/if\(response\.text\)void speakAdminReply\(response\.text\)/);
 assert.match(read('admin/assets/agent-canvas.css'),/\[data-mode="speaking"\]/);
+
+function testSilentVoiceChatDoesNotDuck(){
+  const audio={paused:false,ended:false,muted:false,volume:0.8};
+  const sandbox={audio,st:{conversationOn:true},voicePlaybackPending:true,voiceInputActive:false,
+    voiceSpeechAudible:false,speechPilotAgentSpeaking:false,musicOriginalVolume:null};
+  const functions=['syncConversationMusic','elementPlayerVolume','playerVolume','applyPlayerVolume'];
+  vm.runInNewContext(functions.map(name=>extract(publicApp,name)).join('\n'),sandbox);
+  sandbox.syncConversationMusic();
+  assert.equal(audio.volume,0.8,'silent microphone and preparing reply leave music unchanged');
+  sandbox.voiceInputActive=true;
+  sandbox.syncConversationMusic();
+  assert.equal(audio.volume,0.4,'actual voice input ducks the song');
+  audio.ended=true;
+  sandbox.syncConversationMusic();
+  assert.equal(audio.volume,0.8,'ended playback restores the user volume');
+}
 
 async function testTypedReply(enabled,pilotActive=false){
   let spoken=0;
@@ -52,6 +66,7 @@ async function testAdminPrivateVoice(){
   await sandbox.speakTest('Muted reply');
   assert.equal(spoken.length,1,'Admin voice off must suppress playback');
 }
+testSilentVoiceChatDoesNotDuck();
 Promise.all([testTypedReply(true),testTypedReply(false),testTypedReply(true,true),testAdminPrivateVoice()]).then(()=>{
   console.log('Section 90E typed prompt voice, mute, Admin local-only speech and companion states: PASS');
 }).catch(error=>{console.error(error);process.exitCode=1});

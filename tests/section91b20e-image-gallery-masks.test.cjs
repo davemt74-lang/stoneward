@@ -64,8 +64,9 @@ test('Changed masks are rejected before locking a billed daily attempt',()=>{
 });
 
 test('Provider request supports transparent output and a single edit-region mask without automatic retries',()=>{
-  const request=core.slice(core.indexOf('function sf_image_gen_request'),core.indexOf('function sf_image_gen_reconcile_cost'));
-  assert.match(request,/'background'=>\(string\)\(\$options\['background'\]/);
+  const request=core.slice(core.indexOf('function sf_image_gen_payload'),core.indexOf('function sf_image_gen_reconcile_cost'));
+  assert.match(request,/sf_image_gen_payload\(\$job,\$adminId,\(string\)\(\$options\['background'\]/);
+  assert.match(request,/'background'=>\$background/);
   assert.match(request,/'output_format'=>'webp'/);
   assert.match(request,/v1\/images\/edits/);
   assert.match(request,/\$payload\['mask'\]=\['image_url'=>'data:image\/png;base64,'\.base64_encode\(\$maskBytes\)\]/);

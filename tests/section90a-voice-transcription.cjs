@@ -10,7 +10,7 @@ assert.ok(body,'Recognition result handler must be available for behavioral test
 const events=[],turns=[],micActivity=[];
 const context={
   st:{conversationOn:true},recognition:{},input:{value:'Unsent typed message'},
-  isIOSVoiceBrowser:false,voiceSpeechGuard:{blocked:false},
+  isIOSVoiceBrowser:false,speechPilotActive:false,recognitionNetworkFailures:0,voiceSpeechGuard:{blocked:false},
   showTranscript:(text,phase)=>events.push({text,phase}),
   setVoiceInputActive:active=>micActivity.push(active),
   // Music-aware gating is separately tested in 91B13H; these frames are user speech.
@@ -43,4 +43,8 @@ context.setPlayback(false);
 
 context.recognition.onresult({results:[{0:{transcript:'Can you'},isFinal:true},{0:{transcript:'play music'},isFinal:false}]});
 assert.equal(turns.at(-1),'Can you play music','Mixed final/interim frames preserve all recognized words');
-console.log('Section 90A voice transcript: 10/10 behavioral checks passed');
+context.setBusy(false);
+context.speechPilotActive=true;
+context.recognition.onresult({results:[{0:{transcript:'stale browser event'},isFinal:true}]});
+assert.equal(turns.length,2,'Browser recognition cannot submit while Speech Engine owns the microphone');
+console.log('Section 90A voice transcript: 11 behavioral checks passed');

@@ -85,7 +85,7 @@ async function run(){
   check('Admin recognition has speech-guarded start and result',()=>assert.match(adminApp,/adminSpeechGuard\?\.blocked/g));
   check('Public audio tracks output start and completion',()=>{assert.match(publicApp,/voiceSpeechGuard\?\.begin\(text\)/);assert.match(publicApp,/voiceSpeechGuard\?\.finish\(\)/)});
   check('Admin audio tracks output start and completion',()=>{assert.match(adminApp,/adminSpeechGuard\?\.begin\(text\)/);assert.match(adminApp,/adminSpeechGuard\?\.finish\(\)/)});
-  check('Both sides wait for speaker echo to fade',()=>{assert.match(publicApp,/echoTailMs:320,echoDeadlineMs:930/);assert.match(adminApp,/echoTailMs:320,echoDeadlineMs:930/)});
+  check('Public speech guard and Admin monitor retain their echo protection',()=>{assert.match(publicApp,/createSpeechGuard\(\{cooldownMs:1100\}\)/);assert.match(adminApp,/echoTailMs:320,echoDeadlineMs:930/)});
   check('Admin voice sends music commands to local playback not to remote actions',()=>assert.match(adminApp,/await adminMusic\?\.handle\(message\)/));
   check('Admin playback is wired to a real audio element',()=>{const shell=read('admin/index.php');assert.match(shell,/id="adminAgentMusicAudio"/);assert.match(shell,/agent-music-controller\.js/)});
   check('Public Agent retains its existing real player executor behind identity validation',()=>{assert.match(publicApp,/publicAudioSkill\?\.dispatch\(verified\.action\)/);assert.match(publicApp,/await executePlayerAgentAction\(verified\.action\)/)});

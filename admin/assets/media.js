@@ -4,7 +4,7 @@
   if(!ctx)return;
   const {app,api,canvas,head,say,esc,openView,openCatalogTrack,reloadCore}=ctx;
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const state={assets:[],category:'',query:'',aiOnly:false,trackId:'',trackLinks:[],publication:null,capabilities:{},completeness:{},dashboard:{},entityConfigs:new Map(),health:null,healthBusy:false,healthStatus:''};
+  const state={assets:[],category:'',query:'',aiOnly:false,trackId:'',trackLinks:[],publication:null,capabilities:{},completeness:{},dashboard:{},entityConfigs:new Map(),imageAnalysisRequests:new Map(),imageBatchSelection:new Set(),imageBatchSession:null,health:null,healthBusy:false,healthStatus:''};
   const roles={
     audio_candidate:{label:'Audio',category:'audio',accept:'.mp3,.wav,audio/mpeg,audio/wav',multiple:true},
     alternate_audio:{label:'Alternate audio',category:'audio',accept:'.mp3,.wav,audio/mpeg,audio/wav',multiple:true},
@@ -118,12 +118,15 @@
     canvas.innerHTML=head('ASSET MANAGEMENT','Media Library','One reusable asset system for songs, releases, shows, campaigns, store products and the public site.','<button class="secondary" id="mediaOpenImageStudio" type="button">Create with AI</button> <button class="primary" id="mediaUploadLibrary" type="button">Upload media</button>')+
       '<div class="stats media-stats"><div class="stat"><strong>'+Number(d.assets||rows.length)+'</strong><span>Total assets</span></div><div class="stat"><strong>'+fmtBytes(d.storage_bytes||0)+'</strong><span>Managed storage</span></div><div class="stat"><strong>'+Number(d.unused_assets||0)+'</strong><span>Unused</span></div><div class="stat"><strong>'+(state.capabilities.ffprobe?'FFprobe':'Built-in')+'</strong><span>Audio analyzer</span></div></div><div class="notice media-capability-note">Audio metadata: '+(state.capabilities.ffprobe?'FFprobe available; built-in MP3/WAV fallback also enabled.':'built-in MP3 frame/ID3 and WAV RIFF parser active.')+' Image derivatives: '+(state.capabilities.gd?'enabled via GD.':'original-only; GD is unavailable.')+' Effective upload ceiling: '+esc(state.capabilities.upload_max_label||'server-defined')+'.</div>'+
       completenessHtml()+mediaHealthHtml()+storeMediaHtml(state.dashboard.store_products||[])+'<section class="panel" id="videoHubPanel"><div class="empty compact">Loading Public Video Hub…</div></section><section class="panel" id="photoGalleriesPanel"><div class="empty compact">Loading Photo Galleries…</div></section>'+
-      '<section class="panel"><div class="panel-title"><div><h2>Asset library</h2><p>Search, inspect usage, edit metadata and remove unused files. Generated images remain private until approved in Image Studio.</p></div></div><div class="toolbar media-toolbar"><input id="mediaSearch" type="search" placeholder="Search filename, title or caption" value="'+esc(state.query)+'"><div class="media-filters">'+['','audio','image','video','document'].map(k=>'<button type="button" data-media-category="'+k+'" class="'+(state.category===k?'active':'')+'">'+(k||'all')+'</button>').join('')+'<button type="button" id="mediaGeneratedOnly" class="'+(state.aiOnly?'active':'')+'">AI generated</button></div></div><div id="mediaLibraryGrid" class="media-library-grid">'+(rows.length?rows.map(assetCard).join(''):'<div class="empty">No media assets match this filter.</div>')+'</div></section>';
+      '<section class="panel"><div class="panel-title"><div><h2>Asset library</h2><p>Search, inspect usage, edit metadata and remove unused files. Generated images remain private until approved in Image Studio.</p></div></div><div class="toolbar media-toolbar"><input id="mediaSearch" type="search" placeholder="Search filename, title or caption" value="'+esc(state.query)+'"><div class="media-filters">'+['','audio','image','video','document'].map(k=>'<button type="button" data-media-category="'+k+'" class="'+(state.category===k?'active':'')+'">'+(k||'all')+'</button>').join('')+'<button type="button" id="mediaGeneratedOnly" class="'+(state.aiOnly?'active':'')+'">AI generated</button></div></div>'+imageBatchToolbar()+'<div id="mediaLibraryGrid" class="media-library-grid">'+(rows.length?rows.map(assetCard).join(''):'<div class="empty">No media assets match this filter.</div>')+'</div></section>';
     $('#mediaUploadLibrary').onclick=()=>pickUploadFiles('', '', '');bindMediaHealth();
     $('#mediaOpenImageStudio').onclick=()=>openView('image-generation');
     $('#mediaGeneratedOnly').onclick=()=>{state.aiOnly=!state.aiOnly;if(state.aiOnly)state.category='image';renderMediaLibrary()};
     $('#mediaSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();state.query=e.currentTarget.value.trim();renderMediaLibrary()}};
     $$('[data-media-category]',canvas).forEach(b=>b.onclick=()=>{state.category=b.dataset.mediaCategory;renderMediaLibrary()});
+    bindImageBatchToolbar(canvas);
+    bindReferenceGalleryControls(canvas,state.assets);
+    $$('[data-media-analyze]',canvas).forEach(button=>button.onclick=()=>editAsset(Number(button.dataset.mediaAnalyze),{analyze:true}));
     $$('[data-media-edit]',canvas).forEach(b=>b.onclick=()=>editAsset(Number(b.dataset.mediaEdit)));
     $$('[data-media-add-catalog]',canvas).forEach(b=>b.onclick=()=>addCatalogAsset(Number(b.dataset.mediaAddCatalog)));
     $$('[data-media-open-catalog]',canvas).forEach(b=>b.onclick=()=>openCatalogTrack(b.dataset.mediaOpenCatalog));
@@ -151,13 +154,384 @@
     if(a.category==='document')return '<div class="media-type-icon">DOC</div>';
     return '<div class="media-type-icon">FILE</div>';
   }
+  function referenceGalleryControl(asset){
+    if(asset.category!=='image'||!['image/png','image/jpeg','image/webp'].includes(asset.mime_type))return '';
+    const id=Number(asset.asset_id||asset.id),included=asset.in_reference_gallery===true||Number(asset.in_reference_gallery)===1;
+    return '<div class="media-reference-gallery"><label><input type="checkbox" data-media-reference="'+id+'" '+(included?'checked':'')+'> <span>Include in reference gallery</span></label><small>Available to all visitors in /images</small><small data-media-reference-status role="status"></small></div>';
+  }
+  function bindReferenceGalleryControls(root,assets){
+    $$('[data-media-reference]',root).forEach(control=>control.onchange=async()=>{
+      const id=Number(control.dataset.mediaReference),asset=assets.find(a=>Number(a.asset_id||a.id)===id);
+      if(!asset)return;
+      const previous=asset.in_reference_gallery===true||Number(asset.in_reference_gallery)===1,enabled=control.checked;
+      const controls=$$('[data-media-reference="'+id+'"]');
+      controls.forEach(node=>{
+        node.disabled=true;
+        const status=$('[data-media-reference-status]',node.closest('.media-reference-gallery'));
+        if(status)status.textContent='Saving…';
+      });
+      try{
+        const result=await api('media.php',{action:'set_reference_gallery',id,enabled});
+        const included=result.asset?.in_reference_gallery===true||Number(result.asset?.in_reference_gallery)===1;
+        for(const item of [...state.assets,...assets]){
+          if(Number(item.asset_id||item.id)===id)item.in_reference_gallery=included;
+        }
+        controls.forEach(node=>{
+          node.checked=included;
+          const status=$('[data-media-reference-status]',node.closest('.media-reference-gallery'));
+          if(status)status.textContent=included?'Included in the reference gallery.':'Removed from the reference gallery.';
+        });
+        say(included?'Image included in the reference gallery.':'Image removed from the reference gallery.');
+      }catch(error){
+        controls.forEach(node=>{
+          node.checked=previous;
+          const status=$('[data-media-reference-status]',node.closest('.media-reference-gallery'));
+          if(status)status.textContent=error.message||'Reference gallery could not be updated.';
+        });
+      }finally{controls.forEach(node=>node.disabled=false);}
+    });
+  }
+  function imageBatchToolbar(){
+    return '<section class="media-image-batch-toolbar" aria-label="Batch image analysis"><div><strong>Batch image analysis</strong><p>Analyze selected images or images missing analysis across the managed library. Review the drafts before approving them.</p></div><div class="media-image-batch-actions"><label><input type="checkbox" data-media-batch-visible> Select visible images</label><span data-media-batch-count role="status"></span><button class="secondary" type="button" data-media-batch-clear>Clear selection</button><button class="primary" type="button" data-media-batch-selected>Analyze selected</button><button class="secondary" type="button" data-media-batch-missing>Analyze missing images</button><button class="secondary" type="button" data-media-batch-open>Open saved batch</button></div></section>';
+  }
+  function bindImageBatchToolbar(root){
+    const selection=state.imageBatchSelection,visible=$$('[data-media-batch-image]',root);
+    const sync=()=>{
+      for(const checkbox of visible)checkbox.checked=selection.has(Number(checkbox.dataset.mediaBatchImage));
+      const count=$('[data-media-batch-count]',root),all=$('[data-media-batch-visible]',root);
+      if(count)count.textContent=selection.size+' selected';
+      const selected=$('[data-media-batch-selected]',root),clear=$('[data-media-batch-clear]',root);
+      if(selected)selected.disabled=selection.size===0;
+      if(clear)clear.disabled=selection.size===0;
+      if(all){
+        const checked=visible.filter(checkbox=>checkbox.checked).length;
+        all.checked=visible.length>0&&checked===visible.length;all.indeterminate=checked>0&&checked<visible.length;all.disabled=visible.length===0;
+      }
+    };
+    for(const checkbox of visible)checkbox.onchange=()=>{
+      const id=Number(checkbox.dataset.mediaBatchImage);
+      if(checkbox.checked)selection.add(id);else selection.delete(id);
+      sync();
+    };
+    const all=$('[data-media-batch-visible]',root);
+    if(all)all.onchange=()=>{for(const checkbox of visible){const id=Number(checkbox.dataset.mediaBatchImage);if(all.checked)selection.add(id);else selection.delete(id);}sync();};
+    const clear=$('[data-media-batch-clear]',root);
+    if(clear)clear.onclick=()=>{selection.clear();sync();};
+    const selected=$('[data-media-batch-selected]',root);
+    if(selected)selected.onclick=()=>openImageAnalysisBatch({mode:'selected',ids:Array.from(selection)});
+    const missing=$('[data-media-batch-missing]',root);
+    if(missing)missing.onclick=()=>openImageAnalysisBatch({mode:'missing'});
+    const saved=$('[data-media-batch-open]',root);
+    if(saved)saved.onclick=()=>openImageAnalysisBatch();
+    sync();
+  }
+  function imageBatchSelectionControl(asset){
+    if(asset.category!=='image')return '';
+    const id=Number(asset.id),title=String(asset.title||asset.original_name||'image');
+    return '<label class="media-image-batch-select"><input type="checkbox" data-media-batch-image="'+id+'" aria-label="'+esc('Select '+title+' for batch analysis')+'" '+(state.imageBatchSelection.has(id)?'checked':'')+'> Select for batch analysis</label>';
+  }
+  async function openImageAnalysisBatch(options={}){
+    if(state.imageBatchSession){state.imageBatchSession.dialog.focus();return;}
+    const dialog=document.createElement('dialog');dialog.className='media-image-batch-dialog';dialog.setAttribute('aria-labelledby','mediaImageBatchTitle');
+    dialog.innerHTML='<section class="media-image-batch-panel"><header><div><h2 id="mediaImageBatchTitle">Batch image analysis</h2><p>Progress is saved after each image. Closing pauses the batch.</p></div><button class="secondary" type="button" data-batch-close>Close</button></header><div class="media-image-batch-body"><div class="media-image-batch-controls"><label>Saved batches<select data-batch-jobs aria-label="Saved batches"><option value="">Choose a saved batch</option></select></label><button class="secondary" type="button" data-batch-refresh>Refresh progress</button><button class="secondary" type="button" data-batch-pause>Pause</button><button class="primary" type="button" data-batch-resume>Resume</button><button class="danger" type="button" data-batch-cancel>Cancel batch</button></div><p class="media-image-batch-message" data-batch-message role="status"></p><div data-batch-progress></div><div class="media-image-batch-review-actions"><button class="secondary" type="button" data-batch-select-drafts>Select all drafts</button><button class="primary" type="button" data-batch-review>Approve selected drafts</button><span data-batch-review-count></span></div><div class="media-image-batch-items" data-batch-items></div></div></section>';
+    const session={dialog,job:null,jobs:[],active:true,running:false,busy:false,controlBusy:false,driving:false,stepPromise:null,review:new Map(),createId:options.mode?crypto.randomUUID().replaceAll('-',''):null,message:'Loading saved progress…'};
+    state.imageBatchSession=session;
+    const body=$('.media-image-batch-body',dialog),message=$('[data-batch-message]',dialog),progress=$('[data-batch-progress]',dialog),items=$('[data-batch-items]',dialog),jobs=$('[data-batch-jobs]',dialog);
+    const pause=$('[data-batch-pause]',dialog),resume=$('[data-batch-resume]',dialog),refresh=$('[data-batch-refresh]',dialog),cancel=$('[data-batch-cancel]',dialog),review=$('[data-batch-review]',dialog),selectDrafts=$('[data-batch-select-drafts]',dialog);
+    const fieldNames=['description','visible_text','objects','scene','style','colors','tags','uncertainties'];
+    const active=()=>session.active&&state.imageBatchSession===session;
+    const canReview=item=>item.status==='completed'&&item.analysis_status==='pending_review'&&typeof item.analysis_id==='string'&&Number.isInteger(item.version);
+    const applyJob=job=>{
+      if(!job||typeof job.id!=='string'||!Array.isArray(job.items))throw new Error('The server did not return saved batch progress.');
+      session.job=job;
+      for(const [id,selected] of session.review){
+        const current=job.items.find(item=>String(item.image_id)===id);
+        if(!current||!canReview(current)||current.analysis_id!==selected.analysis_id||current.version!==selected.version)session.review.delete(id);
+      }
+    };
+    const render=()=>{
+      if(!active())return;
+      const job=session.job,counts=job?.counts||{},stopped=!session.running&&!session.busy&&!session.controlBusy;
+      message.textContent=session.message;
+      pause.disabled=!job||session.controlBusy||(!session.running&&!session.busy);
+      pause.textContent=session.controlBusy?'Saving pause…':'Pause';
+      resume.disabled=!job||!stopped||!['running','paused'].includes(job.status)||Number(counts.processing)>0||Number(counts.pending)===0;
+      refresh.disabled=session.controlBusy||session.busy;
+      cancel.disabled=!job||session.controlBusy||!['running','paused'].includes(job.status);
+      jobs.disabled=session.busy||session.controlBusy||session.running;
+      selectDrafts.disabled=!job||!stopped||!job.items.some(canReview);
+      review.disabled=!stopped||session.review.size===0;
+      $('[data-batch-review-count]',dialog).textContent=session.review.size+' selected for approval';
+      progress.replaceChildren();items.replaceChildren();
+      if(!job)return;
+      const status=document.createElement('p');status.className='media-image-batch-status';
+      status.textContent='Batch '+job.status+' · '+Number(counts.total||0)+' images';progress.append(status);
+      const bar=document.createElement('progress'),finished=Number(counts.total||0)-Number(counts.pending||0)-Number(counts.processing||0);
+      bar.max=Math.max(1,Number(counts.total||0));bar.value=Math.max(0,finished);bar.setAttribute('aria-label','Batch analysis progress');progress.append(bar);
+      const tally=document.createElement('p');tally.textContent=finished+' finished · '+Number(counts.pending||0)+' pending · '+Number(counts.processing||0)+' processing · '+Number(counts.completed||0)+' drafts · '+Number(counts.reviewed||0)+' approved · '+Number(counts.failed||0)+' failed · '+Number(counts.skipped||0)+' skipped';progress.append(tally);
+      const usage=document.createElement('p'),totals=job.usage||{};
+      usage.className='media-image-batch-usage';usage.textContent='Input tokens '+Number(totals.input_tokens||0)+' · Output tokens '+Number(totals.output_tokens||0)+' · Active Tokens charged '+Number(totals.active_tokens_used||0);progress.append(usage);
+      if(Number(job.remaining_count)>0){const remaining=document.createElement('p');remaining.textContent=Number(job.remaining_count)+' more images are missing analysis beyond this batch.';progress.append(remaining);}
+      for(const item of job.items){
+        const card=document.createElement('article');card.className='media-image-batch-item';
+        const content=document.createElement('div'),title=document.createElement('h3'),stateLabel=document.createElement('p');
+        title.textContent=item.title||'Image '+item.image_id;stateLabel.textContent=item.status;content.append(title,stateLabel);
+        try{
+          if(typeof item.image_url!=='string'||!item.image_url)throw new Error('Image preview unavailable.');
+          const source=typeof item.image_url==='string'&&item.image_url.startsWith('api/')?'../'+item.image_url:item.image_url;
+          const url=new URL(source,document.baseURI);
+          if(['http:','https:'].includes(url.protocol)&&url.origin===window.location.origin&&!url.username&&!url.password){const image=document.createElement('img');image.alt='';image.loading='lazy';image.src=url.href;card.append(image);}
+        }catch(_){}
+        if(item.analysis?.description){const description=document.createElement('p');description.textContent=item.analysis.description;content.append(description);}
+        if(item.analysis){
+          const details=document.createElement('details'),summary=document.createElement('summary'),fields=document.createElement('dl');summary.textContent='Review image details';
+          for(const key of fieldNames){
+            const value=item.analysis[key];if(!value||(Array.isArray(value)&&!value.length))continue;
+            const term=document.createElement('dt'),definition=document.createElement('dd');term.textContent=key.replaceAll('_',' ');definition.textContent=Array.isArray(value)?value.join(', '):String(value);fields.append(term,definition);
+          }
+          details.append(summary,fields);content.append(details);
+        }
+        if(item.error){const error=document.createElement('p');error.className='media-image-batch-error';error.textContent=item.error;content.append(error);}
+        if(canReview(item)){
+          const label=document.createElement('label'),checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=session.review.has(String(item.image_id));checkbox.disabled=!stopped;
+          checkbox.setAttribute('aria-label','Approve analysis for '+title.textContent);
+          checkbox.onchange=()=>{const id=String(item.image_id);if(checkbox.checked)session.review.set(id,{analysis_id:item.analysis_id,version:item.version});else session.review.delete(id);review.disabled=session.review.size===0;$('[data-batch-review-count]',dialog).textContent=session.review.size+' selected for approval';};
+          label.className='media-image-batch-review-choice';label.append(checkbox,document.createTextNode(' Select draft for approval'));content.append(label);
+        }
+        if(item.analysis_id){
+          const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='Edit analysis';edit.disabled=!stopped;
+          edit.onclick=async()=>{
+            session.running=false;session.controlBusy=true;render();
+            try{
+              if(['running','paused'].includes(session.job.status)){const response=await api('image-analysis-batch.php',{action:'pause',id:session.job.id});applyJob(response.job);}
+              if(!active())return;
+              dialog.close();
+              await editAsset(Number(item.image_id),{onClose:()=>{
+                if(!active())return;
+                dialog.showModal();void recover();
+              }});
+            }catch(error){session.message=error.message||'Image details could not be opened.';}
+            finally{session.controlBusy=false;render();}
+          };
+          content.append(edit);
+        }
+        card.append(content);items.append(card);
+      }
+    };
+    const updateJobs=()=>{
+      const selected=session.job?.id||'';jobs.replaceChildren();
+      const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Choose a saved batch';jobs.append(placeholder);
+      const summaries=session.jobs.slice();
+      if(session.job&&!summaries.some(job=>job.id===session.job.id))summaries.unshift(session.job);
+      for(const job of summaries){const option=document.createElement('option');option.value=job.id;option.textContent=(job.created_at||'Saved batch')+' · '+job.status+' · '+Number(job.counts?.total||0)+' images';jobs.append(option);}
+      jobs.value=selected;
+    };
+    const recover=async()=>{
+      if(!active())return;
+      session.running=false;session.controlBusy=true;render();
+      try{
+        const id=session.job?.id||session.createId;
+        const response=await api('image-analysis-batch.php'+(id?'?id='+encodeURIComponent(id):''));
+        if(!active())return;
+        if(Array.isArray(response.jobs))session.jobs=response.jobs;
+        if(response.job)applyJob(response.job);
+        session.message=response.job?'Saved progress loaded.': 'No saved batches yet.';updateJobs();
+      }catch(error){if(active())session.message=error.message||'Saved progress could not be loaded.';}
+      finally{session.controlBusy=false;render();}
+    };
+    const drive=async()=>{
+      if(session.driving)return;
+      session.driving=true;
+      try{
+        while(active()&&dialog.open&&document.visibilityState==='visible'&&session.running&&session.job?.status==='running'&&Number(session.job.counts?.pending)>0){
+          session.busy=true;session.message='Analyzing the next image…';render();
+          try{
+            const next=session.job.items.find(item=>item.status==='pending');
+            session.stepPromise=api('image-analysis-batch.php',{action:'step',id:session.job.id,request_id:next.request_id});
+            const response=await session.stepPromise;applyJob(response.job);
+            if(Number(session.job.counts?.processing)>0){session.running=false;session.message='An image is still processing. Refresh to check its saved progress.';}
+            else if(session.job.items.find(item=>item.request_id===next.request_id)?.status==='pending'){
+              session.running=false;session.message='The next image has not started. Refresh saved progress before resuming.';
+            }
+          }catch(error){
+            session.running=false;session.message=error.message||'The connection was interrupted. Refresh saved progress before resuming.';
+            if(active()){
+              try{const response=await api('image-analysis-batch.php?id='+encodeURIComponent(session.job.id));if(active())applyJob(response.job);}catch(_){}
+            }
+          }finally{session.stepPromise=null;session.busy=false;render();}
+        }
+        if(session.running){session.running=false;session.message=session.job?.status==='completed'?'Analysis finished. Review the saved drafts.':'Batch progress is saved.';}
+      }finally{session.driving=false;render();}
+    };
+    const pauseBatch=async()=>{
+      session.running=false;session.controlBusy=true;render();
+      const id=session.job?.id,pendingStep=session.stepPromise;
+      try{
+        if(id){const response=await api('image-analysis-batch.php',{action:'pause',id});if(active())applyJob(response.job);}
+        if(active())session.message='Batch paused. Progress is saved.';
+      }catch(error){if(active())session.message=error.message||'Progress is saved. Refresh to check the batch.';}
+      finally{
+        session.controlBusy=false;render();
+        if(pendingStep)pendingStep.then(()=>{if(active())void recover();},()=>{if(active())void recover();});
+      }
+    };
+    const close=()=>{
+      if(!active())return;
+      session.running=false;
+      if(session.job&&['running','paused'].includes(session.job.status))void pauseBatch();
+      session.active=false;state.imageBatchSession=null;document.removeEventListener('visibilitychange',visibilityChanged);
+      if(dialog.open)dialog.close();dialog.remove();
+      $('[data-media-batch-open]',canvas)?.focus();
+    };
+    const visibilityChanged=()=>{if(document.visibilityState!=='visible'&&session.running)void pauseBatch();};
+    document.addEventListener('visibilitychange',visibilityChanged);
+    $('[data-batch-close]',dialog).onclick=close;
+    dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
+    dialog.addEventListener('keydown',event=>event.stopPropagation());
+    pause.onclick=()=>void pauseBatch();refresh.onclick=()=>void recover();
+    resume.onclick=async()=>{
+      if(!active()||session.busy||session.controlBusy||!session.job)return;
+      session.controlBusy=true;render();
+      try{const response=await api('image-analysis-batch.php',{action:'resume',id:session.job.id});if(!active())return;applyJob(response.job);session.running=true;session.message='Resuming batch…';}
+      catch(error){session.message=error.message||'The batch could not be resumed.';}
+      finally{session.controlBusy=false;render();}
+      if(active()&&session.running)void drive();
+    };
+    cancel.onclick=async()=>{
+      if(!session.job||session.controlBusy)return;
+      session.running=false;session.controlBusy=true;render();
+      const pendingStep=session.stepPromise;
+      try{
+        const response=await api('image-analysis-batch.php',{action:'cancel',id:session.job.id});if(active()){applyJob(response.job);session.message='Batch canceled. Completed drafts remain available for review.';}}
+      catch(error){if(active())session.message=error.message||'The batch could not be canceled.';}
+      finally{
+        session.controlBusy=false;render();
+        if(pendingStep)pendingStep.then(()=>{if(active())void recover();},()=>{if(active())void recover();});
+      }
+    };
+    jobs.onchange=async()=>{
+      if(!jobs.value||session.running||session.busy||session.controlBusy)return;
+      session.controlBusy=true;render();
+      try{const response=await api('image-analysis-batch.php?id='+encodeURIComponent(jobs.value));if(active()){applyJob(response.job);session.message='Saved batch loaded.';}}
+      catch(error){if(active())session.message=error.message||'The saved batch could not be loaded.';}
+      finally{session.controlBusy=false;render();}
+    };
+    selectDrafts.onclick=()=>{
+      for(const item of session.job?.items||[])if(canReview(item))session.review.set(String(item.image_id),{analysis_id:item.analysis_id,version:item.version});render();
+    };
+    review.onclick=async()=>{
+      if(session.running||session.busy||session.controlBusy||!session.review.size)return;
+      const selected=session.job.items.filter(item=>{const choice=session.review.get(String(item.image_id));return canReview(item)&&choice?.analysis_id===item.analysis_id&&choice.version===item.version;});
+      const payload=selected.map(item=>({image_id:item.image_id,analysis_id:item.analysis_id,version:item.version,analysis:Object.fromEntries(fieldNames.map(key=>[key,item.analysis[key]]))}));
+      session.controlBusy=true;session.message='Approving selected drafts…';render();
+      try{
+        const response=await api('image-analysis-batch.php',{action:'review',id:session.job.id,items:payload});
+        if(!active())return;
+        applyJob(response.job);
+        const rejected=(response.review_results||[]).filter(result=>!result.ok);
+        session.message=rejected.length?rejected.length+' drafts changed or could not be approved. Review their latest details.':'Selected image analyses approved.';
+      }catch(error){if(active())session.message=error.message||'Draft approval could not be confirmed. Refresh the saved batch.';}
+      finally{session.controlBusy=false;render();}
+    };
+    document.body.append(dialog);dialog.showModal();render();
+    if(options.mode){
+      session.controlBusy=true;session.message='Saving batch…';render();
+      try{
+        const response=await api('image-analysis-batch.php',{action:'create',request_id:session.createId,mode:options.mode,ids:options.ids||[]});
+        if(!active())return;
+        applyJob(response.job);updateJobs();session.running=session.job.status==='running';session.message='Batch saved.';
+      }catch(error){
+        if(active())session.message=error.message||'The batch could not be created. Open saved progress before trying again.';
+        try{
+          const response=await api('image-analysis-batch.php?id='+encodeURIComponent(session.createId));
+          if(active()){applyJob(response.job);updateJobs();session.message='Batch was saved. Resume when ready.';}
+        }catch(_){}
+      }
+      finally{session.controlBusy=false;render();}
+      if(active()&&session.running)void drive();
+    }else await recover();
+  }
+  function mediaImageAnalysisSummary(asset){
+    if(asset.category!=='image')return '';
+    const analysis=asset.image_analysis;
+    const text=analysis?.description?String(analysis.description).slice(0,320):'';
+    return '<p class="media-image-analysis-summary" data-media-analysis-summary="'+Number(asset.asset_id||asset.id)+'">'+esc(text)+'</p>';
+  }
+  function mediaImageAnalysisPanel(asset){
+    if(asset.category!=='image'||!['image/png','image/jpeg','image/webp'].includes(asset.mime_type))return '';
+    const analysis=asset.image_analysis||{},editable=['pending_review','approved'].includes(analysis.status);
+    const listValue=key=>Array.isArray(analysis[key])?analysis[key].join('\n'):'';
+    const textField=(key,label,maxLength,rows=3)=>'<label class="field media-analysis-wide">'+esc(label)+'<textarea aria-label="'+esc(label)+'" name="'+key+'" maxlength="'+maxLength+'" rows="'+rows+'">'+esc(analysis[key]||'')+'</textarea></label>';
+    const listField=(key,label,maxLength)=>'<label class="field">'+esc(label)+'<textarea aria-label="'+esc(label)+'" name="'+key+'" maxlength="'+maxLength+'" rows="3">'+esc(listValue(key))+'</textarea></label>';
+    const metadata=[analysis.provider,analysis.model,analysis.analyzed_at?'Analyzed '+analysis.analyzed_at:'',analysis.reviewed_at?'Reviewed '+analysis.reviewed_at:''].filter(Boolean).map(esc).join(' · ');
+    const status=analysis.status==='approved'?'Reviewed analysis saved.':analysis.status==='pending_review'?'Review this analysis before saving it for image search.':analysis.status==='running'?'Image analysis is running. Check its progress below.':analysis.status==='failed'?'Image analysis could not finish. You can try again.':'Analyze the image to describe its visible content and make it easier to find.';
+    return '<section class="media-image-analysis" data-media-image-analysis><div class="panel-title"><div><h3>Image analysis</h3><p>'+esc(status)+'</p></div><button class="secondary" type="button" data-media-analysis-run>'+(analysis.status==='running'?'Check analysis':analysis.id?'Analyze image again':'Analyze image')+'</button></div>'+
+      (metadata?'<p class="hint media-analysis-provider">'+metadata+'</p>':'')+
+      '<form data-media-analysis-form><fieldset '+(editable?'':'disabled')+'><div class="media-analysis-fields">'+
+      textField('description','Visible description',4000,4)+textField('visible_text','Visible text / OCR',12000,4)+
+      textField('scene','Scene and setting',1000,2)+textField('style','Visual style',500,2)+
+      listField('objects','Objects, one per line',3630)+listField('colors','Colors, one per line',1296)+listField('tags','Tags, one per line',2430)+listField('uncertainties','Uncertainties, one per line',2892)+
+      '</div><div class="actions"><button class="primary" type="submit">Save reviewed analysis</button></div></fieldset><p class="status-line" data-media-analysis-status role="status"></p></form></section>';
+  }
+  function bindMediaImageAnalysis(root,asset,analyzeOnOpen=false){
+    const section=$('[data-media-image-analysis]',root);
+    if(!section)return;
+    const run=$('[data-media-analysis-run]',section),form=$('[data-media-analysis-form]',section),status=$('[data-media-analysis-status]',section);
+    let busy=false;
+    const remember=analysis=>{
+      asset.image_analysis=analysis;
+      for(const item of state.assets)if(Number(item.id)===Number(asset.id))item.image_analysis=analysis;
+      $$('[data-media-analysis-summary="'+Number(asset.id)+'"]').forEach(node=>node.textContent=String(analysis.description||'').slice(0,320));
+    };
+    const render=analysis=>{
+      remember(analysis);
+      if(!root.isConnected)return;
+      section.outerHTML=mediaImageAnalysisPanel(asset);
+      bindMediaImageAnalysis(root,asset);
+    };
+    run.onclick=async()=>{
+      if(busy)return;
+      busy=true;run.disabled=true;form.querySelector('fieldset').disabled=true;status.textContent='Analyzing image…';
+      const key=Number(asset.id);
+      let requestId=state.imageAnalysisRequests.get(key)||(asset.image_analysis?.status==='running'?asset.image_analysis.id:null);
+      if(!requestId){requestId=crypto.randomUUID().replaceAll('-','');state.imageAnalysisRequests.set(key,requestId);}
+      try{
+        const response=await api('media.php',{action:'analyze_image',id:key,request_id:requestId});
+        if(!response.analysis?.id)throw new Error('The server did not return image analysis.');
+        if(response.analysis.status!=='running')state.imageAnalysisRequests.delete(key);
+        render(response.analysis);
+      }catch(error){
+        status.textContent=error.message||'Image analysis could not be loaded.';
+        run.textContent='Check analysis';run.disabled=false;
+        form.querySelector('fieldset').disabled=!['pending_review','approved'].includes(asset.image_analysis?.status);
+      }finally{busy=false;}
+    };
+    form.onsubmit=async event=>{
+      event.preventDefault();
+      const current=asset.image_analysis;
+      if(busy||!current?.id||!['pending_review','approved'].includes(current.status))return;
+      const fields=new FormData(form),analysis={};
+      for(const key of ['description','visible_text','scene','style'])analysis[key]=String(fields.get(key)||'');
+      for(const key of ['objects','colors','tags','uncertainties'])analysis[key]=String(fields.get(key)||'').split(/\r?\n/).map(item=>item.trim()).filter(Boolean);
+      busy=true;run.disabled=true;form.querySelector('fieldset').disabled=true;status.textContent='Saving reviewed analysis…';
+      try{
+        const response=await api('media.php',{action:'save_image_analysis',id:Number(asset.id),analysis_id:current.id,expected_version:current.version,analysis});
+        if(!response.analysis?.id)throw new Error('The server did not confirm the reviewed analysis.');
+        render(response.analysis);say('Reviewed image analysis saved.');
+      }catch(error){
+        status.textContent=error.message||'The reviewed analysis could not be saved.';
+        run.disabled=false;form.querySelector('fieldset').disabled=false;
+      }finally{busy=false;}
+    };
+    if(analyzeOnOpen)void run.onclick();
+  }
   function assetCard(a){
     const tags=a.technical&&a.technical.normalized_tags||{};
     const audio=a.category==='audio'&&['mp3','wav','wave'].includes(String(a.extension||'').toLowerCase());
     const existing=audio?(app.catalog||[]).find(t=>Number(t.media_primary_asset||0)===Number(a.id)||Number(t.media_private_master_asset||0)===Number(a.id)||(t.audio||'').includes('api/media.php?id='+a.uuid)):null;
     const catalogAction=audio?(existing?'<button class="secondary" type="button" data-media-open-catalog="'+esc(existing.id)+'">In Catalog</button>':
       '<button class="primary media-add-catalog-btn" type="button" data-media-add-catalog="'+a.id+'">Add to Catalog</button>'):'';
-    return '<article class="media-asset-card" data-asset-id="'+a.id+'"><div class="media-asset-preview">'+assetPreview(a)+'</div><div class="media-asset-main"><div class="media-asset-kicker">'+esc(String(a.category||'media').toUpperCase())+' · '+esc(sourceLabel(a))+'</div><strong>'+esc(a.title||a.original_name)+'</strong><small>'+esc(a.original_name)+'</small><p>'+esc(technicalLine(a))+'</p>'+(a.technical?.source==='openai_image_generation'?'<p class="hint">Generated image · approval managed in AI Image Studio · job #'+Number(a.technical.image_job_id||0)+'</p>':'')+(tags.artist||tags.album?'<p>'+esc([tags.artist,tags.album].filter(Boolean).join(' · '))+'</p>':'')+'<div class="media-asset-foot"><span>'+fmtBytes(a.size_bytes)+'</span><span>'+Number(a.link_count||0)+' use'+(Number(a.link_count||0)===1?'':'s')+'</span></div></div><div class="media-asset-actions">'+catalogAction+(a.category==='image'&&['image/png','image/jpeg','image/webp'].includes(a.mime_type)&&Number(a.size_bytes)<=10*1024*1024?'<button class="secondary" type="button" data-media-vary="'+Number(a.id)+'">Create variation</button>':'')+(a.technical?.source==='openai_image_generation'&&Number(a.technical.image_job_id||0)>0?'<button class="secondary" type="button" data-media-preview-ai="'+Number(a.technical.image_job_id)+'">Preview placements</button>':'')+'<button class="secondary" type="button" data-media-edit="'+a.id+'">Edit</button>'+(Number(a.link_count||0)===0?'<button class="danger" type="button" data-media-delete="'+a.id+'">Delete</button>':'')+'</div></article>';
+    return '<article class="media-asset-card" data-asset-id="'+a.id+'"><div class="media-asset-preview">'+assetPreview(a)+'</div><div class="media-asset-main"><div class="media-asset-kicker">'+esc(String(a.category||'media').toUpperCase())+' · '+esc(sourceLabel(a))+'</div>'+imageBatchSelectionControl(a)+'<strong>'+esc(a.title||a.original_name)+'</strong><small>'+esc(a.original_name)+'</small><p>'+esc(technicalLine(a))+'</p>'+(a.technical?.source==='openai_image_generation'?'<p class="hint">Generated image · approval managed in AI Image Studio · job #'+Number(a.technical.image_job_id||0)+'</p>':'')+(tags.artist||tags.album?'<p>'+esc([tags.artist,tags.album].filter(Boolean).join(' · '))+'</p>':'')+mediaImageAnalysisSummary(a)+referenceGalleryControl(a)+'<div class="media-asset-foot"><span>'+fmtBytes(a.size_bytes)+'</span><span>'+Number(a.link_count||0)+' use'+(Number(a.link_count||0)===1?'':'s')+'</span></div></div><div class="media-asset-actions">'+catalogAction+(a.category==='image'&&['image/png','image/jpeg','image/webp'].includes(a.mime_type)&&Number(a.size_bytes)<=10*1024*1024?'<button class="secondary" type="button" data-media-vary="'+Number(a.id)+'">Create variation</button>':'')+(a.technical?.source==='openai_image_generation'&&Number(a.technical.image_job_id||0)>0?'<button class="secondary" type="button" data-media-preview-ai="'+Number(a.technical.image_job_id)+'">Preview placements</button>':'')+(a.category==='image'&&['image/png','image/jpeg','image/webp'].includes(a.mime_type)?'<button class="secondary" type="button" data-media-analyze="'+Number(a.id)+'">Analyze image</button>':'')+'<button class="secondary" type="button" data-media-edit="'+a.id+'">Edit</button>'+(Number(a.link_count||0)===0?'<button class="danger" type="button" data-media-delete="'+a.id+'">Delete</button>':'')+'</div></article>';
   }
   async function addCatalogAsset(id){
     const asset=state.assets.find(a=>Number(a.id)===id);
@@ -239,13 +613,14 @@
       say('Uploaded '+done+' of '+files.length+' media file'+(files.length===1?'':'s')+'.');if(onDone){await onDone()}else if(entityType==='track')await refreshTrackMedia(entityId);else if(entityType&&entityId&&state.entityConfigs.has(entityType+':'+entityId))await refreshEntityMedia(entityType,entityId);else renderMediaLibrary();
     };inp.click();
   }
-  async function editAsset(id){
+  async function editAsset(id,options={}){
     let a=state.assets.find(x=>Number(x.id)===id),usage=[];try{const detail=await api('media.php?asset_id='+encodeURIComponent(id));a=detail.asset||a;usage=detail.usage||[]}catch(_){if(!a){await loadAssets();a=state.assets.find(x=>Number(x.id)===id)}}if(!a)return;
     const tags=a.technical&&a.technical.normalized_tags||{},usageHtml='<section class="media-usage-panel"><strong>Used by '+usage.length+' item'+(usage.length===1?'':'s')+'</strong>'+(usage.length?usage.map(u=>'<div><span>'+esc(String(u.entity_type).toUpperCase())+' · '+esc(u.role)+'</span><b>'+esc(u.entity_label||u.entity_id)+'</b><small>'+(Number(u.public_visible)?'public':'private')+(Number(u.download_allowed)?' · downloadable':'')+'</small></div>').join(''):'<p>This asset is currently unused and may be deleted.</p>')+'</section>';
-    const overlay=document.createElement('div');overlay.className='media-modal';overlay.innerHTML='<div class="media-modal-card"><div class="panel-title"><div><div class="eyebrow">MEDIA ASSET</div><h2>'+esc(a.title||a.original_name)+'</h2><p>'+esc(technicalLine(a))+'</p></div><button type="button" class="secondary" data-media-close>Close</button></div>'+(a.category==='audio'?'<audio controls preload="metadata" src="'+esc(mediaUrl(a))+'"></audio>':a.category==='image'?'<img class="media-modal-image" src="'+esc(mediaUrl(a,a.variants&&a.variants.medium?'medium':'original'))+'" alt="">':a.category==='video'?'<video class="media-modal-image" controls preload="metadata" src="'+esc(mediaUrl(a))+'"></video>':'')+'<form id="mediaAssetForm" class="form-grid"><label class="field span2">Title<input name="title" value="'+esc(a.title||'')+'"></label><label class="field span3">Caption<textarea name="caption">'+esc(a.caption||'')+'</textarea></label><label class="field span2">Alt text<input name="alt_text" value="'+esc(a.alt_text||'')+'"></label><label class="field">Credit<input name="credit" value="'+esc(a.credit||'')+'"></label><label class="field span3">Copyright / rights<input name="copyright_text" value="'+esc(a.copyright_text||'')+'"></label><div class="actions span3"><button class="primary" type="submit">Save metadata</button></div></form><section class="media-tech-panel"><strong>Extracted metadata</strong><dl><div><dt>File</dt><dd>'+esc(a.original_name)+' · '+fmtBytes(a.size_bytes)+'</dd></div><div><dt>Technical</dt><dd>'+esc(technicalLine(a))+'</dd></div><div><dt>Analyzer</dt><dd>'+esc(sourceLabel(a))+'</dd></div>'+(tags.title?'<div><dt>Embedded title</dt><dd>'+esc(tags.title)+'</dd></div>':'')+(tags.artist?'<div><dt>Embedded artist</dt><dd>'+esc(tags.artist)+'</dd></div>':'')+(tags.album?'<div><dt>Embedded album</dt><dd>'+esc(tags.album)+'</dd></div>':'')+(a.technical&&a.technical.embedded_artwork?'<div><dt>Embedded artwork</dt><dd>Detected</dd></div>':'')+'</dl></section>'+usageHtml+'</div>';
-    document.body.appendChild(overlay);$('[data-media-close]',overlay).onclick=()=>overlay.remove();$('#mediaAssetForm',overlay).onsubmit=async e=>{e.preventDefault();const d=new FormData(e.currentTarget);try{await api('media.php',{action:'update_asset',id:a.id,asset:{title:d.get('title'),caption:d.get('caption'),alt_text:d.get('alt_text'),credit:d.get('credit'),copyright_text:d.get('copyright_text')}});overlay.remove();say('Media metadata saved.');if(app.view==='media')renderMediaLibrary();else reloadCore()}catch(x){alert(x.message)}};
+    const overlay=document.createElement('div');overlay.className='media-modal';overlay.innerHTML='<div class="media-modal-card"><div class="panel-title"><div><div class="eyebrow">MEDIA ASSET</div><h2>'+esc(a.title||a.original_name)+'</h2><p>'+esc(technicalLine(a))+'</p></div><button type="button" class="secondary" data-media-close>Close</button></div>'+(a.category==='audio'?'<audio controls preload="metadata" src="'+esc(mediaUrl(a))+'"></audio>':a.category==='image'?'<img class="media-modal-image" src="'+esc(mediaUrl(a,a.variants&&a.variants.medium?'medium':'original'))+'" alt="">':a.category==='video'?'<video class="media-modal-image" controls preload="metadata" src="'+esc(mediaUrl(a))+'"></video>':'')+referenceGalleryControl(a)+'<form id="mediaAssetForm" class="form-grid"><label class="field span2">Title<input name="title" value="'+esc(a.title||'')+'"></label><label class="field span3">Caption<textarea name="caption">'+esc(a.caption||'')+'</textarea></label><label class="field span2">Alt text<input name="alt_text" value="'+esc(a.alt_text||'')+'"></label><label class="field">Credit<input name="credit" value="'+esc(a.credit||'')+'"></label><label class="field span3">Copyright / rights<input name="copyright_text" value="'+esc(a.copyright_text||'')+'"></label><div class="actions span3"><button class="primary" type="submit">Save metadata</button></div></form>'+mediaImageAnalysisPanel(a)+'<section class="media-tech-panel"><strong>Extracted metadata</strong><dl><div><dt>File</dt><dd>'+esc(a.original_name)+' · '+fmtBytes(a.size_bytes)+'</dd></div><div><dt>Technical</dt><dd>'+esc(technicalLine(a))+'</dd></div><div><dt>Analyzer</dt><dd>'+esc(sourceLabel(a))+'</dd></div>'+(tags.title?'<div><dt>Embedded title</dt><dd>'+esc(tags.title)+'</dd></div>':'')+(tags.artist?'<div><dt>Embedded artist</dt><dd>'+esc(tags.artist)+'</dd></div>':'')+(tags.album?'<div><dt>Embedded album</dt><dd>'+esc(tags.album)+'</dd></div>':'')+(a.technical&&a.technical.embedded_artwork?'<div><dt>Embedded artwork</dt><dd>Detected</dd></div>':'')+'</dl></section>'+usageHtml+'</div>';
+    let closed=false;const closeAsset=()=>{if(closed)return;closed=true;overlay.remove();options.onClose?.();};
+    document.body.appendChild(overlay);bindReferenceGalleryControls(overlay,[a]);bindMediaImageAnalysis(overlay,a,options.analyze===true);$('[data-media-close]',overlay).onclick=closeAsset;$('#mediaAssetForm',overlay).onsubmit=async e=>{e.preventDefault();const d=new FormData(e.currentTarget);try{await api('media.php',{action:'update_asset',id:a.id,asset:{title:d.get('title'),caption:d.get('caption'),alt_text:d.get('alt_text'),credit:d.get('credit'),copyright_text:d.get('copyright_text')}});closeAsset();say('Media metadata saved.');if(app.view==='media')renderMediaLibrary();else reloadCore()}catch(x){alert(x.message)}};
   }
-  async function deleteAsset(id){if(!confirm('Permanently delete this unused media asset and its stored file?'))return;try{await api('media.php',{action:'delete_asset',id});say('Media asset deleted.');renderMediaLibrary()}catch(e){alert(e.message)}}
+  async function deleteAsset(id){if(!confirm('Permanently delete this unused media asset and its stored file?'))return;try{await api('media.php',{action:'delete_asset',id});state.imageBatchSelection.delete(id);say('Media asset deleted.');renderMediaLibrary()}catch(e){alert(e.message)}}
 
   function trackSection(){return '<div class="track-media-toolbar"><button class="primary" type="button" data-track-media-upload="audio_candidate">Upload audio</button><button class="secondary" type="button" id="trackReplaceSourceAudio">Replace source audio</button><button class="secondary" type="button" data-track-media-upload="artwork">Upload artwork</button><button class="secondary" type="button" id="trackCreateAiArtwork">Create artwork with AI</button><button class="secondary" type="button" data-track-media-upload="photo">Upload photos</button><button class="secondary" type="button" data-track-media-upload="video">Upload video</button><button class="secondary" type="button" data-track-media-upload="document">Upload documents</button><button class="secondary" type="button" data-track-media-upload="archive">Upload archive media</button><button class="secondary" type="button" id="trackMediaChoose">Choose from Library</button></div><div class="media-publishing-hint">Use separate Media Library files for the public preview and the private purchased original. Your existing uploader and media attachments are used.</div><div id="trackMasterHistory" class="track-master-history"></div><div id="trackPublicationStatus" class="media-publication-status" role="status"></div><div id="trackMediaStatus" class="status-line"></div><div id="trackMediaGroups" class="track-media-groups"><div class="empty compact">Loading attached media…</div></div>'}
   async function bindTrackMedia(trackId){
@@ -372,9 +747,11 @@
   }
   function genericLinkCard(l,cfg){
     const publishRoles=cfg.publishRoles||[],canPublish=l.category==='image'&&publishRoles.includes(l.role),preview=l.category==='image'?'<img src="'+esc(mediaUrl(l,l.variants&&l.variants.thumb?'thumb':'original'))+'" alt="">':l.category==='audio'?'<audio controls preload="metadata" src="'+esc(mediaUrl(l))+'"></audio>':'<div class="media-type-icon">'+esc(l.category==='video'?'▶':l.category==='document'?'DOC':'FILE')+'</div>';
-    return '<article class="track-media-card universal-media-card" draggable="true" data-generic-media-link="'+l.id+'" data-media-role="'+esc(l.role)+'"><div class="track-media-preview">'+preview+'</div><div class="track-media-main"><strong>'+esc(l.title||l.original_name)+'</strong><small>'+esc(roleLabel(l.role))+' · '+esc(technicalLine(l))+'</small><span>'+esc(l.original_name)+' · '+fmtBytes(l.size_bytes)+'</span><div class="media-link-flags"><label><input type="checkbox" data-generic-public="'+l.id+'" '+(Number(l.public_visible)?'checked':'')+'> Public</label><label><input type="checkbox" data-generic-download="'+l.id+'" '+(Number(l.download_allowed)?'checked':'')+'> Downloadable</label><label><input type="checkbox" data-generic-featured="'+l.id+'" '+(Number(l.featured)?'checked':'')+'> Featured</label></div></div><div class="track-media-actions">'+(canPublish?'<button class="primary" type="button" data-generic-publish="'+l.id+'" data-publish-role="'+esc(l.role)+'">'+(Number(l.featured)&&Number(l.public_visible)?'Republish ':'Publish ')+esc(roleLabel(l.role))+'</button>':'')+'<button class="secondary" type="button" data-generic-edit="'+l.asset_id+'">Edit</button><button class="danger" type="button" data-generic-detach="'+l.id+'">Detach</button></div></article>';
+    return '<article class="track-media-card universal-media-card" draggable="true" data-generic-media-link="'+l.id+'" data-media-role="'+esc(l.role)+'"><div class="track-media-preview">'+preview+'</div><div class="track-media-main"><strong>'+esc(l.title||l.original_name)+'</strong><small>'+esc(roleLabel(l.role))+' · '+esc(technicalLine(l))+'</small><span>'+esc(l.original_name)+' · '+fmtBytes(l.size_bytes)+'</span>'+mediaImageAnalysisSummary(l)+referenceGalleryControl(l)+'<div class="media-link-flags"><label><input type="checkbox" data-generic-public="'+l.id+'" '+(Number(l.public_visible)?'checked':'')+'> Public</label><label><input type="checkbox" data-generic-download="'+l.id+'" '+(Number(l.download_allowed)?'checked':'')+'> Downloadable</label><label><input type="checkbox" data-generic-featured="'+l.id+'" '+(Number(l.featured)?'checked':'')+'> Featured</label></div></div><div class="track-media-actions">'+(canPublish?'<button class="primary" type="button" data-generic-publish="'+l.id+'" data-publish-role="'+esc(l.role)+'">'+(Number(l.featured)&&Number(l.public_visible)?'Republish ':'Publish ')+esc(roleLabel(l.role))+'</button>':'')+(l.category==='image'&&['image/png','image/jpeg','image/webp'].includes(l.mime_type)?'<button class="secondary" type="button" data-media-analyze="'+Number(l.asset_id)+'">Analyze image</button>':'')+'<button class="secondary" type="button" data-generic-edit="'+l.asset_id+'">Edit</button><button class="danger" type="button" data-generic-detach="'+l.id+'">Detach</button></div></article>';
   }
   function bindGenericCards(entityType,entityId,links,cfg,box){
+    bindReferenceGalleryControls(box,links);
+    $$('[data-media-analyze]',box).forEach(button=>button.onclick=()=>editAsset(Number(button.dataset.mediaAnalyze),{analyze:true}));
     $$('[data-generic-public]',box).forEach(x=>x.onchange=()=>{const videoGoverned=entityType==='video_feature',governed=['video_feature','photo_gallery'].includes(entityType),label=videoGoverned?'Video Hub':entityType==='photo_gallery'?'Photo Gallery':'governed media';if(governed&&!confirm('Change this '+label+' media item to '+(x.checked?'Public':'Private')+'?')){x.checked=!x.checked;return}updateLink(Number(x.dataset.genericPublic),{public_visible:x.checked},governed)});
     $$('[data-generic-download]',box).forEach(x=>x.onchange=()=>{const videoGoverned=entityType==='video_feature',governed=['video_feature','photo_gallery'].includes(entityType),label=videoGoverned?'Video Hub':entityType==='photo_gallery'?'Photo Gallery':'governed media';if(governed&&!confirm('Change download permission for this '+label+' media item?')){x.checked=!x.checked;return}updateLink(Number(x.dataset.genericDownload),{download_allowed:x.checked,public_visible:x.checked||undefined},governed)});
     $$('[data-generic-featured]',box).forEach(x=>x.onchange=()=>updateLink(Number(x.dataset.genericFeatured),{featured:x.checked}));

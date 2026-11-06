@@ -67,3 +67,25 @@ test('app keeps progress, manual retry, cleanup and premature-completion boundar
  assert.match(app,/play\(st.track,savedPlaybackPosition\(\)/);
  assert.match(app,/if\(playbackEndedEarly\(\)\)\{[\s\S]*?return;[\s\S]*?recordListen\('complete'\)/);
 });
+
+test('replaying an ended song clears its EOF checkpoint instead of waiting for an impossible resume seek',async()=>{
+ const h=setup();h.audio.setPosition(240);h.ctx.rememberPlaybackPosition();h.audio.ended=true;h.audio.paused=true;
+ assert.equal(h.ctx.playbackLifecycle.position(h.ctx.playbackLifecycle.token()),240,'fixture has a genuine EOF checkpoint');
+ assert.equal(h.ctx.savedPlaybackPosition(),0,'EOF is a replay request, not a resume position');
+ h.audio.play=()=>{h.audio.setPosition(0);h.audio.ended=false;h.audio.paused=false;h.plays.push(0);return Promise.resolve()};
+ const fresh={...h.ctx.st.track,audio:'api/canvas-audio.php?action=source&track_id=song'};
+ assert.equal(await h.ctx.play(fresh,h.ctx.savedPlaybackPosition()),true);
+ assert.deepEqual(h.plays,[0]);assert.equal(h.timers.size,0,'completed song never enters the 12-second verified-seek wait');
+});
+test('an actual unseekable saved position retains progress and has a distinct safe failure classification',async()=>{
+ const h=setup();h.audio.mode='throws';h.audio.setPosition(0);let failure;
+ const pending=h.ctx.play(h.ctx.st.track,60,'player',false,error=>{failure=error});
+ h.audio.metadata();h.fail();assert.equal(await pending,false);
+ assert.equal(failure.code,'audio_seek_unavailable');assert.equal(failure.stage,'resume_seek');
+ assert.equal(h.ctx.savedPlaybackPosition(),60);assert.deepEqual(h.plays,[]);
+});
+
+test('a prematurely ended incomplete file retains its verified progress for a repaired source',()=>{
+ const h=setup();h.audio.duration=100;h.audio.setPosition(100);h.ctx.rememberPlaybackPosition();h.audio.ended=true;
+ assert.equal(h.ctx.playbackEndedEarly(),true);assert.equal(h.ctx.savedPlaybackPosition(),100);
+});

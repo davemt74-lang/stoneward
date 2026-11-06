@@ -227,29 +227,11 @@ async function prepareAfterCloseCannotReopenMic(){
 
 async function playbackHoldsAreWiredWithoutKillingRecognition(){
   const app=read('assets/js/app.js'),admin=read('admin/assets/admin.js');
-  assert.doesNotMatch(app,/conversationBargeIn\?\.prepare\(\)/,'public canvas must not pre-open an acoustic monitor that hears its own speech');
+  assert.doesNotMatch(app,/conversationBargeIn/,'public canvas must not pre-open an acoustic monitor that hears its own speech');
   assert.match(admin,/adminConversationMonitor\?\.prepare\(\)/,'Admin microphone gesture must prepare the detector');
-  assert.match(app,/conversationBargeIn\?\.close\(\)/,'public conversation shutdown releases mic');
+  assert.match(app,/if\(wasPilot\)void window\.StonefellowSpeechEngine\?\.stop\(\)/,'public stop releases the selected Speech Engine');
+  assert.match(app,/if\(!wasPilot\)try\{recognition\?\.abort\(\)/,'public stop releases browser recognition');
   assert.match(admin,/adminConversationMonitor\?\.close\(\)/,'Admin conversation shutdown releases mic');
-  let cancelAudio=0,cancelSpeech=0,monitorStopped=0,shown='';
-  const publicContext={
-    st:{conversationOn:true,voiceAudio:{paused:false,pause(){cancelAudio++}}},
-    voicePlaybackPending:true,voicePlaybackSequence:6,
-    voiceAudioCancel:()=>{cancelAudio++},speechFallbackResolve:()=>{},
-    window:{speechSynthesis:{cancel:()=>cancelSpeech++}},
-    conversationBargeIn:{stop:()=>monitorStopped++},
-    restoreVoiceProbeMusic:()=>{},
-    cancelLocalVoiceOutput:()=>cancelSpeech++,
-    agent:()=>{},showTranscript:text=>{shown=text}
-  };
-  vm.createContext(publicContext);
-  vm.runInContext(extract(app,'holdVoicePlaybackForBarge'),publicContext);
-  publicContext.holdVoicePlaybackForBarge();
-  assert.equal(publicContext.voicePlaybackSequence,7,'old audio must become stale immediately');
-  assert.ok(cancelAudio>=1&&cancelSpeech===1,'output is silenced immediately');
-  assert.equal(monitorStopped,0,'barge recognizer must remain active after voice onset');
-  assert.equal(publicContext.voicePlaybackPending,true,'capture window stays open for the complete request');
-  assert.match(shown,/Listening to the interruption/);
   let adminCancelled=0,adminStopped=0;
   const adminContext={
     adminConversationEnabled:true,adminSpeechPending:true,adminSpeechSequence:8,
@@ -279,5 +261,5 @@ Promise.resolve().then(voiceSilencesAgentAfterEchoProbe)
   .then(unavailableMicFailsClosed)
   .then(prepareAfterCloseCannotReopenMic)
   .then(playbackHoldsAreWiredWithoutKillingRecognition)
-  .then(()=>console.log('Section 90Q live voice: public/Admin pause, misheard echo, real interruption, and mic lifecycle PASS'))
+  .then(()=>console.log('Section 90Q live voice: Admin pause, misheard echo, real interruption, and mic lifecycle PASS'))
   .catch(error=>{console.error(error);process.exitCode=1});

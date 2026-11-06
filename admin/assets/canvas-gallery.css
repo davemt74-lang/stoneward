@@ -1,0 +1,50 @@
+.sf-admin-canvas-gallery { min-width:0; }
+.sf-admin-canvas-gallery button,.sf-admin-canvas-gallery input,.sf-admin-canvas-gallery select { min-height:44px; }
+.sf-canvas-gallery-toolbar { display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin:0 0 24px; }
+.sf-canvas-gallery-toolbar .field { flex:1 1 190px; }
+.sf-canvas-gallery-toolbar .field:first-child { flex:0 1 210px; }
+.sf-canvas-gallery-toolbar input,.sf-canvas-gallery-toolbar select { width:100%;min-width:0; }
+.sf-canvas-gallery-layout { display:grid;grid-template-columns:minmax(240px,.8fr) minmax(0,1.7fr);gap:28px;align-items:start; }
+.sf-canvas-gallery-index,.sf-canvas-gallery-detail { min-width:0; }
+.sf-canvas-gallery-list { display:grid;gap:9px;padding:0;margin:12px 0;list-style:none; }
+.sf-canvas-gallery-item { display:grid;gap:7px;min-width:0;width:100%;padding:14px;border:1px solid var(--line,#2b2823);background:var(--panel,#11100e);color:var(--ink,#f1ede6);text-align:left;overflow-wrap:anywhere; }
+.sf-canvas-gallery-item[aria-pressed="true"] { border-color:var(--accent,#caa96d); }
+.sf-canvas-gallery-item .badge { justify-self:start; }
+.sf-canvas-gallery-item strong { font:400 1.15rem/1.35 Georgia,serif; }
+.sf-canvas-gallery-item > span:not(.badge),.sf-canvas-gallery-item small { color:var(--muted,#8e887f);font-size:.76rem; }
+.sf-canvas-gallery-pager { display:flex;align-items:center;flex-wrap:wrap;gap:8px; }
+.sf-canvas-gallery-pager span { color:var(--muted,#8e887f);font-size:.75rem; }
+.sf-canvas-gallery-detail { border-top:1px solid var(--line,#2b2823);padding-top:16px;overflow-wrap:anywhere; }
+.sf-canvas-gallery-detail h2 { margin:0 0 12px;font:400 1.7rem/1.15 Georgia,serif; }
+.sf-canvas-gallery-detail h3 { margin:20px 0 12px;font:400 1.25rem/1.3 Georgia,serif; }
+.sf-canvas-gallery-description,.sf-canvas-gallery-saved-feedback { white-space:pre-wrap;line-height:1.55; }
+.sf-canvas-gallery-metadata { display:grid;grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr);gap:9px 14px;font-size:.76rem;line-height:1.5; }
+.sf-canvas-gallery-metadata dt { color:var(--muted,#8e887f); }
+.sf-canvas-gallery-metadata dd { margin:0; }
+.sf-canvas-gallery-note,.sf-canvas-gallery-empty { color:var(--muted,#8e887f);font-size:.78rem;line-height:1.55; }
+.sf-canvas-gallery-source { margin:20px 0;border-block:1px solid var(--line,#2b2823);padding-bottom:12px; }
+.sf-canvas-gallery-source summary { min-height:44px;display:list-item;padding:12px 0;cursor:pointer;font-size:.8rem; }
+.sf-canvas-gallery-source pre { margin:0 0 14px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace; }
+.sf-canvas-gallery-source pre code { white-space:inherit;overflow-wrap:inherit; }
+.sf-canvas-gallery-status { min-height:1.3em;margin:10px 0;font-size:.8rem;line-height:1.5;overflow-wrap:anywhere; }
+.sf-canvas-gallery-status[role="alert"] { color:var(--bad,#d2877c); }
+.sf-canvas-gallery-decision-saved { color:var(--good,#8eac78);font-size:.85rem; }
+.sf-canvas-gallery-review { border-top:1px solid var(--line,#2b2823);margin-top:20px;padding-top:2px; }
+.sf-canvas-gallery-review textarea { width:100%;min-width:0;min-height:110px;text-transform:none; }
+.sf-canvas-gallery-review .actions { margin-top:14px; }
+.sf-canvas-gallery-preview { margin:18px 0; }
+.sf-canvas-gallery-preview-head { display:flex;align-items:center;justify-content:space-between;gap:10px; }
+.sf-canvas-gallery-preview-head h3 { margin:10px 0; }
+.sf-canvas-gallery-preview-host { width:100%;min-height:240px;background:var(--panel,#11100e); }
+.sf-canvas-gallery-preview-host iframe { display:block;width:100%;height:clamp(300px,60vh,620px);border:1px solid var(--line,#2b2823); }
+.sf-admin-canvas-gallery :is(button,input,select,textarea,summary,pre):focus-visible { outline:2px solid var(--accent,#caa96d);outline-offset:3px; }
+.sf-admin-canvas-gallery button:disabled { opacity:.55;cursor:default; }
+@media(max-width:800px) {
+  .sf-canvas-gallery-layout { grid-template-columns:minmax(0,1fr);gap:24px; }
+  .sf-admin-canvas-gallery.has-submission-detail .sf-canvas-gallery-index { display:none; }
+  .sf-canvas-gallery-toolbar .field:first-child { flex:1 1 190px; }
+  .sf-canvas-gallery-metadata { grid-template-columns:minmax(0,1fr);gap:3px; }
+  .sf-canvas-gallery-metadata dd { margin-bottom:8px; }
+  .sf-canvas-gallery-review .actions > button { flex:1 1 160px; }
+  .sf-canvas-gallery-preview-head { flex-wrap:wrap; }
+}

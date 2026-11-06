@@ -24,12 +24,15 @@ check('One live speech transcript moves out of the footer into the orb and is re
 check('Live speech recognition keeps updating the real caption and its visibility',()=>{
   const begin=app.indexOf("  const voiceTranscript=$('#voiceTranscript')");
   const end=app.indexOf('  function syncAgentDockLayout()',begin);
+  const briefStart=app.indexOf('  function canvasDesignBrief(');
+  const briefEnd=app.indexOf('  function canvasLyricSection(',briefStart);
   assert.ok(begin>0&&end>begin);
+  assert.ok(briefStart>0&&briefEnd>briefStart);
   let calls=0;
   const nodes={'#voiceTranscript':{hidden:true,dataset:{}},'#voiceTranscriptText':{textContent:''}};
   const ctx={$:key=>nodes[key],window:{SFPublicAgentCanvas:{syncTranscript:()=>calls++}}};
   vm.createContext(ctx);
-  vm.runInContext(app.slice(begin,end)+'\nthis.update=showTranscript;',ctx);
+  vm.runInContext(app.slice(briefStart,briefEnd)+app.slice(begin,end)+'\nthis.update=showTranscript;',ctx);
   ctx.update('You: And','listening');
   assert.equal(nodes['#voiceTranscript'].hidden,false);
   assert.equal(nodes['#voiceTranscript'].dataset.phase,'listening');
@@ -39,12 +42,34 @@ check('Live speech recognition keeps updating the real caption and its visibilit
   assert.equal(calls,2);
 });
 check('Agent Chat messages are shown in the orb preview, not duplicated or spoken',()=>{
-  assert.match(app,/SFPublicAgentCanvas\?\.showConversation\?\.\(role,String\(text\)\)/);
-  assert.match(app,/initialConversation:popupEntries\.at\(-1\)\|\|null/);
+  assert.match(app,/if\(role!=='user'\|\|\(!canvasBrief&&!canvasBriefInChat\(value\)\)\)window\.SFPublicAgentCanvas\?\.showConversation\?\.\(role,value\)/);
+  assert.match(app,/initialConversation:popupEntries\.filter\(entry=>entry\.role!=='user'\|\|\(!entry\.canvasBrief&&!canvasBriefInChat\(entry\.text\)\)\)\.at\(-1\)\|\|null/);
   assert.match(canvas,/function showConversation\(role,text\)/);
   assert.match(canvas,/liveMessage\.textContent=/);
   assert.match(canvas,/showConversation:\(role,text\)=>current\?\.showConversation\(role,text\)/);
   assert.match(canvas,/role==='user'\?'You: ':'Stonefellow: '/);
+});
+check('Hiding the agent preserves the active conversation and speech controller',()=>{
+  const begin=app.indexOf('  let manualAgentHidden=false;');
+  const end=app.indexOf('  function handleAgentVisibilityCommand(',begin);
+  assert.ok(begin>0&&end>begin);
+  const classes=new Set(),restore={hidden:true};let stops=0,layouts=0;
+  const ctx={st:{conversationOn:true},$:()=>restore,
+    document:{body:{classList:{toggle(name,enabled){enabled?classes.add(name):classes.delete(name);}}}},
+    stopConversation(){stops++;ctx.st.conversationOn=false;},stopAgentSpeaking(){stops++;},syncAgentDockLayout(){layouts++;}};
+  vm.createContext(ctx);vm.runInContext(app.slice(begin,end),ctx);
+  ctx.syncAgentVisibility(true);
+  assert.equal(ctx.st.conversationOn,true);assert.equal(stops,0);
+  assert.equal(restore.hidden,false);assert.equal(classes.has('sf-agent-hidden-by-scene'),true);
+  ctx.syncAgentVisibility(false);
+  assert.equal(ctx.st.conversationOn,true);assert.equal(stops,0);assert.equal(layouts,2);
+  assert.equal(restore.hidden,true);assert.equal(classes.has('sf-agent-hidden-by-scene'),false);
+  ctx.st.conversationOn=false;ctx.syncAgentVisibility(true);
+  assert.equal(stops,0);assert.equal(ctx.st.conversationOn,false);
+  for(const name of ['  async function agentSpeak(','  async function handleVoiceClick(']){
+    const start=app.indexOf(name);assert.ok(start>0);
+    assert.doesNotMatch(app.slice(start,start+700),/sf-agent-hidden-by-scene/);
+  }
 });
 check('Old drag hint and redundant footer transcript row are gone from Agent Canvas',()=>{
   assert.doesNotMatch(canvas,/DRAG TO MOVE|sf-agent-hint|sf-agent-listen-actions/);
@@ -53,12 +78,14 @@ check('Old drag hint and redundant footer transcript row are gone from Agent Can
   assert.match(css,/\.sf-agent-live-feed\.has-live-transcript \.sf-agent-live-preview\{display:none;/);
   assert.match(canvas,/if\(e\.target\.closest\?\.\('\.sf-agent-live-feed'\)\)return;/);
 });
-check('Two song actions are now icon-only and sit above the orb',()=>{
+check('Song Lyrics and Record Studio retain their orbital positions',()=>{
   assert.match(canvas,/class="sf-agent-orbit-tools"/);
-  assert.match(canvas,/data-orbit-action="listen"[^>]*data-tip="Listen &amp; Interpret"/);
+  assert.match(canvas,/data-orbit-action="listen"[^>]*data-tip="Song Lyrics"/);
+  assert.match(canvas,/data-orbit-action="scene-history"[^>]*data-tip="Canvas History"/);
+  assert.doesNotMatch(canvas,/<span>Song Lyrics<\/span>|data-agent-action="open-lyrics"/);
   assert.match(canvas,/data-orbit-action="record"[^>]*data-tip="Record Studio"/);
-  assert.match(canvas,/data-orbit-action="stop"[^>]*data-tip="Stop listening"/);
-  assert.ok(canvas.indexOf('class="sf-agent-orbit-tools"')<canvas.indexOf('class="sf-agent-sphere"'));
+  assert.match(canvas,/data-orbit-action="stop"[^>]*data-tip="Stop recording"/);
+  assert.match(canvas,/class="sf-agent-presence"/);
   assert.match(canvas,/function positionOrbitTools\(\)/);
   assert.match(canvas,/Math\.min\(168,56\+\(count-2\)\*42\)/);
   // Hidden controls retain their slots; hiding a tool must not shuffle the ring.
@@ -100,7 +127,8 @@ check('Ember uses ivory and gold tokens through the footer, player and notificat
   assert.match(css,/\.sf-agent-live-feed \.voice-transcript-dot/);
 });
 check('Mobile can use compact orbital icons and an attached, short caption',()=>{
-  assert.match(css,/@media\(max-width:720px\)\{[\s\S]*?\.sf-agent-orbit-tools button\{/);
+  assert.match(css,/\.sf-agent-orbit-tools button\{[\s\S]*?width:44px;height:44px/);
+  assert.match(css,/@media\(max-width:720px\)\{[\s\S]*?\.sf-agent-orbit-tools button svg\{width:17px/);
   assert.match(css,/\.sf-agent-live-feed\{[\s\S]*?width:min\(320px,calc\(100vw - 20px\)\)/);
   assert.match(css,/\.sf-agent-live-feed #voiceTranscriptText\{[\s\S]*?-webkit-line-clamp:2/);
   assert.match(canvas,/radius=visual\.offsetWidth\*\.5/);

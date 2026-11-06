@@ -510,9 +510,14 @@ function sf_agent_policy(string $route,string $message,array $client=[],?int $us
     // start, stop, or submit a captured section; the upload endpoint later
     // checks the published catalog independently before provider processing.
     $captureAction=in_array($route,['song_capture_start','song_capture_live_start','song_capture_stop','song_capture_status','song_capture_transcribe','song_capture_analyze'],true);
-    $track=($captureAction||$route==='playlist_random')?null:sf_agent_find_track($message,$active);
+    $track=($captureAction||in_array($route,['playlist_random','canvas_discuss'],true))?null:sf_agent_find_track($message,$active);
     $action=['type'=>'none'];$text='';$profile='none';$needs=false;$confirm=false;
     switch($route){
+        case 'canvas_discuss':
+            if(($userId??0)<1||($client['public_canvas_enabled']??0)!==1)$text='Open the signed-in canvas to discuss a design.';
+            elseif(strlen($message)>4000)$text='Shorten this canvas message so I can discuss it with the design agent.';
+            else{$action=['type'=>'canvas_discuss','brief'=>$message];$text='Let’s discuss the canvas idea.';}
+            break;
         case 'song_capture_live_start':
             // A model-selected route must still be backed by an explicit
             // listener request before opening a saved lyric selection.
@@ -849,19 +854,39 @@ function sf_agent_jev_evaluate(string $message,string $context,string $response,
     $j=sf_http_json($url,['Authorization: Bearer '.$d['api_key']],['requestId'=>sf_agent_uuid(),'model'=>$model,'state'=>$state,'questions'=>['verdict'=>['type'=>'choice','instructions'=>'Evaluate whether the proposed response is relevant and supported by the supplied Stonefellow context. Choose withhold if it makes unsupported factual claims or claims an action/purchase happened when it did not.','criteria'=>['approve'=>'Relevant and grounded enough to show to the user.','withhold'=>'Contains unsupported Stonefellow facts, unsafe action claims, or should not be shown as written.']]]],40);
     $data=(array)($j['data']??[]);$usage=(array)($data['result']['usage']??$j['usage']??[]);return ['verdict'=>(string)($data['result']['answers']['verdict']['choice']??'approve'),'provider'=>'jev','model'=>$model,'run_id'=>(string)($data['id']??''),'status'=>(string)($data['status']??''),'input_tokens'=>(int)($data['inputTokens']??$usage['input_tokens']??0),'output_tokens'=>(int)($data['outputTokens']??$usage['output_tokens']??0)];
 }
-function sf_openai_call(array $provider,string $system,array $history,string $message,int $maxOutput): array {
+function sf_openai_call(array $provider,string $system,array $history,string $message,int $maxOutput,int $timeout=50): array {
     $model=trim((string)$provider['model'])?:'gpt-6-luna';$input=[];
     foreach($history as $h){$assistant=($h['role']??'')==='assistant';$input[]=['role'=>$assistant?'assistant':'user','content'=>[['type'=>$assistant?'output_text':'input_text','text'=>(string)$h['content']]]];}
     $input[]=['role'=>'user','content'=>[['type'=>'input_text','text'=>$message]]];
-    $j=sf_http_json('https://api.openai.com/v1/responses',['Authorization: Bearer '.$provider['api_key']],['model'=>$model,'instructions'=>$system,'input'=>$input,'max_output_tokens'=>$maxOutput],50);
+    $j=sf_http_json('https://api.openai.com/v1/responses',['Authorization: Bearer '.$provider['api_key']],['model'=>$model,'instructions'=>$system,'input'=>$input,'max_output_tokens'=>$maxOutput],$timeout);
     $text='';foreach((array)($j['output']??[]) as $item)foreach((array)($item['content']??[]) as $c)if(($c['type']??'')==='output_text')$text.=(string)($c['text']??'');if($text==='')$text=(string)($j['output_text']??'');
     $u=(array)($j['usage']??[]);return ['text'=>trim($text),'provider'=>'openai','model'=>$model,'input_tokens'=>(int)($u['input_tokens']??0),'output_tokens'=>(int)($u['output_tokens']??0),'raw_id'=>$j['id']??null];
 }
-function sf_anthropic_call(array $provider,string $system,array $history,string $message,int $maxOutput): array {
+function sf_anthropic_call(array $provider,string $system,array $history,string $message,int $maxOutput,int $timeout=50): array {
     $model=trim((string)$provider['model'])?:SF_CLAUDE_FAST_MODEL;$msgs=[];foreach($history as $h)$msgs[]=['role'=>$h['role']==='assistant'?'assistant':'user','content'=>(string)$h['content']];$msgs[]=['role'=>'user','content'=>$message];
-    $j=sf_http_json('https://api.anthropic.com/v1/messages',['x-api-key: '.$provider['api_key'],'anthropic-version: 2023-06-01'],['model'=>$model,'max_tokens'=>$maxOutput,'system'=>$system,'messages'=>$msgs],50);
+    $j=sf_http_json('https://api.anthropic.com/v1/messages',['x-api-key: '.$provider['api_key'],'anthropic-version: 2023-06-01'],['model'=>$model,'max_tokens'=>$maxOutput,'system'=>$system,'messages'=>$msgs],$timeout);
     $text='';foreach((array)($j['content']??[]) as $c)if(($c['type']??'')==='text')$text.=(string)($c['text']??'');$u=(array)($j['usage']??[]);
     return ['text'=>trim($text),'provider'=>'anthropic','model'=>$model,'input_tokens'=>(int)($u['input_tokens']??0),'output_tokens'=>(int)($u['output_tokens']??0),'raw_id'=>$j['id']??null];
+}
+/** Large picker bindings are routing context; the discussion endpoint receives and validates the original turn. */
+function sf_agent_chat_message(mixed $raw,array &$client): string {
+    unset($client['canvas_selection_counts']);
+    if(is_string($raw)&&strlen($raw)>4000&&strlen($raw)<=2*1024*1024&&
+        in_array($client['public_canvas_enabled']??false,[true,1],true)){
+        require_once __DIR__.'/canvas-resource-core.php';
+        require_once __DIR__.'/agent-canvas-music-core.php';
+        try{
+            [$brief,$artist,,$sources]=sf_canvas_resource_selection($raw);
+            [$brief,$music]=sf_agent_canvas_music_selection($brief);
+            $counts=[];
+            if($sources!==null)$counts['canvas']=count($sources);
+            foreach(['merch_ids'=>'merch','ticket_ids'=>'tickets'] as $field=>$kind)
+                if($artist!==null&&array_key_exists($field,$artist))$counts[$kind]=count($artist[$field]);
+            if($music!==null)$counts[$music['mode']==='all'?'all_music':'songs']=$music['mode']==='all'?1:count($music['track_ids']);
+            if($counts){$client['canvas_selection_counts']=$counts;$raw=$brief;}
+        }catch(InvalidArgumentException $ignored){/* Invalid bindings remain ordinary bounded chat data. */}
+    }
+    return sf_clean_text($raw,4000);
 }
 /**
  * Section 43I: client-supplied state is navigation context, never authority.
@@ -869,6 +894,13 @@ function sf_anthropic_call(array $provider,string $system,array $history,string 
  */
 function sf_agent_normalize_client_state(array $raw): array {
     $out=[];
+    if(array_key_exists('public_canvas_enabled',$raw))$out['public_canvas_enabled']=in_array($raw['public_canvas_enabled'],[true,1],true)?1:0;
+    if(($out['public_canvas_enabled']??0)===1&&is_array($raw['canvas_selection_counts']??null)){
+        foreach(['canvas','merch','tickets','songs','all_music'] as $kind){
+            $count=$raw['canvas_selection_counts'][$kind]??null;
+            if(is_int($count)&&$count>=0&&$count<=2*1024*1024)$out['canvas_selection_counts'][$kind]=$count;
+        }
+    }
     $text=['active_track_id'=>180,'route_id'=>180,'view'=>40,'builder_format'=>24,'home_suggestion_kind'=>60,'home_suggestion_title'=>180,'latest_notification_title'=>180,'search_query'=>300,'agent_listening_session_id'=>120,'timezone'=>70,'active_release_title'=>180,'playlist_name'=>120];
     foreach($text as $key=>$limit){
         if(isset($raw[$key])&&is_scalar($raw[$key]))$out[$key]=sf_clean_text((string)$raw[$key],$limit);

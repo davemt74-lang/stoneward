@@ -4,6 +4,13 @@ require __DIR__.'/bootstrap.php';
 $speechCore=SF_ROOT.'/api/speech-engine-core.php';
 require_once $speechCore;
 $write=($_SERVER['REQUEST_METHOD']??'GET')!=='GET';sf_admin_require_auth($write);
+if(!$write&&array_key_exists('coding_catalog',$_GET)){
+    session_write_close();
+    require_once SF_ROOT.'/api/ai-model-catalog.php';
+    try{sf_json_response(['ok'=>true,'models'=>sf_ai_coding_catalog($_GET['coding_catalog'])]);}
+    catch(InvalidArgumentException $e){sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);}
+    catch(Throwable){sf_json_response(['ok'=>false,'message'=>'Could not load the provider model list. Check the saved API key or enter a model ID manually.'],502);}
+}
 if(!$write)sf_json_response(['ok'=>true]+sf_ai_state()+['speech_engine'=>sf_speech_engine_pilot_config()]);
 $body=sf_request_json();$action=(string)($body['action']??'save_provider');
 try{

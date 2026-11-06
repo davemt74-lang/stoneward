@@ -36,7 +36,8 @@ check('Floating Agent exists outside route canvas and above the chat footer',()=
 check('Music is ducked, remains playing and original loudness is restored',()=>{
   const sandbox={audio:{paused:false,volume:.78},st:{conversationOn:true},voicePlaybackPending:false,voiceInputActive:false,voiceSpeechAudible:false,speechPilotAgentSpeaking:false,musicOriginalVolume:null};
   vm.createContext(sandbox);
-  vm.runInContext(functionSource('syncConversationMusic')+';globalThis.run=syncConversationMusic',sandbox);
+  const volumeFunctions=['syncConversationMusic','elementPlayerVolume','playerVolume','applyPlayerVolume'];
+  vm.runInContext(volumeFunctions.map(name=>functionSource(name)).join('\n')+';globalThis.run=syncConversationMusic',sandbox);
   sandbox.run();assert.equal(sandbox.audio.volume,.78,'armed mic stays at normal volume');
   sandbox.voiceInputActive=true;sandbox.run();assert.equal(sandbox.audio.volume,.4);
   sandbox.voiceSpeechAudible=true;sandbox.run();assert.equal(sandbox.audio.volume,.16);
@@ -63,7 +64,7 @@ check('Music wake phrase protects playback; 18-second follow-ups and echo guard 
 
 check('ElevenLabs preferred; local system voice is fallback when unavailable',async()=>{
   let localCalls=0,remoteResult=false;
-  const sandbox={st:{conversationOn:true,playing:false},voiceRepliesEnabled:true,voiceInteractionStarted:true,voicePlaybackPending:false,voicePlaybackSequence:0,recognition:null,recognitionActive:false,conversationRestartTimer:null,voiceTurnBusy:false,isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,agentInterrupt:{hidden:false},conversationBargeIn:{start:async()=>true,stop:()=>{}},clearTimeout:()=>{},scheduleConversationListen:()=>{},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},setVoiceInputActive:()=>{},setVoiceSpeechAudible:()=>{},restoreVoiceProbeMusic:()=>{},agent:()=>{}};
+  const sandbox={st:{conversationOn:true,playing:false},voiceRepliesEnabled:true,voiceInteractionStarted:true,voicePlaybackPending:false,voicePlaybackSequence:0,recognition:null,recognitionActive:false,conversationRestartTimer:null,voiceTurnBusy:false,isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,agentInterrupt:{hidden:false},clearTimeout:()=>{},scheduleConversationListen:()=>{},elevenLabsSpeak:async()=>remoteResult,speakWithDeviceVoice:async()=>{localCalls++;return true},syncConversationMusic:()=>{},setVoiceInputActive:()=>{},setVoiceSpeechAudible:()=>{},agent:()=>{}};
   vm.createContext(sandbox);
   vm.runInContext(functionSource('agentSpeak',true)+';globalThis.run=agentSpeak',sandbox);
   assert.equal(await sandbox.run('Test voice'),true);assert.equal(localCalls,1);
@@ -73,7 +74,7 @@ check('ElevenLabs preferred; local system voice is fallback when unavailable',as
 
 check('Interrupt cancels playback without disabling listening',()=>{
   let stopped=0,restarted=0,restored=0;
-  const sandbox={st:{conversationOn:true,voiceAudio:{paused:false,pause:()=>stopped++}},voicePlaybackSequence:0,voiceAudioCancel:null,conversationBargeIn:{stop:()=>{}},speechFallbackResolve:null,voicePlaybackPending:true,agentInterrupt:{hidden:false},window:{},syncConversationMusic:()=>restored++,setVoiceSpeechAudible:()=>{},restoreVoiceProbeMusic:()=>{},showTranscript:()=>{},agent:()=>{},scheduleConversationListen:()=>restarted++};
+  const sandbox={st:{conversationOn:true,voiceAudio:{paused:false,pause:()=>stopped++}},voicePlaybackSequence:0,voiceAudioCancel:null,speechFallbackResolve:null,speechPilotActive:false,voicePlaybackPending:true,agentInterrupt:{hidden:false},window:{},syncConversationMusic:()=>restored++,setVoiceSpeechAudible:()=>{},showTranscript:()=>{},agent:()=>{},scheduleConversationListen:()=>restarted++};
   vm.createContext(sandbox);
   vm.runInContext(functionSource('interruptVoicePlayback')+';globalThis.run=interruptVoicePlayback',sandbox);
   sandbox.run();assert.equal(stopped,1);assert.equal(restarted,1);assert.equal(restored,1);

@@ -26,7 +26,7 @@ const capture=scope.window.StonefellowSongCapture.create({
   audio,getTrack:()=>({id:'published-1',title:'Earth Girl',audio:'/published.mp3'})});
 check('Record Clip remains explicitly started and browser-local',()=>{
   assert.equal(Recorder.count,0);assert.equal(capture.begin().ok,true);
-  assert.equal(Recorder.count,1);assert.equal(capture.status().live_enabled,false);
+  assert.equal(Recorder.count,1);assert.equal(capture.enableLive,undefined);
 });
 async function main(){
   audio.currentTime=20;
@@ -35,7 +35,7 @@ async function main(){
     assert.equal(completed.ok,true);assert.ok(completed.capture.blob instanceof Blob);
     assert.equal(completed.capture.start_ms,10000);assert.equal(completed.capture.end_ms,20000);
   });
-  check('Listen & Interpret does not call the recorder upload pipeline',()=>{
+  check('Song Lyrics does not call the recorder upload pipeline',()=>{
     const app=read('assets/js/app.js');
     assert.match(app,/songListeningSkill\.begin\(\)/);
     assert.match(app,/songListeningSkill\.stop\(\)/);
@@ -72,15 +72,13 @@ async function main(){
     ctx.window.SFSongExperienceUI.mount(host,{...base,listening_mode:'record_clip'},()=>{});
     assert.match(host.textContent,/Record Clip keeps a browser-local audio excerpt/);
     assert.doesNotMatch(host.textContent,/Start live transcription/);
-    assert.match(host.textContent,/Stop listening/);
+    assert.match(host.textContent,/Stop recording/);
   });
-  check('Live listening mode describes no retained song clip',()=>{
-    ctx.window.SFSongExperienceUI.mount(host,{...base,listening_mode:'recognition',
-      live_enabled:true,auto_interpret:true,transcript:'Estimated lyrics'},()=>{});
-    assert.match(host.textContent,/live lyrics → review before interpretation/);
-    assert.match(host.textContent,/No song clip is being recorded/);
-    assert.doesNotMatch(host.textContent,/Transcribe excerpt/);
-    assert.doesNotMatch(host.textContent,/Start live transcription/);
+  check('Song Lyrics selects saved lyrics without retaining or transcribing a clip',()=>{
+    ctx.window.SFSongExperienceUI.mount(host,{...base,listening_mode:'catalog',
+      lyrics_source:'saved-catalog-lyrics'},()=>{});
+    assert.match(host.textContent,/Stop retrieves saved lyrics/);
+    assert.doesNotMatch(host.textContent,/Transcribe excerpt|Start live transcription|Stop recording/);
   });
   console.log('Section 91B11B: '+checks+' separate recording and listening assertions passed');
 }

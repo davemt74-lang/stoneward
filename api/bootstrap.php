@@ -4,10 +4,16 @@ declare(strict_types=1);
 if(!defined('SF_ROOT')) define('SF_ROOT', dirname(__DIR__));
 
 function sf_json_response(array $payload, int $status = 200): never {
+    $json=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE);
+    if($json===false){
+        error_log('[Stonefellow JSON] '.json_last_error_msg());
+        $status=500;
+        $json='{"ok":false,"error":"response_encoding_failed","message":"Stonefellow could not encode the response."}';
+    }
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo $json;
     exit;
 }
 

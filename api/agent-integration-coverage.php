@@ -6,6 +6,7 @@ declare(strict_types=1);
  * or an executable workflow. This audit does not grant new capabilities.
  */
 require_once __DIR__.'/agent-capability-audit.php';
+require_once __DIR__.'/agent-canvas-data.php';
 require_once __DIR__.'/agent-skill-registry.php';
 require_once __DIR__.'/agent-orchestration.php';
 
@@ -13,6 +14,7 @@ require_once __DIR__.'/agent-orchestration.php';
 function sf_agent_integration_coverage(array $moduleRoutes): array {
     $registry=sf_agent_tool_registry();
     $definitions=sf_agent_skill_definitions();
+    $canvasTools=array_column(sf_agent_canvas_data_tools(),null,'id');
     $base=sf_agent_capability_audit();
     $toolToSkills=[];
     $invalidSkillTools=[];
@@ -27,13 +29,15 @@ function sf_agent_integration_coverage(array $moduleRoutes): array {
     $tools=[];$missingSkills=[];$discoveryOnly=[];$reviewed=[];
     foreach($registry as $id=>$def){
         $skills=$toolToSkills[$id]??[];
-        if($def['scope']!=='server' && !$skills)$missingSkills[]=$id;
+        $canvasData=isset($canvasTools[$id]);
+        if($def['scope']!=='server' && !$skills && !$canvasData)$missingSkills[]=$id;
         $canPropose=sf_agent_tool_executable($id,'admin',true);
         $canDiscover=sf_agent_tool_allowed($id,'admin',false);
         $classification=match(true){
             $def['scope']==='server'=>'internal_only',
             $canPropose=>'reviewed_action_eligible',
             $def['kind']==='local_action'=>'browser_action',
+            $canvasData=>'canvas_data_contract',
             $def['kind']==='read'=>'read_contract',
             $def['kind']==='metered'=>'provider_contract',
             default=>'owner_workflow_only'
@@ -73,6 +77,7 @@ function sf_agent_integration_coverage(array $moduleRoutes): array {
         'registry_passed'=>(bool)$base['checks_passed'],
         'registered_tools'=>count($registry),
         'registered_skills'=>count($definitions),
+        'registered_canvas_data_tools'=>count($canvasTools),
         'reviewed_action_eligible'=>$reviewed,
         'admin_discovery_without_agent_proposal'=>$discoveryOnly,
         'admin_navigation_only_count'=>count($modules),

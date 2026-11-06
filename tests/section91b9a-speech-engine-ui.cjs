@@ -16,7 +16,7 @@ check(account.includes('pilot_available')&&account.includes('disabled=true'),'Un
 check(account.includes('speech_engine')&&account.includes('legacy'),'Both voice engines have explicit choices');
 check(admin.includes("json('ai-providers.php')")&&admin.includes('save_speech_engine'),'Existing Admin AI provider page controls pilot');
 check(admin.includes("json('auth.php')")&&admin.includes('X-CSRF-Token'),'Admin pilot changes use CSRF');
-check(app.includes("stonefellow.voice.replies.v1")&&app.includes('conversationBargeIn'),'Original voice controls remain intact');
+check(app.includes("stonefellow.voice.replies.v1")&&app.includes('recognition.onresult=e=>'),'Original voice controls remain intact');
 check(gateway.includes("bridge?'signed':'disabled'")&&gateway.includes('session.sendResponse(pilotReply())'),'Gateway fails closed until authenticated bridge');
 check(!gateway.includes('disableAuth: true'),'Gateway never bypasses provider JWT verification');
 check(read('stonefellow-v120.php').includes('account-voice-engine.js'),'Public selector is loaded');

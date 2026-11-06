@@ -21,7 +21,7 @@ try{
         sf_json_response(['ok'=>true,'settings'=>sf_image_gen_settings(),
             'openai'=>sf_ai_provider_public('openai'),'models'=>sf_image_gen_models(),
             'jobs'=>sf_image_gen_jobs(),'presets'=>sf_image_studio_presets(),'styles'=>sf_image_studio_styles(),
-            'dashboard'=>sf_image_studio_dashboard(),'references'=>sf_image_gen_available_references()]);
+            'dashboard'=>sf_image_studio_dashboard((int)$me['id']),'references'=>sf_image_gen_available_references()]);
     }
     $body=sf_request_json();$action=(string)($body['action']??'');
     if($action==='save_settings'){

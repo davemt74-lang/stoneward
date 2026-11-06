@@ -42,13 +42,20 @@ function sf_ai_reserve_tokens(array $user,int $amount,string $source): ?string {
         $pdo->commit();return $key;
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 }
-function sf_ai_finish_reservation(array $user,?string $key,int $actual,array $usage,string $source,bool $succeeded): int {
-    if(($user['role']??'')==='admin'){
+/** The optional success callback receives the balance and must leave this transaction open. */
+function sf_ai_finish_reservation(array $user,?string $key,int $actual,array $usage,string $source,bool $succeeded,?callable $afterSettle=null): int {
+    $admin=($user['role']??'')==='admin';
+    if($admin&&(!$succeeded||$afterSettle===null)){
         return $succeeded?sf_consume_ai($user,max(0,$actual),$usage,$source):PHP_INT_MAX;
     }
-    if(!$key||!preg_match('/^[a-f0-9]{32}$/',$key))throw new InvalidArgumentException('Invalid token reservation.');
+    if(!$admin&&(!$key||!preg_match('/^[a-f0-9]{32}$/',$key)))throw new InvalidArgumentException('Invalid token reservation.');
     sf_ai_reservation_schema();$pdo=sf_db();$userId=(int)$user['id'];$pdo->beginTransaction();
     try{
+        if($admin){
+            $balance=sf_consume_ai($user,max(0,$actual),$usage,$source);
+            $afterSettle($balance);
+            $pdo->commit();return $balance;
+        }
         $now=gmdate('c');
         if((sf_db_config()['driver']??'')==='sqlite'){
             $lock=$pdo->prepare('INSERT OR IGNORE INTO user_token_balances(user_id,balance,updated_at) VALUES(?,0,?)');$lock->execute([$userId,$now]);
@@ -66,6 +73,7 @@ function sf_ai_finish_reservation(array $user,?string $key,int $actual,array $us
         $q=$pdo->prepare('UPDATE ai_token_reservations SET actual=?,status=?,closed_at=? WHERE request_key=? AND status=\'held\'');
         $q->execute([$succeeded?$charge:0,$succeeded?'settled':'released',$now,$key]);
         if($q->rowCount()!==1)throw new RuntimeException('Token reservation status changed during settlement.');
+        if($succeeded&&$afterSettle!==null)$afterSettle($balance);
         $pdo->commit();return $balance;
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 }

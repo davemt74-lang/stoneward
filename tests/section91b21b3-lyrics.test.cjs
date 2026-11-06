@@ -14,39 +14,35 @@ function context(supported=true){
  updateSongExperience(changes){calls.updates++;Object.assign(ctx.songExperience,changes)},currentSongDraft:()=>null};
  vm.createContext(ctx);vm.runInContext(execute+'\n'+route,ctx);return {ctx,calls,state};
 }
-test('Production typed commands route both and and ampersand to recognition, never recording',()=>{
+test('Production typed commands route both and and ampersand to saved lyrics, never recording',()=>{
  const {ctx}=context();for(const input of ['Listen and interpret','Listen & Interpret','please listen to this song and interpret the lyrics']){
   assert.equal(ctx.directSongListeningCommand(input).type,'song_capture_live_start');}
 });
 test('Production listening action starts only the listening skill and opens its rail',async()=>{
  const {ctx,calls}=context();await ctx.executeSongCaptureAction({type:'song_capture_live_start',interpret_on_stop:true});
- assert.equal(calls.listen,1);assert.equal(calls.record,0);assert.equal(calls.open,1);assert.equal(ctx.songExperience.listening_mode,'recognition');
+ assert.equal(calls.listen,1);assert.equal(calls.record,0);assert.equal(calls.open,1);assert.equal(ctx.songExperience.listening_mode,'catalog');
 });
-test('Repeated Listen reopens the existing session, not a second recognition or recording',async()=>{
+test('Repeated Listen reopens the existing session, without a second lookup or recording',async()=>{
  const {ctx,calls}=context();await ctx.executeSongCaptureAction({type:'song_capture_live_start'});await ctx.executeSongCaptureAction({type:'song_capture_live_start'});
  assert.equal(calls.listen,1);assert.equal(calls.record,0);assert.equal(calls.open,2);
 });
 test('Unsupported device presents an explicit unavailable state, with no Record Clip fallback',async()=>{
  const {ctx,calls}=context(false);await ctx.executeSongCaptureAction({type:'song_capture_live_start'});
- assert.equal(calls.record,0);assert.equal(ctx.songExperience.phase,'unavailable');assert.equal(ctx.songExperience.listening_mode,'recognition');assert.equal(calls.open,1);
+ assert.equal(calls.record,0);assert.equal(ctx.songExperience.phase,'unavailable');assert.equal(ctx.songExperience.listening_mode,'catalog');assert.equal(calls.open,1);
 });
-test('Production stop publishes stopping state and ends recognition, not a clip',async()=>{
+test('Production stop finishes a lyric selection without stopping a clip',async()=>{
  const {ctx,calls}=context();await ctx.executeSongCaptureAction({type:'song_capture_live_start'});await ctx.executeSongCaptureAction({type:'song_capture_stop'});
- assert.equal(ctx.songExperience.phase,'stopping');assert.equal(calls.stop,1);assert.equal(calls.record,0);
+ assert.equal(calls.stop,1);assert.equal(calls.record,0);
 });
-test('Recording cannot start while recognition or an analysis request is in progress',async()=>{
+test('Recording cannot start while lyric selection or an analysis request is in progress',async()=>{
  const {ctx,calls}=context();await ctx.executeSongCaptureAction({type:'song_capture_live_start'});await ctx.executeSongCaptureAction({type:'song_capture_start'});assert.equal(calls.record,0);
  ctx.songAnalysisBusy=true;await ctx.executeSongCaptureAction({type:'song_capture_live_start'});assert.equal(calls.listen,1);
 });
 test('An existing Record Clip is not silently switched into lyric listening',async()=>{
  const {ctx,calls}=context();ctx.songCaptureSkill.status=()=>({active:true});await ctx.executeSongCaptureAction({type:'song_capture_live_start'});assert.equal(calls.listen,0);assert.equal(calls.record,0);
 });
-test('Original desktop-only recognition capability remains conservative on native iPhone',()=>{
- const ctx={window:{},document:{documentElement:{lang:'en'}},navigator:{}};vm.createContext(ctx);vm.runInContext(read('assets/js/agent-song-listening-skill.js'),ctx);
- assert.equal(ctx.window.StonefellowSongListening.supportsPlayerTrack({navigator:{userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1'},webkitSpeechRecognition:class{}}),false);
-});
 test('Canvas uses the native rail, truthful priority status and persistent explicit Stop',()=>{
- const src=read('assets/js/public-agent-canvas.js');for(const marker of ['openLyrics','TRANSCRIBING LYRICS','STOPPING LYRIC TRANSCRIPTION','stop-lyrics','pageView===\'lyrics\''])assert.ok(src.includes(marker),marker);
+ const src=read('assets/js/public-agent-canvas.js');for(const marker of ['openLyrics','LOADING SAVED LYRICS','SELECTING SONG SECTION','stop-lyrics','pageView===\'lyrics\''])assert.ok(src.includes(marker),marker);
  assert.ok(src.includes("pageRail.hasAttribute('inert')"));assert.ok(src.includes("button.dataset.orbitAction!=='stop'"));
  assert.ok(src.includes("stopSlot.style.left=listenSlot.style.left"));
 });

@@ -70,17 +70,16 @@
     const heading = el('h3', '', state.title || 'Current song section');
     const meta = el('p', 'song-experience-meta', clock(state.start_ms) + ' – ' + (state.end_ms == null ? 'Live' : clock(state.end_ms)));
     const phaseLabels = {
-      starting: 'Starting lyric listening…', stopping: 'Stopping lyric listening…', unavailable: 'Song lyric listening unavailable',
-      capturing: 'Listening now', captured: 'Recorded · ready to transcribe',
+      starting: 'Checking saved lyrics…', unavailable: 'Song lyrics unavailable',
+      capturing: 'Recording song clip', captured: 'Recorded · ready to transcribe',
       transcribing: 'Creating an unverified lyric draft…', draft: 'Unverified transcript ready',
       analyzing: 'Reviewing lyrics and Stonefellow song notes…', report: 'Lyric interpretation ready',
       discarded: 'Listening ended without a usable excerpt'
     };
-    const phase = el('p', 'song-experience-phase'+(state.live_enabled?' song-experience-live':''),
-      state.phase==='capturing'&&state.listening_mode==='catalog'?(savedLyrics?'Selecting song section · Stop retrieves saved lyrics':'Selecting song section · Stop converts it into text'):
+    const phase = el('p', 'song-experience-phase',
+      state.phase==='capturing'&&state.listening_mode==='catalog'?'Selecting song section · Stop retrieves saved lyrics':
       savedLyrics&&state.phase==='transcribing'?'Loading saved song lyrics…':
       savedLyrics&&state.phase==='draft'?'Saved lyric selection ready':
-      state.phase==='capturing'&&state.live_enabled ? (state.auto_interpret?'Listening · live lyrics → review before interpretation':'Listening · provisional live lyrics') :
         phaseLabels[state.phase] || 'Session captured');
     phase.setAttribute('role', 'status');
     card.append(eyebrow, heading, meta, phase);
@@ -95,7 +94,7 @@
       if (!canEdit && editor) { editors.delete(target); editor = null; }
       const isEditing = !!editor;
       titleRow.append(el('h4', '', savedLyrics&&!state.corrected ? (state.review_status==='approved'?'Saved lyrics · administrator approved':'Saved lyric draft · unverified') : state.corrected ? 'Listener-edited draft · unverified' :
-        state.canAnalyze ? 'Automated lyric draft · unverified' : 'Live lyric preview · provisional, unverified'));
+        'Automated lyric draft · unverified'));
       if (canEdit) {
         const editButton = el('button', 'song-experience-edit-icon', isEditing ? '×' : '✎');
         editButton.type = 'button';
@@ -115,7 +114,7 @@
       }
       if (isEditing) {
         const form = el('form', 'song-experience-lyric-editor');
-        const label = el('label', '', 'Correct the recognized lyric words');
+        const label = el('label', '', 'Correct the lyric words');
         const textarea = el('textarea', 'song-experience-edit-textarea');
         textarea.rows = 5; textarea.maxLength = 4200;
         textarea.value = editor.text;
@@ -143,9 +142,6 @@
       } else panel.append(el('p', 'song-experience-copy', visibleDraft));
       if (state.corrected) panel.append(el('small', '', 'Original machine draft retained in this session.'));
       panel.append(el('small', '', savedLyrics ? 'Saved song lyrics are reused for this selection. Block timing is approximate unless manually aligned. Nothing is saved to Agent Brain automatically.' : 'Automated words can be wrong. Nothing is saved to Agent Brain automatically.'));
-      if (state.live_enabled) panel.append(el('small', '',
-        state.listening_mode==='recognition' ? 'Listening directly to the player. No song clip is being recorded.' :
-           (Number(state.segments_completed)||0)+' section(s) transcribed. The final full-clip pass will replace these provisional words.'));
       card.append(panel);
       const context = state.phase === 'discarded' ? null : sectionContext(state.section_context, onAction);
       if (context) card.append(context);
@@ -167,7 +163,6 @@
       card.append(panel);
     }
     if (state.message) card.append(el('p', 'song-experience-note', state.message));
-    if (state.live_error) card.append(el('p', 'song-experience-note', state.live_error));
     const actions = el('div', 'song-experience-actions');
     const button = (label, action, disabled = false) => {
       const b = el('button', '', label);
@@ -176,16 +171,13 @@
       actions.append(b);
     };
     if (state.phase === 'capturing') {
-      button('Stop listening', 'stop');
+      button(state.listening_mode==='catalog'?'Stop':'Stop recording', 'stop');
       if (state.listening_mode==='record_clip') card.append(el('small', 'song-experience-consent',
         'Record Clip keeps a browser-local audio excerpt. It does not automatically transcribe or interpret.'));
-      else if (!state.live_enabled&&state.listening_mode!=='catalog') {
-        button('Start live transcription', 'live');
-      }
     }
     if(state.phase==='starting'&&state.listening_mode==='catalog')button('Stop', 'stop');
     if(state.phase==='transcribing'&&state.listening_mode==='catalog')button('Stop waiting', 'stop');
-    if (state.phase === 'captured' && !['recognition','catalog'].includes(state.listening_mode)) button('Transcribe excerpt', 'transcribe');
+    if (state.phase === 'captured' && state.listening_mode!=='catalog') button('Transcribe excerpt', 'transcribe');
     if (state.transcript && !['transcribing', 'analyzing', 'discarded'].includes(state.phase)) {
       button(state.reports?.length ? 'Interpret again' : (state.auto_interpret ? 'Review & interpret lyrics' : 'Interpret lyrics'), 'analyze', !state.canAnalyze);
       button(state.saved_note_id ? 'Saved privately #' + state.saved_note_id : 'Save private note', 'save', !state.canAnalyze || !!state.saved_note_id);

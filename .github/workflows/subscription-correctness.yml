@@ -11,19 +11,10 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: isolated-ci-only
-          MYSQL_DATABASE: stonefellow_91b21a_test
-        ports:
-          - 33306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pisolated-ci-only"
-          --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v4
+      - name: Disposable MySQL with a fresh masked job credential
+        run: bash .github/scripts/start-test-mysql.sh stonefellow_91b21a_test
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
@@ -38,5 +29,4 @@ jobs:
       - name: MySQL concurrency, rollback and independent PHP sessions
         env:
           SF_TEST_DRIVER: mysql
-          SF_TEST_MYSQL_PASSWORD: isolated-ci-only
         run: php tests/section91b21a-runtime.php

@@ -9,7 +9,9 @@ function sf_agent_public_artist_text(mixed $value,int $max=180): string {
     if(!is_scalar($value))return '';
     $text=trim((string)$value);
     $text=preg_replace('/[\p{C}\s]+/u',' ',$text)??'';
-    return function_exists('mb_substr')?mb_substr($text,0,$max):substr($text,0,$max);
+    if($max<=0)return '';
+    if(function_exists('mb_substr'))return mb_substr($text,0,$max,'UTF-8');
+    return preg_match('/\A.{0,'.min($max,65535).'}/us',$text,$prefix)===1?$prefix[0]:'';
 }
 
 function sf_agent_public_artist_provider_context(string $query,int $maxChars=3800): string {

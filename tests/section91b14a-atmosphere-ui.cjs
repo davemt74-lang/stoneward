@@ -46,7 +46,7 @@ test('Main menu floats right with compact single-column right aligned links',()=
   assert.match(site,/padding:3px 18px 3px 4px/);
   assert.match(site,/text-align:right/);
   assert.match(site,/\.menu-atmosphere-options button\[aria-pressed="true"\]/);
-  assert.match(app,/if\(menu\.open\)closeQuickMenu\(\)/);
+  assert.match(app,/if\(menu\.open\)\s*\{?\s*closeQuickMenu\(\)/);
 });
 test('Preset menu is actionable without navigation and remains accessible',()=>{
   for(const choice of ['ember','mesh','violet'])assert.match(shell,new RegExp('data-sf-atmosphere="'+choice+'" aria-pressed="false"'));

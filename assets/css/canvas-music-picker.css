@@ -1,0 +1,45 @@
+.sf-canvas-music-picker {
+  box-sizing:border-box;width:min(760px,calc(100% - 24px));max-width:none;max-height:calc(100dvh - 24px);
+  margin:auto;padding:0;overflow:hidden;border:1px solid #a8d7ef66;border-radius:14px;background:#101a2a;color:#ecf6ff;
+  font:15px/1.5 system-ui,sans-serif;
+}
+.sf-canvas-music-picker::backdrop { background:#060913df; }
+.sf-canvas-music-picker [hidden] { display:none; }
+body:has(.sf-canvas-music-picker[open]) { overflow:hidden; }
+.sf-canvas-music-picker-panel { display:flex;flex-direction:column;max-height:calc(100dvh - 26px); }
+.sf-canvas-music-picker header { padding:20px 24px 12px; }
+.sf-canvas-music-picker h2 { margin:0;color:inherit;font:650 22px/1.35 system-ui,sans-serif; }
+.sf-canvas-music-picker header p { margin:6px 0 16px;color:#c6d8e4; }
+.sf-canvas-music-search { display:flex;flex-direction:column;gap:5px; }
+.sf-canvas-music-search input { box-sizing:border-box;width:100%;min-height:44px;padding:10px 12px;border:1px solid #a8d7ef66;border-radius:8px;background:#142337;color:inherit;font:inherit; }
+.sf-canvas-music-tabs { display:flex;gap:8px;margin-top:12px; }
+.sf-canvas-music-picker button { min-height:44px;padding:10px 14px;border:1px solid #a8d7ef66;border-radius:8px;background:#1a2a40;color:inherit;font:650 14px/1.4 system-ui,sans-serif;cursor:pointer; }
+.sf-canvas-music-tabs button[aria-selected="true"] { border-color:#a2dfff;background:#203a50; }
+.sf-canvas-music-picker button:disabled { opacity:.5;cursor:default; }
+.sf-canvas-music-picker button:focus-visible,.sf-canvas-music-picker input:focus-visible { outline:2px solid #a2dfff;outline-offset:3px; }
+.sf-canvas-music-picker-body { min-height:0;padding:0 24px 16px;overflow:auto;overscroll-behavior:contain; }
+.sf-canvas-music-status { margin:0 0 10px;color:#c6d8e4; }
+.sf-canvas-music-status:empty { margin:0; }
+.sf-canvas-music-row { display:flex;align-items:center;gap:12px;min-width:0;min-height:56px;margin-bottom:8px;padding:10px 12px;border:1px solid #a8d7ef55;border-radius:9px;background:#142337;cursor:pointer; }
+.sf-canvas-music-row:has(input:checked),.sf-canvas-music-row:has(input:indeterminate) { border-color:#a2dfff;background:#203a50; }
+.sf-canvas-music-row:has(input:focus-visible) { outline:2px solid #a2dfff;outline-offset:-2px; }
+.sf-canvas-music-row:has(input:disabled) { opacity:.6;cursor:default; }
+.sf-canvas-music-row input { flex:none;width:20px;height:20px;margin:0;accent-color:#a2dfff; }
+.sf-canvas-music-row-copy { flex:1;min-width:0;overflow-wrap:anywhere; }
+.sf-canvas-music-row-copy strong,.sf-canvas-music-row-copy small { display:block; }
+.sf-canvas-music-row-copy small,.sf-canvas-music-duration { color:#b8cbdb;font-size:13px; }
+.sf-canvas-music-duration { flex:none; }
+.sf-canvas-music-empty { color:#c6d8e4; }
+.sf-canvas-music-picker footer { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:14px 24px;border-top:1px solid #a8d7ef40; }
+.sf-canvas-music-count { color:#c6d8e4; }
+.sf-canvas-music-actions { display:flex;flex-wrap:wrap;gap:8px;margin-left:auto; }
+.sf-canvas-music-picker .sf-canvas-music-primary { border-color:#a2dfff;background:#a2dfff;color:#0a1724; }
+@media (max-width:600px) {
+  .sf-canvas-music-picker header { padding:16px 16px 12px; }
+  .sf-canvas-music-picker h2 { font-size:20px; }
+  .sf-canvas-music-search input { font-size:16px; }
+  .sf-canvas-music-picker-body { padding:0 16px 12px; }
+  .sf-canvas-music-picker footer { padding:12px 16px; }
+  .sf-canvas-music-actions { width:100%;margin-left:0; }
+  .sf-canvas-music-actions button { flex:1 1 auto; }
+}

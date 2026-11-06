@@ -1,11 +1,12 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.245';
+  window.STONEFELLOW_APP_BUILD='1.3.294';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
   const playbackLifecycle=window.StonefellowPlaybackLifecycle.create();
   let playbackWantsAudio=false,playbackBufferTimer=null,pendingNetworkRecovery=null,queueAdvancePending=false;
   let canvas=mainCanvas;
+  let listeningRoom=null,listeningRoomRequest=null,listeningRoomOwner=null,canvasSelection=null;
   const readJSON=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch(_){return fallback}};
   const temporaryPlaylistKey='stonefellow.temporary-playlist.v1';
   function restoreTemporaryPlaylist(){
@@ -23,7 +24,7 @@
   const drawerTitle=$('#activityDrawerTitle'),drawerCartCount=$('#drawerCartCount'),drawerTools=$('#activityDrawerTools'),chatFooterRestore=$('#chatFooterRestore'),chatFooterHide=$('#chatFooterHide');
   let drawerRenderSequence=0;
   let drawerReturnFocus=null,queueReturnFocus=null;
-  let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,voiceTurnGeneration=0,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupEntries=[];
+  let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,voiceTurnGeneration=0,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupHistoryEpoch=0,popupEntries=[];
   let voiceGreetingArmed=false,voiceGreetingDelivered=false;
   const guestProfileKey='stonefellow.guest.profile.v1';
   let guestProfile=readJSON(guestProfileKey,null),welcomeStarted=false,welcomeWaitingForName=false,welcomeGreeting='';
@@ -37,26 +38,15 @@
   let iosVoiceNeedsGesture=false,iosProcessedFinalIndex=-1,iosVoiceMuteUntil=0;
   const voiceReplyToggle=$('#agentVoiceReplyToggle');
   let voiceRepliesEnabled=localStorage.getItem('stonefellow.voice.replies.v1')!=='off',voiceInteractionStarted=false,speechPilotActive=false;
-  let voicePlaybackPending=false,voicePlaybackText='',speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,voiceEchoUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
+  let speechPilotEpoch=0,speechPilotReplyInProgress=false;
+  let voicePlaybackPending=false,speechFallbackResolve=null,voiceAudioCancel=null,voicePlaybackSequence=0,musicOriginalVolume=null,musicFollowupUntil=0,voiceEchoUntil=0,recognitionNetworkFailures=0,lastAudibleVolume=0.7;
   let voiceInputActive=false,voiceSpeechAudible=false,speechPilotAgentSpeaking=false,voiceSpeechReleaseTimer=null,speechPilotReleaseTimer=null;
-  let voiceProbeAudio=null,voiceProbeSynth=false,voiceProbeMusicVolume=null;
   const voiceSpeechGuard=window.StonefellowBargeIn?.createSpeechGuard({cooldownMs:1100});
-  const conversationBargeIn=window.StonefellowBargeIn?.create(spoken=>{
-    if(!st.conversationOn||!voicePlaybackPending)return;
-    interruptVoicePlayback();
-    const request=String(spoken||'').trim();
-    if(request&&!/^(?:stop|stop speaking)$/i.test(request))void submitVoiceTurn(request);
-    else showTranscript(request?'Agent stopped. I’m listening.':'I heard someone, but missed the words. Please continue.','listening');
-  },window,signal=>window.StonefellowBargeIn.verifyAgentSpeech(voicePlaybackText,window,signal),
-  stage=>handleVoiceActivityProbe(stage),state=>{
-    if(st.conversationOn&&state==='microphone-monitor-unavailable')showTranscript('Interruption microphone unavailable. Check microphone permission; Stop speaking button remains available.','error');
-    if(st.conversationOn&&state==='microphone-monitor-suspended')showTranscript('Microphone audio monitor is suspended. Click the mic again if voice interruption does not work.','error');
-    if(st.conversationOn&&state==='speech-recognition-unavailable')showTranscript('Speech recognition is unavailable. Use Stop speaking if you need to interrupt the Agent.','waiting');
-  },{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930});
   const voiceTranscript=$('#voiceTranscript'),voiceTranscriptText=$('#voiceTranscriptText');
   function showTranscript(text,phase='listening'){
     if(!voiceTranscript||!voiceTranscriptText)return;
-    const value=String(text||'').trim();
+    let value=String(text||'').trim();
+    if(value.startsWith('You: ')&&(canvasImageEditDraft||canvasBriefInChat(value.slice(5))))value='Canvas brief received.';
     voiceTranscript.hidden=!value;
     voiceTranscript.dataset.phase=phase;
     voiceTranscriptText.textContent=value;
@@ -74,10 +64,12 @@
   // the listener's music. Duck only during real voice input or audible speech.
   function syncConversationMusic(){
     const agentSpeaking=voiceSpeechAudible||speechPilotAgentSpeaking;
-    if((agentSpeaking||voiceInputActive)&&!audio.paused){
-      if(musicOriginalVolume===null)musicOriginalVolume=audio.volume;
-      audio.volume=Math.min(musicOriginalVolume,agentSpeaking?0.16:0.4);
-    }else if(musicOriginalVolume!==null){audio.volume=musicOriginalVolume;musicOriginalVolume=null}
+    const base=playerVolume();
+    const effective=(agentSpeaking||voiceInputActive)&&!audio.paused&&!audio.ended
+      ? Math.min(base,agentSpeaking?0.16:0.4) : base;
+    if(!applyPlayerVolume(effective))return false;
+    musicOriginalVolume=effective===base?null:base;
+    return true;
   }
   function setVoiceInputActive(active){voiceInputActive=!!active;syncConversationMusic()}
   function setVoiceSpeechAudible(active){
@@ -94,10 +86,10 @@
     }
     voiceSpeechAudible=false;syncConversationMusic();
   }
-  function setSpeechPilotSpeaking(active){
+  function setSpeechPilotSpeaking(active,immediate=false){
     if(speechPilotReleaseTimer!==null){clearTimeout(speechPilotReleaseTimer);speechPilotReleaseTimer=null}
     if(active){speechPilotAgentSpeaking=true;syncConversationMusic();return}
-    if(speechPilotAgentSpeaking&&speechPilotActive){
+    if(speechPilotAgentSpeaking&&speechPilotActive&&!immediate){
       speechPilotReleaseTimer=setTimeout(()=>{
         speechPilotReleaseTimer=null;speechPilotAgentSpeaking=false;syncConversationMusic();
       },220);
@@ -106,14 +98,34 @@
     speechPilotAgentSpeaking=false;syncConversationMusic();
   }
   // The user-facing level is independent of automatic conversation ducking.
-  function playerVolume(){return musicOriginalVolume===null?audio.volume:musicOriginalVolume}
+  function elementPlayerVolume(){return audio.muted?0:audio.volume}
+  function playerVolume(){return musicOriginalVolume??elementPlayerVolume()}
+  function applyPlayerVolume(level,allowMute=false){
+    if(elementPlayerVolume()===level)return true;
+    try{
+      if(audio.volume!==level)audio.volume=level;
+      if(audio.volume===level&&level>0&&audio.muted)audio.muted=false;
+    }catch(_){}
+    if(allowMute&&level===0&&elementPlayerVolume()!==0&&typeof audio.muted==='boolean'){
+      // Mobile browsers that ignore element volume can still mute the player.
+      try{audio.muted=true}catch(_){}
+    }
+    return elementPlayerVolume()===level;
+  }
   function setPlayerVolume(value){
     const requested=Number(value);
     if(!Number.isFinite(requested))return null;
     const level=Math.max(0,Math.min(1,requested));
+    const previous=playerVolume();
+    if(musicOriginalVolume!==null){
+      musicOriginalVolume=level;
+      if(!syncConversationMusic()){musicOriginalVolume=previous;return null}
+    }else{
+      if(!applyPlayerVolume(level,true))return null;
+      syncConversationMusic();
+    }
     if(level>0)lastAudibleVolume=level;
-    if(musicOriginalVolume!==null){musicOriginalVolume=level;syncConversationMusic()}
-    else audio.volume=level;
+    else if(previous>0)lastAudibleVolume=previous;
     return Math.round(level*100);
   }
   // One browser observation feeds the LLM, voice bridge, status replies and
@@ -127,7 +139,8 @@
   }
   function playerState(){
     const observed=observedPlayer();
-    return {player_is_playing:observed.playing?1:0,song_capture_active:(songCaptureSkill?.status().active||songListeningSkill?.status().active)?1:0,song_capture_live_enabled:(songCaptureSkill?.status().live_enabled||songListeningSkill?.status().active)?1:0,song_capture_available:songCaptureSkill?.getCapture()?1:0,song_lyric_draft_available:songLyricDraft?1:0,player_volume_percent:Math.round(playerVolume()*100),player_position_seconds:observed.position,player_duration_seconds:observed.duration};
+    const selectingLyrics=!!songListeningSkill?.status().active;
+    return {player_is_playing:observed.playing?1:0,song_capture_active:(songCaptureSkill?.status().active||selectingLyrics)?1:0,song_capture_live_enabled:selectingLyrics?1:0,song_capture_available:songCaptureSkill?.getCapture()?1:0,song_lyric_draft_available:songLyricDraft?1:0,player_volume_percent:Math.round(playerVolume()*100),player_position_seconds:observed.position,player_duration_seconds:observed.duration};
   }
   function describePlayer(){
     const observed=observedPlayer(),track=observed.track;
@@ -148,7 +161,7 @@
         else if(mode==='adjust')target+=Math.max(-100,Math.min(100,Number(action.percent)||0))/100;
         else return describePlayer();
         const actual=setPlayerVolume(target);
-        return actual===null?'I could not change the volume.':'Stonefellow player volume is now '+actual+' percent.';
+        return actual===null?'This browser controls volume through your device. Use the device volume buttons.':'Stonefellow player volume is now '+actual+' percent.';
       }
       case 'pause_player':
         if(!st.track)return 'There is no song to pause.';
@@ -208,15 +221,15 @@
         if(freshCapture){
           songExperience={phase:'capturing',listening_mode:'record_clip',title:st.track?.title||'Song section',
             track_id:capture.track_id,start_ms:capture.start_ms,end_ms:null,
-            transcript:'',corrected:'',reports:[],saved_note_id:null,message:'',live_enabled:false,auto_interpret:false};
+            transcript:'',corrected:'',reports:[],saved_note_id:null,message:'',auto_interpret:false};
           agent('recording','Capturing this song section… say “stop listening” to finish.');
           updateSongExperience({},true);
-        }else updateSongExperience({live_enabled:capture.live_enabled});
+        }
       }else if(capture.last){
         songExperience=songExperience||{reports:[],transcript:'',corrected:''};
         updateSongExperience({phase:'captured',title:capture.last.title,
           track_id:capture.last.track_id,start_ms:capture.last.start_ms,
-          end_ms:capture.last.end_ms,live_enabled:false,
+          end_ms:capture.last.end_ms,
           message:'Record Clip finished. Its audio remains in this browser until you explicitly request transcription.'},true);
       }else if(songExperience?.phase==='capturing'&&songExperience.listening_mode==='record_clip'){
         updateSongExperience({phase:'discarded',message:'The recording was discarded after playback changed. Start a fresh Record Clip.'});
@@ -300,40 +313,37 @@
       segments:[{id:Number(moment.id),start_ms:start,end_ms:end,timing_source:moment.timing_source}]});
     songListeningReceipt=draft;songLyricDraft=draft;songLyricCorrected='';songPersonalNote='';songLyricReport=null;
     songExperience={phase:'draft',listening_mode:'catalog',title:draft.title,track_id:draft.track_id,start_ms:start,end_ms:end,
-      transcript:draft.text,corrected:'',reports:[],saved_note_id:null,auto_interpret:true,live_enabled:false,
+      transcript:draft.text,corrected:'',reports:[],saved_note_id:null,auto_interpret:true,
       lyrics_source:draft.source,review_status:draft.review_status,timing:draft.timing,lyric_segments:draft.segments||[],
       message:'Saved lyric range selected. Review the text, then choose Review & interpret lyrics. No transcription call was made.'};
     songMoments?.close();updateSongExperience({},true);window.SFPublicAgentCanvas?.openLyrics?.();
   }
   async function finishSongListening(result){
-    const mode=result.listening_mode||'recognition';
-    if(songExperience?.listening_mode!==mode||
-        (mode==='catalog'&&songExperience.request_id!==result.request_id))return result.text;
+    if(songExperience?.listening_mode!=='catalog'||songExperience.request_id!==result.request_id)return result.text;
     if(!result.ok||!result.receipt||String(st.track?.id)!==String(result.receipt.track_id)){
-      updateSongExperience({phase:'discarded',live_enabled:false,end_ms:Math.round((audio.currentTime||0)*1000),
+      updateSongExperience({phase:'discarded',end_ms:Math.round((audio.currentTime||0)*1000),
         message:result.error||result.text},true);
       return result.error||result.text;
     }
     const draft=Object.freeze({...result.receipt});
     songListeningReceipt=draft;songLyricDraft=draft;
     songLyricCorrected='';songPersonalNote='';songLyricReport=null;
-    updateSongExperience({phase:'draft',live_enabled:false,start_ms:draft.start_ms,end_ms:draft.end_ms,
+    updateSongExperience({phase:'draft',start_ms:draft.start_ms,end_ms:draft.end_ms,
       transcript:draft.text,corrected:'',reports:[],saved_note_id:null,
       lyrics_source:draft.source,review_status:draft.review_status,timing:draft.timing,lyric_segments:draft.segments||[],
-      section_context:mode==='catalog'&&Array.isArray(draft.section_context)?draft.section_context:[],
-      message:mode==='catalog'?'Saved song lyrics are ready for this selection. Approximate blocks may extend beyond its edges; review the text before interpretation. No audio transcription was requested.':
-        'Unverified browser-recognized lyrics are ready. No song clip was created or saved.'},true);
+      section_context:Array.isArray(draft.section_context)?draft.section_context:[],
+      message:'Saved song lyrics are ready for this selection. Approximate blocks may extend beyond its edges. Review the text before interpretation.'},true);
     // Even a Listen & Interpret command first offers the listener a chance
     // to correct the draft. Interpretation is a separate explicit request.
     if(songExperience.auto_interpret){
       updateSongExperience({message:'Review these words or tap the pencil to correct them, then select Review & interpret lyrics.'},true);
       return 'Lyric draft ready. Review or correct the words, then select Review & interpret lyrics.';
     }
-    return (mode==='catalog'?'Saved lyrics are ready for “':'An unverified lyric transcript is ready for “')+draft.title+'.” Select Interpret lyrics when ready.';
+    return 'Saved lyrics are ready for “'+draft.title+'.” Select Interpret lyrics when ready.';
   }
   // Every browser selects playback offsets from the same saved lyric timeline.
-  const catalogSongListeningSkill=window.StonefellowCatalogListening?.create({
-    audio,getTrack:()=>st.track,savedLyrics:true,
+  const songListeningSkill=window.StonefellowCatalogListening?.create({
+    audio,getTrack:()=>st.track,
     prepare:async(trackId,sourceRef,signal)=>{
       const response=await fetch((cfg.apiBase||'api')+'/song-lyrics-section.php?track_id='+encodeURIComponent(trackId)+'&source_ref='+encodeURIComponent(sourceRef),
         {credentials:'same-origin',signal});
@@ -347,18 +357,17 @@
       if(songExperience?.listening_mode!=='catalog'||String(songExperience.track_id)!==part.track_id)return;
       if(songExperience.request_id&&songExperience.request_id!==part.request_id)return;
       const changes={phase:part.phase,request_id:part.request_id,start_ms:part.start_ms,
-        end_ms:part.phase==='transcribing'?part.end_ms:null,live_enabled:false};
+        end_ms:part.phase==='transcribing'?part.end_ms:null};
       if(part.text)changes.message=part.text;
       updateSongExperience(changes);
     },
     onFinish:finishSongListening
   });
-  const songListeningSkill=catalogSongListeningSkill?Object.freeze({...catalogSongListeningSkill,mode:()=> 'catalog'}):null;
   window.addEventListener('pagehide',()=>{
     if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');
   });
   function currentSongSource(){
-    if(songLyricDraft?.provider==='browser-speech-recognition'||['catalog-audio','saved-catalog-lyrics'].includes(songLyricDraft?.source)){
+    if(songLyricDraft?.source==='saved-catalog-lyrics'){
       return songListeningReceipt;
     }
     return songCaptureSkill?.getCapture();
@@ -377,7 +386,7 @@
     renderPopupEntries();
     window.SFCustomerAgentChat?.onSongExperience?.();
     window.SFPublicAgentCanvas?.syncSongExperience?.();
-    window.SFPublicAgentCanvas?.setState?.(songExperience.phase==='capturing'?(songExperience.listening_mode==='catalog'?'listening':songExperience.listening_mode==='recognition'?'listening':'recording'):
+    window.SFPublicAgentCanvas?.setState?.(songExperience.phase==='capturing'?(songExperience.listening_mode==='catalog'?'listening':'recording'):
       ['transcribing','analyzing'].includes(songExperience.phase)?'thinking':st.playing?'playing':'idle');
     // Agent Canvas displays transcript and analysis in its attached orb panel.
     // Keep the chat popup under the visitor's explicit control in that template.
@@ -404,12 +413,11 @@
       if(!result.startsWith('Updated the listener-edited'))updateSongExperience({message:result});
       return;
     }
-    const userText={stop:'Stop listening',live:'Transcribe live',transcribe:'Transcribe this song section',
+    const userText={stop:'Stop listening',transcribe:'Transcribe this song section',
       analyze:'Analyze this captured lyric section',save:'Save this lyric note'}[action]||String(question).trim();
     popupEntry('user',userText);
     let response;
     if(action==='stop')response=await executeSongCaptureAction({type:'song_capture_stop'});
-    else if(action==='live')response=await executeSongCaptureAction({type:'song_capture_live_start'});
     else if(action==='transcribe')response=await transcribeLastCapturedSong();
     else if(action==='analyze'||action==='ask')response=await analyzeLastSongDraft(
       action==='ask'?String(question).trim():'Interpret lyrical themes, symbols and emotions in this excerpt using documented songwriter thoughts and approved Stonefellow song notes. Distinguish source-backed facts from your own reading.');
@@ -521,14 +529,14 @@
       return 'Finish your vocal recording before starting song lyric listening or a separate song clip.';
     if(action.type==='song_capture_live_start'){
       if(songTranscriptionBusy||songAnalysisBusy)return 'Finish the current lyric request before starting another.';
-      if(songCaptureSkill?.status().active)return 'Record Clip is active. Stop that recording before choosing Listen & Interpret.';
+      if(songCaptureSkill?.status().active)return 'Record Clip is active. Stop that recording before opening Song Lyrics.';
       if(!songListeningSkill)return 'Song lyric listening is unavailable. No audio recording was started.';
-      if(songListeningSkill.status().active){window.SFPublicAgentCanvas?.openLyrics?.();return 'Already listening to the song. Select Stop listening to review the lyrics.';}
-      const previousExperience=songExperience,mode=songListeningSkill.mode?.()||'recognition';
-      const attempt={phase:'starting',lyrics_source:mode==='catalog'?'saved-catalog-lyrics':'',listening_mode:mode,title:st.track?.title||'Listen & Interpret',
+      if(songListeningSkill.status().active){window.SFPublicAgentCanvas?.openLyrics?.();return 'A song section is already selected. Use Stop to review the lyrics.';}
+      const previousExperience=songExperience;
+      const attempt={phase:'starting',lyrics_source:'saved-catalog-lyrics',listening_mode:'catalog',title:st.track?.title||'Song Lyrics',
         track_id:String(st.track?.id||''),start_ms:Math.round((audio.currentTime||0)*1000),end_ms:null,
-        transcript:'',corrected:'',reports:[],live_enabled:false,auto_interpret:!!action.interpret_on_stop,
-        message:mode==='catalog'?'Checking saved song lyrics…':'Starting lyric listening…'};
+        transcript:'',corrected:'',reports:[],auto_interpret:!!action.interpret_on_stop,
+        message:'Checking saved song lyrics…'};
       songExperience=attempt;updateSongExperience({});window.SFPublicAgentCanvas?.openLyrics?.();
       const started=await songListeningSkill.begin();
       if(songExperience!==attempt)return started.text;
@@ -540,31 +548,27 @@
       }
       if(!songListeningSkill.status().active)return started.text;
       songListeningReceipt=null;songLyricDraft=null;songLyricReport=null;songLyricCorrected='';songPersonalNote='';
-      Object.assign(songExperience,{phase:'capturing',listening_mode:mode,title:st.track?.title||'Song section',
+      Object.assign(songExperience,{phase:'capturing',title:st.track?.title||'Song section',
         track_id:songListeningSkill.status().track_id,start_ms:songListeningSkill.status().start_ms,
-        end_ms:null,transcript:'',corrected:'',reports:[],saved_note_id:null,live_enabled:mode==='recognition',
+        end_ms:null,transcript:'',corrected:'',reports:[],saved_note_id:null,
         auto_interpret:!!action.interpret_on_stop,
-        message:mode==='catalog'?'Selecting this song section. Stop retrieves the saved lyrics for this range.':
-          'Listening to the song through the browser speech service. No recording is retained.'});
+        message:'Selecting this song section. Stop retrieves the saved lyrics for this range.'});
       updateSongExperience({},true);
       return started.text;
     }
-    if(action.type==='song_capture_stop'&&songListeningSkill?.status().active){
-      if(songExperience?.listening_mode!=='catalog')updateSongExperience({phase:'stopping',message:'Stopping lyric listening…'});
-      return (await songListeningSkill.stop()).text;
-    }
+    if(action.type==='song_capture_stop'&&songListeningSkill?.status().active)return (await songListeningSkill.stop()).text;
     if(!songCaptureSkill)return 'Song-section audio capture is unavailable. Playback was not changed.';
     if(action.type==='song_capture_start'){
       if(songTranscriptionBusy||songAnalysisBusy)return 'Finish the current lyric request before starting Record Clip.';
-      if(songListeningSkill?.status().active)return 'Listen & Interpret is active. Stop listening before starting Record Clip.';
+      if(songListeningSkill?.status().active)return 'Song Lyrics is active. Stop selecting lyrics before starting Record Clip.';
       return songCaptureSkill.begin().text;
     }
     if(action.type==='song_capture_stop')return (await songCaptureSkill.stop()).text;
     if(action.type==='song_capture_transcribe')return await transcribeLastCapturedSong();
     if(action.type==='song_capture_analyze')return await analyzeLastSongDraft(action.question);
-    if(songListeningSkill?.status().active)return songExperience?.listening_mode==='catalog'
-      ?songExperience.phase==='transcribing'?'Loading the saved lyrics for this section. Stop waiting discards the result.':'Selecting the current song section. Stop retrieves its saved lyrics.'
-      :'Transcribing lyrics from the player. Select Stop listening to review; no song clip is recorded.';
+    if(songListeningSkill?.status().active)return songExperience?.phase==='transcribing'
+      ?'Loading the saved lyrics for this section. Stop waiting discards the result.'
+      :'Selecting the current song section. Stop retrieves its saved lyrics.';
     const snapshot=songCaptureSkill.status();
     if(snapshot.active)return 'I am recording the current song from '+Math.round(snapshot.start_ms/1000)+' seconds. Stop Record Clip to finish.';
     return snapshot.last?'The last song section is recorded and ready for optional transcription.':'There is no song listening or recording session in progress.';
@@ -690,6 +694,7 @@
   // Both typed chat and Speech Engine actions use the same published-catalog
   // receipt verification and browser-owned player/navigation dispatch.
   async function dispatchAgentBrowserAction(message,action,resolution,allowSongCapture=true){
+    if(action?.type==='canvas_discuss')return discussCanvasProject(String(message||''));
     // A generic playlist request must not be converted into a blank /music
     // search by a model or a delayed Speech Engine action.
     if(directRandomPlaylistCommand(message)&&action?.type!=='load_temporary_playlist')
@@ -709,80 +714,23 @@
     // Agent Brain silently discarded what actually happened.
     return await executeAgentAction(verified.action);
   }
-  function holdVoicePlaybackForBarge(){
-    if(!st.conversationOn||!voicePlaybackPending)return;
-    restoreVoiceProbeMusic();
-    voiceProbeAudio=null;voiceProbeSynth=false;
-    // Silence audio immediately but keep the primed recognizer alive to finish
-    // the participant's sentence before submitting the next Agent turn.
-    voicePlaybackSequence++;
-    if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
-    if(st.voiceAudio&&!st.voiceAudio.paused)st.voiceAudio.pause();
-    if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;cancelLocalVoiceOutput();resolve(null)}
-    agent('listening','I heard you. Keep speaking.');
-    showTranscript('Listening to the interruption…','listening');
-  }
-  function muteMusicDuringVoiceProbe(){
-    if(!audio.paused&&voiceProbeMusicVolume===null){voiceProbeMusicVolume=audio.volume;audio.volume=0}
-  }
-  function restoreVoiceProbeMusic(){
-    if(voiceProbeMusicVolume!==null){audio.volume=voiceProbeMusicVolume;voiceProbeMusicVolume=null}
-  }
   function cancelLocalVoiceOutput(){
     const synthesis=window.speechSynthesis;
     try{synthesis?.cancel()}catch(_){}
     // Some engines retain paused after cancel, silently blocking later speech.
     try{if(synthesis?.paused)synthesis.resume?.()}catch(_){}
   }
-  function handleVoiceActivityProbe(stage){
-    if(stage==='paused'){
-      if(voiceProbeAudio)return voiceProbeAudio.paused===true;
-      return voiceProbeSynth&&window.speechSynthesis?.paused===true;
-    }
-    if(stage==='probe'){
-      if(!st.conversationOn||!voicePlaybackPending)return false;
-      if(st.voiceAudio&&!st.voiceAudio.paused){
-        voiceProbeAudio=st.voiceAudio;
-        muteMusicDuringVoiceProbe();
-        try{voiceProbeAudio.pause()}catch(_){voiceProbeAudio=null;restoreVoiceProbeMusic();return false}
-        return true;
-      }
-      const synthesis=window.speechSynthesis;
-      if(speechFallbackResolve&&synthesis?.speaking&&typeof synthesis.pause==='function'){
-        muteMusicDuringVoiceProbe();
-        try{synthesis.pause()}catch(_){restoreVoiceProbeMusic();return false}
-        voiceProbeSynth=true;return true;
-      }
-      return false;
-    }
-    if(stage==='resume'){
-      const pausedAudio=voiceProbeAudio,pausedSynth=voiceProbeSynth;
-      voiceProbeAudio=null;voiceProbeSynth=false;
-      restoreVoiceProbeMusic();
-      if(pausedAudio&&voicePlaybackPending&&st.voiceAudio===pausedAudio){
-        void pausedAudio.play().catch(()=>interruptVoicePlayback());
-      }
-      if(pausedSynth&&voicePlaybackPending)window.speechSynthesis?.resume?.();
-      return true;
-    }
-    if(stage==='confirm'){holdVoicePlaybackForBarge();return true}
-    return false;
-  }
   function interruptVoicePlayback(){
-    restoreVoiceProbeMusic();
-    voiceProbeAudio=null;voiceProbeSynth=false;
     voicePlaybackSequence++;
-    conversationBargeIn?.stop();
     if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
     if(st.voiceAudio&&!st.voiceAudio.paused)st.voiceAudio.pause();
     if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;cancelLocalVoiceOutput();resolve(null)}
     voicePlaybackPending=false;
-    voicePlaybackText='';
     setVoiceSpeechAudible(false);
     if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();
     if(agentInterrupt)agentInterrupt.hidden=true;
     syncConversationMusic();
-    if(st.conversationOn){showTranscript('Agent interrupted. Listening for you…','listening');agent('listening','I’m listening.');scheduleConversationListen()}
+    if(st.conversationOn&&!speechPilotActive){showTranscript('Agent interrupted. Listening for you…','listening');agent('listening','I’m listening.');scheduleConversationListen()}
   }
   // Section 91B17F: a single tap on the main particle orb interrupts whichever
   // voice engine is actually speaking. It must not restart a microphone session.
@@ -791,8 +739,8 @@
       if(!speechPilotAgentSpeaking)return false;
       const interrupted=window.StonefellowSpeechEngine?.interrupt?.();
       if(interrupted===false)return false;
-      speechPilotAgentSpeaking=false;
-      setSpeechPilotSpeaking(false);
+      speechPilotReplyInProgress=false;
+      setSpeechPilotSpeaking(false,true);
       window.StonefellowSpeechEngine?.setInputMuted?.(false);
       agent('listening','I’m listening.');
       showTranscript('Stonefellow stopped speaking. I’m listening.','listening');
@@ -815,13 +763,19 @@
     if(!popupEntries.length&&!songExperience){
       const empty=document.createElement('p');empty.className='agent-chat-empty';
       empty.textContent='Your conversation will appear here. Use the bar below to type or speak.';
-      chatPopupMessages.appendChild(empty);return;
+      chatPopupMessages.appendChild(empty);canvasProjects.current?.attach?.();return;
     }
     for(const entry of popupEntries.slice(-60)){
       const row=document.createElement('article'),who=document.createElement('strong'),body=document.createElement('p');
       row.className='agent-chat-popup-entry '+(entry.role==='user'?'from-user':entry.role==='notice'?'notice':'from-agent');
       who.textContent=entry.role==='user'?'You':entry.role==='notice'?'Session update':'Stonefellow';
       body.textContent=entry.text;row.append(who,body);chatPopupMessages.appendChild(row);
+      if(entry.imageReview&&/^[a-f0-9]{32}$/.test(entry.imageReview)){
+        const button=document.createElement('button');
+        button.type='button';button.textContent='Choose an image';
+        button.addEventListener('click',()=>void handleListeningRoomCommand({kind:'image_review',requestId:entry.imageReview}));
+        row.append(button);
+      }
     }
     if(songExperience){
       const host=document.createElement('div');host.className='song-experience-in-chat';
@@ -830,11 +784,17 @@
         host.querySelector('.song-experience-followup input').value=pendingQuestion;
       chatPopupMessages.appendChild(host);
     }
+    canvasProjects.current?.attach?.();
     chatPopupMessages.scrollTop=chatPopupMessages.scrollHeight;
   }
-  function popupEntry(role,text){if(!text)return;popupEntries.push({role,text:String(text)});popupEntries=popupEntries.slice(-60);renderPopupEntries();window.SFPublicAgentCanvas?.showConversation?.(role,String(text))}
-  async function openChatPopup(){if(!chatPopup)return;closeQuickMenu();chatPopup.hidden=false;document.body.classList.add('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','true');chatToggle?.setAttribute('aria-label','Close Agent Chat');chatToggle.title='Close Agent Chat';orb?.setAttribute('aria-expanded','true');orb?.setAttribute('aria-label','Close Agent Chat');if(popupHistoryLoaded)return;popupHistoryLoaded=true;await loadAuth();if(!st.auth.authenticated){popupHistoryLoaded=false;return}try{const cid=st.conversationId;const response=await api('agent-brain.php'+(cid?'?conversation_id='+encodeURIComponent(cid):''));const messages=response.brain?.messages||response.messages||[];const historical=messages.filter(m=>['user','assistant'].includes(m.role)).slice(-40).map(m=>({role:m.role==='user'?'user':'assistant',text:String(m.content||'')}));const live=popupEntries.slice();let overlap=0;for(let n=Math.min(historical.length,live.length);n>0;n--){if(historical.slice(-n).every((m,i)=>m.role===live[i].role&&m.text===live[i].text)){overlap=n;break}}popupEntries=historical.concat(live.slice(overlap)).slice(-60);renderPopupEntries()}catch(_){popupHistoryLoaded=false;/* A history outage must not stop new chat turns. */}}
-  function closeChatPopup(){if(!chatPopup)return;chatPopup.hidden=true;document.body.classList.remove('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','false');chatToggle?.setAttribute('aria-label','Open Agent Chat');chatToggle.title='Open Agent Chat';orb?.setAttribute('aria-expanded','false');orb?.setAttribute('aria-label','Open Agent Chat')}
+  function popupEntry(role,text,{canvasBrief=false,imageReview=null}={}){
+    if(!text)return;
+    const value=String(text);
+    popupEntries.push({role,text:value,...(canvasBrief?{canvasBrief:true}:{}),...(imageReview?{imageReview}:{})});popupEntries=popupEntries.slice(-60);renderPopupEntries();
+    if(role!=='user'||(!canvasBrief&&!canvasBriefInChat(value)))window.SFPublicAgentCanvas?.showConversation?.(role,value);
+  }
+  async function openChatPopup(){if(!chatPopup)return;closeQuickMenu();chatPopup.hidden=false;document.body.classList.add('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','true');chatToggle?.setAttribute('aria-label','Close Agent Chat');chatToggle.title='Close Agent Chat';orb?.setAttribute('aria-expanded','true');orb?.setAttribute('aria-label','Close Agent Chat');if(popupHistoryLoaded)return;const epoch=popupHistoryEpoch;popupHistoryLoaded=true;await loadAuth();if(epoch!==popupHistoryEpoch)return;if(!st.auth.authenticated){popupHistoryLoaded=false;return}try{const cid=st.conversationId,owner=canvasOwner();const response=await api('agent-brain.php'+(cid?'?conversation_id='+encodeURIComponent(cid):''));if(epoch!==popupHistoryEpoch||owner!==canvasOwner()||cid!==st.conversationId)return;const messages=response.brain?.messages||response.messages||[];const historical=messages.filter(m=>['user','assistant'].includes(m.role)).slice(-40).map(m=>({role:m.role==='user'?'user':'assistant',text:String(m.content||'')}));const live=popupEntries.slice();let overlap=0;for(let n=Math.min(historical.length,live.length);n>0;n--){if(historical.slice(-n).every((m,i)=>m.role===live[i].role&&m.text===live[i].text)){overlap=n;break}}popupEntries=historical.concat(live.slice(overlap)).slice(-60);renderPopupEntries()}catch(_){if(epoch===popupHistoryEpoch)popupHistoryLoaded=false;/* A history outage must not stop new chat turns. */}}
+  function closeChatPopup(){if(!chatPopup)return;chatPopup.hidden=true;setCanvasDebugVisible(false);document.body.classList.remove('agent-chat-open');syncAgentDockLayout();chatToggle?.setAttribute('aria-expanded','false');chatToggle?.setAttribute('aria-label','Open Agent Chat');chatToggle.title='Open Agent Chat';orb?.setAttribute('aria-expanded','false');orb?.setAttribute('aria-label','Open Agent Chat')}
   function say(text,cb){const answer=String(text||'');agent('thinking','…');popupEntry('assistant',answer);if(st.conversationOn)showTranscript('Stonefellow: '+answer.slice(0,240),'responding');const work=new Promise(resolve=>setTimeout(resolve,120)).then(async()=>{agent('responding',answer);if(cb)cb();if(!speechPilotActive&&voiceRepliesEnabled&&(st.conversationOn||voiceInteractionStarted)&&(await agentSpeak(answer))===false){const note='The reply is available in text, but speech playback is unavailable on this device.';popupEntry('notice',note);agent('idle',note)}if(st.conversationOn&&!speechPilotActive&&!voiceRepliesEnabled&&!voiceTurnBusy){agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}else if(!st.conversationOn)agent(st.playing?'playing':'idle');});pendingReply=work.catch(()=>{agent('idle',answer)});return pendingReply}
   // Local-first visitor identity. The schema deliberately keeps a guest scope
   // and timestamps so a future explicit account migration can read it; never
@@ -1014,9 +974,9 @@
   function scoreTrack(t,q){const qwords=words(q);let score=0;[t.title,t.release,...t.mood,...t.themes].forEach(field=>words(field).forEach(w=>{if(qwords.has(w))score+=field===t.title?5:2}));if(/quiet|mellow|soft|calm/.test(q)&&Number(t.energy)<=2)score+=4;if(/dark|heavy|loud|electric/.test(q)&&Number(t.energy)>=4)score+=4;if(/drive|road|driving/.test(q)&&(t.mood.includes('driving')||t.themes.includes('road')))score+=5;return score}
   function recommend(q,exclude=[]){const ranked=catalog.filter(t=>!exclude.includes(t.id)).map(t=>({t,s:scoreTrack(t,q)})).sort((a,b)=>b.s-a.s||a.t.energy-b.t.energy);return ranked[0]?.t||catalog.find(t=>!exclude.includes(t.id))||catalog[0]}
   function related(base){if(!base)return catalog[0];const keys=new Set([...base.mood,...base.themes]);return catalog.filter(t=>t.id!==base.id).map(t=>({t,s:[...t.mood,...t.themes].filter(x=>keys.has(x)).length*3-Math.abs((t.energy||3)-(base.energy||3))})).sort((a,b)=>b.s-a.s)[0]?.t||catalog.find(t=>t.id!==base.id)}
-  async function api(path,body){const opts=body===undefined?{credentials:'same-origin'}:{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body)};const r=await fetch((cfg.apiBase||'api')+'/'+path,opts);let j={};try{j=await r.json();if(!j||typeof j!=='object'||Array.isArray(j))throw new Error('invalid_payload')}catch(_){const e=new Error(path==='storefront.php'?'Store service returned unreadable data (HTTP '+r.status+').':'Service returned unreadable data (HTTP '+r.status+').');e.status=r.status;throw e}if(!r.ok||j.ok===false){const e=new Error(j.message||j.errors?.join(' ')||j.error||'Store request failed.');e.payload=j;throw e}return j}
+  async function api(path,body,signal){const opts=body===undefined?{credentials:'same-origin',signal}:{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body),signal};const r=await fetch((cfg.apiBase||'api')+'/'+path,opts);let j={};try{j=await r.json();if(!j||typeof j!=='object'||Array.isArray(j))throw new Error('invalid_payload')}catch(_){const e=new Error(path==='storefront.php'?'Store service returned unreadable data (HTTP '+r.status+').':'Service returned unreadable data (HTTP '+r.status+').');e.status=r.status;throw e}if(!r.ok||j.ok===false){const e=new Error(j.message||j.errors?.join(' ')||j.error||'Store request failed.');e.payload=j;e.status=r.status;throw e}return j}
   async function loadPlans(){try{const j=await api('plans.php');st.plans=j.plans||[];return st.plans}catch(_){st.plans=[];return []}}
-  async function speakWithDeviceVoice(text,sequence=voicePlaybackSequence){
+  async function speakWithDeviceVoice(text,sequence=voicePlaybackSequence,updateOrb=true){
     if(!window.speechSynthesis||!window.SpeechSynthesisUtterance||!voiceRepliesEnabled)return false;
     // A browser voice is only a privacy-safe fallback when the browser marks it local.
     let installed=window.speechSynthesis.getVoices().filter(voice=>voice.localService===true);
@@ -1035,9 +995,6 @@
         const resume=()=>{
           if(finished)return;
           if(sequence!==voicePlaybackSequence||!voiceRepliesEnabled){done(null);return}
-          // Some speech engines emit an early end/error when the echo probe
-          // pauses a chunk. Never advance the text until the probe has ended.
-          if(voiceProbeSynth){setTimeout(resume,80);return}
           cancelLocalVoiceOutput();next();
         };
         setTimeout(resume,150);
@@ -1049,19 +1006,19 @@
         const utterance=new window.SpeechSynthesisUtterance(parts[index]);
         utterance.voice=selected;utterance.lang=selected.lang||'en-US';utterance.rate=1;
         let settled=false,started=false;
-        utterance.onstart=()=>{started=true;if(!finished&&sequence===voicePlaybackSequence){setVoiceSpeechAudible(true);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.audible();agent('speaking',text)}};
+        utterance.onstart=()=>{started=true;if(!finished&&sequence===voicePlaybackSequence){setVoiceSpeechAudible(true);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.audible();if(updateOrb)agent('speaking',text)}};
         utterance.onend=()=>{
           if(settled||finished)return;settled=true;
           if(sequence!==voicePlaybackSequence){done(null);return}
           setVoiceSpeechAudible(false);
-          if(!started||voiceProbeSynth){retry();return}
+          if(!started){retry();return}
           index++;retries=0;next();
         };
         utterance.onerror=event=>{
           if(settled||finished)return;settled=true;
           if(sequence!==voicePlaybackSequence){done(null);return}
           setVoiceSpeechAudible(false);
-          if(voiceProbeSynth||['interrupted','canceled','audio-busy'].includes(event?.error)){retry();return}
+          if(['interrupted','canceled','audio-busy'].includes(event?.error)){retry();return}
           done(false);
         };
         try{window.speechSynthesis.speak(utterance)}catch(_){retry()}
@@ -1098,11 +1055,6 @@
           const done=ok=>{if(finished)return;finished=true;if(sequence===voicePlaybackSequence)setVoiceSpeechAudible(false);URL.revokeObjectURL(url);if(st.voiceAudio===a)st.voiceAudio=null;if(voiceAudioCancel===cancel)voiceAudioCancel=null;resolve(ok)};
           const cancel=()=>{a.pause();done(null)};voiceAudioCancel=cancel;
           a.onended=()=>done(true);a.onerror=()=>done(false);
-          // An echo probe pauses audio temporarily; it must not resolve the
-          // whole reply as cancelled or leave the sequence permanently stale.
-          // A reversible echo-check pause can dispatch its onpause event
-          // after playback has resumed. Only explicit cancel() may settle
-          // the reply as interrupted; a delayed pause event must not end it.
           a.play().then(()=>{if(!finished&&sequence===voicePlaybackSequence&&voiceRepliesEnabled){setVoiceSpeechAudible(true);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.audible();agent('speaking',text)}else if(!finished)cancel()}).catch(()=>done(false));
         });
         if(spoken===null||sequence!==voicePlaybackSequence)return null;
@@ -1111,42 +1063,39 @@
       return true;
     }catch(_){return sequence!==voicePlaybackSequence?null:(nextUnspoken?{remaining:parts.slice(nextUnspoken).join(' ')}:false)}
   }
-  async function agentSpeak(text){
-    if(!voiceRepliesEnabled||(!st.conversationOn&&!voiceInteractionStarted)||!text)return null;
+  async function agentSpeak(text,deviceOnly=false,signal){
+    if(!voiceRepliesEnabled||(!st.conversationOn&&!voiceInteractionStarted)||!text||signal?.aborted)return null;
     if(voicePlaybackPending){
-      restoreVoiceProbeMusic();
-      voiceProbeAudio=null;voiceProbeSynth=false;
-      conversationBargeIn?.stop();
       if(voiceAudioCancel){const cancel=voiceAudioCancel;voiceAudioCancel=null;cancel()}
       if(speechFallbackResolve){const resolve=speechFallbackResolve;speechFallbackResolve=null;cancelLocalVoiceOutput();resolve(null)}
     }
     const sequence=++voicePlaybackSequence;
+    const cancel=()=>{if(sequence===voicePlaybackSequence)interruptVoicePlayback();};
+    signal?.addEventListener('abort',cancel,{once:true});
     if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.begin(text);
-    voicePlaybackPending=true;voicePlaybackText=String(text);setVoiceInputActive(false);
+    voicePlaybackPending=true;setVoiceInputActive(false);
     if(st.conversationOn){
       clearTimeout(conversationRestartTimer);
       if(!isIOSVoiceBrowser){
         try{recognition?.abort()}catch(_){}
         recognitionActive=false;
       }
-      // The playback microphone must stay suspended while the Agent speaks.\n      // Acoustic barge-in can hear the Agent's speakers, repeatedly pause TTS,\n      // and mute/unmute music during verification. Stop speaking is the explicit interrupt.
     }
     try{
-      const remote=await elevenLabsSpeak(text,false,sequence);
+      const remote=deviceOnly?false:await elevenLabsSpeak(text,false,sequence);
       if(sequence!==voicePlaybackSequence)return null;
       if(remote===true||remote===null||!voiceRepliesEnabled)return remote;
       if(remote&&typeof remote==='object'&&remote.remaining)return await speakWithDeviceVoice(remote.remaining,sequence);
       // The installed browser voice is a local, free fallback; it sends no text to a new provider.
-      return await speakWithDeviceVoice(text,sequence);
+      return await speakWithDeviceVoice(text,sequence,!deviceOnly);
     }finally{
+      signal?.removeEventListener('abort',cancel);
       if(sequence===voicePlaybackSequence){
-        restoreVoiceProbeMusic();
-        voiceProbeAudio=null;voiceProbeSynth=false;
-        conversationBargeIn?.stop();voicePlaybackPending=false;voicePlaybackText='';setVoiceSpeechAudible(false);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();voiceEchoUntil=Date.now()+3000;syncConversationMusic();
+        voicePlaybackPending=false;setVoiceSpeechAudible(false);if(typeof voiceSpeechGuard!=='undefined')voiceSpeechGuard?.finish();voiceEchoUntil=Date.now()+3000;syncConversationMusic();
         if(agentInterrupt)agentInterrupt.hidden=true;
         if(isIOSVoiceBrowser)iosVoiceMuteUntil=Date.now()+1800;
-        agent(st.conversationOn&&!iosVoiceNeedsGesture?'listening':st.playing?'playing':'idle');
-        if(iosVoiceNeedsGesture&&st.conversationOn)showTranscript('Microphone paused · tap Start Chat to resume.','waiting');
+        if(!deviceOnly)agent(st.conversationOn&&!iosVoiceNeedsGesture?'listening':st.playing?'playing':'idle');
+        if(iosVoiceNeedsGesture&&st.conversationOn)showTranscript('Microphone paused · tap Resume Voice Chat.','waiting');
         if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen();
       }
     }
@@ -1245,6 +1194,23 @@
   function syncAuthMenu(){
     // Account navigation is rendered exclusively by PHP on full-page requests.
     document.documentElement.dataset.authState=st.auth.authenticated?'logged-in':'logged-out';
+    syncCanvasDebugOwner();
+    if(accountPhotoPreferencesRequest&&accountPhotoPreferencesRequest.owner!==canvasOwner()){
+      accountPhotoPreferencesRequest.request.abort();accountPhotoPreferencesRequest=null;
+    }
+    if(chatImagePicker&&chatImagePicker.owner!==canvasOwner())closeChatImagePicker(chatImagePicker,false);
+    if(chatMusicPicker&&chatMusicPicker.owner!==canvasOwner())chatMusicPicker.request.abort();
+    if(chatResourcePicker&&chatResourcePicker.owner!==canvasOwner())chatResourcePicker.request.abort();
+    if(stopListeningRoomBuild.pending&&stopListeningRoomBuild.pending.owner!==canvasOwner())stopListeningRoomBuild.pending=null;
+    if(canvasImageEditDraft&&canvasImageEditDraft.owner!==canvasOwner())setCanvasImageEditDraft(null);
+    if(gallerySceneRequest&&gallerySceneRequest.galleryOwner!==canvasOwner())cancelGalleryOpen();
+    if((!st.auth.authenticated&&!isGalleryScene())||(listeningRoomOwner!==null&&listeningRoomOwner!==canvasSceneOwner()))closeListeningRoom(false);
+    canvasGalleryView?.setOwner();
+    canvasAccess.current?.setOwner();
+    const canvasPermissionsMenu=document.getElementById('menuCanvasPermissions');if(canvasPermissionsMenu)canvasPermissionsMenu.hidden=!canvasOwner();
+    window.SFPublicAgentCanvas?.syncSceneAccess?.();
+    syncCanvasCodingModelMenu();
+    canvasProjects()?.setOwner();
   }
   async function loadAuth(force=false){
     if(st.auth.loaded&&!force)return st.auth;
@@ -1273,14 +1239,75 @@
     }
     return j;
   }
-  async function secureJsonPost(path,payload,retried=false,signal){
+  async function readSceneResponseStream(response,onDelta,onConcept,onRetry,onTrace){
+    const reader=response.body?.getReader();
+    if(!reader)throw new Error('Missing scene stream');
+    const decoder=new TextDecoder('utf-8',{fatal:true});
+    const eventLimit=1048576;
+    let buffer='',outputLength=0,conceptReceived=false,retried=false;
+    try{
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        buffer+=decoder.decode(value,{stream:true});
+        let end;
+        while((end=buffer.indexOf('\n'))!==-1){
+          if(end>eventLimit)throw new Error('Scene event exceeded its limit');
+          const event=JSON.parse(buffer.slice(0,end));
+          buffer=buffer.slice(end+1);
+          if(event?.type==='retry'&&!retried){
+            retried=true;
+            conceptReceived=false;
+            outputLength=0;
+            onRetry?.(event.reason);
+          }else if(event?.type==='concept'&&typeof event.text==='string'){
+            if(!conceptReceived&&!outputLength&&event.text.length<=160){
+              conceptReceived=true;
+              onConcept?.(event.text);
+            }
+          }else if(event?.type==='delta'&&typeof event.text==='string'){
+            outputLength+=event.text.length;
+            if(outputLength>36000)throw new Error('Scene output exceeded its limit');
+            onDelta(event.text);
+          }else if(event?.type==='image'&&['generating','working','saved'].includes(event.state)){
+            if(event.state!=='working')onTrace?.('image_'+event.state,{index:event.index,total:event.total,image:event.image});
+          }else if((event?.type==='result'||event?.type==='error')&&Number.isInteger(event.status)&&
+            (event.type==='result'?event.status>=200&&event.status<300:event.status>=400&&event.status<600))return event;
+          else throw new Error('Invalid scene event');
+        }
+        if(buffer.length>eventLimit)throw new Error('Scene event exceeded its limit');
+      }
+      throw new Error('Scene stream ended before its result');
+    }finally{
+      void reader.cancel().catch(()=>{});
+      reader.releaseLock();
+    }
+  }
+  async function secureJsonPost(path,payload,retried=false,signal,onDelta,onConcept,onRetry,onTrace){
     if(signal?.aborted)throw new Error('The request was canceled.');
     if(!st.auth.csrf)await loadAuth(true);
     if(signal?.aborted)throw new Error('The request was canceled.');
-    const r=await fetch((cfg.apiBase||'api')+'/'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':st.auth.csrf||''},body:JSON.stringify(payload||{}),signal});
-    let j={};try{j=await r.json()}catch(_){throw new Error('The server returned an invalid response.')}
-    if(r.status===403&&j.error==='csrf_failed'&&!retried){await loadAuth(true);return secureJsonPost(path,payload,true,signal)}
-    if(!r.ok||j.ok===false){const e=new Error(j.message||j.error||'Request failed.');e.payload=j;e.status=r.status;throw e}
+    const headers={'Content-Type':'application/json','X-CSRF-Token':st.auth.csrf||''};
+    if(onDelta&&typeof ReadableStream==='function'&&typeof TextDecoder==='function')headers.Accept='application/x-ndjson';
+    const r=await fetch((cfg.apiBase||'api')+'/'+path,{method:'POST',credentials:'same-origin',headers,body:JSON.stringify(payload||{}),signal});
+    const type=r.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+    const streamed=!!headers.Accept&&type===headers.Accept;
+    onTrace?.('response_headers',{http_status:r.status,transport:streamed?'ndjson':type==='application/json'?'json':'other'});
+    let j,status=r.status;
+    try{
+      if(streamed){
+        const event=await readSceneResponseStream(r,onDelta,onConcept,onRetry,onTrace);
+        j=event.data;
+        status=event.status;
+      }else j=await r.json();
+      if(!j||typeof j!=='object'||Array.isArray(j))throw new Error('Invalid JSON payload');
+    }catch(_){
+      onTrace?.('response_unreadable',{});
+      const error=new Error('The server returned an invalid response.');error.status=r.status;throw error;
+    }
+    onTrace?.('response_result',{status});
+    if(status===403&&j.error==='csrf_failed'&&!retried){await loadAuth(true);return secureJsonPost(path,payload,true,signal,onDelta,onConcept,onRetry,onTrace)}
+    if(status<200||status>=300||j.ok===false){const e=new Error(j.message||j.error||'Request failed.');e.payload=j;e.status=status;throw e}
     return j;
   }
   function applyQueue(queue){const q=queue||{};st.queue.loaded=true;st.queue.items=Array.isArray(q.items)?q.items:[];updateQueueUi();return st.queue.items}
@@ -1831,6 +1858,17 @@
     const renderer=window.StonefellowLibrary;if(!renderer?.render){canvas.innerHTML=`<article class="module"><div class="module-kicker">MY LIBRARY</div><h2>Library unavailable</h2><p class="player-note">Reload Stonefellow to load the library workspace.</p></article>`;return}
     return renderer.render({canvas,api,securePost:secureJsonPost,esc,time,$,$,bind,navigate,state:st,favoriteButton,bindFavoriteButtons,bindQueueTrackButtons,trackById,play,playPlaylist,loadBuild:loadAccountBuild,resumeTrack,say},params)
   }
+  let accountPhotoPreferencesRequest=null;
+  async function openAccountPhotoPreferences(){
+    const owner=canvasOwner();
+    if(!owner)return;
+    accountPhotoPreferencesRequest?.request.abort();
+    const pending={owner,request:new AbortController()};accountPhotoPreferencesRequest=pending;
+    try{
+      await window.SFCanvasImageAnalysis?.openPreferences({signal:pending.request.signal,
+        api:(path,body,signal)=>body===undefined?api(path,undefined,signal):secureJsonPost(path,body,false,signal)});
+    }finally{if(accountPhotoPreferencesRequest===pending)accountPhotoPreferencesRequest=null;}
+  }
   async function renderAccount(){
     await loadAuth(true);if(!st.auth.authenticated){renderLogin();return}let j;try{j=await api('account.php')}catch(e){if(e.payload?.error==='authentication_required'){st.auth={loaded:true,authenticated:false,user:null,csrf:null};syncAuthMenu();renderLogin();return}throw e}
     st.auth.user=j.user;st.auth.authenticated=true;st.auth.csrf=j.csrf||st.auth.csrf;syncAuthMenu();const orders=j.orders||[],ent=j.entitlement||{},sub=ent.subscription||{},saved=j.saved_builds||[],library=j.library||[],life=j.lifecycle||{},invoices=j.invoices||[],sessions=j.sessions||[],personal=j.personalization||{favorites:{tracks:[],releases:[]},continue_listening:[],history:[],recommendations:{personalized:false,summary:'',signals:{},items:[]}},playlists=j.playlists||[],notificationPrefs=j.notification_preferences||[],myLibrary=j.my_library||{summary:{}},fanCrm=j.fan_crm||{},privacy=j.privacy||{};st.personalization={loaded:true,...personal};st.playlists={loaded:true,items:playlists};const favTracks=personal.favorites?.tracks||[],favReleases=personal.favorites?.releases||[],continueRows=personal.continue_listening||[],history=personal.history||[],recommendations=personal.recommendations?.items||[];const membership=ent.membership||{},paidManaged=(sub.provider||'local')==='stripe'&&!!sub.provider_subscription_id;
@@ -1838,8 +1876,10 @@
     const fanPrefsHtml=`<div class="account-orders fan-preferences"><div class="module-kicker account-section-head"><span>FAN + AGENT</span><button class="text-control" id="saveFanPreferences" type="button">Save preferences</button></div><p class="player-note">Control newsletter email and whether the Stonefellow Agent can proactively greet or suggest something based on your recent activity. Automatic Agent touches are in-app and logged in Agent Brain.</p><div class="fan-preference-grid"><label><input id="fanNewsletterOptIn" type="checkbox" ${fanCrm.marketing_opt_in?'checked':''}> Stonefellow newsletter</label><label><input id="fanAutoEngage" type="checkbox" ${fanCrm.agent_auto_engage!==false?'checked':''}> Proactive Agent interaction</label></div></div>`;
     const verifyNotice=!life.email_verified?`<div class="account-alert"><div><strong>Verify your email</strong><span>${esc(j.user.email)} is not verified. Verification is required before starting a paid subscription.</span></div><button class="text-control" id="resendVerification" type="button">Resend verification</button></div>`:'';
     const billingActions=`<div class="player-controls">${paidManaged?'<button class="text-control" id="manageBilling" type="button">Manage billing</button>':''}${sub.status&&sub.status!=='none'&&!sub.cancel_at_period_end?'<button class="text-control" id="cancelSubscription" type="button">Cancel at period end</button>':''}${Number(sub.cancel_at_period_end)?'<button class="text-control" id="resumeSubscription" type="button">Resume subscription</button>':''}</div>`;
-    canvas.innerHTML=`<article class="module auth-module"><div class="module-kicker">MY STONEFELLOW</div><div class="account-header"><div><h2>${esc(j.user.display_name)}</h2><div class="account-meta">${esc(j.user.email)} · ${life.email_verified?'Verified':'Unverified'}<br>${j.user.role==='admin'?'Administrator · ':''}Member since ${esc((j.user.created_at||'').slice(0,10))}</div></div></div>${verifyNotice}<div class="token-panel"><div class="token-stat"><strong>${j.user.role==='admin'?'Unlimited':Number(ent.balance||0).toLocaleString()}</strong><span>Active Tokens</span></div><div class="token-stat"><strong>${esc(sub.package_name||'No package')}</strong><span>Plan</span></div><div class="token-stat"><strong>${esc(sub.status||'none')}</strong><span>Status</span></div>${sub.current_period_end?`<div class="token-stat"><strong>${esc(sub.current_period_end.slice(0,10))}</strong><span>${Number(sub.cancel_at_period_end)?'Access ends':'Renews'}</span></div>`:''}${sub.trial_ends_at?`<div class="token-stat"><strong>${esc(sub.trial_ends_at.slice(0,10))}</strong><span>Trial ends</span></div>`:''}</div>${membership.active?`<section class="account-membership-panel"><div><div class="module-kicker">MEMBERSHIP</div><h3>${esc(membership.badge||membership.package_name||'Stonefellow Member')}</h3><p>${membershipBenefitText(membership.benefits||{})}</p></div><button class="buy-primary" type="button" data-view="membership">Open membership</button></section>`:''}<div class="player-controls"><button class="text-control" data-view="library" type="button">My Library</button><button class="text-control" data-view="plans" type="button">Plans</button><button class="text-control" id="editProfile" type="button">Edit profile</button><button class="text-control" data-view="account-privacy" type="button">Privacy & data</button><button class="text-control" id="saveCurrentBuild" type="button">Save current build</button></div>${billingActions}<div class="account-orders"><div class="module-kicker">BILLING + RECEIPTS</div>${invoices.length?invoices.map(i=>`<div class="account-order"><div><strong>${esc(i.provider_invoice_id)}</strong><small>${esc((i.paid_at||i.created_at||'').replace('T',' ').slice(0,19))} · ${esc(i.status)}</small></div><div><strong>${new Intl.NumberFormat('en-US',{style:'currency',currency:i.currency||'USD'}).format((i.amount_paid_cents||0)/100)}</strong>${i.hosted_invoice_url?`<a class="text-control inline-link" href="${esc(i.hosted_invoice_url)}" target="_blank" rel="noopener">Receipt</a>`:''}${i.invoice_pdf?`<a class="text-control inline-link" href="${esc(i.invoice_pdf)}" target="_blank" rel="noopener">PDF</a>`:''}</div></div>`).join(''):'<p class="player-note">Subscription receipts will appear here after billing begins.</p>'}</div><div class="account-orders account-library-portal"><div class="module-kicker account-section-head"><span>MY LIBRARY</span><button class="text-control" type="button" data-view="library">Open My Library</button></div><p class="player-note">Your saved tracks and releases, playlists, owned music, custom-media builds, Continue Listening, history, and Collections now live in one library workspace.</p><div class="account-library-summary"><button type="button" data-view="library" data-tab="tracks"><strong>${Number(myLibrary.summary?.tracks||0)}</strong><span>Tracks</span></button><button type="button" data-view="library" data-tab="releases"><strong>${Number(myLibrary.summary?.releases||0)}</strong><span>Releases</span></button><button type="button" data-view="library" data-tab="playlists"><strong>${Number(myLibrary.summary?.playlists||0)}</strong><span>Playlists</span></button><button type="button" data-view="library" data-tab="purchases"><strong>${Number(myLibrary.summary?.purchases||0)}</strong><span>Purchases</span></button><button type="button" data-view="library" data-tab="collections"><strong>${Number(myLibrary.summary?.collections||0)}</strong><span>Collections</span></button></div></div>${notificationPrefsHtml}${fanPrefsHtml}<div class="account-orders"><div class="module-kicker">SECURITY + SESSIONS</div><div class="player-controls"><button class="text-control" type="button" id="revokeOtherSessions">Sign out other sessions</button></div>${sessions.length?sessions.map(x=>`<div class="account-order"><div><strong>${x.current?'Current browser':'Signed-in session'}</strong><small>Last active ${esc(String(x.last_seen_at||'').replace('T',' ').slice(0,19))} · Expires ${esc(String(x.expires_at||'').slice(0,10))}</small></div>${x.current?'<span class="account-badge">current</span>':`<button class="text-control" type="button" data-revoke-session="${esc(x.id)}">Sign out</button>`}</div>`).join(''):'<p class="player-note">No persistent sessions are active.</p>'}</div><div class="account-orders"><div class="module-kicker">PURCHASES</div>${orders.length?orders.map(o=>`<div class="account-order"><div><strong>${esc(o.id)}</strong><small>${esc((o.created_at||'').replace('T',' ').slice(0,19))} · ${(o.items||[]).map(i=>esc(i.label)).join(', ')}</small></div><div><div class="account-badge">${esc(o.fulfillment?.status&&o.fulfillment.status!=='not_required'?o.fulfillment.status:o.status)}</div>${o.vinyl_production?`<small class="order-vinyl-status">Vinyl production: ${esc(String(o.vinyl_production.status||'').replaceAll('_',' '))}</small>`:''}${o.fulfillment?.tracking_number?`<small>${esc(o.fulfillment.carrier||'')} ${esc(o.fulfillment.tracking_number)}</small>`:''}<strong>${new Intl.NumberFormat('en-US',{style:'currency',currency:o.currency||'USD'}).format((o.total_cents||0)/100)}</strong><button class="text-control" type="button" data-order-id="${esc(o.id)}">View details</button></div></div>`).join(''):'<p class="player-note">No purchases yet.</p>'}</div><p class="tiny-note">Account navigation, logout, and Admin access are available from the ••• menu.</p></article>`;
+    canvas.innerHTML=`<article class="module auth-module"><div class="module-kicker">MY STONEFELLOW</div><div class="account-header"><div><h2>${esc(j.user.display_name)}</h2><div class="account-meta">${esc(j.user.email)} · ${life.email_verified?'Verified':'Unverified'}<br>${j.user.role==='admin'?'Administrator · ':''}Member since ${esc((j.user.created_at||'').slice(0,10))}</div></div></div>${verifyNotice}<div class="token-panel"><div class="token-stat"><strong>${j.user.role==='admin'?'Unlimited':Number(ent.balance||0).toLocaleString()}</strong><span>Active Tokens</span></div><div class="token-stat"><strong>${esc(sub.package_name||'No package')}</strong><span>Plan</span></div><div class="token-stat"><strong>${esc(sub.status||'none')}</strong><span>Status</span></div>${sub.current_period_end?`<div class="token-stat"><strong>${esc(sub.current_period_end.slice(0,10))}</strong><span>${Number(sub.cancel_at_period_end)?'Access ends':'Renews'}</span></div>`:''}${sub.trial_ends_at?`<div class="token-stat"><strong>${esc(sub.trial_ends_at.slice(0,10))}</strong><span>Trial ends</span></div>`:''}</div>${membership.active?`<section class="account-membership-panel"><div><div class="module-kicker">MEMBERSHIP</div><h3>${esc(membership.badge||membership.package_name||'Stonefellow Member')}</h3><p>${membershipBenefitText(membership.benefits||{})}</p></div><button class="buy-primary" type="button" data-view="membership">Open membership</button></section>`:''}<div class="player-controls"><button class="text-control" data-view="library" type="button">My Library</button><button class="text-control" data-view="plans" type="button">Plans</button><button class="text-control" id="editProfile" type="button">Edit profile</button><button class="text-control" data-view="account-privacy" type="button">Privacy & data</button><button class="text-control" id="accountPhotoPreferences" type="button">Photo preferences</button><button class="text-control" id="saveCurrentBuild" type="button">Save current build</button></div>${billingActions}<div class="account-orders"><div class="module-kicker">BILLING + RECEIPTS</div>${invoices.length?invoices.map(i=>`<div class="account-order"><div><strong>${esc(i.provider_invoice_id)}</strong><small>${esc((i.paid_at||i.created_at||'').replace('T',' ').slice(0,19))} · ${esc(i.status)}</small></div><div><strong>${new Intl.NumberFormat('en-US',{style:'currency',currency:i.currency||'USD'}).format((i.amount_paid_cents||0)/100)}</strong>${i.hosted_invoice_url?`<a class="text-control inline-link" href="${esc(i.hosted_invoice_url)}" target="_blank" rel="noopener">Receipt</a>`:''}${i.invoice_pdf?`<a class="text-control inline-link" href="${esc(i.invoice_pdf)}" target="_blank" rel="noopener">PDF</a>`:''}</div></div>`).join(''):'<p class="player-note">Subscription receipts will appear here after billing begins.</p>'}</div><div class="account-orders account-library-portal"><div class="module-kicker account-section-head"><span>MY LIBRARY</span><button class="text-control" type="button" data-view="library">Open My Library</button></div><p class="player-note">Your saved tracks and releases, playlists, owned music, custom-media builds, Continue Listening, history, and Collections now live in one library workspace.</p><div class="account-library-summary"><button type="button" data-view="library" data-tab="tracks"><strong>${Number(myLibrary.summary?.tracks||0)}</strong><span>Tracks</span></button><button type="button" data-view="library" data-tab="releases"><strong>${Number(myLibrary.summary?.releases||0)}</strong><span>Releases</span></button><button type="button" data-view="library" data-tab="playlists"><strong>${Number(myLibrary.summary?.playlists||0)}</strong><span>Playlists</span></button><button type="button" data-view="library" data-tab="purchases"><strong>${Number(myLibrary.summary?.purchases||0)}</strong><span>Purchases</span></button><button type="button" data-view="library" data-tab="collections"><strong>${Number(myLibrary.summary?.collections||0)}</strong><span>Collections</span></button></div></div>${notificationPrefsHtml}${fanPrefsHtml}<div class="account-orders"><div class="module-kicker">SECURITY + SESSIONS</div><div class="player-controls"><button class="text-control" type="button" id="revokeOtherSessions">Sign out other sessions</button></div>${sessions.length?sessions.map(x=>`<div class="account-order"><div><strong>${x.current?'Current browser':'Signed-in session'}</strong><small>Last active ${esc(String(x.last_seen_at||'').replace('T',' ').slice(0,19))} · Expires ${esc(String(x.expires_at||'').slice(0,10))}</small></div>${x.current?'<span class="account-badge">current</span>':`<button class="text-control" type="button" data-revoke-session="${esc(x.id)}">Sign out</button>`}</div>`).join(''):'<p class="player-note">No persistent sessions are active.</p>'}</div><div class="account-orders"><div class="module-kicker">PURCHASES</div>${orders.length?orders.map(o=>`<div class="account-order"><div><strong>${esc(o.id)}</strong><small>${esc((o.created_at||'').replace('T',' ').slice(0,19))} · ${(o.items||[]).map(i=>esc(i.label)).join(', ')}</small></div><div><div class="account-badge">${esc(o.fulfillment?.status&&o.fulfillment.status!=='not_required'?o.fulfillment.status:o.status)}</div>${o.vinyl_production?`<small class="order-vinyl-status">Vinyl production: ${esc(String(o.vinyl_production.status||'').replaceAll('_',' '))}</small>`:''}${o.fulfillment?.tracking_number?`<small>${esc(o.fulfillment.carrier||'')} ${esc(o.fulfillment.tracking_number)}</small>`:''}<strong>${new Intl.NumberFormat('en-US',{style:'currency',currency:o.currency||'USD'}).format((o.total_cents||0)/100)}</strong><button class="text-control" type="button" data-order-id="${esc(o.id)}">View details</button></div></div>`).join(''):'<p class="player-note">No purchases yet.</p>'}</div><p class="tiny-note">Account navigation, logout, and Admin access are available from the ••• menu.</p></article>`;
     bind(canvas);Array.from(canvas.querySelectorAll('[data-view="library"][data-tab]')).forEach(b=>b.onclick=()=>navigate('library',{tab:b.dataset.tab||'all'}));$('#editProfile').onclick=()=>renderProfileForm();$('#saveCurrentBuild').onclick=saveCurrentBuildToAccount;$$('[data-load-build]',canvas).forEach(b=>b.onclick=()=>loadAccountBuild(Number(b.dataset.loadBuild),saved));$$('[data-delete-build]',canvas).forEach(b=>b.onclick=()=>deleteAccountBuild(Number(b.dataset.deleteBuild)));const resend=$('#resendVerification');if(resend)resend.onclick=resendVerification;const manage=$('#manageBilling');if(manage)manage.onclick=manageBilling;const cancel=$('#cancelSubscription');if(cancel)cancel.onclick=cancelSubscription;const resume=$('#resumeSubscription');if(resume)resume.onclick=resumeSubscription;$$('[data-order-id]',canvas).forEach(b=>b.onclick=()=>navigate('order',{id:b.dataset.orderId}));const revokeOthers=$('#revokeOtherSessions');if(revokeOthers)revokeOthers.onclick=revokeOtherSessions;$$('[data-revoke-session]',canvas).forEach(b=>b.onclick=()=>revokeSession(b.dataset.revokeSession));$$('[data-favorite-track-open]',canvas).forEach(b=>b.onclick=()=>navigate('track',{id:b.dataset.favoriteTrackOpen}));$$('[data-favorite-release-open]',canvas).forEach(b=>b.onclick=()=>navigate('release',{id:b.dataset.favoriteReleaseOpen}));const createPlaylist=$('#createPlaylist');if(createPlaylist)createPlaylist.onclick=createPlaylistPrompt;const saveAgentSession=$('#saveAgentSession');if(saveAgentSession)saveAgentSession.onclick=saveAgentSessionPrompt;$$('[data-playlist-open]',canvas).forEach(b=>b.onclick=()=>navigate('playlist',{id:b.dataset.playlistOpen}));Array.from(canvas.querySelectorAll('[data-resume-track]')).forEach(b=>b.onclick=()=>resumeTrack(b.dataset.resumeTrack,Number(b.dataset.resumePosition||0)));Array.from(canvas.querySelectorAll('[data-recommend-play]')).forEach(b=>b.onclick=()=>{const t=trackById(b.dataset.recommendPlay);if(t)play(t,0,'recommendation')});const clearHistory=$('#clearListeningHistory');if(clearHistory)clearHistory.onclick=clearListeningHistory;const saveNotificationPrefs=$('#saveNotificationPreferences');if(saveNotificationPrefs)saveNotificationPrefs.onclick=saveNotificationPreferences;const saveFanPrefs=$('#saveFanPreferences');if(saveFanPrefs)saveFanPrefs.onclick=saveFanPreferences;
+    const photoPreferences=$('#accountPhotoPreferences');
+    if(photoPreferences)photoPreferences.onclick=openAccountPhotoPreferences;
     renderGuestMigrationOffer();
   }
   async function saveFanPreferences(){try{await secureJsonPost('fan-preferences.php',{marketing_opt_in:!!$('#fanNewsletterOptIn',canvas)?.checked,agent_auto_engage:!!$('#fanAutoEngage',canvas)?.checked});st.fanEngagementLoaded=false;say('Fan and Agent preferences saved.',()=>renderAccount())}catch(e){say(e.message)}}
@@ -1894,14 +1934,14 @@
   async function renderPrivacyCenter(){
     await loadAuth(true);if(!st.auth.authenticated){renderLogin();return}let j;try{j=await api('privacy.php')}catch(e){if(e.payload?.error==='authentication_required'){renderLogin();return}throw e}
     const p=j.privacy||{},profile=p.profile||{},blockers=p.closure_blockers||[],events=p.recent_privacy_events||[],browserTz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';
-    canvas.innerHTML='<article class="module privacy-center"><div class="module-kicker">ACCOUNT · PROFILE + PRIVACY</div><div class="privacy-head"><div><h2>Your Stonefellow data</h2><p class="player-note">Control the profile details Stonefellow uses, whether future listening is tied to your account, and whether your activity is used for personalized recommendations.</p></div><button class="text-control" type="button" data-view="account">Back to account</button></div><section class="privacy-panel"><div class="module-kicker">PROFILE + PERSONALIZATION</div><form id="privacyProfileForm" class="privacy-profile-form"><label>Timezone<input name="timezone" list="privacyTimezoneList" value="'+esc(profile.timezone||browserTz)+'" placeholder="America/Phoenix"><datalist id="privacyTimezoneList">'+(browserTz?'<option value="'+esc(browserTz)+'">':'')+'<option value="America/Phoenix"><option value="America/Los_Angeles"><option value="America/Denver"><option value="America/Chicago"><option value="America/New_York"><option value="UTC"></datalist></label><label>Country code<input name="country_code" maxlength="2" value="'+esc(profile.country_code||'')+'" placeholder="US"></label><label>Locale<input name="locale" maxlength="20" value="'+esc(profile.locale||'en-US')+'" placeholder="en-US"></label><label class="privacy-switch"><input type="checkbox" name="listening_history_enabled" '+(profile.listening_history_enabled!==false?'checked':'')+'><span><strong>Save listening history</strong><small>When off, new listening events remain anonymous and Continue Listening stops updating.</small></span></label><label class="privacy-switch"><input type="checkbox" name="personalization_enabled" '+(profile.personalization_enabled!==false?'checked':'')+'><span><strong>Use my activity for personalization</strong><small>When off, recommendations and Agent music ranking stop using favorites, listening, playlists and feedback.</small></span></label><div class="actions"><button class="buy-primary" type="submit">Save profile + privacy</button><span id="privacyProfileStatus" class="auth-error"></span></div></form></section><section class="privacy-panel"><div class="module-kicker">YOUR DATA</div><p class="player-note">Exports include account/profile information, library, listening history, playlists, purchases, invoices, Agent conversations, support history and identifiable telemetry associated with your account.</p><div class="privacy-action-grid"><button class="text-control" id="privacyExport" type="button">Download my data</button><button class="text-control" id="privacyClearHistory" type="button">Clear listening history</button><button class="text-control" id="privacyResetPersonalization" type="button">Reset personalization signals</button><button class="text-control" id="privacyClearSearch" type="button">Clear search/discovery activity</button><button class="text-control" id="privacyClearAgent" type="button">Clear Agent conversation history</button></div></section><section class="privacy-panel"><div class="module-kicker">RECENT PRIVACY ACTIVITY</div>'+privacyEventRows(events)+'</section><section class="privacy-panel privacy-danger"><div class="module-kicker">CLOSE ACCOUNT</div><h3>Close your Stonefellow account</h3><p class="player-note">'+esc(p.retention_note||'')+'</p>'+(blockers.length?'<div class="account-alert"><div><strong>Closure is currently blocked</strong><span>'+esc(blockers.join(' '))+'</span></div></div>':'<p class="player-note">Closing your account signs you out everywhere, removes or anonymizes fan-behavior/profile data, archives newsletter identity, and disables future login.</p>')+'<form id="privacyCloseForm" class="privacy-close-form"><label>Current password<input name="current_password" type="password" autocomplete="current-password" required '+(blockers.length?'disabled':'')+'></label><label>Type DELETE<input name="confirmation" autocomplete="off" required pattern="DELETE" '+(blockers.length?'disabled':'')+'></label><button class="danger-button" type="submit" '+(blockers.length?'disabled':'')+'>Close account permanently</button><p id="privacyCloseStatus" class="auth-error"></p></form></section></article>';
+    canvas.innerHTML='<article class="module privacy-center"><div class="module-kicker">ACCOUNT · PROFILE + PRIVACY</div><div class="privacy-head"><div><h2>Your Stonefellow data</h2><p class="player-note">Control the profile details Stonefellow uses, whether future listening is tied to your account, and whether your activity is used for personalized recommendations.</p></div><button class="text-control" type="button" data-view="account">Back to account</button></div><section class="privacy-panel"><div class="module-kicker">PROFILE + PERSONALIZATION</div><form id="privacyProfileForm" class="privacy-profile-form"><label>Timezone<input name="timezone" list="privacyTimezoneList" value="'+esc(profile.timezone||browserTz)+'" placeholder="America/Phoenix"><datalist id="privacyTimezoneList">'+(browserTz?'<option value="'+esc(browserTz)+'">':'')+'<option value="America/Phoenix"><option value="America/Los_Angeles"><option value="America/Denver"><option value="America/Chicago"><option value="America/New_York"><option value="UTC"></datalist></label><label>Country code<input name="country_code" maxlength="2" value="'+esc(profile.country_code||'')+'" placeholder="US"></label><label>Locale<input name="locale" maxlength="20" value="'+esc(profile.locale||'en-US')+'" placeholder="en-US"></label><label class="privacy-switch"><input type="checkbox" name="listening_history_enabled" '+(profile.listening_history_enabled!==false?'checked':'')+'><span><strong>Save listening history</strong><small>When off, new listening events remain anonymous and Continue Listening stops updating.</small></span></label><label class="privacy-switch"><input type="checkbox" name="personalization_enabled" '+(profile.personalization_enabled!==false?'checked':'')+'><span><strong>Use my activity for personalization</strong><small>When off, recommendations and Agent music ranking stop using favorites, listening, playlists and feedback.</small></span></label><div class="actions"><button class="buy-primary" type="submit">Save profile + privacy</button><span id="privacyProfileStatus" class="auth-error"></span></div></form></section><section class="privacy-panel"><div class="module-kicker">YOUR DATA</div><p class="player-note">Exports include account/profile information, library, listening history, playlists, purchases, invoices, Agent conversations, support history and identifiable telemetry associated with your account.</p><div class="privacy-action-grid"><button class="text-control" id="privacyExport" type="button">Download my data</button><button class="text-control" id="privacyClearHistory" type="button">Clear listening history</button><button class="text-control" id="privacyResetPersonalization" type="button">Reset personalization signals</button><button class="text-control" id="privacyClearSearch" type="button">Clear search/discovery activity</button><button class="text-control" id="privacyClearAgent" type="button">Clear Agent conversation history and canvas scenes</button></div></section><section class="privacy-panel"><div class="module-kicker">RECENT PRIVACY ACTIVITY</div>'+privacyEventRows(events)+'</section><section class="privacy-panel privacy-danger"><div class="module-kicker">CLOSE ACCOUNT</div><h3>Close your Stonefellow account</h3><p class="player-note">'+esc(p.retention_note||'')+'</p>'+(blockers.length?'<div class="account-alert"><div><strong>Closure is currently blocked</strong><span>'+esc(blockers.join(' '))+'</span></div></div>':'<p class="player-note">Closing your account signs you out everywhere, removes or anonymizes fan-behavior/profile data, archives newsletter identity, and disables future login.</p>')+'<form id="privacyCloseForm" class="privacy-close-form"><label>Current password<input name="current_password" type="password" autocomplete="current-password" required '+(blockers.length?'disabled':'')+'></label><label>Type DELETE<input name="confirmation" autocomplete="off" required pattern="DELETE" '+(blockers.length?'disabled':'')+'></label><button class="danger-button" type="submit" '+(blockers.length?'disabled':'')+'>Close account permanently</button><p id="privacyCloseStatus" class="auth-error"></p></form></section></article>';
     bind(canvas);
     const form=$('#privacyProfileForm',canvas);if(form)form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),status=$('#privacyProfileStatus',canvas);status.textContent='Saving…';try{await secureJsonPost('privacy.php',{action:'save_profile',profile:{timezone:fd.get('timezone'),country_code:fd.get('country_code'),locale:fd.get('locale'),listening_history_enabled:fd.get('listening_history_enabled')==='on',personalization_enabled:fd.get('personalization_enabled')==='on'}});st.personalization.loaded=false;status.textContent='Saved.'}catch(x){status.textContent=x.message}};
     const exportBtn=$('#privacyExport',canvas);if(exportBtn)exportBtn.onclick=async()=>{if(!confirm('Generate and download a JSON copy of your Stonefellow account data?'))return;exportBtn.disabled=true;try{const x=await secureJsonPost('privacy.php',{action:'export',confirmed:true});downloadPrivacyJson(x.filename,x.export);say('Your Stonefellow data export is ready.')}catch(x){say(x.message)}finally{exportBtn.disabled=false}};
     const clearHistory=$('#privacyClearHistory',canvas);if(clearHistory)clearHistory.onclick=async()=>{if(!confirm('Clear your identifiable Stonefellow listening history and Continue Listening progress?'))return;try{await secureJsonPost('privacy.php',{action:'clear_history',confirmed:true});st.personalization.loaded=false;say('Listening history cleared.',()=>renderPrivacyCenter())}catch(x){say(x.message)}};
     const reset=$('#privacyResetPersonalization',canvas);if(reset)reset.onclick=async()=>{if(!confirm('Reset listening history and track-feedback signals used for personalization? Favorites, playlists and purchases will stay saved.'))return;try{await secureJsonPost('privacy.php',{action:'reset_personalization',confirmed:true});st.personalization.loaded=false;say('Personalization signals reset.',()=>renderPrivacyCenter())}catch(x){say(x.message)}};
     const search=$('#privacyClearSearch',canvas);if(search)search.onclick=async()=>{if(!confirm('Remove your account identity from saved search and discovery analytics?'))return;try{await secureJsonPost('privacy.php',{action:'clear_search_activity',confirmed:true});say('Search and discovery activity anonymized.',()=>renderPrivacyCenter())}catch(x){say(x.message)}};
-    const agentClear=$('#privacyClearAgent',canvas);if(agentClear)agentClear.onclick=async()=>{if(!confirm('Permanently delete your Stonefellow Agent conversation history?'))return;try{await secureJsonPost('privacy.php',{action:'clear_agent_history',confirmed:true});st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');say('Agent conversation history cleared.',()=>renderPrivacyCenter())}catch(x){say(x.message)}};
+    const agentClear=$('#privacyClearAgent',canvas);if(agentClear)agentClear.onclick=async()=>{if(!confirm('Permanently delete your Stonefellow Agent conversation history and saved canvas scenes?'))return;try{closeListeningRoom();await secureJsonPost('privacy.php',{action:'clear_agent_history',confirmed:true});popupHistoryEpoch++;window.SFPublicAgentCanvas?.setSceneWorkflow?.(null);stopListeningRoomBuild.pending=null;canvasProjects.current?.clearHistory?.();popupEntries=[];popupHistoryLoaded=true;st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');renderPopupEntries();say('Agent conversations and canvas scenes cleared.',()=>renderPrivacyCenter())}catch(x){say(x.message)}};
     const close=$('#privacyCloseForm',canvas);if(close)close.onsubmit=async e=>{e.preventDefault();const fd=new FormData(close),status=$('#privacyCloseStatus',canvas);if(String(fd.get('confirmation')||'')!=='DELETE'){status.textContent='Type DELETE exactly.';return}if(!confirm('Permanently close this Stonefellow account? This cannot be undone from the site.'))return;status.textContent='Closing account…';try{await secureJsonPost('privacy.php',{action:'close_account',current_password:fd.get('current_password'),confirmation:fd.get('confirmation'),confirmed:true});localStorage.removeItem('stonefellow.agent.conversation');localStorage.removeItem('stonefellow.auth');location.href=new URL('./',document.baseURI).href}catch(x){status.textContent=x.message}};
   }
   function renderProfileForm(){
@@ -1963,6 +2003,7 @@
     return {
       view,route_id:history.state?.params?.id||u.searchParams.get('id')||'',
       active_track_id:current.track?.id||'',active_release_title:current.track?.release||'',
+      public_canvas_enabled:window.SFPublicAgentCanvas?.active?.()===true,
       timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
       ...playerState(),builder_format:st.builder.format,
       builder_side_a_count:st.builder.A.length,builder_side_b_count:st.builder.B.length,
@@ -1980,7 +2021,1695 @@
       search_query:$('#siteSearchInput',canvas)?.value||$('#catalogSearch',canvas)?.value||''
     };
   }
+  function canvasDesignBrief(brief){
+    const clean=brief.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all)\}/gi,' ')
+      .replace(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|merch-clear|tickets-clear)\}/gi,' ')
+      .replace(/(`?)\{[^\S\r\n]*(?:hide-agent|design-ag(?:ent|net))[^\S\r\n]*\}\1/gi,' ').trim();
+    return clean!==brief&&/^[.!?…]+$/.test(clean)?'':clean;
+  }
+  let manualAgentHidden=false;
+  function syncAgentVisibility(hidden){
+    const effective=manualAgentHidden||hidden;
+    document.body.classList.toggle('sf-agent-hidden-by-scene',effective);
+    const restore=$('#menuShowAgent');
+    if(restore)restore.hidden=!effective;
+    syncAgentDockLayout();
+  }
+  function handleAgentVisibilityCommand(text){
+    const action=String(text||'').trim().toLowerCase();
+    if(action!=='/hide-agent'&&action!=='/show-agent')return false;
+    manualAgentHidden=action==='/hide-agent';
+    const moveFocus=manualAgentHidden&&document.activeElement?.closest?.('.agent-stage,#voiceButton,#agentVoiceReplyToggle');
+    document.body.classList.toggle('sf-agent-manually-hidden',manualAgentHidden);
+    if(!window.SFPublicAgentCanvas?.setAgentHidden?.(manualAgentHidden))syncAgentVisibility(manualAgentHidden);
+    if(moveFocus)$('#menuButton')?.focus({preventScroll:true});
+    return true;
+  }
+  function bindAgentVisibilityMenu(){
+    const restore=$('#menuShowAgent');
+    if(restore)restore.onclick=()=>{
+      handleAgentVisibilityCommand('/show-agent');
+      closeMenu();
+      $('#menuButton')?.focus({preventScroll:true});
+    };
+  }
+  let chatImagePicker=null,chatImageDraftLimit=-1,canvasImageEditDraft=null;
+  async function uploadCanvasPhoto(file,{signal}={},retried=false){
+    if(signal?.aborted)throw new Error('The photo upload was canceled.');
+    if(!st.auth.csrf)await loadAuth(true);
+    const payload=new FormData();
+    payload.append('file',file);
+    payload.append('title',String(file.name||'My photo').replace(/\.[^.]+$/,'').slice(0,180));
+    const response=await fetch((cfg.apiBase||'api')+'/agent-canvas-photo.php',{
+      method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':st.auth.csrf||''},body:payload,signal});
+    let result;
+    try{result=await response.json();}catch(_){throw new Error('The server returned an unreadable photo upload response.');}
+    if(response.status===403&&result.error==='csrf_failed'&&!retried){
+      await loadAuth(true);
+      return uploadCanvasPhoto(file,{signal},true);
+    }
+    if(!response.ok||result.ok===false)throw new Error(result.message||'The photo could not be uploaded.');
+    if(!result.image||typeof result.image.id!=='string'||!/^[a-f0-9]{32}$/.test(result.image.id))
+      throw new Error('The server could not confirm the saved photo.');
+    return result.image;
+  }
+  const chatImageReferenceLimit=4;
+  const chatImageId=/^(?:ref-)?[a-f0-9]{32}$/;
+  function setCanvasImageEditDraft(selection){
+    if(canvasImageEditDraft===selection)return;
+    canvasImageEditDraft=selection;
+    const row=document.getElementById?.('canvasImageEditDraft');
+    if(row){
+      row.hidden=!selection;
+      row.querySelector('[data-canvas-image-edit-label]').textContent=selection?'Editing '+selection.title+' · describe the change':'';
+      row.querySelector('[data-canvas-image-edit-cancel]').onclick=selection?()=>{
+        setCanvasImageEditDraft(null);
+        input.focus({preventScroll:true});
+      }:null;
+    }
+    document.body?.classList?.toggle('sf-canvas-image-editing',!!selection);
+  }
+  function selectCanvasImageForEdit(asset){
+    const owner=canvasOwner();
+    if(!owner||listeningRoomRequest||!listeningRoom||asset?.sceneId!==listeningRoom.id||listeningRoom.canvas_kind!=='custom'||
+      !window.SFPublicAgentCanvas?.sceneActive?.()||typeof asset.id!=='string'||!chatImageId.test(asset.id))return false;
+    const current=Array.isArray(listeningRoom.image_assets)&&listeningRoom.image_assets.find(image=>image?.id===asset.id);
+    if(!current)return false;
+    const title=(typeof current.title==='string'&&current.title.trim().slice(0,160))||'selected image';
+    setCanvasImageEditDraft({owner,sceneId:listeningRoom.id,imageId:current.id,title});
+    setChatFooterHidden(false);
+    closeQuickMenu();
+    input.focus({preventScroll:true});
+    return true;
+  }
+  function chatDraftImageIds(draft){
+    return new Set(Array.from(draft.matchAll(/\{image-((?:ref-)?[a-f0-9]{32})\}/gi),match=>match[1].toLowerCase()));
+  }
+  function chatDraftVisualReferenceIds(draft){
+    return Array.from(new Set(Array.from(draft.matchAll(/\{reference-image-((?:ref-)?[a-f0-9]{32})\}/gi),match=>match[1].toLowerCase())));
+  }
+  let chatMusicPicker=null,chatMusicCommandTimer=null;
+  let chatResourcePicker=null,chatResourceCommandTimer=null;
+  function chatDraftResourceInputs(draft){
+    const sources=[],merch=[],tickets=[];
+    for(const match of draft.matchAll(/\{(canvas|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
+      const kind=match[1].toLowerCase(),id=match[2];
+      if(kind==='canvas'){
+        const value=Number(id);if(/^[1-9]\d*$/.test(id)&&Number.isSafeInteger(value))sources.push(value);
+      }else (kind==='merch'?merch:tickets).push(id);
+    }
+    const artist={};
+    if(merch.length||/\{merch-clear\}/i.test(draft))artist.merch_ids=Array.from(new Set(merch));
+    if(tickets.length||/\{tickets-clear\}/i.test(draft))artist.ticket_ids=Array.from(new Set(tickets));
+    return {...(sources.length?{source_scene_ids:Array.from(new Set(sources))}:{}),
+      ...(Object.keys(artist).length?{artist_inputs:artist}:{})};
+  }
+  function chatResourceCommandRange(draft,caret){
+    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|merch|tickets)(?=$|[\s),.!?;:])/gi)){
+      const start=match.index+match[1].length,end=start+match[2].length+1;
+      if(caret!==undefined&&caret!==end)continue;
+      return {kind:match[2].toLowerCase(),start,end,standalone:draft.trim().toLowerCase()==='/'+match[2].toLowerCase()};
+    }
+    return null;
+  }
+  function applyChatResourceSelection(range,ids){
+    const tokenKind=range.kind==='tickets'?'ticket':range.kind;
+    const rule=new RegExp('\\{'+tokenKind+':[A-Za-z0-9_-]{1,180}\\}|\\{'+(range.kind==='tickets'?'tickets':range.kind)+'-clear\\}','gi');
+    const strip=value=>value.replace(rule,'');
+    const before=strip(input.value.slice(0,range.start)),after=strip(input.value.slice(range.end));
+    const tokens=ids.map(id=>'{'+tokenKind+':'+id+'}').join(' ')||
+      (range.kind==='canvas'?'':'{'+(range.kind==='tickets'?'tickets':'merch')+'-clear}');
+    input.value=before+tokens+after;
+    syncChatImageDraftLimit();
+    input.setSelectionRange(before.length+tokens.length,before.length+tokens.length);
+  }
+  async function openChatResourcePicker(range){
+    if(chatResourcePicker||chatMusicPicker||chatImagePicker)return;
+    const requestedDraft=input.value;
+    await loadAuth();
+    if(input.value!==requestedDraft||chatResourcePicker||chatMusicPicker||chatImagePicker)return;
+    if(!canvasOwner()){popupEntry('notice','Sign in to choose canvas project sources.');return;}
+    const open=window.SFCanvasResourcePicker?.open;
+    if(typeof open!=='function'){popupEntry('notice','Reload the page to open the source picker.');return;}
+    const draft=input.value,owner=canvasOwner(),resources=chatDraftResourceInputs(draft);
+    const key=range.kind==='merch'?'merch_ids':'ticket_ids';
+    const selected=range.kind==='canvas'?resources.source_scene_ids:
+      resources.artist_inputs?.[key]??(directListeningRoomCommand(draft)?.kind==='revise'?listeningRoom?.artist_inputs?.[key]:[]);
+    const picker={owner,request:new AbortController()};chatResourcePicker=picker;
+    try{
+      const result=await open({kind:range.kind,load:signal=>api('canvas-resources.php?kind='+range.kind,undefined,signal),
+        selectedIds:(selected||[]).map(String),signal:picker.request.signal});
+      if(!result||picker.request.signal.aborted||chatResourcePicker!==picker||owner!==canvasOwner()||input.value!==draft)return;
+      applyChatResourceSelection(range,result.ids);
+    }catch(error){if(error.name!=='AbortError'&&owner===canvasOwner())popupEntry('notice',error.message||'Sources could not load.');}
+    finally{if(chatResourcePicker===picker)chatResourcePicker=null;picker.request.abort();}
+  }
+  function bindChatResourcePicker(){
+    const read=event=>{
+      clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
+      if(event?.isComposing||input.selectionStart!==input.selectionEnd)return;
+      const draft=input.value,range=chatResourceCommandRange(draft,input.selectionEnd),owner=canvasOwner();
+      if(!range)return;
+      chatResourceCommandTimer=setTimeout(()=>{
+        if(input.value===draft&&owner===canvasOwner())void openChatResourcePicker(range);
+      },350);
+    };
+    input.addEventListener('input',read);input.addEventListener('compositionend',read);
+  }
+  function chatDraftMusicInputs(draft){
+    if(/\{music-all\}/i.test(draft))return {mode:'all'};
+    const ids=Array.from(new Set(Array.from(draft.matchAll(/\{music-track:([A-Za-z0-9_-]{1,180})\}/gi),match=>match[1])));
+    return ids.length?{mode:'selected',track_ids:ids}:null;
+  }
+  function chatDraftBindingLength(draft){
+    const placed=Array.from(draft.matchAll(/\{image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
+    const references=Array.from(draft.matchAll(/\{reference-image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
+    const music=Array.from(draft.matchAll(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all)\}/gi));
+    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|merch-clear|tickets-clear)\}/gi));
+    return [...placed,...references,...music,...resources].reduce((length,match)=>length+match[0].length+1,0);
+  }
+  function syncChatImageDraftLimit(){
+    if(chatImageDraftLimit<=0)return;
+    input.maxLength=chatImageDraftLimit+chatDraftBindingLength(input.value);
+  }
+  function chatMusicCommandRange(draft){
+    for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music)(?=$|[\s),.!?;:])/gi)){
+      const start=match.index+match[1].length,end=start+match[2].length+1;
+      const standalone=draft.trim().toLowerCase()==='/'+match[2].toLowerCase();
+      if(standalone||['create','revise','build_on'].includes(directListeningRoomCommand(draft)?.kind))
+        return {start,end,standalone,all:match[2].toLowerCase()==='music-all'};
+    }
+    return null;
+  }
+  function applyChatMusicSelection(range,selection){
+    const bindings=selection.mode==='all'?'{music-all}':selection.track_ids.map(id=>'{music-track:'+id+'}').join(' ');
+    const strip=value=>value.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all)\}/gi,'');
+    const before=strip(input.value.slice(0,range.start)),after=strip(input.value.slice(range.end));
+    const inserted=(range.standalone?"Let's build ":'')+bindings;
+    input.value=before+inserted+after;
+    syncChatImageDraftLimit();
+    input.setSelectionRange(before.length+inserted.length,before.length+inserted.length);
+  }
+  async function openChatMusicPicker(range){
+    if(chatMusicPicker||chatImagePicker||chatResourcePicker)return;
+    const open=window.SFCanvasMusicPicker?.open;
+    if(typeof open!=='function'){popupEntry('notice','Reload the page to open the music picker.');return;}
+    const draft=input.value,owner=canvasOwner();
+    const existing=chatDraftMusicInputs(draft)||
+      (directListeningRoomCommand(draft)?.kind==='revise'?listeningRoom?.music_inputs:null);
+    const picker={owner,request:new AbortController()};
+    chatMusicPicker=picker;
+    try{
+      const selection=await open({api,signal:picker.request.signal,selection:existing,selectedIds:existing?.mode==='selected'?existing.track_ids:[]});
+      if(!selection||picker.request.signal.aborted||chatMusicPicker!==picker||canvasOwner()!==owner||input.value!==draft)return;
+      applyChatMusicSelection(range,selection);
+    }finally{
+      if(chatMusicPicker===picker)chatMusicPicker=null;
+      picker.request.abort();
+    }
+  }
+  function bindChatMusicPicker(){
+    const readDraft=event=>{
+      clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
+      if(event?.isComposing||input.selectionStart!==input.selectionEnd)return;
+      const draft=input.value,range=chatMusicCommandRange(draft),owner=canvasOwner();
+      if(!range)return;
+      const apply=()=>{
+        chatMusicCommandTimer=null;
+        if(input.value!==draft||canvasOwner()!==owner||chatImagePicker||chatMusicPicker||chatResourcePicker)return;
+        if(range.all)applyChatMusicSelection(range,{mode:'all'});
+        else void openChatMusicPicker(range);
+      };
+      if(range.end<draft.length)apply();
+      else chatMusicCommandTimer=setTimeout(apply,350);
+    };
+    input.addEventListener('input',readDraft);
+    input.addEventListener('compositionend',readDraft);
+  }
+  function chatImageCommandRange(draft,caret){
+    const standalone=draft.trim().toLowerCase()==='/images';
+    for(const match of draft.matchAll(/(^|[\s(])\/images(?=$|[\s),.!?;:])/gi)){
+      const start=match.index+match[1].length,end=start+7;
+      if(caret!==undefined&&caret!==end)continue;
+      if(standalone||['create','revise','build_on'].includes(directListeningRoomCommand(draft)?.kind))
+        return {start,end,standalone};
+    }
+    return null;
+  }
+  function closeChatImagePicker(picker,restoreFocus=true){
+    if(chatImagePicker!==picker)return;
+    chatImagePicker=null;
+    picker.request?.abort();
+    picker.lifetime?.abort();
+    if(picker.dialog.open)picker.dialog.close();
+    picker.dialog.remove();
+    if(restoreFocus)input.focus({preventScroll:true});
+  }
+  function openChatImagePicker(range){
+    if(chatImagePicker||chatMusicPicker||chatResourcePicker)return;
+    setCanvasImageEditDraft(null);
+    const draft=input.value,owner=canvasOwner();
+    const existingByMode={place:chatDraftImageIds(draft),reference:new Set(chatDraftVisualReferenceIds(draft))};
+    const dialog=document.createElement('dialog');
+    dialog.id='chatImagePicker';
+    dialog.className='sf-chat-image-picker';
+    dialog.setAttribute('aria-labelledby','chatImagePickerTitle');
+    dialog.innerHTML=`<section class="sf-chat-image-picker-panel">
+      <header><h2 id="chatImagePickerTitle">Choose saved images</h2>
+        <div class="sf-chat-image-picker-options" role="group" aria-label="Image source"><button type="button" data-image-picker-source="saved" aria-pressed="false" ${owner?'':'disabled'}>My images</button><button type="button" data-image-picker-source="reference" aria-pressed="false">Artist references</button></div>
+        <div class="sf-chat-image-picker-options" role="group" aria-label="How to use images"><button type="button" data-image-picker-mode="place" aria-pressed="true">Place in canvas</button><button type="button" data-image-picker-mode="reference" aria-pressed="false">Use as visual reference</button></div>
+        <p data-image-picker-help>Place the selected images in your canvas.</p>
+        <form class="sf-chat-image-picker-search" data-image-picker-search role="search"><label>Search images<input type="search" name="query" maxlength="240" placeholder="Describe an image or search its visible text"></label><button type="submit">Search</button></form>
+        <div class="sf-chat-image-picker-options" data-image-picker-private ${owner?'':'hidden'}><button type="button" data-image-picker-upload>Upload photo</button><button type="button" data-image-picker-mode="analysis" aria-pressed="false">Select for analysis</button><button type="button" data-image-picker-batch>Batch analysis</button><button type="button" data-image-picker-preferences>Photo preferences</button><input type="file" data-image-picker-photo accept="image/jpeg,image/png,image/webp" hidden></div></header>
+      <div class="sf-chat-image-picker-body"><p class="sf-chat-image-picker-status" role="status"></p><ul aria-label="Saved images"></ul><button type="button" data-image-picker-more hidden>Load more</button></div>
+      <footer><span class="sf-chat-image-picker-count" aria-live="polite"></span><div><button type="button" data-image-picker-cancel autofocus>Cancel</button><button type="button" data-image-picker-add disabled>Add images</button></div></footer>
+    </section>`;
+    const status=$('.sf-chat-image-picker-status',dialog),list=$('ul',dialog),count=$('.sf-chat-image-picker-count',dialog);
+    const more=$('[data-image-picker-more]',dialog),add=$('[data-image-picker-add]',dialog),cancel=$('[data-image-picker-cancel]',dialog);
+    const help=$('[data-image-picker-help]',dialog),search=$('[data-image-picker-search]',dialog),searchInput=$('input[type="search"]',search);
+    const privateControls=$('[data-image-picker-private]',dialog),upload=$('[data-image-picker-upload]',dialog),photoInput=$('[data-image-picker-photo]',dialog);
+    const picker={dialog,owner,request:null,lifetime:new AbortController()};
+    const selected=new Set();
+    const sources={saved:{rows:new Map(),cursor:null,loaded:false,failed:false},reference:{rows:new Map(),cursor:null,loaded:false,failed:false}};
+    let source=owner?'saved':'reference',mode='place',query='',uploading=false;
+    const active=()=>chatImagePicker===picker&&canvasOwner()===owner;
+    const analysisApi=(path,body,signal)=>body===undefined?api(path,undefined,signal):secureJsonPost(path,body,false,signal);
+    const selectionExisting=()=>mode==='analysis'?new Set():existingByMode[mode];
+    const selectionLimit=()=>mode==='analysis'?200:chatImageReferenceLimit;
+    const syncSelection=()=>{
+      const existing=selectionExisting(),remaining=Math.max(0,selectionLimit()-existing.size);
+      count.textContent=existing.size?`${selected.size} selected · ${existing.size} already in draft`:`${selected.size} of ${remaining} selected`;
+      add.disabled=selected.size===0;
+      add.textContent=mode==='analysis'?'Analyze selected':mode==='reference'?'Add references':'Add images';
+      help.textContent=mode==='analysis'?'Select your images for a saved analysis batch. You can pause and review the results.':mode==='reference'?'Use the selected images to guide newly generated artwork.':'Place the selected images in your canvas.';
+      for(const inventory of Object.values(sources))for(const [id,row] of inventory.rows){
+        row.checkbox.checked=existing.has(id)||selected.has(id);
+        row.checkbox.disabled=existing.has(id)||(!selected.has(id)&&selected.size>=remaining);
+      }
+      for(const button of $$('[data-image-picker-mode]',dialog))button.setAttribute('aria-pressed',String(button.dataset.imagePickerMode===mode));
+    };
+    const renderSource=()=>{
+      const inventory=sources[source],empty=query?'No images match this search.':source==='reference'?'No artist references are available yet.':'No saved images yet.';
+      list.replaceChildren(...Array.from(inventory.rows.values(),row=>row.item));
+      list.setAttribute('aria-label',source==='reference'?'Artist reference images':'Saved images');
+      privateControls.hidden=!owner||source!=='saved';
+      for(const button of $$('[data-image-picker-source]',dialog))button.setAttribute('aria-pressed',String(button.dataset.imagePickerSource===source));
+      status.textContent=inventory.failed?'Images could not be loaded.':inventory.loaded?(inventory.rows.size?'':empty):'Loading images…';
+      more.textContent=inventory.failed?'Try again':'Load more';more.hidden=!inventory.failed&&!inventory.cursor;
+      syncSelection();
+    };
+    const renderImageMetadata=(row,image)=>{
+      row.image=image;
+      const analysis=image.image_analysis||{};
+      row.description.textContent=typeof analysis.description==='string'?analysis.description.slice(0,4000):'';
+      row.details.replaceChildren();
+      const fields=[['Description',analysis.description],['Visible text / OCR',analysis.visible_text],['Objects',analysis.objects],['Scene',analysis.scene],['Style',analysis.style],['Colors',analysis.colors],['Tags',analysis.tags],['Uncertainties',analysis.uncertainties],['Caption',image.caption],['Credit',image.credit]];
+      const entries=fields.filter(([,value])=>typeof value==='string'?value.trim():Array.isArray(value)&&value.length);
+      if(entries.length){
+        const summary=document.createElement('summary'),metadata=document.createElement('dl');
+        summary.textContent='Image details';
+        for(const [label,value] of entries){
+          const term=document.createElement('dt'),definition=document.createElement('dd');
+          term.textContent=label;
+          definition.textContent=Array.isArray(value)?value.filter(item=>typeof item==='string').join(', '):value;
+          metadata.append(term,definition);
+        }
+        row.details.append(summary,metadata);
+      }
+      row.details.hidden=entries.length===0;
+    };
+    const analyzeImage=image=>{
+      if(!active()||!owner||!window.SFCanvasImageAnalysis?.open)return;
+      window.SFCanvasImageAnalysis.open(image,{api:analysisApi,signal:picker.lifetime.signal,imageUrl:asset=>sceneImagePath(asset.id),onSaved:saved=>{
+        if(!active()||saved?.id!==image.id)return;
+        for(const inventory of Object.values(sources)){
+          const row=inventory.rows.get(saved.id);
+          if(row)renderImageMetadata(row,saved);
+        }
+      }});
+    };
+    const appendImage=(inventory,image,loadingSource)=>{
+      const id=image?.id;
+      if(typeof id!=='string'||!chatImageId.test(id)||(id.startsWith('ref-')!==(loadingSource==='reference'))||inventory.rows.has(id))return;
+      const url=new URL(sceneImagePath(id),document.baseURI);
+      if(url.origin!==window.location.origin)return;
+      const item=document.createElement('li'),label=document.createElement('label');
+      const preview=document.createElement('img'),title=document.createElement('span'),checkbox=document.createElement('input');
+      const description=document.createElement('p'),details=document.createElement('details');
+      description.className='sf-chat-image-picker-description';details.className='sf-chat-image-picker-details';
+      preview.alt='';preview.loading='lazy';preview.decoding='async';preview.src=url.href;
+      title.textContent=(typeof image.title==='string'&&image.title.trim().slice(0,160))||(loadingSource==='reference'?'Artist reference':'Saved image');
+      checkbox.type='checkbox';checkbox.setAttribute('aria-label',title.textContent);
+      checkbox.addEventListener('change',()=>{
+        if(!active())return;
+        const remaining=Math.max(0,selectionLimit()-selectionExisting().size);
+        if(checkbox.checked&&selected.size<remaining)selected.add(id);
+        else selected.delete(id);
+        syncSelection();
+      });
+      label.append(preview,checkbox,title);item.append(label,description,details);
+      const row={item,checkbox,description,details,image};
+      renderImageMetadata(row,image);
+      if(loadingSource==='saved'){
+        const analyze=document.createElement('button');
+        analyze.type='button';analyze.textContent='Analyze image';analyze.setAttribute('aria-label','Analyze image '+title.textContent);
+        analyze.addEventListener('click',()=>analyzeImage(row.image));item.append(analyze);
+      }
+      inventory.rows.set(id,row);
+    };
+    const load=async()=>{
+      if(!active()||picker.request||(source==='saved'&&!owner))return;
+      const loadingSource=source,inventory=sources[loadingSource],request=new AbortController();
+      picker.request=request;more.disabled=true;status.textContent='Loading images…';
+      try{
+        const params=new URLSearchParams();
+        if(loadingSource==='reference')params.set('scope','reference');
+        if(query)params.set('q',query);
+        if(inventory.cursor)params.set('before',inventory.cursor);
+        const path='agent-canvas-image.php'+(params.size?'?'+params.toString():'');
+        if(new URL((cfg.apiBase||'api')+'/'+path,document.baseURI).origin!==window.location.origin)
+          throw new Error('Image inventory must use the site origin.');
+        const page=await api(path,undefined,request.signal);
+        if(!active()||request.signal.aborted)return;
+        if(!Array.isArray(page?.images))throw new Error('Invalid image inventory.');
+        for(const image of page.images)appendImage(inventory,image,loadingSource);
+        inventory.cursor=typeof page.next_cursor==='string'&&chatImageId.test(page.next_cursor)&&page.next_cursor!==inventory.cursor?page.next_cursor:null;
+        inventory.loaded=true;inventory.failed=false;
+      }catch(_){
+        if(!active()||request.signal.aborted)return;
+        inventory.failed=true;
+      }finally{
+        if(picker.request===request){picker.request=null;more.disabled=false;}
+        if(active()&&!request.signal.aborted&&source===loadingSource)renderSource();
+      }
+    };
+    const resetInventories=()=>{
+      picker.request?.abort();picker.request=null;more.disabled=false;
+      for(const inventory of Object.values(sources)){
+        inventory.rows.clear();inventory.cursor=null;inventory.loaded=false;inventory.failed=false;
+      }
+    };
+    const searchImages=()=>{
+      if(!active())return;
+      query=searchInput.value.trim();resetInventories();renderSource();void load();
+    };
+    chatImagePicker=picker;
+    cancel.addEventListener('click',()=>closeChatImagePicker(picker));
+    dialog.addEventListener('cancel',event=>{event.preventDefault();closeChatImagePicker(picker);});
+    dialog.addEventListener('click',event=>{if(event.target===dialog)closeChatImagePicker(picker);});
+    dialog.addEventListener('keydown',event=>event.stopPropagation());
+    search.addEventListener('submit',event=>{event.preventDefault();event.stopPropagation();searchImages();});
+    searchInput.addEventListener('input',()=>{if(!searchInput.value&&query)searchImages();});
+    for(const button of $$('[data-image-picker-source]',dialog))button.addEventListener('click',()=>{
+      const next=button.dataset.imagePickerSource;
+      if(!active()||source===next||(next==='saved'&&!owner))return;
+      picker.request?.abort();picker.request=null;more.disabled=false;source=next;
+      if(source==='reference'&&mode==='analysis'){mode='place';selected.clear();}
+      renderSource();if(!sources[source].loaded)void load();
+    });
+    for(const button of $$('[data-image-picker-mode]',dialog))button.addEventListener('click',()=>{
+      if(!active()||(button.dataset.imagePickerMode==='analysis'&&(!owner||source!=='saved')))return;
+      mode=button.dataset.imagePickerMode;
+      const existing=selectionExisting(),remaining=Math.max(0,selectionLimit()-existing.size);
+      for(const id of selected)if(existing.has(id)||(mode==='analysis'&&id.startsWith('ref-')))selected.delete(id);
+      while(selected.size>remaining)selected.delete(Array.from(selected).at(-1));
+      syncSelection();
+    });
+    const openBatch=selectedIds=>{
+      if(!active()||!owner||!window.SFCanvasImageAnalysis?.openBatch)return;
+      window.SFCanvasImageAnalysis.openBatch({api:analysisApi,signal:picker.lifetime.signal,
+        imageUrl:asset=>sceneImagePath(asset.id),selectedIds,onSaved:()=>{
+          if(!active())return;
+          resetInventories();renderSource();void load();
+        }});
+    };
+    $('[data-image-picker-batch]',dialog).addEventListener('click',()=>openBatch([]));
+    $('[data-image-picker-preferences]',dialog).addEventListener('click',()=>{
+      if(active()&&owner)window.SFCanvasImageAnalysis?.openPreferences({api:analysisApi,signal:picker.lifetime.signal,imageUrl:asset=>sceneImagePath(asset.id)});
+    });
+    upload.addEventListener('click',()=>{if(active()&&owner&&!uploading)photoInput.click();});
+    photoInput.addEventListener('change',async()=>{
+      const file=photoInput.files?.[0];photoInput.value='';
+      if(!file||!active()||!owner||uploading)return;
+      uploading=true;upload.disabled=true;status.textContent='Uploading photo…';
+      try{
+        const image=await uploadCanvasPhoto(file,{signal:picker.lifetime.signal});
+        if(!active())return;
+        source='saved';query='';searchInput.value='';resetInventories();renderSource();
+        await load();
+        if(active()&&image?.id)analyzeImage(image);
+      }catch(error){
+        if(active()&&!picker.lifetime.signal.aborted)status.textContent=error.message||'Photo could not be uploaded.';
+      }finally{uploading=false;upload.disabled=false;}
+    });
+    more.addEventListener('click',()=>void load());
+    add.addEventListener('click',()=>{
+      if(!active()||!selected.size)return;
+      if(mode==='analysis'){openBatch(Array.from(selected).filter(id=>!id.startsWith('ref-')));return;}
+      if(input.value!==draft){closeChatImagePicker(picker);return;}
+      const prefix=mode==='reference'?'reference-image-':'image-';
+      const refs=Array.from(selected,id=>'{'+prefix+id+'}').join(' ');
+      input.setRangeText((range.standalone?"Let's build ":'')+refs,range.start,range.end,'end');
+      syncChatImageDraftLimit();
+      closeChatImagePicker(picker);
+    });
+    document.body.append(dialog);
+    dialog.showModal();renderSource();void load();
+  }
+  function bindChatImagePicker(){
+    chatImageDraftLimit=input.maxLength;
+    input.addEventListener('paste',event=>{
+      if(chatImageDraftLimit<=0||!event.clipboardData)return;
+      const draft=input.value.slice(0,input.selectionStart)+event.clipboardData.getData('text')+input.value.slice(input.selectionEnd);
+      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all)|canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
+      input.maxLength=chatImageDraftLimit+chatDraftBindingLength(draft);
+      setTimeout(syncChatImageDraftLimit,0);
+    });
+    const readDraft=()=>{
+      syncChatImageDraftLimit();
+      if(input.selectionStart!==input.selectionEnd)return;
+      const range=chatImageCommandRange(input.value,input.selectionEnd);
+      if(range)openChatImagePicker(range);
+    };
+    input.addEventListener('input',event=>{if(!event.isComposing)readDraft();});
+    input.addEventListener('compositionend',readDraft);
+  }
+  function submitAgentChat(event){
+    event.preventDefault();
+    clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
+    clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
+    const resourceRange=chatResourceCommandRange(input.value);
+    if(resourceRange){void openChatResourcePicker(resourceRange);return;}
+    const imageRange=chatImageCommandRange(input.value);
+    if(imageRange){openChatImagePicker(imageRange);return;}
+    const musicRange=chatMusicCommandRange(input.value);
+    if(musicRange){
+      if(!musicRange.all){void openChatMusicPicker(musicRange);return;}
+      applyChatMusicSelection(musicRange,{mode:'all'});
+      if(musicRange.standalone)return;
+    }
+    if(input.value.trim().toLowerCase()==='ddd'&&toggleCanvasDebug()){input.value='';return;}
+    if(handleAgentVisibilityCommand(input.value)){input.value='';return;}
+    if(voiceTurnBusy){showTranscript('Finishing the previous voice reply. Your typed message is still in the bar.','waiting');return;}
+    if(chatImageDraftLimit>0)input.maxLength=chatImageDraftLimit;
+    voiceInteractionStarted=true;
+    command(input.value).catch(err=>say('I could not process that message. '+err.message));
+  }
+  function directListeningRoomCommand(message){
+    const text=String(message||'').trim()
+      .replace(/^(?:(?:hey|hi|ok|okay)\s+)?stone[\s-]?fellow[,.:!?\s]*/i,'')
+      .replace(/^please\s+/i,'');
+    const edit=text.match(/^\/edit(?:\s+([\s\S]*)|$)/i);
+    if(edit)return {kind:'revise',brief:(edit[1]||'').trim()};
+    const command=text.replace(/[.!?…]+$/,'').trim()
+      .replace(/^(?:(?:can|could|would|will)\s+you|i(?:['’]d|\s+would)\s+like\s+you\s+to)\s+(?:please\s+)?/i,'');
+    const assetReference=/\{\s*(?:canvas:|merch:|ticket:|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
+    if(/^\/review-images$/i.test(text))return {kind:'image_review'};
+    const build=command.match(/^let['’]?s\s+build(?:\s*[:,]\s*|\s+|$)([\s\S]*)$/i);
+    if(build){
+      const brief=build[1].trim();
+      if(!brief)return {kind:'suggest'};
+      const earlier=brief.match(/^on\s+(.+?)(?:\s*[:,]\s*(.+))?$/i);
+      if(earlier)return {kind:'build_on',target:earlier[1].replace(/^my\s+/i,'').trim(),brief:(earlier[2]||'').trim()};
+      if(assetReference.test(brief))
+        return {kind:'create',canvasKind:'custom',brief};
+      const design=canvasDesignBrief(brief);
+      const room=design.match(/^(?:(?:a|the)\s+)?(listening room|canvas\s+1)(?:\s+for\s+(.+))?$/i);
+      if(room)return {kind:'create',canvasKind:'listening_room',subject:(room[2]||'').trim(),
+        ...(/^canvas/i.test(room[1])?{requiresTrack:true}:{}),...(brief!==design?{brief}:{})};
+      const example=design.match(/^(?:(?:a|the)\s+)?space eq example(?:\s+for\s+(.+))?$/i);
+      if(example)return {kind:'create',canvasKind:'space_eq',subject:(example[1]||'').trim(),brief};
+      return {kind:'create',canvasKind:'custom',brief};
+    }
+    if(/^(?:what (?:should|could|can) we build(?: next)?|suggest (?:a |some )?(?:new )?canvas(?: ideas?| experiences?)?)$/i.test(command))return {kind:'suggest'};
+    if(/^(?:close|hide|exit)\s+(?:(?:this|the|my)\s+)?(?:listening room|(?:space eq|canvas))$/i.test(command))return {kind:'close'};
+    if(/^(?:open|show|view)\s+(?:me\s+)?(?:my\s+|the\s+)?(?:canvas|listening room)\s+history$/i.test(command))return {kind:'history'};
+    const revision=command.match(/^(?:revise|update|change)\s+(?:(?:this|the|my)\s+)?(?:listening room|canvas|space eq)(?:(?:\s*:\s*|\s+)(.*))?$/i);
+    if(revision)return {kind:'revise',brief:(revision[1]||'').trim()};
+    const design=canvasDesignBrief(command);
+    const create=design.match(/^(?:build|create|make|open|try|design)\s+(?:me\s+)?(?:(?:a|the|my)\s+)?(listening room|canvas\s+1)(?:\s+for\s+(.+))?$/i);
+    if(create)return {kind:'create',subject:(create[2]||'').trim(),
+      ...(/^canvas/i.test(create[1])?{requiresTrack:true}:{}),...(command!==design?{brief:command}:{})};
+    if(/^(?:show|display|open|use|reuse)\s/i.test(command)&&/\{(?:reference-)?image-(?:ref-)?[a-f0-9]{32}\}/i.test(command))
+      return {kind:'create',canvasKind:'custom',brief:command};
+
+    const request=command.match(/^(build|create|make|design|draw|generate|render)\s+(?:me\s+)?([\s\S]+)$/i);
+    if(!request)return null;
+    const brief=request[2].trim();
+    const subject=canvasDesignBrief(brief).split(/\s+(?:about|around|based on|featuring|for|from|inspired by|showing|that|to|using|with)\b|[,.!?;:\r\n]/i,1)[0];
+    const imageSubject=/\b(?:illustrations?|images?|photos?|pictures?)\b/i.test(subject);
+    const visual=imageSubject||/\b(?:animation|backdrop|background|canvas|dashboard|design|diagram|display|eq|equalizer|gallery|graphics?|interface|layout|listening room|mockup|page|panel|posters?|scene|ui|visual|visuali[sz]er|wallpaper|webpage|window)\b/i.test(subject);
+    const native=/\b(?:account|album|cassette|checkout|collection|guide|list|mix|mixtape|order|plan|playlist|purchase|queue|receipt|record|reservation|song|subscription|ticket|track|vinyl)\b/i.test(subject);
+    const creative=/^(?:build|create|design|draw|render)$/i.test(request[1])&&/^(?:a|an|the)\s+\S/i.test(subject)&&!native;
+    return visual||creative||assetReference.test(brief)?{kind:'create',canvasKind:'custom',brief:imageSubject?command:brief}:null;
+  }
+  function canvasBriefInChat(text){
+    const action=directListeningRoomCommand(text);
+    return ['create','revise','build_on'].includes(action?.kind);
+  }
+  function canvasLyricSection(brief){
+    if(/\bchorus\b/i.test(brief))return 'chorus';
+    if(/\bverse\b/i.test(brief))return 'verse';
+    if(/\b(?:(?:this|the|its|song['’]s|track['’]s)\s+bridge|bridge\s+lyrics?)\b/i.test(brief))return 'bridge';
+    return /\blyrics?\b/i.test(brief)?'whole':null;
+  }
+  function canvasTrackTarget(brief){
+    const namedLyrics=brief.match(/\b(?:lyrics?|chorus|verse|bridge)\s+(?:of|from)\s+(.+?)(?:\s+(?:using|with|as)\s+.+)?$/is);
+    const namedTrack=brief.match(/\bfor\s+(.+?)(?:\s+(?:using|with)\s+(?:its|the|this)\s+(?:lyrics?|chorus|verse|bridge)\b.*)?$/is);
+    const target=(namedLyrics||namedTrack)?.[1];
+    const isKnown=title=>{
+      const name=norm(title);
+      return canvasCurrentTrack(title)||catalog.some(track=>norm(track.title)===name);
+    };
+    if(!target||isKnown(target))return target;
+    // Keep a catalog title intact when it includes punctuation of its own.
+    let named;
+    for(const boundary of target.matchAll(/[.!?…]+(?=\s)|[\r\n]/g)){
+      const title=target.slice(0,boundary.index).trim();
+      if(isKnown(title))named=title;
+    }
+    return named??target;
+  }
+  function canvasCurrentTrack(target){
+    return /^(?:(?:this|the)(?: current| playing| currently playing)?|current|playing|currently playing) (?:song|track)$/.test(norm(target));
+  }
+  function canvasTargetMatches(scene,target){
+    const name=norm(target);
+    const kind=scene?.canvas_kind||'listening_room';
+    return !!scene&&(norm(scene.title)===name||
+      (kind==='space_eq'&&['space eq','space equalizer'].includes(name))||
+      (kind==='listening_room'&&['canvas 1','listening room'].includes(name)));
+  }
+  let canvasGalleryView=null,gallerySceneRequest=null,gallerySceneSequence=0;
+  function canvasOwner(){
+    return st.auth.authenticated&&st.auth.user?.id?String(st.auth.user.id):'';
+  }
+  function isGalleryScene(scene=listeningRoom){
+    return !!scene&&typeof scene.gallery_id==='string'&&/^[a-f0-9]{32}$/.test(scene.gallery_id)&&!Number.isSafeInteger(scene.id);
+  }
+  function canvasSceneOwner(){return canvasOwner()||(isGalleryScene()?'gallery-guest':'');}
+  function galleryRequestId(){return Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,'0')).join('');}
+  function cancelGalleryOpen(){gallerySceneSequence++;gallerySceneRequest?.abort();gallerySceneRequest=null;}
+  function galleryQuery(values){const query=new URLSearchParams();for(const [key,value] of Object.entries(values))if(value!==undefined&&value!==null&&value!=='')query.set(key,String(value));return query;}
+  async function galleryRead(id,signal){
+    if(!/^[a-f0-9]{32}$/.test(id||''))throw new Error('Choose a published canvas.');
+    return api('canvas-gallery.php?'+galleryQuery({action:'open',id,current_track_id:observedPlayer().track?.id||''}),undefined,signal);
+  }
+  async function requirePublishedCanvas(scene,signal){
+    if(!isGalleryScene(scene))return;
+    try{
+      const result=await galleryRead(scene.gallery_id,signal);
+      if(result.scene?.gallery_id!==scene.gallery_id)throw new Error('This published canvas is unavailable.');
+    }catch(error){
+      if(scene===listeningRoom&&error.name!=='AbortError'&&error.status===404){closeListeningRoom(false);popupEntry('notice','This canvas is no longer in the public catalog.');}
+      throw error;
+    }
+  }
+  function canvasAccess(){
+    if(canvasAccess.current)return canvasAccess.current;
+    if(!window.SFCanvasAccess?.create)return null;
+    canvasAccess.current=window.SFCanvasAccess.create({
+      getOwner:canvasOwner,getScene:()=>listeningRoom,isBusy:()=>!!listeningRoomRequest,
+      readMine:signal=>api('canvas-access.php?mine=1',undefined,signal),
+      read:(context,signal)=>api('canvas-access.php?'+new URLSearchParams(context).toString(),undefined,signal),
+      write:(payload,signal)=>secureJsonPost('canvas-access.php',payload,false,signal),
+      onSignIn:()=>navigate('login'),
+      onRefresh:async(scene,signal)=>{
+        if(!scene)return;
+        const owner=canvasOwner(),stage=window.SFPublicAgentCanvas;
+        const active=()=>!signal.aborted&&canvasOwner()===owner&&listeningRoom===scene&&!listeningRoomRequest&&stage?.active?.();
+        if(!active())return;
+        const result=isGalleryScene(scene)?await galleryRead(scene.gallery_id,signal):await api('agent-scene.php?id='+encodeURIComponent(scene.id)+'&current_track_id='+encodeURIComponent(observedPlayer().track?.id||''),undefined,signal);
+        if(!active())return;
+        const next=result.scene;
+        if(!next||(isGalleryScene(scene)?next.gallery_id!==scene.gallery_id:next.id!==scene.id))throw new Error('The canvas access response changed. Reopen this canvas.');
+        if(stage.showScene(next,{focus:false})){listeningRoom=next;listeningRoomOwner=canvasSceneOwner();}
+        else throw new Error('The updated canvas could not display. Reopen this canvas.');
+      },
+    });
+    return canvasAccess.current;
+  }
+  document.getElementById('menuCanvasPermissions')?.addEventListener('click',()=>{closeMenu();void canvasAccess()?.manage();});
+  async function openGalleryCanvas(item,signal){
+    const id=item?.id,viewer=canvasOwner();
+    cancelGalleryOpen();
+    const sequence=gallerySceneSequence,request=new AbortController();request.galleryOwner=viewer;gallerySceneRequest=request;
+    const abort=()=>request.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
+    const active=()=>!request.signal.aborted&&sequence===gallerySceneSequence&&viewer===canvasOwner()&&!listeningRoomRequest;
+    try{
+      if(listeningRoomRequest)throw new Error('Finish or stop the current build before opening another canvas.');
+      const response=await galleryRead(id,request.signal);
+      if(!active())return;
+      const scene=response.scene;
+      if(scene?.gallery_id!==id||scene.canvas_kind!=='custom'||Number.isSafeInteger(scene.id))throw new Error('The catalog returned an invalid canvas.');
+      if(!window.SFPublicAgentCanvas?.active?.())await renderAgentCanvas();
+      if(!active())return;
+      const previous=listeningRoom,previousOwner=listeningRoomOwner;
+      listeningRoom=scene;listeningRoomOwner=canvasSceneOwner();
+      const stage=window.SFPublicAgentCanvas;
+      if(!stage?.showScene?.(scene,{focus:false})){listeningRoom=previous;listeningRoomOwner=previousOwner;throw new Error('The published canvas could not open.');}
+      stage.setSceneWorkflow?.(null);stage.closePage?.();canvas=mainCanvas;
+      selectCanvasId(viewer,null);setUrl('home',{});
+      popupEntry('notice','Opened “'+String(item.title||scene.title)+'” by '+String(item.creator_label||'a Stonefellow creator')+'. Remix it to make your own version.');
+    }finally{
+      signal?.removeEventListener('abort',abort);if(gallerySceneRequest===request)gallerySceneRequest=null;
+    }
+  }
+  async function remixGalleryCanvas(item,signal){
+    const owner=canvasOwner();
+    if(!owner){await navigate('login');return;}
+    if(listeningRoomRequest)throw new Error('Finish or stop the current build before remixing.');
+    cancelGalleryOpen();
+    const sequence=gallerySceneSequence,request=new AbortController();request.galleryOwner=owner;gallerySceneRequest=request;
+    const abort=()=>request.abort();signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
+    const active=()=>!request.signal.aborted&&sequence===gallerySceneSequence&&owner===canvasOwner()&&!listeningRoomRequest;
+    try{
+      const result=await secureJsonPost('canvas-gallery.php',{action:'remix',id:item.id,request_id:galleryRequestId()},false,request.signal);
+      if(!active())return;
+      if(!Number.isSafeInteger(result.scene?.id)||result.scene.id<1)throw new Error('The private remix could not be confirmed.');
+      if(!window.SFPublicAgentCanvas?.active?.())await renderAgentCanvas();
+      if(!active())return;
+      await handleListeningRoomCommand({kind:'restore',id:result.scene.id});
+      if(owner===canvasOwner()&&listeningRoom?.id===result.scene.id){window.SFPublicAgentCanvas?.closePage?.();canvas=mainCanvas;setUrl('home',{});popupEntry('notice','Saved your private remix. Use /edit followed by your changes.');}
+    }finally{signal?.removeEventListener('abort',abort);if(gallerySceneRequest===request)gallerySceneRequest=null;}
+  }
+  async function renderCanvasGallery(params={}){
+    canvasGalleryView?.destroy();
+    const host=canvas;
+    if(!window.SFCanvasGallery?.create)throw new Error('The canvas catalog is unavailable. Refresh this page.');
+    canvasGalleryView=window.SFCanvasGallery.create({
+      getOwner:canvasOwner,getCreatorLabel:()=>st.auth.user?.display_name||'',onSignIn:()=>navigate('login'),
+      api:{
+        list:(query,signal)=>api('canvas-gallery.php?'+galleryQuery({action:'list',...query}),undefined,signal),
+        detail:(id,signal)=>api('canvas-gallery.php?'+galleryQuery({id}),undefined,signal),
+        mine:(query,signal)=>api('canvas-gallery.php?'+galleryQuery({action:'mine',...query}),undefined,signal),
+        sources:signal=>api('canvas-resources.php?kind=canvas',undefined,signal),
+        source:(id,signal)=>api('agent-scene.php?id='+encodeURIComponent(id),undefined,signal),
+        submit:(payload,signal)=>secureJsonPost('canvas-gallery.php',{action:'submit',...payload},false,signal),
+        withdraw:async(id,signal)=>{const result=await secureJsonPost('canvas-gallery.php',{action:'withdraw',id},false,signal);if(isGalleryScene()&&listeningRoom.gallery_id===id)closeListeningRoom(false);return result;},
+      },getPreviewUrl:sceneImagePath,getItemUrl:item=>{const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('view','canvas-gallery');url.searchParams.set('id',item.id);return url.href;},onOpen:openGalleryCanvas,onRemix:remixGalleryCanvas,
+    });
+    await canvasGalleryView.mount(host,{view:['mine','submit'].includes(params.tab)?params.tab:'public',sceneId:Number(params.id)||undefined,itemId:/^[a-f0-9]{32}$/.test(params.id||'')?params.id:undefined});
+  }
+  const canvasDebugEvents=[];
+  let canvasDebugOwner='';
+  const canvasDebugElement=id=>document.getElementById?.(id);
+  function syncCanvasDebugOwner(){
+    const owner=canvasOwner();
+    if(owner===canvasDebugOwner)return;
+    canvasDebugOwner=owner;
+    canvasDebugEvents.length=0;
+    const status=canvasDebugElement('canvasDebugStatus');
+    if(status)status.textContent='';
+    renderCanvasDebug();
+  }
+  function renderCanvasDebug(){
+    const report=canvasDebugElement('canvasDebugReport');
+    if(!report)return;
+    const build=window.STONEFELLOW_APP_BUILD;
+    const heading='Stonefellow canvas debug'+(/^\d+\.\d+\.\d+$/.test(build)?' · v'+build:'');
+    const entries=canvasDebugEvents.map(({at,id,event,data})=>
+      `${new Date(at).toISOString()} ${id} ${event}${Object.keys(data).length?' '+JSON.stringify(data):''}`);
+    report.value=[heading,...(entries.length?entries:['No canvas builds captured in this tab yet.'])].join('\n');
+    report.scrollTop=report.scrollHeight;
+  }
+  function recordCanvasDebug(id,event,data={}){
+    if(!/^[a-f0-9]{32}$/.test(id||''))return;
+    syncCanvasDebugOwner();
+    if(!canvasDebugOwner)return;
+    canvasDebugEvents.push({at:Date.now(),id,event,data});
+    if(canvasDebugEvents.length>60)canvasDebugEvents.shift();
+    if(canvasDebugVisible())renderCanvasDebug();
+  }
+  function canvasDebugReason(reason){
+    if(typeof reason==='string'&&/^http_[45]\d{2}$/.test(reason))return reason;
+    return ['timeout','stream_incomplete','output_limit','provider_busy','provider_refused','provider_unavailable',
+      'invalid_json','invalid_markup','output_too_large','missing_player_slot','invalid_code','invalid_image_request','invalid_image_binding',
+      'image_provider_unavailable','image_daily_limit','image_account_disabled','image_generation_failed','image_storage_failed','image_generation_disabled',
+      'image_already_started'].includes(reason)?reason:undefined;
+  }
+  function canvasDebugFailure(error){
+    const code=error.payload?.error;
+    const codes=['authentication_required','csrf_failed','scene_coding_model_unavailable','invalid_scene_request',
+      'scene_provider_required','scene_model_unavailable','scene_image_unavailable','invalid_scene_output','active_tokens_required',
+      'scene_unavailable','response_encoding_failed','scene_request_not_found','scene_request_too_large','invalid_json'];
+    return {code:codes.includes(code)?code:error.name==='TypeError'?'network_error':'canvas_request_failed',
+      ...(Number.isInteger(error.status)&&error.status>=100&&error.status<600?{status:error.status}:{}),
+      reason:canvasDebugReason(error.payload?.reason)};
+  }
+  function canvasDebugVisible(){
+    return canvasDebugElement('canvasDebugPanel')?.hidden===false;
+  }
+  function setCanvasDebugVisible(visible){
+    const panel=canvasDebugElement('canvasDebugPanel');
+    if(!panel)return;
+    panel.hidden=!visible;
+    document.body.classList.toggle('sf-canvas-debug-open',visible);
+    if(visible){syncCanvasDebugOwner();renderCanvasDebug();}
+    const status=canvasDebugElement('canvasDebugStatus');
+    if(status)status.textContent='';
+  }
+  function toggleCanvasDebug(){
+    if(!canvasDebugElement('canvasDebugPanel'))return false;
+    const visible=!canvasDebugVisible();
+    setCanvasDebugVisible(visible);
+    if(visible){setChatFooterHidden(false);void openChatPopup();}
+    syncAgentDockLayout();
+    return true;
+  }
+  async function copyCanvasDebug(){
+    const report=canvasDebugElement('canvasDebugReport'),status=canvasDebugElement('canvasDebugStatus');
+    if(!report||!status)return;
+    if(navigator.clipboard?.writeText){
+      try{await navigator.clipboard.writeText(report.value);status.textContent='Debug report copied.';return;}
+      catch(_){/* The selected report supports manual copying when clipboard access is blocked. */}
+    }
+    report.focus({preventScroll:true});
+    report.select();
+    try{if(document.execCommand?.('copy')){status.textContent='Debug report copied.';return;}}
+    catch(_){/* Keep the report selected for manual copying. */}
+    status.textContent='Report selected. Use your device’s copy command.';
+  }
+  function bindCanvasDebug(){
+    const copy=canvasDebugElement('canvasDebugCopy');
+    if(!copy)return;
+    copy.onclick=copyCanvasDebug;
+    let count=0,last=0;
+    window.addEventListener('keydown',event=>{
+      if(event.defaultPrevented||event.repeat||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||
+        event.target?.closest?.('input,textarea,select,[contenteditable],[role="textbox"]')||event.key.toLowerCase()!=='d'){
+        count=0;return;
+      }
+      const now=Date.now();
+      count=now-last<1000?count+1:1;
+      last=now;
+      if(count===3){count=0;if(toggleCanvasDebug())event.preventDefault();}
+    },true);
+  }
+  let codingModelMemory=null,codingModelMenuOwner='',codingModelMenuRequest=null,codingModelMenuLoadedAt=0;
+  function canvasCodingModelKey(owner){
+    const apiPath=new URL(cfg.apiBase||'api',document.baseURI).pathname;
+    return 'stonefellow.codingModel.'+apiPath+':'+owner;
+  }
+  function canvasCodingModel(value){
+    if(!['openai','anthropic'].includes(value?.provider)||typeof value.model!=='string'||
+      !value.model||value.model.length>160||/\s/.test(value.model))return null;
+    return {provider:value.provider,model:value.model};
+  }
+  function selectedCanvasCodingModel(owner){
+    if(!owner)return null;
+    if(codingModelMemory?.owner===owner)return codingModelMemory.choice;
+    try{return canvasCodingModel(JSON.parse(localStorage.getItem(canvasCodingModelKey(owner))));}
+    catch(_){return null;}
+  }
+  function setCanvasCodingModel(owner,choice){
+    if(!owner)return;
+    try{
+      if(choice)localStorage.setItem(canvasCodingModelKey(owner),JSON.stringify(choice));
+      else localStorage.removeItem(canvasCodingModelKey(owner));
+      codingModelMemory=null;
+    }catch(_){codingModelMemory={owner,choice};}
+  }
+  function canvasCodingModelLabel(choice){
+    return choice?(choice.provider==='anthropic'?'Claude':'OpenAI')+' · '+choice.model:'Use default';
+  }
+  function renderCanvasCodingModelMenu(picker,models,choice){
+    const selected=choice?JSON.stringify(choice):'';
+    const choices=[null,...models];
+    const values=choices.map(model=>model?JSON.stringify(model):'');
+    const inputs=Array.from(picker.querySelectorAll('input'));
+    $('#menuCodingModelCurrent').textContent=canvasCodingModelLabel(choice);
+    if(inputs.length===values.length&&inputs.every((input,index)=>input.value===values[index])){
+      for(const input of inputs)input.checked=input.value===selected;
+      return;
+    }
+    const focused=inputs.includes(document.activeElement)?document.activeElement.value:null;
+    let nextFocus=null;
+    picker.replaceChildren(...choices.map((model,index)=>{
+      const row=document.createElement('label');
+      const input=document.createElement('input');
+      const text=document.createElement('span');
+      input.type='radio';input.name='coding-model-choice';input.value=values[index];input.checked=input.value===selected;
+      if(input.value===focused)nextFocus=input;
+      text.textContent=canvasCodingModelLabel(model);
+      row.append(input,text);
+      return row;
+    }));
+    if(focused!==null)(nextFocus||picker.querySelector(':checked'))?.focus({preventScroll:true});
+  }
+  function syncCanvasCodingModelMenu(){
+    const picker=$('#menuCodingModelOptions'),owner=canvasOwner();
+    if(!picker||owner===codingModelMenuOwner)return;
+    codingModelMenuOwner=owner;
+    codingModelMenuRequest?.abort();
+    codingModelMenuRequest=null;
+    codingModelMenuLoadedAt=0;
+    const field=$('#menuCodingModelField');
+    field.hidden=!owner;
+    field.open=false;
+    $('#menuCodingModelStatus').textContent='';
+    const choice=selectedCanvasCodingModel(owner);
+    renderCanvasCodingModelMenu(picker,choice?[choice]:[],choice);
+    if(owner)void refreshCanvasCodingModelMenu();
+  }
+  async function refreshCanvasCodingModelMenu(force=false){
+    const picker=$('#menuCodingModelOptions'),owner=canvasOwner();
+    if(!picker||!owner||codingModelMenuRequest||(!force&&Date.now()-codingModelMenuLoadedAt<60000))return;
+    const status=$('#menuCodingModelStatus');
+    const request=new AbortController();
+    codingModelMenuRequest=request;
+    const active=()=>!request.signal.aborted&&codingModelMenuRequest===request&&canvasOwner()===owner;
+    if(!codingModelMenuLoadedAt)status.textContent='Loading coding models…';
+    try{
+      const response=await api('agent-scene.php?models=1',undefined,request.signal);
+      if(!active())return;
+      if(!Array.isArray(response.models))throw new Error('Invalid coding models');
+      codingModelMenuLoadedAt=Date.now();
+      const models=response.models.map(canvasCodingModel).filter(Boolean);
+      const choice=selectedCanvasCodingModel(owner);
+      const stale=choice&&!models.some(model=>model.provider===choice.provider&&model.model===choice.model);
+      if(stale)setCanvasCodingModel(owner,null);
+      renderCanvasCodingModelMenu(picker,models,stale?null:choice);
+      status.textContent=stale?'The previous coding model is no longer available.':
+        models.length?'For canvas builds and revisions.':'No coding model overrides are available.';
+    }catch(_){
+      if(active())status.textContent='Coding models could not be loaded. You can still use the default.';
+    }finally{
+      if(active())codingModelMenuRequest=null;
+    }
+  }
+  function bindCanvasCodingModelMenu(){
+    const picker=$('#menuCodingModelOptions');
+    if(!picker)return;
+    picker.addEventListener('change',event=>{
+      const owner=canvasOwner(),input=event.target;
+      if(!owner||owner!==codingModelMenuOwner||input.name!=='coding-model-choice'||!input.checked)return;
+      const choice=input.value?canvasCodingModel(JSON.parse(input.value)):null;
+      setCanvasCodingModel(owner,choice);
+      $('#menuCodingModelCurrent').textContent=canvasCodingModelLabel(choice);
+    });
+    const field=$('#menuCodingModelField');
+    field.addEventListener('keydown',event=>{
+      if(event.key!=='Escape'||!field.open)return;
+      event.preventDefault();event.stopPropagation();
+      field.open=false;
+      $('#menuCodingModel').focus({preventScroll:true});
+    });
+    syncCanvasCodingModelMenu();
+  }
+  function canvasSelectionKey(owner){
+    const apiPath=new URL(cfg.apiBase||'api',document.baseURI).pathname;
+    return 'stonefellow.activeCanvas.'+apiPath+':'+owner;
+  }
+  function selectedCanvasId(owner){
+    if(!owner)return null;
+    if(canvasSelection?.owner===owner)return canvasSelection.id;
+    try{
+      const id=Number(localStorage.getItem(canvasSelectionKey(owner)));
+      if(Number.isSafeInteger(id)&&id>0)return id;
+    }catch(_){/* Browser storage can be disabled. */}
+    return null;
+  }
+  function selectCanvasId(owner,id){
+    if(!owner)return;
+    try{
+      if(id===null)localStorage.removeItem(canvasSelectionKey(owner));
+      else localStorage.setItem(canvasSelectionKey(owner),String(id));
+      canvasSelection=null;
+    }catch(_){canvasSelection={owner,id};}
+  }
+  async function restoreActiveCanvas(){
+    const owner=canvasOwner(),id=selectedCanvasId(owner),stage=window.SFPublicAgentCanvas;
+    const canRestore=()=>owner===canvasOwner()&&selectedCanvasId(owner)===id&&
+      stage?.active?.()&&!stage.sceneActive?.()&&!listeningRoomRequest;
+    if(!id||!canRestore())return;
+    try{
+      const response=await api('agent-scene.php?id='+id);
+      if(!canRestore()||response.scene?.id!==id)return;
+      const scene=response.scene,standard=(response.design_source??scene.design_source)==='standard';
+      if(scene.canvas_kind==='space_eq'){selectCanvasId(owner,null);return;}
+      if(!savedCanvasCanOpen(response)){
+        selectCanvasId(owner,null);popupEntry('notice','The saved candidate has not completed its checks. Open Canvas History to review its source.');return;
+      }
+      let workflow=response.workflow;
+      if(workflow){
+        const committed=await secureJsonPost('canvas-build-workflow.php',{action:'apply',request_id:workflow.request_id,scene_id:scene.id});
+        if(!canRestore()||committed.workflow?.state!=='applied'||committed.workflow.candidate_scene_id!==scene.id)return;
+        workflow=committed.workflow;
+      }
+      if(stage.showScene?.(scene,{standard,focus:false})){
+        listeningRoom=scene;
+        listeningRoomOwner=owner;
+        if(workflow){
+          stage.setSceneWorkflow?.({...workflow,phase:'coding',silent:true});
+          stage.setSceneCandidateCode?.(scene);
+          stage.setSceneWorkflow?.({...workflow,phase:'applied',silent:true});
+        }
+      }
+    }catch(error){
+      if(error.payload?.error==='scene_not_found'&&canRestore())selectCanvasId(owner,null);
+    }
+  }
+  function savedCanvasCanOpen(response){
+    const scene=response?.scene,workflow=response?.workflow;
+    if(workflow)return workflow.candidate_scene_id===scene?.id&&['ready','applied'].includes(workflow.state);
+    return scene?.workflow_required!==true||response.verification?.verified===true;
+  }
+  async function deleteSavedCanvas(id){
+    const owner=canvasOwner();
+    if(!owner)throw new Error('Sign in again to manage your canvases.');
+    if(!Number.isSafeInteger(id)||id<1)throw new Error('Choose a saved canvas.');
+    if(listeningRoomRequest)throw new Error('Wait for the current canvas request to finish.');
+    try{
+      const result=await secureJsonPost('agent-scene.php',{action:'delete',id});
+      if(result.deleted_id!==id)throw new Error('Stonefellow could not confirm the canvas was deleted.');
+    }catch(error){
+      if(error.status!==404||error.payload?.error!=='scene_not_found')throw error;
+    }
+    if(owner!==canvasOwner())throw new Error('Your account changed. Reopen Canvas History.');
+    if(selectedCanvasId(owner)===id)selectCanvasId(owner,null);
+    if(listeningRoomOwner===owner&&listeningRoom?.id===id){
+      setCanvasImageEditDraft(null);
+      listeningRoom=null;
+      if(!listeningRoomRequest)listeningRoomOwner=null;
+      window.SFPublicAgentCanvas?.closeScene?.(false);
+    }
+  }
+  function clearListeningRoom(){
+    canvasAccess.current?.close();
+    setCanvasImageEditDraft(null);
+    listeningRoomRequest?.abort();
+    listeningRoomRequest=null;
+    listeningRoom=null;
+    listeningRoomOwner=null;
+  }
+  function closeListeningRoom(forget=true){
+    cancelGalleryOpen();
+    const owner=canvasOwner();
+    const hadRoom=!!(listeningRoom||listeningRoomRequest||(forget&&selectedCanvasId(owner)));
+    if(forget)selectCanvasId(owner,null);
+    clearListeningRoom();
+    window.SFPublicAgentCanvas?.closeScene?.(forget);
+    window.SFPublicAgentCanvas?.closeSceneHistory?.();
+    window.SFPublicAgentCanvas?.setSceneCoding?.('idle');
+    return hadRoom;
+  }
+  function listeningRoomError(error,reading){
+    if(error.payload?.error==='authentication_required')return 'Sign in again to access your canvases.';
+    if(['scene_model_unavailable','scene_image_unavailable','invalid_scene_output'].includes(error.payload?.error)&&/^[a-f0-9]{32}$/.test(error.payload.request_id||''))
+      return error.message+' Build reference '+error.payload.request_id+'.';
+    if(error.payload||!Number.isInteger(error.status)||error.status<100)return String(error.message||'Please try again.');
+    const status=' (HTTP '+error.status+').';
+    if(error.status===404)return 'The canvas service was not found'+status+' Check that the current deploy ZIP was extracted into the site folder.';
+    if(error.status===401||error.status===403)return 'The server refused access to the canvas service'+status;
+    return 'The server returned an unreadable response'+status+(reading?'':' Check Canvas History before asking Stonefellow to build it again.');
+  }
+  function listeningRoomHasResult(response,trackId,canvasKind='listening_room'){
+    const scene=response?.scene;
+    return Number.isSafeInteger(scene?.id)&&scene.id>0&&String(scene.track_id??'')===trackId&&
+      (scene.canvas_kind||'listening_room')===canvasKind;
+  }
+  function waitForListeningRoom(delay,signal){
+    return new Promise(resolve=>{
+      if(signal.aborted){resolve();return;}
+      const timer=setTimeout(done,delay);
+      signal.addEventListener('abort',done,{once:true});
+      function done(){clearTimeout(timer);signal.removeEventListener('abort',done);resolve();}
+    });
+  }
+  async function recoverListeningRoom(payload,signal,failure,started,trace){
+    if(signal.aborted)throw failure;
+    const poll=new AbortController();
+    const stop=()=>poll.abort();
+    const elapsed=Math.max(0,Date.now()-started);
+    const extended=payload.canvas_kind==='custom';
+    const recoveryWindow=extended?90000:25000;
+    let deadline=setTimeout(stop,Math.max(10000,recoveryWindow-elapsed));
+    const delays=[0,550,950,1400,1850,2200,2500,3000,3000,3000,3000,3000];
+    let confirmedPending=false;
+    signal.addEventListener('abort',stop,{once:true});
+    try{
+      for(let attempt=0;extended||confirmedPending||attempt<delays.length;attempt++){
+        const delay=delays[attempt]??3500;
+        if(delay)await waitForListeningRoom(delay,poll.signal);
+        if(poll.signal.aborted)break;
+        let result;
+        try{result=await api('agent-scene.php?request_id='+payload.request_id,undefined,poll.signal);}
+        catch(error){
+          if(error.status===401||error.status===403||error.payload?.error==='authentication_required')throw error;
+          continue;
+        }
+        if(poll.signal.aborted)break;
+        if(result?.state==='review')return result;
+        if(result?.state==='ready'&&listeningRoomHasResult(result,payload.track_id,payload.canvas_kind)){
+          trace?.('recovery_ready');return result;
+        }
+        if(result?.state==='canceled'){trace?.('recovery_canceled');return result;}
+        if(result?.state==='failed'){
+          trace?.('recovery_failed');
+          return result;
+        }
+        // Keep checking while the server can confirm the original build is pending.
+        if(result?.state==='pending'){
+          if(!confirmedPending)trace?.('recovery_pending');
+          confirmedPending=true;
+          clearTimeout(deadline);
+          deadline=setTimeout(stop,recoveryWindow);
+        }
+      }
+      trace?.('recovery_unconfirmed');
+      throw failure;
+    }finally{
+      clearTimeout(deadline);
+      signal.removeEventListener('abort',stop);
+    }
+  }
+  function canvasProjects(){
+    if(!window.SFCanvasProjects?.create)return null;
+    if(!canvasProjects.current)canvasProjects.current=window.SFCanvasProjects.create({
+      getOwner:canvasOwner,getHost:()=>chatPopupMessages,
+      get:signal=>api('canvas-projects.php',undefined,signal),
+      post:(payload,signal)=>secureJsonPost('canvas-projects.php',payload,false,signal),
+      onPresent:concept=>{openChatPopup();agent(st.playing?'playing':'idle',concept);},
+      onSuggest:()=>{closeMenu();void handleListeningRoomCommand({kind:'suggest'});},
+      onExecute:proposal=>{const owner=canvasOwner();setTimeout(()=>{if(owner&&canvasOwner()===owner)void handleListeningRoomCommand({kind:'project',proposal,owner});},0);}
+    });
+    canvasProjects.current.setOwner();return canvasProjects.current;
+  }
+  async function discussCanvasProject(brief){
+    if(!window.SFPublicAgentCanvas?.active?.())return 'Open the Stonefellow home canvas to discuss a canvas project.';
+    await loadAuth();
+    const owner=canvasOwner();
+    if(!owner)return 'Sign in to discuss your saved canvases.';
+    if(listeningRoomRequest)return 'Review or finish the current project first.';
+    const controller=canvasProjects();
+    if(!controller?.discuss)throw new Error('Reload the page to discuss your canvas.');
+    const resources=chatDraftResourceInputs(brief),music=chatDraftMusicInputs(brief);
+    agent('thinking','Reviewing your canvas ideas…');
+    const result=await controller.discuss({brief,currentCanvasId:listeningRoom?.id,codingModel:selectedCanvasCodingModel(owner),
+      sourceSceneIds:resources.source_scene_ids,artistInputs:resources.artist_inputs,musicInputs:music,
+      imageReferenceIds:chatDraftVisualReferenceIds(brief)});
+    if(canvasOwner()!==owner)return null;
+    return result.reply||(result.proposal?'Your canvas project is ready for review.':'');
+  }
+  async function requestListeningRoom(details,request,stage,requestActive,announce){
+    if(details.action!=='edit_image'){
+      const projects=canvasProjects();
+      if(!projects)throw new Error('Refresh the page to load project approval.');
+      const {proposal_id:reuseId,...project}=details;
+      let approved;
+      try{approved=await projects.prepare(project,{signal:request.signal,reuseId});}
+      catch(error){if(error.name==='AbortError'){stage.setSceneCoding?.('idle');request.abort();}throw error;}
+      if(!requestActive())return {state:'canceled'};
+      details={...approved.project,project_managed:true,proposal_id:approved.id};
+    }
+
+    stage.setSceneImage?.('clear');
+    const requestId=Array.from(window.crypto.getRandomValues(new Uint8Array(16)),
+      byte=>byte.toString(16).padStart(2,'0')).join('');
+    const payload={...details,request_id:requestId};
+    const trace=(event,data)=>{if(requestActive())recordCanvasDebug(requestId,event,data);};
+    const model=canvasCodingModel(details.coding_model);
+    trace('build_started',{action:details.action==='edit_image'?'edit_image':details.previous_id?'revise':'create',canvas_kind:details.canvas_kind||'listening_room',
+      canvas_track:!!details.track_id,context_track:!!details.context_track_id,
+      provider:model?.provider||'default',model:model&&/^(?:gpt-|o[1-9]|claude-)[a-z0-9._-]{0,80}$/i.test(model.model)?model.model:undefined});
+    const stop=new Promise(settle=>{request.sceneBuild={payload,trace,settle,request,owner:canvasOwner(),stopping:false,stopConfirmed:false,
+      workflowEligible:payload.project_managed===true&&payload.canvas_kind==='custom',imageIndex:0,imageTotal:0};});
+    stopListeningRoomBuild.pending=null;
+    if(request.sceneBuild.workflowEligible)stage.setSceneWorkflow?.({request_id:requestId,phase:'coding',project:details,
+      summary:'Coding Agent is building the approved project.',steps:[],total_active_tokens_used:0});
+    return Promise.race([sendListeningRoomRequest(request.sceneBuild,request.signal,stage,requestActive,announce),stop]);
+  }
+  async function runCanvasBuildWorkflow(initial,request,stage,requestActive){
+    const build=request.sceneBuild;
+    if(!build?.workflowEligible||initial.scene?.workflow_required!==true||initial.verification?.verified===true){
+      if(build?.workflowEligible)stage.setSceneWorkflow?.(null);
+      return initial;
+    }
+    if(build.stopRequested)return {state:'canceled'};
+    if(!window.SFCanvasBuildWorkflow?.create||!window.SFCanvasSceneTester?.test||!stage.prepareSceneTest)
+      throw new Error('Reload the page to load canvas testing and repair. Your current canvas is still available.');
+    const owner=build.owner;
+    const owned=()=>owner===canvasOwner()&&st.auth.authenticated;
+    const active=()=>owned()&&requestActive()&&!build.stopRequested;
+    const getScene=async(id,signal)=>{
+      const response=await api('agent-scene.php?id='+encodeURIComponent(id)+'&current_track_id='+encodeURIComponent(observedPlayer().track?.id||''),undefined,signal);
+      if(!active()||response.scene?.id!==id)throw new DOMException('Project session changed.','AbortError');
+      return response.scene;
+    };
+    const controller=window.SFCanvasBuildWorkflow.create({requestId:build.payload.request_id,project:build.payload,
+      getOwner:canvasOwner,active,signal:request.signal,
+      post:(payload,options={})=>secureJsonPost('canvas-build-workflow.php',payload,false,options.signal,options.onDelta,undefined,options.onRetry),
+      get:signal=>api('canvas-build-workflow.php?request_id='+encodeURIComponent(build.payload.request_id),undefined,signal),getScene,
+      onUpdate:update=>{if(owned()&&stage.active?.()&&(requestActive()||build.stopRequested))stage.setSceneWorkflow?.(update);},
+      onCandidate:scene=>{if(active())stage.setSceneCandidateCode?.(scene);},
+      onCode:text=>{
+        if(!active())return;
+        stage.setSceneCoding?.('streaming','Repair Agent is revising this candidate.');stage.appendSceneCode?.('raw',text);
+      },
+      onRetry:()=>{if(active())stage.setSceneCoding?.('generating','Repair Agent is retrying the same approved correction.');},
+      test:(scene,{signal,onEvent})=>{
+        const valid=()=>active()&&!signal.aborted;
+        const loadCatalog=async(filters={},readSignal)=>{
+          if(!valid())throw new DOMException('Project session changed.','AbortError');
+          const params=new URLSearchParams({action:'catalog'});
+          for(const field of ['release_id','track_id'])if(filters[field]!==undefined){
+            if(typeof filters[field]!=='string'||!/^[A-Za-z0-9_-]{1,180}$/.test(filters[field]))throw new Error('Choose a valid catalog source.');
+            params.set(field,filters[field]);
+          }
+          const response=await api('canvas-audio.php?'+params,undefined,readSignal);
+          if(!valid()||!Array.isArray(response.tracks)||!Array.isArray(response.releases))throw new Error('The preview catalog is unavailable.');
+          return scopeCanvasMusicCatalog(response,scene);
+        };
+        return window.SFCanvasSceneTester.test(scene,{signal,onEvent,getOwner:canvasOwner,canUse:valid,getState:canvasAudioState,
+          prepareScene:(candidate,probe,previewProgram)=>stage.prepareSceneTest(candidate,{probe,previewProgram,currentTrackId:observedPlayer().track?.id||''}),loadCatalog,
+          loadAudio:async(id,readSignal)=>{
+            const catalog=await loadCatalog({track_id:id},readSignal),track=catalog.tracks.find(value=>value.track_id===id);
+            if(!track?.source_available)throw new Error('The selected MP3 is unavailable.');
+            const response=await fetch((cfg.apiBase||'api')+'/canvas-audio.php?action=source&track_id='+encodeURIComponent(id),
+              {credentials:'same-origin',mode:'same-origin',redirect:'error',cache:'no-store',signal:readSignal});
+            if(!response.ok||!/^audio\/mpeg(?:\s*;|$)/i.test(response.headers.get('content-type')||'')||
+              Number(response.headers.get('content-length'))>128*1024*1024)throw new Error('The preview MP3 could not load.');
+            const blob=await response.blob();if(!valid()||!blob.size||blob.size>128*1024*1024)throw new Error('The preview MP3 could not load.');
+            return {track,blob};
+          },
+          onSceneImage:async(id,readSignal)=>{
+            const path=sceneImagePath(id);if(!path||!valid())throw new Error('The preview image is unavailable.');
+            const response=await fetch(path,{credentials:'same-origin',mode:'same-origin',redirect:'error',cache:'no-store',signal:readSignal});
+            if(!response.ok||Number(response.headers.get('content-length'))>16*1024*1024)throw new Error('The preview image could not load.');
+            const blob=await response.blob();if(!valid())throw new DOMException('Project session changed.','AbortError');return blob;
+          }});
+      }});
+    build.workflowController=controller;
+    return controller.run(initial);
+  }
+  async function stopCanvasBuildWorkflow(build){
+    if(build.stopping||build.owner!==canvasOwner())return;
+    build.stopping=true;build.stopRequested=true;stopListeningRoomBuild.pending=build;
+    try{
+      const canceled=build.workflowController?await build.workflowController.cancel():
+        await secureJsonPost('canvas-build-workflow.php',{action:'cancel',request_id:build.payload.request_id});
+      if(!build.workflowController)await secureJsonPost('agent-scene.php',{action:'cancel',request_id:build.payload.request_id});
+      if(build.owner!==canvasOwner())return;
+      if(canceled?.workflow?.state==='applied'){build.stopConfirmed=true;stopListeningRoomBuild.pending=null;return;}
+      if(canceled?.workflow?.state!=='canceled')throw new Error('The server did not confirm that the project stopped.');
+      window.SFPublicAgentCanvas?.setSceneWorkflow?.({...canceled.workflow,phase:'canceled',summary:'The project was stopped.'});
+      build.stopConfirmed=true;build.settle({state:'canceled'});stopListeningRoomBuild.pending=null;
+    }catch(error){
+      if(build.owner===canvasOwner())return 'The project is stopped locally, but server cancellation could not be confirmed. '+error.message;
+    }finally{build.stopping=false;}
+  }
+  function validCanvasImagePosition(index,total){
+    return Number.isInteger(index)&&Number.isInteger(total)&&index>=1&&index<=total&&total<=4;
+  }
+  function showCanvasBuildImages(stage,build,result){
+    if(!build||!result)return;
+    const requestId=build.payload.request_id;
+    const assets=Array.isArray(result.generated_images)?result.generated_images.slice(0,4):[];
+    if(!assets.length){
+      const asset=Array.isArray(result.scene?.image_assets)&&result.scene.image_assets.find(image=>image?.id===requestId);
+      if(asset)assets.push({id:asset.id,title:asset.title,index:1});
+    }
+    const total=validCanvasImagePosition(1,result.image_total)?result.image_total:Math.max(build.imageTotal,assets.length);
+    for(const asset of assets){
+      if(validCanvasImagePosition(asset?.index,total)&&/^[a-f0-9]{32}$/.test(asset.id||'')&&
+        (asset.index!==1||asset.id===requestId))stage.setSceneImage?.('saved',asset,{index:asset.index,total});
+    }
+  }
+  async function stopListeningRoomBuild(){
+    const request=listeningRoomRequest,build=request?.sceneBuild;
+    const managed=build?.workflowEligible?build:stopListeningRoomBuild.pending;
+    if(managed&&managed.owner===canvasOwner())return stopCanvasBuildWorkflow(managed);
+    if(!build||build.stopping||request.signal.aborted)return;
+    build.stopping=true;
+    build.trace('stop_requested');
+    try{
+      const {request_id,track_id,canvas_kind}=build.payload;
+      const result=await secureJsonPost('agent-scene.php',{action:'cancel',request_id},false,request.signal);
+      if(listeningRoomRequest!==request||request.signal.aborted)return;
+      if(result?.state!=='canceled'&&result?.state!=='failed'&&
+        !(result?.state==='ready'&&listeningRoomHasResult(result,track_id,canvas_kind)))
+        throw new Error('The server did not confirm the build status.');
+      build.stopConfirmed=true;
+      build.trace('stop_result',{state:result.state});
+      build.settle(result);
+    }catch(error){
+      if(listeningRoomRequest===request&&!request.signal.aborted){
+        build.trace('stop_failed',canvasDebugFailure(error));
+        return 'Could not stop the build. '+listeningRoomError(error,true);
+      }
+    }finally{
+      build.stopping=false;
+    }
+  }
+  async function sendListeningRoomRequest(build,signal,stage,requestActive,announce){
+    const {payload,trace}=build;
+    const started=Date.now();
+    let result,failure,streaming=false,receivedSource=false,announcement='',announced=false;
+    try{
+      result=await secureJsonPost('agent-scene.php',payload,false,signal,text=>{
+        if(!text||!requestActive())return;
+        if(!streaming){
+          streaming=true;
+          trace('source_started');
+          if(receivedSource)stage.setSceneCoding?.('generating');
+          stage.setSceneCoding?.('streaming',announcement||'Receiving live code from the text model…');
+        }
+        receivedSource=true;
+        stage.appendSceneCode?.('raw',text);
+      },concept=>{
+        if(!requestActive()||announcement)return;
+        const plan=concept.trim().replace(/[.!?…]+$/,'');
+        if(!plan)return;
+        trace('concept_received');
+        const briefKey=value=>norm(value).replace(/^(?:please )?(?:build|make|create|design|render)(?: me)? /,'');
+        const planKey=briefKey(plan),designKey=briefKey(canvasDesignBrief(payload.brief));
+        const echoesBrief=payload.canvas_kind==='custom'&&(planKey===designKey||
+          (planKey.split(' ').length>=5&&(' '+designKey+' ').includes(' '+planKey+' ')));
+        announcement=echoesBrief?(payload.previous_id?'I’m revising your canvas.':'I’m building your canvas.'):
+          (payload.previous_id?'I’m updating the canvas with ':'I’m building ')+plan+'.';
+        if(!announced){
+          announced=true;
+          announce(announcement,receivedSource?'streaming':'generating');
+        }else stage.setSceneCoding?.(receivedSource?'streaming':'generating',announcement);
+      },reason=>{
+        if(!requestActive())return;
+        trace('provider_retry',{reason:canvasDebugReason(reason)});
+        streaming=false;
+        announcement='';
+        stage.setSceneCoding?.(receivedSource?'streaming':'generating','Retrying the same canvas brief…');
+      },(event,data)=>{
+        if(!requestActive())return;
+        if(event!=='image_generating'&&event!=='image_saved'){trace(event,data);return;}
+        const {index=1,total=1,image}=data||{};
+        if(!validCanvasImagePosition(index,total)||(build.imageTotal&&total!==build.imageTotal))return;
+        if(event==='image_generating'&&index===build.imageIndex+1){
+          build.imageIndex=index;
+          build.imageTotal=total;
+          trace(event,{index,total});
+          const editing=payload.action==='edit_image';
+          stage.setSceneCoding?.('streaming',editing?'Editing your selected image…':total===1?'Creating your canvas image…':`Creating image ${index} of ${total}…`);
+          stage.setSceneImage?.('generating',undefined,{index,total,...(editing?{editing:true}:{})});
+        }else if(event==='image_saved'&&index===build.imageIndex&&/^[a-f0-9]{32}$/.test(image?.id||'')&&
+          (index!==1||image.id===payload.request_id)){
+          trace(event,{index,total});
+          stage.setSceneCoding?.('streaming',index<total?`Image ${index} of ${total} saved.`:
+            total===1?'Image saved. Finishing your canvas…':'Images saved. Finishing your canvas…');
+          stage.setSceneImage?.('saved',image,{index,total});
+        }
+      });
+    }catch(error){
+      const status=error.status;
+      const network=error.name==='TypeError';
+      const encoding=error.payload?.error==='response_encoding_failed';
+      if(signal.aborted||!(network||encoding||(!error.payload&&(status>=500||(status>=200&&status<300)))))throw error;
+      trace('request_interrupted',canvasDebugFailure(error));
+      failure=network?new Error('The connection was interrupted. Check Canvas History before asking Stonefellow to build it again.'):
+        encoding?Object.assign(new Error(error.message),{status}):error;
+    }
+    if(['canceled','failed','review'].includes(result?.state)||listeningRoomHasResult(result,payload.track_id,payload.canvas_kind))return result;
+    failure??=new Error((result?.state==='pending'?'Stonefellow is still building your canvas.':
+      'The server returned an incomplete canvas response.')+' Check Canvas History in a moment.');
+    if(signal.aborted)throw failure;
+    trace('recovery_started');
+    stage.setSceneCoding?.(receivedSource?'streaming':'generating','Checking whether your canvas was saved…');
+    return recoverListeningRoom(payload,signal,failure,started,trace);
+  }
+  let reuseCanvasImagesOnly=null;
+  const canvasImageReviewKey=owner=>'stonefellow.canvas-image-review.'+owner;
+  function rememberCanvasImageReview(owner,requestId){
+    try{
+      if(requestId)localStorage.setItem(canvasImageReviewKey(owner),requestId);
+      else localStorage.removeItem(canvasImageReviewKey(owner));
+    }catch(_){}
+  }
+  function pendingCanvasImageReview(owner){
+    try{
+      const id=localStorage.getItem(canvasImageReviewKey(owner));
+      return /^[a-f0-9]{32}$/.test(id||'')?id:null;
+    }catch(_){return null;}
+  }
+  async function confirmCanvasImageGeneration(brief,editing,request){
+    const owner=canvasOwner();
+    if(!editing&&reuseCanvasImagesOnly){
+      const savedOnly=reuseCanvasImagesOnly;reuseCanvasImagesOnly=null;
+      if(savedOnly.owner===owner&&brief.startsWith(savedOnly.brief))return {image_count:0};
+    }
+    const result=await secureJsonPost('agent-scene.php',{action:'image_preflight',brief,editing},false,request.signal);
+    if(!Number.isInteger(result.preflight?.requested_count))return {};
+    const confirmImages=window.SFCanvasImageReview?.confirmGeneration;
+    if(typeof confirmImages!=='function')throw new Error('Refresh the page to load the image generation controls.');
+    const choice=await confirmImages(result.preflight,{signal:request.signal});
+    if(!choice)return null;
+    if(choice.use_saved&&editing)return {use_saved:true};
+    if(choice.use_saved){
+      input.value="Let's build "+brief+' ';
+      input.setSelectionRange(input.value.length,input.value.length);
+      reuseCanvasImagesOnly={owner,brief};
+      setChatFooterHidden(false);
+      openChatImagePicker({start:input.value.length,end:input.value.length,standalone:false});
+      popupEntry('notice','Choose images for this draft. It will use saved images only.');
+      return null;
+    }
+    return {image_count:choice.count,review_images:!editing&&choice.review};
+  }
+  async function chooseCanvasImageVariation(response,requestId,request,stage,requestActive){
+    const owner=canvasOwner();
+    rememberCanvasImageReview(owner,requestId);
+    stage.setSceneCoding?.('ready','Your image variations are ready to compare.');
+    const choose=window.SFCanvasImageReview?.choose;
+    if(typeof choose!=='function')throw new Error('Refresh the page to load image comparison.');
+    const imageId=await choose(response.generated_images||[],{
+      signal:request.signal,title:'Choose an image for your canvas',imageUrl:asset=>sceneImagePath(asset.id)});
+    if(!requestActive())return null;
+    if(!imageId){
+      popupEntry('assistant','Your variations are saved. Choose an image when you’re ready.',{imageReview:requestId});
+      return null;
+    }
+    const selected=await secureJsonPost('agent-scene.php',{action:'choose_image_variation',request_id:requestId,image_id:imageId},false,request.signal);
+    if(requestActive()&&selected.state==='ready')rememberCanvasImageReview(owner,null);
+    return selected;
+  }
+  async function replaceCanvasImage(asset){
+    const owner=canvasOwner(),stage=window.SFPublicAgentCanvas;
+    if(!owner||listeningRoomRequest||asset?.sceneId!==listeningRoom?.id||!stage?.sceneActive?.())return false;
+    const previous=listeningRoom;
+    const request=new AbortController();listeningRoomRequest=request;
+    const active=()=>listeningRoomRequest===request&&!request.signal.aborted&&canvasOwner()===owner&&listeningRoom?.id===previous.id;
+    try{
+      const loadImages=async scope=>{
+        const images=[],seen=new Set();
+        let cursor=null;
+        do{
+          const query=new URLSearchParams({limit:'100',...(scope?{scope}:{}),...(cursor?{before:cursor}:{})});
+          const page=await api('agent-canvas-image.php?'+query,undefined,request.signal);
+          if(!Array.isArray(page.images))throw new Error('The image gallery could not be loaded.');
+          images.push(...page.images);
+          cursor=typeof page.next_cursor==='string'&&!seen.has(page.next_cursor)?page.next_cursor:null;
+          if(cursor)seen.add(cursor);
+        }while(cursor&&active());
+        return images;
+      };
+      const [saved,references]=await Promise.all([loadImages(''),loadImages('reference')]);
+      if(!active())return false;
+      const images=[...saved,...references].filter(image=>image.id!==asset.id);
+      if(!images.length){popupEntry('notice','Save or generate another image before replacing this one.');return false;}
+      const id=await window.SFCanvasImageReview?.choose(images,{
+        signal:request.signal,title:'Replace this canvas image',imageUrl:image=>sceneImagePath(image.id)});
+      if(!id||!active())return false;
+      const requestId=Array.from(window.crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
+      const result=await secureJsonPost('agent-scene.php',{action:'swap_image',request_id:requestId,
+        previous_id:previous.id,image_id:asset.id,replacement_id:id},false,request.signal);
+      if(!active()||!listeningRoomHasResult(result,String(previous.track_id??''),'custom')||!stage.showScene(result.scene))
+        throw new Error('The replacement canvas could not open.');
+      listeningRoom=result.scene;selectCanvasId(owner,result.scene.id);
+      popupEntry('assistant','I replaced the image. The previous version is saved in Canvas History.');
+      return true;
+    }catch(error){if(active())popupEntry('notice','The image could not be replaced. '+error.message);return false;}
+    finally{if(listeningRoomRequest===request)listeningRoomRequest=null;}
+  }
+  async function handleListeningRoomCommand(action){
+    cancelGalleryOpen();
+    if(action.kind==='close'){
+      if(closeListeningRoom())agent(st.playing?'playing':'idle','Canvas closed.');
+      return;
+    }
+    await loadAuth(true);
+    if(!st.auth.authenticated||!st.auth.user?.id){
+      popupEntry('notice','Sign in to create or reopen your private canvases.');return;
+    }
+    if(listeningRoomRequest){popupEntry('notice','A canvas request is already in progress.');return;}
+    const stage=window.SFPublicAgentCanvas;
+    if(!stage?.active?.()||!stage.showScene){popupEntry('notice','Open the Stonefellow home canvas to build or reopen a canvas.');return;}
+    let trackId,brief,previousId,canvasKind=action.canvasKind;
+    const selectedProject=action.kind==='project'?action.proposal:null;
+    if(selectedProject&&action.owner!==canvasOwner())return;
+    const editingImage=action.kind==='edit_image';
+    const reading=['history','restore','suggest','image_review'].includes(action.kind)||(action.kind==='build_on'&&!action.brief);
+    if(action.kind==='image_review'){
+      const requestId=action.requestId||pendingCanvasImageReview(canvasOwner());
+      if(!/^[a-f0-9]{32}$/.test(requestId||'')){popupEntry('notice','There are no image variations waiting for a choice.');return;}
+      action={...action,requestId};
+    }
+    if(action.kind==='restore'&&(!Number.isSafeInteger(action.id)||action.id<1))return;
+    if(action.kind==='create'&&(!canvasKind||canvasKind==='listening_room')&&!action.subject&&!action.requiresTrack&&!st.track?.id){
+      canvasKind='custom';
+      action={...action,brief:action.brief||'A listening room'};
+    }
+    if(selectedProject){
+      const project=selectedProject.project;
+      if(!project||typeof project.brief!=='string')return;
+      trackId=project.track_id||'';previousId=project.previous_id;canvasKind=project.canvas_kind||'custom';brief=project.brief;
+    }else if(editingImage){
+      const selection=action.selection;
+      if(!selection||selection.owner!==canvasOwner()||selection.sceneId!==listeningRoom?.id||!stage.sceneActive?.()||
+        !Array.isArray(listeningRoom?.image_assets)||!listeningRoom.image_assets.some(image=>image?.id===selection.imageId)){
+        setCanvasImageEditDraft(null);
+        popupEntry('notice','Choose an image on the current canvas to edit it.');return;
+      }
+      trackId=listeningRoom.track_id;
+      previousId=listeningRoom.id;
+      canvasKind='custom';
+      brief=action.brief;
+      setCanvasImageEditDraft(null);
+    }else if(action.kind==='revise'){
+      if(!listeningRoom||!stage.sceneActive?.()){popupEntry('notice','Open a canvas before editing it.');return;}
+      if(isGalleryScene()){popupEntry('notice','Choose Remix in the Canvas Catalog to edit your own private copy.');return;}
+      if(!action.brief){popupEntry('notice','Type /edit followed by what you want to change.');return;}
+      trackId=listeningRoom.track_id;
+      previousId=listeningRoom.id;
+      canvasKind=listeningRoom.canvas_kind;
+      brief=action.brief;
+    }else if(action.kind==='create'&&canvasKind==='custom'){
+      brief=action.brief;
+      const design=canvasDesignBrief(brief);
+      const lyricSection=canvasLyricSection(design);
+      const namedSong=canvasTrackTarget(design);
+      const matches=namedSong?catalog.filter(track=>norm(track.title)===norm(namedSong)):[];
+      if(matches.length>1){popupEntry('notice','More than one song has that title. Play the version you want and use “this song.”');return;}
+      if(lyricSection&&namedSong&&!matches.length&&!canvasCurrentTrack(namedSong)){
+        popupEntry('notice','I couldn’t match that song title. Play the song and use “this song,” or use its exact catalog title.');return;
+      }
+      trackId=matches[0]?.id??((lyricSection||canvasCurrentTrack(namedSong)||/\b(?:this|current|playing)\s+(?:song|track)\b/i.test(design))?st.track?.id:'');
+      if(lyricSection&&!trackId){popupEntry('notice','Play the song whose lyrics you want to use, then tell me what to build.');return;}
+    }else if(action.kind==='create'){
+      const subject=norm(action.subject);
+      if(!subject||canvasCurrentTrack(subject)){
+        trackId=canvasKind==='space_eq'&&!subject?'':st.track?.id;
+        if(!trackId&&canvasKind!=='space_eq'){popupEntry('notice','Play a song first, or say “Build a listening room for” followed by its exact title.');return;}
+      }else{
+        const matches=catalog.filter(track=>norm(track.title)===subject);
+        if(matches.length!==1){popupEntry('notice',matches.length?'More than one song has that title. Play the version you want and say “Build a listening room for this song.”':'I could not find that exact song title. Play the song first or try its catalog title.');return;}
+        trackId=matches[0].id;
+      }
+      brief=action.brief||'Design a cinematic listening room that reflects this song and its published story.';
+    }
+    const request=new AbortController();
+    listeningRoomRequest=request;
+    const owner=String(st.auth.user.id);
+    listeningRoomOwner=owner;
+    const requestActive=()=>listeningRoomRequest===request&&!request.signal.aborted&&
+      st.auth.authenticated&&String(st.auth.user?.id)===owner;
+    try{
+      if(action.kind==='suggest'){
+        const projects=canvasProjects();
+        if(!projects)throw new Error('Refresh the page to load canvas ideas.');
+        await projects.suggest({signal:request.signal,currentCanvasId:listeningRoom?.id,
+          brief:action.brief||'',codingModel:selectedCanvasCodingModel(owner)});
+        return;
+      }
+      if(action.kind==='build_on'){
+        const current=stage.sceneActive?.()?listeningRoom:null;
+        let saved=/^(?:this|current|the current) canvas$/i.test(action.target)?current:null;
+        if(!saved&&canvasTargetMatches(current,action.target))saved=current;
+        if(!saved){
+          const history=await api('agent-scene.php',undefined,request.signal);
+          if(!requestActive())return;
+          saved=(Array.isArray(history.scenes)?history.scenes:[]).find(scene=>canvasTargetMatches(scene,action.target));
+        }
+        if(!Number.isSafeInteger(saved?.id)||saved.id<1){popupEntry('notice','I couldn’t find that canvas in your history. Open Canvas History to see your saved builds.');return;}
+        if(!action.brief)action={kind:'restore',id:saved.id};
+        else{
+          trackId=saved.track_id;previousId=saved.id;canvasKind=saved.canvas_kind||'listening_room';brief=action.brief;
+          action={kind:'revise'};
+        }
+      }
+      const design=reading?'':canvasDesignBrief(brief);
+      const resourceInputs=reading?{}:chatDraftResourceInputs(brief);
+      if(Object.keys(resourceInputs).length)canvasKind='custom';
+      const roomImageEdit=(!canvasKind||canvasKind==='listening_room')&&
+        (/\{(?:reference-)?image-(?:ref-)?[a-f0-9]{32}\}/i.test(design)||/\b(?:create|generate|make|draw|render|design)\b[^.!?\n]{0,100}\b(?:images?|photos?|pictures?|illustrations?)\b/i.test(design));
+      if(previousId&&design&&(canvasKind==='space_eq'||roomImageEdit))canvasKind='custom';
+      const lyricSection=canvasKind==='custom'&&!reading&&!editingImage?canvasLyricSection(design):null;
+      if(lyricSection&&previousId){
+        const target=canvasTrackTarget(design);
+        const targetMatches=!target||(canvasCurrentTrack(target)?String(st.track?.id??'')===String(trackId??''):
+          catalog.some(track=>String(track.id)===String(trackId)&&norm(track.title)===norm(target)));
+        if(!trackId||!targetMatches){popupEntry('notice','Start a new canvas for that song to use its lyrics. A revision keeps the original song.');return;}
+      }
+      let contextTrackId;
+      if(!reading&&canvasKind==='custom'&&(previousId||!trackId)){
+        const playback=observedPlayer();
+        if(previousId||playback.playing)contextTrackId=playback.track?.id;
+      }
+      const announce=(announcement,codingState='generating')=>{
+        popupEntry('assistant',announcement);
+        agent('thinking',announcement);
+        stage.setSceneCoding?.(codingState,announcement);
+        // Use the installed device voice for this status update, without a paid speech request.
+        if(!speechPilotActive)void agentSpeak(announcement,true,request.signal).catch(()=>{});
+      };
+      let imageOptions={};
+      if(!reading&&(canvasKind==='custom'||editingImage)){
+        imageOptions=await confirmCanvasImageGeneration(brief,editingImage,request);
+        if(!requestActive()||imageOptions===null)return;
+        if(imageOptions.use_saved){
+          listeningRoomRequest=null;
+          await replaceCanvasImage({id:action.selection.imageId,sceneId:action.selection.sceneId,title:action.selection.title});
+          return;
+        }
+      }
+      if(!reading){
+        if(editingImage)announce('I’m editing “'+action.selection.title+'.”');
+        else agent('thinking','Planning your canvas…');
+      }
+      const codingModel=!reading&&!editingImage&&canvasKind!=='space_eq'&&!(previousId&&!design)?selectedCanvasCodingModel(owner):null;
+      const imageReferenceIds=reading?[]:chatDraftVisualReferenceIds(brief);
+      const musicInputs=reading?null:chatDraftMusicInputs(brief);
+      let response=reading
+        ?await api('agent-scene.php'+(action.kind==='restore'?'?id='+action.id:action.kind==='image_review'?'?request_id='+action.requestId:''),undefined,request.signal)
+        :await requestListeningRoom({track_id:String(trackId??''),brief,...(canvasKind?{canvas_kind:canvasKind}:{}),
+          ...(previousId?{previous_id:previousId}:{}),...(lyricSection?{lyric_section:lyricSection}:{}),
+          ...(editingImage?{action:'edit_image',image_id:action.selection.imageId}:{}),
+          ...(imageReferenceIds.length?{image_reference_ids:imageReferenceIds}:{}),...imageOptions,
+          ...(musicInputs?{music_inputs:musicInputs}:{}),
+          ...resourceInputs,
+          ...(contextTrackId?{context_track_id:String(contextTrackId)}:{}),...(codingModel?{coding_model:codingModel}:{}),
+          ...(selectedProject?{...selectedProject.project,...imageOptions,proposal_id:selectedProject.id}:{})},request,stage,requestActive,announce);
+      if(!requestActive())return;
+      if(!reading)showCanvasBuildImages(stage,request.sceneBuild,response);
+      if(response?.state==='review'){
+        response=await chooseCanvasImageVariation(response,action.requestId||request.sceneBuild.payload.request_id,request,stage,requestActive);
+        if(!response||!requestActive())return;
+      }
+      if(action.kind==='image_review'&&['ready','canceled','failed'].includes(response?.state))rememberCanvasImageReview(owner,null);
+      if(action.kind==='image_review'&&response.scene){trackId=response.scene.track_id;canvasKind=response.scene.canvas_kind;}
+      if(action.kind==='image_review'&&response.project_managed===true&&response.approved_project&&response.scene?.canvas_kind==='custom'){
+        const requestId=action.requestId;
+        request.sceneBuild={payload:{...response.approved_project,request_id:requestId,project_managed:true,proposal_id:response.proposal_id},
+          owner,request,workflowEligible:true,trace:()=>{},settle:()=>{},stopping:false,stopConfirmed:false};
+        stage.setSceneWorkflow?.({request_id:requestId,phase:'coding',project:response.approved_project,steps:[],summary:'Testing the selected image candidate.'});
+      }
+      if(response?.scene&&request.sceneBuild?.workflowEligible){
+        response=await runCanvasBuildWorkflow(response,request,stage,requestActive);
+        if(!requestActive())return;
+      }
+      if(response?.state==='needs_attention'){
+        canvasProjects.current?.complete?.(request.sceneBuild?.payload.proposal_id,'needs_attention');
+        const message='The candidate needs attention. Your current canvas is still open; see the Testing and Repair tabs.';
+        popupEntry('notice',message);agent(st.playing?'playing':'idle',message);return;
+      }
+      if(response?.state==='canceled'){
+        canvasProjects.current?.complete?.(request.sceneBuild?.payload.proposal_id,'canceled');
+        request.sceneBuild?.trace('build_canceled');
+        request.abort();
+        const message=editingImage?'Image edit stopped.':'Canvas build stopped.';
+        stage.setSceneImage?.('failed',editingImage?message:'Image generation stopped.');
+        stage.setSceneCoding?.('cancelled',message);
+        popupEntry('notice',message);agent(st.playing?'playing':'idle',message);
+        return;
+      }
+      if(response?.state==='failed')throw new Error('This canvas request did not finish. You can ask Stonefellow to try again.');
+      if(action.kind==='history'){
+        if(!stage.showSceneHistory?.(response.scenes||[]))throw new Error('The history could not open.');
+        closeChatPopup();return;
+      }
+      const scene=response.scene;
+      if(scene?.workflow_required===true&&!response.workflow&&response.verification?.verified!==true){
+        const key='unverified-scene-'+scene.id;
+        stage.setSceneWorkflow?.(null);
+        stage.setSceneImage?.('clear');
+        stage.setSceneWorkflow?.({request_id:key,phase:'coding',project:response.approved_project||{brief:scene.design_brief||''},steps:[]});
+        stage.setSceneCandidateCode?.(scene);
+        stage.setSceneWorkflow?.({request_id:key,phase:'needs_attention',summary:'This saved candidate has not completed testing.'});
+        const message='This saved candidate has not completed testing. I opened its source; your current canvas is still in place.';
+        popupEntry('notice',message);agent(st.playing?'playing':'idle',message);return;
+      }
+      if(reading&&response.workflow&&scene){
+        const workflow=response.workflow;
+        stage.setSceneWorkflow?.(null);
+        stage.setSceneImage?.('clear');
+        stage.setSceneWorkflow?.({...workflow,phase:'coding'});
+        stage.setSceneCandidateCode?.(scene);
+        stage.setSceneWorkflow?.({...workflow,phase:workflow.candidate_scene_id===scene.id?workflow.state:'needs_attention',summary:workflow.message||'Saved project activity.'});
+        if(workflow.candidate_scene_id!==scene.id||!['ready','applied'].includes(workflow.state)){
+          if(['testing','reviewing','needs_repair','repairing'].includes(workflow.state))stopListeningRoomBuild.pending={
+            payload:{request_id:workflow.request_id},owner,workflowEligible:true,stopping:false,settle:()=>{},
+            workflowController:{cancel:()=>secureJsonPost('canvas-build-workflow.php',{action:'cancel',request_id:workflow.request_id})}};
+          const message='This saved candidate has not passed the current checks. I opened its code and agent activity; your canvas is still in place.';
+          popupEntry('notice',message);agent(st.playing?'playing':'idle',message);return;
+        }
+      }
+      const standard=(response.design_source??scene?.design_source)==='standard';
+      if(!stage.active?.()||!Number.isSafeInteger(scene?.id)||scene.id<1||
+        (!reading&&!listeningRoomHasResult(response,String(trackId??''),canvasKind)))throw new Error('The canvas could not open.');
+      if(editingImage&&(scene.id===previousId||!Array.isArray(scene.image_assets)||
+        !scene.image_assets.some(asset=>asset?.id===request.sceneBuild?.payload.request_id)))
+        throw new Error('The server could not confirm the revised image on the canvas.');
+      if(reading)stage.setSceneImage?.('clear');
+      if(reading&&action.kind!=='image_review'&&!response.workflow)stage.setSceneWorkflow?.(null);
+      if(response.workflow){
+        const committed=await secureJsonPost('canvas-build-workflow.php',{action:'apply',request_id:response.workflow.request_id,scene_id:scene.id},false,request.signal);
+        if(!requestActive()||request.sceneBuild?.stopRequested)return;
+        if(committed.workflow?.state!=='applied'||committed.workflow.candidate_scene_id!==scene.id)
+          throw new Error('The server did not authorize this candidate to open. Your current canvas is still available.');
+        response.workflow=committed.workflow;
+      }
+      if(!stage.showScene(scene,{standard}))throw new Error('The canvas could not open.');
+      if(response.workflow){
+        stage.setSceneWorkflow?.({...response.workflow,phase:'applied',summary:'The checked candidate is now open.'});
+      }
+      setCanvasImageEditDraft(null);
+      listeningRoom=scene;
+      canvasProjects.current?.complete?.(request.sceneBuild?.payload.proposal_id);
+      selectCanvasId(owner,scene.canvas_kind==='space_eq'?null:scene.id);
+      stage.closePage?.(true);
+      request.sceneBuild?.trace('canvas_opened',{source:standard?'standard':'model'});
+      if(!canvasDebugVisible())closeChatPopup();
+      let message=action.kind==='image_review'||request.sceneBuild?.payload.review_images?'I applied your chosen image.':editingImage?'I updated the image and kept the original in your library.':previousId&&!design?(musicInputs?'I updated your canvas’s music selection.':response.active_tokens_used>0?'I updated how the agent appears.':'I updated how the agent appears. No Active Tokens were used.'):
+        scene.canvas_kind==='space_eq'?(reading?'I reopened your Space EQ.':'I built your Space EQ with code. No Active Tokens were used.'):
+        scene.canvas_kind==='custom'?(standard?(reading?'I reopened your built-in catalog layout.':'I opened your live catalog in a built-in layout. No Active Tokens were used.'):
+          reading?'I reopened your canvas.':action.kind==='revise'?'I updated your canvas.':'Your canvas is ready.'):
+        standard?'I opened a listening room using the built-in layout. No Active Tokens were used.':
+        action.kind==='revise'?'I revised the listening room.':reading?'I reopened the listening room for “'+scene.title+'.”':'I built a listening room for “'+scene.title+'.”';
+      if(!standard&&!reading&&Number.isSafeInteger(response.active_tokens_used)&&response.active_tokens_used>0)message+=' Used '+response.active_tokens_used.toLocaleString()+' Active Tokens.';
+      popupEntry('assistant',message);
+      agent(st.playing?'playing':'idle',message);
+    }catch(error){
+      if(!requestActive())return;
+      request.sceneBuild?.trace('build_failed',canvasDebugFailure(error));
+      canvasProjects.current?.complete?.(request.sceneBuild?.payload.proposal_id,'failed');
+      if(error.payload?.error==='scene_coding_model_unavailable')void refreshCanvasCodingModelMenu(true);
+      const message=(editingImage?'Image edit could not finish. ':action.kind==='suggest'?'Canvas suggestions could not be loaded. ':reading?'Canvas history could not be opened. ':
+        canvasKind&&canvasKind!=='listening_room'?'Canvas could not be created. ':'Listening room could not be created. ')+listeningRoomError(error,reading);
+      if(!reading){
+        showCanvasBuildImages(stage,request.sceneBuild,error.payload);
+        if(request.sceneBuild?.workflowEligible)stage.setSceneWorkflow?.({request_id:request.sceneBuild.payload.request_id,phase:'failed',summary:message});
+        request.abort();
+        stage.setSceneImage?.('failed',editingImage?'Image edit did not complete.':'Image generation did not complete.');
+        stage.setSceneCoding?.('error',message);
+      }
+      popupEntry('notice',message);agent(st.playing?'playing':'idle',message);
+    }finally{
+      if(request.sceneBuild?.stopConfirmed)request.abort();
+      if(listeningRoomRequest===request)listeningRoomRequest=null;
+    }
+  }
   async function liveAgent(text){
+    if(handleAgentVisibilityCommand(text))return;
+    if(canvasProjects()?.handleCommand(text))return;
+    const listeningRoomCommand=directListeningRoomCommand(text);
+    if(listeningRoomCommand){await handleListeningRoomCommand(listeningRoomCommand);return;}
     if(directRandomPlaylistCommand(text)){
       const result=await startRandomTemporaryPlaylist();
       await say(result);
@@ -2017,7 +3746,9 @@
         return;
       }
       const client_state=agentClientState();
+      const contextEpoch=popupHistoryEpoch,chatOwner=canvasOwner();
       const j=await secureJsonPost('agent-chat.php',{message:text,conversation_id:st.conversationId,client_state});
+      if(contextEpoch!==popupHistoryEpoch||chatOwner!==canvasOwner())return;
       st.conversationId=j.conversation_id||st.conversationId;
       if(st.conversationId)localStorage.setItem('stonefellow.agent.conversation',st.conversationId);
       const playerResult=await dispatchAgentBrowserAction(text,j.action,j.audio_resolution);
@@ -2033,8 +3764,10 @@
           });
         }catch(_){/* Keep unconfirmed server history if the receipt is unavailable. */}
       }
-      await say(playerResult??(String(j.text||'').trim()||'The Agent received your message but returned no reply. Please try again.'));
+      if(contextEpoch===popupHistoryEpoch&&chatOwner===canvasOwner())
+        await say(playerResult??(String(j.text||'').trim()||'The Agent received your message but returned no reply. Please try again.'));
     }catch(e){
+      if(e.name==='AbortError')return;
       if(e.payload?.error==='active_tokens_required'){
         await say(e.message||'You are out of Active Tokens.',()=>navigate('plans'));return;
       }
@@ -2206,22 +3939,264 @@
     const pp=$('[data-home-personalized]',canvas);if(pp)pp.onclick=()=>{homepageEvent('personalized_open','personalized');const sec=(home.sections||[]).find(x=>x.section_key==='personalized'),a=sec?.data?.suggestion?.action||{};if(a.type==='play_track'&&a.track_id){const t=trackById(a.track_id);if(t)play(t)}else if(a.type==='resume_track'&&a.track_id){const t=trackById(a.track_id);if(t)play(t,a.position_seconds||0)}else if(a.type==='open_release')navigate('release',{id:a.release_id});else if(a.type==='open_build')navigate('builder');else navigate(a.view||'music')};
     agent(st.playing?'playing':'idle','Welcome to Stonefellow. Start with the music, see what is next, or ask me where to begin.');return true;
   }
+  function sceneImagePath(id){
+    return typeof id==='string'&&chatImageId.test(id)?(cfg.apiBase||'api')+'/agent-canvas-image.php?id='+encodeURIComponent(id):'';
+  }
+  function gallerySceneImagePath(scene,id){
+    if(!isGalleryScene(scene)||!Array.isArray(scene.image_assets))return '';
+    const asset=scene.image_assets.find(item=>item?.id===id);
+    if(!asset||typeof asset.url!=='string')return '';
+    try{
+      const url=new URL(asset.url,document.baseURI),endpoint=new URL((cfg.apiBase||'api')+'/canvas-gallery.php',document.baseURI);
+      return url.origin===endpoint.origin&&url.pathname===endpoint.pathname&&url.searchParams.get('action')==='asset'&&
+        url.searchParams.get('id')===scene.gallery_id&&url.searchParams.get('asset_id')===id?url.href:'';
+    }catch(_){return '';}
+  }
+  function canvasAudioState(){
+    const duration=Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:Math.max(0,Number(st.track?.duration)||0);
+    return {trackId:st.track?String(st.track.id):'',title:String(st.track?.title||''),
+      currentTime:Number.isFinite(audio.currentTime)?Math.max(0,audio.currentTime):0,duration,
+      playing:!!st.track&&!audio.paused&&!audio.ended&&!audio.error,volume:playerVolume(),muted:!!audio.muted,ended:!!audio.ended};
+  }
+  const canvasAudioDebugSessions=new WeakMap();
+  function recordCanvasAudioDiagnostic(detail){
+    const scene=listeningRoom,owner=canvasOwner();
+    if(!scene||!owner)return;
+    let entry=canvasAudioDebugSessions.get(scene);
+    if(!entry||entry.owner!==owner){
+      entry={owner,id:Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,'0')).join('')};
+      canvasAudioDebugSessions.set(scene,entry);
+    }
+    recordCanvasDebug(entry.id,'canvas_audio',{scene_id:scene.id,...detail});
+  }
+  function requireCanvasAudioSession(owner,scene){
+    if(!owner||owner!==canvasSceneOwner()||(!st.auth.authenticated&&!isGalleryScene(scene))||!scene||scene!==listeningRoom)
+      throw new Error('The canvas audio session is no longer active.');
+  }
+  function scopeCanvasMusicCatalog(catalog,scene){
+    const inputs=scene?.music_inputs;
+    if(inputs==null)return catalog;
+    if(inputs.mode!=='all'&&(inputs.mode!=='selected'||!Array.isArray(inputs.track_ids)))
+      throw new Error('This canvas has an invalid music selection.');
+    const available=new Map(catalog.tracks.filter(track=>track?.source_available===true).map(track=>[track.track_id,track]));
+    const ids=inputs.mode==='all'?Array.from(available.keys()):Array.from(new Set(inputs.track_ids));
+    const tracks=ids.flatMap(id=>available.has(id)?[available.get(id)]:[]),selected=new Set(tracks.map(track=>track.track_id));
+    const releases=catalog.releases.flatMap(release=>{
+      const trackIds=Array.isArray(release.track_ids)?release.track_ids.filter(id=>selected.has(id)):[];
+      return trackIds.length?[{...release,track_ids:trackIds}]:[];
+    });
+    return {tracks,releases};
+  }
+  async function loadCanvasAudioCatalog(filters={},signal){
+    const owner=canvasSceneOwner(),scene=listeningRoom;
+    requireCanvasAudioSession(owner,scene);
+    await requirePublishedCanvas(scene,signal);
+    const params=new URLSearchParams({action:'catalog'});
+    for(const field of ['release_id','track_id'])if(filters[field]!==undefined){
+      if(typeof filters[field]!=='string'||!/^[A-Za-z0-9_-]{1,180}$/.test(filters[field]))throw new Error('Choose a valid music catalog ID.');
+      params.set(field,filters[field]);
+    }
+    const result=await api('canvas-audio.php?'+params,undefined,signal);
+    requireCanvasAudioSession(owner,scene);
+    if(!Array.isArray(result.tracks)||!Array.isArray(result.releases))throw new Error('The music catalog returned an invalid response.');
+    return scopeCanvasMusicCatalog({tracks:result.tracks,releases:result.releases},scene);
+  }
+  async function loadCanvasAudioSource(trackId,signal){
+    const owner=canvasSceneOwner(),scene=listeningRoom;
+    const catalog=await loadCanvasAudioCatalog({track_id:trackId},signal);
+    const track=catalog.tracks.find(row=>row.track_id===trackId);
+    if(!track?.source_available)throw new Error('This song does not have an available hosted MP3 source.');
+    requireCanvasAudioSession(owner,scene);
+    const path='canvas-audio.php?action=source&track_id='+encodeURIComponent(trackId);
+    const response=await fetch((cfg.apiBase||'api')+'/'+path,{credentials:'same-origin',mode:'same-origin',cache:'no-store',redirect:'error',signal});
+    if(!response.ok||!/^audio\/mpeg(?:\s*;|$)/i.test(response.headers.get('content-type')||''))
+      throw new Error('The song’s MP3 source is unavailable.');
+    const maximum=128*1024*1024;
+    if(Number(response.headers.get('content-length'))>maximum)throw new Error('The MP3 exceeds the canvas audio file size limit.');
+    const blob=await response.blob();
+    requireCanvasAudioSession(owner,scene);
+    if(!blob.size||blob.size>maximum)throw new Error('The song’s MP3 could not be loaded.');
+    return {track,blob};
+  }
+  async function playCanvasAudio(trackId){
+    const owner=canvasSceneOwner(),scene=listeningRoom,id=trackId??(st.track?String(st.track.id):'');
+    let stage='selection';
+    try{
+      if(!id)throw Object.assign(new Error('Choose a song before starting playback.'),{code:'invalid_track'});
+      stage='catalog';
+      const catalog=await loadCanvasAudioCatalog({track_id:id});
+      stage='selection';
+      const published=catalog.tracks.find(track=>track.track_id===id);
+      if(!published)throw Object.assign(new Error('This song is no longer in the published catalog.'),{code:'track_unavailable'});
+      if(!published.source_available)throw Object.assign(new Error('This song does not have an available hosted MP3 source.'),{code:'audio_source_unavailable'});
+      stage='site_catalog';
+      let track=trackById(id);
+      if(!track){await refreshSiteData();track=trackById(id);}
+      stage='session';
+      requireCanvasAudioSession(owner,scene);
+      if(!track)throw Object.assign(new Error('This song is unavailable.'),{code:'track_unavailable',stage:'site_catalog'});
+      if(String(st.track?.id)===id&&!audio.paused&&!audio.ended)return canvasAudioState();
+      // The fresh catalog authorized this source. Keep canonical player state,
+      // but do not fall back to a listening URL cached before a media update.
+      track={...track,audio:(cfg.apiBase||'api')+'/canvas-audio.php?action=source&track_id='+encodeURIComponent(id)};
+      const position=String(st.track?.id)===id?savedPlaybackPosition():0;
+      stage='playback';
+      let failure;
+      if(!await play(track,position,'player',false,error=>{failure=error;})){
+        const mediaCode=Number(audio.error?.code)||0;
+        const code=failure?.code==='audio_seek_unavailable'?'audio_seek_unavailable':
+          failure?.name==='NotAllowedError'?'audio_gesture_required':
+          failure?.name==='AbortError'||String(st.track?.id)!==id?'audio_playback_interrupted':
+          mediaCode===2?'audio_network_error':mediaCode===3?'audio_decode_error':
+          mediaCode===4||failure?.name==='NotSupportedError'?'audio_source_unavailable':'audio_unavailable';
+        const error=new Error(code==='audio_gesture_required'?'Tap Play to allow audio for this session.':'The player could not start this song.');
+        error.code=code;error.stage=code==='audio_seek_unavailable'?'resume_seek':'playback';
+        if(mediaCode>=1&&mediaCode<=4)error.media_code=mediaCode;
+        error.source_kind='host_reference';
+        if(['NotAllowedError','AbortError','NotSupportedError'].includes(failure?.name))error.name=failure.name;
+        throw error;
+      }
+      stage='session';
+      requireCanvasAudioSession(owner,scene);
+      return canvasAudioState();
+    }catch(error){
+      // Stage names and codes are safe diagnostic classifications; never send
+      // upstream messages, URLs or song content to the canvas debug stream.
+      const failure=new Error('The canvas audio operation could not be completed.');
+      failure.stage=['catalog','selection','site_catalog','source','playback','resume_seek','session'].includes(error?.stage)?error.stage:stage;
+      failure.code=typeof error?.code==='string'?error.code:stage==='catalog'?'audio_catalog_unavailable':stage==='session'?'audio_session_closed':
+        stage==='site_catalog'?'track_unavailable':'audio_unavailable';
+      if(['NotAllowedError','AbortError','NotSupportedError','TypeError','NetworkError'].includes(error?.name))failure.name=error.name;
+      if(Number.isInteger(error?.media_code)&&error.media_code>=1&&error.media_code<=4)failure.media_code=error.media_code;
+      if(['host_reference','blob','other'].includes(error?.source_kind))failure.source_kind=error.source_kind;
+      throw failure;
+    }
+  }
+  function pauseCanvasAudio(){
+    requireCanvasAudioSession(canvasSceneOwner(),listeningRoom);
+    if(st.track&&!audio.paused)toggle();
+    return canvasAudioState();
+  }
+  function seekCanvasAudio(seconds){
+    requireCanvasAudioSession(canvasSceneOwner(),listeningRoom);
+    if(!Number.isFinite(seconds)||seconds<0||!Number.isFinite(audio.duration)||audio.duration<=0||seconds>audio.duration)
+      throw new Error('The requested playback position is not currently seekable.');
+    seekPlayback(seconds/audio.duration);
+    return canvasAudioState();
+  }
+  function setCanvasAudioVolume(value){
+    requireCanvasAudioSession(canvasSceneOwner(),listeningRoom);
+    if(!Number.isFinite(value)||value<0||value>1||setPlayerVolume(value)===null)
+      throw new Error('The player could not apply that volume.');
+    return canvasAudioState();
+  }
   async function renderAgentCanvas(){
     if(!window.SFPublicAgentCanvas?.mount)return false;
+    clearListeningRoom();
     document.body.classList.remove('artist-home-active','artist-home-chat-hidden');
     document.body.classList.add('sf-agent-canvas-active');
     starters.hidden=true;
     const mounted=window.SFPublicAgentCanvas.mount(mainCanvas,{
       audio,
       player:footerPlayer,
-      initialConversation:popupEntries.at(-1)||null,
+      initialAgentHidden:manualAgentHidden,
+      initialConversation:popupEntries.filter(entry=>entry.role!=='user'||(!entry.canvasBrief&&!canvasBriefInChat(entry.text))).at(-1)||null,
       isCapturing:()=>!!(songCaptureSkill?.status()?.active||songListeningSkill?.status()?.active||vocalStudio?.status()?.active),
       isVocalRecording:()=>!!vocalStudio?.status()?.active,
       hasTemporaryPlaylist:()=>isTemporaryPlaylist(),
       onOpenQueue:()=>void openQueue(),
       onOpenMoments:()=>songMoments?.open(),
       onOpenMoment:(id,trigger)=>songMoments?.openMoment(id,trigger),
+      getTrackId:()=>st.track?.id,
+      canUseScenes:()=>!!canvasOwner()||isGalleryScene(),
+      canManageScenes:()=>!!canvasOwner(),
+      onOpenSceneHistory:()=>void handleListeningRoomCommand({kind:'history'}),
+      onRestoreScene:id=>void handleListeningRoomCommand({kind:'restore',id:Number(id)}),
+      onDeleteScene:deleteSavedCanvas,
+      onSubmitScene:id=>void navigate('canvas-gallery',{tab:'submit',id}),
+      onPageClose:view=>{if(view==='canvas-gallery'){canvasGalleryView?.destroy();canvasGalleryView=null;cancelGalleryOpen();}},
+      onSceneFeedback:()=>{
+        if(listeningRoom&&canvasOwner())void canvasProjects()?.feedbackForScene?.(listeningRoom)?.catch(error=>{
+          if(error.name!=='AbortError')popupEntry('notice',error.message||'Canvas feedback could not open.');
+        });
+      },
+      getSceneOwner:canvasSceneOwner,
+      getSceneImageUrl:sceneImagePath,
+      onEditSceneImage:selectCanvasImageForEdit,
+      onReplaceSceneImage:replaceCanvasImage,
+      onLoadSceneImages:(cursor,signal)=>api('agent-canvas-image.php'+(cursor?'?before='+encodeURIComponent(cursor):''),undefined,signal),
+      onSceneStop:stopListeningRoomBuild,
+      onSceneAccess:()=>void canvasAccess()?.show(),
+      onSceneMounted:scene=>canvasAccess()?.sceneMounted(scene),
+      onSceneTrackData:async(sceneId,trackId,signal)=>{
+        if(isGalleryScene()&&sceneId===listeningRoom.gallery_id){
+          const result=await api('canvas-gallery.php?'+galleryQuery({action:'open',id:sceneId,current_track_id:trackId}),undefined,signal);
+          return result.scene??null;
+        }
+        if(typeof sceneId==='string')return null;
+        const result=await api('agent-scene.php?id='+encodeURIComponent(sceneId)+'&current_track_id='+encodeURIComponent(trackId),undefined,signal);
+        return result.scene??null;
+      },
+      onSceneImage:async(id,signal,scene=null)=>{
+        const viewer=canvasSceneOwner();
+        if(scene===null&&!canvasOwner())return null;
+        const path=isGalleryScene(scene)?gallerySceneImagePath(scene,id):sceneImagePath(id);
+        if(!path)return null;
+        const response=await fetch(path,{mode:'same-origin',credentials:'same-origin',cache:'no-store',redirect:'error',signal});
+        if(!response.ok||!/^image\/(?:png|webp|jpeg)$/i.test(response.headers.get('content-type')||'')||Number(response.headers.get('content-length'))>16*1024*1024)return null;
+        const blob=await response.blob();
+        return (scene===null||scene===listeningRoom)&&viewer===canvasSceneOwner()&&blob.size<=16*1024*1024?blob:null;
+      },
+      onScenePlay:trackId=>{
+        if(!listeningRoom||String(listeningRoom.track_id)!==String(trackId))return;
+        const track=trackById(trackId);
+        if(!track)return;
+        if(String(st.track?.id)===String(trackId)){
+          if(audio.paused)toggle();
+        }else void play(track,0,'player');
+      },
+      onSceneCatalogPlay:async trackId=>{
+        const current=listeningRoom,owner=canvasSceneOwner();
+        if(!current||(!st.auth.authenticated&&!isGalleryScene(current)))return;
+        try{await requirePublishedCanvas(current);}catch(_){return;}
+        if(listeningRoom!==current||owner!==canvasSceneOwner())return;
+        let track=trackById(trackId);
+        if(!track){
+          await refreshSiteData();
+          if(listeningRoom!==current||(!st.auth.authenticated&&!isGalleryScene(current)))return;
+          track=trackById(trackId);
+        }
+        if(!track){popupEntry('notice','That song is no longer available in the public catalog.');return;}
+        if(String(st.track?.id)===String(trackId)){
+          if(audio.paused)toggle();
+        }else void play(track,0,'player');
+      },
+      onSceneCatalogOpen:(kind,id)=>{
+        if(!listeningRoom||(!st.auth.authenticated&&!isGalleryScene())||!/^[A-Za-z0-9_-]{1,180}$/.test(String(id||'')))return;
+        if(kind==='merch')void navigate('store',{slug:id});
+        if(kind==='album')void navigate('release',{id});
+        if(kind==='show')void navigate('show',{id});
+        if(kind==='tickets')void navigate('tickets',{id});
+      },
+      onSceneStory:(trackId,story)=>{
+        if(!listeningRoom||String(listeningRoom.track_id)!==String(trackId))return;
+        if(story?.story_slug)void navigate('story',{slug:story.story_slug});
+        else if(String(st.track?.id)===String(trackId)&&songMoments?.open())return;
+        else void navigate('track',{id:trackId});
+      },
+      onSceneClose:()=>{selectCanvasId(canvasOwner(),null);clearListeningRoom();},
+      onCanvasAudioCatalog:loadCanvasAudioCatalog,
+      onCanvasAudioSource:loadCanvasAudioSource,
+      onCanvasAudioPlay:playCanvasAudio,
+      onCanvasAudioPause:pauseCanvasAudio,
+      onCanvasAudioSeek:seekCanvasAudio,
+      onCanvasAudioVolume:setCanvasAudioVolume,
+      onCanvasAudioState:canvasAudioState,
+      onCanvasAudioDiagnostic:recordCanvasAudioDiagnostic,
+      onAgentVisibilityChange:syncAgentVisibility,
+      onShowAgent:()=>handleAgentVisibilityCommand('/show-agent'),
       onOpenLibrary:()=>openExperienceDrawer('music','songs'),
+      onOpenRecordBuilder:()=>void navigate('builder'),
       onOpenCommerce:()=>openExperienceDrawer('commerce','merch'),
       isConversationActive:()=>st.conversationOn,
       onStopSpeaking:()=>stopAgentSpeaking(),
@@ -2268,6 +4243,7 @@
       window.SFPublicAgentCanvas.setSongMoment?.(songMoments?.getOrbMoment?.()||null);
       syncWelcomeActions();
       agent(st.playing?'playing':'idle','Welcome to Stonefellow. Play a song, then ask me to listen and interpret its lyrics, or record a clip.');
+      void restoreActiveCanvas();
     }
     return mounted;
   }
@@ -2684,6 +4660,7 @@
     }
   }
   async function renderNavigation(view='home',params={},push=true){
+    if(view!=='canvas-gallery'){canvasGalleryView?.destroy();canvasGalleryView=null;cancelGalleryOpen();}
     closeMenu();hide();
     if(view==='home'&&window.SFPublicAgentCanvas?.active?.()){
       window.SFPublicAgentCanvas.closePage?.();
@@ -2695,12 +4672,13 @@
     }
     // The record builder is an immersive, full-page studio, not a sidebar view.
     if(view==='builder'&&window.SFPublicAgentCanvas?.active?.()){
+      clearListeningRoom();
       window.SFPublicAgentCanvas.unmount();
       document.body.classList.remove('sf-agent-canvas-active');
     }
     const nativePanel=view!=='home'&&view!=='builder'&&homepageTemplate==='agent_canvas'&&window.SFPublicAgentCanvas?.active?.();
     canvas=nativePanel?(window.SFPublicAgentCanvas.openPage?.(view)||mainCanvas):mainCanvas;
-    document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='checkout'){await renderCheckout()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='capture'){await renderCreativeCapture()}else if(view==='team'){await renderTeamWorkspace()}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
+    document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='canvas-gallery'){await renderCanvasGallery(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='checkout'){await renderCheckout()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='capture'){await renderCreativeCapture()}else if(view==='team'){await renderTeamWorkspace()}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
   async function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}
 
     if(homepageTemplate==='agent_canvas'&&view!=='home'&&view!=='builder'&&!window.SFPublicAgentCanvas?.active?.()){
@@ -2723,6 +4701,7 @@
     songMoments?.setTrack(st.track);
     playerTitle.textContent=st.track.title;
     playerRelease.textContent=st.track.release||'Stonefellow';
+    playerDuration.textContent=time(Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:st.track.duration);
     playerToggle.textContent=st.playing?'Ⅱ':'▶';
     playerToggle.setAttribute('aria-label',st.playing?'Pause':'Play');
     const art=st.track.artwork||'';
@@ -2747,6 +4726,8 @@
       playbackLifecycle.remember(playbackLifecycle.token(),Number(audio.currentTime));
   }
   function savedPlaybackPosition(){
+    // Replaying a completed song starts at zero; its EOF is not a resume seek.
+    if(audio.ended&&!playbackEndedEarly())return 0;
     return Math.max(playbackLifecycle.position(playbackLifecycle.token()),Number(audio.currentTime)||0);
   }
   function setPlaybackStatus(message='',phase=''){
@@ -2794,7 +4775,7 @@
     audio.pause();audio.src=source;audio.load();
     return true;
   }
-  function play(t,resumeAt=0,source='player',keepPlaylist=false){
+  function play(t,resumeAt=0,source='player',keepPlaylist=false,onFailure=null){
     if(!t?.audio)return Promise.resolve(false);
     const changing=!st.track||String(st.track.id)!==String(t.id)||audio.getAttribute('src')!==String(t.audio);
     const reloading=changing||!!audio.error||footerPlayer?.dataset.playbackPhase==='error';
@@ -2815,7 +4796,7 @@
         const recovery={token,position:startAt,controller:null,reject};pendingNetworkRecovery=recovery;
         const current=()=>pendingNetworkRecovery===recovery&&playbackWantsAudio&&playbackLifecycle.isCurrent(token)&&String(st.track?.id)===String(t.id);
         recovery.controller=window.StonefellowPlaybackLifecycle.restorePosition({audio,position:startAt,isCurrent:current,
-          onFailure:()=>{if(current())reject(new Error('Saved position is not seekable yet'));},
+          onFailure:()=>{if(current()){const error=new Error('Saved position is not seekable yet');error.code='audio_seek_unavailable';error.stage='resume_seek';reject(error);}},
           onRestored:()=>{if(current()){try{Promise.resolve(audio.play()).then(resolve,reject)}catch(error){reject(error)}}}});
         recovery.controller.check();
       });
@@ -2825,16 +4806,24 @@
       cancelNetworkRecovery();st.playing=true;rememberPlaybackPosition();recordListen(startAt>0?'resume':'start');
       agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');
       updateFooterPlayer();return true;
-    }).catch(()=>{
+    }).catch(error=>{
       if(!playbackLifecycle.isCurrent(token))return false;
-      playbackProblem('Playback unavailable · tap Play to retry.');
-      agent('idle','The browser could not start “'+t.title+'.” Check its audio in Media Health.');return false;
+      onFailure?.(error);
+      const blocked=error?.name==='NotAllowedError';
+      playbackProblem(blocked?'Tap Play to allow audio for this session.':'Playback unavailable · tap Play to retry.');
+      agent('idle',blocked?'Tap Play to allow audio for this session.':'The browser could not start “'+t.title+'.” Check its audio in Media Health.');return false;
     });
   }
   function toggle(){
     if(!st.track)return;
     if(!audio.paused){recordListen('pause');invalidatePlayback();audio.pause();st.playing=false;agent('idle','Paused “'+st.track.title+'.”');updateFooterPlayer();return}
     void play(st.track,savedPlaybackPosition(),st.playSource,!!st.playlistPlayback.playlistId);
+  }
+  function seekPlayback(fraction){
+    if(!Number.isFinite(fraction)||fraction<0||fraction>1||!Number.isFinite(audio.duration)||audio.duration<=0)return;
+    if(songCaptureSkill?.status().active)songCaptureSkill.discard();
+    if(songListeningSkill?.status().active)void songListeningSkill.stop('seek');
+    audio.currentTime=fraction*audio.duration;
   }
   async function stepTrack(delta){
     // Await the real media outcome before the Agent records a successful skip.
@@ -3371,7 +5360,25 @@
   })}
   async function publicKnowledgeAnswer(q){try{const r=await fetch((cfg.apiBase||'api')+'/knowledge-search.php?q='+encodeURIComponent(q),{cache:'no-store'}),j=await r.json();if(j.ok&&j.hits?.length){const h=j.hits[0];say('From the Stonefellow knowledge base: '+(h.snippet||h.name));return true}}catch(_){}return false}
   function releaseAnswer(q){const n=norm(q);const r=releases.find(x=>n.includes(norm(x.title)))||releases.find(x=>(x.state||'published')==='published'&&x.agent_discoverable!==false);if(!r)return false;openRelease(r.id,true);say('Here is “'+r.title+'.”');return true}
-  async function command(raw){const text=String(raw||'').trim(),q=norm(text);if(!text)return;popupEntry('user',text);hide();input.value='';closeMenu();const atmosphereChoice=window.SFPublicAgentCanvas?.active?.() && window.SFPublicAgentCanvas.applyCommand?.(text);
+  async function command(raw){const text=String(raw||'').trim(),q=norm(text);if(!text||handleAgentVisibilityCommand(text))return;
+    if(canvasProjects()?.handleCommand(text)){popupEntry('user',text);input.value='';return;}
+    if(/^\/cancel$/i.test(text)&&reuseCanvasImagesOnly){reuseCanvasImagesOnly=null;input.value='';return;}
+    const imageSelection=canvasImageEditDraft;
+    if(imageSelection&&/^(?:\/cancel|cancel(?: (?:the )?image edit)?)[.!?]?$/i.test(text)){
+      setCanvasImageEditDraft(null);input.value='';return;
+    }
+    if(imageSelection&&/^\/(?!edit(?:\s|$))/i.test(text)){
+      popupEntry('notice','Describe the image change or cancel the selected image edit.');return;
+    }
+    const imageBrief=imageSelection?text.replace(/^\/edit(?:\s+|$)/i,'').trim():'';
+    if(imageSelection&&!imageBrief){popupEntry('notice','Describe what you want to change in the selected image.');return;}
+    if(imageSelection)popupEntry('user',text,{canvasBrief:true});
+    else popupEntry('user',text);
+    hide();input.value='';closeMenu();
+    if(imageSelection){await handleListeningRoomCommand({kind:'edit_image',selection:imageSelection,brief:imageBrief});return;}
+    const listeningRoomCommand=directListeningRoomCommand(text);
+    if(listeningRoomCommand){await handleListeningRoomCommand(listeningRoomCommand);return;}
+    const atmosphereChoice=window.SFPublicAgentCanvas?.active?.() && window.SFPublicAgentCanvas.applyCommand?.(text);
     if(atmosphereChoice){say('Atmosphere set to '+({ember:'Ember',mesh:'Blue Mesh',violet:'Violet Signal'}[atmosphereChoice])+'.');return}
     if(/^(?:(?:start|show|open|take me through)\s+(?:the\s+)?)?(?:guided\s+)?(?:tour|tutorial|walkthrough)(?:\s+of\s+(?:the\s+)?(?:canvas|site))?$/i.test(text)){
       window.SFPublicAgentCanvas?.startGuide?.();return;
@@ -3413,7 +5420,7 @@
   // Both screen sizes launch with the composer hidden. Desktop zzz and the
   // small restore chip can reveal it; mobile users have an explicit hide X.
   function setChatFooterHidden(hidden){
-    if(hidden){closeChatPopup();closeQuickMenu()}
+    if(hidden){setCanvasImageEditDraft(null);closeChatPopup();closeQuickMenu()}
     document.body.classList.toggle('sf-agent-chatbar-collapsed',!!hidden);
   }
   // The server renders the collapsed class before CSS and JS arrive, so the
@@ -3424,12 +5431,17 @@
   let zSequence=0,lastZ=0;
   window.addEventListener('keydown',event=>{
     if(!document.body.classList.contains('sf-agent-canvas-active')||!window.matchMedia('(min-width:721px)').matches)return;
+    if(!manualAgentHidden&&document.body.classList.contains('sf-agent-hidden-by-scene')){zSequence=0;return;}
     if(event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.target?.closest?.('input,textarea,select,[contenteditable="true"],[role="textbox"]')){zSequence=0;return}
     if(event.key.toLowerCase()!=='z'){zSequence=0;return}
     const now=Date.now();zSequence=now-lastZ<1000?zSequence+1:1;lastZ=now;
     if(zSequence===3){zSequence=0;event.preventDefault();setChatFooterHidden(!document.body.classList.contains('sf-agent-chatbar-collapsed'))}
   },true);
-  form.onsubmit=e=>{e.preventDefault();if(voiceTurnBusy){showTranscript('Finishing the previous voice reply. Your typed message is still in the bar.','waiting');return}voiceInteractionStarted=true;command(input.value).catch(err=>say('I could not process that message. '+err.message))};if(quickButton)quickButton.onclick=e=>{e.stopPropagation();quickMenu?.hidden?openQuickMenu():closeQuickMenu()};if(chatToggle)chatToggle.onclick=()=>chatPopup?.hidden?openChatPopup():closeChatPopup();if(chatPopupClose)chatPopupClose.onclick=closeChatPopup;if(chatPopupNew)chatPopupNew.onclick=()=>{st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');popupEntries=[];popupHistoryLoaded=true;renderPopupEntries();input.focus()};if(orb)orb.onclick=()=>{if(document.body.classList.contains('artist-home-chat-hidden')){document.body.classList.remove('artist-home-chat-hidden');syncAgentDockLayout()}chatPopup?.hidden?openChatPopup():closeChatPopup()};if(agentInterrupt)agentInterrupt.onclick=interruptVoicePlayback;$$('[data-quick-action]',quickMenu||document).forEach(b=>b.onclick=()=>handleQuickAction(b.dataset.quickAction));document.addEventListener('click',e=>{if(quickMenu&&!quickMenu.hidden&&!quickMenu.contains(e.target)&&e.target!==quickButton)closeQuickMenu()});bind();syncAuthMenu();syncAgentDockLayout();
+  bindCanvasDebug();
+  bindChatImagePicker();
+  bindChatMusicPicker();
+  bindChatResourcePicker();
+  form.onsubmit=submitAgentChat;if(quickButton)quickButton.onclick=e=>{e.stopPropagation();quickMenu?.hidden?openQuickMenu():closeQuickMenu()};if(chatToggle)chatToggle.onclick=()=>chatPopup?.hidden?openChatPopup():closeChatPopup();if(chatPopupClose)chatPopupClose.onclick=closeChatPopup;if(chatPopupNew)chatPopupNew.onclick=()=>{popupHistoryEpoch++;st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');popupEntries=[];popupHistoryLoaded=true;renderPopupEntries();input.focus()};if(orb)orb.onclick=()=>{if(document.body.classList.contains('artist-home-chat-hidden')){document.body.classList.remove('artist-home-chat-hidden');syncAgentDockLayout()}chatPopup?.hidden?openChatPopup():closeChatPopup()};if(agentInterrupt)agentInterrupt.onclick=interruptVoicePlayback;$$('[data-quick-action]',quickMenu||document).forEach(b=>b.onclick=()=>handleQuickAction(b.dataset.quickAction));document.addEventListener('click',e=>{if(quickMenu&&!quickMenu.hidden&&!quickMenu.contains(e.target)&&e.target!==quickButton)closeQuickMenu()});bind();bindAgentVisibilityMenu();syncAuthMenu();syncAgentDockLayout();
   function updateVoiceReplyToggle(){if(!voiceReplyToggle)return;voiceReplyToggle.textContent=voiceRepliesEnabled?'Voice on':'Voice off';voiceReplyToggle.setAttribute('aria-pressed',String(voiceRepliesEnabled));voiceReplyToggle.title=voiceRepliesEnabled?'Mute spoken Agent replies':'Enable spoken Agent replies'}
   updateVoiceReplyToggle();
   function setVoiceRepliesEnabled(enabled,persist=true){
@@ -3437,6 +5449,10 @@
     voiceRepliesEnabled=enabled;
     if(persist)localStorage.setItem('stonefellow.voice.replies.v1',enabled?'on':'off');
     if(!enabled)interruptVoicePlayback();
+    if(speechPilotActive){
+      window.StonefellowSpeechEngine?.setOutputMuted?.(!enabled);
+      setSpeechPilotSpeaking(enabled&&speechPilotReplyInProgress,true);
+    }
     updateVoiceReplyToggle();
   }
   if(voiceReplyToggle)voiceReplyToggle.onclick=()=>setVoiceRepliesEnabled(!voiceRepliesEnabled);
@@ -3444,15 +5460,16 @@
     if(event.key==='stonefellow.voice.replies.v1')setVoiceRepliesEnabled(event.newValue!=='off',false);
   });
   $('#homeLink').onclick=e=>{e.preventDefault();navigate('home')};const menuQueueLink=$('#menuQueueLink');if(menuQueueLink)menuQueueLink.onclick=e=>{e.preventDefault();closeMenu();openQueue()};
+  bindCanvasCodingModelMenu();
   if(menu?.tagName==='DETAILS'){menu.addEventListener('toggle',()=>{
     $('#menuButton')?.setAttribute('aria-expanded',String(menu.open));
-    if(menu.open)closeQuickMenu();
-  })}else{$('#menuButton').onclick=()=>{const open=!menu.classList.contains('open');menu.classList.toggle('open',open);menu.setAttribute('aria-hidden',String(!open));$('#menuButton').setAttribute('aria-expanded',String(open))}};$('#menuClose').onclick=closeMenu;
+    if(menu.open){closeQuickMenu();void refreshCanvasCodingModelMenu();}
+  })}else{$('#menuButton').onclick=()=>{const open=!menu.classList.contains('open');menu.classList.toggle('open',open);menu.setAttribute('aria-hidden',String(!open));$('#menuButton').setAttribute('aria-expanded',String(open));if(open)void refreshCanvasCodingModelMenu()}};$('#menuClose').onclick=closeMenu;
   document.addEventListener('click',event=>{
-    if(menu?.open&&!menu.contains(event.target))closeMenu();
+    if(menu?.open&&!event.composedPath().includes(menu))closeMenu();
   });
   document.addEventListener('keydown',event=>{
-    if(event.key==='Escape'&&menu?.open){closeMenu();$('#menuButton')?.focus({preventScroll:true})}
+    if(event.key==='Escape'&&menu?.open){event.preventDefault();closeMenu();$('#menuButton')?.focus({preventScroll:true})}
   });
   menu?.addEventListener('click',event=>{
     const choice=event.target.closest?.('[data-sf-atmosphere]');
@@ -3472,8 +5489,8 @@
   playerToggle.onclick=toggle;playerPrev.onclick=()=>stepTrack(-1);playerNext.onclick=()=>stepTrack(1);if(playerQueueButton)playerQueueButton.onclick=openQueue;if(queueClose)queueClose.onclick=closeQueue;if(queueBackdrop)queueBackdrop.onclick=closeQueue;if(queueClear)queueClear.onclick=()=>clearQueue(true);playerClose.onclick=()=>{songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');invalidatePlayback();audio.pause();audio.removeAttribute('src');audio.load();st.track=null;st.playing=false;st.playSource='player';songMoments?.setTrack(null);clearPlaylistPlayback();footerPlayer.hidden=true;window.SFPublicAgentCanvas?.syncPlayer?.();document.body.classList.remove('has-player');agent('idle','Player closed. Your place in the site is unchanged.')};
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&queueDrawer&&!queueDrawer.hidden){event.preventDefault();closeQueue()}});
   playerTitle.onclick=playerArtwork.onclick=()=>{if(st.track){renderStory(st.track);setUrl('track',{id:st.track.id})}};
-  playerSeek.oninput=()=>{if(Number.isFinite(audio.duration)&&audio.duration>0){if(songCaptureSkill?.status().active)songCaptureSkill.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('seek');audio.currentTime=(Number(playerSeek.value)/1000)*audio.duration}};
-  audio.addEventListener('loadedmetadata',()=>{playerDuration.textContent=time(audio.duration);updateFooterPlayer()});
+  playerSeek.oninput=()=>seekPlayback(Number(playerSeek.value)/1000);
+  audio.addEventListener('loadedmetadata',updateFooterPlayer);
   audio.addEventListener('timeupdate',()=>{rememberPlaybackPosition();songCaptureSkill?.playbackPosition();playerCurrent.textContent=time(audio.currentTime);playerDuration.textContent=time(audio.duration||st.track?.duration||0);playerSeek.value=audio.duration?String(Math.round((audio.currentTime/audio.duration)*1000)):'0';const now=Date.now();if(st.track&&st.playing&&now-st.lastProgressAt>30000){st.lastProgressAt=now;recordListen('progress')}});
   audio.addEventListener('seeked',rememberPlaybackPosition);
   audio.addEventListener('seeking',()=>{if(songCaptureSkill?.status().active)songCaptureSkill.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('seek')});
@@ -3498,7 +5515,7 @@
     if(pendingNetworkRecovery)return;
     const endedToken=playbackLifecycle.token();
     if(!st.track||!playbackLifecycle.claimEnded(endedToken))return;
-    playbackWantsAudio=false;clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
+    playbackWantsAudio=false;clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();syncConversationMusic();
     if(songCaptureSkill?.status().active)void songCaptureSkill.stop('end');if(songListeningSkill?.status().active)void songListeningSkill.stop('end');
     if(playbackEndedEarly()){
       st.playing=false;updateFooterPlayer();
@@ -3520,7 +5537,7 @@
     playbackProblem(code===3?'Audio decode failed · check Media Health':code===4?'Audio source unavailable · check Media Health':'Audio connection failed · tap Play to retry.');
     agent('idle','The player could not finish loading “'+st.track.title+'.” Review its audio in Media Health.');
   });
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&chatPopup&&!chatPopup.hidden){closeChatPopup();chatToggle?.focus();return}const tag=String(e.target?.tagName||'').toLowerCase(),editing=['input','textarea','select'].includes(tag)||e.target?.isContentEditable;if((e.key==='/'&&!editing)||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();if(new URL(location.href).searchParams.get('view')!=='search'&&!String(location.pathname).replace(/\/+$/,'').endsWith('/search'))navigate('search',{});else $('#siteSearchInput',canvas)?.focus()}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&chatPopup&&!chatPopup.hidden&&!document.body.classList.contains('sf-agent-hidden-by-scene')){closeChatPopup();chatToggle?.focus();return}const tag=String(e.target?.tagName||'').toLowerCase(),editing=['input','textarea','select'].includes(tag)||e.target?.isContentEditable;if((e.key==='/'&&!editing)||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();if(new URL(location.href).searchParams.get('view')!=='search'&&!String(location.pathname).replace(/\/+$/,'').endsWith('/search'))navigate('search',{});else $('#siteSearchInput',canvas)?.focus()}});
   window.addEventListener('popstate',routeFromLocation);
   const R=window.SpeechRecognition||window.webkitSpeechRecognition;
   const isIOSVoiceBrowser=/iPad|iPhone|iPod/i.test(navigator.userAgent||'')||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -3559,15 +5576,15 @@
   function shouldDuckConversationInput(recognized=''){
     if(!st.conversationOn||voiceTurnBusy||voicePlaybackPending||voiceSpeechGuard?.blocked)return false;
     // Song vocals and speaker echo can activate microphone speech detection.
-    // Only a recognized wake phrase makes it a conversation while music plays.
-    if(st.playing&&!audio.paused)return musicWakePhrase.test(String(recognized||''));
+    // During music, wait for recognized words, then apply the wake or follow-up rules.
+    if(st.playing&&!audio.paused)return !!recognized&&(Date.now()<musicFollowupUntil||musicWakePhrase.test(recognized));
     return true;
   }
   function updateConversationButton(){
     const listening=st.conversationOn&&!iosVoiceNeedsGesture;
     voice.classList.toggle('active',listening);
     voice.setAttribute('aria-pressed',String(listening));
-    voice.setAttribute('aria-label',iosVoiceNeedsGesture?'Resume conversation':st.conversationOn?'End conversation':'Start conversation');
+    voice.setAttribute('aria-label',iosVoiceNeedsGesture?'Resume Voice Chat':st.conversationOn?'End Voice Chat':'Start Voice Chat');
     voice.title=iosVoiceNeedsGesture?'Microphone paused · tap to resume':st.conversationOn?'Conversation active · click to stop':'Start hands-free conversation';
     window.SFPublicAgentCanvas?.syncVoice?.();
   }
@@ -3597,17 +5614,28 @@
   function startConversationListen(){
     if(!st.conversationOn||!recognition||recognitionActive)return;
     if(voiceTurnBusy||voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked)||['THINKING','RESPONDING','SPEAKING'].includes(status.textContent)){
-      if(isIOSVoiceBrowser){iosVoiceNeedsGesture=true;updateConversationButton();showTranscript('Wait for Stonefellow to finish, then tap Start Chat to resume.','waiting')}
+      if(isIOSVoiceBrowser){iosVoiceNeedsGesture=true;updateConversationButton();showTranscript('Wait for Stonefellow to finish, then tap Resume Voice Chat.','waiting')}
       else scheduleConversationListen(450);
       return;
     }
     try{recognition.start()}catch(e){if(e.name==='InvalidStateError'){
-      if(isIOSVoiceBrowser){iosVoiceNeedsGesture=true;updateConversationButton();showTranscript('Microphone paused · tap Start Chat to resume.','waiting')}
+      if(isIOSVoiceBrowser){iosVoiceNeedsGesture=true;updateConversationButton();showTranscript('Microphone paused · tap Resume Voice Chat.','waiting')}
       else scheduleConversationListen(600);
       return;
-    }stopConversation();showTranscript(isIOSVoiceBrowser?'Safari could not start speech recognition. Reopen Safari and tap the mic again; ensure Siri is enabled in iPhone Settings.':'The microphone could not start. Click the mic to retry.','error')}
+    }stopConversation();showTranscript(isIOSVoiceBrowser?'This browser could not start iPhone speech recognition. Check Siri in iPhone Settings, then reopen the browser and tap Start Voice Chat.':'The microphone could not start. Click the mic to retry.','error')}
   }
-  function stopConversation(){voiceGreetingArmed=false;iosVoiceNeedsGesture=false;iosProcessedFinalIndex=-1;stopSpeechContextSync();if(speechPilotActive){speechPilotActive=false;void window.StonefellowSpeechEngine?.stop();}st.conversationOn=false;clearTimeout(conversationRestartTimer);try{recognition?.abort()}catch(_){}recognitionActive=false;setVoiceInputActive(false);setSpeechPilotSpeaking(false);interruptVoicePlayback();conversationBargeIn?.close();musicFollowupUntil=0;syncConversationMusic();showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Conversation mode is off.')}
+  function stopConversation(){
+    voiceGreetingArmed=false;iosVoiceNeedsGesture=false;iosProcessedFinalIndex=-1;
+    speechPilotEpoch++;speechPilotReplyInProgress=false;stopSpeechContextSync();
+    const wasPilot=speechPilotActive;
+    speechPilotActive=false;st.conversationOn=false;
+    if(wasPilot)void window.StonefellowSpeechEngine?.stop();
+    clearTimeout(conversationRestartTimer);
+    if(!wasPilot)try{recognition?.abort()}catch(_){}
+    recognitionActive=false;setVoiceInputActive(false);setSpeechPilotSpeaking(false,true);
+    interruptVoicePlayback();musicFollowupUntil=0;syncConversationMusic();
+    showTranscript('');updateConversationButton();agent(st.playing?'playing':'idle','Voice Chat is off.');
+  }
   async function submitVoiceTurn(spoken){
     const turn=++voiceTurnGeneration;
     voiceTurnBusy=true;clearTimeout(conversationRestartTimer);setVoiceInputActive(false);
@@ -3616,7 +5644,7 @@
     if(!isIOSVoiceBrowser)try{recognition?.stop()}catch(_){}
     showTranscript('You: '+spoken,'heard');agent('thinking','Thinking…');
     try{await command(spoken);await pendingReply}catch(e){await say('I could not process that message. '+e.message)}
-    finally{if(turn===voiceTurnGeneration){voiceTurnBusy=false;if(st.conversationOn){musicFollowupUntil=Date.now()+18000;if(iosVoiceNeedsGesture){agent('idle','Microphone paused.');showTranscript('Microphone paused · tap Start Chat to resume.','waiting')}else{agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}}}}
+    finally{if(turn===voiceTurnGeneration){voiceTurnBusy=false;if(st.conversationOn&&!speechPilotActive){musicFollowupUntil=Date.now()+18000;if(iosVoiceNeedsGesture){agent('idle','Microphone paused.');showTranscript('Microphone paused · tap Resume Voice Chat.','waiting')}else{agent('listening','I’m ready for your next question.');showTranscript(listeningPrompt(),'listening');scheduleConversationListen()}}}}
   }
   function submitRecognizedVoiceTurn(spoken){
     const own=String(voiceSpeechGuard?.reference||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
@@ -3633,7 +5661,7 @@
   async function handleVoiceClick(){
     if(isIOSVoiceBrowser&&st.conversationOn&&iosVoiceNeedsGesture){
       if(voiceTurnBusy||voicePlaybackPending||voiceSpeechGuard?.blocked){
-        showTranscript('Wait for Stonefellow to finish, then tap Start Chat to resume.','waiting');return;
+        showTranscript('Wait for Stonefellow to finish, then tap Resume Voice Chat.','waiting');return;
       }
       iosVoiceNeedsGesture=false;iosProcessedFinalIndex=-1;
       updateConversationButton();showTranscript('Reconnecting microphone…','connecting');startConversationListen();return;
@@ -3643,13 +5671,43 @@
     // Read the last server-synced preference without awaiting network I/O.
     // On iOS WebKit, SpeechRecognition/startSession must begin in the tap turn.
     if((window.STONEFELLOW_VOICE_ENGINE_BOOTSTRAP||localStorage.getItem(voiceEngineKey))==='speech_engine'){
-      voiceInteractionStarted=true;speechPilotActive=true;st.conversationOn=true;updateConversationButton();showTranscript('Connecting ElevenLabs Speech Engine…','connecting');agent('connecting','Connecting…');
+      const epoch=++speechPilotEpoch;
+      const isCurrent=()=>epoch===speechPilotEpoch&&speechPilotActive;
+      voiceInteractionStarted=true;speechPilotActive=true;st.conversationOn=true;
+      updateConversationButton();showTranscript('Connecting ElevenLabs Speech Engine…','connecting');agent('connecting','Connecting…');
       try{await window.StonefellowSpeechEngine.start({
-        onStatus(value){if(value==='disconnected'){stopSpeechContextSync();speechPilotActive=false;st.conversationOn=false;setSpeechPilotSpeaking(false);updateConversationButton();agent('idle','Voice connection ended.');showTranscript('Speech Engine disconnected. Click the microphone to reconnect.','waiting');return}if(value==='ready'){startSpeechContextSync();agent('listening','Speech Engine connected.');showTranscript('Listening · Speech Engine pilot','listening')}},
-        onMode(mode){if(!speechPilotActive)return;const speaking=mode==='speaking';setSpeechPilotSpeaking(speaking);window.StonefellowSpeechEngine?.setInputMuted?.(speaking);agent(speaking?'speaking':'listening');showTranscript(mode==='speaking'?'Stonefellow is speaking…':'Listening · Speech Engine pilot',mode==='speaking'?'responding':'listening')},
-        onMessage(data){const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);if(user&&!st.auth.authenticated){const name=nameFromTurn(content);if(name){saveVisitorName(name);welcomeWaitingForName=false;syncWelcomeActions()}}showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');scheduleSpeechContextSync();if(!user)void deliverSpeechEngineAction()},
-        onError(message){popupEntry('notice',String(message));showTranscript(String(message),'error')}
-      });}catch(error){stopSpeechContextSync();speechPilotActive=false;st.conversationOn=false;setSpeechPilotSpeaking(false);updateConversationButton();agent('idle','Speech Engine unavailable.');showTranscript(error.message||'Speech Engine could not connect. Select the original voice engine in Account Settings to use fallback.','error')}
+        outputMuted:!voiceRepliesEnabled,
+        onStatus(value){
+          if(!isCurrent())return;
+          if(value==='disconnected'){
+            stopConversation();
+            showTranscript('Voice Chat disconnected. Tap Start Voice Chat to reconnect.','waiting');
+          }else if(value==='ready'){
+            window.StonefellowSpeechEngine?.setOutputMuted?.(!voiceRepliesEnabled);
+            startSpeechContextSync();agent('listening','Speech Engine connected.');showTranscript('Listening · Voice Chat','listening');
+          }
+        },
+        onMode(mode){
+          if(!isCurrent())return;
+          speechPilotReplyInProgress=mode==='speaking';
+          const audible=speechPilotReplyInProgress&&voiceRepliesEnabled;
+          setSpeechPilotSpeaking(audible);
+          window.StonefellowSpeechEngine?.setInputMuted?.(speechPilotReplyInProgress);
+          agent(audible?'speaking':speechPilotReplyInProgress?'responding':'listening');
+          showTranscript(audible?'Stonefellow is speaking…':speechPilotReplyInProgress?'Stonefellow is responding…':'Listening · Voice Chat',speechPilotReplyInProgress?'responding':'listening');
+        },
+        onMessage(data){if(!isCurrent())return;const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);if(user&&!st.auth.authenticated){const name=nameFromTurn(content);if(name){saveVisitorName(name);welcomeWaitingForName=false;syncWelcomeActions()}}showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');scheduleSpeechContextSync();if(!user)void deliverSpeechEngineAction()},
+        onError(message){if(isCurrent()){popupEntry('notice',String(message));showTranscript(String(message),'error')}}
+      });}catch(error){
+        if(!isCurrent())return;
+        stopConversation();
+        agent('idle','Speech Engine unavailable.');
+        const message=error.name==='NotAllowedError'?'Microphone access was blocked. Allow the microphone for this site, then tap Start Voice Chat again.'
+          :error.name==='NotFoundError'?'This browser could not find a microphone for Voice Chat.'
+          :error.name==='NotReadableError'?'The microphone is unavailable. Close other apps using it, then tap Start Voice Chat again.'
+          :error.message||'Speech Engine could not connect. You can select the original voice engine in Account Settings.';
+        showTranscript(message,'error');
+      }
       return;
     }
     if(!recognition){showTranscript('Voice recognition is unavailable here. Select Speech Engine in Account Settings or type a message.','error');return}
@@ -3657,9 +5715,10 @@
   }
   async function deliverSpeechEngineAction(){
     if(!speechPilotActive||!window.StonefellowSpeechEngine?.active)return;
+    const epoch=speechPilotEpoch;
     try{
       const envelope=await window.StonefellowSpeechEngine.takeAction();
-      if(!speechPilotActive||!envelope?.action)return;
+      if(epoch!==speechPilotEpoch||!envelope?.action)return;
       const result=await dispatchAgentBrowserAction(String(envelope.message||''),envelope.action,envelope.audio_resolution,false);
       // The Speech Engine dispatches through the same local player as typed
       // chat; report the actual outcome to its own conversation history.
@@ -3670,18 +5729,19 @@
           action_type:String(receipt.action_type||''),text:result.trim()
         })}catch(_){/* No invented success if the receipt cannot be saved. */}
       }
+      if(epoch!==speechPilotEpoch)return;
       if(result)popupEntry('notice',String(result));
       scheduleSpeechContextSync();
-    }catch(error){if(speechPilotActive)popupEntry('notice','Voice action could not complete: '+String(error.message||'Unknown error'))}
+    }catch(error){if(epoch===speechPilotEpoch)popupEntry('notice','Voice action could not complete: '+String(error.message||'Unknown error'))}
   }
   voice.onclick=()=>{void handleVoiceClick()};
   if(R){
     recognition=new R();recognition.lang='en-US';recognition.interimResults=true;recognition.continuous=isIOSVoiceBrowser;
-    recognition.onstart=()=>{recognitionActive=true;setVoiceInputActive(false);if(voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked)){if(!isIOSVoiceBrowser)try{recognition.abort()}catch(_){}return}if(st.conversationOn&&!voiceTurnBusy){if(greetAfterMicrophoneReady())return;agent('listening','I’m listening.');showTranscript(listeningPrompt(),'listening')}};
+    recognition.onstart=()=>{if(!st.conversationOn||speechPilotActive)return;recognitionActive=true;setVoiceInputActive(false);if(voicePlaybackPending||(typeof voiceSpeechGuard!=='undefined'&&voiceSpeechGuard?.blocked)){if(!isIOSVoiceBrowser)try{recognition.abort()}catch(_){}return}if(st.conversationOn&&!voiceTurnBusy){if(greetAfterMicrophoneReady())return;agent('listening','I’m listening.');showTranscript(listeningPrompt(),'listening')}};
     recognition.onspeechstart=()=>{if(shouldDuckConversationInput())setVoiceInputActive(true)};
     recognition.onspeechend=()=>setVoiceInputActive(false);
     recognition.onresult=e=>{
-      if(!st.conversationOn)return;
+      if(!st.conversationOn||speechPilotActive)return;
       const guarded=voiceTurnBusy||voicePlaybackPending||voiceSpeechGuard?.blocked;
       if(isIOSVoiceBrowser){
         // Continuous recognition accumulates old final results. Only process
@@ -3724,27 +5784,28 @@
       if(finalReceived&&spoken)submitRecognizedVoiceTurn(spoken);
     };
     recognition.onerror=e=>{
+      if(!st.conversationOn||speechPilotActive)return;
       recognitionActive=false;setVoiceInputActive(false);
       if(e.error==='service-not-allowed'){
-        stopConversation();showTranscript(isIOSVoiceBrowser?'Safari speech recognition is unavailable. Microphone access may already be allowed. Enable Siri in iPhone Settings, then reopen Safari and tap the mic.':'The browser blocked its speech recognition service. Try another voice engine or type your message.','error');return
+        stopConversation();showTranscript(isIOSVoiceBrowser?'iPhone speech recognition is unavailable. Microphone access may already be allowed. Check Siri in iPhone Settings, then reopen the browser and tap Start Voice Chat.':'The browser blocked its speech recognition service. Try another voice engine or type your message.','error');return
       }
       if(e.error==='not-allowed'){
-        stopConversation();showTranscript(isIOSVoiceBrowser?'Safari blocked speech recognition. This does not necessarily mean your website microphone permission is denied. Reopen Safari and tap the mic; check Siri is enabled in iPhone Settings.':'Speech input was blocked. Check browser site permissions and retry.','error');return
+        stopConversation();showTranscript(isIOSVoiceBrowser?'This browser blocked speech recognition. Check microphone access for this site and Siri in iPhone Settings, then tap Start Voice Chat.':'Speech input was blocked. Check browser site permissions and retry.','error');return
       }
-      if(e.error==='audio-capture'){stopConversation();showTranscript(isIOSVoiceBrowser?'Safari could not capture microphone audio. Close other apps using the microphone, reopen Safari, and retry.':'No microphone was detected. Check your audio input and retry.','error');return}
-      if(e.error==='network'){recognitionNetworkFailures=Math.min(5,recognitionNetworkFailures+1);showTranscript('Speech recognition connection interrupted. Retrying…','waiting');scheduleConversationListen(Math.min(7500,600*2**recognitionNetworkFailures));return}
+      if(e.error==='audio-capture'){stopConversation();showTranscript(isIOSVoiceBrowser?'This browser could not capture microphone audio. Close other apps using the microphone, then tap Start Voice Chat.':'No microphone was detected. Check your audio input and retry.','error');return}
       if(isIOSVoiceBrowser&&st.conversationOn){
         iosVoiceNeedsGesture=true;updateConversationButton();
-        showTranscript('Microphone paused · tap Start Chat to resume.','waiting');return;
+        showTranscript('Microphone paused · tap Resume Voice Chat.','waiting');return;
       }
+      if(e.error==='network'){recognitionNetworkFailures=Math.min(5,recognitionNetworkFailures+1);showTranscript('Speech recognition connection interrupted. Retrying…','waiting');scheduleConversationListen(Math.min(7500,600*2**recognitionNetworkFailures));return}
       if(st.conversationOn&&!voiceTurnBusy)scheduleConversationListen(e.error==='no-speech'?500:750);
     };
-    recognition.onend=()=>{recognitionActive=false;setVoiceInputActive(false);
+    recognition.onend=()=>{if(!st.conversationOn||speechPilotActive)return;recognitionActive=false;setVoiceInputActive(false);
       if(isIOSVoiceBrowser&&st.conversationOn){
         iosVoiceNeedsGesture=true;updateConversationButton();
         if(!voiceTurnBusy&&!voicePlaybackPending){
           agent('idle','Microphone paused.');
-          showTranscript('Microphone paused · tap Start Chat to resume.','waiting');
+          showTranscript('Microphone paused · tap Resume Voice Chat.','waiting');
         }
         return;
       }
@@ -3752,7 +5813,8 @@
     };
     updateConversationButton();
   }else{voice.title='Original voice recognition is unavailable; Speech Engine pilot may be available in Account Settings';showTranscript('Original voice recognition is not supported here. You can still use chat or an enabled Speech Engine pilot.','waiting')}
-  window.addEventListener('pagehide',()=>{stopSpeechContextSync();conversationBargeIn?.close()});
+  window.addEventListener('pagehide',()=>{closeListeningRoom(false);if(st.conversationOn)stopConversation()});
+  window.addEventListener('pageshow',event=>{if(event.persisted)void loadAuth(true).then(restoreActiveCanvas);});
   document.addEventListener('stonefellow:navigation',event=>{
     if(event.detail?.view==='builder'){
       window.SFPublicAgentCanvas?.unmount?.();

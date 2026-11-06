@@ -21,7 +21,7 @@ assert.match(read('service-worker.js'),/conversation-barge-in\.js/);
 assert.match(publicApp,/sequence!==voicePlaybackSequence/);
 assert.match(publicApp,/if\(!st\.conversationOn\|\|voiceTurnBusy\|\|voicePlaybackPending\|\|/);
 assert.match(publicApp,/voiceSpeechGuard\?\.blocked/);
-assert.match(publicApp,/conversationBargeIn\?\.stop\(\)/);
+assert.doesNotMatch(publicApp,/conversationBargeIn/);
 assert.match(adminApp,/recognition\.onend=\(\)=>\{recognitionActive=false;if\(conversationOn/);
 assert.match(adminApp,/if\(!conversationOn\|\|pending\|\|adminSpeechPending\|\|/);
 assert.match(adminApp,/adminSpeechGuard\?\.blocked/);
@@ -136,7 +136,7 @@ async function publicVoiceResumesAndStaleAudioCannotPlay(){
   let resumes=0,stops=0;
   const context={
     voiceTurnBusy:false,voiceTurnGeneration:0,conversationRestartTimer:null,recognition:{stop:()=>stops++},
-    st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,showTranscript:()=>{},agent:()=>{},command:async()=>{},
+    st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,speechPilotActive:false,showTranscript:()=>{},agent:()=>{},command:async()=>{},
     pendingReply:Promise.resolve(),musicFollowupUntil:0,Date:{now:()=>1000},
     listeningPrompt:()=> 'Listening…',scheduleConversationListen:()=>resumes++,say:async()=>{},clearTimeout:()=>{},setVoiceInputActive:()=>{}
   };
