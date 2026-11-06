@@ -1,0 +1,82 @@
+name: Canvas Listening Attribution Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  listening-attribution-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SF_TEST_PHP: php
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, fileinfo, curl
+          coverage: none
+      - name: Disposable database and audio fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg mariadb-server
+      - name: Canonical events, privacy, HTTP authorization and observed media state
+        run: |
+          php tests/listening-playback.php
+          php tests/canvas-listening-data.php
+          python tests/listening-playback-http.py
+          node tests/listening-telemetry.test.cjs
+          node tests/canvas-audio-sdk.test.cjs
+      - name: Native MySQL concurrency and atomic rollback
+        env:
+          SF_MARIADB_ROOT: /
+        run: python tests/listening-playback-mysql.py
+  listening-attribution-browser:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    env:
+      SF_TEST_PHP: php
+      SF_AUDIO_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, fileinfo, curl
+          coverage: none
+      - name: Native media and browser fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install playwright==1.64.1
+          python -m playwright install --with-deps "${{ matrix.browser }}"
+          python - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              with open(os.environ['GITHUB_ENV'], 'a') as output:
+                  if os.environ['SF_AUDIO_BROWSER'] == 'chromium':
+                      output.write('CHROMIUM_BIN=' + p.chromium.executable_path + '\n')
+          PY
+      - name: Actual main, footer, synchronized and independent playback
+        run: |
+          python tests/listening-telemetry-browser.py
+          python tests/canvas-independent-audio-browser.py

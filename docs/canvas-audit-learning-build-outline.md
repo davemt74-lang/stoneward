@@ -1,6 +1,6 @@
 # Canvas audit and learning build outline
 
-Status: implementation resumed. Capability/admin-policy and remembered-consent phases merged in [PR #346](https://github.com/davemt74-lang/stoneward/pull/346), with 29 GitHub checks passing. See [foundation evidence](canvas-capability-permissions.md). The [account token meter](account-token-meter.md) is the next implemented section under release verification. Remaining sections are planned work. Image/vision/production expansion stays deferred.
+Status: implementation resumed. Capability/admin-policy and remembered-consent phases merged in [PR #346](https://github.com/davemt74-lang/stoneward/pull/346), with 29 GitHub checks passing. See [foundation evidence](canvas-capability-permissions.md). The [account token meter](account-token-meter.md) merged in [PR #347](https://github.com/davemt74-lang/stoneward/pull/347), with all 26 GitHub checks passing. [Canonical cross-experience listening](canvas-listening-attribution.md) is implemented in v1.3.296 with independent scoped review and is entering integration/release CI. Remaining sections are planned work. Image/vision/production expansion stays deferred.
 
 ## Current scope hold
 

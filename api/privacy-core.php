@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/listening-playback-core.php';
 
 require_once __DIR__.'/agent-mission-planner.php';
 require_once __DIR__.'/agent-feedback-core.php';
@@ -45,13 +46,21 @@ function sf_privacy_profile(int $userId): array {
     $r['user_id']=(int)$r['user_id'];$r['listening_history_enabled']=!empty($r['listening_history_enabled']);$r['personalization_enabled']=!empty($r['personalization_enabled']);return $r;
 }
 function sf_privacy_save_profile(int $userId,array $raw): array {
-    sf_privacy_ensure_schema();$tz=sf_clean_text($raw['timezone']??'',80);if($tz!==''&&!in_array($tz,DateTimeZone::listIdentifiers(),true))throw new InvalidArgumentException('Choose a valid timezone.');
+    sf_privacy_ensure_schema();sf_ops_ensure_schema();$tz=sf_clean_text($raw['timezone']??'',80);if($tz!==''&&!in_array($tz,DateTimeZone::listIdentifiers(),true))throw new InvalidArgumentException('Choose a valid timezone.');
     $country=strtoupper(sf_clean_text($raw['country_code']??'',2));if($country!==''&&!preg_match('/^[A-Z]{2}$/',$country))throw new InvalidArgumentException('Country code must use two letters.');
     $locale=sf_clean_text($raw['locale']??'en-US',20);if(!preg_match('/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/',$locale))throw new InvalidArgumentException('Locale format is invalid.');
     $history=!empty($raw['listening_history_enabled'])?1:0;$personal=!empty($raw['personalization_enabled'])?1:0;$now=gmdate('c');$driver=(string)(sf_db_config()['driver']??'');
     if($driver==='sqlite')$sql='INSERT INTO user_profiles(user_id,timezone,country_code,locale,listening_history_enabled,personalization_enabled,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET timezone=excluded.timezone,country_code=excluded.country_code,locale=excluded.locale,listening_history_enabled=excluded.listening_history_enabled,personalization_enabled=excluded.personalization_enabled,updated_at=excluded.updated_at';
     else $sql='INSERT INTO user_profiles(user_id,timezone,country_code,locale,listening_history_enabled,personalization_enabled,updated_at) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE timezone=VALUES(timezone),country_code=VALUES(country_code),locale=VALUES(locale),listening_history_enabled=VALUES(listening_history_enabled),personalization_enabled=VALUES(personalization_enabled),updated_at=VALUES(updated_at)';
-    sf_db()->prepare($sql)->execute([$userId,$tz,$country,$locale,$history,$personal,$now]);sf_privacy_log($userId,'privacy_preferences_updated',['listening_history_enabled'=>(bool)$history,'personalization_enabled'=>(bool)$personal,'timezone_set'=>$tz!=='','country_set'=>$country!=='']);sf_log_user_activity($userId,'privacy_preferences','Updated privacy and profile preferences','account',(string)$userId);return sf_privacy_profile($userId);
+    $db=sf_db();$owns=!$db->inTransaction();if($owns)$db->beginTransaction();
+    try{
+        if($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='sqlite')$db->prepare('UPDATE users SET id=id WHERE id=?')->execute([$userId]);
+        $q=$db->prepare("SELECT id FROM users WHERE id=? AND status='active'".($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' FOR UPDATE':''));$q->execute([$userId]);$active=$q->fetchColumn()!==false;$q->closeCursor();if(!$active)throw new InvalidArgumentException('Account unavailable.');
+        $before=sf_listening_playback_enabled($userId);$db->prepare($sql)->execute([$userId,$tz,$country,$locale,$history,$personal,$now]);
+        if($before!==((bool)$history))sf_listening_playback_forget($userId);
+        if($owns)$db->commit();
+    }catch(Throwable $e){if($owns&&$db->inTransaction())$db->rollBack();throw $e;}
+    sf_privacy_log($userId,'privacy_preferences_updated',['listening_history_enabled'=>(bool)$history,'personalization_enabled'=>(bool)$personal,'timezone_set'=>$tz!=='','country_set'=>$country!=='']);sf_log_user_activity($userId,'privacy_preferences','Updated privacy and profile preferences','account',(string)$userId);return sf_privacy_profile($userId);
 }
 function sf_privacy_listening_history_enabled(int $userId): bool { return $userId<1?false:!empty(sf_privacy_profile($userId)['listening_history_enabled']); }
 function sf_privacy_personalization_enabled(int $userId): bool { return $userId<1?false:!empty(sf_privacy_profile($userId)['personalization_enabled']); }
@@ -74,7 +83,7 @@ function sf_privacy_export(int $userId,array $user): array {
     sf_privacy_canvas_project_helpers();
     sf_privacy_ensure_schema();$profile=sf_privacy_profile($userId);$orders=sf_privacy_orders_for_user($userId,(string)$user['email']);
     $account=['id'=>$userId,'email'=>(string)$user['email'],'display_name'=>(string)$user['display_name'],'role'=>(string)($user['role']??'user'),'status'=>(string)($user['status']??''),'created_at'=>(string)($user['created_at']??''),'last_login_at'=>(string)($user['last_login_at']??''),'email_verified_at'=>(string)($user['email_verified_at']??'')];
-    $out=['export_version'=>1,'generated_at'=>gmdate('c'),'account'=>$account,'profile'=>$profile,'sessions'=>function_exists('sf_auth_sessions')?sf_auth_sessions($userId):[],'notifications'=>function_exists('sf_notification_preferences')?sf_notification_preferences($userId):[],'fan_preferences'=>function_exists('sf_crm_newsletter_state_for_user')?sf_crm_newsletter_state_for_user($userId):[],'favorites'=>function_exists('sf_personalization_favorites')?sf_personalization_favorites($userId):[],'listening_history'=>function_exists('sf_personalization_history')?sf_personalization_history($userId,200):[],'imported_guest_recent_signals'=>function_exists('sf_guest_migration_recent_for_user')?sf_guest_migration_recent_for_user($userId):[],'continue_listening'=>function_exists('sf_personalization_continue_listening')?sf_personalization_continue_listening($userId,50):[],'playlists'=>function_exists('sf_playlist_list')?sf_playlist_list($userId):[],'library'=>function_exists('sf_library_snapshot')?sf_library_snapshot($userId):[],'saved_builds'=>function_exists('sf_account_saved_builds')?sf_account_saved_builds($userId):[],'purchases'=>$orders,'invoices'=>function_exists('sf_billing_invoices')?sf_billing_invoices($userId):[],'membership'=>function_exists('sf_membership_state')?sf_membership_state($userId,false):null,'account_activity'=>function_exists('sf_user_history')?sf_user_history($userId,500):[],'agent_memories'=>function_exists('sf_agent_customer_memory_list')?sf_agent_customer_memory_list($userId):[],
+    $out=['export_version'=>1,'generated_at'=>gmdate('c'),'account'=>$account,'profile'=>$profile,'sessions'=>function_exists('sf_auth_sessions')?sf_auth_sessions($userId):[],'notifications'=>function_exists('sf_notification_preferences')?sf_notification_preferences($userId):[],'fan_preferences'=>function_exists('sf_crm_newsletter_state_for_user')?sf_crm_newsletter_state_for_user($userId):[],'favorites'=>function_exists('sf_personalization_favorites')?sf_personalization_favorites($userId):[],'listening_playbacks'=>sf_listening_playback_export($userId),'listening_history'=>function_exists('sf_personalization_history')?sf_personalization_history($userId,200):[],'imported_guest_recent_signals'=>function_exists('sf_guest_migration_recent_for_user')?sf_guest_migration_recent_for_user($userId):[],'continue_listening'=>function_exists('sf_personalization_continue_listening')?sf_personalization_continue_listening($userId,50):[],'playlists'=>function_exists('sf_playlist_list')?sf_playlist_list($userId):[],'library'=>function_exists('sf_library_snapshot')?sf_library_snapshot($userId):[],'saved_builds'=>function_exists('sf_account_saved_builds')?sf_account_saved_builds($userId):[],'purchases'=>$orders,'invoices'=>function_exists('sf_billing_invoices')?sf_billing_invoices($userId):[],'membership'=>function_exists('sf_membership_state')?sf_membership_state($userId,false):null,'account_activity'=>function_exists('sf_user_history')?sf_user_history($userId,500):[],'agent_memories'=>function_exists('sf_agent_customer_memory_list')?sf_agent_customer_memory_list($userId):[],
         'agent_mission_plans'=>sf_agent_mission_plan_export('customer',$userId),'canvas_history'=>sf_agent_scene_history_export($userId),
         'canvas_projects'=>function_exists('sf_canvas_project_export')?sf_canvas_project_export($userId):[],
         'canvas_project_idea_requests'=>function_exists('sf_canvas_project_ideas_export')?sf_canvas_project_ideas_export($userId):[],
@@ -88,8 +97,9 @@ function sf_privacy_export(int $userId,array $user): array {
     sf_privacy_log($userId,'data_export_generated',['format'=>'json','orders'=>count($orders)]);return $out;
 }
 function sf_privacy_anonymize_user_events(int $userId): array {
+    $listening=sf_listening_playback_forget($userId);
     $tables=['listening_events','catalog_search_events','discovery_events','artist_home_events','story_events','songbook_events','video_events','photo_gallery_events'];$updated=[];
-    foreach($tables as $table){$q=sf_db()->prepare('UPDATE '.$table.' SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$updated[$table]=$q->rowCount();}
+    foreach($tables as $table){$q=sf_db()->prepare('UPDATE '.$table.' SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$updated[$table]=$q->rowCount()+($table==='listening_events'?$listening:0);}
     return $updated;
 }
 function sf_privacy_clear_search_activity(int $userId): array {$updated=[];foreach(['catalog_search_events','discovery_events'] as $table){try{$q=sf_db()->prepare('UPDATE '.$table.' SET user_id=NULL WHERE user_id=?');$q->execute([$userId]);$updated[$table]=$q->rowCount();}catch(Throwable $e){}}sf_privacy_log($userId,'search_activity_anonymized',['events'=>array_sum($updated)]);sf_log_user_activity($userId,'search_activity_cleared','Cleared identifiable search/discovery activity','account',(string)$userId);return $updated;}
@@ -110,6 +120,7 @@ function sf_privacy_clear_agent_history(int $userId): array {
         $canvasGallery=function_exists('sf_canvas_gallery_clear')?sf_canvas_gallery_clear($userId):[];
         $canvasBuilds=function_exists('sf_canvas_build_workflow_clear')?sf_canvas_build_workflow_clear($userId):[];
         $canvasAccess=function_exists('sf_canvas_access_clear')?sf_canvas_access_clear($userId):0;
+        $listeningPrivate=sf_listening_playback_forget($userId,null,true);
         $canvasScenes=sf_agent_scene_history_clear($userId);
         $canvasProjects=function_exists('sf_canvas_project_clear')?sf_canvas_project_clear($userId,false):[];
         $canvasIdeas=function_exists('sf_canvas_project_ideas_clear')?sf_canvas_project_ideas_clear($userId):0;
@@ -119,7 +130,7 @@ function sf_privacy_clear_agent_history(int $userId): array {
         $m=$pdo->prepare('DELETE FROM agent_messages WHERE user_id=?');$m->execute([$userId]);$messages+=$m->rowCount();
         $q=$pdo->prepare('DELETE FROM agent_conversations WHERE user_id=?');$q->execute([$userId]);$conversations=$q->rowCount();
         $q=$pdo->prepare('DELETE FROM agent_brain_decisions WHERE user_id=?');$q->execute([$userId]);sf_agent_mission_plan_clear('customer',$userId);sf_agent_feedback_clear('customer',$userId);if(function_exists('sf_agent_customer_memory_clear'))sf_agent_customer_memory_clear($userId);
-        $result=['conversations'=>$conversations,'messages'=>$messages,'canvas_scenes'=>$canvasScenes,'canvas_access_grants'=>$canvasAccess,'photo_preferences'=>sf_image_profile_clear($userId),
+        $result=['listening_private_links'=>$listeningPrivate,'conversations'=>$conversations,'messages'=>$messages,'canvas_scenes'=>$canvasScenes,'canvas_access_grants'=>$canvasAccess,'photo_preferences'=>sf_image_profile_clear($userId),
             'canvas_project_idea_requests'=>$canvasIdeas,'canvas_feedback'=>$canvasFeedback]+$canvasProjects+$canvasBuilds+$canvasGallery;
         sf_privacy_log($userId,'agent_history_cleared',$result);
         sf_log_user_activity($userId,'agent_history_cleared','Cleared personal Agent conversation history and canvas scenes','account',(string)$userId);
@@ -159,6 +170,7 @@ function sf_privacy_close_account(int $userId,array $user,string $password,strin
       $purged['canvas_images']=sf_agent_canvas_image_clear_metadata($userId);
       $purged+=sf_image_gen_clear_user_quota($pdo,$userId);
       foreach(['user_sessions','user_favorites','user_listening_progress','user_guest_recent_signals','user_guest_imports','user_track_feedback','user_play_queue','user_saved_builds','user_library','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','user_notifications','user_activity','user_collections','user_playlists','agent_listening_sessions','community_posts','account_action_tokens','user_token_balances','token_ledger','user_subscriptions','user_trial_history','ai_token_reservations'] as $table)$purged[$table]=sf_privacy_delete_rows($table,$userId);
+      if(sf_listening_playback_exists())$purged['listening_account_state']=sf_privacy_delete_rows('listening_account_state',$userId);
       $q=$pdo->prepare('UPDATE fan_contacts SET marketing_opt_in=0,agent_auto_engage=0,status=?,display_name=?,email=?,user_id=NULL,unsubscribed_at=?,unsubscribe_token_hash=NULL,updated_at=? WHERE user_id=?');$q->execute(['archived','Closed account',$anon,gmdate('c'),gmdate('c'),$userId]);
       $q=$pdo->prepare('UPDATE transactional_email_outbox SET user_id=NULL,recipient_email=? WHERE user_id=?');$q->execute([$anon,$userId]);$purged['transactional_email_identity_anonymized']=$q->rowCount();
       sf_privacy_log($userId,'account_closed',['behavior_tables_purged'=>array_sum($purged),'events_anonymized'=>array_sum($anonymized),'agent_conversations'=>$agent['conversations']??0]);

@@ -67,28 +67,49 @@ function sf_notification_unread_count(int $userId): int {
     sf_ops_ensure_schema();$q=sf_db()->prepare('SELECT COUNT(*) FROM user_notifications WHERE user_id=? AND is_read=0');$q->execute([$userId]);return (int)$q->fetchColumn();
 }
 function sf_listen_record(?int $userId,string $sessionKey,string $trackId,string $eventType,int $position,int $duration,string $source='player'): void {
-    sf_ops_ensure_schema();
+    require_once __DIR__.'/listening-playback-core.php';sf_listening_playback_schema();
     if(!in_array($eventType,['start','resume','pause','complete','progress','skip'],true))throw new InvalidArgumentException('Unsupported listening event.');
     if(!preg_match('/^[A-Za-z0-9._:-]{1,180}$/',$trackId)||!isset(sf_track_map()[$trackId]))throw new InvalidArgumentException('Invalid track.');
-    if($userId&&function_exists('sf_privacy_listening_history_enabled')&&!sf_privacy_listening_history_enabled($userId))$userId=null;
     $sessionKey=preg_replace('/[^A-Za-z0-9._:-]/','',$sessionKey)??'';if($sessionKey==='')$sessionKey=bin2hex(random_bytes(12));$sessionKey=substr($sessionKey,0,128);
-    $window=$eventType==='progress'?20:2;$cut=gmdate('c',time()-$window);$dupe=sf_db()->prepare('SELECT id FROM listening_events WHERE session_key=? AND track_id=? AND event_type=? AND created_at>=? ORDER BY id DESC LIMIT 1');$dupe->execute([$sessionKey,$trackId,$eventType,$cut]);if($dupe->fetchColumn()!==false)return;
-    $q=sf_db()->prepare('INSERT INTO listening_events(user_id,session_key,track_id,event_type,position_seconds,duration_seconds,source,created_at) VALUES(?,?,?,?,?,?,?,?)');
-    $q->execute([$userId?:null,$sessionKey,$trackId,$eventType,max(0,$position),max(0,$duration),sf_clean_text($source,40),gmdate('c')]);
-    if($userId && in_array($eventType,['start','complete'],true)){
-        $track=sf_track_map()[$trackId]??null;
-        sf_log_user_activity($userId,$eventType==='complete'?'listen_complete':'listen_start',($eventType==='complete'?'Finished ':'Played ').($track['title']??$trackId),'track',$trackId,['position'=>$position,'duration'=>$duration]);
-    }
+    $db=sf_db();$db->beginTransaction();
+    try{
+        if($userId){
+            if($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='sqlite')$db->prepare('UPDATE users SET id=id WHERE id=?')->execute([$userId]);
+            $q=$db->prepare("SELECT id FROM users WHERE id=? AND status='active'".($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' FOR UPDATE':''));$q->execute([$userId]);$active=$q->fetchColumn()!==false;$q->closeCursor();if(!$active)throw new InvalidArgumentException('Account unavailable.');
+            if(!sf_listening_playback_enabled($userId)){
+                sf_user_session();$stamp=[$userId,sf_listening_playback_epoch($userId)];
+                if(($_SESSION['sf_listening_legacy_stamp']??null)!==$stamp){$_SESSION['sf_listening_legacy_stamp']=$stamp;$_SESSION['sf_listening_legacy_salt']=bin2hex(random_bytes(16));}
+                $sessionKey=hash_hmac('sha256',$sessionKey,$_SESSION['sf_listening_legacy_salt']);$userId=null;
+            }
+        }
+        $key=hash('sha256',json_encode([$userId,$sessionKey,$trackId,$eventType]));$insert=$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?'INSERT IGNORE':'INSERT OR IGNORE';
+        $db->prepare($insert.' INTO listening_legacy_locks(lock_key,updated_at) VALUES(?,?)')->execute([$key,gmdate('c')]);
+        $db->prepare('UPDATE listening_legacy_locks SET updated_at=? WHERE lock_key=?')->execute([gmdate('c'),$key]);
+        if($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'){$q=$db->prepare('SELECT lock_key FROM listening_legacy_locks WHERE lock_key=? FOR UPDATE');$q->execute([$key]);$q->fetchColumn();$q->closeCursor();}
+        $window=$eventType==='progress'?20:2;$cut=gmdate('c',time()-$window);$args=[$sessionKey,$trackId,$eventType,$cut];$owner=$userId?'user_id=?':'user_id IS NULL';if($userId)$args[]=$userId;
+        $q=$db->prepare('SELECT id FROM listening_events WHERE session_key=? AND track_id=? AND event_type=? AND created_at>=? AND '.$owner.' ORDER BY id DESC LIMIT 1');$q->execute($args);$dupe=$q->fetchColumn()!==false;$q->closeCursor();
+        if(!$dupe){
+            $db->prepare('INSERT INTO listening_events(user_id,session_key,track_id,event_type,position_seconds,duration_seconds,source,created_at) VALUES(?,?,?,?,?,?,?,?)')->execute([$userId?:null,$sessionKey,$trackId,$eventType,max(0,$position),max(0,$duration),sf_clean_text($source,40),gmdate('c')]);$canonicalId=(int)$db->lastInsertId();
+            if($userId){sf_personalization_record_progress($userId,$trackId,$eventType,$position,$duration);if(in_array($eventType,['start','complete'],true))sf_listening_playback_activity($userId,$trackId,$eventType,$position,$duration,$canonicalId);}
+        }
+        $db->commit();sf_listening_playback_drain_crm();
+    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+}
+/** Existing rows without measurement stay explicit legacy/unknown coverage. */
+function sf_listening_measurement_sql():array {
+    $db=sf_db();$mysql=$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';$columns=$db->query($mysql?'SHOW COLUMNS FROM listening_events':'PRAGMA table_info(listening_events)')->fetchAll(PDO::FETCH_COLUMN,$mysql?0:1);
+    return in_array('listened_seconds',$columns,true)?['seconds'=>'COALESCE(SUM(listened_seconds),0)','measured'=>"SUM(CASE WHEN evidence='host_media_report' THEN 1 ELSE 0 END)",'legacy'=>"SUM(CASE WHEN evidence='legacy_unknown' THEN 1 ELSE 0 END)",'attribution'=>true]:['seconds'=>'0','measured'=>'0','legacy'=>'COUNT(*)','attribution'=>false];
 }
 function sf_listening_track_rows(string $since,?int $userId=null,?string $trackId=null): array {
     sf_ops_ensure_schema();
-    $where="created_at>=? AND event_type IN ('start','complete')";
+    $where="created_at>=?";
     $args=[$since];
     if($userId){$where.=' AND user_id=?';$args[]=$userId;}
     if($trackId!==null){$where.=' AND track_id=?';$args[]=$trackId;}
-    $q=sf_db()->prepare("SELECT track_id,SUM(CASE WHEN event_type='start' THEN 1 ELSE 0 END) AS listens,
+    $measurement=sf_listening_measurement_sql();
+    $q=sf_db()->prepare("SELECT track_id,{$measurement['seconds']} AS listened_seconds,{$measurement['measured']} AS measured_events,{$measurement['legacy']} AS legacy_events,SUM(CASE WHEN event_type='start' THEN 1 ELSE 0 END) AS listens,
         SUM(CASE WHEN event_type='complete' THEN 1 ELSE 0 END) AS completes
-        FROM listening_events WHERE $where GROUP BY track_id ORDER BY listens DESC LIMIT 30");
+        FROM listening_events WHERE $where GROUP BY track_id HAVING listens+completes>0 OR listened_seconds>0 ORDER BY listens DESC LIMIT 30");
     $q->execute($args);
     return $q->fetchAll();
 }
@@ -102,7 +123,12 @@ function sf_listening_analytics(int $days=30,?int $userId=null): array {
     $tracks=sf_listening_track_rows($since,$userId);
     $map=sf_track_map();foreach($tracks as &$r){$r['title']=$map[$r['track_id']]['title']??$r['track_id'];$r['release']=$map[$r['track_id']]['release']??'';}unset($r);
     $q=$pdo->prepare("SELECT substr(created_at,1,10) AS day,SUM(CASE WHEN event_type='start' THEN 1 ELSE 0 END) AS listens,SUM(CASE WHEN event_type='complete' THEN 1 ELSE 0 END) AS completes FROM listening_events WHERE $where GROUP BY substr(created_at,1,10) ORDER BY day ASC");$q->execute($args);$daily=$q->fetchAll();
-    return ['days'=>$days,'starts'=>$starts,'completes'=>$completes,'sessions'=>$sessions,'listeners'=>$listeners,'completion_rate'=>$starts?round($completes/$starts*100,1):0,'tracks'=>$tracks,'daily'=>$daily];
+    $measurement=sf_listening_measurement_sql();$q=$pdo->prepare("SELECT {$measurement['seconds']} AS listened_seconds,{$measurement['measured']} AS measured_events,{$measurement['legacy']} AS legacy_events FROM listening_events WHERE $where");$q->execute($args);$coverage=$q->fetch(PDO::FETCH_ASSOC);$q->closeCursor();$groups=[];
+    if($measurement['attribution']){
+        $q=$pdo->prepare("SELECT attribution_json,playback_method,evidence,SUM(CASE WHEN event_type='start' THEN 1 ELSE 0 END) starts,SUM(CASE WHEN event_type='complete' THEN 1 ELSE 0 END) completes,{$measurement['seconds']} listened_seconds,{$measurement['measured']} measured_events,{$measurement['legacy']} legacy_events FROM listening_events WHERE $where GROUP BY attribution_json,playback_method,evidence");$q->execute($args);
+        foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row){$row['context']=$row['attribution_json']===null?['kind'=>'legacy_unknown']:json_decode($row['attribution_json'],true);unset($row['attribution_json']);foreach(['starts','completes','measured_events','legacy_events'] as $field)$row[$field]=(int)$row[$field];$row['listened_seconds']=(float)$row['listened_seconds'];$groups[]=$row;}$q->closeCursor();
+    }
+    return ['listened_seconds'=>(float)$coverage['listened_seconds'],'measured_events'=>(int)$coverage['measured_events'],'legacy_events'=>(int)$coverage['legacy_events'],'attribution_groups'=>$groups,'days'=>$days,'starts'=>$starts,'completes'=>$completes,'sessions'=>$sessions,'listeners'=>$listeners,'completion_rate'=>$starts?round($completes/$starts*100,1):0,'tracks'=>$tracks,'daily'=>$daily];
 }
 function sf_listening_users(int $days=30): array {
     sf_ops_ensure_schema();$since=gmdate('c',time()-max(1,min(3650,$days))*86400);

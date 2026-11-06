@@ -13,6 +13,7 @@ $core=(string)file_get_contents($root.'/api/privacy-core.php');
 $api=(string)file_get_contents($root.'/api/privacy.php');
 $account=(string)file_get_contents($root.'/api/account.php');
 $ops=(string)file_get_contents($root.'/api/operations.php');
+$recording=(string)file_get_contents($root.'/api/listening-playback-core.php');
 $personal=(string)file_get_contents($root.'/api/personalization-core.php');
 $app=(string)file_get_contents($root.'/assets/js/app.js');
 $css=(string)file_get_contents($root.'/assets/css/site.css');
@@ -30,7 +31,10 @@ ok41(substr_count($core,'CREATE TABLE IF NOT EXISTS user_profiles')===2,'profile
 ok41(substr_count($core,'CREATE TABLE IF NOT EXISTS user_privacy_events')===2,'privacy audit schema supports SQLite and MySQL');
 ok41(str_contains($core,'DateTimeZone::listIdentifiers()')&&str_contains($core,"preg_match('/^[A-Z]{2}$/")&&str_contains($core,"preg_match('/^[A-Za-z]{2,3}"),'profile timezone, country and locale are server validated');
 ok41(str_contains($core,'listening_history_enabled')&&str_contains($core,'personalization_enabled'),'profile stores explicit history and personalization controls');
-ok41(str_contains($ops,"sf_privacy_listening_history_enabled")&&str_contains($ops,'$userId=null'),'disabled listening history makes future listening analytics anonymous');
+ok41(str_contains($ops,'sf_listening_playback_enabled($userId)')&&str_contains($ops,'$userId=null')
+    &&str_contains($recording,"(bool)(\$session['history_enabled']??false)&&\$uid>0")
+    &&str_contains($recording,'$identified?$uid:null'),
+    'disabled listening history makes both legacy and native future listening analytics anonymous');
 ok41(str_contains($personal,"sf_privacy_listening_history_enabled")&&str_contains($personal,'return;'),'disabled listening history stops Continue Listening progress writes');
 ok41(str_contains($personal,"sf_privacy_personalization_enabled")&&str_contains($personal,"'personalized'=>false"),'disabled personalization returns a signal-free recommendation profile');
 
