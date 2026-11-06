@@ -193,14 +193,25 @@ with sync_playwright() as p:
         label = f'{BROWSER}/{width}'
         lyric_button = page.locator('[data-orbit-action="listen"]')
         voice_button = page.locator('[data-agent-action="start-chat"]')
-        open_song_lyrics = lyric_button.tap if width < 720 else lyric_button.click
+        def activate_control(control):
+            # The production orb intentionally fades its controls after idle.
+            # A slower browser may cross that deadline between assertions; use
+            # the same trusted orb activation a visitor uses before the action.
+            orb = page.locator('.sf-agent-sphere')
+            if orb.get_attribute('aria-expanded') == 'false':
+                (orb.tap if width < 720 else orb.click)()
+            control.wait_for(state='visible')
+            (control.tap if width < 720 else control.click)()
+
+        def open_song_lyrics():
+            activate_control(lyric_button)
         check(lyric_button.get_attribute('aria-label') == 'Song Lyrics' and visible_text(lyric_button) == '',
               label + ': Song Lyrics has an accessible ring icon without an extra label')
         check('Start Voice Chat' in visible_text(voice_button), label + ': Voice Chat is a separate action')
         for button in (lyric_button, voice_button):
             box = button.bounding_box()
             check(box and box['width'] >= 44 and box['height'] >= 44, label + ': labeled control has a 44px target')
-        (voice_button.tap if width < 720 else voice_button.click)()
+        activate_control(voice_button)
         check(page.evaluate('voiceStarts===1&&gets.length===0'), label + ': Voice Chat does not open a lyric selection')
         before = lyric_button.evaluate('(e)=>[e.style.left,e.style.top]')
         open_song_lyrics()

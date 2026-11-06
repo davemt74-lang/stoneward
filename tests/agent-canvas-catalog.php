@@ -38,7 +38,7 @@ file_put_contents($fixture.'/data/shows.json',json_encode([
 ],JSON_THROW_ON_ERROR));
 define('SF_ROOT',$fixture);
 require $root.'/api/bootstrap.php';
-require $root.'/api/agent-canvas-catalog.php';
+require_once $root.'/api/agent-canvas-catalog.php';
 
 function check(bool $ok,string $label): void {
     if(!$ok)throw new RuntimeException($label);

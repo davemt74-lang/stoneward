@@ -875,6 +875,8 @@ function sf_agent_scene_render(string $raw,array $context,?array &$imageRequest=
 }
 
 function sf_agent_scene_response_context(array $context,array $refs): array {
+    $brief=sf_agent_scene_design_brief($context['design_brief']??null);
+    if($brief===null)unset($context['design_brief']);else $context['design_brief']=$brief;
     return ['title'=>$context['canvas_title'],'song_title'=>$context['title']===''?null:$context['title'],'catalog_refs'=>$refs,'catalog_blocks'=>[]]+
         array_intersect_key($context,array_flip(['track_id','artwork','story','canvas_kind','lyric_section','lyric_cue','agent_design','agent_palette','music_inputs','design_brief','artist_inputs','gallery_attribution']));
 }

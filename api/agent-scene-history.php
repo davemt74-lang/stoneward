@@ -225,7 +225,8 @@ function sf_agent_scene_history_save(int $uid,array $scene,?int $previousId=null
     try{
         sf_agent_scene_history_lock_account($db,$uid);
         require_once __DIR__.'/canvas-access-core.php';
-        $accessRoot=$previousId===null?null:sf_canvas_access_root($uid,$previousId);
+        try{$accessRoot=$previousId===null?null:sf_canvas_access_root($uid,$previousId);}
+        catch(OutOfBoundsException $e){throw new InvalidArgumentException('The canvas scene or account is unavailable.',0,$e);}
         $created=gmdate('c');
         $sql='INSERT INTO agent_scene_history(user_id,track_id,title,html,css,js,previous_id,created_at,canvas_kind,lyric_section,catalog_refs,agent_design,agent_palette,music_inputs,design_brief,artist_inputs,workflow_required,verification_parent_id,gallery_attribution)
             SELECT u.id,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM users u';

@@ -33,7 +33,7 @@ function harness(authenticated = true, storage = new Map()) {
   };
   const scene = (id, trackId = 'desert') => ({ id, track_id: trackId, title: 'Desert Lights', html: '<h2>Desert Lights</h2>', css: 'h2{color:tan}' });
   const scope = {
-    AbortController, DOMException, URL, URLSearchParams, cfg: {}, document: { baseURI: 'https://stonefellow.test/demo/' },
+    AbortController, DOMException, URL, URLSearchParams, cfg: {}, document: { baseURI: 'https://stonefellow.test/demo/', getElementById: () => null },
     localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
     window: {
       SFPublicAgentCanvas: stage,

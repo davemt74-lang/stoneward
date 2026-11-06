@@ -1617,6 +1617,19 @@ def exercise_canvas_data_tools(site, base, first, second, csrf):
     assert status == 201, built
     scene = built['scene']
     datasets = scene['datasets']
+    check(all(scene['datasets'][key]['rows'] == [] and scene['datasets'][key]['state'] == 'consent_required'
+              for key in ['personal_listening_stats', 'my_purchases', 'my_tickets']),
+          'Personal canvas datasets remain withheld before the current viewer explicitly allows them')
+    access = scene['canvas_access']
+    granted_status, _, granted = request(first, base, '/api/canvas-access.php', method='POST', csrf=csrf, data={
+        'action': 'grant', 'context': {'scene_id': scene['id']}, 'fingerprint': access['fingerprint'],
+        'permission_ids': ['canvas.data.personal_listening_stats', 'canvas.data.my_purchases', 'canvas.data.my_tickets'],
+    })
+    assert granted_status == 200 and not granted['access']['requires_consent'], granted
+    read_status, _, fresh = request(first, base, SCENE + '?id=' + str(scene['id']) + '&current_track_id=album-first')
+    assert read_status == 200, fresh
+    scene = fresh['scene']
+    datasets = scene['datasets']
     model_request = json.loads((site / 'model-request.json').read_text())
     prompt = json.loads(model_request['input'][0]['content'][0]['text'])
     tools = {tool['id']: tool for tool in prompt['canvas_data_tools']}

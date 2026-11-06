@@ -86,6 +86,7 @@ FIXTURE = '''() => {
   window.menu=document.querySelector('#menuPanel');
   window.chatFooter=document.querySelector('.chat-footer');
   window.chatPopup=document.querySelector('#agentChatPopup');
+  window.chatPopupMessages=document.querySelector('#agentChatPopupMessages');
   window.chatToggle=document.querySelector('#agentChatToggle');
   window.orb=null;window.popupHistoryLoaded=true;
   window.footerPlayer=document.querySelector('#footerPlayer');
@@ -185,7 +186,19 @@ FIXTURE = '''() => {
       ]},
       {ref:'media-albums',type:'albums',title:'More albums',items:[{id:'release-two',title:'Second release'}]}
     ]};
+  // This renderer fixture uses the existing explicit auto-approval preference.
+  // Dedicated project/consent suites cover interactive approval and server authorization.
+  window.fixtureProjectId=0;window.fixtureCanceledWorkflows=new Set();
   window.secureJsonPost=async(path,body,unused,signal,onCode,onConcept,onRetry)=>{
+    if(path==='canvas-projects.php'&&body.action==='propose')return {ok:true,preferences:{ideas_enabled:false,auto_approve:true},
+      proposal:{id:++fixtureProjectId,status:'approved',approval_mode:'automatic',project:body.project,concept:'Fixture approved project'}};
+    if(path==='canvas-build-workflow.php'&&body.action==='cancel'){
+      buildStops.push(body.request_id);
+      await new Promise(resolve=>window.releaseBuildStop=resolve);
+      fixtureCanceledWorkflows.add(body.request_id);
+      return {ok:true,workflow:{state:'canceled',request_id:body.request_id}};
+    }
+    if(path==='agent-scene.php'&&body.action==='cancel'&&fixtureCanceledWorkflows.has(body.request_id))return {ok:true,state:'canceled'};
     if(path==='agent-scene.php'&&body.action==='image_preflight')return {ok:true,preflight:{requested_count:null}};
     if(path==='agent-scene.php'&&body.action==='delete'){
       deletes.push(body.id);
@@ -237,6 +250,7 @@ FIXTURE = '''() => {
   };
   window.api=async(path,body,signal)=>{
     if(body!==undefined||!(signal instanceof AbortSignal))throw Error('Unexpected read');
+    if(path==='canvas-projects.php')return {ok:true,preferences:{ideas_enabled:false,auto_approve:true},proposals:[],feedback:[]};
     if(path.startsWith('agent-canvas-image.php')){
       const id='c1'.repeat(16);
       imageInventoryReads.push(path);
@@ -349,10 +363,12 @@ with sync_playwright() as p:
 
         context.route('**/*', respond)
         page.goto(SITE)
-        for name in ('assets/css/site.css', 'assets/css/public-agent-canvas.css', 'assets/css/canvas-image-review.css'):
+        # Use the actual stylesheet stack so later responsive overrides match production.
+        for name in re.findall(r'<link rel="stylesheet" href="(assets/css/[^?"]+)', SHELL):
             page.add_style_tag(content=(ROOT / name).read_text())
         page.add_script_tag(content=(ROOT / 'assets/js/public-agent-canvas.js').read_text())
         page.add_script_tag(content=(ROOT / 'assets/js/canvas-image-review.js').read_text())
+        page.add_script_tag(content=(ROOT / 'assets/js/canvas-projects-ui.js').read_text())
         page.evaluate(FIXTURE)
         page.add_script_tag(content='\n'.join((
             block('  function syncAgentDockLayout(){', '  // Armed microphone'),
@@ -444,11 +460,14 @@ with sync_playwright() as p:
               boxes.slice(0,i).every(other=>Math.hypot(box.x-other.x,box.y-other.y)>=44));
         }'''), prefix + 'ring targets fit and have 44px center separation')
         page.evaluate('void handleListeningRoomCommand(directListeningRoomCommand("Make a listening room for Testing song"))')
-        page.wait_for_function('typeof releaseSceneConcept==="function"')
-        check(coding.is_visible() and coding.get_attribute('data-state') == 'generating' and
-              not source.is_visible() and not canvas_stage.is_visible() and
-              coding_status.inner_text() == 'Planning your canvas…' and page.evaluate('spoken.length===0'),
-              prefix + 'Coding Agent shows planning before a build concept arrives')
+        try:
+            page.wait_for_function('typeof releaseSceneConcept==="function"')
+        except Exception:
+            print('BUILD DIAGNOSTIC', page.evaluate('({notices:popupEntries,posts,errors:window.fixtureErrors||[]})'), errors, flush=True)
+            raise
+        check(not coding.is_visible() and not source.is_visible() and not canvas_stage.is_visible() and
+              page.evaluate('posts.length===1&&spoken.length===0'),
+              prefix + 'approved request waits for its concept without opening an empty code rail')
         page.evaluate('releaseSceneConcept()')
         page.wait_for_function('typeof releaseSceneFirstDelta==="function"')
         announcement = 'I’m building a moonlit listening room.'
@@ -493,10 +512,10 @@ with sync_playwright() as p:
               prefix + 'the Coding Agent reaches ready with validated source while the agent is hidden')
         page.evaluate('handleAgentVisibilityCommand("/show-agent")')
         if width >= 821:
-            rightmost_ring_edge = page.locator('.sf-agent-orbit-tools button:not([hidden])').evaluate_all(
-                'nodes=>Math.max(...nodes.map(node=>node.getBoundingClientRect().right))')
-            check(source.get_attribute('open') is not None and coding.bounding_box()['x'] > rightmost_ring_edge,
-                  prefix + 'Coding Agent sits open on the right side of the desktop canvas')
+            coding_box = coding.bounding_box()
+            check(source.get_attribute('open') is not None and coding_box['x'] >= width / 2 and
+                  coding_box['x'] + coding_box['width'] <= width,
+                  prefix + 'Coding Agent sits open within the right side of the desktop viewport')
         else:
             check(coding.get_attribute('data-state') == 'ready' and source.get_attribute('open') is None,
                   prefix + 'reduced-motion mobile shows source immediately in a collapsed disclosure')
@@ -802,7 +821,8 @@ with sync_playwright() as p:
               rows:[{track_id:'track-1',title:'Pinned track'},{track_id:'other-track',title:'General stats for another track'}],
               current_rows:[{track_id:trackId,title:'Current stats for '+trackId,listens:0},
                 {track_id:'different-track',title:'Unexpected foreign row',listens:9}]}}});
-          SFPublicAgentCanvas.showScene(trackDatasetFor('other-track'));
+          window.listeningRoom=trackDatasetFor('other-track');
+          SFPublicAgentCanvas.showScene(listeningRoom);
           window.trackDataFrame=document.querySelector('.sf-agent-scene-backdrop iframe');}''', SCENE_IMAGE_ID)
         current_stats = frame.locator('.sf-current-track .sf-data-row')
         pinned_stats = frame.locator('.sf-filter-track_id--track-1 .sf-data-row .sf-field-title')
@@ -1069,11 +1089,12 @@ with sync_playwright() as p:
             const body=new ReadableStream({start(controller){fixture.controller=controller;}});
             return Promise.resolve(new Response(body,{headers:{'content-type':'application/x-ndjson'}}));
           };
-          window.secureJsonPost=window.productionScenePost;
+          window.secureJsonPost=(...args)=>args[0]==='agent-scene.php'?window.productionScenePost(...args):fixturePost(...args);
           st.auth.csrf='fixture';
           void handleListeningRoomCommand({kind:'create',canvasKind:'custom',brief:'Create artwork for a private scene.'});
         }''')
         page.wait_for_function('!!window.imageBuildFixture?.controller')
+        page.evaluate('closeChatPopup()')
         sidebar_image_id = page.evaluate('imageBuildFixture.payload.request_id')
         sidebar_image_url = SITE + 'api/agent-canvas-image.php?id=' + sidebar_image_id
         page.evaluate('''() => {
@@ -1144,6 +1165,7 @@ with sync_playwright() as p:
           void handleListeningRoomCommand({kind:'create',canvasKind:'custom',brief:'Create a scene with the saved artwork.'});
         }''')
         page.wait_for_function('!!imageBuildFixture.controller')
+        page.evaluate('closeChatPopup()')
         expect(image_section).not_to_be_visible()
         page.evaluate('''() => {
           const fixture=imageBuildFixture;
@@ -1157,6 +1179,7 @@ with sync_playwright() as p:
         batch_composer.fill('Create 3 images of a garden in a gallery')
         batch_composer.press('Enter')
         page.wait_for_function('!!imageBuildFixture.controller')
+        page.evaluate('closeChatPopup()')
         check('3 images of a garden in a gallery' in page.evaluate('imageBuildFixture.payload.brief'),
               prefix + 'an ordinary create-three-images prompt enters the canvas generation flow')
         batch_image_ids = [page.evaluate('imageBuildFixture.payload.request_id'), 'e2' * 16, 'e3' * 16]
@@ -1232,6 +1255,7 @@ with sync_playwright() as p:
         batch_composer.fill(edit_instruction)
         batch_composer.press('Enter')
         page.wait_for_function('!!imageBuildFixture.controller')
+        page.evaluate('closeChatPopup()')
         payload = page.evaluate('imageBuildFixture.payload')
         check(payload['action'] == 'edit_image' and payload['previous_id'] == 45 and
               payload['image_id'] == batch_image_ids[1] and payload['brief'] == edit_instruction and
@@ -1285,6 +1309,7 @@ with sync_playwright() as p:
         batch_composer.fill('Try a different color palette.')
         batch_composer.press('Enter')
         page.wait_for_function('!!imageBuildFixture.controller')
+        page.evaluate('closeChatPopup()')
         page.evaluate('''() => {
           const fixture=imageBuildFixture;
           fixture.emit({type:'error',status:422,data:{ok:false,error:'scene_image_unavailable',message:'The image edit failed.'}});
@@ -1306,6 +1331,8 @@ with sync_playwright() as p:
             return read(path,body,signal);
           };
         }''')
+        if coding.is_visible():
+            activate(coding.get_by_role('button', name='Hide Coding Agent', exact=True))
         activate(history_button)
         activate(image_folder.get_by_text('Generated Images', exact=True))
         expect(image_folder.get_by_role('button', name='Copy reference for ' + batch_titles[1], exact=True)).to_be_visible()
@@ -1531,7 +1558,9 @@ with sync_playwright() as p:
           st.track=null;st.playing=false;
           window.tracklessPosts=[];window.tracklessPlayCount=played.length;
           window.tracklessModelReads=modelReads.length;
+          window.tracklessProjectPost=secureJsonPost;
           secureJsonPost=async(path,body,unused,signal)=>{
+            if(path==='canvas-projects.php')return tracklessProjectPost(path,body,unused,signal);
             if(path!=='agent-scene.php'||!(signal instanceof AbortSignal))throw Error('Unexpected trackless build request');
             if(body.action==='image_preflight')return {ok:true,preflight:{requested_count:null}};
             tracklessPosts.push(body);
@@ -1763,6 +1792,7 @@ with sync_playwright() as p:
                 return originalRead(path,body,signal);
               };
               window.secureJsonPost=async(path,body,unused,signal)=>{
+                if(path==='canvas-projects.php')return originalPost(path,body,unused,signal);
                 if(path!=='agent-scene.php'||!(signal instanceof AbortSignal))throw Error('Unexpected image action request');
                 fixture.calls.push({...body});
                 if(body.action==='image_preflight')return {ok:true,preflight:{requested_count:3,

@@ -44,7 +44,10 @@ def sign_in(base, email):
 
 
 def public_item(item):
-    return set(item).issubset({'id', 'title', 'description', 'creator_label', 'preview_url', 'submitted_at', 'published_at', 'attribution'})
+    return set(item).issubset({'id', 'title', 'description', 'creator_label', 'preview_url', 'submitted_at', 'published_at', 'attribution', 'uses'}) and isinstance(item.get('uses'), list) and all(
+        set(permission) == {'id', 'label', 'personal', 'enabled'} and isinstance(permission['id'], str) and
+        isinstance(permission['label'], str) and isinstance(permission['personal'], bool) and isinstance(permission['enabled'], bool)
+        for permission in item['uses'])
 
 
 with tempfile.TemporaryDirectory(prefix='stoneward-canvas-gallery-http-') as temporary:
