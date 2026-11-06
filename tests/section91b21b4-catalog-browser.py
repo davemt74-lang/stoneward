@@ -194,13 +194,15 @@ with sync_playwright() as p:
         lyric_button = page.locator('[data-orbit-action="listen"]')
         voice_button = page.locator('[data-agent-action="start-chat"]')
         def activate_control(control):
-            # The production orb intentionally fades its controls after idle.
-            # A slower browser may cross that deadline between assertions; use
-            # the same trusted orb activation a visitor uses before the action.
+            # Keep native focus in the agent while exercising lyric routing.
+            # Its separate idle/roaming suites test automatic chrome hiding;
+            # browser setup delays must not race that lifecycle in this suite.
             orb = page.locator('.sf-agent-sphere')
-            if orb.get_attribute('aria-expanded') == 'false':
+            orb.focus()
+            if page.locator('.sf-agent-floater').evaluate("node=>node.classList.contains('is-chrome-collapsed')"):
                 (orb.tap if width < 720 else orb.click)()
             control.wait_for(state='visible')
+            control.focus()
             (control.tap if width < 720 else control.click)()
 
         def open_song_lyrics():
