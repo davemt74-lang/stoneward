@@ -80,3 +80,6 @@ jobs:
         run: |
           python tests/listening-telemetry-browser.py
           python tests/canvas-independent-audio-browser.py
+      - name: Full canvas controls on the matching current Chromium engine
+        if: matrix.browser == 'chromium'
+        run: python tests/section91b23a-listening-room-browser.py
