@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.294';
+  window.STONEFELLOW_APP_BUILD='1.3.295';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -456,6 +456,7 @@
         method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':st.auth.csrf||''},body:form
       });
       const payload=await response.json().catch(()=>({ok:false,message:'The transcription service returned an unreadable response.'}));
+      if(typeof window!=='undefined')window.SFTokenMeter?.notifyUsage?.();
       if(response.status===403&&payload.error==='csrf_failed'&&!retried){
         await loadAuth(true);songTranscriptionBusy=false;
         return await transcribeLastCapturedSong(true,interpretAfter);
@@ -974,7 +975,7 @@
   function scoreTrack(t,q){const qwords=words(q);let score=0;[t.title,t.release,...t.mood,...t.themes].forEach(field=>words(field).forEach(w=>{if(qwords.has(w))score+=field===t.title?5:2}));if(/quiet|mellow|soft|calm/.test(q)&&Number(t.energy)<=2)score+=4;if(/dark|heavy|loud|electric/.test(q)&&Number(t.energy)>=4)score+=4;if(/drive|road|driving/.test(q)&&(t.mood.includes('driving')||t.themes.includes('road')))score+=5;return score}
   function recommend(q,exclude=[]){const ranked=catalog.filter(t=>!exclude.includes(t.id)).map(t=>({t,s:scoreTrack(t,q)})).sort((a,b)=>b.s-a.s||a.t.energy-b.t.energy);return ranked[0]?.t||catalog.find(t=>!exclude.includes(t.id))||catalog[0]}
   function related(base){if(!base)return catalog[0];const keys=new Set([...base.mood,...base.themes]);return catalog.filter(t=>t.id!==base.id).map(t=>({t,s:[...t.mood,...t.themes].filter(x=>keys.has(x)).length*3-Math.abs((t.energy||3)-(base.energy||3))})).sort((a,b)=>b.s-a.s)[0]?.t||catalog.find(t=>t.id!==base.id)}
-  async function api(path,body,signal){const opts=body===undefined?{credentials:'same-origin',signal}:{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body),signal};const r=await fetch((cfg.apiBase||'api')+'/'+path,opts);let j={};try{j=await r.json();if(!j||typeof j!=='object'||Array.isArray(j))throw new Error('invalid_payload')}catch(_){const e=new Error(path==='storefront.php'?'Store service returned unreadable data (HTTP '+r.status+').':'Service returned unreadable data (HTTP '+r.status+').');e.status=r.status;throw e}if(!r.ok||j.ok===false){const e=new Error(j.message||j.errors?.join(' ')||j.error||'Store request failed.');e.payload=j;e.status=r.status;throw e}return j}
+  async function api(path,body,signal){const opts=body===undefined?{credentials:'same-origin',signal}:{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body),signal};const r=await fetch((cfg.apiBase||'api')+'/'+path,opts);let j={};try{j=await r.json();if(!j||typeof j!=='object'||Array.isArray(j))throw new Error('invalid_payload')}catch(_){const e=new Error(path==='storefront.php'?'Store service returned unreadable data (HTTP '+r.status+').':'Service returned unreadable data (HTTP '+r.status+').');e.status=r.status;throw e}if(!r.ok||j.ok===false){const e=new Error(j.message||j.errors?.join(' ')||j.error||'Store request failed.');e.payload=j;e.status=r.status;throw e}if(body!==undefined||j.entitlement||j.scene||j.workflow)if(typeof window!=='undefined')window.SFTokenMeter?.notifyUsage?.();return j}
   async function loadPlans(){try{const j=await api('plans.php');st.plans=j.plans||[];return st.plans}catch(_){st.plans=[];return []}}
   async function speakWithDeviceVoice(text,sequence=voicePlaybackSequence,updateOrb=true){
     if(!window.speechSynthesis||!window.SpeechSynthesisUtterance||!voiceRepliesEnabled)return false;
@@ -1046,6 +1047,7 @@
           if(sequence!==voicePlaybackSequence)return null;
         }
         if(!r.ok)return index?{remaining:parts.slice(index).join(' ')}:false;
+        if(typeof window!=='undefined')window.SFTokenMeter?.notifyUsage?.();
         const blob=await r.blob(),url=URL.createObjectURL(blob);
         if(!voiceRepliesEnabled||sequence!==voicePlaybackSequence){URL.revokeObjectURL(url);return null}
         if(st.voiceAudio)st.voiceAudio.pause();
@@ -1194,6 +1196,7 @@
   function syncAuthMenu(){
     // Account navigation is rendered exclusively by PHP on full-page requests.
     document.documentElement.dataset.authState=st.auth.authenticated?'logged-in':'logged-out';
+    window.SFTokenMeter?.setOwner?.();
     syncCanvasDebugOwner();
     if(accountPhotoPreferencesRequest&&accountPhotoPreferencesRequest.owner!==canvasOwner()){
       accountPhotoPreferencesRequest.request.abort();accountPhotoPreferencesRequest=null;
@@ -1306,6 +1309,7 @@
       const error=new Error('The server returned an invalid response.');error.status=r.status;throw error;
     }
     onTrace?.('response_result',{status});
+    if(typeof window!=='undefined')window.SFTokenMeter?.notifyUsage?.();
     if(status===403&&j.error==='csrf_failed'&&!retried){await loadAuth(true);return secureJsonPost(path,payload,true,signal,onDelta,onConcept,onRetry,onTrace)}
     if(status<200||status>=300||j.ok===false){const e=new Error(j.message||j.error||'Request failed.');e.payload=j;e.status=status;throw e}
     return j;
@@ -2069,6 +2073,7 @@
       return uploadCanvasPhoto(file,{signal},true);
     }
     if(!response.ok||result.ok===false)throw new Error(result.message||'The photo could not be uploaded.');
+    if(typeof window!=='undefined')window.SFTokenMeter?.notifyUsage?.();
     if(!result.image||typeof result.image.id!=='string'||!/^[a-f0-9]{32}$/.test(result.image.id))
       throw new Error('The server could not confirm the saved photo.');
     return result.image;
@@ -3828,7 +3833,7 @@
   }
   function bindShareButtons(r=document){$$('[data-share-view]',r).forEach(b=>b.onclick=()=>shareRoute(b.dataset.shareView,b.dataset.shareId||'',b.dataset.shareTitle||'Stonefellow',b.dataset.shareSlug||''))}
   function setUrl(view,params={}){const u=publicRouteUrl(view,params);history.pushState({view,params},'',u);syncSeo(view,params)}
-  function closeMenu(){if(menu?.tagName==='DETAILS'){menu.open=false}else{menu?.classList.remove('open');menu?.setAttribute('aria-hidden','true')}$('#menuButton')?.setAttribute('aria-expanded','false')}
+  function closeMenu(){if(menu?.tagName==='DETAILS'){menu.open=false}else{menu?.classList.remove('open');menu?.setAttribute('aria-hidden','true')}$('#menuButton')?.setAttribute('aria-expanded','false');window.SFTokenMeter?.setOpen?.(false)}
   function recommendationCard(x){const t=trackById(x.track_id)||x,reasons=Array.isArray(x.reasons)?x.reasons:[];return `<article class="recommendation-card"><button class="recommendation-play" type="button" data-recommend-play="${esc(x.track_id)}" aria-label="Play ${esc(x.title||t.title||'recommendation')}">▶</button><button class="recommendation-main" type="button" data-recommend-open="${esc(x.track_id)}"><span class="recommendation-art">${(x.artwork||t.artwork)?`<img src="${esc(x.artwork||t.artwork)}" alt="">`:'SF'}</span><span><strong>${esc(x.title||t.title||x.track_id)}</strong><small>${esc(x.release||t.release||'Stonefellow')}</small>${reasons.length?`<em>${esc(reasons[0])}</em>`:''}</span></button>${favoriteButton('track',x.track_id,'Favorite')}</article>`}
   function bindRecommendationCards(r=document){Array.from(r.querySelectorAll('[data-recommend-play]')).forEach(b=>b.onclick=e=>{e.stopPropagation();const t=trackById(b.dataset.recommendPlay);if(t)play(t,0,'recommendation')});Array.from(r.querySelectorAll('[data-recommend-open]')).forEach(b=>b.onclick=()=>{const t=trackById(b.dataset.recommendOpen);if(t){renderStory(t);setUrl('track',{id:t.id})}});bindFavoriteButtons(r)}
   function homeArtwork(src,label='SF'){return `<span class="home-card-art">${src?`<img src="${esc(src)}" alt="">`:`<span>${esc(label)}</span>`}</span>`}
@@ -5461,10 +5466,12 @@
   });
   $('#homeLink').onclick=e=>{e.preventDefault();navigate('home')};const menuQueueLink=$('#menuQueueLink');if(menuQueueLink)menuQueueLink.onclick=e=>{e.preventDefault();closeMenu();openQueue()};
   bindCanvasCodingModelMenu();
+  window.SFTokenMeter?.create?.({getOwner:canvasOwner,read:signal=>api('token-meter.php',undefined,signal)});
   if(menu?.tagName==='DETAILS'){menu.addEventListener('toggle',()=>{
     $('#menuButton')?.setAttribute('aria-expanded',String(menu.open));
+    window.SFTokenMeter?.setOpen?.(menu.open);
     if(menu.open){closeQuickMenu();void refreshCanvasCodingModelMenu();}
-  })}else{$('#menuButton').onclick=()=>{const open=!menu.classList.contains('open');menu.classList.toggle('open',open);menu.setAttribute('aria-hidden',String(!open));$('#menuButton').setAttribute('aria-expanded',String(open));if(open)void refreshCanvasCodingModelMenu()}};$('#menuClose').onclick=closeMenu;
+  })}else{$('#menuButton').onclick=()=>{const open=!menu.classList.contains('open');menu.classList.toggle('open',open);menu.setAttribute('aria-hidden',String(!open));$('#menuButton').setAttribute('aria-expanded',String(open));window.SFTokenMeter?.setOpen?.(open);if(open)void refreshCanvasCodingModelMenu()}};$('#menuClose').onclick=closeMenu;
   document.addEventListener('click',event=>{
     if(menu?.open&&!event.composedPath().includes(menu))closeMenu();
   });
@@ -5696,7 +5703,7 @@
           agent(audible?'speaking':speechPilotReplyInProgress?'responding':'listening');
           showTranscript(audible?'Stonefellow is speaking…':speechPilotReplyInProgress?'Stonefellow is responding…':'Listening · Voice Chat',speechPilotReplyInProgress?'responding':'listening');
         },
-        onMessage(data){if(!isCurrent())return;const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);if(user&&!st.auth.authenticated){const name=nameFromTurn(content);if(name){saveVisitorName(name);welcomeWaitingForName=false;syncWelcomeActions()}}showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');scheduleSpeechContextSync();if(!user)void deliverSpeechEngineAction()},
+        onMessage(data){if(!isCurrent())return;const content=String(data?.message||'').trim();if(!content)return;const user=data.role==='user'||data.source==='user';popupEntry(user?'user':'assistant',content);if(user&&!st.auth.authenticated){const name=nameFromTurn(content);if(name){saveVisitorName(name);welcomeWaitingForName=false;syncWelcomeActions()}}showTranscript((user?'You: ':'Stonefellow: ')+content.slice(0,240),user?'heard':'responding');scheduleSpeechContextSync();if(!user){if(typeof window!=='undefined')window.SFTokenMeter?.notifyUsage?.();void deliverSpeechEngineAction()}},
         onError(message){if(isCurrent()){popupEntry('notice',String(message));showTranscript(String(message),'error')}}
       });}catch(error){
         if(!isCurrent())return;

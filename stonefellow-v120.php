@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.294');
+define('SF_BUILD', '1.3.295');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -75,6 +75,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <link rel="stylesheet" href="assets/css/canvas-music-picker.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/canvas-projects.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/canvas-resource-picker.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/account-token-meter.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/canvas-access.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/canvas-gallery.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/fan-vocal-studio.css?v=<?=rawurlencode(SF_BUILD)?>">
@@ -136,6 +137,13 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
             <button type="button" data-sf-atmosphere="lunar" aria-pressed="false" title="Moonlit mountain horizon">Lunar</button>
           </div>
         </div>
+        <section id="menuTokenMeter" class="menu-token-meter" aria-label="Your Active Tokens" hidden>
+          <div class="menu-token-meter-head"><strong data-token-title>Active Tokens</strong><span class="menu-token-meter-count" data-token-count></span></div>
+          <progress data-token-bar max="100" aria-label="Percentage of current token allowance remaining" hidden></progress>
+          <span class="menu-token-meter-percentage" data-token-percentage></span>
+          <small data-token-basis></small><small data-token-held hidden></small>
+          <small class="menu-token-meter-status" data-token-status role="status"></small>
+        </section>
         <nav>
           <button id="menuShowAgent" class="menu-link-button" type="button" hidden>Show Agent</button>
           <details id="menuCodingModelField" class="menu-coding-model" hidden>
@@ -371,6 +379,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/canvas-agent-theme.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-projects-ui.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-resource-picker.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/account-token-meter.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-access.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-gallery.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/vendor/acorn.js?v=<?=rawurlencode(SF_BUILD)?>"></script>

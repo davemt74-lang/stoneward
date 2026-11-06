@@ -1,6 +1,6 @@
 # Canvas audit and learning build outline
 
-Status: implementation resumed by the user. The capability/admin-policy and remembered-consent phases are implemented locally; see [implementation notes and scoped acceptance evidence](canvas-capability-permissions.md). The remaining sections are planned work, not completed features. Image/vision/production expansion remains deferred. Release requires the documented validation, PR, merge and deployment steps.
+Status: implementation resumed. Capability/admin-policy and remembered-consent phases merged in [PR #346](https://github.com/davemt74-lang/stoneward/pull/346), with 29 GitHub checks passing. See [foundation evidence](canvas-capability-permissions.md). The [account token meter](account-token-meter.md) is the next implemented section under release verification. Remaining sections are planned work. Image/vision/production expansion stays deferred.
 
 ## Current scope hold
 

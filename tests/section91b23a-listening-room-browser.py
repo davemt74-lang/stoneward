@@ -904,19 +904,28 @@ with sync_playwright() as p:
         check(frame.locator('.sf-data-unavailable,.sf-data-row').count() == 0,
               prefix + 'an available empty dataset shows the authored empty message')
         page.evaluate('''SFPublicAgentCanvas.showScene({canvas_kind:'custom',track_id:'',
-          title:'Silent geometry',
+          title:'Silent geometry',agent_design:'hidden',
           html:'<section class="geometry"><h1>Silent geometry</h1><details class="reveal"><summary>Open the sketch</summary><p>Private sketch content</p></details></section>',
           css:'.geometry{padding:90px 16px}.reveal{width:170px}h1{color:lime}@keyframes quiet{from{opacity:.8}to{opacity:1}}'})''')
         frame.get_by_role('heading', name='Silent geometry').wait_for()
         check(not play_source.is_visible() and not open_source_story.is_visible() and
               not eq.is_visible() and page.evaluate('!audio.paused'),
               prefix + 'trackless custom canvases hide song controls and leave existing audio alone')
+        # Isolate authored background interaction from the intentionally movable host orb.
+        expect(page.locator('.sf-agent-sphere')).not_to_be_visible()
         disclosure = frame.locator('summary')
-        (disclosure.tap if width < 720 else disclosure.click)(position={'x': 8, 'y': 10})
+        # Activate the native label center, not a browser-specific disclosure-marker offset.
+        activate(disclosure)
+        expect(frame.locator('details.reveal')).to_have_attribute('open', '')
+        expect(frame.get_by_text('Private sketch content')).to_be_visible()
         check(frame.get_by_text('Private sketch content').is_visible() and backdrop.get_attribute('tabindex') == '0' and
               backdrop.get_attribute('sandbox') == '',
               prefix + 'custom canvas supports native disclosure inside the opaque sandbox')
         disclosure.press('Space')
+        expect(frame.locator('details.reveal')).not_to_have_attribute('open', '')
+        expect(frame.get_by_text('Private sketch content')).not_to_be_visible()
+        page.evaluate('handleAgentVisibilityCommand("/show-agent")')
+        expect(page.locator('#composer-input')).to_be_visible()
         page.locator('#composer-input').click()
         check(not frame.get_by_text('Private sketch content').is_visible() and
               page.evaluate('document.activeElement.id==="composer-input"'),

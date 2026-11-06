@@ -1,0 +1,12 @@
+.menu-token-meter{padding:12px 13px;margin:8px 0;border:1px solid var(--sf-atmo-border,#c4d8e433);border-radius:10px;background:#13213148;color:inherit;overflow-wrap:anywhere;font:13px/1.45 var(--body-font,system-ui,sans-serif)}
+.menu-token-meter[hidden],.menu-token-meter [hidden]{display:none!important}
+.menu-token-meter-head{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:3px 10px}
+.menu-token-meter-head strong{font-size:12px;letter-spacing:.04em}
+.menu-token-meter-count{font-weight:650;font-variant-numeric:tabular-nums;font-size:14px}
+.menu-token-meter progress{appearance:none;display:block;width:100%;height:5px;margin:9px 0;border:none;border-radius:4px;overflow:hidden;background:#c0d3e52b;color:var(--sf-atmo-accent,#c4e2ef)}
+.menu-token-meter progress::-webkit-progress-bar{background:#c0d3e52b;border-radius:4px}
+.menu-token-meter progress::-webkit-progress-value{background:var(--sf-atmo-accent,#c4e2ef);border-radius:4px}
+.menu-token-meter progress::-moz-progress-bar{background:var(--sf-atmo-accent,#c4e2ef);border-radius:4px}
+.menu-token-meter-percentage{font-variant-numeric:tabular-nums}
+.menu-token-meter small{display:block;font-size:11px;line-height:1.45;opacity:.8;margin-top:3px}
+.menu-token-meter-status:empty{display:none}

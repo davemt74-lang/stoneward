@@ -1,5 +1,5 @@
 'use strict';
-const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const app=read('assets/js/app.js'),client=read('speech-gateway/browser-entry.mjs'),core=read('api/speech-engine-actions-core.php'),bridge=read('api/speech-engine-bridge.php');
 let count=0;const check=(ok,label)=>{assert.ok(ok,label);console.log('91B9D PASS:',label);count++;};
@@ -7,7 +7,20 @@ check(client.includes("post('take_action',{conversation_id:conversationId},sessi
 check(client.includes('current===session?result.action_envelope||null:null'),'Stale or disconnected voice session cannot dispatch an old action');
 check(app.includes('dispatchAgentBrowserAction(text,j.action,j.audio_resolution)'),'Typed chat uses shared verified action dispatch');
 check(app.includes("dispatchAgentBrowserAction(String(envelope.message||''),envelope.action,envelope.audio_resolution,false)"),'Speech Engine uses identical catalog and player dispatch without song capture');
-check(app.includes('if(!user)void deliverSpeechEngineAction()'),'Action is claimed after provider speaks, not on an arbitrary transcript');
+const messageStart=app.indexOf('        onMessage(data)'),messageEnd=app.indexOf('\n        onError(',messageStart);
+assert.ok(messageStart>=0&&messageEnd>messageStart,'Speech Engine message handler is present');
+let current=true,claimed=0;
+const scope={isCurrent:()=>current,st:{auth:{authenticated:true}},popupEntry(){},showTranscript(){},scheduleSpeechContextSync(){},deliverSpeechEngineAction(){claimed++;}};
+const onMessage=vm.runInNewContext('({'+app.slice(messageStart,messageEnd)+'}).onMessage',scope);
+onMessage({role:'user',message:'Play a song'});
+onMessage({source:'user',message:'Play another song'});
+assert.equal(claimed,0,'User transcripts must not claim provider actions');
+onMessage({role:'assistant',message:'Playing the song.'});
+assert.equal(claimed,1,'An assistant response claims its verified queued action without the optional token meter');
+onMessage({role:'assistant',message:'  '});
+current=false;
+onMessage({role:'assistant',message:'Stale reply'});
+check(claimed===1,'Only a nonempty reply from the current provider session claims an action');
 check(/if\([^\n]*\|\|!envelope\?\.action\)return/.test(app),'Stopping the microphone stops pending action delivery');
 check(core.includes('sf_speech_public_action')&&core.includes('requires_confirmation'),'Server allowlist explicitly rejects confirmation-required actions');
 check(!core.includes("'builder_save'")&&!core.includes("'set_favorite_track'")&&!core.includes("'purchase'"),'No account, commerce or builder write is on the voice allowlist');
