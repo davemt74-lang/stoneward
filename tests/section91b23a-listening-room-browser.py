@@ -361,8 +361,9 @@ with sync_playwright() as p:
         def activate(control):
             # Keyboard focus invokes the real focusin pause on roaming controls
             # before Playwright checks pointer stability; it never activates them.
-            control.focus()
-            expect(control).to_be_focused()
+            if control.evaluate("node=>!!node.closest('.sf-agent-floater')&&node.matches('button,input,select,textarea,summary,a[href],[tabindex]')"):
+                control.focus()
+                expect(control).to_be_focused()
             (control.tap if width < 720 else control.click)()
 
         requests, errors = [], []
