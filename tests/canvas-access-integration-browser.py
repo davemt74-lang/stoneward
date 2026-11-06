@@ -66,6 +66,8 @@ with tempfile.TemporaryDirectory(prefix='stoneward-consent-browser-') as tempora
      check(page.evaluate("posts.filter(p=>p.path==='api/canvas-access.php').length===0"),f'{width}px opening review performs no implicit grant')
      expect(page.get_by_role('button',name='Allow selected access')).to_be_enabled()
      if os.environ.get('SF_CONSENT_SCREENSHOTS'):
+      expect(page.get_by_role('checkbox',name='Allow Personal listening statistics')).to_be_visible()
+      expect(page.get_by_role('button',name='Allow selected access')).to_be_enabled()
       page.screenshot(path='/tmp/sf-consent-'+('mobile' if width==390 else 'desktop')+'.png',full_page=True)
      page.get_by_role('button',name='Allow selected access').click();expect(page.get_by_role('dialog')).to_have_count(0)
      check(page.evaluate("scene.datasets.personal_listening_stats.rows.length===1&&scene.datasets.personal_listening_stats.rows[0].track_id==='song-1'"),f'{width}px UI grant through actual CSRF endpoint loads only current owner rows')

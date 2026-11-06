@@ -15,7 +15,7 @@ $assert($coverage['schema']==='stonefellow.agent-integration-coverage.v1' && $co
 $assert($coverage['checks_passed'] && $coverage['registry_passed'],'Existing registry contracts and coverage pass');
 $assert($coverage['registered_tools']===count(sf_agent_tool_registry()) && $coverage['registered_skills']===count(sf_agent_skill_definitions()),'Complete live tool and skill counts');
 $assert(!$coverage['missing_skill_bindings'] && !$coverage['invalid_skill_bindings'],'Every exposed tool has a chat skill or canvas data contract');
-$assert($coverage['registered_canvas_data_tools']===count(sf_agent_canvas_data_tools())
+$assert($coverage['registered_canvas_data_tools']===count(sf_canvas_capability_cards())
     && $index['personal_listening_stats']['classification']==='canvas_data_contract'
     && !$index['personal_listening_stats']['skill_ids'],'Canvas data contracts are counted independently of chat skills');
 $assert($coverage['admin_navigation_only_count']===count(sf_admin_agent_module_routes()) && $coverage['admin_navigation_only_count']===24,'All 24 module routes inventoried');

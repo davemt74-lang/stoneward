@@ -14,7 +14,8 @@ require_once __DIR__.'/agent-orchestration.php';
 function sf_agent_integration_coverage(array $moduleRoutes): array {
     $registry=sf_agent_tool_registry();
     $definitions=sf_agent_skill_definitions();
-    $canvasTools=array_column(sf_agent_canvas_data_tools(),null,'id');
+    // Declaration coverage includes disabled cards; runtime discovery enforces policy separately.
+    $canvasTools=sf_canvas_capability_cards();
     $base=sf_agent_capability_audit();
     $toolToSkills=[];
     $invalidSkillTools=[];

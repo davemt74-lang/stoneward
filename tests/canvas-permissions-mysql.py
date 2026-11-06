@@ -6,6 +6,7 @@ loopback-only database. No deployment database is contacted.
 """
 import json
 import os
+import pwd
 from pathlib import Path
 import subprocess
 import socket as net_socket
@@ -17,7 +18,7 @@ PHP = os.environ.get('SF_TEST_PHP', 'php')
 RUNTIME = Path(os.environ['SF_MARIADB_ROOT'])
 BIN = RUNTIME / 'usr/sbin/mariadbd'
 INSTALL = RUNTIME / 'usr/bin/mariadb-install-db'
-CLIENT = RUNTIME / 'usr/bin/mariadb'
+RUN_USER = pwd.getpwuid(os.geteuid()).pw_name
 env = os.environ.copy()
 env['LD_LIBRARY_PATH'] = str(RUNTIME / 'usr/lib/x86_64-linux-gnu') + ':' + env.get('LD_LIBRARY_PATH', '')
 checks = []
@@ -37,12 +38,12 @@ with tempfile.TemporaryDirectory(prefix='sf-permissions-mysql-') as temporary:
         port = reservation.getsockname()[1]
     initialized = subprocess.run([str(INSTALL), '--no-defaults', '--basedir=' + str(RUNTIME / 'usr'),
                                   '--datadir=' + str(data), '--auth-root-authentication-method=normal',
-                                  '--skip-test-db', '--user=root'], env=env, capture_output=True, text=True)
+                                  '--skip-test-db', '--user='+RUN_USER], env=env, capture_output=True, text=True)
     assert initialized.returncode == 0, initialized.stdout + initialized.stderr
     with (work / 'server.log').open('w+') as log:
         server = subprocess.Popen([str(BIN), '--no-defaults', '--basedir=' + str(RUNTIME / 'usr'),
                                    '--datadir=' + str(data), '--socket=', '--bind-address=127.0.0.1', '--port='+str(port),
-                                   '--pid-file=' + str(work / 'db.pid'), '--user=root', '--innodb-use-native-aio=0'],
+                                   '--pid-file=' + str(work / 'db.pid'), '--user='+RUN_USER, '--innodb-use-native-aio=0'],
                                   env=env, stdout=log, stderr=log)
         try:
             for _ in range(200):

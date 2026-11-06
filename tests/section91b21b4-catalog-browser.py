@@ -122,7 +122,9 @@ with sync_playwright() as p:
             songLyricCorrected=command.replace(/^correct lyrics to /,'');
             updateSongExperience({corrected:songLyricCorrected});return 'Updated the listener-edited';
           };
-          window.response=value=>({ok:true,status:200,json:async()=>value});
+          // Match the real fetch response contract, including content-type
+          // headers used by the production JSON/stream transport selector.
+          window.response=value=>new Response(JSON.stringify(value),{status:200,headers:{'Content-Type':'application/json'}});
           window.ready=()=>response({ok:true,available:true,source:'saved-catalog-lyrics',max_seconds:90,source_fingerprint:'a'.repeat(64)});
           window.fetch=(url,options={})=>{
             if(String(url).includes('song-lyrics-section.php?')){

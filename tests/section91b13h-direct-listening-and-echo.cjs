@@ -14,6 +14,7 @@ assert.ok(directStart>0&&liveStart>directStart&&liveEnd>liveStart);
 let active=false,loadAuthCalls=0;
 const actions=[],notices=[],modes=[],spoken=[];
 const scope={
+  document:{getElementById:()=>null}, // Optional account-menu binding is outside this listening fixture.
   directRandomPlaylistCommand:()=>false,
   songListeningSkill:{status:()=>({active})},
   currentSongDraft:()=>active?null:{track_id:'sf-earth',text:'A corrected verse'},

@@ -7,7 +7,7 @@ $public=sf_agent_skill_inventory('public');
 $customer=sf_agent_skill_inventory('customer');
 $admin=sf_agent_skill_inventory('admin');
 $tools=fn(array $skills): array=>array_column($skills,'tool_id');
-$discoverable=array_merge(array_column($defs,'tool'),array_column(sf_agent_canvas_data_tools(),'id'));
+$discoverable=array_merge(array_column($defs,'tool'),array_keys(sf_canvas_capability_cards()));
 $nonInternal=array_keys(array_filter($registry,fn(array $tool): bool=>$tool['kind']!=='internal'));
 sort($discoverable);
 sort($nonInternal);
