@@ -1,0 +1,74 @@
+name: Account Token Meter Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  token-meter-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SF_TEST_PHP: php
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, fileinfo, curl
+          coverage: none
+      - name: Disposable database and audio fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg mariadb-server
+      - name: Immutable billing snapshots and real account authentication
+        run: |
+          php tests/token-meter.php
+          python tests/token-meter-http.py
+          node tests/account-token-meter-transports.cjs
+      - name: SELECT-only credentials and concurrent settlement snapshot
+        env:
+          SF_MARIADB_ROOT: /
+        run: python tests/token-meter-mysql.py
+  token-meter-browser:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SF_TEST_PHP: php
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, fileinfo, curl
+          coverage: none
+      - name: Native browser and audio fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install playwright==1.64.1
+          python -m playwright install --with-deps chromium
+          python - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              with open(os.environ['GITHUB_ENV'], 'a') as output:
+                  output.write('CHROMIUM_BIN=' + p.chromium.executable_path + '\n')
+          PY
+      - name: Mobile and desktop meter lifecycle, account isolation and model selection
+        run: |
+          python tests/account-token-meter-browser.py
+          python tests/account-token-meter-integration-browser.py
