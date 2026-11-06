@@ -80,6 +80,8 @@ jobs:
         run: |
           python tests/listening-telemetry-browser.py
           python tests/canvas-independent-audio-browser.py
-      - name: Full canvas controls on the matching current Chromium engine
+      - name: Full canvas controls in the bundled current headless shell
         if: matrix.browser == 'chromium'
+        env:
+          SF_CANVAS_HEADLESS_SHELL: '1'
         run: python tests/section91b23a-listening-room-browser.py

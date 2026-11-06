@@ -340,7 +340,10 @@ def first_pointer_disclosure(browser, width):
 
 
 with sync_playwright() as p:
-    executable = os.environ.get('CHROMIUM_BIN') or shutil.which('chromium')
+    # Keep opaque-frame pointer tests on Playwright's default headless engine.
+    # Regular Chromium audio remains covered separately in the CI matrix.
+    executable = None if os.environ.get('SF_CANVAS_HEADLESS_SHELL') == '1' else (
+        os.environ.get('CHROMIUM_BIN') or shutil.which('chromium'))
     launch = {'headless': True, 'args': ['--no-sandbox']}
     if executable:
         launch['executable_path'] = executable
