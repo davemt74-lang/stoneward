@@ -103,7 +103,11 @@ with tempfile.TemporaryDirectory(prefix='stoneward-native-listening-') as tempor
      activate(frame.get_by_role('button',name='Play synchronized song'));page.wait_for_timeout(70);check(len([row for row in reports if row.get('action')=='begin' and row.get('track_id')=='song-2'])==1,f'{BROWSER}/{width}px repeated synchronized play request does not duplicate counts')
      page.evaluate('audio.currentTime=5.4');page.wait_for_function('audio.ended',timeout=5000);page.wait_for_timeout(100)
      completed=[row for row in reports if row.get('event_type')=='complete' and row.get('play_id')==sdk[0]['play_id']];check(len(completed)==1 and completed[0]['elapsed_played_seconds']<2,f'{BROWSER}/{width}px actual seek skips media without adding seek distance to listening seconds')
-     activate(page.locator('#next'));page.wait_for_function('st.track?.id==="song-3"&&!audio.paused');page.wait_for_timeout(100)
+     # Begin reporting awaits the authorized host response. Native playback can
+     # start before that asynchronous POST; observe the report rather than a delay.
+     with page.expect_request(lambda request: '/api/listening.php' in request.url and request.method=='POST' and request.post_data_json.get('action')=='begin' and request.post_data_json.get('track_id')=='song-3'):
+      activate(page.locator('#next'))
+      page.wait_for_function('st.track?.id==="song-3"&&!audio.paused')
      normal=[row for row in reports if row.get('action')=='begin' and row.get('track_id')=='song-3'];check(len(normal)==1 and normal[0]['context']=={'app':True},f'{BROWSER}/{width}px subsequent normal app play resets initiation context')
      activate(page.locator('#footer'));page.wait_for_timeout(50);before=len([row for row in reports if row.get('action')=='begin']);activate(page.locator('#bad'));page.wait_for_timeout(250)
      check(len([row for row in reports if row.get('action')=='begin'])==before,f'{BROWSER}/{width}px failed native play adds no play start')

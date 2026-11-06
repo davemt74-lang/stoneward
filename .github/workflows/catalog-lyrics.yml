@@ -79,6 +79,8 @@ jobs:
           name: catalog-lyrics-${{ matrix.browser }}
           path: catalog-lyric-evidence
           if-no-files-found: ignore
-      - name: Private listening room browser isolation
+      - name: Private listening room isolation in the bundled matching headless shell
         if: matrix.browser == 'chromium'
+        env:
+          SF_CANVAS_HEADLESS_SHELL: '1'
         run: python tests/section91b23a-listening-room-browser.py
