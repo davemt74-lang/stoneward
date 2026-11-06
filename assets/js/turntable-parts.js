@@ -204,7 +204,18 @@
     const volume=stage.querySelector('[data-player-volume]');
     if(volume){
       volume.value=String(Math.round(100*(ctx?.getVolume?.()??0.75)));
-      volume.addEventListener('input',()=>ctx?.setVolume?.(Number(volume.value)/100));
+      const hint=document.createElement('span');
+      hint.setAttribute('role','status');
+      hint.hidden=true;
+      volume.after(hint);
+      volume.addEventListener('input',()=>{
+        const actual=ctx?.setVolume?.(Number(volume.value)/100);
+        const rejected=actual===null;
+        if(rejected)volume.value=String(Math.round(100*(ctx?.getVolume?.()??0.75)));
+        else if(Number.isFinite(actual))volume.value=String(actual);
+        hint.hidden=!rejected;
+        hint.textContent=rejected?'Use device buttons':'';
+      });
     }
   }
   function decorateCatalog(){

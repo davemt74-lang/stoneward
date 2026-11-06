@@ -70,7 +70,17 @@ jobs:
           node --check assets/js/agent-brain.js
           node --check assets/js/agent-chat-canvas.js
           node --check assets/js/agent-song-experience-ui.js
+          node --check assets/js/canvas-projects-ui.js
+          node --check assets/js/canvas-resource-picker.js
+          node --check assets/js/canvas-build-workflow.js
+          node --check assets/js/canvas-gallery.js
+          node --check assets/js/canvas-scene-tester.js
+          node --check assets/js/canvas-preview-guard.js
+          node --check assets/js/vendor/acorn.js
+          node --check assets/js/canvas-agent-theme.js
           node --check assets/js/public-agent-canvas.js
+          node --check assets/js/canvas-audio-sdk.js
+          node --check assets/js/canvas-music-picker.js
           node --check assets/js/library.js
           node --check assets/js/owned-music.js
           node tests/section85a-owned-ui.cjs
@@ -83,6 +93,7 @@ jobs:
           node --check admin/assets/stripe-connect.js
           node --check admin/assets/commerce-ops.js
           node --check admin/assets/agent-canvas.js
+          node --check admin/assets/canvas-gallery.js
           node --check admin/assets/agent-commerce-review.js
           node --check admin/assets/turntable-modules.js
           node --check assets/js/turntable-parts.js
@@ -566,7 +577,6 @@ jobs:
           node tests/section91b12d-sidecar-autohide.cjs
           node tests/section91b12e-lyric-interpretation.cjs
           node tests/section91b13a-native-page-rail.cjs
-          node tests/section91b13b-player-track-listening.cjs
           php tests/section91b12e-lyric-interpretation.php
           node tests/section91b13e-lyric-review-gate.cjs
           node tests/section91b13f-conversation-ducking.cjs
@@ -667,6 +677,57 @@ jobs:
           php tests/section91b22a-saved-section.php
           php tests/deploy-store-config.php
           python3 tests/deploy-config-preservation.py
+
+      - name: Private listening rooms and token accounting
+        run: |
+          node --test tests/section91b23a-listening-room-commands.cjs tests/section91b12a-public-agent-canvas.cjs tests/section91b19d-token-reservations.test.cjs
+          node --test tests/canvas-image-review.test.cjs tests/agent-canvas-reference-gallery-ui.cjs tests/section91b279-canvas-image-actions.cjs
+          node --test tests/canvas-resource-composer.cjs
+          node --test tests/canvas-build-workflow.test.cjs tests/canvas-preview-guard.test.cjs
+          node --test tests/canvas-gallery-app.cjs tests/canvas-audio-debug.test.cjs
+          php tests/section91b23a-agent-scene.php
+          php tests/agent-scene-history.php
+          php tests/canvas-projects.php
+          php tests/canvas-project-ideas.php
+          php tests/canvas-project-privacy.php
+          php tests/canvas-resources.php
+          php tests/canvas-resource-scenes.php
+          php tests/agent-canvas-resource-history.php
+          php tests/canvas-project-chat.php
+          php tests/canvas-feedback.php
+          php tests/canvas-build-agents.php
+          php tests/canvas-build-workflow.php
+          php tests/canvas-build-workflow-privacy.php
+          php tests/canvas-build-verification.php
+          php tests/canvas-gallery.php
+          php tests/canvas-gallery-assets.php
+          php tests/canvas-gallery-privacy.php
+          php tests/canvas-gallery-attribution-history.php
+          python3 tests/canvas-gallery-http.py
+          python3 tests/canvas-build-workflow-http.py
+          python3 tests/canvas-projects-http.py
+          php tests/agent-scene-stream.php
+          php tests/agent-canvas-image-generation.php
+          php tests/agent-canvas-image-references.php
+          php tests/agent-canvas-image-review.php
+          php tests/media-image-analysis.php
+          php tests/agent-canvas-image-analysis.php
+          php tests/agent-canvas-image-search.php
+          php tests/image-profile.php
+          php tests/image-analysis-batch.php
+          php tests/image-analysis-batch-privacy.php
+          python3 tests/image-analysis-batch-http.py
+          php tests/agent-canvas-lyrics.php
+          php tests/agent-canvas-catalog.php
+          php tests/agent-canvas-release-data.php
+          php tests/agent-scene-javascript.php
+          php tests/agent-scene-palette.php
+          php tests/canvas-audio-core.php
+          php tests/agent-canvas-music.php
+          node --test tests/canvas-agent-theme.test.cjs
+          node --test tests/canvas-audio-sdk.test.cjs tests/canvas-audio-debug.test.cjs
+          python3 tests/canvas-audio-integration-browser.py --http-only
+          python3 tests/section91b23a-agent-scene-http.py
 
       - name: Build verified deployment ZIP
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'

@@ -1,8 +1,5 @@
-/* 91B22A — catalog section selection, with stored lyrics lookup for the main application.
- * Only catalog identity and playback times leave this controller. The server
- * retrieves saved lyrics after Stop in savedLyrics mode; the legacy opt-in path
- * can create a bounded audio excerpt. This module never
- * opens a microphone or the separate Record Clip workflow.
+/* Catalog section selection and saved lyrics lookup.
+ * Only catalog identity and playback times leave this controller.
  */
 (() => {
   'use strict';
@@ -10,13 +7,13 @@
   const canceledReasons = new Set(['switch', 'seek', 'error', 'pagehide', 'navigation', 'cancel']);
   const position = audio => Number.isFinite(Number(audio?.currentTime))
     ? Math.max(0, Math.round(Number(audio.currentTime) * 1000)) : null;
-  const message = error => String(error?.message || 'Song transcription could not complete.');
+  const message = error => String(error?.message || 'Saved lyrics could not be retrieved.');
   const savedText = text => typeof text === 'string' && text.length <= 4200 && !!text.trim() &&
     new TextEncoder().encode(text).length <= 4200;
 
   function create({ audio, getTrack, prepare, submit, onUpdate = () => {}, onFinish = () => {},
     now = () => new Date(), monotonic = () => performance.now(), crypto = window.crypto,
-    eventTarget = window, maxSeconds = 90, requestTimeoutMs = 75000, savedLyrics = false } = {}) {
+    eventTarget = window, maxSeconds = 90, requestTimeoutMs = 75000 } = {}) {
     if (!audio || typeof getTrack !== 'function' || typeof prepare !== 'function' || typeof submit !== 'function')
       throw new Error('Catalog lyric listening requires the current player and authenticated requests.');
     let active = null;
@@ -53,9 +50,7 @@
     }
     function discard(session, reason = 'cancel') {
       return finish(session, { ok: false, canceled: true, reason, receipt: null,
-        text: savedLyrics ? 'Lyric selection stopped. No audio was sent and no transcription was charged.' : session.submitted
-          ? 'Stopped waiting for this lyric draft. The submitted transcription may still complete and use Active Tokens; its result will not replace this session.'
-          : 'Lyric selection stopped. No audio was sent for transcription.' });
+        text: 'Lyric selection stopped. No audio was sent and no transcription was charged.' });
     }
     function boundedRequest(session, operation, timeoutMs) {
       return new Promise((resolve, reject) => {
@@ -101,7 +96,7 @@
       if (active) return { ok: false, pending: true, text: 'A lyric session is already active. Use Stop to finish it.' };
       const track = getTrack(), start = position(audio);
       if (!track?.id || !track.audio || audio.paused || audio.seeking || !source() || start === null)
-        return { ok: false, text: 'Play a published song before selecting Listen & Interpret.' };
+        return { ok: false, text: 'Play a published song before selecting Song Lyrics.' };
       if (typeof crypto?.getRandomValues !== 'function')
         return { ok: false, text: 'Secure lyric requests require a secure browser connection.' };
       const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
@@ -113,14 +108,14 @@
         abort: typeof AbortController === 'function' ? new AbortController() : null };
       session.done = new Promise(resolve => { session.resolve = resolve; });
       active = session;
-      emit(session, savedLyrics ? 'Checking saved song lyrics…' : 'Checking song transcription availability…');
+      emit(session, 'Checking saved song lyrics…');
       try {
         const ready = await boundedRequest(session, () => prepare(session.track_id, session.audio_ref, session.abort?.signal), 15000);
         if (active !== session || session.ended) return { ok: false, canceled: true, text: 'Lyric selection was canceled.' };
         if (!matches(session) || audio.paused || audio.seeking) {
           await discard(session, 'switch'); return { ok: false, canceled: true, text: 'Playback changed before lyric listening could start.' };
         }
-        if (ready?.ok !== true || ready.available !== true) throw new Error(ready?.message || (savedLyrics ? 'Saved lyrics are not available for this song yet.' : 'Song transcription is unavailable.'));
+        if (ready?.ok !== true || ready.available !== true) throw new Error(ready?.message || 'Saved lyrics are not available for this song yet.');
         if(typeof ready.source_fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(ready.source_fingerprint))
           throw new Error('The server could not verify the currently playing song source.');
         session.source_fingerprint = ready.source_fingerprint;
@@ -132,9 +127,9 @@
         session.max_ms = Math.min(session.max_ms, Math.max(500, Number(ready.max_seconds || 90) * 1000));
         session.phase = 'capturing';
         session.deadline = setTimeout(() => { void stop('time_limit'); }, session.max_ms + 1000);
-        emit(session, savedLyrics ? 'Selecting this song section. Stop retrieves its saved lyrics; no audio is sent for transcription.' : 'Selecting this song section. Stop sends a temporary excerpt to OpenAI for a lyric draft; the microphone is not used.');
+        emit(session, 'Selecting this song section. Stop retrieves its saved lyrics; no audio is sent for transcription.');
         return { ok: true, mode: 'catalog', request_id: session.request_id,
-          text: savedLyrics ? 'Selecting lyrics from “' + session.title + '.” Select Stop to retrieve the saved lyrics for this range.' : 'Listening to “' + session.title + '.” Select Stop to convert this song section into text with OpenAI, then review the draft before interpretation.' };
+          text: 'Selecting lyrics from “' + session.title + '.” Select Stop to retrieve the saved lyrics for this range.' };
       } catch (error) {
         if (active !== session || session.ended) return { ok: false, canceled: true, text: 'Lyric selection was canceled.' };
         const text = message(error);
@@ -157,7 +152,7 @@
         return finish(session, { ok: false, receipt: null, reason: 'too_short', text: 'Listen for at least one second before selecting Stop. No audio was sent.' });
       session.end_ms = end; session.phase = 'transcribing'; session.submitted = true;
       clearTimeout(session.deadline);
-      emit(session, savedLyrics ? 'Retrieving saved lyrics for this song section… No audio upload or transcription charge.' : 'Transcribing lyrics with OpenAI. Stop waiting discards this result; an already submitted request may still use Active Tokens.');
+      emit(session, 'Retrieving saved lyrics for this song section… No audio upload or transcription charge.');
       try {
         const payload = { track_id: session.track_id, start_ms: session.start_ms, end_ms: end,
           captured_at: session.captured_at, request_id: session.request_id,
@@ -166,7 +161,7 @@
         if (active !== session || session.ended) return session.done;
         if (!matches(session)) return discard(session, 'switch');
         const draft = result?.transcript;
-        const savedContract = !savedLyrics || (draft?.source === 'saved-catalog-lyrics' && draft?.provider === 'stored' &&
+        const savedContract = draft?.source === 'saved-catalog-lyrics' && draft?.provider === 'stored' &&
           ['approved', 'corrected', 'unverified'].includes(draft.review_status) &&
           draft.selected_start_ms === session.start_ms && draft.selected_end_ms === end &&
           draft.start_ms === session.start_ms && draft.end_ms === end && draft.timing === 'saved_segments' && savedText(draft.text) &&
@@ -175,18 +170,13 @@
             segment.start_ms >= 0 && segment.end_ms > segment.start_ms && segment.start_ms < end &&
             segment.end_ms > session.start_ms && savedText(segment.text) && ['approved', 'corrected', 'unverified'].includes(segment.lyric_state) &&
             (draft.review_status !== 'approved' || segment.lyric_state === 'approved') &&
-            ['whole_clip_estimate', 'catalog_chunk_estimate', 'manual', 'provider'].includes(segment.timing_source)));
-        const freshContract = savedLyrics || (draft?.review_status === 'unverified' && draft?.source === 'catalog-audio' && draft?.provider === 'openai');
-        if (result?.ok !== true || !draft || !savedContract || !freshContract || String(draft.track_id) !== session.track_id ||
+            ['whole_clip_estimate', 'catalog_chunk_estimate', 'manual', 'provider'].includes(segment.timing_source));
+        if (result?.ok !== true || !savedContract || String(draft.track_id) !== session.track_id ||
             draft.source_fingerprint !== session.source_fingerprint ||
-            typeof draft.text !== 'string' || !draft.text.trim() || draft.text.length > 4200 ||
-            !Number.isInteger(draft.start_ms) || !Number.isInteger(draft.end_ms) ||
-            draft.start_ms < session.start_ms || draft.end_ms > end ||
-            draft.end_ms - draft.start_ms < 500 || draft.end_ms - draft.start_ms > MAX_MS ||
             draft.captured_at !== session.captured_at)
           throw new Error(result?.message || 'The server did not return a valid lyric draft for this song section.');
         return finish(session, { ok: true, receipt: Object.freeze({ ...draft }), reason,
-          text: savedLyrics ? 'Saved lyrics ready. Review the words and their timing before interpretation.' : 'Lyric draft ready. Review or correct the words before interpretation.' });
+          text: 'Saved lyrics ready. Review the words and their timing before interpretation.' });
       } catch (error) {
         if (active !== session || session.ended) return session.done;
         return finish(session, { ok: false, receipt: null, reason: 'error', error: message(error),
@@ -219,15 +209,5 @@
     return Object.freeze({ begin, stop, status, destroy });
   }
 
-  function combine(browser, catalog, supportsBrowser) {
-    const choose = () => catalog?.status().active ? catalog : browser?.status().active ? browser :
-      supportsBrowser?.() && browser ? browser : catalog || browser;
-    return Object.freeze({
-      mode: () => choose() === catalog ? 'catalog' : 'recognition',
-      status: () => choose()?.status() || { active: false },
-      begin: () => choose()?.begin() || { ok: false, text: 'Song lyric listening is unavailable.' },
-      stop: reason => choose()?.stop(reason) || Promise.resolve({ ok: false, text: 'No lyric session is active.' })
-    });
-  }
-  window.StonefellowCatalogListening = Object.freeze({ create, combine });
+  window.StonefellowCatalogListening = Object.freeze({ create });
 })();

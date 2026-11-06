@@ -17,7 +17,7 @@ function fixture(options={}){
   source:'saved-catalog-lyrics',provider:'stored',model:'',review_status:'approved',timing:'saved_segments',
   selected_start_ms:p.start_ms,selected_end_ms:p.end_ms,
   segments:[{id:1,start_ms:60000,end_ms:120000,text:'Reviewed stored words',lyric_state:'approved',timing_source:'catalog_chunk_estimate'}],...extra}}}
- const skill=context.window.StonefellowCatalogListening.create({audio,getTrack:()=>track,savedLyrics:true,
+ const skill=context.window.StonefellowCatalogListening.create({audio,getTrack:()=>track,
   monotonic:()=>clock,now:()=>new Date('2026-11-03T18:00:00Z'),eventTarget:events,
   prepare:options.prepare||(async()=>({ok:true,available:true,max_seconds:90,source_fingerprint:fingerprint})),
   submit:async(p,signal)=>{requests.push({p,signal});return options.submit?options.submit(p,signal):result(p)},

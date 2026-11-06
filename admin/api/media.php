@@ -4,6 +4,7 @@ require __DIR__.'/bootstrap.php';
 require_once SF_ROOT.'/api/track-media-publishing.php';
 require_once SF_ROOT.'/api/fan-owned-music-core.php';
 require_once SF_ROOT.'/api/kunaki-media-transfer.php';
+require_once SF_ROOT.'/api/agent-canvas-image-references.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $me=sf_admin_require_auth($method!=='GET');
 sf_media_ensure_schema();
@@ -93,18 +94,51 @@ function sf_admin_image_studio_history(string $type,string $id,string $role): ar
 }
 
 if($method==='GET'){
-    $assetId=max(0,(int)($_GET['asset_id']??0));if($assetId){$asset=sf_media_asset($assetId);if(!$asset)sf_json_response(['ok'=>false,'message'=>'Media asset not found.'],404);sf_json_response(['ok'=>true,'asset'=>$asset,'usage'=>sf_media_usage($assetId),'capabilities'=>sf_media_capabilities()]);}
+    $assetId=max(0,(int)($_GET['asset_id']??0));if($assetId){$asset=sf_media_asset($assetId);if(!$asset)sf_json_response(['ok'=>false,'message'=>'Media asset not found.'],404);sf_json_response(['ok'=>true,'asset'=>sf_agent_canvas_reference_admin_assets([$asset])[0],'usage'=>sf_media_usage($assetId),'capabilities'=>sf_media_capabilities()]);}
     $mode=sf_clean_text($_GET['mode']??'',40);
     if($mode==='image_placement_history'){
         $type=sf_clean_text($_GET['entity_type']??'',40);$id=sf_clean_text($_GET['entity_id']??'',160);$role=sf_clean_text($_GET['role']??'',60);
         sf_json_response(['ok'=>true]+sf_admin_image_studio_history($type,$id,$role));
     }if($mode==='dashboard'){$cfg=sf_store_config();$products=[];foreach((array)($cfg['products']??[]) as $id=>$p)$products[]=['id'=>(string)$id,'label'=>(string)($p['label']??$id),'format'=>(string)($p['format']??''),'kind'=>'builder'];if(function_exists('sf_commerce_products'))foreach(sf_commerce_products(false) as $p)$products[]=['id'=>(string)$p['id'],'label'=>(string)$p['title'],'format'=>'merch','kind'=>'merch'];sf_json_response(['ok'=>true,'completeness'=>sf_media_completeness(),'store_products'=>$products,'site'=>sf_site_settings(),'capabilities'=>sf_media_capabilities()]);}
-    $entityType=sf_clean_text($_GET['entity_type']??'',40);$entityId=sf_clean_text($_GET['entity_id']??'',160);if($entityType!==''&&$entityId!=='')sf_json_response(['ok'=>true,'links'=>sf_media_links($entityType,$entityId),'publication'=>$entityType==='track'?sf_track_media_publication_status($entityId):null,'capabilities'=>sf_media_capabilities()]);
-    $category=sf_clean_text($_GET['category']??'',40);$q=sf_clean_text($_GET['q']??'',180);sf_json_response(['ok'=>true,'assets'=>sf_media_list($category,$q,500),'completeness'=>sf_media_completeness(),'capabilities'=>sf_media_capabilities()]);
+    $entityType=sf_clean_text($_GET['entity_type']??'',40);$entityId=sf_clean_text($_GET['entity_id']??'',160);if($entityType!==''&&$entityId!=='')sf_json_response(['ok'=>true,'links'=>sf_agent_canvas_reference_admin_assets(sf_media_links($entityType,$entityId),'asset_id'),'publication'=>$entityType==='track'?sf_track_media_publication_status($entityId):null,'capabilities'=>sf_media_capabilities()]);
+    $category=sf_clean_text($_GET['category']??'',40);$q=sf_clean_text($_GET['q']??'',180);sf_json_response(['ok'=>true,'assets'=>sf_agent_canvas_reference_admin_assets(sf_media_list($category,$q,500)),'completeness'=>sf_media_completeness(),'capabilities'=>sf_media_capabilities()]);
 }
 if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $b=sf_request_json();$action=(string)($b['action']??'');
 try{
+    if($action==='analyze_image'){
+        require_once SF_ROOT.'/api/media-image-analysis.php';
+        $id=(int)($b['id']??0);$requestId=$b['request_id']??null;
+        if(!is_string($requestId))throw new InvalidArgumentException('Choose a valid image analysis request.');
+        if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
+        try{$analysis=sf_media_image_analysis_analyze((int)$me['id'],$id,$requestId);}
+        catch(InvalidArgumentException $error){throw $error;}
+        catch(Throwable $error){
+            error_log('[Stonefellow media image analysis] '.get_class($error));
+            sf_json_response(['ok'=>false,'error'=>'image_analysis_unavailable',
+                'message'=>'Image analysis could not be completed. Check the enabled AI provider and try again.'],422);
+        }
+        sf_log_admin_action((int)$me['id'],'media_image_analyzed','media_asset',(string)$id,
+            ['analysis_id'=>$analysis['id'],'status'=>$analysis['status'],'source_sha256'=>$analysis['source_sha256']]);
+        sf_json_response(['ok'=>true,'asset_id'=>$id,'analysis'=>$analysis]);
+    }
+    if($action==='save_image_analysis'){
+        require_once SF_ROOT.'/api/media-image-analysis.php';
+        $id=(int)($b['id']??0);$analysisId=$b['analysis_id']??null;$version=$b['expected_version']??null;
+        if(!is_string($analysisId)||!is_int($version))throw new InvalidArgumentException('Refresh the image analysis before saving.');
+        $analysis=sf_media_image_analysis_save((int)$me['id'],$id,$analysisId,$version,$b['analysis']??null);
+        sf_log_admin_action((int)$me['id'],'media_image_analysis_reviewed','media_asset',(string)$id,
+            ['analysis_id'=>$analysis['id'],'version'=>$analysis['version'],'source_sha256'=>$analysis['source_sha256']]);
+        sf_json_response(['ok'=>true,'asset_id'=>$id,'analysis'=>$analysis]);
+    }
+    if($action==='set_reference_gallery'){
+        if(!is_bool($b['enabled']??null))throw new InvalidArgumentException('Choose whether to include this image in the reference gallery.');
+        $id=(int)($b['id']??0);$enabled=$b['enabled'];
+        $asset=sf_agent_canvas_reference_set($id,$enabled);
+        sf_log_admin_action((int)$me['id'],$enabled?'canvas_reference_published':'canvas_reference_revoked',
+            'media_asset',(string)$id,['reference_id'=>$asset['reference_image_id'],'available_to_all_visitors'=>$enabled]);
+        sf_json_response(['ok'=>true,'asset'=>$asset]);
+    }
     if($action==='attach'){
         $entityType=sf_clean_text($b['entity_type']??'',40);$entityId=sf_clean_text($b['entity_id']??'',160);$role=sf_clean_text($b['role']??'media',60);$assetId=(int)($b['asset_id']??0);
         if(in_array($entityType,['video_feature','photo_gallery'],true)&&(!empty($b['public_visible'])||!empty($b['download_allowed']))&&empty($b['confirmed'])){if($entityType==='video_feature')throw new RuntimeException('Changing Video Hub media visibility requires explicit Admin confirmation.');throw new RuntimeException('Publishing governed public media requires explicit Admin confirmation.');}
@@ -116,7 +150,7 @@ try{
     if($action==='detach'){
         $linkId=(int)($b['link_id']??0);$row=sf_admin_media_link_row($linkId);if(($row['entity_type']??'')==='track'&&($row['role']??'')==='master_audio')throw new RuntimeException('Source master revisions are retained; select a different private original instead.');$ok=sf_media_detach($linkId);sf_log_admin_action((int)$me['id'],'media_detached','media_link',(string)$linkId,['entity_type'=>$row['entity_type'],'entity_id'=>$row['entity_id'],'role'=>$row['role']]);if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_media','media_detach',['route'=>'media_library','action'=>'detach_media','context_profile'=>'catalog','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','request'=>'Detach media from '.$row['entity_type'].' '.$row['entity_id'],'response'=>'Detached '.$row['role'].' media relationship; library asset preserved.']);sf_json_response(['ok'=>$ok]);
     }
-    if($action==='update_asset'){$a=sf_media_update_asset((int)($b['id']??0),(array)($b['asset']??[]));sf_log_admin_action((int)$me['id'],'media_metadata_updated','media_asset',(string)$a['id']);sf_json_response(['ok'=>true,'asset'=>$a]);}
+    if($action==='update_asset'){$a=sf_media_update_asset((int)($b['id']??0),(array)($b['asset']??[]));sf_log_admin_action((int)$me['id'],'media_metadata_updated','media_asset',(string)$a['id']);sf_json_response(['ok'=>true,'asset'=>sf_agent_canvas_reference_admin_assets([$a])[0]]);}
     if($action==='update_link'){$id=(int)($b['id']??0);$patch=(array)($b['link']??[]);$row=sf_admin_media_link_row($id);if(($row['entity_type']??'')==='photo_gallery'&&array_key_exists('role',$patch)&&!in_array((string)$patch['role'],['cover','photo'],true))throw new InvalidArgumentException('Photo gallery media role must be cover or photo.');$consequential=false;if(in_array((string)($row['entity_type']??''),['video_feature','photo_gallery'],true)){foreach(['public_visible','download_allowed'] as $k)if(array_key_exists($k,$patch)&&((int)!empty($patch[$k]))!==(int)!empty($row[$k]))$consequential=true;if($consequential&&empty($b['confirmed'])){if(($row['entity_type']??'')==='video_feature')throw new RuntimeException('Changing Video Hub media visibility requires explicit Admin confirmation.');throw new RuntimeException('Changing governed public media visibility requires explicit Admin confirmation.');}}sf_media_update_link($id,$patch);if($consequential){$isVideo=($row['entity_type']??'')==='video_feature';$auditAction=$isVideo?'video_media_visibility_changed':'governed_media_visibility_changed';$brainKind=$isVideo?'video_media_visibility':'governed_media_visibility';$request=$isVideo?'Change Video Hub media visibility':'Change governed public media visibility';sf_log_admin_action((int)$me['id'],$auditAction,(string)$row['entity_type'],(string)$row['entity_id'],['link_id'=>$id,'role'=>$row['role'],'public_visible'=>array_key_exists('public_visible',$patch)?!empty($patch['public_visible']):!empty($row['public_visible']),'download_allowed'=>array_key_exists('download_allowed',$patch)?!empty($patch['download_allowed']):!empty($row['download_allowed'])]);if(function_exists('sf_agent_brain_log'))sf_agent_brain_log((int)$me['id'],'admin_media',$brainKind,['route'=>'universal_media','action'=>'update_media_visibility','context_profile'=>'catalog','needs_llm'=>false,'requires_confirmation'=>true,'status'=>'completed','request'=>$request,'response'=>'Public media visibility updated for '.$row['role'].'.']);}sf_json_response(['ok'=>true]);}
     if($action==='delete_asset'){$id=(int)($b['id']??0);$ok=sf_media_delete_asset($id);if($ok)sf_log_admin_action((int)$me['id'],'media_deleted','media_asset',(string)$id);sf_json_response(['ok'=>$ok]);}
     if($action==='publish_track_master'){

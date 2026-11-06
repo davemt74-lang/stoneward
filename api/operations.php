@@ -61,7 +61,7 @@ function sf_user_history(int $userId,int $limit=80): array {
     sf_ops_ensure_schema();$limit=max(1,min(200,$limit));$q=sf_db()->prepare('SELECT id,event_type,title,entity_type,entity_id,metadata_json,created_at FROM user_activity WHERE user_id=? ORDER BY id DESC LIMIT '.$limit);$q->execute([$userId]);$rows=$q->fetchAll();foreach($rows as &$r){$r['metadata']=json_decode((string)$r['metadata_json'],true)?:[];unset($r['metadata_json']);}unset($r);return $rows;
 }
 function sf_user_brain_timeline(int $userId,int $limit=80): array {
-    sf_agent_brain_ensure_schema();$limit=max(1,min(200,$limit));$q=sf_db()->prepare('SELECT id,phase,route,action,context_profile,needs_llm,requires_confirmation,request_excerpt,response_excerpt,provider_status,input_tokens,output_tokens,created_at FROM agent_brain_decisions WHERE user_id=? ORDER BY id DESC LIMIT '.$limit);$q->execute([$userId]);return $q->fetchAll();
+    sf_entitlements_ensure_schema();$limit=max(1,min(200,$limit));$q=sf_db()->prepare('SELECT id,phase,route,action,context_profile,needs_llm,requires_confirmation,request_excerpt,response_excerpt,provider_status,input_tokens,output_tokens,created_at FROM agent_brain_decisions WHERE user_id=? ORDER BY id DESC LIMIT '.$limit);$q->execute([$userId]);return $q->fetchAll();
 }
 function sf_notification_unread_count(int $userId): int {
     sf_ops_ensure_schema();$q=sf_db()->prepare('SELECT COUNT(*) FROM user_notifications WHERE user_id=? AND is_read=0');$q->execute([$userId]);return (int)$q->fetchColumn();
@@ -80,6 +80,18 @@ function sf_listen_record(?int $userId,string $sessionKey,string $trackId,string
         sf_log_user_activity($userId,$eventType==='complete'?'listen_complete':'listen_start',($eventType==='complete'?'Finished ':'Played ').($track['title']??$trackId),'track',$trackId,['position'=>$position,'duration'=>$duration]);
     }
 }
+function sf_listening_track_rows(string $since,?int $userId=null,?string $trackId=null): array {
+    sf_ops_ensure_schema();
+    $where="created_at>=? AND event_type IN ('start','complete')";
+    $args=[$since];
+    if($userId){$where.=' AND user_id=?';$args[]=$userId;}
+    if($trackId!==null){$where.=' AND track_id=?';$args[]=$trackId;}
+    $q=sf_db()->prepare("SELECT track_id,SUM(CASE WHEN event_type='start' THEN 1 ELSE 0 END) AS listens,
+        SUM(CASE WHEN event_type='complete' THEN 1 ELSE 0 END) AS completes
+        FROM listening_events WHERE $where GROUP BY track_id ORDER BY listens DESC LIMIT 30");
+    $q->execute($args);
+    return $q->fetchAll();
+}
 function sf_listening_analytics(int $days=30,?int $userId=null): array {
     sf_ops_ensure_schema();$days=max(1,min(3650,$days));$since=gmdate('c',time()-$days*86400);$where='created_at>=?';$args=[$since];if($userId){$where.=' AND user_id=?';$args[]=$userId;}
     $pdo=sf_db();
@@ -87,7 +99,7 @@ function sf_listening_analytics(int $days=30,?int $userId=null): array {
     $q=$pdo->prepare("SELECT COUNT(*) FROM listening_events WHERE $where AND event_type='complete'");$q->execute($args);$completes=(int)$q->fetchColumn();
     $q=$pdo->prepare("SELECT COUNT(DISTINCT session_key) FROM listening_events WHERE $where");$q->execute($args);$sessions=(int)$q->fetchColumn();
     $q=$pdo->prepare("SELECT COUNT(DISTINCT CASE WHEN user_id IS NOT NULL THEN user_id END) FROM listening_events WHERE $where");$q->execute($args);$listeners=(int)$q->fetchColumn();
-    $q=$pdo->prepare("SELECT track_id,SUM(CASE WHEN event_type='start' THEN 1 ELSE 0 END) AS listens,SUM(CASE WHEN event_type='complete' THEN 1 ELSE 0 END) AS completes FROM listening_events WHERE $where AND event_type IN ('start','complete') GROUP BY track_id ORDER BY listens DESC LIMIT 30");$q->execute($args);$tracks=$q->fetchAll();
+    $tracks=sf_listening_track_rows($since,$userId);
     $map=sf_track_map();foreach($tracks as &$r){$r['title']=$map[$r['track_id']]['title']??$r['track_id'];$r['release']=$map[$r['track_id']]['release']??'';}unset($r);
     $q=$pdo->prepare("SELECT substr(created_at,1,10) AS day,SUM(CASE WHEN event_type='start' THEN 1 ELSE 0 END) AS listens,SUM(CASE WHEN event_type='complete' THEN 1 ELSE 0 END) AS completes FROM listening_events WHERE $where GROUP BY substr(created_at,1,10) ORDER BY day ASC");$q->execute($args);$daily=$q->fetchAll();
     return ['days'=>$days,'starts'=>$starts,'completes'=>$completes,'sessions'=>$sessions,'listeners'=>$listeners,'completion_rate'=>$starts?round($completes/$starts*100,1):0,'tracks'=>$tracks,'daily'=>$daily];

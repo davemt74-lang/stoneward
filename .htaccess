@@ -38,6 +38,10 @@ RewriteCond %{THE_REQUEST} \s/+index\.php(?:[?\s]) [NC]
 RewriteRule ^index\.php$ ./ [R=302,L]
 </IfModule>
 
+<IfModule mod_setenvif.c>
+SetEnvIf Request_URI "/api/agent-scene\.php$" no-gzip=1 no-brotli=1
+</IfModule>
+
 <IfModule mod_headers.c>
 Header always set X-Content-Type-Options "nosniff"
 Header always set X-Frame-Options "SAMEORIGIN"
@@ -46,7 +50,7 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
 Header always set Pragma "no-cache"
 Header always set Expires "0"
-Header always set X-Stonefellow-Build "1.3.245"
+Header always set X-Stonefellow-Build "1.3.294"
 </FilesMatch>
 </IfModule>
 

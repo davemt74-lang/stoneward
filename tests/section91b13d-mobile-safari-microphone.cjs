@@ -24,7 +24,7 @@ function voiceHarness(ios,engine){
   const context={
     isIOSVoiceBrowser:ios,voiceEngineKey:'stonefellow.voice.engine.v1.7',
     localStorage:{getItem:key=>key==='stonefellow.voice.engine.v1.7'?engine:null},
-    st:{conversationOn:false},voiceInteractionStarted:false,speechPilotActive:false,voiceGreetingArmed:false,
+    st:{conversationOn:false},voiceInteractionStarted:false,speechPilotActive:false,speechPilotEpoch:0,speechPilotReplyInProgress:false,voiceRepliesEnabled:true,voiceGreetingArmed:false,
     iosVoiceNeedsGesture:false,iosProcessedFinalIndex:-1,voiceTurnBusy:false,voicePlaybackPending:false,
     voiceSpeechGuard:{blocked:false},recognitionNetworkFailures:0,
     window:{STONEFELLOW_VOICE_ENGINE_BOOTSTRAP:engine,StonefellowSpeechEngine:{
@@ -79,9 +79,9 @@ check('Account preference is warmed ahead of mic clicks',()=>{
   assert.doesNotMatch(app,/await window\.StonefellowSpeechEngine\?\.isSelected/);
 });
 check('Neither iPhone nor desktop starts competing microphone monitoring during Agent speech',()=>{
-  assert.doesNotMatch(app,/conversationBargeIn\?\.start\(\)/);
-  assert.doesNotMatch(app,/conversationBargeIn\?\.prepare\(\)/);
-  assert.match(app,/conversationBargeIn\?\.stop\(\)/);
+  assert.doesNotMatch(app,/StonefellowBargeIn\?\.create\(/);
+  assert.doesNotMatch(app,/conversationBargeIn|voiceProbeMusicVolume/);
+  assert.match(app,/StonefellowBargeIn\?\.createSpeechGuard/);
 });
 function speechError(error,ios){
   let errorText='',stops=0;
@@ -90,10 +90,10 @@ function speechError(error,ios){
   const end=app.indexOf('    recognition.onend=',begin);
   assert.ok(end>begin,'error handler boundary');
   const context={
-    recognition:{},recognitionActive:true,st:{conversationOn:true},voiceTurnBusy:false,
+    recognition:{},recognitionActive:true,st:{conversationOn:true},voiceTurnBusy:false,speechPilotActive:false,iosVoiceNeedsGesture:false,
     isIOSVoiceBrowser:ios,
     stopConversation(){stops++},setVoiceInputActive(){},showTranscript(text){errorText=text},
-    scheduleConversationListen(){},recognitionNetworkFailures:0,Math
+    scheduleConversationListen(){throw Error("iPhone errors must wait for a tap")},updateConversationButton(){},recognitionNetworkFailures:0,Math
   };
   vm.createContext(context);
   vm.runInContext(app.slice(begin,end),context);
@@ -103,17 +103,22 @@ function speechError(error,ios){
 check('Speech service failure is not mislabeled microphone permission denial',()=>{
   const result=speechError('service-not-allowed',true);
   assert.equal(result.stops,1);
-  assert.match(result.errorText,/Safari speech recognition is unavailable/);
+  assert.match(result.errorText,/iPhone speech recognition is unavailable/);
   assert.match(result.errorText,/Microphone access may already be allowed/);
   assert.doesNotMatch(result.errorText,/Microphone permission denied/);
 });
 check('Speech input refusal explains ambiguity on iPhone',()=>{
   const result=speechError('not-allowed',true);
   assert.equal(result.stops,1);
-  assert.match(result.errorText,/does not necessarily mean/);
+  assert.match(result.errorText,/Check microphone access for this site/);
 });
 check('Audio capture failure gives actionable iPhone recovery',()=>{
   const result=speechError('audio-capture',true);
   assert.match(result.errorText,/Close other apps using the microphone/);
+});
+check('iPhone network errors wait for an explicit resume',()=>{
+  const result=speechError('network',true);
+  assert.equal(result.stops,0);
+  assert.match(result.errorText,/Resume Voice Chat/);
 });
 console.log('Section 91B13D mobile Safari microphone: '+passed+' passed');

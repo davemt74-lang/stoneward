@@ -17,8 +17,8 @@ test('Image Studio operations dashboard returns live job status, daily budget an
   assert.match(presets,/GROUP BY status/);
   assert.match(presets,/WHERE started_at>=\?/);
   assert.match(presets,/model_activity_30d/);
-  assert.match(presets,/today_remaining/);
-  assert.match(api,/'dashboard'=>sf_image_studio_dashboard\(\)/);
+  assert.match(presets,/sf_image_gen_user_quota\(\$adminId\)/);
+  assert.match(api,/'dashboard'=>sf_image_studio_dashboard\(\(int\)\$me\['id'\]\)/);
 });
 test('Seven named built-in presets cover music, Artist World, merch, marketing and site imagery',()=>{
   for(const slug of ['album_cover','song_moment','artist_world','social_promo','artist_portrait','merch_art','site_hero'])

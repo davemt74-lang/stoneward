@@ -84,7 +84,7 @@ with sync_playwright() as p:
     browser = launcher.launch(**launch)
     for width in (375, 1440):
         context = browser.new_context(
-            viewport={'width': width, 'height': 850}, reduced_motion='reduce',
+            viewport={'width': width, 'height': 850}, reduced_motion='reduce', has_touch=width < 720,
             user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1')
         page = context.new_page()
         errors = []
@@ -94,7 +94,7 @@ with sync_playwright() as p:
             page.add_style_tag(content=(ROOT / name).read_text())
         page.add_style_tag(content='body{margin:0}#target{min-height:780px}.sf-agent-landing{height:780px!important;min-height:780px!important}')
         page.evaluate('''() => {
-          window.recordings=0;window.mics=0;window.captures=0;
+          window.recordings=0;window.mics=0;window.captures=0;window.voiceStarts=0;
           window.gets=[];window.posts=[];window.pending=[];window.pendingReady=[];window.deferReady=false;
           window.interpretations=[];window.pendingInterpretations=[];window.navigations=[];
           window.fakeClock=0;window.playPosition=60;
@@ -122,7 +122,9 @@ with sync_playwright() as p:
             songLyricCorrected=command.replace(/^correct lyrics to /,'');
             updateSongExperience({corrected:songLyricCorrected});return 'Updated the listener-edited';
           };
-          window.response=value=>({ok:true,status:200,json:async()=>value});
+          // Match the real fetch response contract, including content-type
+          // headers used by the production JSON/stream transport selector.
+          window.response=value=>new Response(JSON.stringify(value),{status:200,headers:{'Content-Type':'application/json'}});
           window.ready=()=>response({ok:true,available:true,source:'saved-catalog-lyrics',max_seconds:90,source_fingerprint:'a'.repeat(64)});
           window.fetch=(url,options={})=>{
             if(String(url).includes('song-lyrics-section.php?')){
@@ -166,7 +168,7 @@ with sync_playwright() as p:
               shared_note_count:1,section_context}}));
           };
         }''')
-        for name in ('assets/js/agent-song-experience-ui.js', 'assets/js/agent-song-listening-skill.js',
+        for name in ('assets/js/agent-song-experience-ui.js',
                      'assets/js/agent-song-catalog-listening.js', 'assets/js/public-agent-canvas.js'):
             page.add_script_tag(content=(ROOT / name).read_text())
         # Execute the production app action/routing/receipt code, not a second
@@ -184,18 +186,41 @@ with sync_playwright() as p:
             mount:target=>SFSongExperienceUI.mount(target,songExperience&&{...songExperience,canAnalyze:!!currentSongDraft()},songExperienceAction)};
           SFPublicAgentCanvas.mount(document.querySelector('#target'),{audio,player:document.querySelector('#player'),
             isCapturing:()=>songListeningSkill.status().active,isVocalRecording:()=>false,
+            onStartChat:()=>{voiceStarts++},
             onListenInterpret:()=>void executeSongCaptureAction({type:'song_capture_live_start',interpret_on_stop:true}),
             onStopListening:()=>void executeSongCaptureAction({type:'song_capture_stop'})});
         }''')
         label = f'{BROWSER}/{width}'
-        before = page.locator('[data-orbit-action="listen"]').evaluate('(e)=>[e.style.left,e.style.top]')
-        page.locator('[data-orbit-action="listen"]').click(force=True)
+        lyric_button = page.locator('[data-orbit-action="listen"]')
+        voice_button = page.locator('[data-agent-action="start-chat"]')
+        def activate_control(control):
+            # The production orb intentionally fades its controls after idle.
+            # A slower browser may cross that deadline between assertions; use
+            # the same trusted orb activation a visitor uses before the action.
+            orb = page.locator('.sf-agent-sphere')
+            if orb.get_attribute('aria-expanded') == 'false':
+                (orb.tap if width < 720 else orb.click)()
+            control.wait_for(state='visible')
+            (control.tap if width < 720 else control.click)()
+
+        def open_song_lyrics():
+            activate_control(lyric_button)
+        check(lyric_button.get_attribute('aria-label') == 'Song Lyrics' and visible_text(lyric_button) == '',
+              label + ': Song Lyrics has an accessible ring icon without an extra label')
+        check('Start Voice Chat' in visible_text(voice_button), label + ': Voice Chat is a separate action')
+        for button in (lyric_button, voice_button):
+            box = button.bounding_box()
+            check(box and box['width'] >= 44 and box['height'] >= 44, label + ': labeled control has a 44px target')
+        activate_control(voice_button)
+        check(page.evaluate('voiceStarts===1&&gets.length===0'), label + ': Voice Chat does not open a lyric selection')
+        before = lyric_button.evaluate('(e)=>[e.style.left,e.style.top]')
+        open_song_lyrics()
         page.wait_for_function('songExperience?.phase === "capturing"')
         wait_open_rail(page, width)
-        check(page.evaluate('songListeningSkill.mode() === "catalog"'), label + ': iPhone UA uses server catalog path')
+        check(page.evaluate('songExperience.listening_mode === "catalog"'), label + ': iPhone UA uses server catalog path')
         check(page.locator('.sf-agent-page-rail[data-view="lyrics"]').is_visible(), label + ': opens existing lyric slideout')
         check(not page.locator('.sf-agent-panel').is_visible(), label + ': no duplicate recording panel')
-        check(page.evaluate('recordings===0&&mics===0&&captures===0&&posts.length===0'), label + ': selection starts without recording, microphone or paid request')
+        check(page.evaluate('recordings===0&&mics===0&&captures===0&&posts.length===0&&voiceStarts===1'), label + ': selection starts without recording, microphone or paid request')
         check(page.evaluate('gets.length===1&&gets[0].includes("source_ref=")'), label + ': readiness binds current player source')
         details = capture_evidence(page, width, 'selection')
         expected_phase = 'Selecting song section · Stop retrieves saved lyrics'
@@ -224,9 +249,10 @@ with sync_playwright() as p:
         check(not page.locator('.sf-agent-page-rail').is_visible(), label + ': completion does not force the slideout open')
         check(not page.locator('[data-agent-action="stop-lyrics"]').is_visible(), label + ': Stop clears on completion')
         check(page.evaluate('currentSongSource()===songLyricDraft&&currentSongDraft()===songLyricDraft'), label + ': catalog receipt integrates with existing draft gates')
-        page.locator('[data-agent-action="open-lyrics"]').click()
+        open_song_lyrics()
         wait_open_rail(page, width)
         check('Words from the selected song' in visible_text(page.locator('.sf-agent-lyric-workspace')), label + ': reopening displays completed lyric draft')
+        check(page.get_by_role('button', name='New section').is_visible(), label + ': new selections start from the reopened lyric rail')
         check(page.evaluate('interpretations.length===0&&posts.length===1'), label + ': completion never auto-interprets or repeats the lookup')
         workspace = page.locator('.sf-agent-lyric-workspace')
         context_details = workspace.locator('.song-experience-context')
@@ -267,7 +293,7 @@ with sync_playwright() as p:
               label + ': a same-track source replacement discards late context and interpretation')
         page.evaluate('st.track.audio="api/media.php?id=M123"')
         page.keyboard.press('Escape')
-        page.locator('[data-orbit-action="listen"]').click(force=True)
+        open_song_lyrics()
         page.wait_for_function('songExperience?.phase === "capturing"')
         wait_open_rail(page, width)
         page.locator('.sf-agent-page-rail [data-agent-action="close-page"]').click()
@@ -277,7 +303,7 @@ with sync_playwright() as p:
         page.locator('[data-agent-action="stop-lyrics"]').click()
         page.wait_for_function('!songListeningSkill.status().active')
         check(page.evaluate('songExperience.phase==="discarded"&&songExperience.message.includes("No audio was sent and no transcription was charged")'), label + ': Stop waiting discards the read-only lookup')
-        page.locator('[data-orbit-action="listen"]').click(force=True)
+        open_song_lyrics()
         page.wait_for_function('songExperience?.phase === "capturing"')
         wait_open_rail(page, width)
         request_id = page.evaluate('songExperience.request_id')
@@ -289,7 +315,7 @@ with sync_playwright() as p:
         check(page.evaluate('posts.length===2'), label + ': seek discards selection without submitting')
         page.keyboard.press('Escape')
         page.evaluate('deferReady=true')
-        page.locator('[data-orbit-action="listen"]').click(force=True)
+        open_song_lyrics()
         page.wait_for_function('songExperience?.phase === "starting"')
         wait_open_rail(page, width)
         page.locator('.sf-agent-lyric-workspace button', has_text='Stop').click()
@@ -298,7 +324,7 @@ with sync_playwright() as p:
         page.wait_for_timeout(20)
         check(page.evaluate('posts.length===2&&songExperience.phase!=="capturing"'), label + ': Stop during readiness prevents a later start')
         check(page.evaluate('recordings===0&&mics===0&&captures===0'), label + ': all mobile paths leave Record Clip and microphone untouched')
-        page.evaluate('SFPublicAgentCanvas.closePage(true);SFPublicAgentCanvas.unmount();catalogSongListeningSkill.destroy()')
+        page.evaluate('SFPublicAgentCanvas.closePage(true);SFPublicAgentCanvas.unmount();songListeningSkill.destroy()')
         check(page.locator('.sf-agent-modal-layer').count() == 0, label + ': unmount removes sidebar portal')
         check(not errors, label + ': no browser JavaScript exceptions: ' + str(errors))
         context.close()

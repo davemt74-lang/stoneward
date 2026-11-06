@@ -35,11 +35,11 @@ check('The plus navigation rail uses a translucent photographic overlay, not a f
   assert.match(site,/body\.sf-agent-canvas-active \.chat-quick-menu button\{/);
   assert.match(site,/text-shadow:0 1px 5px/);
 });
-check('Start Chat begins voice listening and hides while an active microphone is listening',()=>{
+check('Start Voice Chat begins voice listening and hides while an active microphone is listening',()=>{
   assert.match(canvas,/class="sf-agent-chat-start" data-agent-action="start-chat"/);
   assert.doesNotMatch(canvas,/class="sf-agent-player-reveal"/);
   assert.match(canvas,/chatStart\.hidden=active/);
-  assert.match(canvas,/Resume Chat':'◉ Start Chat'/);
+  assert.match(canvas,/Resume Voice Chat':'◉ Start Voice Chat'/);
   assert.match(canvas,/if\(action==='start-chat'\)options\.onStartChat\?\.\(\)/);
   assert.match(app,/onStartChat:\(\)=>\{beginWelcome\(\);if\(!st\.conversationOn\|\|iosVoiceNeedsGesture\)void handleVoiceClick\(\);\}/);
   assert.match(app,/SFPublicAgentCanvas\?\.syncVoice\?\.\(\)/);
@@ -51,7 +51,7 @@ check('iOS stays on one continuous recognition session through thinking and spee
   assert.match(app,/if\(!isIOSVoiceBrowser\)\{\s*try\{recognition\?\.abort\(\)\}/);
   assert.match(app,/voiceTurnBusy\|\|isIOSVoiceBrowser\)return;/);
   assert.match(app,/if\(isIOSVoiceBrowser&&st\.conversationOn&&iosVoiceNeedsGesture\)/);
-  assert.match(app,/Microphone paused · tap Start Chat to resume/);
+  assert.match(app,/Microphone paused · tap Resume Voice Chat/);
 });
 check('Continuous speech consumes new final segments once and ignores Agent echo',()=>{
   const begin=app.indexOf('    recognition.onresult=e=>{');
@@ -59,7 +59,7 @@ check('Continuous speech consumes new final segments once and ignores Agent echo
   assert.ok(begin>0&&end>begin);
   const seen=[],captions=[];
   const ctx={
-    recognition:{},st:{conversationOn:true,playing:false},voiceTurnBusy:false,
+    recognition:{},st:{conversationOn:true,playing:false},voiceTurnBusy:false,speechPilotActive:false,
     voicePlaybackPending:false,voiceSpeechGuard:{blocked:false,reference:''},
     isIOSVoiceBrowser:true,iosVoiceMuteUntil:0,iosProcessedFinalIndex:-1,
     recognitionNetworkFailures:0,setVoiceInputActive:()=>{},
@@ -118,7 +118,7 @@ check('iOS end needs a real tap instead of requesting permission in a timer',()=
   assert.ok(begin>0&&end>begin);
   let schedules=0,updates=0;
   const ctx={
-    recognition:{},recognitionActive:true,st:{conversationOn:true},
+    recognition:{},recognitionActive:true,st:{conversationOn:true},speechPilotActive:false,
     isIOSVoiceBrowser:true,voiceTurnBusy:false,voicePlaybackPending:false,
     iosVoiceNeedsGesture:false,recognitionNetworkFailures:0,
     setVoiceInputActive:()=>{},scheduleConversationListen:()=>schedules++,

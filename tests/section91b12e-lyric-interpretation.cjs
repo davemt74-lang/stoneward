@@ -21,11 +21,10 @@ const scope={window:{},document:{createElement:tag=>new Element(tag)}};
 vm.runInNewContext(read('assets/js/agent-song-experience-ui.js'),scope);
 const mount=scope.window.SFSongExperienceUI.mount;
 const target=new Element('div');
-check('An opted-in live session advertises review before interpretation',()=>{
+check('A saved lyric selection advertises lookup rather than live transcription',()=>{
   mount(target,{title:'Earth Girl',phase:'capturing',start_ms:2500,end_ms:null,
-    live_enabled:true,auto_interpret:true,reports:[]},()=>{});
-  assert.match(target.textContent,/live lyrics → review before interpretation/);
-  assert.match(target.textContent,/Stop listening/);
+    listening_mode:'catalog',lyrics_source:'saved-catalog-lyrics',auto_interpret:true,reports:[]},()=>{});
+  assert.match(target.textContent,/Stop retrieves saved lyrics/);
   assert.doesNotMatch(target.textContent,/Start live transcription/);
 });
 check('Interpretation exposes approved writer-source provenance and unverified lyric disclaimer',()=>{
@@ -54,7 +53,7 @@ check('Quick links form a vertical mesh-overlay rail without modal, title, or re
   assert.match(css,/\.chat-quick-menu button::before/);
   assert.match(css,/\.chat-quick-menu button::after/);
 });
-check('Listen & Interpret and Record Clip are independent orb actions',()=>{
+check('Song Lyrics and Record Clip are independent orb actions',()=>{
   const canvas=read('assets/js/public-agent-canvas.js'),app=read('assets/js/app.js');
   assert.match(canvas,/data-agent-action="listen-interpret"/);
   assert.match(canvas,/data-agent-action="capture"/);

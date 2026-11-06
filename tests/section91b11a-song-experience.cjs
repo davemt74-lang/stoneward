@@ -34,12 +34,21 @@ check('A captured excerpt stays visible and offers a deliberate transcription ac
   host.all('button').find(b=>b.textContent==='Transcribe excerpt').listeners.click();
   assert.deepEqual(actions,[['transcribe']]);
 });
-check('The live listening state offers Stop without auto-transcribing',()=>{
-  actions=[];mount(host,{...base,phase:'capturing',end_ms:null},onAction);
-  assert.match(host.textContent,/Listening now/);
-  assert.match(host.textContent,/Stop listening/);
+check('The catalog selection offers Stop without starting a recording or transcription',()=>{
+  actions=[];mount(host,{...base,phase:'capturing',listening_mode:'catalog',end_ms:null},onAction);
+  assert.match(host.textContent,/Selecting song section · Stop retrieves saved lyrics/);
+  assert.ok(host.all('button').some(b=>b.textContent==='Stop'));
   assert.doesNotMatch(host.textContent,/Transcribe excerpt/);
   assert.equal(actions.length,0);
+});
+check('Record Clip has its own recording state and Stop control',()=>{
+  actions=[];mount(host,{...base,phase:'capturing',listening_mode:'record_clip',end_ms:null},onAction);
+  assert.match(host.textContent,/Recording song clip/);
+  const stop=host.all('button').find(b=>b.textContent==='Stop recording');
+  assert.ok(stop);
+  assert.equal(actions.length,0);
+  stop.listeners.click();
+  assert.deepEqual(actions,[['stop']]);
 });
 const transcript='First line <script>alert(1)</script>\nAnother line';
 check('Unverified lyrics are rendered literally, labeled and not automatically analyzed',()=>{

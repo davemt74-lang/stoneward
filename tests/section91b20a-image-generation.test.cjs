@@ -39,12 +39,11 @@ test('Saved prompts require a unique request key and separate paid approval',()=
   assert.match(ui,/Generate · paid API request/);
   assert.match(ui,/pendingDraft/);
 });
-test('A shared daily lock and compare-and-set prevent concurrent duplicate jobs',()=>{
-  assert.match(core,/image_generation_daily_locks/);
-  assert.match(core,/SELECT day FROM image_generation_daily_locks WHERE day=\? FOR UPDATE/);
-  assert.match(core,/UPDATE image_generation_jobs SET status='generating',started_at=/);
+test('The account lock and compare-and-set prevent concurrent duplicate jobs',()=>{
+  assert.match(core,/SELECT role,status FROM users WHERE id=\?'.*' FOR UPDATE'/);
+  assert.match(core,/UPDATE image_generation_jobs SET status='generating',started_at=\?,started_by=\?/);
   assert.match(core,/\$q->rowCount\(\)!==1/);
-  assert.match(core,/Daily paid-generation limit reached/);
+  assert.match(core,/Your daily paid-generation limit has been reached/);
 });
 test('Generated image bytes are validated, capped, and stored in private managed media',()=>{
   assert.match(core,/base64_decode\(\$base64,true\)/);
@@ -90,18 +89,18 @@ test('SQLite schema implements immutable approvals and status compare-and-set',(
   const db=new DatabaseSync(':memory:');
   const schema=core.match(/if\(\$sqlite\)\$pdo->exec\("(CREATE TABLE IF NOT EXISTS image_generation_jobs \([\s\S]*?\))"\);/);
   assert.ok(schema,'SQLite job schema must be extractable');
+  db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY); INSERT INTO users VALUES(1),(2)');
   db.exec(schema[1]);
-  db.exec('CREATE TABLE image_generation_daily_locks(day TEXT PRIMARY KEY)');
   db.prepare(`INSERT INTO image_generation_jobs(request_key,created_by,prompt,model,size,quality,status,usage_json,created_at,updated_at)
     VALUES(?,?,?,?,?,?,'draft','{}',?,?)`).run('b6fceea3-2c6a-491d-aa2e-fabc63271015',1,'Cinematic image concept testing strict approval','gpt-image-2.5-flare','1536x1024','medium','2026-11-02T00:00:00','2026-11-02T00:00:00');
   const approve=db.prepare("UPDATE image_generation_jobs SET status='approved',prompt_approved_by=?,updated_at=? WHERE id=? AND status='draft'");
   assert.equal(approve.run(1,'2026-11-02T00:01:00',1).changes,1);
   assert.equal(approve.run(1,'2026-11-02T00:01:01',1).changes,0);
-  const run=db.prepare("UPDATE image_generation_jobs SET status='generating',started_at=?,updated_at=? WHERE id=? AND status='approved' AND prompt_approved_by IS NOT NULL");
-  assert.equal(run.run('2026-11-02T00:02:00','2026-11-02T00:02:00',1).changes,1);
-  assert.equal(run.run('2026-11-02T00:02:00','2026-11-02T00:02:00',1).changes,0);
+  const run=db.prepare("UPDATE image_generation_jobs SET status='generating',started_at=?,started_by=?,updated_at=? WHERE id=? AND status='approved' AND prompt_approved_by IS NOT NULL");
+  assert.equal(run.run('2026-11-02T00:02:00',2,'2026-11-02T00:02:00',1).changes,1);
+  assert.equal(run.run('2026-11-02T00:02:00',1,'2026-11-02T00:02:00',1).changes,0);
   assert.throws(()=>db.prepare(`INSERT INTO image_generation_jobs(request_key,created_by,prompt,model,size,quality,status,usage_json,created_at,updated_at) VALUES(?,?,?,?,?,?,'draft','{}',?,?)`)
     .run('b6fceea3-2c6a-491d-aa2e-fabc63271015',1,'Duplicate','gpt-image-2.5-flare','1536x1024','medium','x','x'));
-  const count=db.prepare('SELECT COUNT(*) n FROM image_generation_jobs WHERE started_at>=?').get('2026-11-02T00:00:00');
+  const count=db.prepare('SELECT COUNT(*) n FROM image_generation_jobs WHERE started_by=? AND started_at>=?').get(2,'2026-11-02T00:00:00');
   assert.equal(count.n,1);db.close();
 });

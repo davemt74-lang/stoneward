@@ -3,6 +3,9 @@ declare(strict_types=1);
 require_once __DIR__.'/claude-model-routing.php';
 
 const SF_AI_SECRET_CONFIG = SF_ROOT . '/config/app-secret.php';
+const SF_AI_CODING_MODEL_LIMIT = 16;
+
+final class SfAiCanvasModelUnavailable extends InvalidArgumentException {}
 
 function sf_ai_providers(): array {
     return [
@@ -100,9 +103,52 @@ function sf_ai_provider_public(string $provider): array {
     return ['provider'=>$provider,'label'=>$def['label'],'kind'=>$def['kind'],'enabled'=>(bool)($r['enabled']??false),'key_configured'=>!empty($r['secret_payload']),'key_hint'=>(string)($r['key_hint']??''),'model'=>(string)($r['model']??''),'voice_id'=>(string)($r['voice_id']??''),'endpoint_url'=>(string)($r['endpoint_url']??''),'updated_at'=>(string)($r['updated_at']??''),'last_verified_at'=>$r['last_verified_at']??null,'last_status'=>(string)($r['last_status']??'')];
 }
 
+function sf_ai_coding_model_id_valid(mixed $model): bool {
+    return is_string($model)&&preg_match('/\A[A-Za-z0-9][A-Za-z0-9._:-]{0,159}\z/',$model)===1;
+}
+
+function sf_ai_saved_coding_models(): array {
+    $stored=sf_ai_meta_get('ai.coding_models');
+    if($stored==='')return [];
+    $models=json_decode($stored,true);
+    return is_array($models)?$models:['openai'=>[],'anthropic'=>[]];
+}
+
+function sf_ai_coding_models(array $providers,array $routing): array {
+    $defaults=[
+        'openai'=>[trim($providers['openai']['model'])?:'gpt-6-luna'],
+        'anthropic'=>[trim($providers['anthropic']['model']),$routing['claude_fast_model'],$routing['claude_reasoning_model']],
+    ];
+    $saved=sf_ai_saved_coding_models();
+    $models=[];
+    foreach($defaults as $provider=>$list){
+        $entries=array_key_exists($provider,$saved)?(array)$saved[$provider]:$list;
+        $models[$provider]=array_values(array_unique(array_filter($entries,'sf_ai_coding_model_id_valid')));
+    }
+    return $models;
+}
+
+/** Validate the whole change before the routing endpoint writes any settings. */
+function sf_ai_validate_coding_models(mixed $input): array {
+    $providers=['openai'=>[],'anthropic'=>[]];
+    if(!is_array($input)||array_diff_key($input,$providers))
+        throw new InvalidArgumentException('Choose coding model lists for OpenAI or Anthropic.');
+    if(!$input)return $providers;
+    foreach($input as $provider=>$models){
+        if(!is_array($models)||!array_is_list($models)||count($models)>SF_AI_CODING_MODEL_LIMIT)
+            throw new InvalidArgumentException('Enter up to '.SF_AI_CODING_MODEL_LIMIT.' coding model IDs per provider.');
+        foreach($models as $model){
+            if(!sf_ai_coding_model_id_valid($model))
+                throw new InvalidArgumentException('Enter exact coding model IDs using letters, numbers, dots, colons, hyphens or underscores.');
+        }
+        $input[$provider]=array_values(array_unique($models));
+    }
+    return $input;
+}
+
 function sf_ai_state(): array {
     sf_ai_ensure_schema();$providers=[];foreach(array_keys(sf_ai_providers()) as $p)$providers[$p]=sf_ai_provider_public($p);
-    return ['providers'=>$providers,'routing'=>[
+    $routing=[
         'preferred_llm'=>sf_ai_meta_get('ai.preferred_llm','openai'),
         'fallback_enabled'=>sf_ai_meta_get('ai.fallback_enabled','1')==='1',
         'voice_provider'=>sf_ai_meta_get('ai.voice_provider','elevenlabs'),
@@ -111,7 +157,9 @@ function sf_ai_state(): array {
         'claude_mode'=>sf_claude_effective_mode(sf_ai_meta_get('ai.claude_mode',''),(string)($providers['anthropic']['model']??'')),
         'claude_fast_model'=>sf_ai_meta_get('ai.claude_fast_model',SF_CLAUDE_FAST_MODEL),
         'claude_reasoning_model'=>sf_ai_meta_get('ai.claude_reasoning_model',SF_CLAUDE_REASONING_MODEL)
-    ]];
+    ];
+    $routing['coding_models']=sf_ai_coding_models($providers,$routing);
+    return ['providers'=>$providers,'routing'=>$routing];
 }
 
 function sf_ai_save_provider(string $provider,array $data): array {
@@ -140,6 +188,7 @@ function sf_ai_save_routing(array $data): array {
     if(!in_array($mode,['auto','manual'],true))throw new InvalidArgumentException('Choose automatic or manual Claude model routing.');
     $fast=sf_claude_model_choice((string)($data['claude_fast_model']??$current['claude_fast_model']));
     $reasoning=sf_claude_model_choice((string)($data['claude_reasoning_model']??$current['claude_reasoning_model']));
+    $codingModels=array_key_exists('coding_models',$data)?sf_ai_validate_coding_models($data['coding_models']):null;
     sf_ai_meta_set('ai.preferred_llm',$preferred);
     sf_ai_meta_set('ai.fallback_enabled',!empty($data['fallback_enabled'])?'1':'0');
     sf_ai_meta_set('ai.voice_provider',$voice);
@@ -148,6 +197,7 @@ function sf_ai_save_routing(array $data): array {
     sf_ai_meta_set('ai.claude_mode',$mode);
     sf_ai_meta_set('ai.claude_fast_model',$fast);
     sf_ai_meta_set('ai.claude_reasoning_model',$reasoning);
+    if($codingModels!==null)sf_ai_meta_set('ai.coding_models',json_encode($codingModels+sf_ai_saved_coding_models(),JSON_THROW_ON_ERROR));
     return sf_ai_state()['routing'];
 }
 
@@ -159,16 +209,46 @@ function sf_ai_resolve_llm(): ?array {
     return sf_ai_llm_candidates('chat')[0]??null;
 }
 
+function sf_ai_llm_candidate(array $row): ?array {
+    if(empty($row['enabled'])||empty($row['secret_payload']))return null;
+    return ['provider'=>(string)$row['provider'],'api_key'=>sf_ai_decrypt((string)$row['secret_payload']),
+        'model'=>(string)($row['model']??''),'endpoint_url'=>(string)($row['endpoint_url']??'')];
+}
 
 function sf_ai_llm_candidates(string $workload='chat'): array {
     $state=sf_ai_state();$first=$state['routing']['preferred_llm'];$order=[$first];if($state['routing']['fallback_enabled'])$order[]=($first==='openai'?'anthropic':'openai');$out=[];
     foreach(array_unique($order) as $provider){
-        $r=sf_ai_provider_row($provider);if(empty($r['enabled'])||empty($r['secret_payload']))continue;
-        $candidate=['provider'=>$provider,'api_key'=>sf_ai_decrypt((string)$r['secret_payload']),
-           'model'=>(string)($r['model']??''),'endpoint_url'=>(string)($r['endpoint_url']??'')];
+        $candidate=sf_ai_llm_candidate(sf_ai_provider_row($provider));
+        if($candidate===null)continue;
         $out[]=sf_claude_choose_model($candidate,$state['routing'],$workload);
     }
     return $out;
+}
+
+/** The browser receives only configured model IDs and their provider names. */
+function sf_ai_canvas_model_options(): array {
+    $state=sf_ai_state();
+    $options=[];
+    foreach($state['routing']['coding_models'] as $provider=>$models){
+        $row=$state['providers'][$provider];
+        if(!$row['enabled']||!$row['key_configured'])continue;
+        foreach($models as $model)$options[]=['provider'=>$provider,'model'=>$model];
+    }
+    return $options;
+}
+
+function sf_ai_canvas_llm_candidates(?array $selection=null): array {
+    if($selection===null)return sf_ai_llm_candidates('chat');
+    $provider=$selection['provider']??null;
+    $model=$selection['model']??null;
+    $message='That coding model is no longer available. Choose another model or use Default.';
+    $models=sf_ai_state()['routing']['coding_models'];
+    if(!is_string($provider)||!isset($models[$provider])||!is_string($model)||!in_array($model,$models[$provider],true))
+        throw new SfAiCanvasModelUnavailable($message);
+    $candidate=sf_ai_llm_candidate(sf_ai_provider_row($provider));
+    if($candidate===null)throw new SfAiCanvasModelUnavailable($message);
+    $candidate['model']=$model;
+    return [$candidate];
 }
 function sf_ai_resolve_decision(): ?array {
     if(sf_ai_meta_get('ai.decision_provider','none')!=='jev')return null;$r=sf_ai_provider_row('jev');if(empty($r['enabled'])||empty($r['secret_payload']))return null;return ['provider'=>'jev','api_key'=>sf_ai_decrypt((string)$r['secret_payload']),'model'=>(string)($r['model']??''),'endpoint_url'=>(string)($r['endpoint_url']??'')];

@@ -1,13 +1,18 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/api/agent-orchestration.php';
+require_once dirname(__DIR__).'/api/agent-canvas-data.php';
 $registry=sf_agent_tool_registry();$defs=sf_agent_skill_definitions();
 $public=sf_agent_skill_inventory('public');
 $customer=sf_agent_skill_inventory('customer');
 $admin=sf_agent_skill_inventory('admin');
 $tools=fn(array $skills): array=>array_column($skills,'tool_id');
+$discoverable=array_merge(array_column($defs,'tool'),array_keys(sf_canvas_capability_cards()));
+$nonInternal=array_keys(array_filter($registry,fn(array $tool): bool=>$tool['kind']!=='internal'));
+sort($discoverable);
+sort($nonInternal);
 $checks=[
- 'Every non-internal tool has one skill manifest'=>count($registry)===count($defs)+1 && count(array_unique(array_column($defs,'tool')))==count($defs),
+ 'Every non-internal tool has one chat skill or canvas data manifest'=>$discoverable===$nonInternal,
  'No internal audit skill'=>!in_array('agent_brain_log',array_column($defs,'tool'),true),
  'Public inventory contains published/queue/public-artist reads, page navigation and audio playback'=>count($public)===7
     && in_array('public_artist_facts',$tools($public),true)

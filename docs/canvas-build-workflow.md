@@ -1,0 +1,42 @@
+# Canvas build workflow API
+
+The public builder saves its first approved custom canvas as a candidate. It keeps the currently displayed canvas while an isolated browser probe, the Testing agent, and any required Repair agent steps work on that candidate. Saving a candidate does not mean it passed testing or was applied. New model-built managed candidates persist `workflow_required:true`, so a reload before workflow start cannot turn an untested saved candidate into a live canvas. Older scenes retain their existing behavior and omit this marker.
+
+All requests use the current signed-in account. POST requests require the existing CSRF header. The server binds the workflow to an original approved project, its original build request ID, its saved result and its privacy epoch. The browser cannot supply replacement code or change the approved project through this API.
+
+`api/canvas-build-workflow.php` returns `{ok:true,workflow,scene?}`. `scene` is the currently owned candidate with fresh image and dataset delivery, not an instruction to apply it. The client applies it only when the workflow is ready and its operation/account guards remain current.
+
+| Method/action | Required inputs | Behavior |
+| --- | --- | --- |
+| POST `start` | `request_id`, `scene_id` | Starts or resumes the workflow for the original approved custom build. |
+| GET or POST `status` | `request_id` | Reads only this account's durable state and role logs. |
+| POST `review` | `request_id`, `step_id`, `candidate_scene_id`, `evidence` | Reviews the exact candidate using bounded browser observations and static model assessment. |
+| POST `repair` | `request_id`, `step_id`, `review_id` | Repairs the current server-owned candidate and current Testing report within the original scope. |
+| POST `cancel` | `request_id` | Stops the workflow and its persisted active repair request; it also covers Stop arriving before workflow start when the original build request is already known to the server. |
+| POST `apply` | `request_id`, `scene_id` | Authorizes the terminal application commit for the exact ready candidate. The browser awaits this acknowledgment and checks its active operation before mounting it. |
+
+`request_id` and each `step_id` are lowercase 32-character hex IDs. Reuse a step ID only to recover the identical action. A simultaneous duplicate reads its existing running state, and a completed replay returns stored results without another provider call or charge. New actions use new step IDs. Stale candidates, reports, and changed action payloads return HTTP 409.
+
+The durable states are `testing`, `reviewing`, `needs_repair`, `repairing`, `ready`, `needs_attention`, `failed`, `canceled`, and `applied`. A Testing verdict of `manual` requires attention. A Repair result that changes neither HTML/CSS/JavaScript nor agent design/palette also requires attention. These are content and evidence conditions; there is no phase deadline or retry-count rule.
+
+The workflow DTO includes `candidate_id` (also `candidate_scene_id`), `original_scene_id`, `proposal_id`, the immutable `project`, `current_step_id`, `review_id`, `steps`, and `total_active_tokens_used`. Each role step includes its ID, role (`coding`, `testing`, `repair`), state, candidate/result IDs, structured observations/report, provider usage, and Active Token receipt. Coding usage comes from the original server build receipt. Testing and Repair usage is committed atomically with their result, exactly once. Provider reservation keys and internal fingerprints are not exposed.
+
+`sf_canvas_build_workflow_for_scene(user_id, scene_id)` reads the latest owned workflow associated with an original, intermediate, or current saved candidate without initializing optional storage. Scene-history responses can include this DTO as top-level `workflow`. Reopening an older candidate, any workflow outside `ready`/`applied`, or a `workflow_required:true` candidate with no workflow must display saved source and role logs while keeping the current live canvas. Only a scene whose ID equals the workflow's current candidate and whose state is `ready` or `applied` may be displayed. Reading history never starts a new Testing/Repair call. `applied` records server authorization; successful rendering remains a client observation, not a server claim.
+
+Free image and metadata edits may persist a host-only `verification_parent_id` equal to their actual revision parent. `sf_canvas_build_workflow_verified_derivative(user_id, scene)` follows only those owned links. Every generation must have exactly unchanged JavaScript and identical HTML/CSS after replacing only `sf-image-` asset binding IDs. A legacy ancestor with no workflow, or the exact current `ready`/`applied` workflow ancestor, can supply verification; an untested model scene, known failed workflow, changed code, missing parent or cycle cannot. The read-only helper returns `{verified:true,source_scene_id,request_id?}` for the qualifying ancestor, otherwise null. Scene responses expose it as top-level `verification`; verified free derivatives can open without another paid Testing call. New model output has no verification-parent link.
+
+Repair can change the current candidate but cannot change the original user brief, explicit model, selected resources or source scope, obtain fresh approval implicitly, generate additional images, or replace the visible canvas. It reuses the candidate's authorized images. A repaired candidate must be tested again before it becomes ready.
+
+For streamed Repair output, send `Accept: application/x-ndjson`; source events use the existing `concept`, `delta`, `retry`, and final `result`/`error` envelope. Testing can run as a normal JSON request while the client polls status independently. PHP session locks are released before model calls so Stop and status requests can proceed.
+
+Privacy export includes owner-scoped workflow and role records. Clearing Agent history or closing an account purges jobs and steps. Every active step, reservation callback, atomic settlement and failure callback is bound to the worker's captured privacy epoch and candidate. A late worker cannot alter a fresh workflow even if the original request and step IDs are deliberately reused after clearing.
+
+## Sidebar and browser verification
+
+The existing Coding Agent sidebar has Project, Coding, Testing, and Repair tabs. Project shows the approved brief, selected resources, current stage, and total usage. Role tabs show source, observed test results, findings, and usage receipts. These are project records and generated code, not private model reasoning. Stop Agent cancels the entire active project. Hiding the orb does not stop this workflow. On page load, saved records restore silently and the code rail stays closed until the footer Code button is opened.
+
+The browser probe uses the production renderer in an opaque sandbox, with candidate-scoped, read-only catalog, image, and audio access. It observes startup, resource loading, and runtime errors without issuing host playback commands or pretending to tap controls. The Testing agent receives those observations together with the saved source and approved brief. User gestures, audible playback, and device-specific behavior remain explicitly identified as manual checks. A passing assessment covers the observed and reviewed behavior; it does not claim those manual interactions were performed.
+
+The test preview instruments JavaScript loops and function entries with an execution guard so ordinary runaway scripts can return incomplete evidence while the parent UI remains responsive. The guard changes only the isolated preview; saved and live code remain unchanged. Unsupported dynamic scope is rejected before execution. Exhausted or unsupported probes require attention rather than a fabricated pass or automatic repair loop. This is not separate-process CPU isolation and cannot preempt every native browser operation. It introduces no wall-clock build deadline, model idle deadline, or repair-count limit.
+
+A replacement is mounted only after testing is ready, the server acknowledges application of that exact candidate, and the client rechecks the current account and Stop state. Failed, canceled, incomplete, intermediate, and untested candidates stay available as source and project records without replacing the live canvas or being executed through History. Restoring a saved scene never starts a paid agent call.

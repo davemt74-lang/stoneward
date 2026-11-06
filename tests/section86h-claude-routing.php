@@ -30,6 +30,9 @@ verify(sf_claude_model_choice('claude-sonnet-5-5')==='claude-sonnet-5-5','Sonnet
 verify(invalid(fn()=>sf_claude_model_choice('unexpected-model')),'Unknown auto-selected models fail closed');
 verify(sf_claude_effective_mode('','claude-sonnet-4-6')==='manual','Legacy configured Claude model is preserved');
 verify(sf_claude_effective_mode('','')==='auto','Fresh configuration uses automatic model routing');
+verify(sf_ai_state()['routing']['coding_models']===['openai'=>['gpt-6-luna'],
+    'anthropic'=>[SF_CLAUDE_FAST_MODEL,SF_CLAUDE_REASONING_MODEL]]&&sf_ai_canvas_model_options()===[],
+    'Initial coding choices derive from the existing defaults and require configured providers to appear');
 verify(sf_claude_workload_for_plan(['route'=>'general_conversation','context_profile'=>'catalog'])==='chat','Everyday conversation selects fast tier');
 verify(sf_claude_workload_for_plan(['route'=>'knowledge_question','context_profile'=>'knowledge'])==='reasoning','Knowledge answer selects reasoning tier');
 verify(sf_claude_workload_for_plan(['route'=>'general_conversation','context_profile'=>'account'])==='reasoning','Account-relevant context selects reasoning tier');
@@ -80,8 +83,54 @@ $ordered=sf_ai_llm_candidates('agent_brain');
 verify($ordered[0]['provider']==='openai'&&$ordered[0]['model']==='gpt-6'&&
     $ordered[1]['provider']==='anthropic'&&$ordered[1]['model']==='claude-sonnet-5-5',
     'OpenAI preference and Claude fallback remain intact');
+verify(sf_ai_canvas_llm_candidates()===sf_ai_llm_candidates('chat')&&
+    array_column(sf_ai_canvas_llm_candidates(),'provider')===['openai','anthropic'],
+    'Default canvas generation keeps existing chat model order and fallback');
+verify(sf_ai_state()['routing']['coding_models']===['openai'=>['gpt-6'],
+    'anthropic'=>['claude-sonnet-4-6',SF_CLAUDE_FAST_MODEL,SF_CLAUDE_REASONING_MODEL]],
+    'Unedited coding lists inherit current provider settings and Claude tier choices');
+
+$codingRoute=['preferred_llm'=>'openai','fallback_enabled'=>false,'voice_provider'=>'none','decision_provider'=>'none'];
+$fineTune='ft:gpt-custom:organization:coding-id';
+$codingModel='claude-coding-custom-20261031';
+$openaiOption=['provider'=>'openai','model'=>$fineTune];
+$claudeOption=['provider'=>'anthropic','model'=>$codingModel];
+$set=sf_ai_save_routing($codingRoute+['coding_models'=>['openai'=>[$fineTune,$fineTune],'anthropic'=>[$codingModel]]]);
+verify($set['coding_models']===['openai'=>[$fineTune],'anthropic'=>[$codingModel]],
+    'Admin saves custom exact coding model IDs in order and deduplicates each list');
+verify(sf_ai_canvas_model_options()===[$openaiOption,$claudeOption],
+    'Public coding options expose only provider and model for every enabled keyed provider regardless of routing preference');
+$selected=sf_ai_canvas_llm_candidates($claudeOption);
+verify(count($selected)===1&&$selected[0]['provider']==='anthropic'&&$selected[0]['model']===$codingModel&&
+    $selected[0]['api_key']==='sk-ant-test-only-not-real-key'&&
+    array_column(sf_ai_canvas_llm_candidates(),'model')===['gpt-6'],
+    'Explicit coding selection uses the exact configured provider credentials with no fallback and keeps chat separate');
+verify(invalid(fn()=>sf_ai_canvas_llm_candidates(['provider'=>'anthropic','model'=>strtoupper($codingModel)])),
+    'Explicit coding selection requires an exact case-sensitive model match');
+
+$before=sf_ai_state()['routing'];
+foreach([null,['jev'=>['some-id']],['openai'=>['wrong id']],['openai'=>['slot'=>'gpt-6']],
+    ['openai'=>array_fill(0,SF_AI_CODING_MODEL_LIMIT+1,'gpt-6')]] as $invalidModels){
+    verify(invalid(fn()=>sf_ai_save_routing(['preferred_llm'=>'anthropic','coding_models'=>$invalidModels]))&&
+        sf_ai_state()['routing']===$before,'Invalid coding lists cannot partially change routing settings');
+}
+$partial=sf_ai_save_routing($codingRoute+['coding_models'=>['anthropic'=>[]]]);
+verify($partial['coding_models']===['openai'=>[$fineTune],'anthropic'=>[]]&&sf_ai_canvas_model_options()===[$openaiOption]&&
+    invalid(fn()=>sf_ai_canvas_llm_candidates($claudeOption)),
+    'Explicit empty provider list removes its choices and rejects a stale public selection');
+verify(sf_ai_save_routing($codingRoute)['coding_models']===$partial['coding_models'],
+    'Saving existing routing controls preserves omitted coding model lists');
+verify(sf_ai_save_routing($codingRoute+['coding_models'=>[]])['coding_models']===['openai'=>[],'anthropic'=>[]]&&
+    sf_ai_canvas_model_options()===[]&&array_column(sf_ai_canvas_llm_candidates(),'model')===['gpt-6'],
+    'An explicit empty map clears both public lists and keeps default generation available');
+sf_ai_save_routing($codingRoute+['coding_models'=>['openai'=>[$fineTune],'anthropic'=>[$codingModel]]]);
 sf_ai_save_provider('anthropic',['enabled'=>false,'model'=>'claude-sonnet-4-6']);
 verify(count(sf_ai_llm_candidates('agent_brain'))===1,'Disabled Anthropic cannot silently consume API tokens');
+verify(sf_ai_canvas_model_options()===[$openaiOption]&&invalid(fn()=>sf_ai_canvas_llm_candidates($claudeOption)),
+    'A disabled provider disappears from the picker and rejects saved selections even with a stored key');
+sf_db()->exec("UPDATE ai_provider_settings SET enabled=1,secret_payload=NULL WHERE provider='anthropic'");
+verify(sf_ai_canvas_model_options()===[$openaiOption]&&invalid(fn()=>sf_ai_canvas_llm_candidates($claudeOption)),
+    'An enabled but keyless provider also remains unavailable');
 $runtime=file_get_contents(dirname(__DIR__).'/api/agent-runtime.php');
 $admin=file_get_contents(dirname(__DIR__).'/api/agent-admin-brain.php');
 $ui=file_get_contents(dirname(__DIR__).'/admin/assets/admin.js');

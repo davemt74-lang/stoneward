@@ -1,0 +1,94 @@
+name: Canvas Permissions and Consent Certification
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  canvas-permissions-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SF_TEST_PHP: php
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, curl, fileinfo, mbstring
+          coverage: none
+      - name: Disposable database and audio fixture dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg mariadb-server
+      - name: Registry, policy, remembered consent and delivery
+        run: |
+          php tests/section44a-tool-registry.php
+          php tests/canvas-capabilities.php
+          php tests/canvas-access.php
+          php tests/canvas-permission-delivery.php
+      - name: Project, gallery and resource compatibility
+        run: |
+          php tests/canvas-projects.php
+          php tests/canvas-gallery.php
+          php tests/canvas-gallery-privacy.php
+          php tests/canvas-gallery-attribution-history.php
+          php tests/canvas-resources.php
+          php tests/canvas-resource-scenes.php
+      - name: Real PHP endpoint authentication, CSRF and current-viewer data
+        run: |
+          python tests/canvas-permissions-http.py
+          python tests/canvas-access-http.py
+      - name: Native MariaDB transactions, rollback and independent-worker races
+        env:
+          SF_MARIADB_ROOT: /
+        run: python tests/canvas-permissions-mysql.py
+  canvas-permissions-browser:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SF_TEST_PHP: php
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, curl, fileinfo, mbstring
+          coverage: none
+      - name: Browser and audio fixture dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install playwright==1.64.1
+          python -m playwright install --with-deps chromium
+          python - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              with open(os.environ['GITHUB_ENV'], 'a') as output:
+                  output.write('CHROMIUM_BIN=' + p.chromium.executable_path + '\n')
+          PY
+      - name: Mobile and desktop permission and consent controls
+        run: |
+          python tests/canvas-permissions-browser.py
+          python tests/canvas-access-browser.py
+      - name: Real PHP and production consent UI roundtrip
+        run: python tests/canvas-access-integration-browser.py
+      - name: Existing public and administrator gallery controls
+        run: |
+          python tests/canvas-gallery-browser.py
+          python tests/admin-canvas-gallery-browser.py

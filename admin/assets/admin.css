@@ -213,3 +213,6 @@
 .admin-agent-music-volume{display:flex;gap:5px;align-items:center;flex:0 0 auto;font-size:.65rem}
 .admin-agent-music-volume input{width:86px;accent-color:var(--accent)}
 @media(max-width:560px){.admin-agent-music-bar:not([hidden]){gap:4px;padding:4px}.admin-agent-music-title{font-size:.67rem}.admin-agent-music-volume{font-size:0}.admin-agent-music-volume input{width:50px}.admin-agent-music-bar button{min-width:28px}}
+
+.ai-coding-catalog,.ai-coding-catalog .field{min-width:0;overflow-wrap:anywhere}
+.ai-coding-catalog select,.ai-coding-catalog textarea{width:100%;min-width:0}

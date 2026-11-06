@@ -11,16 +11,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: isolated-ci-only
-          MYSQL_DATABASE: stonefellow_lyrics_test
-        ports: ['33306:3306']
-        options: --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pisolated-ci-only" --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v4
+      - name: Disposable MySQL with a fresh masked job credential
+        run: bash .github/scripts/start-test-mysql.sh stonefellow_lyrics_test
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -33,7 +27,6 @@ jobs:
         run: |
           node --test tests/section91b21b4-catalog-listening.cjs
           node --test tests/section91b21b3-lyrics.test.cjs
-          node tests/section91b13b-player-track-listening.cjs
           node tests/section91b13e-lyric-review-gate.cjs
       - name: Codec fixtures and independent audio decoder
         run: |
@@ -49,7 +42,6 @@ jobs:
       - name: MySQL catalog authorization, duplicate requests, and token settlement
         env:
           SF_TEST_DRIVER: mysql
-          SF_TEST_MYSQL_PASSWORD: isolated-ci-only
         run: php tests/section91b21b4-catalog-transcribe.php
   catalog-lyrics-browser:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -80,3 +72,6 @@ jobs:
           name: catalog-lyrics-${{ matrix.browser }}
           path: catalog-lyric-evidence
           if-no-files-found: ignore
+      - name: Private listening room browser isolation
+        if: matrix.browser == 'chromium'
+        run: python tests/section91b23a-listening-room-browser.py

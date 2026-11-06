@@ -87,7 +87,7 @@ async function publicSpeechCompletesEveryChunk(){
   const {synth,utterances,Utterance}=voiceSynth(),timers=[];
   const context={
     window:{speechSynthesis:synth,SpeechSynthesisUtterance:Utterance},
-    voiceRepliesEnabled:true,voicePlaybackSequence:5,voiceProbeSynth:false,speechFallbackResolve:null,
+    voiceRepliesEnabled:true,voicePlaybackSequence:5,speechFallbackResolve:null,
     voiceSpeechGuard:{audible:()=>true},
     globalThis:{StonefellowSpeechSegments:{split:()=>['First segment.','Second segment.','Last segment.']}},
     setTimeout:callback=>{timers.push(callback);return timers.length},agent:()=>{},
@@ -106,15 +106,9 @@ async function publicSpeechCompletesEveryChunk(){
   assert.equal(utterances.length,2,'stale end cannot start the next segment');
   utterances[1].onend();
   assert.equal(utterances[2].text,'Second segment.');
-  context.voiceProbeSynth=true;
   utterances[2].onend();
-  assert.equal(utterances.length,3,'end while temporarily paused cannot advance past words');
-  context.voiceProbeSynth=false;
-  while(timers.length)timers.shift()();
-  assert.equal(utterances[3].text,'Second segment.','probe-truncated segment is replayed');
+  assert.equal(utterances[3].text,'Last segment.');
   utterances[3].onend();
-  assert.equal(utterances[4].text,'Last segment.');
-  utterances[4].onend();
   assert.equal(await work,true,'browser speech completes only after the final onend');
   assert.equal(context.speechFallbackResolve,null,'completion releases the cancellation callback');
 }
@@ -158,13 +152,13 @@ async function adminSpeechCompletesEveryChunk(){
 async function remotePauseEventCannotCompleteSpeech(){
   assert.doesNotMatch(extract(publicApp,'elevenLabsSpeak'),/a\.onpause\s*=/,
     'asynchronous Audio.pause events must never settle ElevenLabs segments');
-  assert.match(publicApp,/requireTranscript:true/,'public uses transcript-and-acoustics barge gate');
-  assert.match(adminApp,/requireTranscript:true/,'Admin uses the same barge gate');
+  assert.doesNotMatch(publicApp,/conversationBargeIn/,'public does not open a separate acoustic monitor');
+  assert.match(adminApp,/requireTranscript:true/,'Admin retains the transcript-and-acoustics gate');
   assert.match(read('admin/index.php'),/id="adminAgentSpeechStop"[^>]+hidden/,'Admin provides an accessible manual stop');
   assert.match(adminApp,/stopSpeech\.onclick=\(\)=>\{stopAdminSpeech\(\)/,'manual stop cancels playback');
   assert.match(read('admin/assets/agent-canvas.css'),/:has\(#adminAgentSpeechStop:not\(\[hidden\]\)\)/,'responsive composer reserves stop-button width only when shown');
   assert.match(read('stonefellow-v120.php'),/id="agentInterrupt"/,'public keeps manual interruption');
-  assert.match(publicApp,/Speech recognition is unavailable\. Use Stop speaking/,'ASR outage guidance is accurate');
+  assert.match(publicApp,/agentInterrupt\.onclick=interruptVoicePlayback/,'public manual stop cancels playback');
 }
 
 Promise.resolve().then(onlyIndependentVoiceCanProbe)

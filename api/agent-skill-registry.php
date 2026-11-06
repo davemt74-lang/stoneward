@@ -24,6 +24,7 @@ function sf_agent_skill_definitions(): array {
       'unified_audio_player'=>['label'=>'Control and inspect the local Stonefellow music player','contexts'=>['public','customer','admin'],'tool'=>'audio_player_transport','intents'=>['player_play_named','player_pause','player_stop','player_resume','player_next','player_previous','player_status','player_volume','playlist_random']],
       'playback_queue'=>['label'=>'Manage local playback queue','contexts'=>['public','customer','admin'],'tool'=>'queue_track','intents'=>['queue_track']],
       'public_page_navigation'=>['label'=>'Switch to an installed Stonefellow page or published record, and identify the current view','contexts'=>['public','customer'],'tool'=>'public_page_navigate','intents'=>['page_navigate','page_detail','page_context']],
+      'customer_canvas_discussion'=>['label'=>'Discuss canvas experiences and prepare a creative concept for review','contexts'=>['customer'],'tool'=>'canvas_discussion','intents'=>['canvas_discuss']],
       'customer_favorites'=>['label'=>'Manage my favorites','contexts'=>['customer'],'tool'=>'favorite_track','intents'=>['favorite_save','favorite_remove']],
       'customer_playlists'=>['label'=>'Build my playlists','contexts'=>['customer'],'tool'=>'create_playlist','intents'=>['create_playlist']],
       'customer_voice'=>['label'=>'Generate customer voice reply','contexts'=>['customer'],'tool'=>'elevenlabs_voice','intents'=>['voice_reply']],

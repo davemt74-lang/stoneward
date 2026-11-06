@@ -14,6 +14,7 @@ assert.ok(directStart>0&&liveStart>directStart&&liveEnd>liveStart);
 let active=false,loadAuthCalls=0;
 const actions=[],notices=[],modes=[],spoken=[];
 const scope={
+  document:{getElementById:()=>null}, // Optional account-menu binding is outside this listening fixture.
   directRandomPlaylistCommand:()=>false,
   songListeningSkill:{status:()=>({active})},
   currentSongDraft:()=>active?null:{track_id:'sf-earth',text:'A corrected verse'},
@@ -79,7 +80,7 @@ async function run(){
   const after=app.indexOf('  function updateConversationButton()',wake);
   const guardScope={
     st:{conversationOn:true,playing:true},audio:{paused:false},
-    voiceTurnBusy:false,voicePlaybackPending:false,
+    voiceTurnBusy:false,voicePlaybackPending:false,musicFollowupUntil:0,
     voiceSpeechGuard:{blocked:false}
   };
   vm.createContext(guardScope);
@@ -91,6 +92,9 @@ async function run(){
     guardScope.voiceSpeechGuard.blocked=true;
     assert.equal(guardScope.duck('Stonefellow listen and interpret'),false);
     guardScope.voiceSpeechGuard.blocked=false;
+    guardScope.musicFollowupUntil=Date.now()+10_000;
+    assert.equal(guardScope.duck('Follow-up question'),true);
+    assert.equal(guardScope.duck(),false);
     guardScope.audio.paused=true;
     assert.equal(guardScope.duck(),true);
   });
@@ -99,25 +103,22 @@ async function run(){
     assert.match(app,/if\(spoken&&!finalReceived\)setVoiceInputActive\(shouldDuckConversationInput\(spoken\)\)/);
     assert.match(app,/if\(st\.playing&&!audio\.paused&&!woke&&Date\.now\(\)>=musicFollowupUntil\)/);
     assert.match(app,/say “Stonefellow” to talk over music/);
-    assert.match(app,/\{requireTranscript:true,echoTailMs:320,echoDeadlineMs:930\}/);
-    assert.doesNotMatch(app,/conversationBargeIn\?\.start\(\)/,'The Agent must not start an acoustic monitor while its own voice is audible');
-    assert.doesNotMatch(app,/conversationBargeIn\?\.prepare\(\)/,'The Agent must not prepare a redundant microphone');
-    assert.match(app,/conversationBargeIn\?\.stop\(\)/);
-    assert.match(app,/songExperience\.listening_mode==='recognition'\?'listening':'recording'/);
+    assert.doesNotMatch(app,/conversationBargeIn/,'The Agent must not prepare a redundant microphone');
+    assert.match(app,/songExperience\.listening_mode==='catalog'\?'listening':'recording'/);
     assert.match(app,/if\(directSongListeningCommand\(text\)\|\|directRandomPlaylistCommand\(text\)\)\{await liveAgent\(text\);return\}await loadAuth\(\)/);
   });
   check('Small speech gaps do not repeatedly restore and re-duck music',()=>{
     assert.match(app,/voiceSpeechReleaseTimer=setTimeout/);
     assert.match(app,/speechPilotReleaseTimer=setTimeout/);
-    assert.match(app,/setSpeechPilotSpeaking\(speaking\)/);
-    assert.match(app,/StonefellowSpeechEngine\?\.setInputMuted\?\.\(speaking\)/);
+    assert.match(app,/setSpeechPilotSpeaking\(audible\)/);
+    assert.match(app,/StonefellowSpeechEngine\?\.setInputMuted\?\.\(speechPilotReplyInProgress\)/);
     new vm.Script(app);
   });
   check('Speech Engine microphone is muted during output and released after the echo tail',()=>{
-    const sdk=fs.readFileSync(path.join(__dirname,'../assets/js/speech-engine-conversation.js'),'utf8');
-    assert.match(sdk,/by\.setInputMuted=function\(muted\)/);
-    assert.match(sdk,/session\.setMicMuted\(true\)/);
-    assert.match(sdk,/session===Rt\)session\.setMicMuted\(false\)/);
+    const sdk=fs.readFileSync(path.join(__dirname,'../speech-gateway/browser-entry.mjs'),'utf8');
+    assert.match(sdk,/setInputMuted\(muted\)/);
+    assert.match(sdk,/session\.conversation\.setMicMuted\(true\)/);
+    assert.match(sdk,/current===session\)session\.conversation\.setMicMuted\(false\)/);
     assert.match(sdk,/\},500\)/);
   });
   console.log('Section 91B13H: '+checks+' local listening and acoustic isolation assertions passed');

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__.'/bootstrap.php';
 require_once dirname(__DIR__,2).'/api/user-usage-report.php';
+require_once SF_ROOT.'/api/image-generation-core.php';
 $method = (string)($_SERVER['REQUEST_METHOD'] ?? 'GET');
 $me = sf_admin_require_auth($method !== 'GET');
 sf_entitlements_ensure_schema();
@@ -13,6 +14,16 @@ function sf_admin_user_record(int $id): ?array {
     $q = sf_db()->prepare('SELECT id,email,display_name,role,status,created_at,last_login_at,email_verified_at FROM users WHERE id=? LIMIT 1');
     $q->execute([$id]);
     return $q->fetch() ?: null;
+}
+
+function sf_admin_user_image_quota(int $id): array {
+    $quota = sf_image_gen_user_quota($id);
+    return [
+        'image_daily_cap' => $quota['daily_cap'],
+        'image_default_daily_cap' => $quota['default_daily_cap'],
+        'image_daily_cap_override' => $quota['daily_cap_override'],
+        'image_attempts_today' => $quota['today_attempts'],
+    ];
 }
 
 function sf_admin_user_invite(array $user): array {
@@ -52,6 +63,7 @@ if ($method === 'GET') {
             WHEN source='song-section-transcription' THEN 'Song Transcription'
             WHEN source='song-section-analysis' THEN 'Lyric Analysis'
             WHEN source='image-generation' THEN 'Image Generation'
+            WHEN source='image-analysis' THEN 'Image Analysis'
             WHEN source='image-prompt-composer' THEN 'Image Prompt Refinement'
             ELSE 'Other AI' END feature, COUNT(*) events,
             COALESCE(SUM(CASE WHEN delta<0 THEN -delta ELSE 0 END),0) consumed
@@ -60,6 +72,7 @@ if ($method === 'GET') {
         $byFeature->execute([$id,$since]);
         $user['email_verified'] = !empty($user['email_verified_at']);
         $user['active_sessions'] = count(sf_auth_sessions($id));
+        $user += sf_admin_user_image_quota($id);
         sf_json_response(['ok'=>true,'user'=>$user,'entitlement'=>$entitlement,'ledger'=>$ledger->fetchAll(),'next_offset'=>$offset+100,'usage_30d'=>$totals->fetch() ?: [],'by_provider'=>$byProvider->fetchAll(),'by_feature'=>$byFeature->fetchAll()]);
     }
     $rows = sf_db()->query('SELECT id,email,display_name,role,status,created_at,last_login_at,email_verified_at FROM users ORDER BY created_at DESC')->fetchAll();
@@ -134,6 +147,19 @@ if ($id < 1) sf_json_response(['ok'=>false,'message'=>'Invalid user.'],422);
 $target = sf_admin_user_record($id);
 if (!$target) sf_json_response(['ok'=>false,'message'=>'User not found.'],404);
 
+if ($action === 'save_image_quota') {
+    $cap = $body['image_daily_cap_override'] ?? null;
+    if (!array_key_exists('image_daily_cap_override',$body) || ($cap !== null && (!is_int($cap) || $cap < 0 || $cap > 50))) {
+        sf_json_response(['ok'=>false,'message'=>'Enter a daily image limit from 0 to 50, or leave it blank to inherit the default.'],422);
+    }
+    try {
+        sf_image_gen_save_user_cap($id,$cap);
+    } catch (InvalidArgumentException $e) {
+        sf_json_response(['ok'=>false,'message'=>$e->getMessage()],422);
+    }
+    sf_log_admin_action((int)$me['id'],'user_image_quota_updated','user',(string)$id,['daily_cap_override'=>$cap]);
+    sf_json_response(['ok'=>true,'user'=>$target + sf_admin_user_image_quota($id)]);
+}
 if ($action === 'invite') {
     try {
         $mail = sf_admin_user_invite($target);

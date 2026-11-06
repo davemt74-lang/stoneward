@@ -7,7 +7,7 @@ const app=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
 const implementation=app.match(/  async function submitVoiceTurn\(spoken\)\{[\s\S]*?\n  \}\n  function submitRecognizedVoiceTurn/)?.[0].replace(/\n  function submitRecognizedVoiceTurn$/,'');
 assert.ok(implementation,'Voice-turn implementation should remain present');
 
-async function scenario(stopMidReply){
+async function scenario(stopMidReply,switchToPilot=false){
   const trace=[];
   let resolveCommand,resolveAudio;
   const command=new Promise(resolve=>{resolveCommand=resolve});
@@ -17,7 +17,7 @@ async function scenario(stopMidReply){
     setVoiceInputActive:active=>trace.push('input-'+active),
     clearTimeout:()=>trace.push('clear-timer'),
     conversationRestartTimer:null,
-    st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,
+    st:{conversationOn:true},isIOSVoiceBrowser:false,iosVoiceNeedsGesture:false,speechPilotActive:false,
     musicFollowupUntil:0,
     Date,
     command:async()=>{trace.push('command');await command;trace.push('command-complete')},
@@ -38,10 +38,11 @@ async function scenario(stopMidReply){
   resolveCommand();await new Promise(resolve=>setImmediate(resolve));
   assert.equal(trace.includes('restart'),false,'Recognition must wait for voice/audio completion');
   if(stopMidReply)sandbox.st.conversationOn=false;
+  if(switchToPilot)sandbox.speechPilotActive=true;
   resolveAudio();await task;
   assert.equal(sandbox.isBusy(),false,'Busy gate must be released');
-  assert.equal(trace.includes('restart'),!stopMidReply,'Only active conversations resume listening');
+  assert.equal(trace.includes('restart'),!stopMidReply&&!switchToPilot,'Only the active original engine resumes listening');
   assert.equal(trace.includes('unexpected-error'),false);
 }
 
-(async()=>{await scenario(false);console.log('PASS wait for command and speech before listening');await scenario(true);console.log('PASS stop during reply prevents microphone restart')})().catch(err=>{console.error(err);process.exitCode=1});
+(async()=>{await scenario(false);console.log('PASS wait for command and speech before listening');await scenario(true);console.log('PASS stop during reply prevents microphone restart');await scenario(false,true);console.log('PASS switching to Speech Engine during reply prevents browser microphone restart')})().catch(err=>{console.error(err);process.exitCode=1});

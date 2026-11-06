@@ -23,10 +23,11 @@ check('Create Record opens the full builder page outside the native sidebar',()=
   assert.match(app,/view!=='home'&&view!=='builder'&&\!window\.SFPublicAgentCanvas\?\.active\?\.\(\)/);
 });
 check('Panel renders into original application views, never iframe or external fetch shell',()=>{
-  assert.match(agent,/<aside class="sf-agent-page-rail" hidden inert/);
-  assert.match(agent,/<div id="sfAgentNativePage" class="sf-agent-page-content"><\/div>/);
-  assert.doesNotMatch(agent,/<iframe|srcdoc|contentWindow|fetch\(/i);
-  assert.match(agent,/function openPage\(view\)/);
+  const rail=agent.match(/<aside class="sf-agent-page-rail" hidden inert[\s\S]*?<\/aside>/)?.[0];
+  const renderer=agent.match(/function openPage\(view\)[\s\S]*?(?=function closePage)/)?.[0];
+  assert.ok(rail&&renderer);
+  assert.match(rail,/<div id="sfAgentNativePage" class="sf-agent-page-content"><\/div>/);
+  assert.doesNotMatch(rail+renderer,/<iframe|createElement\(['"]iframe|srcdoc|contentWindow|fetch\(/i);
   // Lyrics reuse the rail but have their own host, leaving normal route renderers unchanged.
   assert.match(agent,/return view==='lyrics'\?lyricHost:pageHost/);
   assert.match(agent,/pageHost\.hidden=view==='lyrics';lyricHost\.hidden=view!=='lyrics'/);

@@ -3,7 +3,7 @@ import { Conversation } from '@elevenlabs/client';
 // This is bundled into Stonefellow's existing same-origin static assets.
 // Only the short-lived, account-issued conversation token enters the browser.
 const base='api/speech-engine.php';
-let current=null,starting=false,sessionEpoch=0;
+let current=null,teardown=null;
 
 async function request(url,options={}) {
   const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
@@ -12,67 +12,148 @@ async function request(url,options={}) {
   return data;
 }
 
-async function post(action,fields={}) {
-  const auth=await request('api/auth.php');
-  return request(base,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf||''},body:JSON.stringify({action,...fields})});
+async function post(action,fields={},signal) {
+  const auth=await request('api/auth.php',{signal});
+  return request(base,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf||''},body:JSON.stringify({action,...fields}),signal});
 }
 
-async function bind(conversationId,bindToken) {
+async function bind(conversationId,bindToken,signal) {
   let error;
-  for(let attempt=0;attempt<7;attempt++){
-    try{return await post('bind',{conversation_id:conversationId,bind_token:bindToken});}
-    catch(e){error=e;if(attempt<6)await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));}
+  for(let attempt=0;attempt<7&&!signal.aborted;attempt++){
+    try{return await post('bind',{conversation_id:conversationId,bind_token:bindToken},signal);}
+    catch(e){error=e;if(attempt<6&&!signal.aborted)await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));}
   }
   throw error||new Error('Voice connection could not be verified.');
 }
 
+function release(session) {
+  current=null;
+  session.abort.abort();
+  clearTimeout(session.inputUnmuteTimer);
+}
+
+function close(session) {
+  release(session);
+  if(!session.connecting)return teardown;
+  // The SDK may still be acquiring the microphone. Let it finish and close
+  // before another start can open a competing microphone session.
+  const closing=session.connecting.then(conversation=>conversation?.endSession(),()=>{});
+  const settled=closing.catch(error=>console.warn('[Stonefellow] Speech Engine cleanup failed',error));
+  teardown=settled;
+  void settled.then(()=>{if(teardown===settled)teardown=null;});
+  return settled;
+}
+
+function applyOutputMute(session) {
+  const {conversation,outputMuted}=session;
+  if(!conversation)return;
+  conversation.setVolume({volume:outputMuted?0:1});
+  // The pinned WebRTC adapter sets element.volume, which iPhone can ignore.
+  // Use its own remote elements for the binary mute and leave song audio alone.
+  for(const audio of conversation.connection?.audioAdapter?.audioElements||[])audio.muted=outputMuted;
+}
+
 const pilot={
-  async isSelected(){
-    try{const state=(await request(base)).speech_engine;return !!state?.pilot_available&&state?.selected_engine==='speech_engine';}
-    catch{return false;}
-  },
-  get active(){return !!current||starting;},
+  get active(){return !!current;},
   async takeAction(){
-    const active=current;
-    if(!active)return null;
-    const conversationId=active.getId();
+    const session=current;
+    if(!session?.ready)return null;
+    const conversationId=session.conversation.getId();
     if(!conversationId)return null;
-    const result=await post('take_action',{conversation_id:conversationId});
-    if(active!==current)return null;
-    return result.action_envelope||null;
+    try{
+      const result=await post('take_action',{conversation_id:conversationId},session.abort.signal);
+      return current===session?result.action_envelope||null:null;
+    }catch(error){if(current===session)throw error;return null;}
+  },
+  setInputMuted(muted){
+    const session=current;
+    if(!session||session.inputMuted===Boolean(muted))return;
+    session.inputMuted=Boolean(muted);
+    clearTimeout(session.inputUnmuteTimer);
+    session.inputUnmuteTimer=null;
+    if(!session.conversation)return;
+    if(session.inputMuted){session.conversation.setMicMuted(true);return;}
+    session.inputUnmuteTimer=setTimeout(()=>{
+      session.inputUnmuteTimer=null;
+      if(current===session)session.conversation.setMicMuted(false);
+    },500);
+  },
+  setOutputMuted(muted){
+    const session=current;
+    if(!session||session.outputMuted===Boolean(muted))return;
+    session.outputMuted=Boolean(muted);
+    applyOutputMute(session);
+  },
+  interrupt(){
+    const conversation=current?.conversation;
+    if(!conversation)return false;
+    try{
+      conversation.output?.interrupt?.();
+      conversation.sendUserActivity?.();
+      conversation.updateMode?.('listening');
+      return true;
+    }catch(error){console.warn('[Stonefellow] Speech Engine interrupt unavailable',error);return false;}
   },
   async start(handlers={}){
-    if(current||starting)return;
-    starting=true;
-    const epoch=++sessionEpoch;
-    let created=null,disconnected=false;
-    const ensureCurrent=()=>{if(epoch!==sessionEpoch||disconnected)throw new Error('Voice session was stopped before it was ready.');};
+    if(current)return;
+    const abort=new AbortController();
+    const session={abort,connecting:null,conversation:null,ready:false,inputMuted:false,
+      inputUnmuteTimer:null,outputMuted:Boolean(handlers.outputMuted)};
+    current=session;
+    const isCurrent=()=>current===session;
+    const emit=(event,value)=>{if(isCurrent())handlers[event]?.(value);};
+    const attachConversation=conversation=>{
+      if(!isCurrent()||session.conversation===conversation)return;
+      session.conversation=conversation;
+      if(session.outputMuted)applyOutputMute(session);
+      if(session.inputMuted)conversation.setMicMuted(true);
+    };
     try{
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('Microphone capture is not available in this browser.');
-      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      // The SDK opens its own WebRTC microphone; release this permissions probe.
-      stream.getTracks().forEach(track=>track.stop());
-      ensureCurrent();
-      const ticket=await post('start');ensureCurrent();let connectedId='';
-      created=await Conversation.startSession({
-        conversationToken:ticket.conversation_token,
-        onConnect:({conversationId})=>{connectedId=conversationId;handlers.onStatus?.('connected');},
-        onDisconnect:()=>{disconnected=true;current=null;handlers.onStatus?.('disconnected');},
-        onStatusChange:({status})=>handlers.onStatus?.(status),
-        onModeChange:({mode})=>handlers.onMode?.(mode),
-        onMessage:payload=>handlers.onMessage?.(payload),
-        onError:error=>handlers.onError?.(typeof error==='string'?error:'Voice connection error.')
+      if(teardown)await teardown;
+      if(!isCurrent())return;
+      const ticket=await post('start',{},abort.signal);
+      if(!isCurrent())return;
+      let connectedId='';
+      // Register the pending connection before the SDK emits synchronous events.
+      session.connecting=Promise.resolve().then(()=>{
+        if(!isCurrent())return null;
+        return Conversation.startSession({
+          conversationToken:ticket.conversation_token,
+          onConversationCreated:attachConversation,
+          onConnect:({conversationId})=>{connectedId=conversationId;emit('onStatus','connected');},
+          onDisconnect:()=>{
+            if(!isCurrent())return;
+            release(session);
+            handlers.onStatus?.('disconnected');
+          },
+          onStatusChange:({status})=>{
+            if(status!=='connected'&&status!=='disconnected')emit('onStatus',status);
+          },
+          onModeChange:({mode})=>emit('onMode',mode),
+          onMessage:payload=>emit('onMessage',payload),
+          onError:error=>emit('onError',typeof error==='string'?error:'Voice connection error.'),
+          onDebug:({type})=>{
+            if(type==='audio_element_ready'&&isCurrent()&&session.outputMuted)applyOutputMute(session);
+          }
+        });
       });
-      ensureCurrent();
-      const id=connectedId||created.getId();
+      const conversation=await session.connecting;
+      if(!isCurrent())return;
+      attachConversation(conversation);
+      const id=connectedId||conversation.getId();
       if(!id)throw new Error('ElevenLabs did not assign a conversation ID.');
-      await bind(id,ticket.bind_token);
-      ensureCurrent();
-      current=created;handlers.onStatus?.('ready');
-    }catch(error){if(created)try{await created.endSession();}catch{}if(epoch===sessionEpoch)handlers.onError?.(error.message||'Could not start voice session.');throw error;}
-    finally{starting=false;}
+      await bind(id,ticket.bind_token,abort.signal);
+      if(!isCurrent())return;
+      session.ready=true;
+      emit('onStatus','ready');
+    }catch(error){
+      if(!isCurrent())return;
+      await close(session);
+      throw error;
+    }
   },
-  async stop(){sessionEpoch++;const active=current;current=null;if(active)await active.endSession();}
+  async stop(){await (current?close(current):teardown);}
 };
 
 window.StonefellowSpeechEngine=pilot;

@@ -18,6 +18,7 @@
   };
   const idempotencyKey=()=>crypto.randomUUID();
   const fmt=n=>Number(n||0).toLocaleString();
+  const dailyCapLabel=cap=>cap===null?'Unlimited':fmt(cap);
   const usd=cents=>'$'+(Number(cents||0)/100).toFixed(2);
   const imageUrl=uuid=>uuid?'../api/media.php?id='+encodeURIComponent(uuid):'';
   async function refresh(){const r=await api('image-generation.php');state={settings:r.settings||{},openai:r.openai||{},jobs:r.jobs||[],models:r.models||[],presets:r.presets||[],styles:r.styles||[],dashboard:r.dashboard||{}};referenceAssets=r.references||[];}
@@ -214,6 +215,10 @@
   function render(){
     const s=state.settings,o=state.openai,d=state.dashboard||{},c=d.counts||{},providerReady=!!(o.enabled&&o.key_configured);
     const presets=state.presets||[],styles=state.styles||[];
+    const accountDailyCap=d.daily_cap===undefined?s.admin_daily_cap:d.daily_cap;
+    let accountAvailability=fmt(d.today_remaining)+' paid requests remaining for your account today across Image Studio and canvases.';
+    if(accountDailyCap===0)accountAvailability='Paid image generation is disabled for your account.';
+    if(accountDailyCap===null)accountAvailability='Your account has unlimited image generation across Image Studio and canvases.';
     canvas.innerHTML=head('91B20I · IMAGE STUDIO','AI Image Studio','Visual Style Library, variations, transparent backgrounds, targeted edits and invoice reconciliation. Every paid request and publication remains separately approved.',
       '<button class="secondary" type="button" id="imagegenBackMedia">Media Library</button>')+
       '<div class="stats imagegen-stats">'+
@@ -221,9 +226,9 @@
       '<div class="stat"><strong>'+fmt(c.needs_review)+'</strong><span>Awaiting image review</span></div>'+
       '<div class="stat"><strong>'+fmt(c.ready)+'</strong><span>Approved images</span></div>'+
       '<div class="stat"><strong>'+fmt(d.reference_variations)+'</strong><span>Reference-based variations</span></div>'+
-      '<div class="stat"><strong>'+fmt(d.today_attempts)+' / '+fmt(d.daily_cap||s.daily_cap)+'</strong><span>Paid attempts today · UTC</span></div>'+
+      '<div class="stat"><strong>'+fmt(d.today_attempts)+' / '+dailyCapLabel(accountDailyCap)+'</strong><span>Your paid attempts today · UTC</span></div>'+
       '<div class="stat"><strong>'+fmt(c.failed)+'</strong><span>Failed / uncertain</span></div></div>'+
-      '<section class="panel imagegen-summary"><div class="panel-title"><div><h2>Generation overview</h2><p>'+fmt(d.today_remaining)+' paid requests available today under your Admin limit · '+fmt(c.draft)+' drafts · '+fmt(c.approved)+' approved prompts · '+fmt(c.generating)+' in progress.</p></div><button type="button" class="secondary" id="imagegenRefresh">Refresh history</button></div>'+
+      '<section class="panel imagegen-summary"><div class="panel-title"><div><h2>Generation overview</h2><p>'+accountAvailability+' '+fmt(c.draft)+' drafts · '+fmt(c.approved)+' approved prompts · '+fmt(c.generating)+' in progress.</p></div><button type="button" class="secondary" id="imagegenRefresh">Refresh history</button></div>'+
       '<div class="imagegen-model-activity"><strong>Model activity · last 30 days</strong><p>'+((d.model_activity_30d||[]).map(m=>esc(m.model)+' · '+fmt(m.total)+' request(s)').join('  ·  ')||'No paid image requests yet.')+' · '+fmt(d.variation_attempts_30d)+' variation attempts.</p>'+
       '<p>Image API reported: '+fmt(d.usage_30d?.['image-generation']?.input_tokens)+' input / '+fmt(d.usage_30d?.['image-generation']?.output_tokens)+' output tokens. Agent text prompt refinement: '+fmt(d.usage_30d?.['image-prompt-composer']?.input_tokens)+' input / '+fmt(d.usage_30d?.['image-prompt-composer']?.output_tokens)+' output tokens.</p></div><p class="hint">The dashboard counts provider-reported tokens, not fabricated dollar amounts. Provider billing is separate from customer Active Tokens. '+fmt(d.cost_reconciled_jobs)+' requests manually reconciled · '+fmt(d.cost_unreconciled_jobs)+' pending · '+usd(d.cost_recorded_cents)+' recorded from invoices (not a provider-sourced total).</p><div class="actions"><button type="button" class="secondary" id="imagegenExportAudit">Download recent usage and invoice audit CSV (up to 150 jobs)</button></div></section>'+
       '<section class="panel imagegen-gallery"><div class="panel-title"><div><h2>Image variation gallery</h2><p>Browse original imagery and all saved variations grouped by artwork family. Compare versions without making an API request.</p></div></div><div class="imagegen-gallery-toolbar"><label class="field">Search generated images<input type="search" id="imagegenGallerySearch" placeholder="Prompt, model, job ID or reference title" value="'+esc(galleryQuery)+'"></label><label class="field">Show<select id="imagegenGalleryFilter"><option value="all">All generated images</option><option value="variation">Variations only</option><option value="ready">Approved images</option><option value="needs_review">Awaiting approval</option></select></label></div><div id="imagegenGalleryGroups">'+galleryHtml()+'</div></section>'+
@@ -256,11 +261,13 @@
       '</details></section>'+
       `<section class="panel"><div class="panel-title"><div><h2>OpenAI Image API</h2><p>Reuses the existing encrypted OpenAI key in Admin → AI Providers. Generation is disabled by default.</p></div><span class="badge ${providerReady&&s.enabled?'good':'warn'}">${providerReady&&s.enabled?'CONFIGURED':'CONFIGURE'}</span></div>
       <form id="imagegenSettings" class="form-grid">
-      <label class="check-field span3"><input type="checkbox" name="enabled" ${s.enabled?'checked':''}> Enable paid image generation in this Admin workspace</label>
+      <label class="check-field span3"><input type="checkbox" name="enabled" ${s.enabled?'checked':''}> Enable paid image generation in Image Studio and administrator canvases</label>
+      <label class="check-field span3"><input type="checkbox" name="canvas_listeners_enabled" ${s.canvas_listeners_enabled?'checked':''}> Allow signed-in listeners to generate private canvas images with Active Tokens</label>
       <label class="field">Image model<select name="model">${state.models.map(m=>`<option value="${esc(m)}" ${m===s.model?'selected':''}>${esc(m)}</option>`).join('')}</select></label>
-      <label class="field">Maximum generations / UTC day<input name="daily_cap" type="number" min="1" max="50" value="${Number(s.daily_cap||5)}"></label>
-      <div class="actions"><button type="submit" class="secondary">Save settings</button></div>
-      <p class="hint span3">API charges come from the OpenAI developer organization; ChatGPT subscription credits are separate. ${providerReady?'OpenAI key configured.':'Enable your existing OpenAI provider and its API key first.'} This is an Admin-only initial phase.</p></form></section>
+      <label class="field">Default listener image limit / UTC day<input name="daily_cap" type="number" min="1" max="50" step="1" required value="${Number(s.daily_cap??5)}"></label>
+      <label class="field">Default admin image limit / UTC day<input name="admin_daily_cap" type="number" min="1" max="50" step="1" value="${esc(s.admin_daily_cap??'')}" placeholder="Unlimited"></label>
+      <div class="actions span3"><button type="submit" class="secondary">Save settings</button></div>
+      <p class="hint span3">OpenAI API charges go to the developer organization. ${providerReady?'OpenAI key configured.':'Enable your existing OpenAI provider and its API key first.'} Leave the admin limit blank for unlimited requests. Set account overrides in Manage Users. Image Studio and canvas requests count toward the same account limit, which resets at midnight UTC.</p></form></section>
       <section class="panel"><div class="panel-title"><div><h2>Compose an image</h2><p>Write a visual concept, select a preset, and ask Stonefellow to draft or refine the prompt. Generation is a later, separately approved step.</p></div></div>
       <div class="imagegen-brief"><label class="field">Starting preset<select id="imagegenPresetSelect">${presets.map(p=>`<option value="${esc(p.slug)}">${esc(p.category+' · '+p.name)}</option>`).join('')}</select></label>
       <label class="field">Visual identity style<select id="imagegenStyleSelect"><option value="0">Use preset direction only</option>${styles.map(s=>'<option value="'+Number(s.id)+'">'+esc(s.mood+' · '+s.name)+'</option>').join('')}</select></label>
@@ -460,8 +467,10 @@
         await refresh();render();say('Custom preset archived.');}
       catch(err){alert(err.message)}finally{busy=false}
     });
-    $('#imagegenSettings').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;const f=new FormData(e.currentTarget);try{
-      await api('image-generation.php',{action:'save_settings',enabled:f.get('enabled')==='on',model:f.get('model'),daily_cap:Number(f.get('daily_cap'))});await refresh();render();say('Image-generation settings saved.');
+    $('#imagegenSettings').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;const f=new FormData(e.currentTarget),adminDailyCap=f.get('admin_daily_cap');try{
+      await api('image-generation.php',{action:'save_settings',enabled:f.get('enabled')==='on',
+        canvas_listeners_enabled:f.get('canvas_listeners_enabled')==='on',model:f.get('model'),
+        daily_cap:Number(f.get('daily_cap')),admin_daily_cap:adminDailyCap===''?null:Number(adminDailyCap)});await refresh();render();say('Image-generation settings saved.');
     }catch(err){alert(err.message)}finally{busy=false}};
     $('#imagegenDraftForm').onsubmit=async e=>{e.preventDefault();if(busy)return;const f=new FormData(e.currentTarget),prompt=String(f.get('prompt')||''),size=String(f.get('size')),quality=String(f.get('quality'));
       const reference_asset_id=Number(f.get('reference_asset_id')||0),reference_consent=f.get('reference_consent')==='on';
@@ -482,7 +491,8 @@
     $$('[data-imagegen-generate]',canvas).forEach(btn=>btn.onclick=async()=>{
       if(busy||!providerReady||!s.enabled){alert('Enable image generation and your OpenAI provider before spending API credits.');return}
       const job=state.jobs.find(x=>Number(x.id)===Number(btn.dataset.imagegenGenerate));
-      if(!confirm('Start ONE paid OpenAI '+(job?.source_asset_id?'image edit using the approved private reference':'image generation')+' now? Output background: '+(job?.background||'auto')+(job?.mask_asset_id?' · Targeted edit mask included':'')+'. This uses one of your '+fmt(d.today_remaining)+' remaining daily request slots. Dollar cost depends on the provider; do not refresh or retry.'))return;
+      const quotaNotice=d.today_remaining>0?' This uses one of your '+fmt(d.today_remaining)+' remaining daily request slots.':'';
+      if(!confirm('Start ONE paid OpenAI '+(job?.source_asset_id?'image edit using the approved private reference':'image generation')+' now? Output background: '+(job?.background||'auto')+(job?.mask_asset_id?' · Targeted edit mask included':'')+'.'+quotaNotice+' Dollar cost depends on the provider; do not refresh or retry.'))return;
       await act('generate',Number(btn.dataset.imagegenGenerate),'Generation complete. Review private image before approving.');
     });
     $$('[data-imagegen-approve-asset]',canvas).forEach(btn=>btn.onclick=async()=>{
@@ -566,7 +576,7 @@
       const r=await api('image-generation.php'),d=r.dashboard||{},c=d.counts||{};
       if(!host.isConnected)return;
       host.innerHTML='<div class="panel-title"><div><h2>AI Image Studio</h2><p>Generated artwork and visual concept approvals</p></div><button type="button" class="secondary" id="imagegenDashboardOpen">Open Image Studio</button></div>'+
-        '<div class="imagegen-home-stats"><span><strong>'+fmt(c.needs_review)+'</strong> images to review</span><span><strong>'+fmt(c.approved)+'</strong> prompts approved</span><span><strong>'+fmt(c.ready)+'</strong> images ready</span><span><strong>'+fmt(d.today_attempts)+' / '+fmt(d.daily_cap)+'</strong> requests today</span></div>';
+        '<div class="imagegen-home-stats"><span><strong>'+fmt(c.needs_review)+'</strong> images to review</span><span><strong>'+fmt(c.approved)+'</strong> prompts approved</span><span><strong>'+fmt(c.ready)+'</strong> images ready</span><span><strong>'+fmt(d.today_attempts)+' / '+dailyCapLabel(d.daily_cap)+'</strong> your paid requests today (UTC)</span></div>';
       host.querySelector('#imagegenDashboardOpen').onclick=()=>openView('image-generation');
     }catch(_){if(host.isConnected)host.innerHTML='<div class="panel-title"><h2>AI Image Studio</h2><button class="secondary" type="button" id="imagegenDashboardOpen">Open Image Studio</button></div><p class="hint">Image summary is temporarily unavailable.</p>';host.querySelector('#imagegenDashboardOpen').onclick=()=>openView('image-generation')}
   }

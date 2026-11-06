@@ -40,7 +40,9 @@ function sf_admin_user_usage_report(int $days=30): array {
         WHEN source='agent-voice' THEN 'Voice Synthesis'
         WHEN source='song-section-transcription' THEN 'Song Transcription'
         WHEN source='song-section-analysis' THEN 'Lyric Analysis'
+        WHEN source='agent-listening-room' THEN 'Canvas Design'
         WHEN source='image-generation' THEN 'Image Generation'
+        WHEN source='image-analysis' THEN 'Image Analysis'
         WHEN source='image-prompt-composer' THEN 'Image Prompt Refinement'
         ELSE 'Other AI' END feature,
         COUNT(*) events,

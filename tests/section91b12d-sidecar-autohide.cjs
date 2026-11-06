@@ -33,21 +33,26 @@ test('Viewport-aware side selection and mobile stacked fallback retain session a
   assert.match(js,/StonefellowSongExperience\.mount\(smallSession\)/);
   assert.match(js,/StonefellowSongExperience\.mount\(bigSession\)/);
 });
-test('Player fades after idle timeout and retains an orbital reveal icon',()=>{
+test('Player and attached controls share idle collapse and remain reachable from the orb',()=>{
   assert.match(js,/const PLAYER_IDLE_MS=5200/);
   assert.match(js,/playerTimer=window\.setTimeout\(hidePlayer,PLAYER_IDLE_MS\)/);
-  assert.match(js,/playerDock\.classList\.add\('is-collapsed'\)/);
+  assert.match(js,/playerDock\.classList\.toggle\('is-collapsed',collapsed\)/);
+  assert.match(js,/floater\.classList\.toggle\('is-chrome-collapsed',collapsed\)/);
+  assert.match(js,/node\.inert=collapsed/);
   assert.match(js,/data-orbit-action="player"[^>]*data-tip="Music Player"/);
   assert.match(js,/if\(action==='show-player'\)showPlayer\(\)/);
-  assert.match(js,/playerDock\.classList\.remove\('is-collapsed'\)/);
+  assert.match(js,/function showPlayer\(\)\{\s*setAgentChromeCollapsed\(false\)/);
   assert.match(css,/\.sf-agent-player-dock\.is-collapsed \{ opacity:0; visibility:hidden/);
   assert.match(js,/aria-label="Show music player"/);
   assert.match(js,/on\(playerDock,'focusin',pausePlayerHide\)/);
 });
 test('Playback, interaction, and cleanup preserve the single authoritative player',()=>{
-  assert.match(js,/on\(audio,'play',\(\)=>\{state\('music'\);showPlayer\(\);\}\)/);
+  assert.match(js,/on\(audio,'play',\(\)=>\{state\('music'\);showPlayer\(\);syncScenePlayback\(\);\}\)/);
   assert.match(js,/on\(playerDock,'pointerenter',pausePlayerHide\)/);
-  assert.match(js,/on\(visual,'pointerenter',\(\)=>\{showPlayer\(\);pausePlayerHide\(\);\}\)/);
+  for(const node of ['visual','floater']){
+    const hover=js.split('\n').find(line=>line.includes(`on(${node},'pointerenter'`));
+    assert.ok(hover);assert.match(hover,/pausePlayerHide\(\)/);assert.doesNotMatch(hover,/showPlayer\(\)/);
+  }
   assert.match(js,/pausePlayerHide\(\)/);
   assert.match(js,/resizeObserver\?\.disconnect\(\)/);
   assert.match(js,/playerObserver\?\.disconnect\(\)/);
@@ -55,7 +60,8 @@ test('Playback, interaction, and cleanup preserve the single authoritative playe
   assert.equal((php.match(/id="persistentAudio"/g)||[]).length,1);
 });
 test('No new capture backend, network calls, or permission changes are introduced',()=>{
-  assert.doesNotMatch(js,/\bfetch\s*\(|MediaRecorder|getUserMedia|captureStream/);
+  assert.doesNotMatch(js,/\bfetch\s*\(|MediaRecorder|getUserMedia|createMediaElementSource/);
+  assert.match(js,/audio\.captureStream\|\|audio\.mozCaptureStream/);
   assert.match(js,/options\.onStartCapture\?\.\(\)/);
   new vm.Script(js,{filename:'public-agent-canvas.js'});
 });

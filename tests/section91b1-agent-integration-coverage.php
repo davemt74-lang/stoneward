@@ -14,7 +14,10 @@ foreach($tools as $row)$index[$row['id']]=$row;
 $assert($coverage['schema']==='stonefellow.agent-integration-coverage.v1' && $coverage['scope']==='stonefellow_only','Explicit Stonefellow-only diagnostic contract');
 $assert($coverage['checks_passed'] && $coverage['registry_passed'],'Existing registry contracts and coverage pass');
 $assert($coverage['registered_tools']===count(sf_agent_tool_registry()) && $coverage['registered_skills']===count(sf_agent_skill_definitions()),'Complete live tool and skill counts');
-$assert(!$coverage['missing_skill_bindings'] && !$coverage['invalid_skill_bindings'],'Every exposed tool has a valid skill');
+$assert(!$coverage['missing_skill_bindings'] && !$coverage['invalid_skill_bindings'],'Every exposed tool has a chat skill or canvas data contract');
+$assert($coverage['registered_canvas_data_tools']===count(sf_canvas_capability_cards())
+    && $index['personal_listening_stats']['classification']==='canvas_data_contract'
+    && !$index['personal_listening_stats']['skill_ids'],'Canvas data contracts are counted independently of chat skills');
 $assert($coverage['admin_navigation_only_count']===count(sf_admin_agent_module_routes()) && $coverage['admin_navigation_only_count']===24,'All 24 module routes inventoried');
 $assert(!$coverage['invalid_module_contracts'],'All module routes resolve to bounded navigation');
 $assert(count(array_filter($coverage['admin_module_routes'],static fn($row)=>$row['conversation_integration']!=='navigation_only' || $row['record_read_verified'] || $row['record_write_verified']))===0,'Navigation is never reported as CRUD');
@@ -35,5 +38,5 @@ $auditPos=strpos($endpoint,"(\$_GET['audit']??'')==='1'");
 $assert($authPos!==false && $auditPos!==false && $authPos<$auditPos,'Coverage endpoint authenticates before diagnostics');
 $assert(str_contains($endpoint,'sf_agent_integration_coverage(sf_admin_agent_module_routes())'),'Admin-only opt-in endpoint uses live module routes');
 $assert(!str_contains($endpoint,'sf_agent_action_execute') && !str_contains($endpoint,'sf_agent_action_prepare'),'Read-only coverage endpoint cannot perform an action');
-echo 'Section 91B1: '.(19-$failed).'/19 checks'.PHP_EOL;
+echo 'Section 91B1: '.(20-$failed).'/20 checks'.PHP_EOL;
 exit($failed?1:0);

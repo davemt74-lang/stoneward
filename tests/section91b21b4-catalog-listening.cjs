@@ -11,10 +11,13 @@ function fixture(options={}){
  Object.assign(audio,{currentTime:60,paused:false,seeking:false,ended:false,playbackRate:1,currentSrc:'https://local.test/api/media.php?id=M123',src:'https://local.test/api/media.php?id=M123'});
  let track={id:'song-1',title:'Testing song',audio:'api/media.php?id=M123'},clock=0,timerId=0;
  const timers=new Map(),updates=[],finished=[],requests=[],readiness=[];
- const context={window:events,performance:{now:()=>clock},AbortController,Uint8Array,Date,Set,Promise,
+ const context={window:events,performance:{now:()=>clock},AbortController,Uint8Array,Date,Set,Promise,TextEncoder,
   setTimeout:(fn,ms)=>{timers.set(++timerId,{fn,ms});return timerId},clearTimeout:id=>timers.delete(id)};
  events.crypto=webcrypto;vm.createContext(context);vm.runInContext(code,context);
- function result(payload,extra={}){return {ok:true,transcript:{...payload,source:'catalog-audio',provider:'openai',model:'gpt-transcribe',review_status:'unverified',text:'Words from the selected song',title:'Testing song',...extra}}}
+ function result(payload,extra={}){return {ok:true,transcript:{...payload,source:'saved-catalog-lyrics',provider:'stored',
+  review_status:'approved',timing:'saved_segments',text:'Words from the selected song',title:'Testing song',
+  selected_start_ms:payload.start_ms,selected_end_ms:payload.end_ms,
+  segments:[{start_ms:payload.start_ms,end_ms:payload.end_ms,text:'Words from the selected song',lyric_state:'approved',timing_source:'manual'}],...extra}}}
  const skill=context.window.StonefellowCatalogListening.create({audio,getTrack:()=>track,monotonic:()=>clock,
   now:()=>new Date('2026-11-03T18:00:00Z'),eventTarget:events,
   prepare:async(id,ref,signal)=>{readiness.push({id,ref,signal});return options.prepare?options.prepare(id,ref,signal):{ok:true,available:true,max_seconds:90,source_fingerprint:fingerprint}},
@@ -31,13 +34,13 @@ test('Mobile selection requires no recording/microphone/browser recognition API 
  f.advance(8000);assert.equal(f.requests.length,0);assert.equal(f.updates.at(-1).end_ms,68000);
  f.skill.destroy();await flush();
 });
-test('Stop sends one canonical source-bound interval and returns an editable unverified draft',async()=>{
+test('Stop sends one canonical source-bound interval and returns reviewed lyrics',async()=>{
  const f=fixture();await f.skill.begin();f.advance(8000);
  const result=await f.skill.stop();assert.equal(result.ok,true);assert.equal(f.requests.length,1);
  const p=f.requests[0].payload;assert.equal(p.start_ms,60000);assert.equal(p.end_ms,68000);
  assert.equal(p.source_ref,'api/media.php?id=M123');assert.equal(p.source_fingerprint,fingerprint);
- assert.match(p.request_id,/^[a-f0-9]{32}$/);assert.equal(result.receipt.source,'catalog-audio');
- assert.equal(result.receipt.review_status,'unverified');assert.equal(f.skill.status().active,false);
+ assert.match(p.request_id,/^[a-f0-9]{32}$/);assert.equal(result.receipt.source,'saved-catalog-lyrics');
+ assert.equal(result.receipt.review_status,'approved');assert.equal(f.skill.status().active,false);
  assert.equal(f.finished.length,1);assert.equal(f.timers.size,0);
 });
 test('Slow readiness starts the interval only after the source is ready',async()=>{
@@ -53,7 +56,7 @@ test('Duplicate starts during readiness do not create another request, and Stop 
  ready.resolve({ok:true,available:true,source_fingerprint:fingerprint});await flush();assert.equal(f.skill.status().active,false);
 });
 test('Unavailable or unbound server source never becomes a recording or provider request',async()=>{
- for(const response of [{ok:true,available:false,message:'Enable OpenAI first.'},{ok:true,available:true}]){
+ for(const response of [{ok:true,available:false,message:'Saved lyrics are missing.'},{ok:true,available:true}]){
   const f=fixture({prepare:()=>response});assert.equal((await f.skill.begin()).ok,false);
   assert.equal(f.requests.length,0);assert.equal(f.skill.status().active,false);assert.equal(f.finished.length,0);
  }
@@ -106,7 +109,7 @@ test('A second Stop during submission discards local waiting and a late response
  const provider=deferred(),f=fixture({submit:()=>provider.promise});await f.skill.begin();f.advance(5000);
  const firstStop=f.skill.stop();await flush();assert.equal(f.requests.length,1);
  const old=f.requests[0].payload;const canceled=await f.skill.stop();assert.equal(canceled.canceled,true);
- assert.match(canceled.text,/may still complete and use Active Tokens/);
+ assert.match(canceled.text,/No audio was sent and no transcription was charged/);
  assert.equal((await firstStop).canceled,true);
  await f.skill.begin();const current=f.skill.status().request_id;
  provider.resolve(f.result(old));await flush();
@@ -133,31 +136,18 @@ test('Only matching source/track/range responses may become the current lyric dr
   const result=await f.skill.stop();assert.equal(result.ok,false,JSON.stringify(alter));assert.equal(result.receipt,null);
  }
 });
-test('Inward MP3 frame alignment is accepted as the actual draft interval',async()=>{
- let f;f=fixture({submit:p=>f.result(p,{start_ms:p.start_ms+40,end_ms:p.end_ms-40,silent_lead_ms:26,audio_duration_ms:1946})});
- await f.skill.begin();f.advance(2000);const result=await f.skill.stop();assert.equal(result.ok,true);
- assert.equal(result.receipt.start_ms,60040);assert.equal(result.receipt.end_ms,61960);
-});
-test('The combined controller prefers supported browser recognition and otherwise uses the catalog path',async()=>{
- const f=fixture();let starts=0;const browser={status:()=>({active:false}),begin:()=>{starts++;return {ok:true}},stop:async()=>({ok:true})};
- const desktop=f.context.window.StonefellowCatalogListening.combine(browser,f.skill,()=>true);
- assert.equal(desktop.mode(),'recognition');desktop.begin();assert.equal(starts,1);assert.equal(f.readiness.length,0);
- const mobile=f.context.window.StonefellowCatalogListening.combine(browser,f.skill,()=>false);
- assert.equal(mobile.mode(),'catalog');await mobile.begin();assert.equal(f.readiness.length,1);
- f.skill.destroy();await flush();
-});
 test('Production authenticated POST checks cancellation again after an asynchronous auth refresh',async()=>{
  const start=app.indexOf('  async function secureJsonPost('),end=app.indexOf('  function applyQueue(',start);
  assert.ok(start>=0&&end>start);const auth=deferred();let requests=0;
  const context={st:{auth:{csrf:null}},cfg:{apiBase:'api'},loadAuth:()=>auth.promise,fetch:()=>{requests++;throw Error('Unexpected POST')}};
  vm.createContext(context);vm.runInContext(app.slice(start,end),context);
- const abort=new AbortController(),pending=context.secureJsonPost('agent-song-catalog-transcribe.php',{},false,abort.signal);
+ const abort=new AbortController(),pending=context.secureJsonPost('song-lyrics-section.php',{},false,abort.signal);
  abort.abort();auth.resolve();await assert.rejects(pending,/canceled/);assert.equal(requests,0);
 });
 test('Production source/draft functions allow catalog receipts and keep another song from analyzing them',()=>{
  const a=app.indexOf('  function currentSongSource(){'),b=app.indexOf('  let songTranscriptionBusy',a);
  const c=app.indexOf('  function currentSongDraft(){'),d=app.indexOf('  async function executePrivateAnnotationCommand',c);
- const receipt={track_id:'song',start_ms:1000,end_ms:3000,source:'catalog-audio',provider:'openai'};
+ const receipt={track_id:'song',start_ms:1000,end_ms:3000,source:'saved-catalog-lyrics',provider:'stored'};
  const context={songLyricDraft:receipt,songListeningReceipt:receipt,songCaptureSkill:{getCapture:()=>null},songListeningSkill:{status:()=>({active:false})},st:{track:{id:'song'}}};
  vm.createContext(context);vm.runInContext(app.slice(a,b)+app.slice(c,d),context);
  assert.equal(context.currentSongSource(),receipt);assert.equal(context.currentSongDraft(),receipt);
@@ -167,12 +157,12 @@ test('Production source/draft functions allow catalog receipts and keep another 
 test('An unavailable fresh selection preserves the completed reviewed draft',async()=>{
  const start=app.indexOf('  async function executeSongCaptureAction(action){'),end=app.indexOf('  // Private annotation commands',start);
  const previous={phase:'report',listening_mode:'catalog',track_id:'song',transcript:'Original words',corrected:'Reviewed words',reports:[{text:'Reviewed interpretation'}]};
- const receipt={track_id:'song',source:'catalog-audio',start_ms:1000,end_ms:3000};
+ const receipt={track_id:'song',source:'saved-catalog-lyrics',start_ms:1000,end_ms:3000};
  const context={songExperience:previous,songLyricDraft:receipt,songListeningReceipt:receipt,
   songLyricCorrected:'Reviewed words',songLyricReport:{report:'Reviewed interpretation'},songPersonalNote:'My note',
   songTranscriptionBusy:false,songAnalysisBusy:false,vocalStudio:null,
   songCaptureSkill:{status:()=>({active:false})},
-  songListeningSkill:{mode:()=> 'catalog',status:()=>({active:false}),begin:async()=>({ok:false,text:'Source unavailable'})},
+  songListeningSkill:{status:()=>({active:false}),begin:async()=>({ok:false,text:'Source unavailable'})},
   st:{track:{id:'song',title:'Song'}},audio:{currentTime:6},window:{},
   updateSongExperience(changes){Object.assign(context.songExperience,changes)}};
  vm.createContext(context);vm.runInContext(app.slice(start,end),context);

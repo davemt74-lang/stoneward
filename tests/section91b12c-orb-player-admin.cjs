@@ -25,12 +25,13 @@ test('Audio panel sits beneath orb and embeds the action buttons',()=>{
   assert.equal((shell.match(/id="persistentAudio"/g)||[]).length,1);
 });
 test('Movement pauses on pointer hover and focus and resumes from current position',()=>{
-  assert.match(js,/hovered\|\|guideIndex>=0\|\|workspace\.classList\.contains\('open'\)/);
-  assert.match(js,/on\(floater,'pointerenter',\(\)=>\{hovered=true;/);
-  assert.match(js,/on\(floater,'pointerleave',\(\)=>\{hovered=false;roam\.start=0;/);
+  assert.match(js,/agentPointerOver\|\|hovered\|\|guideIndex>=0/);
+  assert.match(js,/on\(floater,'pointerenter',event=>\{if\(event\.pointerType==='touch'\)return;agentPointerOver=true;hovered=true;/);
+  assert.match(js,/on\(floater,'pointerleave',\(\)=>\{agentPointerOver=false;hovered=false;roam\.start=0;/);
   assert.match(js,/on\(floater,'focusin'/);
   assert.match(js,/on\(floater,'focusout'/);
-  assert.match(css,/\.sf-agent-floater:hover \.sf-agent-visual \{ animation-play-state:paused/);
+  assert.match(js,/roam\.start=0;return;/);
+  assert.doesNotMatch(css,/animation:sfFloat/);
 });
 test('Transparent shell has one full-viewport mesh behind header and footer',()=>{
   assert.match(css,/body\.sf-agent-canvas-active \.topbar \{ background:transparent!important/);

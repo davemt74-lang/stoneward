@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.245');
+define('SF_BUILD', '1.3.294');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -36,6 +36,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <!doctype html>
 <html lang="en">
 <head>
+  <meta http-equiv="Content-Security-Policy" content="frame-src 'none'" data-sf-canvas-frame-policy>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
@@ -69,6 +70,13 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/agent-song-capture.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/public-agent-canvas.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/canvas-image-review.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/canvas-image-analysis.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/canvas-music-picker.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/canvas-projects.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/canvas-resource-picker.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/canvas-access.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/canvas-gallery.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/fan-vocal-studio.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/song-moments.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/turntable-builder.css?v=<?=rawurlencode(SF_BUILD)?>">
@@ -129,7 +137,22 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           </div>
         </div>
         <nav>
+          <button id="menuShowAgent" class="menu-link-button" type="button" hidden>Show Agent</button>
+          <details id="menuCodingModelField" class="menu-coding-model" hidden>
+            <summary id="menuCodingModel">Coding Model <span id="menuCodingModelCurrent">Use default</span></summary>
+            <fieldset id="menuCodingModelOptions" aria-label="Coding Model" aria-describedby="menuCodingModelStatus"></fieldset>
+            <span id="menuCodingModelStatus" role="status"></span>
+          </details>
+          <button id="menuCanvasPermissions" class="menu-link-button" type="button" hidden>Canvas data permissions</button>
+          <section id="menuCanvasProjects" class="menu-canvas-projects" aria-label="Canvas project settings" hidden>
+            <label><input id="menuCanvasIdeas" type="checkbox" checked>Canvas ideas</label>
+            <label><input id="menuCanvasAutoApprove" type="checkbox">Auto-approve agent projects</label>
+            <small>Projects wait for your approval by default. Planning uses Active Tokens.</small>
+            <button id="menuCanvasSuggest" type="button">Suggest a canvas</button>
+            <small id="menuCanvasProjectsStatus" role="status"></small>
+          </section>
           <a href="./" data-view="home">Agent Canvas</a>
+          <a href="?view=canvas-gallery" data-view="canvas-gallery">Canvas Catalog</a>
           <a href="world" data-view="world">Artist World</a>
           <a href="music" data-view="music">Music</a>
           <a href="search" data-view="search">Search</a>
@@ -306,13 +329,22 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <section id="agentChatPopup" class="agent-chat-popup" aria-label="Stonefellow conversation" hidden>
         <header class="agent-chat-popup-head"><div><strong>Stonefellow</strong><span id="agentChatPopupState" role="status">Ready</span></div><div class="agent-chat-popup-tools"><button id="agentVoiceReplyToggle" type="button" aria-pressed="true" title="Toggle spoken Agent replies">Voice on</button><button id="agentChatNew" type="button">New chat</button><button id="agentChatClose" type="button" aria-label="Close Agent Chat">×</button></div></header>
         <div id="agentChatPopupMessages" class="agent-chat-popup-messages" role="log" aria-live="polite" aria-label="Conversation history"><p class="agent-chat-empty">Your conversation will appear here. Use the bar below to type or speak.</p></div>
+        <section id="canvasDebugPanel" class="sf-canvas-debug" aria-labelledby="canvasDebugTitle" hidden>
+          <header><strong id="canvasDebugTitle">Canvas debug</strong><button id="canvasDebugCopy" type="button">Copy debug report</button></header>
+          <textarea id="canvasDebugReport" aria-label="Canvas debug report" rows="4" readonly spellcheck="false"></textarea>
+          <p id="canvasDebugStatus" role="status"></p>
+        </section>
       </section>
+      <div id="canvasImageEditDraft" class="sf-canvas-image-edit-draft" hidden>
+        <span role="status" data-canvas-image-edit-label></span>
+        <button type="button" data-canvas-image-edit-cancel aria-label="Cancel image edit">Cancel</button>
+      </div>
     <form id="chatForm" class="chatbar" autocomplete="off">
       <button id="chatQuickButton" class="chat-action plus" type="button" aria-label="Open quick actions" aria-controls="chatQuickMenu" aria-expanded="false">+</button>
       <button id="agentChatToggle" class="chat-action chat-toggle" type="button" aria-label="Open Agent Chat" aria-expanded="false" aria-controls="agentChatPopup" title="Open Agent Chat">▤</button>
       <label class="sr-only" for="chatInput">Ask Stonefellow anything</label>
       <input id="chatInput" type="text" placeholder="Ask Stonefellow anything…" maxlength="320">
-      <button id="voiceButton" class="chat-action mic" type="button" aria-label="Start conversation" aria-pressed="false">◉</button>
+      <button id="voiceButton" class="chat-action mic" type="button" aria-label="Start Voice Chat" aria-pressed="false">◉</button>
       <button class="chat-action send" type="submit" aria-label="Send message">↑</button>
     </form>
     </div>
@@ -335,7 +367,20 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/library.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-brain.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-song-experience-ui.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-audio-sdk.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-agent-theme.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-projects-ui.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-resource-picker.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-access.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-gallery.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/vendor/acorn.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-preview-guard.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-scene-tester.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-build-workflow.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/public-agent-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-image-review.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-image-analysis.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-music-picker.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-chat-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/artist-home-renderer.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/turntable-parts.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
@@ -346,7 +391,6 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/agent-song-capture-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/fan-vocal-studio.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/song-moments.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
-  <script src="assets/js/agent-song-listening-skill.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/agent-song-catalog-listening.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/player-playback-lifecycle.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/app.js?v=<?=rawurlencode(SF_BUILD)?>"></script>

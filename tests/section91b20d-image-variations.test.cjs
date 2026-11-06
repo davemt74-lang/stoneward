@@ -73,17 +73,18 @@ test('An altered source is rejected before a daily paid attempt is reserved',()=
   assert.ok(reserve.indexOf('sf_image_gen_reference_candidate')>=0);
   assert.ok(reserve.indexOf('sf_image_gen_reference_candidate')<reserve.indexOf('$pdo->beginTransaction()'));
   assert.match(reserve,/status='generating'.*status='approved'/);
-  assert.match(reserve,/Daily paid-generation limit reached/);
+  assert.match(reserve,/Your daily paid-generation limit has been reached/);
 });
 
 test('Provider switches to one image edit with a base64 data URL only for an approved reference',()=>{
   const request=core.slice(core.indexOf('function sf_image_gen_request'),core.indexOf('function sf_image_gen_image_bytes'));
-  assert.match(request,/v1\/images\/generations/);
+  assert.match(core,/SF_IMAGE_GEN_GENERATE_ENDPOINT='https:\/\/api\.openai\.com\/v1\/images\/generations'/);
+  assert.match(request,/\$endpoint=SF_IMAGE_GEN_GENERATE_ENDPOINT/);
   assert.match(request,/v1\/images\/edits/);
   assert.match(request,/if\(\$reference\)/);
   assert.match(request,/\$payload\['images'\]=\[\['image_url'=>'data:'/);
   assert.match(request,/base64_encode\(\$bytes\)/);
-  assert.match(request,/'n'=>1/);
+  assert.match(core,/function sf_image_gen_payload[\s\S]*?'n'=>1/);
   assert.match(request,/sf_ai_provider_secret\('openai'\)/);
   assert.doesNotMatch(request,/CURLOPT_FOLLOWLOCATION=>true|retry\(/);
 });

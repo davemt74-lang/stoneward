@@ -32,7 +32,7 @@ async function browserSpeakCompletesOrInterrupts(){
   const pending=[],spoken=[];
   const synth={cancel:()=>{},getVoices:()=>[{lang:'en-US',localService:true}],speak:utterance=>{spoken.push(utterance.text);pending.push(utterance)}};
   const context={window:{speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text}}},
-    StonefellowSpeechSegments:{split},voiceRepliesEnabled:true,voicePlaybackSequence:2,speechFallbackResolve:null,voiceProbeSynth:false,
+    StonefellowSpeechSegments:{split},voiceRepliesEnabled:true,voicePlaybackSequence:2,speechFallbackResolve:null,
     agent:()=>{},setVoiceSpeechAudible:()=>{}};
   vm.createContext(context);
   vm.runInContext(extract(publicApp,'cancelLocalVoiceOutput')+';'+extract(publicApp,'speakWithDeviceVoice')+';globalThis.run=speakWithDeviceVoice',context);
