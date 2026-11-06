@@ -60,6 +60,13 @@ jobs:
         run: |
           python -m pip install playwright==1.57.0
           python -m playwright install --with-deps ${{ matrix.browser }}
+          python - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+          if '${{ matrix.browser }}' == 'chromium':
+              with sync_playwright() as p, open(os.environ['GITHUB_ENV'], 'a') as output:
+                  output.write('CHROMIUM_BIN=' + p.chromium.executable_path + '\n')
+          PY
       - name: Production lyric controls with synthetic saved-lyric responses
         env:
           SF_LYRICS_BROWSER: ${{ matrix.browser }}
@@ -72,6 +79,8 @@ jobs:
           name: catalog-lyrics-${{ matrix.browser }}
           path: catalog-lyric-evidence
           if-no-files-found: ignore
-      - name: Private listening room browser isolation
+      - name: Private listening room isolation in the bundled matching headless shell
         if: matrix.browser == 'chromium'
+        env:
+          SF_CANVAS_HEADLESS_SHELL: '1'
         run: python tests/section91b23a-listening-room-browser.py

@@ -6,10 +6,10 @@
   const maxBlobBytes = 128 * 1024 * 1024;
   const diagnosticLimit = 40;
   const diagnosticEvents = new Set(['session_ready', 'play_requested', 'rpc_error', 'local_playback_error', 'local_media_error', 'media_csp_violation', 'unhandled_rejection']);
-  const diagnosticMethods = new Set(['catalog', 'getTrack', 'getAudio', 'play', 'pause', 'seek', 'setVolume', 'getState']);
+  const diagnosticMethods = new Set(['catalog', 'getTrack', 'getAudio', 'play', 'pause', 'seek', 'setVolume', 'getState', 'createPlayer', 'playerPlay', 'playerPause', 'playerSeek', 'playerVolume', 'playerState', 'playerDispose']);
   const diagnosticCodes = new Set(['audio_unavailable', 'audio_session_closed', 'audio_busy', 'audio_asset_released', 'invalid_audio_source',
     'invalid_catalog', 'invalid_audio_request', 'invalid_audio_state', 'invalid_track', 'track_unavailable', 'audio_gesture_required',
-    'audio_source_unavailable', 'audio_network_error', 'audio_decode_error', 'audio_playback_interrupted', 'audio_seek_unavailable', 'audio_catalog_unavailable']);
+    'audio_source_unavailable', 'audio_network_error', 'audio_decode_error', 'audio_playback_interrupted', 'audio_seek_unavailable', 'audio_catalog_unavailable', 'audio_player_disposed']);
   const diagnosticNames = new Set(['Error', 'TypeError', 'ReferenceError', 'SyntaxError', 'RangeError', 'EvalError', 'URIError',
     'NotAllowedError', 'NotSupportedError', 'AbortError', 'InvalidStateError', 'SecurityError', 'NetworkError', 'EncodingError',
     'NotReadableError', 'NotFoundError', 'OperationError', 'DataError', 'QuotaExceededError', 'DOMException']);
@@ -33,6 +33,7 @@
   const readQueue = [];
   const controlQueue = [];
   const audioCache = new Map();
+  const players = new Map();
   const listeners = new Set();
   let nonce = null;
   let session = null;
@@ -53,7 +54,7 @@
     'NotReadableError', 'NotFoundError', 'OperationError', 'DataError', 'QuotaExceededError', 'DOMException']);
   const diagnosticCodes = new Set(['audio_unavailable', 'audio_session_closed', 'audio_busy', 'audio_asset_released', 'invalid_audio_source',
     'invalid_catalog', 'invalid_audio_request', 'invalid_audio_state', 'invalid_track', 'track_unavailable', 'audio_gesture_required',
-    'audio_source_unavailable', 'audio_network_error', 'audio_decode_error', 'audio_playback_interrupted', 'audio_seek_unavailable', 'audio_catalog_unavailable']);
+    'audio_source_unavailable', 'audio_network_error', 'audio_decode_error', 'audio_playback_interrupted', 'audio_seek_unavailable', 'audio_catalog_unavailable', 'audio_player_disposed']);
   function sourceKind(value) {
     if (typeof value !== 'string' || !value) return 'other';
     if (/^blob:/i.test(value)) return 'blob';
@@ -148,9 +149,44 @@
   function post(message) {
     parent.postMessage({ channel, version, documentId, nonce, session, ...message }, '*');
   }
+  function clearPlayers() {
+    for (const player of players.values()) { player.disposed = true; player.listeners.clear(); }
+    players.clear();
+  }
+  function playerState(player, state) {
+    player.state = Object.freeze({ ...state });
+    for (const listener of [...player.listeners]) { try { listener(player.state); } catch (_) {} }
+  }
+  function playerHandle(result) {
+    if (!result || !/^p-[a-f0-9]{32}$/.test(result.playerId || '') || closed)
+      throw failure('The independent player is unavailable.', 'audio_session_closed');
+    const player = { id: result.playerId, disposed: false, listeners: new Set(), state: null };
+    players.set(player.id, player);
+    playerState(player, result.state);
+    const run = (method, args = []) => player.disposed
+      ? Promise.reject(failure('This independent player was released.', 'audio_player_disposed'))
+      : request(method, [player.id, ...args]).then(state => { if (!player.disposed) playerState(player, state); return player.state; });
+    return Object.freeze({
+      play: () => run('playerPlay'), pause: () => run('playerPause'),
+      seek: seconds => run('playerSeek', [seconds]), setVolume: value => run('playerVolume', [value]),
+      getState: () => run('playerState'),
+      subscribe(listener) {
+        if (typeof listener !== 'function') throw new TypeError('Audio state subscribers must be functions.');
+        if (player.disposed) return () => {};
+        player.listeners.add(listener); if (player.state) listener(player.state);
+        return () => player.listeners.delete(listener);
+      },
+      dispose() {
+        if (player.disposed) return Promise.resolve(false);
+        player.disposed = true; player.listeners.clear(); players.delete(player.id);
+        return request('playerDispose', [player.id]);
+      }
+    });
+  }
   function clearAudio() {
     for (const entry of audioCache.values()) if (entry.url) URL.revokeObjectURL(entry.url);
     audioCache.clear();
+    clearPlayers();
   }
   function rejectPending(message) {
     for (const entry of pending.values()) entry.reject(failure(message, 'audio_session_closed'));
@@ -180,7 +216,7 @@
   }
   function request(method, args = []) {
     if (closed) return Promise.reject(failure('Canvas audio is no longer available.', 'audio_session_closed'));
-    const media = ['catalog', 'getTrack', 'getAudio'].includes(method);
+    const media = ['catalog', 'getTrack', 'getAudio', 'createPlayer'].includes(method);
     const controls = controlQueue.length + Array.from(pending.values()).filter(entry => !entry.media).length;
     if (!media && controls >= 16) return Promise.reject(failure('Too many audio controls are pending.', 'audio_busy'));
     return new Promise((resolve, reject) => {
@@ -236,6 +272,11 @@
       updateState(message.state);
       return;
     }
+    if (message.type === 'player-state') {
+      const player = players.get(message.playerId);
+      if (player && !player.disposed) playerState(player, message.state);
+      return;
+    }
     if (message.type !== 'response' || typeof message.id !== 'string') return;
     const entry = pending.get(message.id);
     if (!entry) return;
@@ -287,6 +328,10 @@
       audioCache.set(id, entry);
       return entry.promise;
     },
+    createPlayer(id) {
+      try { return request('createPlayer', [trackId(id)]).then(playerHandle); }
+      catch (error) { return Promise.reject(error); }
+    },
     play(id) {
       try { return request('play', arguments.length === 0 ? [] : [trackId(id)]); }
       catch (error) { diagnostic({ event: 'rpc_error', method: 'play', code: 'invalid_track', name: 'Error' }); return Promise.reject(error); }
@@ -321,7 +366,7 @@
   post({ type: 'connect' });
 })();`;
 
-  const hash = "'sha256-r50gknW0876XMqedAVN9F42tXzrUIaaerHIyys1SBbY='";
+  const hash = "'sha256-v+bUl6CwkiKuME+tMiibeEEQUQAtXW2kHkjD+2bAuRo='";
 
   function token() {
     return Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
@@ -382,6 +427,7 @@
       }
       case 'getTrack':
       case 'getAudio':
+      case 'createPlayer':
         if (args.length !== 1 || !validTrackId(args[0])) throw error('Choose a track from the catalog.', 'invalid_track');
         return args;
       case 'play':
@@ -397,12 +443,23 @@
       case 'setVolume':
         if (args.length !== 1 || !Number.isFinite(args[0]) || args[0] < 0 || args[0] > 1) throw error('Volume must be between zero and one.', 'invalid_audio_request');
         return args;
+      case 'playerPlay':
+      case 'playerPause':
+      case 'playerState':
+      case 'playerDispose':
+        if (args.length !== 1 || !/^p-[a-f0-9]{32}$/.test(args[0])) throw error('Choose an active independent player.', 'invalid_audio_request');
+        return args;
+      case 'playerSeek':
+      case 'playerVolume':
+        if (args.length !== 2 || !/^p-[a-f0-9]{32}$/.test(args[0]) || !Number.isFinite(args[1]) || args[1] < 0 ||
+          (method === 'playerVolume' && args[1] > 1)) throw error('Use a valid independent audio control.', 'invalid_audio_request');
+        return args;
       default: throw error('This audio operation is unavailable.', 'invalid_audio_request');
     }
   }
 
   function createHost(options) {
-    const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic } = options;
+    const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic, observeIndependent } = options;
     if (!frame || !audio || [getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume].some(callback => typeof callback !== 'function'))
       throw new TypeError('Canvas audio requires a frame, the canonical audio element and host callbacks.');
     const owner = getOwner();
@@ -423,6 +480,7 @@
       session.jobs.clear();
       session.queue.length = 0;
       session.tracks.clear();
+      for (const player of [...session.players.values()]) releasePlayer(session, player);
       if (notify) post({ type: 'disconnect', documentId: session.documentId, session: session.id });
       if (current === session) current = null;
     }
@@ -454,6 +512,95 @@
         muted: typeof state.muted === 'boolean' ? state.muted : !!audio.muted,
         ended: typeof state.ended === 'boolean' ? state.ended : !!audio.ended
       };
+    }
+    function independentState(player) {
+      const media = player.media;
+      return { trackId: player.track.track_id, title: player.track.title, currentTime: number(media.currentTime),
+        duration: number(media.duration, player.track.duration_seconds), playing: !media.paused && !media.ended,
+        volume: Math.min(1, number(media.volume, 1)), muted: !!media.muted, ended: !!media.ended };
+    }
+    function releasePlayer(session, player) {
+      if (player.disposed) return;
+      player.disposed = true;
+      player.controller.abort();
+      session.players.delete(player.id);
+      for (const event of events) player.media.removeEventListener(event, player.publish);
+      // Stop the host observer before clearing the element so it can finalize actual playback.
+      try { player.observer?.dispose(); } catch (_) {}
+      try { player.media.pause(); player.media.removeAttribute('src'); player.media.load(); } catch (_) {}
+      URL.revokeObjectURL(player.url);
+    }
+    async function freshTrack(session, id, signal) {
+      const result = await catalog(session, { track_id: id }, signal);
+      const track = result.tracks.find(item => item.track_id === id);
+      if (!track?.source_available) throw error('This track source is unavailable.', 'track_unavailable');
+      return track;
+    }
+    async function createPlayer(session, id, signal) {
+      if (session.players.size + session.creating >= 32) throw error('Too many independent players are active.', 'audio_busy');
+      session.creating++;
+      try {
+        const track = await freshTrack(session, id, signal);
+        const result = await loadAudio(id, signal);
+        if (!active(session)) throw error('Canvas audio access ended.', 'audio_session_closed');
+        const blob = result instanceof Blob ? result : result?.blob;
+        if (!(blob instanceof Blob) || blob.size < 1 || blob.size > maxBlobBytes ||
+          (result?.track && (result.track.track_id !== id || result.track.source_available !== true)))
+          throw error('The audio source is unavailable.', 'invalid_audio_source');
+        const media = new Audio();
+        const player = { id: 'p-' + token(), track, media, url: URL.createObjectURL(blob), disposed: false, observer: null, controller: new AbortController() };
+        player.publish = () => {
+          if (!active(session) || player.disposed) return;
+          post({ type: 'player-state', documentId: session.documentId, session: session.id, playerId: player.id, state: independentState(player) });
+        };
+        session.players.set(player.id, player);
+        try {
+          for (const event of events) media.addEventListener(event, player.publish);
+          player.observer = typeof observeIndependent === 'function' ? observeIndependent(media, Object.freeze({ ...track }), {
+            isActive: () => active(session) && !player.disposed,
+            canComplete: () => {
+              const actual = number(media.duration), position = number(media.currentTime), published = track.duration_seconds;
+              if (!media.ended || (actual >= 10 && position < actual - Math.max(5, actual * .02))) return false;
+              return !(published >= 40 && position >= 2 && Math.max(position, actual) < published - Math.max(15, published * .08));
+            }
+          }) : null;
+          media.preload = 'metadata'; media.src = player.url; media.load();
+        } catch (failure) { releasePlayer(session, player); throw failure; }
+        return { playerId: player.id, state: independentState(player) };
+      } finally { session.creating--; }
+    }
+    function whilePlayerActive(player, promise, controller) {
+      return new Promise((resolve, reject) => {
+        const aborted = () => { controller?.abort(); reject(error('This independent player was released.', 'audio_player_disposed')); };
+        player.controller.signal.addEventListener('abort', aborted, { once: true });
+        Promise.resolve(promise).then(resolve, reject).finally(() => player.controller.signal.removeEventListener('abort', aborted));
+        if (player.controller.signal.aborted) aborted();
+      });
+    }
+    async function independentOperation(session, job) {
+      const player = session.players.get(job.args[0]);
+      if (!player || player.disposed) throw error('This independent player was released.', 'audio_player_disposed');
+      switch (job.method) {
+        case 'playerPlay':
+          await whilePlayerActive(player, freshTrack(session, player.track.track_id, job.controller.signal), job.controller);
+          if (!active(session) || player.disposed) throw error('This independent player was released.', 'audio_player_disposed');
+          try { await whilePlayerActive(player, player.media.play(), job.controller); }
+          catch (failure) {
+            if (player.disposed) throw error('This independent player was released.', 'audio_player_disposed');
+            throw error('Independent playback could not start.', failure?.name === 'NotAllowedError' ? 'audio_gesture_required' :
+              failure?.name === 'NotSupportedError' ? 'audio_decode_error' : failure?.name === 'AbortError' ? 'audio_playback_interrupted' : 'audio_unavailable');
+          }
+          break;
+        case 'playerPause': player.media.pause(); break;
+        case 'playerSeek':
+          if (!Number.isFinite(player.media.duration) || job.args[1] > player.media.duration) throw error('This seek is unavailable.', 'audio_seek_unavailable');
+          player.media.currentTime = job.args[1]; break;
+        case 'playerVolume': player.media.volume = job.args[1]; break;
+        case 'playerDispose': releasePlayer(session, player); return true;
+      }
+      if (!active(session) || player.disposed) throw error('Canvas audio access ended.', 'audio_session_closed');
+      player.publish();
+      return independentState(player);
     }
     function refresh() {
       if (!authorized()) return;
@@ -490,8 +637,10 @@
     async function operation(session, job) {
       if (!active(session)) throw error('Canvas audio access ended.', 'audio_session_closed');
       const [argument] = job.args;
+      if (job.method.startsWith('player')) return independentOperation(session, job);
       switch (job.method) {
         case 'catalog': return catalog(session, argument, job.controller.signal);
+        case 'createPlayer': return createPlayer(session, argument, job.controller.signal);
         case 'getTrack': {
           const result = await catalog(session, { track_id: argument }, job.controller.signal);
           const track = result.tracks.find(item => item.track_id === argument);
@@ -544,7 +693,7 @@
         if (!current || current.documentId !== message.documentId) {
           abortSession(current, true);
           current = { id: token(), documentId: message.documentId, closed: false, lastRequest: 0,
-            jobs: new Map(), queue: [], mediaActive: 0, controlsActive: 0, tracks: new Map(), readyReported: false };
+            jobs: new Map(), queue: [], mediaActive: 0, controlsActive: 0, tracks: new Map(), players: new Map(), creating: 0, readyReported: false };
         }
         try { post({ type: 'hello', documentId: current.documentId, session: current.id, state: snapshot() }); }
         catch (_) { abortSession(current, true); }
@@ -565,8 +714,8 @@
       let args;
       try { args = validateArgs(message.method, message.args); }
       catch (failure) { response(session, message.id, null, failure, message.method); return; }
-      if (message.method === 'play') reportDiagnostic(session, { event: 'play_requested', method: 'play' });
-      const media = ['catalog', 'getTrack', 'getAudio'].includes(message.method);
+      if (message.method === 'play' || message.method === 'playerPlay') reportDiagnostic(session, { event: 'play_requested', method: message.method });
+      const media = ['catalog', 'getTrack', 'getAudio', 'createPlayer'].includes(message.method);
       if ((media && session.queue.length >= 32) || (!media && session.controlsActive >= 16)) {
         response(session, message.id, null, error('Too many audio requests are pending.', 'audio_busy'), message.method);
         return;

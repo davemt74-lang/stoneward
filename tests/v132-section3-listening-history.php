@@ -3,6 +3,7 @@ declare(strict_types=1);
 $root=dirname(__DIR__);
 function ok($v,$m){if(!$v){fwrite(STDERR,"FAIL: $m\n");exit(1);}echo "PASS: $m\n";}
 function src($rel){global $root;return (string)file_get_contents($root.'/'.$rel);}
+$recording=src('api/listening-playback-core.php');
 $core=src('api/personalization-core.php');$api=src('api/listening-history.php');$notifications=src('api/notifications.php');$js=src('assets/js/app.js');$css=src('assets/css/site.css');$migrations=src('api/migrations.php');$version=src('version.php');
 ok(str_contains($core,'function sf_personalization_history_summary'),'listening history summary exists');
 ok(str_contains($core,'COUNT(DISTINCT session_key) AS sessions'),'summary counts listening sessions');
@@ -13,7 +14,10 @@ ok(str_contains($core,"'source'=>"."$"."r['source']"),'history rows include play
 ok(str_contains($core,"'resume_position'=>"."$"."resume")&&str_contains($core,"'can_resume'=>"."$"."resume>0"),'history rows include safe resume state');
 ok(str_contains($core,"id<?")&&str_contains($core,'next_before_id'),'history pagination uses stable event IDs');
 ok(str_contains($core,'function sf_personalization_clear_track_history'),'per-track privacy clearing exists');
-ok(str_contains($core,'UPDATE listening_events SET user_id=NULL WHERE user_id=? AND track_id=?'),'per-track clearing anonymizes aggregate events');
+ok(str_contains($core,'sf_listening_playback_forget($userId,$trackId)')
+    &&str_contains($recording,'UPDATE listening_events SET user_id=NULL,session_key=?')
+    &&str_contains($recording,"(\$track!==null?' AND track_id=?':'')"),
+    'per-track clearing delegates to account-and-track-scoped aggregate anonymization');
 ok(str_contains($core,'DELETE FROM user_listening_progress WHERE user_id=? AND track_id=?'),'per-track clearing removes resume state');
 ok(str_contains($api,"action==='clear_all'")&&str_contains($api,"action==='clear_track'"),'history API supports all/track privacy clearing');
 ok(str_contains($api,'sf_require_user(false,$write)'),'history endpoint requires authenticated user and CSRF on writes');

@@ -304,8 +304,46 @@ FIXTURE = '''() => {
 }'''
 
 
+def first_pointer_disclosure(browser, width):
+    """Fresh production renderer: no prior focus, scripted handler or input retry."""
+    context=browser.new_context(viewport={'width':width,'height':850},has_touch=width<720,reduced_motion='reduce')
+    page=context.new_page()
+    page.set_default_timeout(5000)
+    try:
+        page.set_content('<!doctype html><html><body><audio></audio><div id="target"></div></body></html>')
+        page.add_style_tag(content=(ROOT/'assets/css/public-agent-canvas.css').read_text())
+        page.add_script_tag(content=(ROOT/'assets/js/public-agent-canvas.js').read_text())
+        mounted=page.evaluate("""() => {
+          SFPublicAgentCanvas.mount(document.querySelector('#target'),{audio:document.querySelector('audio'),getSceneOwner:()=> 'fixture',canUseScenes:()=>true});
+          return SFPublicAgentCanvas.showScene({canvas_kind:'custom',track_id:'',title:'First pointer disclosure',agent_design:'hidden',
+            html:'<section class="geometry"><h1>First pointer disclosure</h1><details><summary>Open the first sketch</summary><p>Native first pointer content</p></details></section>',
+            css:'.geometry{padding:90px 16px}details{width:200px}'},{focus:false});
+        }""")
+        check(mounted, f'Chromium/{width} fresh production canvas opens without author scripts')
+        element=page.locator('.sf-agent-scene-backdrop iframe')
+        frame=element.element_handle().content_frame()
+        frame.wait_for_load_state('load')
+        expect(frame.get_by_role('heading',name='First pointer disclosure')).to_be_visible()
+        check(element.get_attribute('sandbox')=='' and not frame.locator('script').count(),
+              f'Chromium/{width} first-pointer fixture retains opaque script-disabled sandbox')
+        summary=frame.locator('summary')
+        # Deliberately do not focus first: this separately certifies the pure
+        # first native pointer path before the complex multi-canvas workflow.
+        (summary.tap if width<720 else summary.click)()
+        expect(frame.locator('details')).to_have_attribute('open','')
+        expect(frame.get_by_text('Native first pointer content')).to_be_visible()
+        check(True,f'Chromium/{width} first native pointer opens disclosure in a fresh opaque canvas')
+        summary.press('Space')
+        expect(frame.locator('details')).not_to_have_attribute('open','')
+    finally:
+        context.close()
+
+
 with sync_playwright() as p:
-    executable = os.environ.get('CHROMIUM_BIN') or shutil.which('chromium')
+    # Keep opaque-frame pointer tests on Playwright's default headless engine.
+    # Regular Chromium audio remains covered separately in the CI matrix.
+    executable = None if os.environ.get('SF_CANVAS_HEADLESS_SHELL') == '1' else (
+        os.environ.get('CHROMIUM_BIN') or shutil.which('chromium'))
     launch = {'headless': True, 'args': ['--no-sandbox']}
     if executable:
         launch['executable_path'] = executable
@@ -314,6 +352,7 @@ with sync_playwright() as p:
     second_tone = fixture_tone(((11000, 5), (4400, 20)))
     sidebar_png = fixture_png(960, 540)
     for width in widths:
+        first_pointer_disclosure(browser,width)
         prefix = f'Chromium/{width} '
         context = browser.new_context(
             viewport={'width': width, 'height': 850},
@@ -321,6 +360,15 @@ with sync_playwright() as p:
             permissions=['clipboard-read', 'clipboard-write'])
         page = context.new_page()
         page.set_default_timeout(5000)
+
+        def activate(control):
+            # Keyboard focus invokes the real focusin pause on roaming controls
+            # before Playwright checks pointer stability; it never activates them.
+            if control.evaluate("node=>!!node.closest('.sf-agent-floater')&&node.matches('button,input,select,textarea,summary,a[href],[tabindex]')"):
+                control.focus()
+                expect(control).to_be_focused()
+            (control.tap if width < 720 else control.click)()
+
         requests, errors = [], []
         sidebar_image_url = None
         sidebar_batch_image_urls = set()
@@ -596,7 +644,7 @@ with sync_playwright() as p:
         check(page.locator('.sf-agent-scene-backdrop iframe').count() == 1 and
               page.evaluate('!firstFrame.isConnected&&posts[1].previous_id===1&&posts[1].brief==="make it minimal"'),
               prefix + 'revision replaces the frame and preserves the prior scene ID')
-        history_button.click()
+        activate(history_button)
         rail = page.locator('.sf-agent-page-rail[data-view="scene-history"]')
         rail.locator('.sf-agent-page-viewport').wait_for()
         page.wait_for_function('document.querySelector(".sf-agent-page-rail[data-view=scene-history]").classList.contains("open")')
@@ -628,7 +676,7 @@ with sync_playwright() as p:
         check(coding.get_attribute('data-state') == 'ready' and
               coding.locator('.sf-agent-coding-html').text_content() == page.evaluate('scene.html'),
               prefix + 'reopened source is available immediately')
-        history_button.click()
+        activate(history_button)
         delete_spare = rail.get_by_role('button', name='Delete Spare canvas')
         expect(delete_spare).to_be_visible()
         delete_spare.click()
@@ -694,9 +742,6 @@ with sync_playwright() as p:
         check(panel_box and panel_box['x'] >= 0 and panel_box['x'] + panel_box['width'] <= width + 1 and
               catalog_panel.evaluate('node=>getComputedStyle(node).overflowY==="visible"'),
               prefix + 'native catalog fits the viewport and uses the outer page scroll')
-
-        def activate(control):
-            (control.tap if width < 720 else control.click)()
 
         activate(catalog_panel.get_by_role('button', name='Play Album track'))
         activate(catalog_panel.get_by_role('button', name='View album Fixture <b>Album</b>'))
@@ -913,10 +958,44 @@ with sync_playwright() as p:
               prefix + 'trackless custom canvases hide song controls and leave existing audio alone')
         # Isolate authored background interaction from the intentionally movable host orb.
         expect(page.locator('.sf-agent-sphere')).not_to_be_visible()
-        disclosure = frame.locator('summary')
-        # Activate the native label center, not a browser-specific disclosure-marker offset.
-        activate(disclosure)
-        expect(frame.locator('details.reveal')).to_have_attribute('open', '')
+        # A parsed heading can precede the new iframe's native load/input lifecycle.
+        geometry_element = backdrop.element_handle()
+        geometry_frame = geometry_element.content_frame()
+        print('Native disclosure frame', json.dumps({
+            'width': width, 'browser_version': browser.version, 'frame_url': geometry_frame.url,
+            'document': geometry_frame.evaluate('''() => ({url:location.href,ready:document.readyState,
+              heading:document.querySelector('h1')?.textContent,open:document.querySelector('details')?.open})'''),
+            'element': geometry_element.evaluate('''element => ({connected:element.isConnected,
+              current:element===document.querySelector('.sf-agent-scene-backdrop iframe'),
+              count:document.querySelectorAll('.sf-agent-scene-backdrop iframe').length,
+              source_has_geometry:element.srcdoc.includes('Silent geometry'),rect:element.getBoundingClientRect().toJSON()})''')
+        }), flush=True)
+        geometry_frame.wait_for_load_state('load')
+        expect(geometry_frame.get_by_role('heading', name='Silent geometry')).to_be_visible()
+        disclosure = geometry_frame.locator('summary')
+        # This long workflow crosses many frames and host focus contexts. Verify
+        # native child focus explicitly before testing the pointer default action;
+        # the separate fresh-canvas case above preserves unfocused first-pointer coverage.
+        disclosure.focus()
+        expect(disclosure).to_be_focused()
+        expect(geometry_frame.locator('details.reveal')).not_to_have_attribute('open','')
+        print('Native disclosure focused',geometry_frame.evaluate('()=>({active:document.activeElement.tagName,focused:document.hasFocus()})'),flush=True)
+        try:
+            (disclosure.tap if width < 720 else disclosure.click)()
+            expect(geometry_frame.locator('details.reveal')).to_have_attribute('open', '')
+        except Exception:
+            print('Native disclosure input failure', json.dumps({
+                'frame_url': geometry_frame.url,
+                'document': geometry_frame.evaluate('''() => {const summary=document.querySelector('summary'),rect=summary.getBoundingClientRect();
+                  return {url:location.href,ready:document.readyState,open:summary.parentElement.open,
+                    active:document.activeElement?.outerHTML,rect:rect.toJSON(),
+                    target:document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)?.outerHTML};}'''),
+                'host': page.evaluate('''() => {const frame=document.querySelector('.sf-agent-scene-backdrop iframe');
+                  return {active:document.activeElement?.outerHTML.slice(0,240),scrollX,scrollY,
+                    frames:document.querySelectorAll('.sf-agent-scene-backdrop iframe').length,
+                    frame_rect:frame?.getBoundingClientRect().toJSON()};}''')
+            }), flush=True)
+            raise
         expect(frame.get_by_text('Private sketch content')).to_be_visible()
         check(frame.get_by_text('Private sketch content').is_visible() and backdrop.get_attribute('tabindex') == '0' and
               backdrop.get_attribute('sandbox') == '',
@@ -1531,7 +1610,7 @@ with sync_playwright() as p:
         check(canvas_stage.is_visible() and page.evaluate('document.activeElement.id==="composer-input"'),
               prefix + 'restoring a saved backdrop can leave focus in the composer')
         page.evaluate('listeningRoomOwner="4";selectCanvasId("4",scene.id)')
-        history_button.click()
+        activate(history_button)
         rail.get_by_role('button', name='Delete <b>Saved room</b>').click()
         rail.get_by_role('button', name='Delete canvas', exact=True).click()
         page.wait_for_function('typeof releaseCanvasDelete==="function"')

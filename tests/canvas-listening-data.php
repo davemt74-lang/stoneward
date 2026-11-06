@@ -1,0 +1,43 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/listening-playback.php';
+require_once $root.'/api/canvas-access-core.php';
+
+$uid=3;$foreignUid=4;
+$q=sf_db()->prepare('INSERT INTO users(id,email,display_name,password_hash,role,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)');
+foreach([$uid,$foreignUid] as $id)$q->execute([$id,'canvas-time'.$id.'@example.invalid','Listener',password_hash('fixture',PASSWORD_DEFAULT),'user','active',gmdate('c'),gmdate('c')]);
+$user=['id'=>$uid,'role'=>'user'];$other=['id'=>$foreignUid,'role'=>'user'];
+sf_privacy_save_profile($uid,['listening_history_enabled'=>true,'personalization_enabled'=>true]);
+$now=(int)floor(microtime(true)*1000);
+$fresh=['session_token'=>str_repeat('c4',16),'privacy_epoch'=>sf_listening_playback_epoch($uid),'history_enabled'=>true];
+$playId=str_repeat('d4',16);
+sf_listening_playback_record($user,$fresh,listen_request('begin',$playId,'start'),$now);
+sf_listening_playback_record($user,$fresh,listen_request('event',$playId,'progress',4,4),$now+4000);
+sf_listen_record($uid,'coverage-legacy','song-one','start',0,120);
+$foreign=['session_token'=>str_repeat('e4',16),'privacy_epoch'=>sf_listening_playback_epoch($foreignUid),'history_enabled'=>true];
+sf_listening_playback_record($other,$foreign,listen_request('begin',str_repeat('f4',16),'start'),$now);
+sf_listening_playback_record($other,$foreign,listen_request('event',str_repeat('f4',16),'progress',90,90),$now+90000);
+
+$html='<section class="sf-dataset-personal_listening_stats"><div class="sf-data-row"><span class="sf-field-listened_seconds"></span></div></section>';
+$scene=sf_agent_scene_history_save($uid,['canvas_kind'=>'custom','track_id'=>'','title'=>'Observed time','html'=>$html,'css'=>'']);
+$context=['scene_id'=>$scene['id']];
+$data=sf_agent_canvas_data_for_scene($user,$scene['html'],'',null,null,$context);
+check($data['personal_listening_stats']['state']==='consent_required'&&$data['personal_listening_stats']['rows']===[],'Measured listening fields remain behind current-viewer canvas consent');
+$access=sf_canvas_access_summary($user,$context);
+sf_canvas_access_change($user,$context,'grant',$access['fingerprint'],['canvas.data.personal_listening_stats']);
+$data=sf_agent_canvas_data_for_scene($user,$scene['html'],'',null,null,$context);
+$row=$data['personal_listening_stats']['rows'][0];
+check($row['track_id']==='song-one'&&(float)$row['listened_seconds']===4.0,'Canvas data uses canonical current-account observed time without another account\'s ninety seconds');
+check((int)$row['measured_events']===2&&(int)$row['legacy_events']===1,'Canvas time exposes both measured and historical unknown coverage');
+check(!isset($row['actor_hash'],$row['session_key'],$row['play_id'],$row['attribution_json']),'Aggregate data does not disclose raw session identities or private origin records');
+$tools=array_column(sf_agent_canvas_data_tools(),null,'id');
+check(str_contains($tools['personal_listening_stats']['description'],'zero measured seconds does not imply no historical listening'),'Coding capability explains the limits of historical time coverage');
+$zero=sf_agent_canvas_listening_rows($uid,array_column(sf_public_catalog(),null,'id'),'song-two')[0];
+check($zero['listened_seconds']===0&&$zero['measured_events']===0&&$zero['legacy_events']===0,'Unplayed current-song fallback includes explicit zero metric and coverage fields');
+$grant=sf_canvas_access_export($uid)[0];
+$fields=array_values(array_filter(json_decode($grant['fields_json'],true),static fn($field)=>!preg_match('/\A(?:listened_seconds|measured_events|legacy_events):/',$field)));
+sf_db()->prepare('UPDATE canvas_access_grants SET fields_json=? WHERE user_id=? AND context_key=? AND permission_id=?')->execute([json_encode($fields),$uid,$grant['context_key'],$grant['permission_id']]);
+check(sf_canvas_access_summary($user,$context)['requires_consent'],'A pre-upgrade grant cannot silently expand to new measured listening fields');
+$access=sf_canvas_access_summary($user,$context);
+sf_canvas_access_change($user,$context,'grant',$access['fingerprint'],['canvas.data.personal_listening_stats']);
+check(!sf_canvas_access_summary($user,$context)['requires_consent'],'Explicit expanded consent restores the newly declared aggregate fields');

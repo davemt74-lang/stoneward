@@ -1,6 +1,6 @@
 # Canvas capability and permission foundation
 
-Implemented locally in v1.3.294: the capability/admin policy foundation and remembered viewer consent for the seven existing registered canvas datasets. This is a scoped release unit; the token meter, cross-experience analytics, additional pickers, library/provider adapters and broader security-learning outline remain future work. Image/vision/production expansion remains on hold.
+Merged in v1.3.294 ([PR #346](https://github.com/davemt74-lang/stoneward/pull/346), 29 passing checks): the capability/admin policy foundation and remembered viewer consent for the seven existing registered canvas datasets. This is a scoped release unit; the token meter and cross-experience analytics have separate implementation/validation records. Additional pickers, library/provider adapters and the broader security-learning outline remain future work. Image/vision/production expansion remains on hold.
 
 ## Capability cards and administrator policy
 

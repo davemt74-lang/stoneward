@@ -33,8 +33,8 @@ function sf_agent_tool_registry(): array {
             'label'=>'Personal listening statistics','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/listening.php',
             'handler'=>'sf_listening_analytics','confirmation'=>false,'execution'=>'server',
             'canvas_data'=>[
-                'description'=>'The signed-in listener’s own play starts and completions per published song over the past 30 days, ordered by play starts.',
-                'fields'=>['track_id'=>'text','title'=>'text','release'=>'text','listens'=>'number','completes'=>'number'],
+                'description'=>'The signed-in listener’s own play starts, completions and observed listening seconds per published song over the past 30 days, ordered by play starts. Listening seconds measure reported native playback, excluding seeking, pauses and buffering. measured_events identifies reports with this evidence; legacy_events identifies older or unsupported reports with no measured time, so zero measured seconds does not imply no historical listening.',
+                'fields'=>['track_id'=>'text','title'=>'text','release'=>'text','listens'=>'number','completes'=>'number','listened_seconds'=>'number','measured_events'=>'number','legacy_events'=>'number'],
                 'filters'=>['track_id'],
                 'max_rows'=>30,
             ],

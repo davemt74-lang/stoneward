@@ -107,6 +107,8 @@ window.cfg={apiBase:'api'};
 window.catalog=window.fixtureTracks;
 window.trackById=id=>catalog.find(track=>track.id===id);
 window.canvasOwner=()=>fixtureOwner;
+// This fixture mounts an owned private canvas, not a gallery entry.
+window.canvasSceneOwner=()=>fixtureOwner;window.isGalleryScene=()=>false;window.requirePublishedCanvas=async()=>{};
 window.playerVolume=()=>audio.volume;
 window.savedPlaybackPosition=()=>audio.currentTime||0;
 window.refreshSiteData=async()=>{};
@@ -271,11 +273,11 @@ def run_browser(pw,site,base,mp3,scene):
         check(page.evaluate('builderCalls')==1,'the vinyl action invokes the native record builder callback')
         page.locator('[data-agent-action="toggle-scene-code"]').click();expect(page.locator('#sfAgentCodingRail')).to_be_hidden()
         prior_plays=page.evaluate('playCalls.length')
-        page.evaluate("()=>{holdNextCatalog=true;window.stalePlay=playCanvasAudio('song-2').then(()=> 'played',error=>error.message)}")
+        page.evaluate("()=>{holdNextCatalog=true;window.stalePlay=playCanvasAudio('song-2').then(()=> 'played',error=>error.code)}")
         page.wait_for_function('held.length===1')
         page.evaluate("fixtureOwner='2';st.auth.user.id=2;listeningRoom={id:2};SFPublicAgentCanvas.syncSceneAccess();held[0].resolve()")
         page.wait_for_function('!SFPublicAgentCanvas.sceneActive()')
-        check(page.evaluate('playCalls.length')==prior_plays and 'session' in page.evaluate('stalePlay'),'an old-owner metadata response cannot start playback in the new scene session')
+        check(page.evaluate('playCalls.length')==prior_plays and page.evaluate('stalePlay')=='audio_session_closed','an old-owner metadata response cannot start playback in the new scene session')
         check(errors==[],'the normal SDK and canvas flow produces no JavaScript errors')
         page.evaluate("()=>{fixtureOwner='1';st.auth.user.id=1;showFixture()}")
         frame=next(frame for frame in page.frames if frame!=page.main_frame)

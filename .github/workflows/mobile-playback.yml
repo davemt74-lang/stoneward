@@ -10,7 +10,8 @@ jobs:
   mobile-playback-runtime:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # Cold browser dependency installation can consume most of ten minutes.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -226,7 +226,7 @@ function sf_agent_canvas_project_rows(array $source,string $id,array $fields): a
 function sf_agent_canvas_listening_rows(int $userId,array $publishedTracks,?string $trackId=null): array {
     if($userId<=0)return [];
     $source=sf_listening_track_rows(gmdate('c',time()-30*86400),$userId,$trackId);
-    if($trackId!==null&&!$source)$source=[['track_id'=>$trackId,'listens'=>0,'completes'=>0]];
+    if($trackId!==null&&!$source)$source=[['track_id'=>$trackId,'listens'=>0,'completes'=>0,'listened_seconds'=>0,'measured_events'=>0,'legacy_events'=>0]];
     $rows=[];
     foreach($source as $row){
         $track=$publishedTracks[$row['track_id']]??null;

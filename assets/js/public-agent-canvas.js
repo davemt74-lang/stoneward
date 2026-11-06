@@ -1850,11 +1850,13 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     function startCanvasAudio(frame,script){
       destroyCanvasAudio();
       if(!script?.js)return;
+      const context=Object.freeze(listeningScene?.galleryId?{gallery_id:listeningScene.galleryId}:{scene_id:listeningScene?.id});
       sceneAudioHost=script.sdk.createHost({frame,audio,
         getOwner:()=>options.getSceneOwner?.(),
         canUse:()=>!destroyed&&listeningScene?.layer===frame&&!!options.canUseScenes?.(),
         loadCatalog:(filters,signal)=>options.onCanvasAudioCatalog?.(filters,signal),
         loadAudio:(trackId,signal)=>options.onCanvasAudioSource?.(trackId,signal),
+        observeIndependent:(media,track,settings)=>options.onCanvasIndependentAudioObserve?.(media,track,context,settings),
         play:trackId=>options.onCanvasAudioPlay?.(trackId),
         pause:()=>options.onCanvasAudioPause?.(),
         seek:position=>options.onCanvasAudioSeek?.(position),
@@ -2183,7 +2185,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         images.ready=true;
         postSceneImages(images);
       });
-      listeningScene={id:scene.id,trackId,story,cue,trackData,images,layer,script,owner};
+      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner};
       renderSceneImageChoices();
       renderSceneCatalog(scene.catalog_blocks);
       const artwork=sourceAvailable?sceneArtwork(scene.artwork):'';
