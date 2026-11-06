@@ -913,10 +913,12 @@ with sync_playwright() as p:
               prefix + 'trackless custom canvases hide song controls and leave existing audio alone')
         disclosure = frame.locator('summary')
         (disclosure.tap if width < 720 else disclosure.click)(position={'x': 8, 'y': 10})
+        expect(frame.get_by_text('Private sketch content')).to_be_visible()
         check(frame.get_by_text('Private sketch content').is_visible() and backdrop.get_attribute('tabindex') == '0' and
               backdrop.get_attribute('sandbox') == '',
               prefix + 'custom canvas supports native disclosure inside the opaque sandbox')
         disclosure.press('Space')
+        expect(frame.get_by_text('Private sketch content')).not_to_be_visible()
         page.locator('#composer-input').click()
         check(not frame.get_by_text('Private sketch content').is_visible() and
               page.evaluate('document.activeElement.id==="composer-input"'),
