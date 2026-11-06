@@ -3,7 +3,7 @@
 Disposable PHP host, actual protocol2 endpoint and canonical analytics; isolated
 host harness rather than full application/physical-device acceptance.
 """
-import importlib.util,json,os,shutil,signal,socket,subprocess,sys,tempfile,time
+import base64,importlib.util,json,os,shutil,signal,socket,subprocess,sys,tempfile,time
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1];sys.dont_write_bytecode=True
@@ -15,10 +15,16 @@ def block(a,b):return APP[APP.index(a):APP.index(b,APP.index(a))]
 def check(value,label):
  assert value,label
  checks.append(label);print('PASS '+label,flush=True)
-PROGRAM="const play=document.createElement('button');play.textContent='Play synchronized song';document.querySelector('.controls').append(play);play.onclick=()=>StonefellowAudio.play('song-2').then(()=>{document.querySelector('p').textContent='playing';}).catch(()=>{document.querySelector('p').textContent='failed';});"
+PROGRAM="""window.canvasClicks=0;window.canvasPointerDowns=0;
+const play=document.createElement('button');play.textContent='Play synchronized song';document.querySelector('.controls').append(play);
+play.addEventListener('pointerdown',()=>window.canvasPointerDowns++);
+play.onclick=()=>{window.canvasClicks++;document.querySelector('p').textContent='starting';
+StonefellowAudio.play('song-2').then(()=>{document.querySelector('p').textContent='playing';})
+.catch(error=>{document.querySelector('p').textContent='failed '+error.code;});};
+document.querySelector('.controls').dataset.audioReady='true';"""
 SETUP='''window.audio=document.getElementById('canonical');window.footerPlayer=document.getElementById('player');window.st={auth:{authenticated:false,user:null,csrf:''},track:null,playing:false,playlistPlayback:{}};
 window.cfg={apiBase:'api'};window.pendingNetworkRecovery=null;window.playbackWantsAudio=false;window.songCaptureSkill=null;window.songListeningSkill=null;
-window.playbackLifecycle=StonefellowPlaybackLifecycle.create();window.listeningRoom=null;window.fixtureOwner='';
+window.playbackLifecycle=StonefellowPlaybackLifecycle.create();window.listeningRoom=null;window.fixtureOwner='';window.audioDiagnostics=[];window.sceneLoaded=false;
 window.canvasOwner=()=>fixtureOwner;window.canvasSceneOwner=()=>fixtureOwner;window.isGalleryScene=()=>false;
 window.trackById=id=>fixtureTracks.find(track=>track.id===id);window.refreshSiteData=async()=>{};window.requirePublishedCanvas=async()=>{};
 window.playerVolume=()=>audio.volume;window.setPlayerVolume=value=>{audio.volume=value;return value;};window.savedPlaybackPosition=()=>audio.currentTime||0;
@@ -30,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='stoneward-native-listening-') as tempor
  saved=json.loads(fixture.cli(site,"""
  require_once SF_ROOT.'/api/agent-scene-core.php';sf_privacy_ensure_schema();sf_ops_ensure_schema();
  $scene=['canvas_kind'=>'custom','track_id'=>'','title'=>'Observed song controls','agent_design'=>'hidden','html'=>'<article><div class="controls"></div><p>ready</p></article>','css'=>'article{padding:100px 20px}button{min-height:44px;background:#233;color:white}p{color:white}',
- 'js'=>"const play=document.createElement('button');play.textContent='Play synchronized song';document.querySelector('.controls').append(play);play.onclick=()=>StonefellowAudio.play('song-2').then(()=>{document.querySelector('p').textContent='playing';}).catch(()=>{document.querySelector('p').textContent='failed';});",'music_inputs'=>['mode'=>'all']];
+ 'js'=>base64_decode('"""+base64.b64encode(PROGRAM.encode()).decode()+"""'),'music_inputs'=>['mode'=>'all']];
  $saved=sf_agent_scene_history_save(1,$scene);echo json_encode(sf_agent_scene_saved(1,$saved['id']));
  """))
  tracks=[{'id':'song-'+str(i),'title':'Song '+str(i),'duration':6,'audio':'api/canvas-audio.php?action=source&track_id=song-'+str(i)} for i in [1,2,3]]
@@ -41,8 +47,9 @@ with tempfile.TemporaryDirectory(prefix='stoneward-native-listening-') as tempor
  page_html+='<script>'+SETUP+api_source+block('  function ensureListenSession(){','  function fmtWhen(')+block('  function canvasAudioState(){','  async function renderAgentCanvas(){')+block('  function playbackEndedEarly(){','  function rememberPlaybackPosition(){')+block('  function play(t,','  function seekPlayback(')+'''
  listeningTelemetryMain();
  document.getElementById('main').onclick=()=>play(fixtureTracks[0]);document.getElementById('footer').onclick=toggle;document.getElementById('next').onclick=()=>play(fixtureTracks[2]);document.getElementById('bad').onclick=()=>play({id:'song-3',title:'Unavailable',duration:6,audio:'missing.mp3'});
- window.mountScene=()=>{listeningRoom=fixtureScene;SFPublicAgentCanvas.mount(document.getElementById('target'),{audio,player:footerPlayer,getSceneOwner:canvasSceneOwner,canUseScenes:()=>!!fixtureOwner,getTrackId:()=>st.track?.id,
- onCanvasAudioCatalog:loadCanvasAudioCatalog,onCanvasAudioSource:loadCanvasAudioSource,onCanvasAudioPlay:playCanvasAudio,onCanvasAudioPause:pauseCanvasAudio,onCanvasAudioSeek:seekCanvasAudio,onCanvasAudioVolume:setCanvasAudioVolume,onCanvasAudioState:canvasAudioState});SFPublicAgentCanvas.showScene(fixtureScene,{focus:false});};
+ window.mountScene=()=>{sceneLoaded=false;listeningRoom=fixtureScene;SFPublicAgentCanvas.mount(document.getElementById('target'),{audio,player:footerPlayer,getSceneOwner:canvasSceneOwner,canUseScenes:()=>!!fixtureOwner,getTrackId:()=>st.track?.id,
+ onCanvasAudioCatalog:loadCanvasAudioCatalog,onCanvasAudioSource:loadCanvasAudioSource,onCanvasAudioPlay:playCanvasAudio,onCanvasAudioPause:pauseCanvasAudio,onCanvasAudioSeek:seekCanvasAudio,onCanvasAudioVolume:setCanvasAudioVolume,onCanvasAudioState:canvasAudioState,onCanvasAudioDiagnostic:detail=>audioDiagnostics.push(detail)});SFPublicAgentCanvas.showScene(fixtureScene,{focus:false});
+ document.querySelector('.sf-agent-scene-backdrop iframe').addEventListener('load',()=>{sceneLoaded=true;},{once:true});};
  </script>'''
  (site/'telemetry.html').write_text(page_html)
  with socket.socket() as reservation:reservation.bind(('127.0.0.1',0));port=reservation.getsockname()[1]
@@ -74,8 +81,23 @@ with tempfile.TemporaryDirectory(prefix='stoneward-native-listening-') as tempor
      check(len([row for row in reports if row.get('action')=='begin'])==1 and len([row for row in reports if row.get('event_type')=='resume'])==1 and len([row for row in reports if row.get('event_type')=='complete'])==1,f'{BROWSER}/{width}px footer resume shares play identity and natural end reports one complete')
      check(all(row.get('protocol')==2 for row in reports),f'{BROWSER}/{width}px no legacy writer runs alongside native protocol2 observer')
      page.evaluate('login()');page.evaluate('mountScene()');frame=page.frame_locator('.sf-agent-scene-backdrop iframe')
-     with page.expect_request(lambda request: '/api/listening.php' in request.url and request.method=='POST' and request.post_data_json.get('action')=='begin' and request.post_data_json.get('track_id')=='song-2'):
-      activate(frame.get_by_role('button',name='Play synchronized song'))
+     # A parsed button can exist before the srcdoc document is loaded and the
+     # authenticated SDK session has completed its handshake. Interact only
+     # after both production readiness events, using native input throughout.
+     page.wait_for_function('sceneLoaded&&audioDiagnostics.some(detail=>detail.event==="session_ready")')
+     expect(frame.locator('.controls')).to_have_attribute('data-audio-ready','true')
+     expect(frame.locator('p')).to_have_text('ready')
+     try:
+      with page.expect_request(lambda request: '/api/listening.php' in request.url and request.method=='POST' and request.post_data_json.get('action')=='begin' and request.post_data_json.get('track_id')=='song-2'):
+       activate(frame.get_by_role('button',name='Play synchronized song'))
+       expect(frame.locator('p')).to_have_text('playing',timeout=5000)
+     except BaseException:
+      print('Native canvas playback failure',json.dumps({'browser':BROWSER,'width':width,
+       'parent':page.evaluate('({sceneLoaded,owner:fixtureOwner,track:st.track?.id,paused:audio.paused,ended:audio.ended,mediaError:audio.error?.code,diagnostics:audioDiagnostics})'),
+       'canvas':frame.locator('p').text_content(),
+       'events':page.locator('.sf-agent-scene-backdrop iframe').element_handle().content_frame().evaluate('()=>({clicks:window.canvasClicks,pointerdowns:window.canvasPointerDowns,ready:document.readyState})'),
+       'reports':[{key:row.get(key) for key in ['action','event_type','track_id']} for row in reports],'errors':errors}),flush=True)
+      raise
      page.wait_for_function('st.track?.id==="song-2"&&!audio.paused')
      sdk=[row for row in reports if row.get('action')=='begin' and row.get('track_id')=='song-2'];check(len(sdk)==1 and sdk[0]['context']=={'scene_id':saved['id']} and sdk[0]['playback_method']=='main',f'{BROWSER}/{width}px production sandbox SDK uses canonical player with captured canvas attribution')
      activate(frame.get_by_role('button',name='Play synchronized song'));page.wait_for_timeout(70);check(len([row for row in reports if row.get('action')=='begin' and row.get('track_id')=='song-2'])==1,f'{BROWSER}/{width}px repeated synchronized play request does not duplicate counts')

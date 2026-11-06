@@ -35,7 +35,7 @@ PROGRAM = r'''(async()=>{
 
 SETUP = r'''({program,hash})=>{
  window.owner='1';window.allowed=true;window.catalogAllowed=true;window.reports=[];window.diagnostics=[];
- window.sourceReads=0;window.catalogReads=0;window.observed=[];window.revoked=[];
+ window.sourceReads=0;window.catalogReads=0;window.observed=[];window.revoked=[];window.sceneLoaded=false;
  const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{revoked.push(url);return revoke(url);};
  window.canonical=document.querySelector('audio');window.canonicalCalls=0;
  window.track={track_id:'song-one',id:'song-one',title:'Synthetic audio',duration_seconds:6,source_available:true,release_ids:[]};
@@ -56,7 +56,8 @@ SETUP = r'''({program,hash})=>{
    observed.push({media,context,settings});
    return SFListeningTelemetry.observe(media,{getTrack:()=>item,getContext:()=>context,method:'independent',...settings});
   },onCanvasAudioDiagnostic:detail=>diagnostics.push(detail)});
- window.show=()=>SFPublicAgentCanvas.showScene(fixture,{focus:false});window.show();
+ window.show=()=>{sceneLoaded=false;const shown=SFPublicAgentCanvas.showScene(fixture,{focus:false});
+  document.querySelector('.sf-agent-scene-backdrop iframe').addEventListener('load',()=>{sceneLoaded=true;},{once:true});return shown;};window.show();
 }'''
 
 checks = 0
@@ -72,6 +73,7 @@ def run(page):
     page.evaluate(SETUP, {'program': PROGRAM, 'hash': base64.b64encode(hashlib.sha256(PROGRAM.encode()).digest()).decode()})
     frame = page.locator('.sf-agent-scene-backdrop iframe').element_handle().content_frame()
     expect(frame.locator('.status')).to_have_text('ready')
+    page.wait_for_function('sceneLoaded&&diagnostics.some(detail=>detail.event==="session_ready")')
 
     def click(label, result=None):
         control=frame.get_by_role('button', name=label, exact=True)
@@ -126,6 +128,7 @@ def run(page):
     check(page.evaluate('(count)=>observed.slice(0,count).every(item=>item.media.paused&&!item.media.getAttribute("src"))', old), 'canvas replacement releases independent media from the prior session')
     frame = page.locator('.sf-agent-scene-backdrop iframe').element_handle().content_frame()
     expect(frame.locator('.status')).to_have_text('ready')
+    page.wait_for_function('sceneLoaded')
     click('Create independent')
     click('Play independent')
     page.evaluate('owner="2";SFPublicAgentCanvas.syncPlayer()')

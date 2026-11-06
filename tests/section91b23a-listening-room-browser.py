@@ -913,7 +913,11 @@ with sync_playwright() as p:
               prefix + 'trackless custom canvases hide song controls and leave existing audio alone')
         # Isolate authored background interaction from the intentionally movable host orb.
         expect(page.locator('.sf-agent-sphere')).not_to_be_visible()
-        disclosure = frame.locator('summary')
+        # A parsed heading can precede the new iframe's native load/input lifecycle.
+        geometry_frame = backdrop.element_handle().content_frame()
+        geometry_frame.wait_for_url('about:srcdoc', wait_until='load')
+        expect(geometry_frame.get_by_role('heading', name='Silent geometry')).to_be_visible()
+        disclosure = geometry_frame.locator('summary')
         # Activate the native label center, not a browser-specific disclosure-marker offset.
         activate(disclosure)
         expect(frame.locator('details.reveal')).to_have_attribute('open', '')
