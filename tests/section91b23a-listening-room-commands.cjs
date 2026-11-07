@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const source = readFileSync(new URL('../assets/js/app.js', `file://${__filename}`), 'utf8');
 const workflowSource = readFileSync(new URL('../assets/js/canvas-build-workflow.js', `file://${__filename}`), 'utf8');
 const commands = source.slice(source.indexOf('  function canvasDesignBrief('), source.indexOf('  async function liveAgent('));
+const audioContext = source.slice(source.indexOf('  function canvasAudioContext('), source.indexOf('  function scopeCanvasMusicCatalog('));
 const transport = source.slice(source.indexOf('  async function readSceneResponseStream('), source.indexOf('  function applyQueue('));
 assert.ok(commands.includes('handleListeningRoomCommand'));
 
@@ -115,7 +116,7 @@ function harness(authenticated = true, storage = new Map()) {
     return postHandler(path, payload, ...args);
   };
   Object.defineProperty(scope, 'secureJsonPost', { get: () => dispatchPost, set: handler => { postHandler = handler; } });
-  vm.runInNewContext(`let listeningRoom=null,listeningRoomRequest=null,listeningRoomOwner=null,canvasSelection=null;${commands}`, scope);
+  vm.runInNewContext(`let listeningRoom=null,listeningRoomRequest=null,listeningRoomOwner=null,canvasSelection=null;${commands}${audioContext}`, scope);
   return { scope, posts, preflights, reads, messages, entries, displayed, histories, coding, spoken, deltas, scene, focus,
     approvedProjects, ideaRequests, completedProjects, workflowPosts, workflowSignals, workflowUpdates, workflowCandidates, workflowRuns, voiceSignal: () => voiceSignal };
 }

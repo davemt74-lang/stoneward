@@ -64,6 +64,9 @@ with tempfile.TemporaryDirectory(prefix='stoneward-native-listening-') as tempor
    with sync_playwright() as p:
     launch={'headless':True}
     if BROWSER=='chromium':
+     # Chromium's new headless mode can drop native pointer input in OOPIFs.
+     if os.environ.get('SF_AUDIO_HEADED') == '1':
+      launch['headless'] = False
      launch['args']=['--no-sandbox','--autoplay-policy=no-user-gesture-required']
      executable=os.environ.get('CHROMIUM_BIN') or shutil.which('chromium')
      if executable:launch['executable_path']=executable
