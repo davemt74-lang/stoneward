@@ -674,3 +674,40 @@ test('data in flight cannot cross an account switch or canvas close', async () =
   assert.equal(h.messages.filter(item => item.direction === 'host' && item.data.type === 'response').length, 0);
   h.destroy();
 });
+
+test('venue-scoped data reads coalesce by source and location and refuse scope widening', async () => {
+  const reads = [];
+  const h = harness({
+    dataAliases: ['weather-nearby', 'fixed-weather', 'nearby'],
+    dataLocationAliases: ['weather-nearby'],
+    loadData: async (alias, _signal, locationId) => {
+      reads.push([alias, locationId]);
+      if (locationId === 'show-withdrawn') throw new Error('Venue withdrawn');
+      return observation(locationId === 'show-north' ? 58 : 74);
+    }
+  });
+  h.start();
+  const north = h.data.get('weather-nearby', { location_id: 'show-north' });
+  const east = h.data.get('weather-nearby', { location_id: 'show-east' });
+  assert.equal(north, h.data.get('weather-nearby', { location_id: 'show-north' }));
+  assert.notEqual(north, east);
+  assert.equal((await north).rows[0].temperature_f, 58);
+  assert.equal((await east).rows[0].temperature_f, 74);
+  assert.deepEqual(reads, [['weather-nearby', 'show-north'], ['weather-nearby', 'show-east']]);
+
+  assert.equal((await h.data.get('weather-nearby')).status, 'unavailable');
+  assert.equal((await h.data.get('fixed-weather', { location_id: 'show-north' })).status, 'unavailable');
+  assert.equal((await h.data.get('nearby', { location_id: 'show-north' })).status, 'unavailable');
+  assert.equal((await h.data.get('missing', { location_id: 'show-north' })).status, 'unavailable');
+  for (const options of [
+    { location_id: 'city-0455000' }, { location_id: 'show-../other' }, { location_id: 'show-Upper' },
+    { location_id: 'show-north', url: 'https://example.invalid/' }, { location_id: undefined }, null, []
+  ]) {
+    await assert.rejects(h.data.get('weather-nearby', options), error => error.code === 'invalid_data_source');
+  }
+  assert.equal(reads.length, 2);
+  assert.equal((await h.data.get('fixed-weather', {})).status, 'fresh');
+  assert.equal((await h.data.get('weather-nearby', { location_id: 'show-withdrawn' })).status, 'unavailable');
+  assert.deepEqual(reads.slice(2), [['fixed-weather', undefined], ['weather-nearby', 'show-withdrawn']]);
+  h.destroy();
+});

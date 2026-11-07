@@ -110,6 +110,7 @@
       const request = new AbortController();
       const products = new Map();
       const places = new Map();
+      let searchResults = new Map();
       const selected = [];
       for (const source of Array.isArray(options.selectedSources) ? options.selectedSources : []) {
         if (source && typeof source.alias === 'string' && aliasPattern.test(source.alias) &&
@@ -140,11 +141,14 @@
       const leaving = () => close(null, false);
       current = {dialog, opener, close};
 
+      const scopesFor = productId => products.get(productId)?.scopeOptions;
+      const locationFor = (productId, locationId) => scopesFor(productId)?.get(locationId) || places.get(locationId);
+
       function sync() {
         count.textContent = selected.length + ' of ' + maxSources + ' sources';
         const aliases = new Set(selected.map(source => source.alias));
         const unusable = aliases.size !== selected.length || selected.some(source =>
-          !products.has(source.product) || !places.has(source.location_id));
+          !products.has(source.product) || !locationFor(source.product, source.location_id));
         attach.disabled = !ready || unusable || selected.length > maxSources;
         add.disabled = !ready || selected.length >= maxSources || !place.value;
       }
@@ -152,7 +156,7 @@
       function drawSelected() {
         list.replaceChildren();
         selected.forEach((source, index) => {
-          const location = places.get(source.location_id);
+          const location = locationFor(source.product, source.location_id);
           const metadata = products.get(source.product);
           const row = node('li', 'sf-canvas-data-source');
           const copy = node('span', 'sf-canvas-resource-row-copy');
@@ -190,7 +194,7 @@
 
       function suggestName() {
         if (alias.value && alias.value !== previousSuggestion) return;
-        const chosen = places.get(place.value);
+        const chosen = locationFor(product.value, place.value);
         let suggestion = '';
         if (chosen && product.value) {
           const slug = chosen.title.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
@@ -221,14 +225,25 @@
           }
         }
         fieldDetails.hidden = !fieldList.childElementCount;
+        drawPlaces(place.value);
+      }
+
+      function drawPlaces(selectedId) {
+        const scopes = scopesFor(product.value);
+        place.replaceChildren(option('', 'Choose a city or venue'));
+        for (const scope of scopes?.values() || []) place.append(option(scope.id, scope.title));
+        for (const match of searchResults.values()) {
+          if (!scopes?.has(match.id)) place.append(option(match.id, match.title + (match.kind === 'venue' ? ' · Venue' : '')));
+        }
+        place.value = scopes?.has(selectedId) || searchResults.has(selectedId) ? selectedId : '';
+        place.disabled = place.options.length === 1;
         suggestName();
+        sync();
       }
 
       function resetPlaces() {
-        place.replaceChildren(option('', 'Choose a city or venue'));
-        place.disabled = true;
-        suggestName();
-        sync();
+        searchResults.clear();
+        drawPlaces(place.value);
       }
 
       async function findPlaces(value) {
@@ -241,13 +256,11 @@
         try {
           const result = await options.search(value, pending.signal);
           if (settled || pending.signal.aborted) return;
-          const selectedLocationMissing = selected.some(source => !places.has(source.location_id));
+          const selectedLocationMissing = selected.some(source => !locationFor(source.product, source.location_id));
           const matches = rememberPlaces(result);
+          searchResults = matches;
           if (selectedLocationMissing) drawSelected();
-          for (const match of matches.values()) {
-            place.append(option(match.id, match.title + (match.kind === 'venue' ? ' · Venue' : '')));
-          }
-          place.disabled = !matches.size;
+          drawPlaces(place.value);
           searchStatus.textContent = matches.size ? matches.size + ' locations found.' :
             value ? 'No matching public cities or venues.' : 'Search for a city or venue to find a location.';
         } catch (error) {
@@ -274,10 +287,20 @@
           for (const item of result.products) {
             if (!item || item.enabled === false || !validProduct(item.id) || typeof item.title !== 'string' ||
                 item.parameters?.location_id?.type !== 'public_place' || products.has(item.id)) continue;
-            products.set(item.id, item);
+            const scopeOptions = new Map();
+            const offeredScopes = item.parameters.location_id.scope_options;
+            for (const scope of Array.isArray(offeredScopes) ? offeredScopes : []) {
+              if (scope?.kind === 'scope' && validPlace(scope.id) && typeof scope.title === 'string' &&
+                  scope.title.trim() && !scopeOptions.has(scope.id)) {
+                scopeOptions.set(scope.id, {id: scope.id, title: scope.title.trim()});
+              }
+            }
+            products.set(item.id, {...item, scopeOptions});
             product.append(option(item.id, item.title));
           }
-          const ids = [...new Set(selected.map(source => source.location_id))].slice(0, maxSources);
+          const unresolved = selected.filter(source =>
+            products.has(source.product) && !scopesFor(source.product)?.has(source.location_id));
+          const ids = [...new Set(unresolved.map(source => source.location_id))].slice(0, maxSources);
           await Promise.allSettled(ids.map(async id => {
             const placeResult = await options.resolvePlace(id, request.signal);
             if (!settled) rememberPlaces({items: Array.isArray(placeResult?.items) ? placeResult.items.filter(item => item?.id === id) : []});
@@ -319,7 +342,7 @@
       });
       entry.addEventListener('submit', event => {
         event.preventDefault();
-        if (add.disabled || !products.has(product.value) || !places.has(place.value)) return;
+        if (add.disabled || !products.has(product.value) || !locationFor(product.value, place.value)) return;
         const name = alias.value.trim().toLowerCase();
         if (!aliasPattern.test(name)) {
           entryStatus.textContent = 'Enter a source name using a letter followed by letters, numbers or hyphens.';

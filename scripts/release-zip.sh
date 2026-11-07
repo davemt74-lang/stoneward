@@ -32,7 +32,7 @@ rm -f "$stage/site/AUDIT-REPORT.md" "$stage/site/RELEASE-NOTES.md" \
   echo "Safety: no Stripe live payment activation"
 } > "$stage/site/DEPLOY-MANIFEST.txt"
 for file in index.php upgrade.php admin/index.php api/bootstrap.php config/store.default.php \
-  api/canvas-data.php assets/js/canvas-data-picker.js config/canvas-data-places/us-places-{01,02,03}.tsv; do
+  api/canvas-data.php api/canvas-geography-core.php assets/js/canvas-data-picker.js config/canvas-data-places/us-places-{01,02,03}.tsv; do
   test -s "$stage/site/$file" || { echo "Missing required deploy file: $file" >&2; exit 1; }
 done
 (cd "$stage/site" && zip -X -q -r "$out/stonefellow-deploy.zip" .)

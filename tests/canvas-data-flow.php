@@ -22,6 +22,10 @@ define('SF_ROOT',$fixture);
 $shows=[
     ['id'=>'flow-venue','title'=>'Forecast show','venue'=>'Fixture Stage','city'=>'Tucson','region'=>'AZ','country'=>'US','date'=>'2099-01-01','status'=>'scheduled','public_visible'=>true],
     ['id'=>'flow-hidden','title'=>'PRIVATE_SHOW_CANARY','venue'=>'PRIVATE_VENUE_CANARY','city'=>'Phoenix','region'=>'AZ','country'=>'US','date'=>'2099-01-01','status'=>'hidden','public_visible'=>false],
+    ['id'=>'flow-nearby','title'=>'Nearby show','venue'=>'Phoenix Stage','city'=>'Phoenix','region'=>'AZ','country'=>'US','date'=>'2099-01-02','status'=>'scheduled','public_visible'=>true,
+        'archive_notes'=>'PRIVATE_SHOW_NOTE_CANARY','ticket_url'=>'https://example.invalid/private-note'],
+    ['id'=>'flow-cancelled','title'=>'Cancelled show','venue'=>'Former Stage','city'=>'Phoenix','region'=>'AZ','country'=>'US','date'=>'2099-01-01','status'=>'cancelled','public_visible'=>true],
+    ['id'=>'flow-past','title'=>'Earlier show','venue'=>'Past Stage','city'=>'Phoenix','region'=>'AZ','country'=>'US','date'=>'2000-01-01','status'=>'scheduled','public_visible'=>true],
 ];
 function data_flow_save_shows(array $shows):void {
     file_put_contents(SF_ROOT.'/data/shows.json',json_encode($shows,JSON_THROW_ON_ERROR));
@@ -217,4 +221,92 @@ sf_canvas_gallery_withdraw($owner,$gallery['id']);
 data_flow_reject(fn()=>sf_canvas_data_read([],$publicContext,'phoenix',$weather),OutOfBoundsException::class,
     'A withdrawn gallery loses its runtime weather route');
 data_flow_check(count($requests)===5&&!$db->inTransaction(),'Authorized and rejected flows leave no open transaction or stray provider calls');
+
+$geoPermission='canvas.data.geography_public';
+$composition=[
+    ['alias'=>'anchor','product'=>'geography.place','location_id'=>'city-0455000'],
+    ['alias'=>'shows','product'=>'geography.shows','location_id'=>'city-0455000'],
+    ['alias'=>'forecast','product'=>'weather.hourly','location_id'=>'published-shows'],
+    $phoenix,
+];
+data_flow_reject(fn()=>sf_canvas_project_propose($owner,['project'=>['brief'=>'Locate a place {data:anchor:geography.place:published-shows}']]),
+    InvalidArgumentException::class,'A show-set weather scope cannot be attached as a single geography place');
+$combined=sf_canvas_project_propose($owner,['project'=>['brief'=>'Build a tour display {data:anchor:geography.place:city-0455000} {data:shows:geography.shows:city-0455000} {data:forecast:weather.hourly:published-shows} {data:phoenix:weather.current:city-0455000}']]);
+sf_canvas_project_approve(1,$combined['id']);
+$combinedBuild=$combined['project']+['project_managed'=>true,'proposal_id'=>$combined['id'],'request_id'=>data_flow_request()];
+$fixedOnly=$combinedBuild;
+$fixedOnly['artist_inputs']['data_sources'][2]['location_id']='show-flow-nearby';
+data_flow_reject(fn()=>sf_agent_scene_create($owner,$fixedOnly),SfCanvasProjectApprovalRequired::class,
+    'An approved catalog scope cannot be silently replaced with a fixed show');
+$combinedScene=sf_agent_scene_create($owner,$combinedBuild)['scene'];
+$combinedContext=['scene_id'=>$combinedScene['id']];
+$uses=array_column(sf_canvas_access_summary($owner,$combinedContext)['permissions'],null,'id');
+data_flow_check($combinedScene['artist_inputs']['data_sources']===$composition&&
+    isset($uses[$geoPermission],$uses[$permission])&&!$uses[$geoPermission]['personal']&&!$uses[$permission]['personal'],
+    'Geography and weather save separate capabilities in one approved scene');
+$anchor=sf_canvas_data_read($owner,$combinedContext,'anchor',$weather);
+$locations=sf_canvas_data_read($owner,$combinedContext,'shows',$weather);
+data_flow_check($anchor['status']==='fresh'&&count($anchor['rows'])===1&&
+    abs($anchor['rows'][0]['lat']-33.5)<0.4&&abs($anchor['rows'][0]['lon']+112.0)<0.4&&count($requests)===5,
+    'A selected city yields map coordinates without a weather provider request');
+$rows=$locations['rows'];
+data_flow_check($locations['status']==='fresh'&&array_column($rows,'location_id')===['show-flow-nearby','show-flow-venue']&&
+    $rows[0]['distance_km']===0.0&&$rows[1]['distance_km']>100&&count($requests)===5&&
+    !str_contains(json_encode($rows,JSON_THROW_ON_ERROR),'PRIVATE_')&&!array_key_exists('ticket_url',$rows[0]),
+    'Geography lists upcoming public shows nearest first with map fields, excluding private notes, past shows and cancelled shows');
+data_flow_reject(fn()=>sf_canvas_data_read($other,$combinedContext,'shows',$weather),OutOfBoundsException::class,
+    'Public map data does not expose another account’s private scene binding');
+foreach([['forecast',null],['forecast','city-0455000'],['phoenix','show-flow-venue'],['anchor','show-flow-venue']] as [$alias,$location]){
+    data_flow_reject(fn()=>sf_canvas_data_read($owner,$combinedContext,$alias,$weather,$location),InvalidArgumentException::class,
+        'A scope requires a show ID and a fixed binding rejects location overrides');
+}
+foreach(['show-flow-hidden','show-flow-cancelled','show-flow-past','show-flow-missing'] as $location){
+    $absent=sf_canvas_data_read($owner,$combinedContext,'forecast',$weather,$location);
+    data_flow_check($absent['status']==='unavailable'&&$absent['rows']===[]&&count($requests)===5,
+        'Ineligible show ID cannot trigger weather or expose data');
+}
+$composed=sf_canvas_data_read($owner,$combinedContext,'forecast',$weather,$rows[1]['location_id']);
+data_flow_check($composed['status']==='fresh'&&$composed['location']['id']==='show-flow-venue'&&count($requests)===6&&
+    abs($requests[5][0]-32.2)<0.4&&$requests[5][2]==='hourly',
+    'A canonical location from geography resolves through the separately attached weather binding');
+
+$setGeography=static function(bool $enabled)use($admin,$geoPermission):void {
+    sf_canvas_permission_save($admin,sf_canvas_permission_policy()['revision'],[$geoPermission=>$enabled]);
+};
+$setGeography(false);
+$products=array_column(sf_canvas_data_inventory()['products'],'id');
+$disabledMap=sf_canvas_data_read($owner,$combinedContext,'shows',$weather);
+data_flow_check(!in_array('geography.shows',$products,true)&&in_array('weather.hourly',$products,true)&&
+    $disabledMap['status']==='unavailable'&&$disabledMap['rows']===[]&&
+    sf_canvas_data_read($owner,$combinedContext,'forecast',$weather,$rows[0]['location_id'])['status']==='fresh'&&count($requests)===7,
+    'Geography can be disabled independently of an authorized weather scope');
+$setGeography(true);
+$setPolicy(false);
+$disabledForecast=sf_canvas_data_read($owner,$combinedContext,'forecast',$weather,$rows[1]['location_id']);
+data_flow_check($disabledForecast['status']==='unavailable'&&$disabledForecast['rows']===[]&&count($requests)===7&&
+    sf_canvas_data_read($owner,$combinedContext,'shows',$weather)['rows']===$rows,
+    'Disabling weather leaves the map and published show locations usable');
+$setPolicy(true);
+$cancelledDuringRead=sf_canvas_data_read($owner,$combinedContext,'forecast',static function()use($shows):array {
+    $shows[0]['status']='cancelled';
+    data_flow_save_shows($shows);
+    return data_flow_weather();
+},$rows[1]['location_id']);
+data_flow_check($cancelledDuringRead['status']==='unavailable'&&$cancelledDuringRead['rows']===[],
+    'Cancellation during scoped weather fetch prevents delivery of its stale authorization');
+data_flow_save_shows($shows);
+
+$composedShareable=sf_agent_scene_history_save(1,['canvas_kind'=>'custom','track_id'=>'','title'=>'Shareable tour map',
+    'html'=>'<p class="map">Fixture map</p>','css'=>'','artist_inputs'=>['data_sources'=>$composition]]);
+$composedGallery=sf_canvas_gallery_submit($owner,['scene_id'=>$composedShareable['id'],'request_id'=>data_flow_request(),
+    'title'=>'Shared map','description'=>'Map and forecast','creator_label'=>'Fixture creator','publication_consent'=>true]);
+sf_canvas_gallery_moderate($admin,$composedGallery['id'],'approve',$composedGallery['snapshot_hash']);
+$composedOpen=sf_canvas_gallery_open($composedGallery['id']);
+$composedPublic=['gallery_id'=>$composedGallery['id']];
+$publicRows=sf_canvas_data_read([],$composedPublic,'shows',$weather)['rows'];
+data_flow_check($composedOpen['scene']['artist_inputs']['data_sources']===$composition&&
+    !array_diff([$geoPermission,$permission],array_column($composedOpen['item']['uses'],'id'))&&$publicRows===$rows&&
+    sf_canvas_data_read([],$composedPublic,'forecast',$weather,$publicRows[0]['location_id'])['status']==='fresh',
+    'An approved gallery lets a guest compose map and scoped weather from its reviewed manifest');
+data_flow_check(count($requests)===8&&!$db->inTransaction(),'Mixed-service runtime and rejection paths leave transactions and provider counts consistent');
 echo 'Canvas external data flow: '.$checks.' checks passed ('.($mysql?'mysql':'sqlite').')'.PHP_EOL;

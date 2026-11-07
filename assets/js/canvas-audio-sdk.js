@@ -360,19 +360,32 @@
   };
   Object.defineProperty(window, 'StonefellowAudio', { value: Object.freeze(api), configurable: false, writable: false });
   Object.defineProperty(window, 'StonefellowData', { value: Object.freeze({
-    get(alias) {
+    get(alias, options) {
       if (typeof alias !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(alias))
         return Promise.reject(failure('Choose a named canvas data source.', 'invalid_data_source'));
+      let locationId;
+      if (options !== undefined) {
+        if (!options || typeof options !== 'object' || Array.isArray(options) ||
+            Object.keys(options).some(key => key !== 'location_id'))
+          return Promise.reject(failure('Choose a published show location.', 'invalid_data_source'));
+        if (Object.prototype.hasOwnProperty.call(options, 'location_id')) {
+          locationId = options.location_id;
+          if (typeof locationId !== 'string' || !/^show-[a-z0-9][a-z0-9-]{0,79}$/.test(locationId))
+            return Promise.reject(failure('Choose a published show location.', 'invalid_data_source'));
+        }
+      }
       if (offlineData) return Promise.resolve(Object.freeze({ status: 'unavailable',
         fetched_at: null, expires_at: null, source: null, timezone: null, rows: Object.freeze([]) }));
-      if (dataReads.has(alias)) return dataReads.get(alias);
-      // Each completed read is reauthorized by the host. Coalesce only work in flight.
-      const read = request('getData', [alias]).then(result => {
+      const key = locationId === undefined ? alias : alias + ':' + locationId;
+      if (dataReads.has(key)) return dataReads.get(key);
+      const args = locationId === undefined ? [alias] : [alias, locationId];
+      // Reauthorize each completed read. Coalesce only requests for the same source and location in flight.
+      const read = request('getData', args).then(result => {
         const expired = result.status === 'fresh' && Date.parse(result.expires_at) <= Date.now();
         return Object.freeze({ ...result, status: expired ? 'stale' : result.status,
           rows: Object.freeze(result.rows.map(row => Object.freeze(row))) });
-      }).finally(() => { if (dataReads.get(alias) === read) dataReads.delete(alias); });
-      dataReads.set(alias, read);
+      }).finally(() => { if (dataReads.get(key) === read) dataReads.delete(key); });
+      dataReads.set(key, read);
       return read;
     }
   }), configurable: false, writable: false });
@@ -386,7 +399,7 @@
   post({ type: 'connect' });
 })();`;
 
-  const hash = "'sha256-XIrtmS94RNOeQ5B0K+Pn4/tegmPNjfMvhVFcvDDMhKs='";
+  const hash = "'sha256-6bwYCqgOkABCPxK/AWWRSMYyf5040gz8wKnE716xEIc='";
 
   function token() {
     return Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
@@ -499,8 +512,9 @@
         return [filters];
       }
       case 'getData':
-        if (args.length !== 1 || typeof args[0] !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(args[0]))
-          throw error('Choose a named canvas data source.', 'invalid_audio_request');
+        if (args.length < 1 || args.length > 2 || typeof args[0] !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(args[0]) ||
+            (args.length === 2 && (typeof args[1] !== 'string' || !/^show-[a-z0-9][a-z0-9-]{0,79}$/.test(args[1]))))
+          throw error('Choose a named canvas data source and an allowed show location.', 'invalid_audio_request');
         return args;
       case 'getTrack':
       case 'getAudio':
@@ -538,6 +552,7 @@
   function createHost(options) {
     const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic, observeIndependent, loadData } = options;
     const dataAliases = new Set(Array.isArray(options.dataAliases) ? options.dataAliases : []);
+    const dataLocationAliases = new Set(Array.isArray(options.dataLocationAliases) ? options.dataLocationAliases : []);
     if (!frame || !audio || [getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume].some(callback => typeof callback !== 'function'))
       throw new TypeError('Canvas audio requires a frame, the canonical audio element and host callbacks.');
     const owner = getOwner();
@@ -719,9 +734,11 @@
       switch (job.method) {
         case 'getData': {
           // Detached previews have no data loader. A live loader is scoped to saved aliases.
-          if (!dataAliases.has(argument) || typeof loadData !== 'function') return unavailableData();
+          const locationId = job.args[1];
+          if (!dataAliases.has(argument) || dataLocationAliases.has(argument) !== (locationId !== undefined) ||
+              typeof loadData !== 'function') return unavailableData();
           try {
-            const result = await loadData(argument, job.controller.signal);
+            const result = await loadData(argument, job.controller.signal, locationId);
             return active(session) ? normalizeData(result) : unavailableData();
           } catch (_) {
             return unavailableData();

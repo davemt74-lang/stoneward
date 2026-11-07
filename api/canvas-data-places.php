@@ -52,8 +52,11 @@ function sf_canvas_data_place_cities(?string $state=null,?string $code=null): Ge
     }
 }
 
-function sf_canvas_data_place_result(array $place): array {
-    return array_intersect_key($place,array_flip(['id','title','kind','lat','lon']));
+function sf_canvas_data_place_result(array $place,bool $withDetails=false): array {
+    $result=array_intersect_key($place,array_flip(['id','title','kind','lat','lon']));
+    if(!$withDetails)return $result;
+    return $result+['name'=>$place['name'],'city'=>$place['name'],'city_id'=>$place['id'],
+        'region'=>$place['region'],'country_code'=>$place['region']==='PR'?'PR':'US'];
 }
 
 /** A published show uses the centroid for its unambiguously identified city. */
@@ -75,28 +78,53 @@ function sf_canvas_data_place_show_city(array $show): ?array {
     return ['id'=>'show-'.$id,'city'=>$city,'region'=>$region,'venue'=>$venue,'name'=>$name,'date'=>$date];
 }
 
-function sf_canvas_data_place_venue_result(array $show,array $city): array {
+function sf_canvas_data_place_venue_result(array $show,array $city,bool $withDetails=false): array {
     $label=$show['venue'].($show['date']!==''?' · '.$show['date']:'').' · '.$city['title'].' (city weather)';
-    return ['id'=>$show['id'],'title'=>$label,'kind'=>'venue','lat'=>$city['lat'],'lon'=>$city['lon']];
+    $result=['id'=>$show['id'],'title'=>$label,'kind'=>'venue','lat'=>$city['lat'],'lon'=>$city['lon']];
+    if(!$withDetails)return $result;
+    return $result+['name'=>$show['venue'],'venue'=>$show['venue'],'show_id'=>substr($show['id'],5),
+        'display_title'=>$show['venue'].' · '.$city['title']]+sf_canvas_data_place_result($city,true);
 }
 
-function sf_canvas_data_place(string $id): ?array {
+/** Match normalized names exactly. Multiple Census entries under one name remain ambiguous. */
+function sf_canvas_data_place_index_city(array &$matches,array $city,string $name,string $alternate): void {
+    foreach(array_unique([$name,$alternate]) as $key){
+        $lookup=$city['region'].':'.$key;
+        if(array_key_exists($lookup,$matches))$matches[$lookup]=$matches[$lookup]===null?$city:false;
+    }
+}
+
+/** Resolve only requested city names in one pass, including when given a full show calendar. */
+function sf_canvas_data_place_show_cities(array $shows): array {
+    $matches=[];$regions=[];
+    foreach($shows as $show){
+        $matches[$show['region'].':'.$show['city']]=null;
+        $regions[$show['region']]=true;
+    }
+    if(!$matches)return [];
+    $region=count($regions)===1?array_key_first($regions):null;
+    foreach(sf_canvas_data_place_cities($region) as $city){
+        if(!isset($regions[$city['region']]))continue;
+        sf_canvas_data_place_index_city($matches,$city,sf_canvas_data_place_key($city['name']),
+            sf_canvas_data_place_key($city['alternate']));
+    }
+    return $matches;
+}
+
+function sf_canvas_data_place_show(array $show,bool $withDetails=false): ?array {
+    $city=sf_canvas_data_place_show_cities([$show])[$show['region'].':'.$show['city']]??null;
+    return is_array($city)?sf_canvas_data_place_venue_result($show,$city,$withDetails):null;
+}
+
+function sf_canvas_data_place(string $id,bool $withDetails=false): ?array {
     if(preg_match('/\Acity-([0-9]{7})\z/',$id,$match)){
-        foreach(sf_canvas_data_place_cities(null,$match[1]) as $city)return sf_canvas_data_place_result($city);
+        foreach(sf_canvas_data_place_cities(null,$match[1]) as $city)return sf_canvas_data_place_result($city,$withDetails);
         return null;
     }
     if(!preg_match('/\Ashow-([a-z0-9][a-z0-9-]{0,79})\z/',$id,$match))return null;
     $publicShow=sf_live_show_by_id($match[1]);
     $show=$publicShow===null?null:sf_canvas_data_place_show_city($publicShow);
-    if($show===null)return null;
-    $exact=null;
-    foreach(sf_canvas_data_place_cities($show['region']) as $city){
-        if($show['city']!==sf_canvas_data_place_key($city['name'])&&
-            $show['city']!==sf_canvas_data_place_key($city['alternate']))continue;
-        if($exact!==null)return null;
-        $exact=$city;
-    }
-    return $exact===null?null:sf_canvas_data_place_venue_result($show,$exact);
+    return $show===null?null:sf_canvas_data_place_show($show,$withDetails);
 }
 
 /** Search by city or venue, optionally ending with a state name or abbreviation. */
@@ -129,12 +157,7 @@ function sf_canvas_data_places(string $query): array {
     foreach(sf_canvas_data_place_cities($region) as $city){
         $name=sf_canvas_data_place_key($city['name']);
         $alternate=sf_canvas_data_place_key($city['alternate']);
-        if($venues){
-            foreach(array_unique([$name,$alternate]) as $key){
-                $lookup=$city['region'].':'.$key;
-                if(array_key_exists($lookup,$venueCities))$venueCities[$lookup]=$venueCities[$lookup]===null?$city:false;
-            }
-        }
+        if($venues)sf_canvas_data_place_index_city($venueCities,$city,$name,$alternate);
         if($needle==='')continue;
         if($name===$needle||$alternate===$needle){
             if(count($exact)<18)$exact[]=sf_canvas_data_place_result($city);

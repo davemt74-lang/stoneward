@@ -80,6 +80,30 @@ PROGRAM = r'''(() => {
   void refresh();
 })();'''
 
+# The fixture composes services in authored code and has no dependency on a map library.
+GEOGRAPHY_PROGRAM = r'''(async () => {
+  const root = document.querySelector('.experiment');
+  const [origin, nearby] = await Promise.all([StonefellowData.get('origin'), StonefellowData.get('nearby')]);
+  if (origin.status !== 'fresh' || nearby.status !== 'fresh') throw new Error('Expected public geography');
+  const label = document.createElement('p');
+  label.textContent = origin.rows[0].title;
+  root.append(label);
+  const rows = await Promise.all(nearby.rows.map(async show => {
+    const conditions = await StonefellowData.get('weather-nearby', {location_id:show.location_id});
+    const item = document.createElement('p');
+    item.textContent = show.title + ' ' + show.distance_km + ' km · ' +
+      (conditions.status === 'fresh' ? conditions.rows[0].condition : 'Weather unavailable');
+    return item;
+  }));
+  root.append(...rows);
+  const wrong = await StonefellowData.get('nearby', {location_id:'show-north'});
+  const missing = await StonefellowData.get('weather-nearby');
+  const withdrawn = await StonefellowData.get('weather-nearby', {location_id:'show-withdrawn'});
+  const boundary = document.createElement('p');
+  boundary.textContent = [wrong.status, missing.status, withdrawn.status].join(',');
+  root.append(boundary);
+})();'''
+
 MOUNT = r'''(sound) => {
   const audio = document.querySelector('audio');
   audio.src = sound;
@@ -105,18 +129,18 @@ MOUNT = r'''(sound) => {
       played.push(track);
     }
   });
-  window.makeScene = async (js, gallery = false) => {
+  window.makeScene = async (js, gallery = false, dataSources = null) => {
     const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(js));
     return {id:88, ...(gallery?{gallery_id:'5'.repeat(32)}:{}), canvas_kind:'custom', track_id:'', title:'Weather experiment',
       html:'<section class="experiment"></section>', css:'.experiment{padding:88px 16px;min-height:100vh}',
       js, js_hash:btoa(String.fromCharCode(...new Uint8Array(bytes))),
-      artist_inputs:{data_sources:[
-        {alias:'phoenix',product:'weather.current',location_id:'place-0455000'},
+      artist_inputs:{data_sources:dataSources||[
+        {alias:'phoenix',product:'weather.current',location_id:'city-0455000'},
         {alias:'venue',product:'weather.hourly',location_id:'show-1'}
       ]}};
   };
-  window.display = async (js, gallery = false) => {
-    listeningRoom = await makeScene(js,gallery);
+  window.display = async (js, gallery = false, dataSources = null) => {
+    listeningRoom = await makeScene(js,gallery,dataSources);
     return SFPublicAgentCanvas.showScene(listeningRoom,{focus:false});
   };
 }'''
@@ -137,6 +161,33 @@ def run(page, width):
             query = parse_qs(url.query)
             requests.append(query)
             alias = query.get('alias', [''])[0]
+            if alias in ('origin', 'nearby'):
+                assert 'location_id' not in query
+                data = weather(None, '', 'fresh')
+                data['source'] = 'U.S. Census Bureau Gazetteer Files (2026)' if alias == 'origin' else 'Stonefellow public shows'
+                data['timezone'] = None
+                data['rows'] = (
+                    [{'title': 'Selected city', 'location_id': 'city-0455000', 'lat': 33.45, 'lon': -112.07}]
+                    if alias == 'origin' else [
+                        {'show_id': 'north', 'title': 'North show', 'location_id': 'show-north', 'distance_km': 18,
+                         'venue': 'North stage', 'date': '2030-06-15', 'lat': 33.61, 'lon': -112.07},
+                        {'show_id': 'east', 'title': 'East show', 'location_id': 'show-east', 'distance_km': 24,
+                         'venue': 'East stage', 'date': '2030-06-16', 'lat': 33.45, 'lon': -111.81},
+                    ]
+                )
+                route.fulfill(json={'ok': True, 'data': data})
+                return
+            if alias == 'weather-nearby':
+                location = query['location_id'][0]
+                if location == 'show-withdrawn':
+                    route.fulfill(status=404, json={'ok': False, 'error': 'unavailable'})
+                else:
+                    assert location in ('show-north', 'show-east')
+                    if location == 'show-north':
+                        route.fulfill(json={'ok': True, 'data': weather(65, 'Cloudy', 'fresh')})
+                    else:
+                        route.fulfill(status=503, json={'ok': False, 'error': 'unavailable'})
+                return
             assert alias in modes, query
             temperature, condition, state = modes[alias]
             if state == 'unavailable':
@@ -228,6 +279,25 @@ def run(page, width):
     assert 'live_data' in {entry['code'] for entry in verification['manual']}
     assert len(requests) == count + 2
     print(f'PASS Chromium/{width} gallery and detached testing use their intended data boundaries', flush=True)
+
+    count = len(requests)
+    assert page.evaluate('([code, sources]) => display(code,false,sources)', [GEOGRAPHY_PROGRAM, [
+        {'alias': 'origin', 'product': 'geography.place', 'location_id': 'city-0455000'},
+        {'alias': 'nearby', 'product': 'geography.shows', 'location_id': 'city-0455000'},
+        {'alias': 'weather-nearby', 'product': 'weather.current', 'location_id': 'published-shows'},
+    ]])
+    frame.get_by_text('Selected city', exact=True).wait_for()
+    frame.get_by_text('North show 18 km · Cloudy', exact=True).wait_for()
+    frame.get_by_text('East show 24 km · Weather unavailable', exact=True).wait_for()
+    frame.get_by_text('unavailable,unavailable,unavailable', exact=True).wait_for()
+    assert {(row['alias'][0], row.get('location_id', [''])[0]) for row in requests[count:]} == {
+        ('origin', ''), ('nearby', ''), ('weather-nearby', 'show-north'),
+        ('weather-nearby', 'show-east'), ('weather-nearby', 'show-withdrawn')
+    }
+    assert len(requests[count:]) == 5 and all(row.get('scene_id') == ['88'] for row in requests[count:])
+    assert not unknown_requests
+    print(f'PASS Chromium/{width} public geography drives independent authorized venue reads and survives a venue weather outage', flush=True)
+    print(f'PASS Chromium/{width} fixed sources cannot accept a new venue and scope reads require a published show', flush=True)
 
 
 with sync_playwright() as playwright:

@@ -1903,7 +1903,8 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         loadCatalog:(filters,signal)=>options.onCanvasAudioCatalog?.(filters,signal),
         loadAudio:(trackId,signal)=>options.onCanvasAudioSource?.(trackId,signal),
         dataAliases:listeningScene?.dataAliases,
-        loadData:(alias,signal)=>options.onCanvasDataRead?.(alias,context,signal),
+        dataLocationAliases:listeningScene?.dataLocationAliases,
+        loadData:(alias,signal,locationId)=>options.onCanvasDataRead?.(alias,context,signal,locationId),
         observeIndependent:(media,track,settings)=>options.onCanvasIndependentAudioObserve?.(media,track,context,settings),
         play:trackId=>options.onCanvasAudioPlay?.(trackId),
         pause:()=>options.onCanvasAudioPause?.(),
@@ -2242,9 +2243,12 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         postSceneImages(images);
       });
       const sources=scene.artist_inputs?.data_sources;
-      const dataAliases=custom&&Array.isArray(sources)?sources.map(source=>source?.alias)
-        .filter(alias=>typeof alias==='string'&&/^[a-z][a-z0-9-]{0,31}$/.test(alias)):[];
-      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner,dataAliases};
+      const dataSources=custom&&Array.isArray(sources)?sources
+        .filter(source=>typeof source?.alias==='string'&&/^[a-z][a-z0-9-]{0,31}$/.test(source.alias)):[];
+      const dataAliases=dataSources.map(source=>source.alias);
+      const dataLocationAliases=dataSources.filter(source=>source.location_id==='published-shows'&&
+        typeof source.product==='string'&&source.product.startsWith('weather.')).map(source=>source.alias);
+      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner,dataAliases,dataLocationAliases};
       renderSceneImageChoices();
       renderSceneCatalog(scene.catalog_blocks);
       const artwork=sourceAvailable?sceneArtwork(scene.artwork):'';
