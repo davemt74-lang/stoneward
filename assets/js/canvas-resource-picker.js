@@ -5,6 +5,7 @@
     canvas: {title: 'Choose canvases', search: 'Search canvases', loading: 'Loading your canvases…', empty: 'No saved canvases are available yet.', fallback: 'Untitled canvas'},
     merch: {title: 'Choose merch', search: 'Search merch', loading: 'Loading public merch…', empty: 'No public merch is available yet.', fallback: 'Untitled merch'},
     playlists: {title: 'Choose playlists', search: 'Search playlists and tracks', loading: 'Loading available playlists…', empty: 'No playlists are available.', fallback: 'Untitled playlist'},
+    stories: {title: 'Choose stories', search: 'Search stories', loading: 'Loading published stories…', empty: 'No stories are published yet.', fallback: 'Untitled story'},
     tickets: {title: 'Choose ticket offers', search: 'Search ticket offers', loading: 'Loading public ticket offers…', empty: 'No public ticket offers are available yet.', fallback: 'Untitled ticket offer'}
   });
   let current = null;
@@ -22,6 +23,7 @@
     return element;
   };
   const textValue = value => typeof value === 'string' ? value.trim() : '';
+  const validStoryTag = value => typeof value === 'string' && value.length <= 64 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
   const imageUrl = value => {
     if (typeof value !== 'string' || !value.trim()) return '';
     try {
@@ -31,7 +33,13 @@
       return '';
     }
   };
-  const validId = (kind, value) => typeof value === 'string' && (kind === 'canvas' ? /^[1-9][0-9]*$/ : kind==='playlists'?/^(?:own|artist)-[1-9][0-9]{0,18}$/:/^[A-Za-z0-9_-]+$/).test(value);
+  function validId(kind, value) {
+    if (typeof value !== 'string') return false;
+    if (kind === 'stories') return /^[1-9][0-9]{0,18}$/.test(value) && (value.length < 19 || value <= '9223372036854775807');
+    if (kind === 'canvas') return /^[1-9][0-9]*$/.test(value);
+    if (kind === 'playlists') return /^(?:own|artist)-[1-9][0-9]{0,18}$/.test(value);
+    return /^[A-Za-z0-9_-]+$/.test(value);
+  }
 
   function open(options = {}) {
     if (!options || typeof options !== 'object') return Promise.resolve(null);
@@ -57,13 +65,39 @@
       search.placeholder = config.search;
       searchLabel.append(node('span', '', config.search), search);
       header.append(title, description, searchLabel);
+      const storyPicker = options.kind === 'stories';
+      let storyTag = storyPicker && validStoryTag(options.storyTag) ? options.storyTag : '';
       const body = node('div', 'sf-canvas-resource-picker-body');
       const status = node('p', 'sf-canvas-resource-status');
       status.setAttribute('role', 'status');
       const retry = button('Try again');
       retry.hidden = true;
       const results = node('div', 'sf-canvas-resource-options');
-      body.append(status, retry, results);
+      body.append(status, retry);
+      let allStoriesRow, allStoriesInput, allStoriesDetail, tagFilter, tagLabel, clearTag;
+      if (storyPicker) {
+        tagFilter = node('div', 'sf-canvas-resource-tag-filter');
+        tagFilter.hidden = true;
+        tagLabel = node('span');
+        clearTag = button('Clear tag filter');
+        clearTag.hidden = options.storyTagLocked === true;
+        tagFilter.append(tagLabel, clearTag);
+        allStoriesRow = node('label', 'sf-canvas-resource-row');
+        allStoriesRow.hidden = true;
+        allStoriesInput = node('input');
+        allStoriesInput.type = 'checkbox';
+        const copy = node('span', 'sf-canvas-resource-row-copy');
+        const heading = node('strong', '', 'All Stories');
+        allStoriesDetail = node('small');
+        heading.id = prefix + '-all-stories';
+        allStoriesDetail.id = prefix + '-all-stories-detail';
+        allStoriesInput.setAttribute('aria-labelledby', heading.id);
+        allStoriesInput.setAttribute('aria-describedby', allStoriesDetail.id);
+        copy.append(heading, allStoriesDetail);
+        allStoriesRow.append(allStoriesInput, copy);
+        body.append(tagFilter, allStoriesRow);
+      }
+      body.append(results);
       const footer = node('footer');
       const count = node('span', 'sf-canvas-resource-count');
       count.setAttribute('aria-live', 'polite');
@@ -78,6 +112,7 @@
       const request = new AbortController();
       const selected = new Set();
       const rows = [];
+      let allStories = storyPicker && options.selectedAll === true;
       let items = [];
       let ready = false;
       let loading = false;
@@ -100,10 +135,19 @@
       current = {dialog, opener, close};
 
       function sync() {
-        count.textContent = selected.size + ' selected';
-        const unavailable=options.kind==='playlists'&&items.some(item=>item.unavailable&&selected.has(item.id));
+        count.textContent = allStories ? 'All published stories selected' : selected.size + ' selected';
+        const unavailable=items.some(item=>item.unavailable&&selected.has(item.id));
         add.disabled = !ready || loading || unavailable;
         for (const {input, id} of rows) input.checked = selected.has(id);
+        if (allStoriesRow) {
+          tagFilter.hidden = !ready || !storyTag;
+          tagLabel.textContent = storyTag ? 'Showing stories tagged “' + storyTag + '”' : '';
+          allStoriesRow.hidden = !ready;
+          allStoriesInput.checked = allStories;
+          allStoriesDetail.textContent = storyTag
+            ? 'Use every published story tagged “' + storyTag + '”, including stories published later.'
+            : 'Use every published story, including stories published later.';
+        }
       }
 
       function render() {
@@ -113,6 +157,7 @@
         const query = search.value.trim().toLocaleLowerCase();
         let shown = 0;
         for (const item of items) {
+          if (storyTag && !item.unavailable && !item.tags.includes(storyTag)) continue;
           if (query && !item.search.includes(query)) continue;
           const label = node('label', 'sf-canvas-resource-row');
           const input = node('input');
@@ -143,7 +188,10 @@
           if (item.price) label.append(node('span', 'sf-canvas-resource-price', item.price));
           input.addEventListener('change', () => {
             if (settled || !ready) return;
-            if (input.checked) selected.add(item.id);
+            if (input.checked) {
+              allStories = false;
+              selected.add(item.id);
+            }
             else selected.delete(item.id);
             sync();
           });
@@ -167,10 +215,11 @@
               details.append(summary,members);group.append(details);
             }
             results.append(group);
-          }else results.append(label);
+          } else results.append(label);
           shown++;
         }
-        if (!shown) results.append(node('p', 'sf-canvas-resource-empty', query ? 'No items match your search.' : config.empty));
+        if (!shown) results.append(node('p', 'sf-canvas-resource-empty', query ? 'No items match your search.' :
+          storyTag ? 'No published stories match this tag.' : config.empty));
         status.textContent = '';
         sync();
       }
@@ -187,14 +236,16 @@
           const result = await options.load(request.signal);
           if (settled || request.signal.aborted) return;
           if (!Array.isArray(result?.items) || result.ok === false) throw new Error('The selection list could not be read.');
-          const seen = new Set();
+          const seen = new Map();
           items = [];
           for (const item of result.items) {
             if (!validId(options.kind, item?.id) || seen.has(item.id)) continue;
-            seen.add(item.id);
             const title = textValue(item.title) || config.fallback;
             const metadata = ['description', 'category', 'show_title', 'show_date', 'venue', 'location', 'availability_label']
               .map(key => textValue(item[key])).filter(Boolean);
+            const tags = storyPicker && Array.isArray(item.tags) ? Array.from(new Set(item.tags.filter(validStoryTag))) : [];
+            seen.set(item.id, tags);
+            metadata.push(...tags);
             const detail = Array.from(new Set(metadata)).join(' · ');
             const price = textValue(item.price_text);
             const playlist=options.kind==='playlists';
@@ -204,15 +255,20 @@
             const tracks=playlist&&Array.isArray(item.items)?item.items.map(track=>({title:textValue(track.title),available:track.available===true,duration_seconds:track.duration_seconds})):[];
             const scope=playlist?(item.source==='own'||item.category==='own'?'My playlist':'Published artist playlist'):'';
             const playlistDetail=playlist?[scope,tracks.filter(track=>track.available).length+' of '+tracks.length+' tracks available',textValue(item.description)].filter(Boolean).join(' · '):detail;
-            items.push({id: item.id, title, detail:playlistDetail, price, image: imageUrl(item.image_url),version,tracks,
+            items.push({id: item.id, title, detail:playlistDetail, price, image: imageUrl(item.image_url),version,tracks,tags,
               changed:playlist&&options.selectedVersions?.[item.id]&&options.selectedVersions[item.id]!==version,
               search: [title, playlistDetail, price,...tracks.filter(track=>track.available).map(track=>track.title)].join(' ').toLocaleLowerCase()});
           }
           selected.clear();
-          for (const id of Array.isArray(options.selectedIds) ? options.selectedIds : []) {
-            if(seen.has(id))selected.add(id);
-            else if(options.kind==='playlists'&&validId(options.kind,id)){
-              selected.add(id);items.push({id,title:'Unavailable selected playlist',detail:'Previously selected reference',search:id.toLocaleLowerCase(),unavailable:true,tracks:[]});
+          for (const id of !allStories && Array.isArray(options.selectedIds) ? options.selectedIds : []) {
+            if(seen.has(id)){
+              if(!storyTag||seen.get(id).includes(storyTag))selected.add(id);
+            }
+            else if((storyPicker||options.kind==='playlists')&&validId(options.kind,id)){
+              selected.add(id);
+              items.push({id,title:storyPicker?'Unavailable selected story':'Unavailable selected playlist',
+                detail:storyPicker?'Remove this selection or choose All Stories.':'Previously selected reference',
+                search:id.toLocaleLowerCase(),unavailable:true,tracks:[]});
             }
           }
           if(options.kind==='playlists'&&options.signedIn===false)description.textContent='Sign in to choose your own playlists. Published artist playlists are available below. Selection does not play music or start a build.';
@@ -230,9 +286,31 @@
       }
 
       search.addEventListener('input', render);
+      allStoriesInput?.addEventListener('change', () => {
+        if (settled || !ready) return;
+        allStories = allStoriesInput.checked;
+        if (allStories) selected.clear();
+        sync();
+      });
+      clearTag?.addEventListener('click', () => {
+        if (settled || !ready || options.storyTagLocked === true) return;
+        storyTag = '';
+        allStories = false;
+        render();
+        search.focus({preventScroll: true});
+      });
       retry.addEventListener('click', () => void load());
       cancel.addEventListener('click', () => close());
-      add.addEventListener('click', () => { if (ready && !loading && !settled && !add.disabled) close({ids: Array.from(selected),...(options.kind==='playlists'?{items:Array.from(selected,ref=>({ref,version:items.find(item=>item.id===ref).version}))}:{})}); });
+      add.addEventListener('click', () => {
+        if (!ready || loading || settled || add.disabled) return;
+        const result = {ids: Array.from(selected)};
+        if (options.kind==='playlists') result.items=Array.from(selected,ref=>({ref,version:items.find(item=>item.id===ref).version}));
+        if (storyPicker) {
+          result.all = allStories;
+          result.tag = storyTag;
+        }
+        close(result);
+      });
       dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
       dialog.addEventListener('close', () => close());
       dialog.addEventListener('click', event => { if (event.target === dialog) close(); });

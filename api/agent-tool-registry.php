@@ -29,6 +29,22 @@ function sf_agent_tool_registry(): array {
                 'actions'=>['play_track'=>['field'=>'track_id']],
             ],
         ],
+        'published_stories'=>[
+            'label'=>'Published artist stories','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-stories-core.php',
+            'handler'=>'sf_canvas_story_rows','confirmation'=>false,'execution'=>'server',
+            'canvas_data'=>[
+                'description'=>'Currently published artist stories in the selected order, the current All Stories collection, or the selected tag collection. Filter exact story_id or public relationship fields. Summary and body are bounded to 640 and 4,000 Unicode characters with explicit truncation fields. Bind live fields for story text. A view mounts at most 120 matching rows and can declare an sf-data-truncated child with sf-field-rendered_count and sf-field-matching_count to display the limit.',
+                'fields'=>[
+                    'story_id'=>'text','title'=>'text','summary'=>'long_text','summary_truncated'=>'number',
+                    'body_text'=>'long_text','body_truncated'=>'number','entry_type'=>'text','event_date'=>'text','era'=>'text','tags'=>'text',
+                    'related_type'=>'text','related_id'=>'text','related_title'=>'text',
+                    'track_id'=>'text','release_id'=>'text','show_id'=>'text',
+                ],
+                'filters'=>['story_id','entry_type','related_type','related_id','release_id','show_id'],
+                'max_rows'=>120,
+                'actions'=>['play_track'=>['field'=>'track_id']],
+            ],
+        ],
         'personal_listening_stats'=>[
             'label'=>'Personal listening statistics','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/listening.php',
             'handler'=>'sf_listening_analytics','confirmation'=>false,'execution'=>'server',

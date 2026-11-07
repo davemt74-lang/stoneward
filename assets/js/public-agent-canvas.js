@@ -128,18 +128,28 @@
       const scoped=classes.includes('sf-current-track');
       const data=scoped?trackDatasets:datasets;
       const dataset=ids.length===1&&data&&Object.hasOwn(data,ids[0])?data[ids[0]]:null;
+      const storyView=ids.length===1&&ids[0]==='published_stories';
       const fields=Object.entries(dataset?.fields??{}).filter(([name,type])=>
-        /^[a-z][a-z0-9_-]{0,63}$/.test(name)&&(type==='text'||type==='number'));
+        /^[a-z][a-z0-9_-]{0,63}$/.test(name)&&(
+          type==='text'||type==='number'||
+          storyView&&type==='long_text'&&(name==='summary'||name==='body_text')));
       const filters=classes.filter(name=>name.startsWith('sf-filter-'))
         .map(name=>name.match(/^sf-filter-([a-z][a-z0-9_-]{0,63}?)--([A-Za-z0-9_-]{1,80})$/));
       const filterFields=Array.isArray(dataset?.filters)?dataset.filters:[];
       const unavailable=dataset?.state==='unavailable';
       const sourceRows=scoped?(currentTrackId&&filterFields.includes('track_id')?dataset?.current_rows:null):dataset?.rows;
-      const rows=!unavailable&&template&&!template.querySelector(marker)&&fields.length&&Array.isArray(sourceRows)
+      const matchingRows=!unavailable&&template&&!template.querySelector(marker)&&fields.length&&Array.isArray(sourceRows)
         ?sourceRows.filter(row=>row&&typeof row==='object'&&!Array.isArray(row)&&
           (!scoped||row.track_id===currentTrackId)&&filters.every(filter=>
           filter&&filterFields.includes(filter[1])&&Object.hasOwn(row,filter[1])&&row[filter[1]]!==null&&String(row[filter[1]])===filter[2]
-        )).slice(0,Math.min(120,remainingRows)):[];
+        )):[];
+      const rows=matchingRows.slice(0,Math.min(120,remainingRows));
+      const truncated=storyView&&matchingRows.length>rows.length;
+      if(truncated){
+        const status='Showing '+rows.length+' of '+matchingRows.length+' matching stories.';
+        container.setAttribute('aria-description',status);
+        container.setAttribute('title',status);
+      }
       if(rows.length){
         const rendered=document.createDocumentFragment();
         rows.forEach((row,index)=>{
@@ -153,6 +163,10 @@
               item.style.setProperty('--sf-value-'+field,String(value));
               values.set('sf-field-'+field,String(value));
             }else if(type==='text'&&typeof value==='string')values.set('sf-field-'+field,value.slice(0,300));
+            else if(type==='long_text'&&typeof value==='string'){
+              const limit=field==='summary'?640:4000;
+              values.set('sf-field-'+field,Array.from(value.slice(0,limit*2)).slice(0,limit).join(''));
+            }
           }
           for(const target of item.querySelectorAll('[class*="sf-field-"]')){
             const field=Array.from(target.classList).find(name=>values.has(name));
@@ -178,8 +192,15 @@
       }
       const hasUnavailable=unavailable&&children.some(node=>node.classList.contains('sf-data-unavailable'));
       for(const node of children){
-        if(node.classList.contains('sf-data-empty')&&(rows.length||hasUnavailable))node.remove();
+        if(node.classList.contains('sf-data-empty')&&(rows.length||hasUnavailable||truncated))node.remove();
         if(node.classList.contains('sf-data-unavailable')&&!unavailable)node.remove();
+        if(storyView&&node.classList.contains('sf-data-truncated')){
+          if(!truncated)node.remove();
+          else{
+            for(const field of node.querySelectorAll('.sf-field-rendered_count'))field.textContent=String(rows.length);
+            for(const field of node.querySelectorAll('.sf-field-matching_count'))field.textContent=String(matchingRows.length);
+          }
+        }
       }
       for(const node of templates)node.remove();
     }

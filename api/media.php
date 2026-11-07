@@ -1,5 +1,7 @@
 <?php
-declare(strict_types=1);require __DIR__.'/bootstrap.php';sf_media_ensure_schema();$id=sf_clean_text($_GET['id']??'',64);$variant=sf_clean_text($_GET['variant']??'original',20);$download=!empty($_GET['download']);$asset=sf_media_asset($id);if(!$asset){http_response_code(404);exit('Media not found.');}
+declare(strict_types=1);require __DIR__.'/bootstrap.php';
+header('Cache-Control: private, no-store, no-transform');
+sf_media_ensure_schema();$id=sf_clean_text($_GET['id']??'',64);$variant=sf_clean_text($_GET['variant']??'original',20);$download=!empty($_GET['download']);$asset=sf_media_asset($id);if(!$asset){http_response_code(404);exit('Media not found.');}
 require_once __DIR__.'/media-stream-range.php';
 // A private original must remain closed even if a stale/duplicate public
 // media link exists. The website owned-download endpoint verifies purchase.
@@ -8,7 +10,28 @@ if(sf_media_protected_master_asset((int)$asset['id'])){
     if(!$viewer||($viewer['role']??'')!=='admin'){http_response_code(404);exit('Media not available.');}
 }
 $publicCacheAllowed=false;$admin=false;$u=null;try{$u=sf_current_user();$admin=$u&&($u['role']??'')==='admin';}catch(Throwable $e){}
-if(!$admin){$q=sf_db()->prepare('SELECT entity_type,entity_id,public_visible,download_allowed FROM media_links WHERE asset_id=? AND public_visible=1');$q->execute([(int)$asset['id']]);$links=$q->fetchAll();$viewAllowed=false;$downloadAllowed=false;foreach($links as $link){$allowed=true;if(($link['entity_type']??'')==='member_content'){$content=function_exists('sf_membership_content_get')?sf_membership_content_get((int)$link['entity_id']):null;$access=$content&&function_exists('sf_membership_content_access')?sf_membership_content_access($u?(int)$u['id']:null,$content):['allowed'=>false];$allowed=!empty($access['allowed']);}if($allowed){$viewAllowed=true;if(($link['entity_type']??'')!=='member_content')$publicCacheAllowed=true;if(!empty($link['download_allowed']))$downloadAllowed=true;}}if(!$viewAllowed){http_response_code(404);exit('Media not available.');}if($download&&!$downloadAllowed){http_response_code(403);exit('Download not allowed.');}}
+if(!$admin){
+    $query=sf_db()->prepare('SELECT entity_type,entity_id,download_allowed FROM media_links WHERE asset_id=? AND public_visible=1');
+    $query->execute([(int)$asset['id']]);
+    $viewAllowed=false;
+    $downloadAllowed=false;
+    foreach($query->fetchAll(PDO::FETCH_ASSOC) as $link){
+        $type=$link['entity_type'];
+        if($type==='member_content'){
+            $content=function_exists('sf_membership_content_get')?sf_membership_content_get((int)$link['entity_id']):null;
+            $access=$content&&function_exists('sf_membership_content_access')?sf_membership_content_access($u?(int)$u['id']:null,$content):['allowed'=>false];
+            if(empty($access['allowed']))continue;
+        }
+        if($type==='story_entry'&&!sf_story_published_ready((string)$link['entity_id']))continue;
+        $viewAllowed=true;
+        $canDownload=!empty($link['download_allowed']);
+        $downloadAllowed=$downloadAllowed||$canDownload;
+        // A story or membership grant is rechecked on every request.
+        if($type!=='story_entry'&&$type!=='member_content'&&(!$download||$canDownload))$publicCacheAllowed=true;
+    }
+    if(!$viewAllowed){http_response_code(404);exit('Media not available.');}
+    if($download&&!$downloadAllowed){http_response_code(403);exit('Download not allowed.');}
+}
 $rel=(string)$asset['stored_path'];if($variant!=='original'&&!empty($asset['variants'][$variant]['path']))$rel=(string)$asset['variants'][$variant]['path'];$root=realpath(SF_ROOT.'/storage/media');$file=realpath(SF_ROOT.'/'.ltrim($rel,'/'));if(!$root||!$file||!str_starts_with($file,$root.DIRECTORY_SEPARATOR)||!is_file($file)){http_response_code(404);exit('Media file missing.');}$size=filesize($file)?:0;$mime=$variant==='original'?(string)$asset['mime_type']:(str_ends_with($file,'.webp')?'image/webp':'image/jpeg');if($variant==='original'&&strtolower((string)$asset['extension'])==='vtt')$mime='text/vtt';
 if($size<1){http_response_code(404);exit('Media file empty.');}
 // Authorization is complete. Long/overlapping mobile Range requests must not hold the PHP session lock.

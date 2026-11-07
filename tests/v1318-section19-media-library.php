@@ -54,7 +54,10 @@ ok(str_contains($core,'embedded_artwork'),'audio analysis records embedded artwo
 ok(str_contains($core,'function sf_media_generate_variants')&&str_contains($core,"'thumb'=>320")&&str_contains($core,"'medium'=>800")&&str_contains($core,"'large'=>1600"),'image pipeline creates thumbnail, medium and large derivatives when GD is available');
 
 ok(str_contains($delivery,'HTTP_RANGE')&&str_contains($delivery,'Accept-Ranges: bytes'),'controlled media delivery supports HTTP Range requests for seeking');
-ok(str_contains($delivery,'$viewAllowed=false')&&str_contains($delivery,'$downloadAllowed=false')&&str_contains($delivery,"if(!empty(\$link['download_allowed']))\$downloadAllowed=true"),'public viewing and downloading are separately permissioned');
+ok(str_contains($delivery,'if(!$viewAllowed){http_response_code(404)')&&
+    str_contains($delivery,'if($download&&!$downloadAllowed){http_response_code(403)')&&
+    str_contains($delivery,'$downloadAllowed=$downloadAllowed||$canDownload'),
+    'public viewing and downloading are separately permissioned');
 ok(str_contains($delivery,"realpath(SF_ROOT.'/storage/media')"),'media delivery is confined to managed media storage');
 ok(str_contains($linksApi,'sf_media_public_links'),'public song media endpoint returns only explicitly public links');
 

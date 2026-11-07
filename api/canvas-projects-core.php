@@ -102,10 +102,18 @@ function sf_canvas_project_normalize(array $raw,bool $parseResourceTokens=true):
     if(($kind==='listening_room'||$section!==null)&&$project['track_id']==='')throw new InvalidArgumentException('Choose a published song.');
     return $project;
 }
-/** Bind selected or inherited playlist membership before approval or any model call. */
+/** Pin the chosen story scope without inheriting unrelated artist input types. */
+function sf_canvas_project_inherit_stories(array $project,?array $from): array {
+    if(!isset($from['stories'])||isset($project['artist_inputs']['stories'])||
+        (array_key_exists('artist_inputs',$project)&&$project['artist_inputs']===null))return $project;
+    $project['artist_inputs']=($project['artist_inputs']??[])+['stories'=>$from['stories']];
+    return sf_canvas_project_normalize($project,false);
+}
+/** Bind inherited story scope and selected or inherited playlist membership before approval or a model call. */
 function sf_canvas_project_bind_playlists(int $uid,array $project):array {
     $parent=null;
     if(isset($project['previous_id'])){require_once __DIR__.'/agent-scene-history.php';$parent=sf_agent_scene_history_get($uid,$project['previous_id']);if(!$parent)throw new InvalidArgumentException('That canvas is unavailable for your account.');}
+    $project=sf_canvas_project_inherit_stories($project,$parent['artist_inputs']??null);
     if(!array_key_exists('playlist_inputs',$project)&&isset($parent['playlist_inputs'])){$project['playlist_inputs']=$parent['playlist_inputs'];$project['playlist_manifest']=$parent['playlist_manifest']??null;}
     if(!array_key_exists('playlist_inputs',$project)){if(isset($project['playlist_manifest']))throw new InvalidArgumentException('Choose playlist references for this manifest.');return $project;}
     $compiled=sf_canvas_playlists_compile($uid,$project['playlist_inputs'],$project['playlist_manifest']??null);$project['playlist_manifest']=$compiled['manifest'];
@@ -134,7 +142,10 @@ function sf_canvas_project_list(int $uid): array {
 }
 function sf_canvas_project_reuse(int $uid,int $id,array $project): ?array {
     $proposal=sf_canvas_project_get($uid,$id);if(!$proposal)throw new InvalidArgumentException('Canvas project not found.');
-    if(in_array($proposal['status'],['awaiting_approval','approved'],true)&&hash_equals(sf_canvas_project_fingerprint($proposal['project']),sf_canvas_project_fingerprint($project)))return $proposal;
+    if(in_array($proposal['status'],['awaiting_approval','approved'],true)&&hash_equals(sf_canvas_project_fingerprint($proposal['project']),sf_canvas_project_fingerprint($project))){
+        sf_canvas_resource_validate_stories($project['artist_inputs']??null);
+        return $proposal;
+    }
     return null;
 }
 function sf_canvas_project_propose(array $user,array $request,string $source='user'): array {
@@ -142,7 +153,9 @@ function sf_canvas_project_propose(array $user,array $request,string $source='us
     sf_canvas_project_ensure_schema();
     $raw=$request['project']??$request['build_request']??null;if(!is_array($raw))throw new InvalidArgumentException('Describe a canvas project.');
     if(isset($request['source_scene_ids'])&&!isset($raw['source_scene_ids']))$raw['source_scene_ids']=$request['source_scene_ids'];
-    $project=sf_canvas_project_bind_playlists($uid,sf_canvas_project_normalize($raw));sf_canvas_resource_validate($uid,$project['artist_inputs']??null,$project['source_scene_ids']);
+    $project=sf_canvas_project_bind_playlists($uid,sf_canvas_project_normalize($raw));
+    sf_canvas_resource_prepare($project['artist_inputs']??null);
+    sf_canvas_resource_validate($uid,$project['artist_inputs']??null,$project['source_scene_ids']);
     if(isset($project['previous_id']))sf_canvas_project_validate_sources($uid,[$project['previous_id']]);
     if(isset($request['reuse_id'])){
         if(!is_int($request['reuse_id'])||$request['reuse_id']<1)throw new InvalidArgumentException('Choose a canvas project.');
@@ -156,6 +169,7 @@ function sf_canvas_project_propose(array $user,array $request,string $source='us
     try{
         $q=$db->prepare('SELECT id FROM users WHERE id=? AND status=?'.($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' FOR UPDATE':''));$q->execute([$uid,'active']);$available=$q->fetchColumn()!==false;$q->closeCursor();
         if(!$available)throw new InvalidArgumentException('Your account is no longer available.');
+        sf_canvas_resource_validate_stories($project['artist_inputs']??null);
         if($replaceId!==null)$db->prepare("UPDATE canvas_projects SET status='canceled',updated_at=? WHERE user_id=? AND id=? AND status IN ('awaiting_approval','approved')")->execute([$now,$uid,$replaceId]);
         $q=$db->prepare('INSERT INTO canvas_projects(user_id,title,concept,project_json,fingerprint,source,status,approval_mode,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
         $q->execute([$uid,$title,$concept,json_encode($project,JSON_THROW_ON_ERROR),sf_canvas_project_fingerprint($project),$source,$status,$prefs['auto_approve']?'automatic':null,$now,$now]);
@@ -165,7 +179,8 @@ function sf_canvas_project_propose(array $user,array $request,string $source='us
 function sf_canvas_project_approve(int $uid,int $id): array {
     $proposal=sf_canvas_project_get($uid,$id);if(!$proposal)throw new InvalidArgumentException('Canvas project not found.');
     if(!in_array($proposal['status'],['awaiting_approval','approved'],true))throw new SfCanvasProjectConflict('This canvas project cannot be approved now.');
-    sf_canvas_project_bind_playlists($uid,$proposal['project']);
+    $bound=sf_canvas_project_bind_playlists($uid,$proposal['project']);
+    sf_canvas_resource_validate_stories($bound['artist_inputs']??null);
     sf_db()->prepare("UPDATE canvas_projects SET status='approved',approval_mode='manual',updated_at=? WHERE user_id=? AND id=? AND status IN ('awaiting_approval','approved')")->execute([gmdate('c'),$uid,$id]);
     return sf_canvas_project_get($uid,$id);
 }
@@ -183,6 +198,7 @@ function sf_canvas_project_begin(array $user,array $request): ?array {
         // Replaying an already claimed exact request returns its saved result;
         // later source edits must neither expand it nor turn recovery into a new build.
         foreach(['music_inputs','playlist_inputs','playlist_manifest'] as $field)if(!array_key_exists($field,$project)&&array_key_exists($field,$existing['project']))$project[$field]=$existing['project'][$field];
+        $project=sf_canvas_project_inherit_stories($project,$existing['project']['artist_inputs']??null);
         $project=sf_canvas_project_normalize($project,false);
     }else $project=sf_canvas_project_bind_playlists($uid,$project);
     // Approval and the later worker claim share the same privacy epoch.
@@ -190,6 +206,7 @@ function sf_canvas_project_begin(array $user,array $request): ?array {
     require_once __DIR__.'/agent-scene-history.php';
     if(!function_exists('sf_privacy_ensure_schema'))require_once __DIR__.'/privacy-core.php';
     sf_agent_scene_history_ensure_schema();sf_privacy_ensure_schema();
+    sf_canvas_resource_prepare($project['artist_inputs']??null);
     $db=sf_db();$own=!$db->inTransaction();if($own)$db->beginTransaction();
     try{
         // Match privacy clearing's account-before-project lock order.
