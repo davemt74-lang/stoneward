@@ -20,10 +20,27 @@ The `published_lyrics` binding exposes untimed Songbook text separately from app
 
 Saved and shared canvases resolve the current publication at load. Withdrawn words and cues from replaced audio stop appearing in the dataset. Picker and planning metadata include availability and source identity, while code generation can use bounded public excerpts for inspiration. Draft lyrics, private annotations and unpublished timeline segments stay private. The **Published song lyrics** admin permission controls canvas delivery.
 
+## Account data with /me
+
+Enter `/me` in chat while signed in. Open a source's **Available fields** to inspect its exact code keys, types, and window. Select any combination and attach it to the draft. The picker reads schema metadata only. Attaching a source uses no Active Tokens, starts no build, and grants no data access.
+
+A canvas receives the current viewer's records only for sources it declares, the administrator enables, and the viewer authorizes in **What this canvas uses**. The attachment stores source IDs as an upper bound. Edits inherit the selection, and `{me-clear}` removes the entire personal-data scope from a revision. The Coding and Testing agents work with schemas and empty private bindings. Published canvases load each viewer's own data after consent.
+
+| Canvas source | Window or row limit | Fields |
+| --- | --- | --- |
+| `personal_listening_stats` | 30 days, up to 30 public songs | `track_id`, `title`, `release`, `listens`, `completes`, `listened_seconds`, `measured_events`, `legacy_events` |
+| `my_listening_summary` | One row for the past 30 days of public-song activity | `window_days`, `starts`, `completes`, `sessions`, `tracks`, `listened_seconds`, `measured_events`, `legacy_events` |
+| `my_listening_history` | Most recent 120 eligible events on public songs | `track_id`, `title`, `release`, `event_type`, `position_seconds`, `duration_seconds`, `occurred_at` |
+| `my_purchases` | Up to 120 recent line items from orders linked to the viewer's account | `purchase_id`, `order_id`, `item_label`, `item_type`, `product_id`, `variant_id`, `track_id`, `release_id`, `quantity`, `item_total_cents`, `order_total_cents`, `currency`, `ordered_at`, `order_status`, `payment_status`, `fulfillment_status`, `vinyl_status` |
+| `my_tickets` | Up to 60 recent Stonefellow reservations | `reservation_id`, `offer_id`, `show_id`, `offer_title`, `offer_type`, `show_title`, `show_date`, `venue`, `location`, `quantity`, `status`, `reserved_at` |
+| `my_preferences` | One row for current settings | `locale`, `timezone`, `country_code`, `listening_history_enabled`, `personalization_enabled` |
+
+History events include start, resume, pause, complete and skip. Measured listening seconds come from reported native playback, and legacy event counts indicate coverage without measured time. Listening sources honor the account's listening-history setting. Purchase order totals repeat across lines in one order, so group by `order_id` before summing totals.
+
 These resources are inventory for the coding agent. The agent authors the experience described by the user. Selected canvases provide their actual prompts, code and authorized image metadata. Selected commerce rows supply live `published_merch` and `published_ticket_offers` bindings with all selected variants. No catalog widget is added by the picker. Existing source, code and privacy context budgets still apply; the inventories and selected runtime rows do not use a three-item sample.
 
 The ordinary chat agent can route a design conversation to the canvas discussion service without a special command phrase. It passes the original message and the browser’s current selections. The service can answer a question, discuss a direction, or propose a project using the account’s history and explicit preferences. A proposed project uses the existing approval setting. Discussion never grants build approval. Planning and discussion use per-user Active Tokens with idempotent request IDs and the existing reservation system.
 
 Project cards include **Like**, **Dislike** and an optional reason. The footer’s **Feedback** action opens the same controls for the current saved canvas. Feedback can be edited or cleared. **Cancel** ends a project without recording a dislike. Private feedback informs subsequent ideas and discussion; account history clearing and closure remove it, and account exports include it.
 
-The canvas resource endpoint supports `kind=canvas|merch|tickets|playlists|stories|lyrics`. A guest can read published artist playlists, stories and lyric availability. Signed-in users also receive their own playlists. New project interfaces include POST `api/canvas-projects.php` actions `discuss` and `feedback`. Saved `artist_inputs` is an additive history field with independently optional artist resource scopes. Existing music, images, playback, project approval and legacy API contracts remain in place.
+The canvas resource endpoint supports `kind=canvas|merch|tickets|playlists|stories|lyrics|me`. A guest can read published artist playlists, stories and lyric availability. Signed-in users also receive their own playlists. New project interfaces include POST `api/canvas-projects.php` actions `discuss` and `feedback`. Saved `artist_inputs` is an additive history field with independently optional artist resource scopes. Existing music, images, playback, project approval and legacy API contracts remain in place.

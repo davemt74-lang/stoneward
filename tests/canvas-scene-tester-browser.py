@@ -122,6 +122,44 @@ with sync_playwright() as playwright:
         }),options())''')
         check(any(row['id'] == 'dataset_published_merch' and row['detail'] == '1 rendered rows' for row in result['checks']),
               prefix + 'the actual production dataset binder contributes observable row evidence')
+        private_preview = page.evaluate(r'''async()=>{
+          const value=await scene(`
+            const sentinel='Owner'+'_'+'Only';
+            if(document.querySelector('main').textContent.includes(sentinel))throw new ReferenceError(sentinel+' is not defined');
+          `,{
+            html:'<section class="sf-dataset-published_merch"><div class="sf-data-row"><span class="sf-field-title"></span></div></section>'+
+              '<section class="sf-dataset-my_purchases"><div class="sf-data-row"><span class="sf-field-item_label"></span></div><p class="sf-data-empty">No purchases here</p></section>'+
+              '<section class="sf-dataset-personal_listening_stats sf-current-track"><div class="sf-data-row"><span class="sf-field-title"></span></div></section>',
+            canvas_access:{permissions:[{id:'canvas.data.my_purchases',personal:true,granted:true}]},
+            dataset_track_id:'song-one',
+            datasets:{
+              published_merch:{fields:{title:'text'},rows:[{title:'Public fixture'}]},
+              my_purchases:{fields:{item_label:'text'},rows:[{item_label:'Owner_Only_Order'}]},
+              personal_listening_stats:{personal:true,fields:{track_id:'text',title:'text'},filters:['track_id'],
+                rows:[{track_id:'song-one',title:'Owner_Only_Listening'}],
+                current_rows:[{track_id:'song-one',title:'Owner_Only_Current'}]}
+            }
+          });
+          const report=await SFCanvasSceneTester.test(value,{...options(),
+            prepareScene:(candidate,probe,previewProgram)=>{
+              const prepared=SFPublicAgentCanvas.prepareSceneTest(candidate,{probe,previewProgram,currentTrackId:'song-one'});
+              window.lastCandidate=prepared;return prepared;
+            }
+          });
+          return {report,srcdoc:lastCandidate.frame.srcdoc,liveRows:value.datasets.personal_listening_stats.current_rows,
+            orderRows:value.datasets.my_purchases.rows};
+        }''')
+        result = private_preview['report']
+        check(result['state'] == 'passed' and any(row['code'] == 'personal_data' for row in result['manual']) and
+              {row['id'] for row in result['checks'] if row.get('detail') == 'Personal rows withheld'} ==
+              {'dataset_my_purchases', 'dataset_personal_listening_stats'},
+              prefix + 'testing verifies private binding shape with manual populated review')
+        check('Owner_Only' not in private_preview['srcdoc'] and 'Owner_Only' not in str(result) and
+              'Public fixture' in private_preview['srcdoc'] and 'No purchases here' in private_preview['srcdoc'],
+              prefix + 'private values stay outside the preview document and report while public rows render')
+        check(private_preview['liveRows'][0]['title'] == 'Owner_Only_Current' and
+              private_preview['orderRows'][0]['item_label'] == 'Owner_Only_Order',
+              prefix + 'detached redaction preserves the authorized live scene data')
         result = page.evaluate(r'''async()=>SFCanvasSceneTester.test(await scene('',{
           html:'<section class="sf-dataset-published_merch"><div class="sf-data-row"></div></section>',
           datasets:{published_merch:{state:'unavailable',fields:{title:'text'},rows:[]}}

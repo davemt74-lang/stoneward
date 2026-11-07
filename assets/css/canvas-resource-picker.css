@@ -27,6 +27,11 @@ body:has(.sf-canvas-resource-picker[open]) { overflow:hidden; }
 .sf-canvas-resource-row-copy { flex:1;min-width:0;overflow-wrap:anywhere; }
 .sf-canvas-resource-row-copy strong,.sf-canvas-resource-row-copy small { display:block; }
 .sf-canvas-resource-row-copy small,.sf-canvas-resource-price { color:#b8cbdb;font-size:13px; }
+.sf-canvas-resource-account-fields { margin:0 0 12px 12px;overflow-wrap:anywhere; }
+.sf-canvas-resource-account-fields summary { box-sizing:border-box;min-height:44px;padding:10px 0;color:#a2dfff;cursor:pointer; }
+.sf-canvas-resource-account-fields summary:focus-visible { outline:2px solid #a2dfff;outline-offset:-2px; }
+.sf-canvas-resource-account-fields ul { margin:0 0 8px;padding-left:24px; }
+.sf-canvas-resource-account-fields code,.sf-canvas-resource-account-fields small { color:#b8cbdb; }
 .sf-canvas-resource-price { max-width:30%;overflow-wrap:anywhere;text-align:right; }
 .sf-canvas-resource-empty { color:#c6d8e4; }
 .sf-canvas-resource-picker footer { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:14px 24px;border-top:1px solid #a8d7ef40; }

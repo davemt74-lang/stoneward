@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.299';
+  window.STONEFELLOW_APP_BUILD='1.3.300';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -2072,7 +2072,7 @@
   }
   function canvasDesignBrief(brief){
     const clean=brief.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi,' ')
-      .replace(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|playlists-clear|merch-clear|tickets-clear)\}/gi,' ')
+      .replace(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|me-clear|playlists-clear|merch-clear|tickets-clear)\}/gi,' ')
       .replace(/(`?)\{[^\S\r\n]*(?:hide-agent|design-ag(?:ent|net))[^\S\r\n]*\}\1/gi,' ').trim();
     return clean!==brief&&/^[.!?…]+$/.test(clean)?'':clean;
   }
@@ -2164,12 +2164,13 @@
     return typeof value==='string'&&value.length<=64&&/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
   }
   function chatDraftResourceInputs(draft){
-    const sources=[],lyrics=[],merch=[],tickets=[],playlists=[];
-    for(const match of draft.matchAll(/\{(canvas|lyrics|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
+    const sources=[],lyrics=[],meTools=[],merch=[],tickets=[],playlists=[];
+    for(const match of draft.matchAll(/\{(canvas|lyrics|me|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
       const kind=match[1].toLowerCase(),id=match[2];
       if(kind==='canvas'){
         const value=Number(id);if(/^[1-9]\d*$/.test(id)&&Number.isSafeInteger(value))sources.push(value);
       }else if(kind==='lyrics')lyrics.push(id);
+      else if(kind==='me'){if(/^[a-z][a-z0-9_]{0,63}$/i.test(id))meTools.push(id.toLowerCase());}
       else (kind==='merch'?merch:tickets).push(id);
     }
     const playlistSeen=new Set();
@@ -2179,6 +2180,7 @@
     }
     const artist={};
     if(lyrics.length||/\{lyrics-clear\}/i.test(draft))artist.lyrics_ids=Array.from(new Set(lyrics));
+    if(meTools.length||/\{me-clear\}/i.test(draft))artist.me_tools=Array.from(new Set(meTools));
     if(merch.length||/\{merch-clear\}/i.test(draft))artist.merch_ids=Array.from(new Set(merch));
     if(tickets.length||/\{tickets-clear\}/i.test(draft))artist.ticket_ids=Array.from(new Set(tickets));
     const storyIds=Array.from(new Set(Array.from(draft.matchAll(/\{story:([1-9]\d{0,18})\}/gi),match=>match[1])));
@@ -2191,7 +2193,7 @@
       ...(playlists.length||/\{playlists-clear\}/i.test(draft)?{playlist_inputs:{items:playlists}}:{})};
   }
   function chatResourceCommandRange(draft,caret){
-    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|merch|tickets|playlists|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|me|merch|tickets|playlists|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
       if(caret!==undefined&&caret!==end)continue;
       const command=match[2].toLowerCase();
@@ -2205,6 +2207,7 @@
     const tokenKind=range.kind==='tickets'?'ticket':range.kind==='playlists'?'playlist':range.kind==='stories'?'story':range.kind;
     let rule=new RegExp('\\{'+tokenKind+':[A-Za-z0-9_-]{1,180}\\}|\\{'+range.kind+'-clear\\}','gi');
     if(range.kind==='playlists')rule=/\{(?:playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|playlists-clear)\}/gi;
+    if(range.kind==='me')rule=/\{(?:me:[a-z][a-z0-9_]{0,63}|me-clear)\}/gi;
     if(range.kind==='stories')rule=/\{(?:story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64}))\}/gi;
     const strip=value=>value.replace(rule,'');
     const before=strip(input.value.slice(0,range.start)),after=strip(input.value.slice(range.end));
@@ -2212,6 +2215,8 @@
     if(range.kind==='playlists'&&ids.some(id=>!/^(?:own|artist)-[1-9]\d{0,18}$/.test(id)||!/^[a-f0-9]{64}$/.test(versions.get(id)||'')))throw new Error('Choose a verified playlist version before adding it.');
     if(range.kind==='lyrics'&&ids.some(id=>typeof id!=='string'||!/^[A-Za-z0-9_-]{1,180}$/.test(id)))
       throw new Error('Choose published lyrics from the picker.');
+    if(range.kind==='me'&&ids.some(id=>typeof id!=='string'||!/^[a-z][a-z0-9_]{0,63}$/.test(id)))
+      throw new Error('Choose account data from the picker.');
     if(range.kind==='stories'&&ids.some(id=>typeof id!=='string'||!/^[1-9]\d{0,18}$/.test(id)||(id.length===19&&id>'9223372036854775807')))
       throw new Error('Choose published stories from the picker.');
     let tokens;
@@ -2231,7 +2236,9 @@
     const requestedDraft=input.value;
     await loadAuth();
     if(input.value!==requestedDraft||chatResourcePicker||chatMusicPicker||chatImagePicker)return;
-    if(!canvasOwner()&&!['lyrics','playlists','stories'].includes(range.kind)){popupEntry('notice','Sign in to choose canvas project sources.');return;}
+    if(!canvasOwner()&&!['lyrics','playlists','stories'].includes(range.kind)){
+      popupEntry('notice',range.kind==='me'?'Sign in to choose your account data.':'Sign in to choose canvas project sources.');return;
+    }
     const open=window.SFCanvasResourcePicker?.open;
     if(typeof open!=='function'){popupEntry('notice','Reload the page to open the source picker.');return;}
     const draft=input.value,owner=canvasOwner(),sourceScene=listeningRoom,resources=chatDraftResourceInputs(draft);
@@ -2246,7 +2253,7 @@
     else if(range.kind==='stories')selected=stories?.mode==='selected'?stories.story_ids:[];
     else if(range.kind==='canvas')selected=resources.source_scene_ids;
     else {
-      const key=range.kind==='tickets'?'ticket_ids':range.kind+'_ids';
+      const key=range.kind==='me'?'me_tools':range.kind==='tickets'?'ticket_ids':range.kind+'_ids';
       selected=resources.artist_inputs?.[key]??previous?.artist_inputs?.[key];
     }
     const picker={owner,request:new AbortController()};chatResourcePicker=picker;
@@ -2257,7 +2264,7 @@
           selectedAll:storyAllSelected}:{}),
         selectedVersions:range.kind==='playlists'?Object.fromEntries((playlistSelection?.items||[]).map(item=>[item.ref,item.version])):undefined,signedIn:!!owner,signal:picker.request.signal});
       if(!result||picker.request.signal.aborted||chatResourcePicker!==picker||owner!==canvasOwner()||input.value!==draft||
-        (revising&&sourceScene!==listeningRoom&&['lyrics','playlists','stories'].includes(range.kind)))return;
+        (revising&&sourceScene!==listeningRoom&&['lyrics','me','playlists','stories'].includes(range.kind)))return;
       applyChatResourceSelection(range,result.ids,result.items,result);
     }catch(error){if(error.name!=='AbortError'&&owner===canvasOwner())popupEntry('notice',error.message||'Sources could not load.');}
     finally{if(chatResourcePicker===picker)chatResourcePicker=null;picker.request.abort();}
@@ -2267,8 +2274,8 @@
       clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
       if(event?.isComposing||input.selectionStart!==input.selectionEnd)return;
       const draft=input.value,range=chatResourceCommandRange(draft,input.selectionEnd),owner=canvasOwner();
-      // A story command may still be growing into a longer tagged command.
-      if(!range||range.kind==='stories')return;
+      // Wait for submission when a command could grow into another resource command.
+      if(!range||['stories','me'].includes(range.kind))return;
       chatResourceCommandTimer=setTimeout(()=>{
         if(input.value===draft&&owner===canvasOwner())void openChatResourcePicker(range);
       },350);
@@ -2284,7 +2291,7 @@
     const placed=Array.from(draft.matchAll(/\{image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
     const references=Array.from(draft.matchAll(/\{reference-image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
     const music=Array.from(draft.matchAll(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi));
-    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|playlists-clear|merch-clear|tickets-clear)\}/gi));
+    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|me-clear|playlists-clear|merch-clear|tickets-clear)\}/gi));
     return [...placed,...references,...music,...resources].reduce((length,match)=>length+match[0].length+1,0);
   }
   function syncChatImageDraftLimit(){
@@ -2580,7 +2587,7 @@
     input.addEventListener('paste',event=>{
       if(chatImageDraftLimit<=0||!event.clipboardData)return;
       const draft=input.value.slice(0,input.selectionStart)+event.clipboardData.getData('text')+input.value.slice(input.selectionEnd);
-      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
+      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|me-clear|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
       input.maxLength=chatImageDraftLimit+chatDraftBindingLength(draft);
       setTimeout(syncChatImageDraftLimit,0);
     });
@@ -2622,7 +2629,7 @@
     if(edit)return {kind:'revise',brief:(edit[1]||'').trim()};
     const command=text.replace(/[.!?…]+$/,'').trim()
       .replace(/^(?:(?:can|could|would|will)\s+you|i(?:['’]d|\s+would)\s+like\s+you\s+to)\s+(?:please\s+)?/i,'');
-    const assetReference=/\{\s*(?:canvas:|lyrics:|merch:|ticket:|playlist:|story:|stories-(?:all|clear|tag:)|lyrics-clear|playlists-clear|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
+    const assetReference=/\{\s*(?:canvas:|lyrics:|me:|merch:|ticket:|playlist:|story:|stories-(?:all|clear|tag:)|lyrics-clear|me-clear|playlists-clear|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
     if(/^\/review-images$/i.test(text))return {kind:'image_review'};
     const build=command.match(/^let['’]?s\s+build(?:\s*[:,]\s*|\s+|$)([\s\S]*)$/i);
     if(build){

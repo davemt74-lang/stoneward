@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__.'/customer-commerce-view.php';
 require_once __DIR__.'/vinyl-customer-status.php';
 
-/** Order lines visible in the account purchase history, with canvas-safe fields only. */
+/** Order lines linked to the viewer's account, with canvas-safe fields only. */
 function sf_agent_canvas_purchase_rows(array $user): array {
     $userId=(int)($user['id']??0);
     if($userId<1)return [];
@@ -12,7 +12,7 @@ function sf_agent_canvas_purchase_rows(array $user): array {
     $vinylByOrder=null;
     foreach(glob(SF_ROOT.'/storage/orders/SF-*.json')?:[] as $path){
         $order=sf_read_order(basename($path,'.json'));
-        if(!$order||!sf_customer_commerce_owns($order,$user))continue;
+        if(!$order||(int)($order['user_id']??0)!==$userId||!sf_customer_commerce_owns($order,$user))continue;
         $id=(string)$order['id'];
         $quote=(array)($order['quote']??[]);
         $payment=(array)($order['payment']??[]);
@@ -31,7 +31,7 @@ function sf_agent_canvas_purchase_rows(array $user): array {
             $type=$item['type']??'';
             $isCustomVinyl=$type==='custom_media'&&($item['format']??'vinyl')==='vinyl';
             if($isCustomVinyl&&$vinylByOrder===null){
-                $vinylByOrder=array_column(sf_vinyl_customer_status($userId,(string)($user['email']??''),25),'status','order_id');
+                $vinylByOrder=array_column(sf_vinyl_customer_status($userId,'',25),'status','order_id');
             }
             $rows[]=$orderFields+[
                 'purchase_id'=>$id.'-line-'.($index+1),

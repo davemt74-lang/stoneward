@@ -76,7 +76,7 @@ require getenv('SF_PERMISSION_REPO').'/api/canvas-capabilities.php';
             first = probe("echo json_encode(sf_canvas_permission_policy());")
             check(first['revision'] == 1 and first['disabled'] == [], 'MySQL default policy reads preserve legacy behavior without schema')
             initialized = probe("echo json_encode(sf_canvas_permission_admin_view());")
-            check(len(initialized['capabilities']) == 9, 'MySQL creates and reads nine capability rows through native SQL')
+            check(len(initialized['capabilities']) == 12, 'MySQL creates and reads twelve capability rows through native SQL')
             engine = probe("echo json_encode(sf_db()->query(\"SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='canvas_permission_policy'\")->fetchColumn());")
             check(engine == 'InnoDB', 'Native policy table uses transactional InnoDB')
             saved = probe("echo json_encode(sf_canvas_permission_save(['id'=>7,'role'=>'admin'],1,['canvas.data.my_purchases'=>false]));")
@@ -206,6 +206,8 @@ echo json_encode(['failed'=>$failed,'summary'=>$summary,'saved'=>sf_canvas_acces
                 ('canvas-stories-flow', 'SF_TEST_STORY_DB_CONFIG'),
                 ('canvas-lyrics', 'SF_TEST_LYRICS_DB_CONFIG'),
                 ('canvas-lyrics-flow', 'SF_TEST_LYRIC_DB_CONFIG'),
+                ('canvas-account-data', 'SF_TEST_ACCOUNT_DATA_DB_CONFIG'),
+                ('canvas-me-flow', 'SF_TEST_ME_DB_CONFIG'),
             ]:
                 database = test.replace('-', '_')
                 dsn = 'mysql:host=127.0.0.1;port=' + str(port)

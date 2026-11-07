@@ -1582,7 +1582,7 @@ def exercise_canvas_data_tools(site, base, first, second, csrf):
     orders = site / 'storage/orders'
     orders.mkdir(exist_ok=True)
     for key, owner_id, label in [('SF-CANVAS-OWNER', 1, 'My canvas jacket'),
-                                 ('SF-CANVAS-LEGACY', None, 'My legacy purchase'),
+                                 ('SF-CANVAS-LEGACY', None, 'Unlinked guest purchase'),
                                  ('SF-CANVAS-OTHER', 2, 'Other fan purchase')]:
         (orders / (key + '.json')).write_text(json.dumps({
             'id': key, 'user_id': owner_id, 'created_at': '2026-01-05T12:00:00Z', 'status': 'paid',
@@ -1660,13 +1660,13 @@ def exercise_canvas_data_tools(site, base, first, second, csrf):
           'Published commerce tools keep stable IDs, actual stock and distinct free and unknown prices')
     purchases = {row['order_id']: row for row in datasets['my_purchases']['rows']}
     reservations = datasets['my_tickets']['rows']
-    check(set(purchases) == {'SF-CANVAS-OWNER', 'SF-CANVAS-LEGACY'}
+    check(set(purchases) == {'SF-CANVAS-OWNER'}
           and purchases['SF-CANVAS-OWNER']['product_id'] == merch['Small']['product_id']
           and purchases['SF-CANVAS-OWNER']['fulfillment_status'] == 'shipped'
           and len(reservations) == 1 and reservations[0]['quantity'] == 1
           and reservations[0]['offer_id'] == offers['Canvas free RSVP']['offer_id']
           and reservations[0]['show_id'] == offers['Canvas free RSVP']['show_id'],
-          'Purchase lines and reservations match the signed-in owner and link to public records')
+          'Only linked account purchases and owned reservations appear, even when another order shares the email')
     secrets = ['private shipping address', 'private payment reference', 'private shipment number',
                'private-owner-ticket-code', 'owner-ticket-request', 'private-other-ticket-code',
                'fan-one@example.test', 'private canvas supplier', 'example.invalid/canvas-checkout']

@@ -132,7 +132,11 @@ $captured=[];$infer=static function(array $provider,string $system,string $messa
     check($cancel()===false,'Testing checks the durable workflow cancellation state during inference');
     return ['text'=>json_encode($pass),'provider'=>$provider['provider'],'model'=>$provider['model'],'input_tokens'=>19,'output_tokens'=>31];
 };
-$before=sf_token_balance(1);$review=sf_canvas_build_review($user,$job,array_replace($candidate,['js'=>'client-forged-code']),$evidence,$job['step_id'],$infer);
+$before=sf_token_balance(1);
+$privateEvidence=$evidence;
+$privateEvidence['manual'][]=['code'=>'personal_data','message'=>'Personal records are withheld from testing.'];
+$review=sf_canvas_build_review($user,$job,array_replace($candidate,['js'=>'client-forged-code',
+    'datasets'=>['my_purchases'=>['rows'=>[['item_label'=>'PRIVATE_PURCHASE_FIXTURE']]]]]),$privateEvidence,$job['step_id'],$infer);
 check($review['active_tokens_used']===50&&sf_token_balance(1)===$before-50&&$review['report']['verdict']==='pass',
     'The Testing agent charges exactly actual selected-model usage and saves its structured assessment');
 check($captured['provider']['model']===$project['coding_model']['model']&&$captured['message']['candidate']['js']===$candidate['js']&&
@@ -140,6 +144,10 @@ check($captured['provider']['model']===$project['coding_model']['model']&&$captu
     'Testing uses the approved enabled model and actual owner-saved code rather than client-supplied source');
 check(str_contains($captured['system'],'You do not run a browser')&&$review['assessment_scope']['manual_checks'][0]['code']==='playback',
     'The assessment distinguishes code review, supplied observations and tests that were not performed');
+check(str_contains($captured['system'],'An empty private binding is expected in this preview')&&
+    $review['assessment_scope']['manual_checks'][1]['code']==='personal_data'&&
+    !str_contains(json_encode($captured['message'],JSON_THROW_ON_ERROR),'PRIVATE_PURCHASE_FIXTURE'),
+    'The Testing provider receives the manual populated check instead of account records');
 $before=sf_token_balance(1);$count=(int)$db->query('SELECT COUNT(*) FROM fixture_steps')->fetchColumn();
 $cancelInfer=static function(array $provider,string $system,string $message,int $limit,callable $cancel):array {$GLOBALS['active']=false;$cancel();throw new RuntimeException('unreachable');};
 rejected(fn()=>sf_canvas_build_review($user,$job,$candidate,$evidence,$job['step_id'],$cancelInfer),'Stopping Testing aborts its provider phase');
