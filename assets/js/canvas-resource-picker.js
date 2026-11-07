@@ -4,6 +4,7 @@
   const kinds = Object.freeze({
     canvas: {title: 'Choose canvases', search: 'Search canvases', loading: 'Loading your canvases…', empty: 'No saved canvases are available yet.', fallback: 'Untitled canvas'},
     lyrics: {title: 'Choose lyrics', search: 'Search songs with lyrics', loading: 'Loading published lyrics…', empty: 'No song lyrics are published yet.', fallback: 'Untitled song'},
+    me: {title: 'Choose your account data', search: 'Search account data or fields', loading: 'Loading account data categories…', empty: 'No account data categories are available.', fallback: 'Account data'},
     merch: {title: 'Choose merch', search: 'Search merch', loading: 'Loading public merch…', empty: 'No public merch is available yet.', fallback: 'Untitled merch'},
     playlists: {title: 'Choose playlists', search: 'Search playlists and tracks', loading: 'Loading available playlists…', empty: 'No playlists are available.', fallback: 'Untitled playlist'},
     stories: {title: 'Choose stories', search: 'Search stories', loading: 'Loading published stories…', empty: 'No stories are published yet.', fallback: 'Untitled story'},
@@ -39,6 +40,7 @@
     if (kind === 'stories') return /^[1-9][0-9]{0,18}$/.test(value) && (value.length < 19 || value <= '9223372036854775807');
     if (kind === 'canvas') return /^[1-9][0-9]*$/.test(value);
     if (kind === 'lyrics') return /^[A-Za-z0-9_-]{1,180}$/.test(value);
+    if (kind === 'me') return /^[a-z][a-z0-9_]{0,63}$/.test(value);
     if (kind === 'playlists') return /^(?:own|artist)-[1-9][0-9]{0,18}$/.test(value);
     return /^[A-Za-z0-9_-]+$/.test(value);
   }
@@ -59,7 +61,10 @@
       const header = node('header');
       const title = node('h2', '', config.title);
       title.id = prefix + '-title';
-      const description = node('p', '', options.kind==='playlists'?'Choose your own or published artist playlists. Track order is preserved; the agent designs the experience you request. Selection does not play music or start a build.':'Choose items to add to your prompt. Adding selections does not start a build.');
+      const accountPicker = options.kind === 'me';
+      const description = node('p', '', accountPicker
+        ? 'Choose which data categories your canvas can request. You control access to each category separately when the canvas opens.'
+        : options.kind==='playlists'?'Choose your own or published artist playlists. Track order is preserved; the agent designs the experience you request. Selection does not play music or start a build.':'Choose items to add to your prompt. Adding selections does not start a build.');
       description.id = prefix + '-description';
       const searchLabel = node('label', 'sf-canvas-resource-search');
       const search = node('input');
@@ -199,7 +204,21 @@
             sync();
           });
           rows.push({input, id: item.id});
-          if(options.kind==='playlists'){
+          if(accountPicker&&item.fields?.length){
+            const group=node('section');
+            const details=node('details','sf-canvas-resource-account-fields');
+            const summary=node('summary','',item.fields.length+' available field'+(item.fields.length===1?'':'s'));
+            summary.setAttribute('aria-label',summary.textContent+' for '+item.title);
+            const fields=node('ul');
+            for(const field of item.fields){
+              const entry=node('li','',field.label+' ');
+              entry.append(node('code','',field.id),node('small','',' · '+field.type));
+              fields.append(entry);
+            }
+            details.append(summary,fields);
+            group.append(label,details);
+            results.append(group);
+          } else if(options.kind==='playlists'){
             const group=node('section','sf-canvas-resource-playlist');group.append(label);
             if(item.changed)group.append(node('p','sf-canvas-resource-status','Updated since your selected version. Adding selections uses the version shown here.'));
             if(item.unavailable)group.append(node('p','sf-canvas-resource-status','This selected playlist is unavailable. Remove it or choose another playlist before adding selections.'));
@@ -242,9 +261,9 @@
           const seen = new Map();
           items = [];
           for (const item of result.items) {
-            if (!validId(options.kind, item?.id) || seen.has(item.id)) continue;
+            if (!validId(options.kind, item?.id) || seen.has(item.id) || accountPicker && item.enabled===false) continue;
             const title = textValue(item.title) || config.fallback;
-            const metadata = ['description', 'category', 'show_title', 'show_date', 'venue', 'location', 'availability_label']
+            const metadata = (accountPicker ? ['description','time_window'] : ['description','category','show_title','show_date','venue','location','availability_label'])
               .map(key => textValue(item[key])).filter(Boolean);
             const tags = storyPicker && Array.isArray(item.tags) ? Array.from(new Set(item.tags.filter(validStoryTag))) : [];
             seen.set(item.id, tags);
@@ -254,8 +273,13 @@
               if (release) metadata.push(release);
               metadata.push(item.timed === true ? 'Timed lyrics available' : 'Plain lyrics');
             }
+            if(accountPicker&&Number.isSafeInteger(item.max_rows)&&item.max_rows>0)metadata.push('Up to '+item.max_rows+' rows');
             const detail = Array.from(new Set(metadata)).join(' · ');
-            const price = textValue(item.price_text);
+            const price = accountPicker ? '' : textValue(item.price_text);
+            const fields = accountPicker ? Object.entries(item.fields??{}).filter(([id,type])=>
+              /^[a-z][a-z0-9_]{0,63}$/.test(id)&&['text','number','long_text'].includes(type)).map(([id,type])=>({
+              id,type,label:textValue(item.field_labels?.[id])||id.replaceAll('_',' ').replace(/^./,letter=>letter.toUpperCase())
+            })) : [];
             const playlist=options.kind==='playlists';
             const version=playlist&&typeof item.revision_hash==='string'&&/^[a-f0-9]{64}$/.test(item.revision_hash)?item.revision_hash:null;
             if(playlist&&!version)throw new Error('A playlist version could not be verified. Refresh the list.');
@@ -263,19 +287,20 @@
             const tracks=playlist&&Array.isArray(item.items)?item.items.map(track=>({title:textValue(track.title),available:track.available===true,duration_seconds:track.duration_seconds})):[];
             const scope=playlist?(item.source==='own'||item.category==='own'?'My playlist':'Published artist playlist'):'';
             const playlistDetail=playlist?[scope,tracks.filter(track=>track.available).length+' of '+tracks.length+' tracks available',textValue(item.description)].filter(Boolean).join(' · '):detail;
-            items.push({id: item.id, title, detail:playlistDetail, price, image: imageUrl(item.image_url),version,tracks,tags,
+            items.push({id: item.id, title, detail:playlistDetail, price, image: accountPicker ? '' : imageUrl(item.image_url),version,tracks,tags,fields,
               changed:playlist&&options.selectedVersions?.[item.id]&&options.selectedVersions[item.id]!==version,
-              search: [title, playlistDetail, price,...tracks.filter(track=>track.available).map(track=>track.title)].join(' ').toLocaleLowerCase()});
+              search: [title, playlistDetail, price,...tracks.filter(track=>track.available).map(track=>track.title),
+                ...fields.flatMap(field=>[field.id,field.label])].join(' ').toLocaleLowerCase()});
           }
           selected.clear();
           for (const id of !allStories && Array.isArray(options.selectedIds) ? options.selectedIds : []) {
             if(seen.has(id)){
               if(!storyTag||seen.get(id).includes(storyTag))selected.add(id);
             }
-            else if((storyPicker||lyricsPicker||options.kind==='playlists')&&validId(options.kind,id)){
+            else if((storyPicker||lyricsPicker||accountPicker||options.kind==='playlists')&&validId(options.kind,id)){
               selected.add(id);
-              const title = storyPicker ? 'Unavailable selected story' : lyricsPicker ? 'Unavailable selected lyrics' : 'Unavailable selected playlist';
-              const detail = storyPicker ? 'Remove this selection or choose All Stories.' : lyricsPicker ? 'Remove these lyrics or choose another song.' : 'Previously selected reference';
+              const title = accountPicker ? 'Unavailable account data' : storyPicker ? 'Unavailable selected story' : lyricsPicker ? 'Unavailable selected lyrics' : 'Unavailable selected playlist';
+              const detail = accountPicker ? id+' · Remove this selection to continue.' : storyPicker ? 'Remove this selection or choose All Stories.' : lyricsPicker ? 'Remove these lyrics or choose another song.' : 'Previously selected reference';
               items.push({id,title,detail,
                 search:id.toLocaleLowerCase(),unavailable:true,tracks:[]});
             }

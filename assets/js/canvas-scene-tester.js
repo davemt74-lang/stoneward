@@ -93,6 +93,21 @@
     addEventListener('DOMContentLoaded',()=>emit('ready'),{once:true});
   `;
 
+  /** The review sees the binding contract while account rows stay in the applied canvas. */
+  function detachedData(scene){
+    const personalIds=new Set((scene?.canvas_access?.permissions??[])
+      .filter(permission=>permission?.personal===true&&typeof permission.id==='string'&&permission.id.startsWith('canvas.data.'))
+      .map(permission=>permission.id.slice('canvas.data.'.length)));
+    const datasets=Object.fromEntries(Object.entries(scene?.datasets??{}).map(([id,dataset])=>{
+      if(dataset?.personal===true)personalIds.add(id);
+      if(!personalIds.has(id)||!dataset)return [id,dataset];
+      const {fields,filters,actions}=dataset;
+      return [id,{fields,filters,actions,rows:[],state:'consent_required',
+        ...(Object.hasOwn(dataset,'current_rows')?{current_rows:[]}:{})}];
+    }));
+    return {candidate:personalIds.size?{...scene,datasets}:scene,personalIds};
+  }
+
   async function test(scene,options={}){
     const report={state:'testing',checks:[],errors:[],warnings:[],manual:[],observed:null};
     const emit=(type,value)=>{try{options.onEvent?.({type,...value});}catch(_){}};
@@ -105,9 +120,10 @@
     };
     if(options.signal?.aborted){report.state='canceled';return report;}
     emit('started',{message:'Checking this candidate in an isolated browser frame.'});
-    let candidate,guard=null;
+    let candidate,guard=null,preview;
     const nonce=token();
     try{
+      preview=detachedData(scene);
       const original=scene?.js??'';
       if(typeof original!=='string')throw new Error('Candidate program unavailable.');
       if(original!==''){
@@ -123,7 +139,7 @@
       const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(source));
       const hash="'sha256-"+btoa(String.fromCharCode(...new Uint8Array(bytes)))+"'";
       const prepare=options.prepareScene||((value,probe,previewProgram)=>window.SFPublicAgentCanvas?.prepareSceneTest(value,{probe,previewProgram,currentTrackId:options.currentTrackId||''}));
-      candidate=await prepare(scene,{source,hash},guard);
+      candidate=await prepare(preview.candidate,{source,hash},guard);
       if(!candidate?.frame||candidate.frame.tagName!=='IFRAME')throw new Error('Candidate document unavailable.');
     }catch(error){
       if(error?.code==='sf_preview_unsupported'){
@@ -232,12 +248,16 @@
         if(!available)entry(report.errors,'image_unavailable','One or more declared image assets were unavailable during the check.');
       }
       if(value.failedImages>0){check('image_decode','Rendered images decoded',false);entry(report.errors,'image_decode','An image in the candidate did not decode.');}
-      const declared=scene?.datasets&&typeof scene.datasets==='object'?scene.datasets:{};
+      const declared=preview.candidate?.datasets??{};
       const requested=new Set(Array.from(String(scene.html||'').matchAll(/\bsf-dataset-([a-z][a-z0-9_-]{0,63})\b/g),match=>match[1]));
       for(const id of requested){
         const dataset=Object.hasOwn(declared,id)?declared[id]:null;
         const observed=Array.isArray(value.datasets)?value.datasets.find(item=>item.id===id):null;
-        if(!dataset||dataset.state==='unavailable')entry(report.errors,'dataset_'+id,'A declared data source was unavailable during this check.');
+        if(preview.personalIds.has(id)){
+          entry(report.manual,'personal_data','Personal records are withheld from testing. Review the populated bindings in the applied canvas after granting access.');
+          if(observed)check('dataset_'+id,'Observed '+id+' data binding',true,'Personal rows withheld');
+          else entry(report.warnings,'dataset_'+id,'The rendered candidate did not retain the declared '+id+' data container.');
+        }else if(!dataset||dataset.state==='unavailable')entry(report.errors,'dataset_'+id,'A declared data source was unavailable during this check.');
         else if(!observed)entry(report.warnings,'dataset_'+id,'The rendered candidate did not retain the declared '+id+' data container.');
         else check('dataset_'+id,'Observed '+id+' data binding',true,String(observed.rows)+' rendered rows');
       }

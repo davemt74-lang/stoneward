@@ -26,6 +26,9 @@ finally:
     sys.argv = original_argv
 PHP = os.environ.get('SF_TEST_PHP', 'php')
 ENDPOINT = '/admin/api/canvas-permissions.php'
+ME_ENDPOINT = '/api/canvas-resources.php?kind=me'
+ACCOUNT_TOOLS = {'personal_listening_stats', 'my_listening_summary', 'my_listening_history',
+                 'my_purchases', 'my_tickets', 'my_preferences'}
 checks = []
 
 
@@ -57,6 +60,10 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
     }
 """ + transport[end:])
     fixture.cli(site, "sf_db()->exec(\"UPDATE users SET role='admin' WHERE id=2\");")
+    fixture.cli(site, """
+        sf_privacy_save_profile(1,['locale'=>'de-DE','timezone'=>'Europe/Berlin','country_code'=>'DE',
+            'listening_history_enabled'=>true,'personalization_enabled'=>true]);
+    """)
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0))
         port = reservation.getsockname()[1]
@@ -82,9 +89,21 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
                   'Signed-in non-admin cannot write policy even with a valid account CSRF token')
             initial = admin.get(ENDPOINT)
             data = initial.json()
-            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 9,
-                  'Authenticated admin loads all nine dataset permissions over HTTP')
+            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 12,
+                  'Authenticated admin loads all twelve dataset permissions over HTTP')
             check('no-store' in initial.headers.get('cache-control', ''), 'Policy responses disallow caching')
+            check(guest.get(ME_ENDPOINT).status == 401, 'Guest cannot open the account-data picker')
+            resources = owner.get(ME_ENDPOINT)
+            items = {item['id']: item for item in resources.json()['items']}
+            check(resources.status == 200 and set(items) == ACCOUNT_TOOLS and
+                  items['my_preferences']['fields']['timezone'] == 'text' and
+                  'no-store' in resources.headers.get('cache-control', '') and
+                  b'Europe/Berlin' not in resources.body() and b'owner@example.invalid' not in resources.body(),
+                  'Signed-in picker exposes the complete field inventory over no-store HTTP')
+            check(admin.get(ME_ENDPOINT).json()['items'] == resources.json()['items'],
+                  'Signed-in owner and admin discovery expose the same field metadata')
+            check(owner.post(ME_ENDPOINT, {}, owner_headers).status == 405,
+                  'Account-data inventory accepts only read requests')
             check(admin.post(ENDPOINT, change).status == 403, 'Administrator POST rejects missing CSRF token')
             check(admin.post(ENDPOINT, change, {'X-CSRF-Token': 'not-a-valid-token'}).status == 403,
                   'Administrator POST rejects forged CSRF token')
@@ -105,6 +124,8 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
             check(saved.status == 200 and data['policy']['revision'] == 2 and
                   next(c for c in data['capabilities'] if c['id'] == 'my_purchases')['enabled'] is False,
                   'Explicit administrator save persists disablement through HTTP')
+            check({item['id'] for item in owner.get(ME_ENDPOINT).json()['items']} == ACCOUNT_TOOLS - {'my_purchases'},
+                  'Disabled account source disappears from the picker immediately')
             check(len(data['history']) == 1 and data['history'][0]['updated_by'] == 2 and
                   data['history'][0]['changes']['canvas.data.my_purchases'] == {'before': True, 'after': False},
                   'Saved policy records authenticated actor and exact before/after change')

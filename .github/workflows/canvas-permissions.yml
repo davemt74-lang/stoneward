@@ -55,6 +55,11 @@ jobs:
           php tests/canvas-lyrics.php
           php tests/canvas-lyrics-flow.php
           php tests/canvas-lyrics-dataset.php
+      - name: Account data inventory, sources and scope-bound approvals
+        run: |
+          php tests/canvas-account-data.php
+          php tests/canvas-me-flow.php
+          php tests/canvas-me-delivery.php
       - name: Real PHP endpoint authentication, CSRF and current-viewer data
         run: |
           python tests/canvas-permissions-http.py
@@ -108,6 +113,10 @@ jobs:
         run: |
           python tests/canvas-lyrics-picker-browser.py
           python tests/canvas-lyrics-dataset-browser.py
+      - name: Account data picker and private preview boundary
+        run: |
+          python tests/canvas-me-picker-browser.py
+          python tests/canvas-scene-tester-browser.py
       - name: Existing public and administrator gallery controls
         run: |
           python tests/canvas-gallery-browser.py

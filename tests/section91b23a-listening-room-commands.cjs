@@ -643,6 +643,26 @@ test('picked published lyrics build and revise independently of the player and l
   assert.deepEqual(h.posts[3].artist_inputs, { lyrics_ids: [] });
 });
 
+test('account data selections reach the approved custom build as scope IDs with the player empty', async () => {
+  const h = harness();
+  h.scope.st.track = null;
+  h.scope.st.playing = false;
+  const run = text => h.scope.handleListeningRoomCommand(h.scope.directListeningRoomCommand(text));
+  const brief = 'Build a list of my own events {me:MY_LISTENING_HISTORY} {me:my_tickets} {me:my_listening_history}';
+  await run(brief);
+  assert.equal(h.posts[0].track_id, '');
+  assert.equal(h.posts[0].canvas_kind, 'custom');
+  assert.equal(h.scope.canvasDesignBrief(brief), 'Build a list of my own events');
+  assert.deepEqual(h.posts[0].artist_inputs, { me_tools: ['my_listening_history', 'my_tickets'] });
+  assert.deepEqual(h.approvedProjects[0].project.artist_inputs, h.posts[0].artist_inputs);
+  await run('/edit Add more space');
+  assert.equal(h.posts[1].previous_id, 1);
+  assert.equal(h.posts[1].artist_inputs, undefined);
+  await run('/edit Remove account data {me-clear}');
+  assert.equal(h.posts[2].previous_id, 2);
+  assert.deepEqual(h.posts[2].artist_inputs, { me_tools: [] });
+});
+
 test('the selected canvas restores privately after a reload and stays selected when the song changes', async () => {
   const storage = new Map();
   const first = harness(true, storage);

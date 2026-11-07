@@ -12,7 +12,7 @@ require_once __DIR__.'/agent-canvas-image-skill.php';
 const SF_CANVAS_PROJECT_IDEA_SOURCE='canvas-project-idea';
 
 /** A compact account-owned reference set, suitable for an existing chat turn too. */
-function sf_canvas_project_ideas_context(int $owner,?int $currentId=null,string $brief='',array $selectedIds=[]): array {
+function sf_canvas_project_ideas_context(int $owner,?int $currentId=null,string $brief='',array $selectedIds=[],?array $meTools=null): array {
     if($owner<1||($currentId!==null&&$currentId<1))throw new InvalidArgumentException('Choose a canvas from your history.');
     $selectedIds=sf_canvas_project_source_ids($selectedIds);sf_canvas_project_validate_sources($owner,$selectedIds);
     $ids=$selectedIds;
@@ -65,7 +65,7 @@ function sf_canvas_project_ideas_context(int $owner,?int $currentId=null,string 
     $context['recent_canvas_discussion']=sf_canvas_project_ideas_recent_discussion($owner);
     $context['available_data_tools']=array_map(static fn(array $tool):array=>[
         'id'=>$tool['id'],'label'=>$tool['label'],'scope'=>$tool['scope'],
-        'description'=>sf_agent_public_artist_text($tool['description'],180)],sf_agent_canvas_data_tools());
+        'description'=>sf_agent_public_artist_text($tool['description'],180)],sf_agent_canvas_data_tools($meTools));
     if(function_exists('sf_canvas_project_list')){
         $context['recent_proposals']=[];
         foreach(array_slice(sf_canvas_project_list($owner),0,5) as $project){
@@ -246,6 +246,11 @@ function sf_canvas_project_ideas_generate(array $user,array $request,string $kin
         $selection=$providedProject['coding_model']??null;
     }
     if($playlistProvided)$playlistManifest=sf_canvas_playlists_compile($owner,$playlistInputs,$playlistManifest)['manifest'];
+    $meTools=$artistInputs['me_tools']??null;
+    if($artistProvided&&$artistInputs===null&&isset($providedProject['previous_id'])){
+        $parent=sf_agent_scene_history_get($owner,$providedProject['previous_id']);
+        $meTools=$parent['artist_inputs']['me_tools']??null;
+    }
     sf_canvas_resource_prepare($artistInputs);
     sf_canvas_project_ideas_schema();sf_canvas_project_ensure_schema();sf_agent_scene_history_ensure_schema();sf_privacy_ensure_schema();
     $fingerprintInputs=[$kind,$kind==='plan'?$brief:$rawBrief,$currentId,$selection,$providedProject,$proposalOptions];
@@ -288,9 +293,14 @@ function sf_canvas_project_ideas_generate(array $user,array $request,string $kin
             throw new InvalidArgumentException('A selected image is no longer available for your account.');
         $preferences=sf_canvas_project_preferences($owner);
         if($kind==='suggest'&&empty($preferences['ideas_enabled']))throw new DomainException('Canvas ideas are turned off for this account.');
-        $context=sf_canvas_project_ideas_context($owner,$currentId,trim($brief),$sourceIds??[]);
+        $context=sf_canvas_project_ideas_context($owner,$currentId,trim($brief),$sourceIds??[],$meTools);
         if($playlistProvided)$context['selected_playlists']=$playlistManifest;
         if($artistProvided)$context['selected_artist_resources']=sf_canvas_resource_artist_context($artistInputs);
+        if($meTools!==null){
+            require_once __DIR__.'/canvas-account-data-core.php';
+            $context['selected_account_sources']=array_values(array_filter(sf_canvas_account_data_inventory(),
+                static fn(array $source):bool=>in_array($source['id'],$meTools,true)));
+        }
         if($musicProvided)$context['selected_music_inputs']=$musicInputs===null?null:['mode'=>$musicInputs['mode']]+
             ($musicInputs['mode']==='selected'?['count'=>count($musicInputs['track_ids'])]:[]);
         if($imageReferenceIds||$placedImageIds){
@@ -338,6 +348,7 @@ PROMPT;
                 throw new InvalidArgumentException('This canvas idea was cleared before planning started.');
         }
         $result=null;$failure=null;$reply='';$idea=null;
+        $system.="\nAny listed account data sources describe fields and access only. Use selected_account_sources as the limit when supplied, including an empty selection. Describe what can be done with the viewer's permission and do not guess their values.";
         if($localPlan){
             $label=str_replace(['<','>'],'',sf_agent_public_artist_text($brief,70));
             $idea=['title'=>$label!==''?$label:'Canvas project','concept'=>str_replace(['<','>'],'',sf_agent_public_artist_text($brief,220)),

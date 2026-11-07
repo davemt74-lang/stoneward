@@ -10,13 +10,15 @@ require_once __DIR__.'/agent-canvas-public-commerce.php';
 require_once __DIR__.'/agent-canvas-private-commerce.php';
 require_once __DIR__.'/canvas-resource-core.php';
 require_once __DIR__.'/canvas-lyrics-core.php';
+require_once __DIR__.'/canvas-account-data-core.php';
 
 /** Provider-safe tool descriptions without dataset values. */
-function sf_agent_canvas_data_tools(): array {
+function sf_agent_canvas_data_tools(?array $meTools=null): array {
     $tools=[];
     $policy=sf_canvas_permission_policy();
     foreach(sf_agent_tool_registry() as $id=>$tool){
-        if(!isset($tool['canvas_data'])||!sf_canvas_permission_enabled($id,$policy))continue;
+        if(!isset($tool['canvas_data'])||!sf_canvas_access_in_scope($id,$tool['scope']==='signed_in_fan',$meTools)||
+            !sf_canvas_permission_enabled($id,$policy))continue;
         $tools[]=[
             'id'=>$id,
             'permission_id'=>'canvas.data.'.$id,
@@ -51,28 +53,44 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
     $role=$userId>0?'fan':'guest';
     $access=null;
     $lyricTrackIds=$artistInputs['lyrics_ids']??null;
+    $meTools=$artistInputs['me_tools']??null;
     if($accessContext!==null){
         $resolved=sf_canvas_access_resolve($user,$accessContext);
         if(!hash_equals($resolved['scene']['html'],$html))throw new RuntimeException('Canvas source does not match its access context.');
         $lyricTrackIds=$resolved['scene']['artist_inputs']['lyrics_ids']??null;
+        $meTools=$resolved['scene']['artist_inputs']['me_tools']??null;
         $access=sf_canvas_access_summary($user,$accessContext);
     }
     $permissions=$access===null?[]:array_column($access['permissions'],null,'id');
     $datasets=[];
     $catalog=null;
     $musicCatalog=null;
-    foreach(sf_agent_canvas_data_tools() as $tool){
+    $accountCatalog=null;
+    $listeningTools=['personal_listening_stats','my_listening_summary','my_listening_history'];
+    $listeningEpoch=null;
+    foreach(sf_agent_canvas_data_tools($meTools) as $tool){
         $id=$tool['id'];
         $marker='sf-dataset-'.$id;
         if(!isset($classes[$marker])||!sf_agent_tool_allowed($id,$role))continue;
-        if($tool['scope']==='signed_in_fan'&&(sf_db()->inTransaction()||empty($permissions['canvas.data.'.$id]['granted']))){
-            $datasets[$id]=['fields'=>$tool['fields'],'filters'=>$tool['filters'],'actions'=>$tool['actions'],'rows'=>[],'state'=>sf_db()->inTransaction()?'unavailable':'consent_required'];
-            continue;
-        }
         $usesCurrentTrack=isset($currentClasses[$marker])&&in_array('track_id',$tool['filters'],true);
         $dataset=['fields'=>$tool['fields'],'filters'=>$tool['filters'],'actions'=>$tool['actions'],'rows'=>[]];
+        if($tool['scope']==='signed_in_fan'){
+            $dataset['personal']=true;
+            if(sf_db()->inTransaction()||empty($permissions['canvas.data.'.$id]['granted'])){
+                $datasets[$id]=$dataset+['state'=>sf_db()->inTransaction()?'unavailable':'consent_required'];
+                continue;
+            }
+        }
         if($usesCurrentTrack)$dataset['current_rows']=[];
         try{
+            if(in_array($id,$listeningTools,true)){
+                if(!sf_privacy_listening_history_enabled($userId)){
+                    $datasets[$id]=$dataset;
+                    continue;
+                }
+                $listeningEpoch??=sf_listening_playback_epoch($userId);
+                $accountCatalog??=sf_canvas_account_public_tracks();
+            }
             if($id==='published_lyrics'){
                 $datasets[$id]=sf_agent_canvas_lyrics_dataset($dataset,$bindings[$id],$lyricTrackIds,$currentTrackId);
                 continue;
@@ -80,7 +98,10 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
             $source=match($id){
                 'published_catalog'=>$catalog??=array_column(sf_public_catalog(),null,'id'),
                 'published_release_tracks'=>sf_agent_canvas_release_track_rows(),
-                'personal_listening_stats'=>sf_agent_canvas_listening_rows($userId,$catalog??=array_column(sf_public_catalog(),null,'id')),
+                'personal_listening_stats'=>sf_agent_canvas_listening_rows($userId,$accountCatalog),
+                'my_listening_summary'=>sf_canvas_account_listening_summary($userId,$accountCatalog),
+                'my_listening_history'=>sf_canvas_account_listening_history($userId,$accountCatalog),
+                'my_preferences'=>sf_canvas_account_preferences($userId),
                 'published_merch'=>sf_canvas_resource_artist_rows($id,$artistInputs),
                 'published_ticket_offers'=>sf_canvas_resource_artist_rows($id,$artistInputs),
                 'published_stories'=>sf_canvas_resource_artist_rows($id,$artistInputs),
@@ -114,7 +135,7 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
                 if($track!==null){
                     $currentSource=match($id){
                         'published_catalog'=>[$track],
-                        'personal_listening_stats'=>sf_agent_canvas_listening_rows($userId,$catalog,$currentTrackId),
+                        'personal_listening_stats'=>sf_agent_canvas_listening_rows($userId,$accountCatalog,$currentTrackId),
                         default=>array_filter($source,static fn(array $row):bool=>($row['track_id']??null)===$currentTrackId),
                     };
                     $currentRows=sf_agent_canvas_project_rows($currentSource,$id,$tool['fields']);
@@ -133,10 +154,20 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
     // Recheck after potentially slow domain reads before delivering private rows.
     $policy=sf_canvas_permission_policy();
     $fresh=$accessContext===null?[]:array_column(sf_canvas_access_summary($user,$accessContext)['permissions'],null,'id');
+    $cards=sf_canvas_capability_cards();
+    $listeningWithdrawn=$listeningEpoch!==null&&
+        (!sf_privacy_listening_history_enabled($userId)||sf_listening_playback_epoch($userId)!==$listeningEpoch);
     foreach(array_keys($datasets) as $id){
-        if(!sf_canvas_permission_enabled($id,$policy))unset($datasets[$id]);
-        elseif((sf_canvas_capability_cards()[$id]['requires_sign_in']??false)&&empty($fresh['canvas.data.'.$id]['granted'])){
+        $personal=$cards[$id]['requires_sign_in']??false;
+        $permission=$fresh['canvas.data.'.$id]??null;
+        if(!sf_canvas_permission_enabled($id,$policy)||($permission!==null&&!$permission['enabled']))unset($datasets[$id]);
+        elseif($personal&&$accessContext!==null&&$permission===null)unset($datasets[$id]);
+        elseif($personal&&empty($permission['granted'])){
             $datasets[$id]['rows']=[];unset($datasets[$id]['current_rows']);$datasets[$id]['state']='consent_required';
+        }
+        elseif($listeningWithdrawn&&in_array($id,$listeningTools,true)){
+            $datasets[$id]['rows']=[];
+            if(isset($datasets[$id]['current_rows']))$datasets[$id]['current_rows']=[];
         }
     }
     return $datasets;
