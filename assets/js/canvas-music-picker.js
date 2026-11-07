@@ -84,6 +84,7 @@
       let loading = false;
       let tab = 0;
       let settled = false;
+      let selectionChanged = false;
       const rows = [];
 
       function close(value = null, restoreFocus = true) {
@@ -104,7 +105,8 @@
 
       function sync() {
         count.textContent = selected.size + (selected.size === 1 ? ' song selected' : ' songs selected');
-        add.disabled = !ready || selected.size === 0;
+        add.disabled = !ready || (selected.size === 0 && !selectionChanged);
+        add.textContent = selected.size === 0 && selectionChanged ? 'Clear song selection' : 'Add songs';
         all.disabled = !ready || !tracks.some(track => track.source_available === true);
         for (const {input, ids} of rows) {
           const matches = ids.filter(id => selected.has(id)).length;
@@ -153,6 +155,7 @@
           if (tab === 0) label.append(node('span', 'sf-canvas-music-duration', duration(item.duration_seconds)));
           input.addEventListener('change', () => {
             if (settled || input.disabled) return;
+            selectionChanged = true;
             for (const id of ids) {
               if (input.checked) selected.add(id);
               else selected.delete(id);
@@ -222,7 +225,7 @@
       retry.addEventListener('click', () => void load());
       cancel.addEventListener('click', () => close());
       add.addEventListener('click', () => {
-        if (!ready || !selected.size) return;
+        if (!ready || add.disabled) return;
         const keepAll = options.selection?.mode === 'all' && tracks.filter(track => track.source_available === true)
           .every(track => selected.has(track.track_id));
         close(keepAll ? {mode: 'all'} : {mode: 'selected', track_ids: Array.from(selected)});

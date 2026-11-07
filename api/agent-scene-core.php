@@ -286,6 +286,10 @@ function sf_agent_scene_create_approved(array $user,array $request,?callable $on
     if($artistProvided&&$kind!=='custom')throw new InvalidArgumentException('Artist resources are available for custom canvases.');
     [$brief,$musicInputs,$musicProvided]=sf_agent_canvas_music_selection($brief,$request['music_inputs']??null,array_key_exists('music_inputs',$request));
     if($musicProvided&&$kind!=='custom')throw new InvalidArgumentException('Music inputs are available for custom canvases.');
+    [$brief,$playlistInputs,$playlistProvided]=sf_canvas_playlists_selection($brief,$request['playlist_inputs']??null,array_key_exists('playlist_inputs',$request));$playlistProvided=$playlistProvided&&$playlistInputs!==null;
+    $playlistManifest=sf_canvas_playlists_manifest_validate($request['playlist_manifest']??null);
+    if($playlistManifest!==null&&!$playlistProvided)throw new InvalidArgumentException('Choose playlist references for this manifest.');
+    if(($playlistProvided||$playlistManifest!==null)&&$kind!=='custom')throw new InvalidArgumentException('Playlist resources are available for custom canvases.');
     $imageReferenceIds=sf_agent_canvas_image_reference_selection($request['image_reference_ids']??[],$brief);
     $imageCount=$request['image_count']??null;
     $imageReview=$request['review_images']??false;
@@ -338,12 +342,13 @@ function sf_agent_scene_create_approved(array $user,array $request,?callable $on
     if($imageReferenceIds)$input[]=['image_reference_ids'=>$imageReferenceIds];
     if($imageCount!==null||$imageReview)$input[]=['image_options'=>$imageOptions];
     if($musicProvided)$input[]=['music_inputs'=>$musicInputs];
+    if($playlistProvided)$input[]=['playlist_inputs'=>$playlistInputs,'playlist_manifest'=>$playlistManifest];
     if($sourceSceneIds)$input[]=['source_scene_ids'=>$sourceSceneIds];
     if($artistProvided)$input[]=['artist_inputs'=>$artistInputs];
     if($repairData!==null)$input[]=['internal_repair'=>array_intersect_key($repairData,array_flip(['candidate_id','diagnostics','browser_evidence']))];
     $generationImageOptions=$repairData===null?$imageOptions:['count'=>0,'review'=>false];
     return sf_agent_scene_run_request($userId,$requestId,hash('sha256',serialize($input)),
-        static fn(int $historyEpoch):array=>sf_agent_scene_generate($user,$kind,$trackId,$contextTrackId,$brief,$section,$previousId,$historyEpoch,$requestId,$onDelta,$design,$onRetry,$codingModel,$onImage,$imageReferenceIds,$generationImageOptions,$musicInputs,$musicProvided,$sourceSceneIds,$artistInputs,$artistProvided,$repairData,$workflowRequired),$expectedHistoryEpoch);
+        static fn(int $historyEpoch):array=>sf_agent_scene_generate($user,$kind,$trackId,$contextTrackId,$brief,$section,$previousId,$historyEpoch,$requestId,$onDelta,$design,$onRetry,$codingModel,$onImage,$imageReferenceIds,$generationImageOptions,$musicInputs,$musicProvided,$sourceSceneIds,$artistInputs,$artistProvided,$repairData,$workflowRequired,$playlistInputs,$playlistProvided,$playlistManifest),$expectedHistoryEpoch);
 }
 
 function sf_agent_scene_run_request(int $userId,string $requestId,string $fingerprint,callable $run,?int $expectedHistoryEpoch=null): array {
@@ -364,7 +369,7 @@ function sf_agent_scene_run_request(int $userId,string $requestId,string $finger
     }
 }
 
-function sf_agent_scene_generate(array $user,string $kind,string $trackId,string $contextTrackId,string $brief,?string $section,?int $previousId,int $historyEpoch,string $requestId,?callable $onDelta,?string $design,?callable $onRetry,?array $codingModel,?callable $onImage,array $imageReferenceIds=[],array $imageOptions=[],?array $musicInputs=null,bool $musicProvided=false,array $sourceSceneIds=[],?array $artistInputs=null,bool $artistProvided=false,?array $repairData=null,bool $workflowRequired=false): array {
+function sf_agent_scene_generate(array $user,string $kind,string $trackId,string $contextTrackId,string $brief,?string $section,?int $previousId,int $historyEpoch,string $requestId,?callable $onDelta,?string $design,?callable $onRetry,?array $codingModel,?callable $onImage,array $imageReferenceIds=[],array $imageOptions=[],?array $musicInputs=null,bool $musicProvided=false,array $sourceSceneIds=[],?array $artistInputs=null,bool $artistProvided=false,?array $repairData=null,bool $workflowRequired=false,?array $playlistInputs=null,bool $playlistProvided=false,?array $playlistManifest=null): array {
     $userId=(int)$user['id'];$previous=null;$saved=null;$admin=($user['role']??'')==='admin';
     if($repairData!==null)($repairData['assert_active'])();
     if($previousId!==null){
@@ -378,8 +383,11 @@ function sf_agent_scene_generate(array $user,string $kind,string $trackId,string
             $previous=array_intersect_key($saved,$previous);
         }
     }
-    if(!$musicProvided)$musicInputs=$saved['music_inputs']??null;
+    if(!$musicProvided)$musicInputs=array_key_exists('direct_music_inputs',$saved??[])?$saved['direct_music_inputs']:($saved['music_inputs']??null);
     if($musicProvided&&$musicInputs!==null)sf_agent_canvas_music_validate($musicInputs);
+    $directMusicInputs=$musicInputs;
+    if(!$playlistProvided){$playlistInputs=$saved['playlist_inputs']??null;$playlistManifest=$saved['playlist_manifest']??null;}
+    if($playlistInputs!==null){$compiled=sf_canvas_playlists_compile($userId,$playlistInputs,$playlistManifest);$playlistManifest=$compiled['manifest'];$musicInputs=sf_canvas_playlists_effective_music($directMusicInputs,$playlistManifest);}
     if($artistProvided)sf_canvas_resource_validate($userId,$artistInputs,$sourceSceneIds);
     $artistInputs=$artistProvided?($artistInputs===null?null:array_replace($saved['artist_inputs']??[],$artistInputs)):($saved['artist_inputs']??null);
     $custom=$kind==='custom';
@@ -420,6 +428,7 @@ function sf_agent_scene_generate(array $user,string $kind,string $trackId,string
     $context['design_brief']=$brief;
     $sourceContext=$sourceSceneIds?sf_canvas_project_source_context($userId,$sourceSceneIds):null;
     if($musicInputs!==null)$context['music_inputs']=$musicInputs;
+    if($playlistInputs!==null){$context['playlist_inputs']=$playlistInputs;$context['playlist_manifest']=$playlistManifest;$context['direct_music_inputs']=$directMusicInputs;}
     if($artistInputs!==null)$context['artist_inputs']=$artistInputs;
     $catalogFallback=$custom&&$previousId===null&&$explicitRefs!==[]&&$requestedImages===null;
     $catalogRemoval=$custom&&$saved!==null?sf_agent_canvas_catalog_removal($brief):[];
@@ -491,6 +500,7 @@ PROMPT;
             $prompt['selected_artist_resources']=sf_canvas_resource_artist_context($artistInputs);
             $system.="\nSelected merchandise and ticket resources are inventory for this project, never a prescribed layout or host widget. Build the interface requested by the listener. Use published_merch and published_ticket_offers data bindings for current selected public facts, including price and availability. An explicitly empty kind has no selected rows; do not substitute the rest of the catalog. Do not add commerce catalog_refs or extra controls that were not requested.";
         }
+        if($playlistManifest!==null){$prompt['selected_playlists']=$playlistManifest;$system.="\nSelected playlist manifests are ordered resource collections, not widgets. Preserve item order, repeated entries and unavailable placeholders as the brief needs. At runtime StonefellowAudio.catalog().playlists provides these manifests separately from deduplicated playable tracks. Resolve each available item through its canonical track_id; unavailable items cannot play. Author the requested interface and interactions without adding a playlist widget or extra controls.";}
         if($musicInputs!==null){
             $prompt['canvas_data_tools']=array_values(array_filter($prompt['canvas_data_tools'],
                 static fn(array $tool):bool=>!in_array($tool['id'],['published_catalog','published_release_tracks'],true)));
@@ -652,6 +662,7 @@ PROMPT;
         $balance=sf_ai_finish_reservation($user,$reservation,$amount,$usage,$source,true,
             static function(int $balance)use(&$stored,&$reviewResult,$reviewImages,$imageResult,$userId,$scene,$previousId,$historyEpoch,$requestId,$admin,$totalUsed,$usage,$repairData):void {
                 if($repairData!==null)($repairData['assert_active'])();
+                if(isset($scene['playlist_inputs']))sf_canvas_playlists_compile($userId,$scene['playlist_inputs'],$scene['playlist_manifest']);
                 if($reviewImages){
                     $reviewResult=sf_agent_canvas_image_review_stage($userId,$requestId,$scene,$previousId,$historyEpoch,
                         $imageResult['generated_images']??[],$totalUsed,$admin?null:$balance);
@@ -878,5 +889,5 @@ function sf_agent_scene_response_context(array $context,array $refs): array {
     $brief=sf_agent_scene_design_brief($context['design_brief']??null);
     if($brief===null)unset($context['design_brief']);else $context['design_brief']=$brief;
     return ['title'=>$context['canvas_title'],'song_title'=>$context['title']===''?null:$context['title'],'catalog_refs'=>$refs,'catalog_blocks'=>[]]+
-        array_intersect_key($context,array_flip(['track_id','artwork','story','canvas_kind','lyric_section','lyric_cue','agent_design','agent_palette','music_inputs','design_brief','artist_inputs','gallery_attribution']));
+        array_intersect_key($context,array_flip(['track_id','artwork','story','canvas_kind','lyric_section','lyric_cue','agent_design','agent_palette','music_inputs','design_brief','artist_inputs','gallery_attribution','playlist_inputs','playlist_manifest','direct_music_inputs']));
 }

@@ -4,6 +4,7 @@
   const kinds = Object.freeze({
     canvas: {title: 'Choose canvases', search: 'Search canvases', loading: 'Loading your canvases…', empty: 'No saved canvases are available yet.', fallback: 'Untitled canvas'},
     merch: {title: 'Choose merch', search: 'Search merch', loading: 'Loading public merch…', empty: 'No public merch is available yet.', fallback: 'Untitled merch'},
+    playlists: {title: 'Choose playlists', search: 'Search playlists and tracks', loading: 'Loading available playlists…', empty: 'No playlists are available.', fallback: 'Untitled playlist'},
     tickets: {title: 'Choose ticket offers', search: 'Search ticket offers', loading: 'Loading public ticket offers…', empty: 'No public ticket offers are available yet.', fallback: 'Untitled ticket offer'}
   });
   let current = null;
@@ -30,7 +31,7 @@
       return '';
     }
   };
-  const validId = (kind, value) => typeof value === 'string' && (kind === 'canvas' ? /^[1-9][0-9]*$/ : /^[A-Za-z0-9_-]+$/).test(value);
+  const validId = (kind, value) => typeof value === 'string' && (kind === 'canvas' ? /^[1-9][0-9]*$/ : kind==='playlists'?/^(?:own|artist)-[1-9][0-9]{0,18}$/:/^[A-Za-z0-9_-]+$/).test(value);
 
   function open(options = {}) {
     if (!options || typeof options !== 'object') return Promise.resolve(null);
@@ -48,7 +49,7 @@
       const header = node('header');
       const title = node('h2', '', config.title);
       title.id = prefix + '-title';
-      const description = node('p', '', 'Choose items to add to your prompt. Adding selections does not start a build.');
+      const description = node('p', '', options.kind==='playlists'?'Choose your own or published artist playlists. Track order is preserved; the agent designs the experience you request. Selection does not play music or start a build.':'Choose items to add to your prompt. Adding selections does not start a build.');
       description.id = prefix + '-description';
       const searchLabel = node('label', 'sf-canvas-resource-search');
       const search = node('input');
@@ -100,7 +101,8 @@
 
       function sync() {
         count.textContent = selected.size + ' selected';
-        add.disabled = !ready || loading;
+        const unavailable=options.kind==='playlists'&&items.some(item=>item.unavailable&&selected.has(item.id));
+        add.disabled = !ready || loading || unavailable;
         for (const {input, id} of rows) input.checked = selected.has(id);
       }
 
@@ -146,7 +148,26 @@
             sync();
           });
           rows.push({input, id: item.id});
-          results.append(label);
+          if(options.kind==='playlists'){
+            const group=node('section','sf-canvas-resource-playlist');group.append(label);
+            if(item.changed)group.append(node('p','sf-canvas-resource-status','Updated since your selected version. Adding selections uses the version shown here.'));
+            if(item.unavailable)group.append(node('p','sf-canvas-resource-status','This selected playlist is unavailable. Remove it or choose another playlist before adding selections.'));
+            else{
+              const details=node('details'),summary=node('summary','',item.tracks.length+' ordered track'+(item.tracks.length===1?'':'s'));
+              summary.style.cssText='min-height:44px;padding:8px 12px;cursor:pointer;box-sizing:border-box';
+              const members=node('ol');members.style.cssText='padding-left:36px;overflow-wrap:anywhere';
+              for(const track of item.tracks){
+                const unavailable=!track.available;
+                const line=node('li','',unavailable?'Unavailable track':track.title||'Untitled track');
+                if(unavailable)line.append(node('small','',' · Not currently available'));
+                else if(Number.isFinite(track.duration_seconds)&&track.duration_seconds>0){const seconds=Math.floor(track.duration_seconds);line.append(node('small','',' · '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')));}
+                members.append(line);
+              }
+              if(!item.tracks.length)members.append(node('li','','This playlist has no track entries.'));
+              details.append(summary,members);group.append(details);
+            }
+            results.append(group);
+          }else results.append(label);
           shown++;
         }
         if (!shown) results.append(node('p', 'sf-canvas-resource-empty', query ? 'No items match your search.' : config.empty));
@@ -176,11 +197,25 @@
               .map(key => textValue(item[key])).filter(Boolean);
             const detail = Array.from(new Set(metadata)).join(' · ');
             const price = textValue(item.price_text);
-            items.push({id: item.id, title, detail, price, image: imageUrl(item.image_url),
-              search: [title, detail, price].join(' ').toLocaleLowerCase()});
+            const playlist=options.kind==='playlists';
+            const version=playlist&&typeof item.revision_hash==='string'&&/^[a-f0-9]{64}$/.test(item.revision_hash)?item.revision_hash:null;
+            if(playlist&&!version)throw new Error('A playlist version could not be verified. Refresh the list.');
+            if(playlist&&!Array.isArray(item.items))throw new Error('The ordered playlist entries could not be read. Refresh the list.');
+            const tracks=playlist&&Array.isArray(item.items)?item.items.map(track=>({title:textValue(track.title),available:track.available===true,duration_seconds:track.duration_seconds})):[];
+            const scope=playlist?(item.source==='own'||item.category==='own'?'My playlist':'Published artist playlist'):'';
+            const playlistDetail=playlist?[scope,tracks.filter(track=>track.available).length+' of '+tracks.length+' tracks available',textValue(item.description)].filter(Boolean).join(' · '):detail;
+            items.push({id: item.id, title, detail:playlistDetail, price, image: imageUrl(item.image_url),version,tracks,
+              changed:playlist&&options.selectedVersions?.[item.id]&&options.selectedVersions[item.id]!==version,
+              search: [title, playlistDetail, price,...tracks.filter(track=>track.available).map(track=>track.title)].join(' ').toLocaleLowerCase()});
           }
           selected.clear();
-          for (const id of Array.isArray(options.selectedIds) ? options.selectedIds : []) if (seen.has(id)) selected.add(id);
+          for (const id of Array.isArray(options.selectedIds) ? options.selectedIds : []) {
+            if(seen.has(id))selected.add(id);
+            else if(options.kind==='playlists'&&validId(options.kind,id)){
+              selected.add(id);items.push({id,title:'Unavailable selected playlist',detail:'Previously selected reference',search:id.toLocaleLowerCase(),unavailable:true,tracks:[]});
+            }
+          }
+          if(options.kind==='playlists'&&options.signedIn===false)description.textContent='Sign in to choose your own playlists. Published artist playlists are available below. Selection does not play music or start a build.';
           ready = true;
           loading = false;
           render();
@@ -197,7 +232,7 @@
       search.addEventListener('input', render);
       retry.addEventListener('click', () => void load());
       cancel.addEventListener('click', () => close());
-      add.addEventListener('click', () => { if (ready && !loading && !settled) close({ids: Array.from(selected)}); });
+      add.addEventListener('click', () => { if (ready && !loading && !settled && !add.disabled) close({ids: Array.from(selected),...(options.kind==='playlists'?{items:Array.from(selected,ref=>({ref,version:items.find(item=>item.id===ref).version}))}:{})}); });
       dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
       dialog.addEventListener('close', () => close());
       dialog.addEventListener('click', event => { if (event.target === dialog) close(); });

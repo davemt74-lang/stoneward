@@ -20,7 +20,7 @@ function harness(name='NotAllowedError',mediaCode=0){
     audio:{paused:true,ended:false,error:mediaCode?{code:mediaCode}:null,duration:120,currentTime:0,
       getAttribute:()=>'',pause(){},load(){},play:()=>Promise.reject(failure)},
     trackById:()=>track,refreshSiteData:async()=>{},savedPlaybackPosition:()=>0,playerVolume:()=>1,
-    api:async()=>({tracks:[{track_id:'song-1',source_available:true}],releases:[]}),
+    api:async()=>({tracks:[{track_id:'song-1',source_available:true}],releases:[],playlists:[]}),
     playbackLifecycle:{begin:()=>1,isCurrent:()=>true},footerPlayer:{dataset:{}},
     songCaptureSkill:null,songListeningSkill:null,cancelNetworkRecovery(){},clearPlaybackBufferWatch(){},
     setPlaybackStatus(){},clearPlaylistPlayback(){},updateQueueUi(){},updateFooterPlayer(){},agent(){},
@@ -53,7 +53,7 @@ test('actual player rejection preserves browser permission failure for canvas di
   const {scope,statuses}=harness();
   await assert.rejects(scope.playCanvasAudio('song-1'),error=>error.code==='audio_gesture_required'&&error.name==='NotAllowedError');
   assert.equal(statuses[0],'Tap Play to allow audio for this session.');
-  assert.equal(scope.st.track.audio,'api/canvas-audio.php?action=source&track_id=song-1');
+  assert.equal(scope.st.track.audio,'api/canvas-audio.php?action=source&track_id=song-1&scene_id=19');
 });
 
 test('network, decode, unsupported and interrupted failures keep distinct safe diagnostic codes',async()=>{
@@ -71,9 +71,9 @@ test('catalog failures are classified before touching the player and never expos
  assert.equal(touched,false);
 });
 test('published selection and site catalog failures identify their stages',async()=>{
- const {scope}=harness();scope.api=async()=>({tracks:[],releases:[]});
+ const {scope}=harness();scope.api=async()=>({tracks:[],releases:[],playlists:[]});
  await assert.rejects(scope.playCanvasAudio('song-1'),error=>error.code==='track_unavailable'&&error.stage==='selection');
- scope.api=async()=>({tracks:[{track_id:'song-1',source_available:true}],releases:[]});scope.trackById=()=>null;
+ scope.api=async()=>({tracks:[{track_id:'song-1',source_available:true}],releases:[],playlists:[]});scope.trackById=()=>null;
  await assert.rejects(scope.playCanvasAudio('song-1'),error=>error.code==='track_unavailable'&&error.stage==='site_catalog');
 });
 test('a verified-seek timeout remains distinguishable from native playback rejection',async()=>{

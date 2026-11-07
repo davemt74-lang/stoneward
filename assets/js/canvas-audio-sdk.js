@@ -402,10 +402,35 @@
       source_url: text(track.source_url, 2048)
     };
   }
+  function normalizePlaylists(value) {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) throw error('The playlist catalog is unavailable.', 'invalid_catalog');
+    return value.map(playlist => {
+      if (!record(playlist) || typeof playlist.ref !== 'string' || !/^(own|artist)-[1-9][0-9]*$/.test(playlist.ref) ||
+          !['own', 'artist'].includes(playlist.source) || !playlist.ref.startsWith(playlist.source + '-') ||
+          typeof playlist.revision_hash !== 'string' || !/^[a-f0-9]{64}$/.test(playlist.revision_hash) || !Array.isArray(playlist.items))
+        throw error('The playlist catalog returned an invalid resource.', 'invalid_catalog');
+      const seen = new Set();
+      return { ref: playlist.ref, source: playlist.source, title: text(playlist.title, 120), description: text(playlist.description, 1000),
+        revision_hash: playlist.revision_hash, items: playlist.items.map(item => {
+          if (!record(item) || !Number.isSafeInteger(item.item_id) || item.item_id < 1 || seen.has(item.item_id) ||
+              !Number.isSafeInteger(item.position) || item.position < 0 || typeof item.available !== 'boolean' ||
+              !['available', 'unavailable', 'source_unavailable'].includes(item.reason) ||
+              (item.track_id !== null && !validTrackId(item.track_id)) || (item.available && (item.track_id === null || item.reason !== 'available')) ||
+              (!item.available && item.reason === 'available')) throw error('The playlist contains an invalid entry.', 'invalid_catalog');
+          seen.add(item.item_id);
+          if (item.reason === 'unavailable') return { item_id: item.item_id, position: item.position, track_id: null, title: 'Unavailable track', duration_seconds: 0, available: false, reason: 'unavailable' };
+          if (item.track_id === null) throw error('The playlist contains an invalid entry.', 'invalid_catalog');
+          return { item_id: item.item_id, position: item.position, track_id: item.track_id, title: text(item.title),
+            duration_seconds: number(item.duration_seconds), available: item.available, reason: item.reason };
+        }) };
+    });
+  }
   function normalizeCatalog(result) {
     if (!record(result) || !Array.isArray(result.tracks) || !Array.isArray(result.releases)) throw error('The audio catalog is unavailable.', 'invalid_catalog');
     return {
       tracks: result.tracks.map(normalizeTrack),
+      playlists: normalizePlaylists(result.playlists),
       releases: result.releases.map(release => {
         if (!record(release) || !validTrackId(release.release_id)) throw error('The catalog returned an invalid album.', 'invalid_catalog');
         return { release_id: release.release_id, id: release.release_id, title: text(release.title), track_ids: Array.isArray(release.track_ids) ? release.track_ids.filter(validTrackId) : [] };

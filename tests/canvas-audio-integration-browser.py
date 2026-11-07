@@ -196,6 +196,13 @@ def seed(site):
     return mp3.read_bytes(),scene
 
 
+def save_fixture_scene(site,draft):
+    draft={key:value for key,value in draft.items() if key not in ('id','previous_id','created_at','js_hash')}
+    encoded=base64.b64encode(json.dumps(draft).encode()).decode()
+    saved=json.loads(cli(site,"require_once SF_ROOT.'/api/agent-scene-core.php';$scene=json_decode(base64_decode('"+encoded+"'),true);echo json_encode(sf_agent_scene_history_save(1,$scene));"))
+    return {**draft,**saved}
+
+
 def run_http(guest,site,mp3):
     response=guest.get('/api/canvas-audio.php?action=catalog&release_id=album-one');catalog=response.json()
     check(response.status==200 and len(catalog['tracks'])==12 and [track['track_id'] for track in catalog['tracks']][:2]==['song-2','song-1'],'the public audio catalog supplies the complete album in release order')
@@ -229,7 +236,7 @@ def run_browser(pw,site,base,mp3,scene):
         errors=[];external=[];page.on('pageerror',lambda error:errors.append(str(error)))
         page.route('https://outside.invalid/**',lambda route:(external.append(route.request.url),route.fulfill(content_type='text/html',body='blocked probe reached transport')))
         page.add_init_script('addEventListener("message",event=>{if(event.data==="navigation-probe")window.navigationProbe=true})')
-        page.goto(base+'/fixture.html')
+        login(page,base,'owner@example.invalid');page.goto(base+'/fixture.html')
         page.wait_for_function("Array.from(document.querySelectorAll('iframe')).some(frame=>frame.title==='Custom canvas background')")
         frame=next(frame for frame in page.frames if frame!=page.main_frame)
         expect(frame.locator('.output')).to_have_text('ready',timeout=12000)
@@ -285,13 +292,13 @@ def run_browser(pw,site,base,mp3,scene):
         page.evaluate('holdNextCatalog=true')
         frame.evaluate("()=>{window.pendingCatalog=StonefellowAudio.catalog({release_id:'album-one'}).catch(error=>error.code)}")
         page.wait_for_function('held.length===2')
-        page.evaluate('()=>{showFixture({...fixtureScene,id:3});}')
+        page.evaluate('scene=>showFixture(scene)',save_fixture_scene(site,scene))
         check(page.evaluate('held[1].signal.aborted'),'replacing a scene aborts its outstanding catalog loader')
         page.evaluate('held[1].resolve()')
         frame=next(frame for frame in page.frames if frame!=page.main_frame)
         expect(frame.locator('.output')).to_have_text('ready')
 
-        dynamic={**scene,'id':6,'html':scene['html']+'<section class="sf-dataset-published_catalog sf-current-track"><div class="sf-data-row"><span class="sf-field-title"></span></div></section>'}
+        dynamic=save_fixture_scene(site,{**scene,'html':scene['html']+'<section class="sf-dataset-published_catalog sf-current-track"><div class="sf-data-row"><span class="sf-field-title"></span></div></section>'})
         page.evaluate("scene=>{const data=fixtureTrackDataset(scene.id,st.track.id);showFixture({...scene,...data});window.dynamicElement=document.querySelector('.sf-agent-scene-backdrop iframe')}",dynamic)
         frame=next(frame for frame in page.frames if frame!=page.main_frame)
         expect(frame.locator('.output')).to_have_text('ready')
@@ -374,10 +381,10 @@ def run_gesture_browser(pw,site,base,scene):
     options={'args':['--no-sandbox']}
     if CHROME:options['executable_path']=CHROME
     browser=pw.chromium.launch(**options)
-    event_scene={**scene,'id':815,'title':'Generic delayed audio event',
+    event_scene=save_fixture_scene(site,{**scene,'title':'Generic delayed audio event',
         'html':'<section class="event-controls"></section><p class="event-output"></p>',
         'css':'main{padding:90px 20px 160px}button{min-height:44px;min-width:100px}',
-        'js':GESTURE_CODE,'js_hash':base64.b64encode(hashlib.sha256(GESTURE_CODE.encode()).digest()).decode()}
+        'js':GESTURE_CODE})
     # This fixture-only legacy callback reproduces the old source choice while
     # preserving today's SDK, catalog route and browser policy. It does not
     # depend on Git history, so the regression remains runnable after release.
@@ -425,7 +432,7 @@ def run_gesture_browser(pw,site,base,scene):
                 result=cdp.send('Runtime.evaluate',{'expression':expression,'returnByValue':True,'awaitPromise':True,'userGesture':False})
                 assert not result.get('exceptionDetails'),result
                 return result['result'].get('value')
-            page.goto(base+('/fixture-legacy-audio.html?music=1' if legacy else '/fixture.html?music=1'))
+            login(page,base,'owner@example.invalid');page.goto(base+('/fixture-legacy-audio.html?music=1' if legacy else '/fixture.html?music=1'))
             frame=next(frame for frame in page.frames if frame!=page.main_frame)
             deadline=time.monotonic()+12
             while time.monotonic()<deadline and inspect('fixtureEvents.length')<1:time.sleep(.05)
@@ -435,7 +442,7 @@ def run_gesture_browser(pw,site,base,scene):
             check(blocked['ok'] is False and inspect('audio.paused'),prefix+'playback without any gesture is genuinely blocked under the default browser policy: '+json.dumps(blocked))
             if not legacy:
                 check(inspect('audioDiagnostics.some(row=>row.event==="rpc_error"&&row.method==="play"&&row.name==="NotAllowedError"&&row.code==="audio_gesture_required")'),prefix+'main-player gesture rejection is captured as an actionable sanitized RPC diagnostic')
-                check(inspect('audioDebugEvents.some(row=>row.phase==="canvas_audio"&&row.detail.scene_id===815&&row.detail.code==="audio_gesture_required")'),prefix+'main-player rejection reaches the scene debug sink')
+                check(inspect('audioDebugEvents.some(row=>row.phase==="canvas_audio"&&row.detail.scene_id==='+str(event_scene['id'])+'&&row.detail.code==="audio_gesture_required")'),prefix+'main-player rejection reaches the scene debug sink')
             button=frame.get_by_role('button',name='Start event',exact=True)
             if width==375:button.tap()
             else:button.click()

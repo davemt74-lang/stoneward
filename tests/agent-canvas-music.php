@@ -15,7 +15,10 @@ verify(sf_agent_canvas_music_inputs(['mode'=>'selected','track_ids'=>['last','fi
     'Pure music normalization preserves canonical ordered IDs without loading the audio inventory');
 verify(sf_agent_canvas_music_inputs(['mode'=>'all'])===['mode'=>'all']&&sf_agent_canvas_music_inputs(null)===null,
     'All mode stays compact and explicit null clears a selection');
-foreach([['mode'=>'selected','track_ids'=>[]],['mode'=>'selected','track_ids'=>['../private']],['mode'=>'selected','track_ids'=>[1]],
+verify(sf_agent_canvas_music_inputs(['mode'=>'selected','track_ids'=>[]])===['mode'=>'selected','track_ids'=>[]]&&
+    sf_agent_canvas_music_selection('Build {music-clear}')===['Build',['mode'=>'selected','track_ids'=>[]],true],
+    'Explicit empty selection and music-clear preserve a deny-all direct resource scope');
+foreach([['mode'=>'selected','track_ids'=>['../private']],['mode'=>'selected','track_ids'=>[1]],
     ['mode'=>'all','track_ids'=>[]],['mode'=>'selected','track_ids'=>['valid'],'user_id'=>2]] as $invalid)
     rejects(fn()=>sf_agent_canvas_music_inputs($invalid),'Invalid or authority-bearing music selections are rejected');
 $mixed='Draw an instrument {music-track:last} {image-'.str_repeat('a',32).'} {music-track:first}';

@@ -34,6 +34,7 @@ function sf_canvas_project_ideas_context(int $owner,?int $currentId=null,string 
         if(isset($scene['design_brief']))$entry['design_brief']=sf_agent_public_artist_text($scene['design_brief'],
             in_array($id,$selectedIds,true)?max(80,min(1200,(int)floor(12000/max(1,$minimum)))):1200);
         foreach(['agent_design','agent_palette'] as $key)if(isset($scene[$key]))$entry[$key]=$scene[$key];
+        if(isset($scene['playlist_manifest']))$entry['playlist_resources']=array_map(static fn(array $playlist):array=>['ref'=>$playlist['ref'],'title'=>$playlist['title'],'revision_hash'=>$playlist['revision_hash'],'track_count'=>count($playlist['items'])],$scene['playlist_manifest']['playlists']);
         $music=$scene['music_inputs']??null;
         if($music!==null)$entry['music_inputs']=['mode'=>$music['mode']]+($music['mode']==='selected'?['count'=>count($music['track_ids'])]:[]);
         $entry['capabilities']=['scripted'=>!empty($scene['js']),'audio_reactive'=>str_contains($scene['css'],'--sf-audio-')];
@@ -107,11 +108,12 @@ function sf_canvas_project_idea_has_bindings(string $brief): bool {
         [,$artist,$artistProvided,$sources]=sf_canvas_resource_selection($brief);
         if($artistProvided||$sources!==null)return true;
         [,,$musicProvided]=sf_agent_canvas_music_selection($brief);
-        if($musicProvided||sf_agent_canvas_catalog_refs($brief)!==[]||sf_agent_canvas_image_reference_selection([],$brief)!==[])return true;
+        [,,$playlistsProvided]=sf_canvas_playlists_selection($brief);
+        if($musicProvided||$playlistsProvided||sf_agent_canvas_catalog_refs($brief)!==[]||sf_agent_canvas_image_reference_selection([],$brief)!==[])return true;
     }catch(InvalidArgumentException){return true;}
     // Placed image tags have no standalone parser. Keep incomplete/future
     // machine tags out too, while ordinary braces in design prose stay valid.
-    return preg_match('/\{\h*(?:(?:reference-)?image-|music-)[^}]*\}/i',$brief)===1;
+    return preg_match('/\{\h*(?:(?:reference-)?image-|music-|playlist:|playlists-)[^}]*\}/i',$brief)===1;
 }
 
 /** Model output proposes a project. It grants no build, image or account-change permission. */
@@ -213,6 +215,8 @@ function sf_canvas_project_ideas_generate(array $user,array $request,string $kin
         array_key_exists('artist_inputs',$request),$request['source_scene_ids']??null);
     $sourcesProvided=$sourceIds!==null;
     [$brief,$musicInputs,$musicProvided]=sf_agent_canvas_music_selection($brief,$request['music_inputs']??null,array_key_exists('music_inputs',$request));
+    [$brief,$playlistInputs,$playlistProvided]=sf_canvas_playlists_selection($brief,$request['playlist_inputs']??null,array_key_exists('playlist_inputs',$request));$playlistProvided=$playlistProvided&&$playlistInputs!==null;
+    $playlistManifest=null;
     $imageReferenceIds=sf_agent_canvas_image_reference_selection($request['image_reference_ids']??[],$rawBrief);
     preg_match_all('/\{image-((?:ref-)?[a-f0-9]{32})\}/i',$rawBrief,$imageTokens);
     $placedImageIds=array_values(array_unique(array_map('strtolower',$imageTokens[1])));
@@ -229,19 +233,22 @@ function sf_canvas_project_ideas_generate(array $user,array $request,string $kin
     }
     if($kind==='plan'){
         if(!is_array($request['project']??null))throw new InvalidArgumentException('Describe the project you want to plan.');
-        $providedProject=sf_canvas_project_normalize($request['project']);
+        $providedProject=sf_canvas_project_bind_playlists($owner,sf_canvas_project_normalize($request['project']));
         [$brief,$artistInputs,$artistProvided,$sourceIds]=sf_canvas_resource_selection($providedProject['brief'],$providedProject['artist_inputs']??null,
             array_key_exists('artist_inputs',$providedProject),$providedProject['source_scene_ids']??null);
         $sourcesProvided=$sourceIds!==null;
         [$brief,$musicInputs,$musicProvided]=sf_agent_canvas_music_selection($brief,$providedProject['music_inputs']??null,array_key_exists('music_inputs',$providedProject));
+        [$brief,$playlistInputs,$playlistProvided]=sf_canvas_playlists_selection($brief,$providedProject['playlist_inputs']??null,array_key_exists('playlist_inputs',$providedProject));$playlistProvided=$playlistProvided&&$playlistInputs!==null;
+        $playlistManifest=$providedProject['playlist_manifest']??null;
         $imageReferenceIds=sf_agent_canvas_image_reference_selection($providedProject['image_reference_ids']??[],$providedProject['brief']);
         preg_match_all('/\{image-((?:ref-)?[a-f0-9]{32})\}/i',$providedProject['brief'],$imageTokens);
         $placedImageIds=array_values(array_unique(array_map('strtolower',$imageTokens[1])));
         $selection=$providedProject['coding_model']??null;
     }
+    if($playlistProvided)$playlistManifest=sf_canvas_playlists_compile($owner,$playlistInputs,$playlistManifest)['manifest'];
     sf_canvas_project_ideas_schema();sf_canvas_project_ensure_schema();sf_agent_scene_history_ensure_schema();sf_privacy_ensure_schema();
     $fingerprintInputs=[$kind,$kind==='plan'?$brief:$rawBrief,$currentId,$selection,$providedProject,$proposalOptions];
-    if($kind!=='plan')foreach(['source_scene_ids','artist_inputs','music_inputs','image_reference_ids'] as $field){
+    if($kind!=='plan')foreach(['source_scene_ids','artist_inputs','music_inputs','image_reference_ids','playlist_inputs'] as $field){
         if(array_key_exists($field,$request))$fingerprintInputs[]=[$field=>$request[$field]];
     }
     $fingerprint=hash('sha256',serialize($fingerprintInputs));
@@ -281,6 +288,7 @@ function sf_canvas_project_ideas_generate(array $user,array $request,string $kin
         $preferences=sf_canvas_project_preferences($owner);
         if($kind==='suggest'&&empty($preferences['ideas_enabled']))throw new DomainException('Canvas ideas are turned off for this account.');
         $context=sf_canvas_project_ideas_context($owner,$currentId,trim($brief),$sourceIds??[]);
+        if($playlistProvided)$context['selected_playlists']=$playlistManifest;
         if($artistProvided)$context['selected_artist_resources']=sf_canvas_resource_artist_context($artistInputs);
         if($musicProvided)$context['selected_music_inputs']=$musicInputs===null?null:['mode'=>$musicInputs['mode']]+
             ($musicInputs['mode']==='selected'?['count'=>count($musicInputs['track_ids'])]:[]);
@@ -365,7 +373,7 @@ PROMPT;
         if($amount>$reserve)throw new RuntimeException('Canvas idea usage exceeded its reserved bound.');
         $admin=($user['role']??'')==='admin';$project=null;
         $save=static function(int $balance)use($db,$owner,$user,$requestId,$epoch,$idea,$reply,$selection,$providedProject,$proposalOptions,
-            $artistInputs,$artistProvided,$musicInputs,$musicProvided,$imageReferenceIds,$placedImageIds,$sourceIds,$admin,$amount,&$project):void {
+            $artistInputs,$artistProvided,$musicInputs,$musicProvided,$playlistInputs,$playlistProvided,$playlistManifest,$imageReferenceIds,$placedImageIds,$sourceIds,$admin,$amount,&$project):void {
                 sf_agent_scene_history_lock_account($db,$owner);
                 $row=sf_canvas_project_ideas_row($owner,$requestId);
                 $q=$db->prepare("SELECT id FROM users WHERE id=? AND status='active'");$q->execute([$owner]);
@@ -383,6 +391,7 @@ PROMPT;
                     if($providedProject===null){
                         if($artistProvided)$build['artist_inputs']=$artistInputs;
                         if($musicProvided)$build['music_inputs']=$musicInputs;
+                        if($playlistProvided){$build['playlist_inputs']=$playlistInputs;$build['playlist_manifest']=$playlistManifest;}
                         if($imageReferenceIds)$build['image_reference_ids']=$imageReferenceIds;
                         foreach($placedImageIds as $id)if(!str_contains($build['brief'],'{image-'.$id.'}'))$build['brief'].=' {image-'.$id.'}';
                     }
@@ -396,8 +405,11 @@ PROMPT;
                 if($q->rowCount()!==1)throw new InvalidArgumentException('This canvas idea changed while it was being prepared.');
             };
         if($localPlan){
+            // sf_token_balance initializes legacy entitlement tables on every call;
+            // keep that DDL outside the atomic no-provider planning transaction.
+            $planBalance=$admin?PHP_INT_MAX:sf_token_balance($owner);
             $db->beginTransaction();
-            try{$save($admin?PHP_INT_MAX:sf_token_balance($owner));$db->commit();}
+            try{$save($planBalance);$db->commit();}
             catch(Throwable $error){if($db->inTransaction())$db->rollBack();throw $error;}
         }else sf_ai_finish_reservation($user,$reservation,$amount,$usage,SF_CANVAS_PROJECT_IDEA_SOURCE,true,$save);
         $settled=true;

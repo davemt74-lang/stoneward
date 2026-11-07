@@ -1,0 +1,29 @@
+.sf-admin-playlists { min-width:0; }
+.sf-admin-playlists button,.sf-admin-playlists input,.sf-admin-playlists select { min-height:44px; }
+.sf-playlist-admin-toolbar { display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-bottom:12px; }
+.sf-playlist-admin-toolbar .field { flex:1 1 220px; }
+.sf-playlist-admin-toolbar input,.sf-playlist-admin-toolbar select { width:100%; }
+.sf-playlist-admin-status { min-height:1.5em;overflow-wrap:anywhere; }
+.sf-playlist-admin-layout { display:grid;grid-template-columns:minmax(230px,340px) minmax(0,1fr);gap:24px;align-items:start; }
+.sf-playlist-admin-list { list-style:none;padding:0;margin:0;display:grid;gap:8px; }
+.sf-playlist-admin-item { display:grid;width:100%;gap:5px;padding:12px;text-align:left;white-space:normal;overflow-wrap:anywhere; }
+.sf-playlist-admin-item span,.sf-playlist-admin-note { font-size:13px;opacity:.75; }
+.sf-playlist-admin-item[aria-pressed="true"] { border-color:var(--accent,#f4c38b); }
+.sf-playlist-admin-detail { min-width:0;padding:18px;border:1px solid var(--line,#ffffff25);border-radius:14px; }
+.sf-playlist-admin-detail p,.sf-playlist-admin-detail h2,.sf-playlist-admin-detail code { overflow-wrap:anywhere; }
+.sf-playlist-admin-detail summary { min-height:44px;display:flex;align-items:center;cursor:pointer; }
+.sf-playlist-admin-detail code { display:block;font-size:12px;white-space:normal; }
+.sf-playlist-admin-tracks { margin:16px 0;padding-left:24px; }
+.sf-playlist-admin-tracks li { padding:9px 0 9px 3px;border-bottom:1px solid #ffffff16;overflow-wrap:anywhere; }
+.sf-playlist-admin-tracks small { display:block;opacity:.7; }
+.sf-playlist-admin-state { font-weight:700; }
+.sf-playlist-admin-back { display:none; }
+.sf-admin-playlists :is(button,input,select,summary):focus-visible { outline:2px solid var(--accent,#f4c38b);outline-offset:3px; }
+@media(max-width:760px){
+  .sf-playlist-admin-layout { display:block; }
+  .sf-playlist-admin-detail { margin-top:18px;padding:14px; }
+  .sf-admin-playlists.has-playlist-detail .sf-playlist-admin-layout>section:first-child { display:none; }
+  .sf-admin-playlists:not(.has-playlist-detail) .sf-playlist-admin-detail { display:none; }
+  .sf-playlist-admin-back { display:inline-flex; }
+  .sf-admin-playlists .canvas-head { flex-wrap:wrap; }
+}

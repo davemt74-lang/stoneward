@@ -35,7 +35,7 @@ try{
     }
     if($action==='propose'){
         if(!is_array($request['project']??null))throw new InvalidArgumentException('Describe a canvas project.');
-        $project=sf_canvas_project_normalize($request['project']);
+        $project=sf_canvas_project_bind_playlists($uid,sf_canvas_project_normalize($request['project']));
         if(isset($request['reuse_id'])){
             if(!is_int($request['reuse_id'])||$request['reuse_id']<1)throw new InvalidArgumentException('Choose a canvas project.');
             $reuse=sf_canvas_project_reuse($uid,$request['reuse_id'],$project);

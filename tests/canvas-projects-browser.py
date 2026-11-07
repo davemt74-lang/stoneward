@@ -30,6 +30,7 @@ def check(value, label):
 
 SETUP = r'''() => {
  window.owner='1';window.calls={get:[],post:[],build:[],code:[],images:[],present:[],execute:[],reply:[]};
+ window.canvasOwner=()=>owner;window.stopListeningRoomBuild=()=>{};
  window.voice={active:true,starts:0,stops:0};
  const clone=value=>JSON.parse(JSON.stringify(value));
  const normalize=raw=>({action:'create',context_track_id:'',image_reference_ids:[],review_images:false,source_scene_ids:[],...clone(raw)});

@@ -10,8 +10,8 @@ function sf_agent_canvas_music_inputs(mixed $raw): ?array {
         if(array_key_exists('track_ids',$raw))throw new InvalidArgumentException('Choose all music or selected songs.');
         return ['mode'=>'all'];
     }
-    if(($raw['mode']??null)!=='selected'||!is_array($raw['track_ids']??null)||!array_is_list($raw['track_ids'])||!$raw['track_ids'])
-        throw new InvalidArgumentException('Choose at least one published song.');
+    if(($raw['mode']??null)!=='selected'||!is_array($raw['track_ids']??null)||!array_is_list($raw['track_ids']))
+        throw new InvalidArgumentException('Choose a valid selected music scope.');
     foreach($raw['track_ids'] as $id)if(!is_string($id)||preg_match('/\A[A-Za-z0-9_-]{1,180}\z/',$id)!==1)
         throw new InvalidArgumentException('Choose songs from the music picker.');
     return ['mode'=>'selected','track_ids'=>array_values(array_unique($raw['track_ids'],SORT_STRING))];
@@ -19,19 +19,20 @@ function sf_agent_canvas_music_inputs(mixed $raw): ?array {
 
 /** Composer tokens carry resource identity, leaving the description budget for the design itself. */
 function sf_agent_canvas_music_selection(string $brief,mixed $raw=null,bool $provided=false): array {
-    $ids=[];$all=false;
+    $ids=[];$all=false;$clear=false;
     $brief=preg_replace_callback('/(?<!\S)(\(*)(`?)\/music-all\2(?=[\s),.!?;:]|$)/i',static function(array $match)use(&$all):string {
         $all=true;return $match[1].' ';
     },$brief)??$brief;
-    $clean=preg_replace_callback('/(`?)\{music-(all|track:([^}]*))\}\1/i',
-        static function(array $match)use(&$ids,&$all):string {
+    $clean=preg_replace_callback('/(`?)\{music-(all|clear|track:([^}]*))\}\1/i',
+        static function(array $match)use(&$ids,&$all,&$clear):string {
             if(strcasecmp($match[2],'all')===0)$all=true;
+            elseif(strcasecmp($match[2],'clear')===0)$clear=true;
             else $ids[]=$match[3];
             return ' ';
         },$brief);
     if($clean===null)throw new InvalidArgumentException('Choose a valid music selection.');
-    if($all&&$ids)throw new InvalidArgumentException('Choose all music or selected songs.');
-    $tokens=$all?['mode'=>'all']:($ids?sf_agent_canvas_music_inputs(['mode'=>'selected','track_ids'=>$ids]):null);
+    if(($all&&$ids)||($clear&&($all||$ids)))throw new InvalidArgumentException('Choose all music, selected songs, or clear the direct music selection.');
+    $tokens=$all?['mode'=>'all']:($clear?['mode'=>'selected','track_ids'=>[]]:($ids?sf_agent_canvas_music_inputs(['mode'=>'selected','track_ids'=>$ids]):null));
     $selection=$provided?sf_agent_canvas_music_inputs($raw):$tokens;
     if($provided&&$tokens!==null&&$selection!==$tokens)
         throw new InvalidArgumentException('The music selection changed. Apply the current picker selection.');
