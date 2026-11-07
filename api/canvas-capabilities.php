@@ -6,14 +6,15 @@ require_once __DIR__.'/agent-tool-registry.php';
 function sf_canvas_capability_cards(): array {
     $cards=[];
     foreach(sf_agent_tool_registry() as $id=>$tool){
-        if(!isset($tool['canvas_data']))continue;
-        $data=$tool['canvas_data'];
+        $data=$tool['canvas_data']??$tool['canvas_external']??null;
+        if($data===null)continue;
         $cards[$id]=['id'=>$id,'permission_id'=>'canvas.data.'.$id,'schema_version'=>1,
             'kind'=>'data_source','label'=>$tool['label'],'description'=>$data['description'],
             'scope'=>$tool['scope'],'access'=>'read','requires_sign_in'=>$tool['scope']==='signed_in_fan',
             'consent_status'=>'explicit_canvas_grant','access_contract_version'=>1,'fields'=>$data['fields'],
             'filters'=>$data['filters']??[],'actions'=>$data['actions']??[],
             'max_rows'=>$data['max_rows'],'version'=>hash('sha256',json_encode($data,JSON_THROW_ON_ERROR))];
+        if(isset($tool['canvas_external']))$cards[$id]['transport']='host_read';
     }
     return $cards;
 }

@@ -33,6 +33,8 @@
   const readQueue = [];
   const controlQueue = [];
   const audioCache = new Map();
+  const dataReads = new Map();
+  const offlineData = typeof document !== 'undefined' && document.currentScript?.dataset.sfDataOffline === 'true';
   const players = new Map();
   const listeners = new Set();
   let nonce = null;
@@ -193,6 +195,7 @@
     for (const entry of readQueue) entry.reject(failure(message, 'audio_session_closed'));
     for (const entry of controlQueue) entry.reject(failure(message, 'audio_session_closed'));
     pending.clear();
+    dataReads.clear();
     readQueue.length = 0;
     controlQueue.length = 0;
     activeReads = 0;
@@ -216,7 +219,7 @@
   }
   function request(method, args = []) {
     if (closed) return Promise.reject(failure('Canvas audio is no longer available.', 'audio_session_closed'));
-    const media = ['catalog', 'getTrack', 'getAudio', 'createPlayer'].includes(method);
+    const media = ['catalog', 'getTrack', 'getAudio', 'createPlayer', 'getData'].includes(method);
     const controls = controlQueue.length + Array.from(pending.values()).filter(entry => !entry.media).length;
     if (!media && controls >= 16) return Promise.reject(failure('Too many audio controls are pending.', 'audio_busy'));
     return new Promise((resolve, reject) => {
@@ -356,6 +359,23 @@
     }
   };
   Object.defineProperty(window, 'StonefellowAudio', { value: Object.freeze(api), configurable: false, writable: false });
+  Object.defineProperty(window, 'StonefellowData', { value: Object.freeze({
+    get(alias) {
+      if (typeof alias !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(alias))
+        return Promise.reject(failure('Choose a named canvas data source.', 'invalid_data_source'));
+      if (offlineData) return Promise.resolve(Object.freeze({ status: 'unavailable',
+        fetched_at: null, expires_at: null, source: null, timezone: null, rows: Object.freeze([]) }));
+      if (dataReads.has(alias)) return dataReads.get(alias);
+      // Each completed read is reauthorized by the host. Coalesce only work in flight.
+      const read = request('getData', [alias]).then(result => {
+        const expired = result.status === 'fresh' && Date.parse(result.expires_at) <= Date.now();
+        return Object.freeze({ ...result, status: expired ? 'stale' : result.status,
+          rows: Object.freeze(result.rows.map(row => Object.freeze(row))) });
+      }).finally(() => { if (dataReads.get(alias) === read) dataReads.delete(alias); });
+      dataReads.set(alias, read);
+      return read;
+    }
+  }), configurable: false, writable: false });
   observeLocalPlayback();
   addEventListener('message', onMessage);
   addEventListener('error', onLocalMediaError, true);
@@ -366,7 +386,7 @@
   post({ type: 'connect' });
 })();`;
 
-  const hash = "'sha256-v+bUl6CwkiKuME+tMiibeEEQUQAtXW2kHkjD+2bAuRo='";
+  const hash = "'sha256-XIrtmS94RNOeQ5B0K+Pn4/tegmPNjfMvhVFcvDDMhKs='";
 
   function token() {
     return Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
@@ -437,6 +457,34 @@
       })
     };
   }
+  function unavailableData() {
+    return { status: 'unavailable', fetched_at: null, expires_at: null, source: null, timezone: null, rows: [] };
+  }
+  function normalizeData(result) {
+    if (!record(result) || !['fresh', 'stale'].includes(result.status) ||
+        !Array.isArray(result.rows) || result.rows.length > 120) return unavailableData();
+    const fetched = text(result.fetched_at, 40), expires = text(result.expires_at, 40);
+    const fetchedAt = Date.parse(fetched), expiresAt = Date.parse(expires);
+    if (!Number.isFinite(fetchedAt) || !Number.isFinite(expiresAt)) return unavailableData();
+    const rows = [];
+    let characters = 0;
+    for (const row of result.rows) {
+      if (!record(row)) return unavailableData();
+      const fields = Object.entries(row);
+      if (fields.length > 32) return unavailableData();
+      for (const [key, value] of fields) {
+        if (!/^[a-z][a-z0-9_]{0,63}$/.test(key) || (value !== null && typeof value !== 'boolean' &&
+            !(typeof value === 'number' && Number.isFinite(value)) &&
+            !(typeof value === 'string' && value.length <= 4000))) return unavailableData();
+        characters += key.length + (typeof value === 'string' ? value.length : 32);
+      }
+      if (characters > 256 * 1024) return unavailableData();
+      rows.push(Object.fromEntries(fields));
+    }
+    return { status: result.status === 'fresh' && expiresAt <= Date.now() ? 'stale' : result.status,
+      fetched_at: fetched, expires_at: expires, source: text(result.source, 120) || null,
+      timezone: text(result.timezone, 80) || null, rows };
+  }
   function validateArgs(method, args) {
     if (!Array.isArray(args)) throw error('Invalid audio request arguments.', 'invalid_audio_request');
     switch (method) {
@@ -450,6 +498,10 @@
         }
         return [filters];
       }
+      case 'getData':
+        if (args.length !== 1 || typeof args[0] !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(args[0]))
+          throw error('Choose a named canvas data source.', 'invalid_audio_request');
+        return args;
       case 'getTrack':
       case 'getAudio':
       case 'createPlayer':
@@ -484,7 +536,8 @@
   }
 
   function createHost(options) {
-    const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic, observeIndependent } = options;
+    const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic, observeIndependent, loadData } = options;
+    const dataAliases = new Set(Array.isArray(options.dataAliases) ? options.dataAliases : []);
     if (!frame || !audio || [getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume].some(callback => typeof callback !== 'function'))
       throw new TypeError('Canvas audio requires a frame, the canonical audio element and host callbacks.');
     const owner = getOwner();
@@ -664,6 +717,16 @@
       const [argument] = job.args;
       if (job.method.startsWith('player')) return independentOperation(session, job);
       switch (job.method) {
+        case 'getData': {
+          // Detached previews have no data loader. A live loader is scoped to saved aliases.
+          if (!dataAliases.has(argument) || typeof loadData !== 'function') return unavailableData();
+          try {
+            const result = await loadData(argument, job.controller.signal);
+            return active(session) ? normalizeData(result) : unavailableData();
+          } catch (_) {
+            return unavailableData();
+          }
+        }
         case 'catalog': return catalog(session, argument, job.controller.signal);
         case 'createPlayer': return createPlayer(session, argument, job.controller.signal);
         case 'getTrack': {
@@ -740,7 +803,7 @@
       try { args = validateArgs(message.method, message.args); }
       catch (failure) { response(session, message.id, null, failure, message.method); return; }
       if (message.method === 'play' || message.method === 'playerPlay') reportDiagnostic(session, { event: 'play_requested', method: message.method });
-      const media = ['catalog', 'getTrack', 'getAudio', 'createPlayer'].includes(message.method);
+      const media = ['catalog', 'getTrack', 'getAudio', 'createPlayer', 'getData'].includes(message.method);
       if ((media && session.queue.length >= 32) || (!media && session.controlsActive >= 16)) {
         response(session, message.id, null, error('Too many audio requests are pending.', 'audio_busy'), message.method);
         return;

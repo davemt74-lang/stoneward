@@ -37,6 +37,23 @@ A canvas receives the current viewer's records only for sources it declares, the
 
 History events include start, resume, pause, complete and skip. Measured listening seconds come from reported native playback, and legacy event counts indicate coverage without measured time. Listening sources honor the account's listening-history setting. Purchase order totals repeat across lines in one order, so group by `order_id` before summing totals.
 
+## Live sources with /data
+
+Type `/data` and add up to four named sources. Each record binds an alias to a registered product and an explicitly selected public location. A revision inherits its bindings until replaced or cleared. The catalog describes parameters, typed fields and permissions. Opening it makes no upstream weather request.
+
+Read a binding from authored code with `await StonefellowData.get(alias)`. The shared envelope contains `status` (`fresh`, `stale` or `unavailable`), `source`, `fetched_at`, `expires_at`, and typed `rows`. Where available, weather responses also include the location time zone. Optional fields can be null. The registry publishes each product's row schema, including observation timestamps and forecast period boundaries. A canvas can use several aliases together with music, account data or any other authorized capability. Layout, conditions and actions come from the prompt.
+
+| Product | Data |
+| --- | --- |
+| `weather.current` | Current station observation, rounded whole Fahrenheit temperature, Celsius temperature, observation time, conditions, humidity, wind and precipitation where reported |
+| `weather.hourly` | Up to 48 hourly forecast periods, with valid times, temperature, conditions and available precipitation and wind fields |
+| `weather.daily` | Up to 14 day and night forecast periods |
+| `weather.alerts` | Active official alerts for the selected point, with severity, applicable times and available guidance |
+
+The first adapter uses the National Weather Service. U.S. public city coordinates come from the Census Gazetteer. Published venues use the corresponding city point, which the picker labels as city weather. Device location and international providers are future additions. [NWS API documentation](https://www.weather.gov/documentation/services-web-API) · [U.S. Census Gazetteer Files](https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html)
+
+The host resolves the alias against the current saved owner canvas or approved gallery. It rechecks the provider policy and location on each read. Detached verification uses an unavailable state so it can test the generated code without depending on live external data. Prefetch before a playback gesture. For a rule based on a current observation, check the returned status, expiry and requested field again when taking the action.
+
 These resources are inventory for the coding agent. The agent authors the experience described by the user. Selected canvases provide their actual prompts, code and authorized image metadata. Selected commerce rows supply live `published_merch` and `published_ticket_offers` bindings with all selected variants. No catalog widget is added by the picker. Existing source, code and privacy context budgets still apply; the inventories and selected runtime rows do not use a three-item sample.
 
 The ordinary chat agent can route a design conversation to the canvas discussion service without a special command phrase. It passes the original message and the browser’s current selections. The service can answer a question, discuss a direction, or propose a project using the account’s history and explicit preferences. A proposed project uses the existing approval setting. Discussion never grants build approval. Planning and discussion use per-user Active Tokens with idempotent request IDs and the existing reservation system.

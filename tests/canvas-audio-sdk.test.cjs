@@ -57,7 +57,7 @@ function harness(overrides = {}) {
     ...overrides
   };
   let controller;
-  return { host, child, frame, audio, api: child.StonefellowAudio, sdk, options, messages, created, revoked, calls,
+  return { host, child, frame, audio, api: child.StonefellowAudio, data: child.StonefellowData, sdk, options, messages, created, revoked, calls,
     diagnostics, LocalMedia, nativeMediaPlay, hostMedia, hostURLs, hostRevoked,
     start() { controller = sdk.createHost(options); return controller; },
     setOwner(value) { owner = value; }, setPermission(value) { permitted = value; },
@@ -597,4 +597,80 @@ test('malformed or authority-conflicting playlist responses fail closed before a
   const h=harness({loadCatalog:async()=>({tracks:[],releases:[],playlists:[playlist]})});h.start();await flush();
   await assert.rejects(h.api.catalog(),error=>error.code==='invalid_catalog');assert.equal(h.calls.filter(call=>call[0]==='play').length,0);h.destroy();
  }
+});
+
+const observation = (temperature, changes = {}) => ({
+  status: 'fresh', fetched_at: new Date(Date.now() - 1000).toISOString(),
+  expires_at: new Date(Date.now() + 60000).toISOString(),
+  source: 'National Weather Service', timezone: 'America/Phoenix',
+  rows: [{ temperature_f: temperature }], ...changes
+});
+
+test('named data reads share the trusted sandbox, coalesce pending reads and reauthorize later requests', async () => {
+  let permitted = true;
+  const aliases = [];
+  const h = harness({ dataAliases: ['phoenix', 'venue'], loadData: async alias => {
+    aliases.push(alias);
+    if (!permitted) throw new Error('Disabled');
+    return alias === 'phoenix' ? observation(94) : observation(71);
+  } });
+  h.start();
+  const first = h.data.get('phoenix');
+  assert.equal(first, h.data.get('phoenix'));
+  const [phoenix, venue] = await Promise.all([first, h.data.get('venue')]);
+  assert.deepEqual(aliases, ['phoenix', 'venue']);
+  assert.equal(phoenix.status, 'fresh'); assert.equal(phoenix.rows[0].temperature_f, 94);
+  assert.equal(venue.rows[0].temperature_f, 71);
+  assert.ok(Object.isFrozen(phoenix) && Object.isFrozen(phoenix.rows) && Object.isFrozen(phoenix.rows[0]));
+  const message = h.messages.find(item => item.direction === 'child' && item.data.method === 'getData').data;
+  h.host.emit('message', { source: {}, origin: 'null', data: { ...message, id: 'r-100' } });
+  h.host.emit('message', { source: h.frame.contentWindow, origin: 'https://artist.example', data: { ...message, id: 'r-100' } });
+  h.host.emit('message', { source: h.frame.contentWindow, origin: 'null', data: { ...message, documentId: '1'.repeat(32), id: 'r-100' } });
+  h.host.emit('message', { source: h.frame.contentWindow, origin: 'null', data: message });
+  await flush();
+  assert.equal((await h.data.get('unbound')).status, 'unavailable');
+  await assert.rejects(h.data.get('https://other.example/read'), error => error.code === 'invalid_data_source');
+  assert.deepEqual(aliases, ['phoenix', 'venue']);
+  permitted = false;
+  assert.equal((await h.data.get('phoenix')).status, 'unavailable');
+  assert.deepEqual(aliases, ['phoenix', 'venue', 'phoenix']);
+  h.destroy();
+});
+
+test('data expiry, unsupported fields and detached host fallback cannot be treated as fresh', async () => {
+  let result = observation(94, { expires_at: new Date(Date.now() - 1).toISOString() });
+  const h = harness({ dataAliases: ['phoenix'], loadData: async () => result });
+  h.start();
+  assert.equal((await h.data.get('phoenix')).status, 'stale');
+  for (const invalid of [observation(94, { expires_at: 'unknown' }), observation(94, { rows: [{ temperature_f: { value: 94 } }] })]) {
+    result = invalid;
+    const data = await h.data.get('phoenix');
+    assert.equal(data.status, 'unavailable');
+    assert.equal(data.rows.length, 0);
+  }
+  h.destroy();
+  const preview = harness({ dataAliases: ['phoenix'] });
+  preview.start();
+  assert.equal((await preview.data.get('phoenix')).status, 'unavailable');
+  preview.destroy();
+});
+
+test('data in flight cannot cross an account switch or canvas close', async () => {
+  let finish, signal;
+  const h = harness({ dataAliases: ['phoenix'], loadData: (_alias, requestSignal) => {
+    signal = requestSignal;
+    return new Promise(resolve => { finish = resolve; });
+  } });
+  const host = h.start();
+  const read = h.data.get('phoenix');
+  const rejected = assert.rejects(read, error => error.code === 'audio_session_closed');
+  await flush();
+  assert.equal(signal.aborted, false);
+  h.setOwner(2);
+  host.refresh();
+  finish(observation(94));
+  await rejected;
+  assert.equal(signal.aborted, true);
+  assert.equal(h.messages.filter(item => item.direction === 'host' && item.data.type === 'response').length, 0);
+  h.destroy();
 });

@@ -48,3 +48,14 @@ body:has(.sf-canvas-resource-picker[open]) { overflow:hidden; }
   .sf-canvas-resource-actions button { flex:1 1 auto; }
   .sf-canvas-resource-image { width:44px;height:44px; }
 }
+
+.sf-canvas-data-picker select { box-sizing:border-box;width:100%;min-height:44px;padding:8px 10px;border:1px solid #a8d7ef66;border-radius:8px;background:#142337;color:inherit;font:inherit; }
+.sf-canvas-data-picker select:focus-visible { outline:2px solid #a2dfff;outline-offset:3px; }
+.sf-canvas-data-selected { list-style:none;margin:0;padding:0; }
+.sf-canvas-data-source { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;padding:8px 10px;border:1px solid #a8d7ef55;border-radius:9px;background:#142337; }
+.sf-canvas-data-builder { display:grid;gap:10px;margin-top:12px; }
+.sf-canvas-data-builder .sf-canvas-resource-account-fields { margin-bottom:0; }
+.sf-canvas-data-search { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px; }
+.sf-canvas-data-entry { display:grid;gap:8px;justify-items:stretch; }
+.sf-canvas-data-entry small { color:#b8cbdb; }
+.sf-canvas-data-entry button { justify-self:start; }

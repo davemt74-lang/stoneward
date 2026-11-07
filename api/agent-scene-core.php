@@ -396,7 +396,7 @@ function sf_agent_scene_generate(array $user,string $kind,string $trackId,string
     sf_canvas_resource_prepare($artistInputs);
     if($artistProvided){
         $toValidate=$suppliedArtistInputs;
-        $toValidate=($toValidate??[])+array_intersect_key($artistInputs??[],['stories'=>true,'lyrics_ids'=>true,'me_tools'=>true]);
+        $toValidate=($toValidate??[])+array_intersect_key($artistInputs??[],['stories'=>true,'lyrics_ids'=>true,'me_tools'=>true,'data_sources'=>true]);
         sf_canvas_resource_validate($userId,$toValidate,$sourceSceneIds);
     }else sf_canvas_resource_validate_scopes($artistInputs);
     $custom=$kind==='custom';
@@ -507,6 +507,10 @@ The canvas can use window.StonefellowAudio. Its async methods are catalog(filter
 PROMPT;
         $prompt['canvas_data_tools']=sf_agent_canvas_data_tools($artistInputs['me_tools']??null);
         if(isset($artistInputs['me_tools']))$prompt['selected_account_sources']=$artistInputs['me_tools'];
+        if(isset($artistInputs['data_sources'])){
+            $prompt['selected_live_data_sources']=$artistInputs['data_sources']===[]?[]:sf_canvas_data_source_context($artistInputs['data_sources']);
+            $system.="\nLive data bindings are inputs to the requested experience. Call await StonefellowData.get(alias) using the exact selected alias. Each result has status (fresh, stale or unavailable), source, fetched_at, expires_at and rows typed by that alias's schema. Optional fields may be null. Combine independent sources and existing canvas tools in any way the listener requests. Treat data text as plain text. Write the requested interface and behavior from the brief. Use observation timestamps separately from forecast valid times. For a condition requiring current facts, require status fresh, a future expires_at and the appropriate populated field. Prefetch data before a playback gesture, refresh when it expires, and check expiry and the condition again in the click handler before invoking playback. Handle unavailable data without inventing values or bypassing conditions.";
+        }
         $system.="\nAccount data tool descriptions are schemas only. Use only the listed account tools that the listener's brief needs. When selected_account_sources is present it is the entire allowed personal-data scope, including an empty array. Remove prior personal-data bindings outside it. Bind viewer records through live dataset fields and show useful empty or unavailable states. The viewer authorizes each declared source at runtime. Never invent, copy, ask for, or hardcode account records, and never initiate account writes.";
         if(in_array('published_lyrics',array_column($prompt['canvas_data_tools'],'id'),true)){
             $system.="\nLyrics are creative resources. Use published_lyrics for the requested live text or cues. Respect attached song IDs, including an explicit empty selection. Without attachments, declare sf-current-track or an exact sf-filter-track_id--ID on the lyrics dataset. Use sf-filter-kind--text for Songbook text or sf-filter-kind--cue for published timeline blocks. A timeline-only song has cue blocks and no whole-song text row. Use sf-field-text for text rendering, or parse the host-injected sfCanvasLyrics element's textContent as JSON to read {rows,current_rows,payload_truncated} from declared bindings. Preserve lyric line breaks. For large views, show sf-field-delivery_status inside a direct sf-data-truncated child, or handle payload_truncated in code. Narrow by track, kind or position when needed. Draw and animate the presentation the listener asks for.";

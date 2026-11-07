@@ -148,6 +148,8 @@ When an authorized resource or host service is unavailable and code changes cann
 PROMPT;
     if(in_array('personal_data',array_column($evidence['manual'],'code'),true))
         $system.="\nThe personal_data browser note means the detached preview intentionally withheld private records. An empty private binding is expected in this preview. Do not treat that alone as a blocker or a reason to repair. Describe populated behavior as a manual check in the applied canvas after the viewer grants access.";
+    if(in_array('live_data',array_column($evidence['manual'],'code'),true))
+        $system.="\nThe live_data browser note means detached verification intentionally withheld live external reads. Treat an unavailable source as expected in that preview. Verify the applied source and freshness behavior as a manual check.";
     $reserve=strlen($system)+strlen($message)+1800;
     $reservation=sf_ai_reserve_tokens($user,$reserve,SF_CANVAS_TESTING_TOKEN_SOURCE);$settled=false;
     $check=static function()use($owner,$job,$stepId,$candidate):bool {

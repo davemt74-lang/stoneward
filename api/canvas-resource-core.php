@@ -24,7 +24,7 @@ function sf_canvas_resource_story_scope(mixed $raw): array {
 /** Syntax only. An omitted type and an explicitly empty selection have different meanings. */
 function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
     if($raw===null)return null;
-    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids','stories','lyrics_ids','me_tools']))
+    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids','stories','lyrics_ids','me_tools','data_sources']))
         throw new InvalidArgumentException('Choose canvas resources from the picker.');
     $inputs=[];
     foreach(['merch_ids','ticket_ids'] as $field){
@@ -41,6 +41,10 @@ function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
         require_once __DIR__.'/canvas-account-data-core.php';
         $inputs['me_tools']=sf_canvas_account_data_ids($raw['me_tools']);
     }
+    if(array_key_exists('data_sources',$raw)){
+        require_once __DIR__.'/canvas-data-core.php';
+        $inputs['data_sources']=sf_canvas_data_sources($raw['data_sources']);
+    }
     return $inputs;
 }
 
@@ -53,7 +57,7 @@ function sf_canvas_resource_source_ids(array $raw): array {
 /** Resource tokens carry identity without consuming the natural-language design budget. */
 function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $artistProvided=false,?array $rawSources=null): array {
     $artistTokens=[];$sourceTokens=[];$cleared=[];$storyIds=[];$storyScopes=[];
-    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket|story|stories-tag|lyrics|me):([^}]*)|(merch-clear|tickets-clear|stories-all|stories-clear|lyrics-clear|me-clear))\}\1/i',
+    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket|story|stories-tag|lyrics|me|data):([^}]*)|(merch-clear|tickets-clear|stories-all|stories-clear|lyrics-clear|me-clear|data-clear))\}\1/i',
         static function(array $match)use(&$artistTokens,&$sourceTokens,&$cleared,&$storyIds,&$storyScopes):string {
             if(($match[4]??'')!==''){
                 $command=strtolower($match[4]);
@@ -61,6 +65,7 @@ function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $
                 elseif($command==='stories-clear')$storyScopes['clear']=['mode'=>'selected','story_ids'=>[]];
                 elseif($command==='lyrics-clear')$cleared['lyrics_ids']=true;
                 elseif($command==='me-clear')$cleared['me_tools']=true;
+                elseif($command==='data-clear')$cleared['data_sources']=true;
                 else $cleared[$command==='merch-clear'?'merch_ids':'ticket_ids']=true;
                 return ' ';
             }
@@ -69,6 +74,9 @@ function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $
                 $number=filter_var($id,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
                 if($number===false||!ctype_digit($id))throw new InvalidArgumentException('Choose a saved canvas from the picker.');
                 $sourceTokens[]=$number;
+            }elseif($kind==='data'){
+                require_once __DIR__.'/canvas-data-core.php';
+                $artistTokens['data_sources'][]=sf_canvas_data_source_token($id);
             }elseif($kind==='me'){
                 $artistTokens['me_tools'][] = strtolower($id);
             }elseif($kind==='lyrics'){
@@ -195,6 +203,7 @@ function sf_canvas_resource_validate_stories(?array $inputs): void {
 function sf_canvas_resource_validate_scopes(?array $inputs): void {
     $inputs=sf_canvas_resource_artist_inputs($inputs);
     sf_canvas_resource_validate_stories($inputs);
+    if(!empty($inputs['data_sources']))sf_canvas_data_source_context($inputs['data_sources']);
     if(!empty($inputs['lyrics_ids'])){
         if(!sf_canvas_resource_lyrics_enabled())
             throw new InvalidArgumentException('Lyrics are turned off for canvases.');
