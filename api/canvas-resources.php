@@ -11,7 +11,7 @@ if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET'){
 try{
     $kind=$_GET['kind']??'';
     if(!is_string($kind))throw new InvalidArgumentException('Choose a valid canvas resource type.');
-    $user=in_array($kind,['playlists','stories'],true)?(sf_current_user()??[]):sf_require_user(false,false);
+    $user=in_array($kind,['playlists','stories','lyrics'],true)?(sf_current_user()??[]):sf_require_user(false,false);
     sf_json_response(['ok'=>true,'kind'=>$kind,'items'=>sf_canvas_resource_inventory((int)($user['id']??0),$kind)]);
 }catch(InvalidArgumentException $error){
     sf_json_response(['ok'=>false,'error'=>'invalid_canvas_resources','message'=>$error->getMessage()],422);

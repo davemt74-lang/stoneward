@@ -9,6 +9,7 @@ require_once __DIR__.'/agent-canvas-catalog.php';
 require_once __DIR__.'/agent-canvas-public-commerce.php';
 require_once __DIR__.'/agent-canvas-private-commerce.php';
 require_once __DIR__.'/canvas-resource-core.php';
+require_once __DIR__.'/canvas-lyrics-core.php';
 
 /** Provider-safe tool descriptions without dataset values. */
 function sf_agent_canvas_data_tools(): array {
@@ -42,16 +43,18 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
         $tokens=array_fill_keys(explode(' ',$attribute),true);
         $classes+=$tokens;
         foreach(array_keys($tokens) as $token){
-            if(preg_match('/\Asf-dataset-([a-z][a-z0-9_-]{0,63})\z/',$token,$match)===1)$bindings[$match[1]][]=$tokens;
+            if(is_string($token)&&preg_match('/\Asf-dataset-([a-z][a-z0-9_-]{0,63})\z/',$token,$match)===1)$bindings[$match[1]][]=$tokens;
         }
         if(isset($tokens['sf-current-track']))$currentClasses+=$tokens;
     }
     $userId=(int)($user['id']??0);
     $role=$userId>0?'fan':'guest';
     $access=null;
+    $lyricTrackIds=$artistInputs['lyrics_ids']??null;
     if($accessContext!==null){
         $resolved=sf_canvas_access_resolve($user,$accessContext);
         if(!hash_equals($resolved['scene']['html'],$html))throw new RuntimeException('Canvas source does not match its access context.');
+        $lyricTrackIds=$resolved['scene']['artist_inputs']['lyrics_ids']??null;
         $access=sf_canvas_access_summary($user,$accessContext);
     }
     $permissions=$access===null?[]:array_column($access['permissions'],null,'id');
@@ -70,6 +73,10 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
         $dataset=['fields'=>$tool['fields'],'filters'=>$tool['filters'],'actions'=>$tool['actions'],'rows'=>[]];
         if($usesCurrentTrack)$dataset['current_rows']=[];
         try{
+            if($id==='published_lyrics'){
+                $datasets[$id]=sf_agent_canvas_lyrics_dataset($dataset,$bindings[$id],$lyricTrackIds,$currentTrackId);
+                continue;
+            }
             $source=match($id){
                 'published_catalog'=>$catalog??=array_column(sf_public_catalog(),null,'id'),
                 'published_release_tracks'=>sf_agent_canvas_release_track_rows(),
@@ -135,24 +142,86 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
     return $datasets;
 }
 
+/** A malformed or undeclared filter makes its binding ineligible for data. */
+function sf_agent_canvas_binding_filters(array $classes,array $allowedFields): ?array {
+    $filters=[];
+    foreach(array_keys($classes) as $class){
+        if(!is_string($class)||!str_starts_with($class,'sf-filter-'))continue;
+        if(preg_match('/\Asf-filter-([a-z][a-z0-9_-]{0,63}?)--([A-Za-z0-9_-]{1,80})\z/',$class,$match)!==1||
+            !in_array($match[1],$allowedFields,true))return null;
+        $filters[]=['field'=>$match[1],'value'=>$match[2]];
+    }
+    return $filters;
+}
+
+function sf_agent_canvas_row_matches_filters(array $row,array $filters): bool {
+    foreach($filters as $filter){
+        if(!isset($row[$filter['field']])||(string)$row[$filter['field']]!==$filter['value'])return false;
+    }
+    return true;
+}
+
+/** Resolve only attached songs or canonical IDs named by an eligible lyrics binding. */
+function sf_agent_canvas_lyrics_dataset(array $dataset,array $bindings,?array $selectedTrackIds,string $currentTrackId): array {
+    $staticBindings=[];$currentBindings=[];$trackIds=[];
+    $dataset['requires_track_filter']=$selectedTrackIds===null;
+    $dataset['payload_truncated']=false;
+    if(!preg_match('/\A[A-Za-z0-9_-]{1,180}\z/',$currentTrackId))$currentTrackId='';
+    foreach($bindings as $classes){
+        if(count(preg_grep('/\Asf-dataset-[a-z][a-z0-9_-]{0,63}\z/',array_keys($classes)))!==1)continue;
+        $filters=sf_agent_canvas_binding_filters($classes,$dataset['filters']);
+        if($filters===null)continue;
+        $current=isset($classes['sf-current-track']);
+        $eligible=$current?($currentTrackId!==''?[$currentTrackId]:[]):$selectedTrackIds;
+        foreach($filters as $filter){
+            if($filter['field']!=='track_id')continue;
+            $eligible=$eligible===null?[$filter['value']]:array_intersect($eligible,[$filter['value']]);
+        }
+        if($eligible!==null&&$selectedTrackIds!==null)$eligible=array_intersect($eligible,$selectedTrackIds);
+        if(!$eligible)continue;
+        if($current)$currentBindings[]=$filters;else $staticBindings[]=$filters;
+        foreach($eligible as $trackId)$trackIds[$trackId]=$trackId;
+    }
+    $ids=$selectedTrackIds===null?array_values($trackIds):array_values(array_intersect($selectedTrackIds,$trackIds));
+    $priority=$currentBindings?array_values(array_unique([$currentTrackId,...$ids],SORT_STRING)):$ids;
+    $staticRows=[];$remaining=384*1024;
+    $append=static function(array &$rows,array $row,int $bytes)use(&$remaining,&$dataset):void {
+        if($bytes>$remaining){$dataset['payload_truncated']=true;return;}
+        $remaining-=$bytes;
+        $rows[]=$row;
+    };
+    foreach(sf_canvas_lyrics_row_stream($priority) as $source){
+        $row=sf_agent_canvas_project_rows([$source],'published_lyrics',$dataset['fields'])[0];
+        $trackId=$row['track_id'];
+        $bytes=strlen(json_encode($row,JSON_THROW_ON_ERROR))+1;
+        if($trackId===$currentTrackId&&isset($dataset['current_rows'])){
+            foreach($currentBindings as $filters){
+                if(!sf_agent_canvas_row_matches_filters($row,$filters))continue;
+                $append($dataset['current_rows'],$row,$bytes);
+                break;
+            }
+        }
+        foreach($staticBindings as $filters){
+            if(!sf_agent_canvas_row_matches_filters($row,$filters))continue;
+            $staticRows[$trackId]??=[];
+            $append($staticRows[$trackId],$row,$bytes);
+            break;
+        }
+        if($dataset['payload_truncated'])break;
+    }
+    foreach($ids as $trackId)array_push($dataset['rows'],...($staticRows[$trackId]??[]));
+    return $dataset;
+}
+
 /** Apply declared exact scopes before the delivery limit, including late catalog rows. */
 function sf_agent_canvas_filter_rows(array $rows,array $bindings,array $allowedFields): array {
     $selected=[];$unfiltered=false;
     foreach($bindings as $classes){
-        $filters=[];$valid=true;
-        foreach(array_keys($classes) as $class){
-            if(!str_starts_with($class,'sf-filter-'))continue;
-            if(preg_match('/\Asf-filter-([a-z][a-z0-9_-]{0,63}?)--([A-Za-z0-9_-]{1,80})\z/',$class,$match)!==1||
-                !in_array($match[1],$allowedFields,true)){$valid=false;break;}
-            $filters[]=['field'=>$match[1],'value'=>$match[2]];
-        }
-        if(!$valid)continue;
+        $filters=sf_agent_canvas_binding_filters($classes,$allowedFields);
+        if($filters===null)continue;
         if(!$filters){$unfiltered=true;continue;}
         foreach($rows as $index=>$row){
-            foreach($filters as $filter){
-                if(!isset($row[$filter['field']])||(string)$row[$filter['field']]!==$filter['value'])continue 2;
-            }
-            $selected[$index]=$row;
+            if(sf_agent_canvas_row_matches_filters($row,$filters))$selected[$index]=$row;
         }
     }
     // Explicitly requested rows get room before an additional unfiltered view.
@@ -226,7 +295,7 @@ function sf_agent_canvas_project_rows(array $source,string $id,array $fields): a
             $value=$sourceRow[$field]??null;
             $row[$field]=match($type){
                 'number'=>is_numeric($value)?max(0,(int)$value):null,
-                // The story source bounds its narrative and preserves line breaks.
+                // Published source readers validate long text and preserve line breaks.
                 'long_text'=>is_string($value)?$value:'',
                 default=>sf_agent_public_artist_text($value),
             };

@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-canvas-public-commerce.php';
 require_once __DIR__.'/canvas-playlists-core.php';
 require_once __DIR__.'/canvas-stories-core.php';
+require_once __DIR__.'/canvas-lyrics-core.php';
 
 function sf_canvas_resource_story_scope(mixed $raw): array {
     if($raw===['mode'=>'all'])return $raw;
@@ -23,7 +24,7 @@ function sf_canvas_resource_story_scope(mixed $raw): array {
 /** Syntax only. An omitted type and an explicitly empty selection have different meanings. */
 function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
     if($raw===null)return null;
-    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids','stories']))
+    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids','stories','lyrics_ids']))
         throw new InvalidArgumentException('Choose published artist resources from the picker.');
     $inputs=[];
     foreach(['merch_ids','ticket_ids'] as $field){
@@ -34,6 +35,7 @@ function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
             throw new InvalidArgumentException('Choose merchandise or ticket resources from the picker.');
         $inputs[$field]=array_values(array_unique($ids,SORT_STRING));
     }
+    if(array_key_exists('lyrics_ids',$raw))$inputs['lyrics_ids']=sf_canvas_lyrics_track_ids($raw['lyrics_ids']);
     if(array_key_exists('stories',$raw))$inputs['stories']=sf_canvas_resource_story_scope($raw['stories']);
     return $inputs;
 }
@@ -47,12 +49,13 @@ function sf_canvas_resource_source_ids(array $raw): array {
 /** Resource tokens carry identity without consuming the natural-language design budget. */
 function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $artistProvided=false,?array $rawSources=null): array {
     $artistTokens=[];$sourceTokens=[];$cleared=[];$storyIds=[];$storyScopes=[];
-    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket|story|stories-tag):([^}]*)|(merch-clear|tickets-clear|stories-all|stories-clear))\}\1/i',
+    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket|story|stories-tag|lyrics):([^}]*)|(merch-clear|tickets-clear|stories-all|stories-clear|lyrics-clear))\}\1/i',
         static function(array $match)use(&$artistTokens,&$sourceTokens,&$cleared,&$storyIds,&$storyScopes):string {
             if(($match[4]??'')!==''){
                 $command=strtolower($match[4]);
                 if($command==='stories-all')$storyScopes['all']=['mode'=>'all'];
                 elseif($command==='stories-clear')$storyScopes['clear']=['mode'=>'selected','story_ids'=>[]];
+                elseif($command==='lyrics-clear')$cleared['lyrics_ids']=true;
                 else $cleared[$command==='merch-clear'?'merch_ids':'ticket_ids']=true;
                 return ' ';
             }
@@ -61,6 +64,8 @@ function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $
                 $number=filter_var($id,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
                 if($number===false||!ctype_digit($id))throw new InvalidArgumentException('Choose a saved canvas from the picker.');
                 $sourceTokens[]=$number;
+            }elseif($kind==='lyrics'){
+                $artistTokens['lyrics_ids'][]=$id;
             }elseif($kind==='story'){
                 $storyIds[]=$id;
             }elseif($kind==='stories-tag'){
@@ -117,8 +122,13 @@ function sf_canvas_resource_artist_rows(string $toolId,?array $inputs): array {
     return $selected;
 }
 
+function sf_canvas_resource_lyrics_enabled(): bool {
+    require_once __DIR__.'/canvas-capabilities.php';
+    return sf_canvas_permission_enabled('published_lyrics');
+}
+
 /** Model context contains selected public facts. Account purchases are separate private tools. */
-function sf_canvas_resource_artist_context(?array $inputs): array {
+function sf_canvas_resource_artist_context(?array $inputs,bool $includeLyricExcerpts=false): array {
     $inputs=sf_canvas_resource_artist_inputs($inputs);$context=[];
     foreach(['merch_ids'=>'published_merch','ticket_ids'=>'published_ticket_offers'] as $field=>$tool){
         if($inputs!==null&&array_key_exists($field,$inputs))$context[$tool]=sf_canvas_resource_artist_rows($tool,$inputs);
@@ -138,12 +148,32 @@ function sf_canvas_resource_artist_context(?array $inputs): array {
             'preview'=>$preview,'preview_complete'=>count($preview)===count($rows),
         ];
     }
+    if(isset($inputs['lyrics_ids'])&&sf_canvas_resource_lyrics_enabled()){
+        $items=sf_canvas_lyrics_inventory($inputs['lyrics_ids']);
+        $preview=[];$bytes=0;
+        foreach($items as $item){
+            $bytes+=strlen(json_encode($item,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE));
+            if($bytes>12000)break;
+            $preview[]=$item;
+        }
+        $context['published_lyrics']=['song_count'=>count($items),'preview'=>$preview,
+            'preview_complete'=>count($preview)===count($items)];
+        if($includeLyricExcerpts){
+            $excerpts=[];
+            foreach(sf_canvas_lyrics_sources(array_column(array_slice($preview,0,4),'id')) as $source){
+                $row=$source['rows'][0];
+                $excerpts[]=['track_id'=>$source['id'],'source'=>$row['source'],'text'=>sf_agent_public_artist_text($row['text'],420)];
+            }
+            if($excerpts)$context['published_lyrics']['creative_excerpts']=$excerpts;
+        }
+    }
     return $context;
 }
 
-/** Initialize storage before a canvas transaction can resolve its story scope. */
+/** Initialize published resource storage before a canvas transaction uses it. */
 function sf_canvas_resource_prepare(?array $inputs): void {
     if(isset($inputs['stories'])&&!sf_db()->inTransaction())sf_canvas_story_prepare();
+    if(!empty($inputs['lyrics_ids'])&&!sf_db()->inTransaction())sf_canvas_lyrics_prepare();
 }
 
 /** Explicit selections must still exist when an approved project uses them. */
@@ -154,10 +184,20 @@ function sf_canvas_resource_validate_stories(?array $inputs): void {
         throw new InvalidArgumentException('A selected story is no longer published. Refresh the story picker.');
 }
 
+/** Recheck publication before approving, saving or applying a creative revision. */
+function sf_canvas_resource_validate_publications(?array $inputs): void {
+    $inputs=sf_canvas_resource_artist_inputs($inputs);
+    sf_canvas_resource_validate_stories($inputs);
+    if(empty($inputs['lyrics_ids']))return;
+    if(!sf_canvas_resource_lyrics_enabled())
+        throw new InvalidArgumentException('Lyrics are turned off for canvases.');
+    sf_canvas_lyrics_validate($inputs['lyrics_ids']);
+}
+
 /** Validate current access before a metered operation, independently of picker contents. */
 function sf_canvas_resource_validate(int $uid,?array $inputs,?array $sources=null): void {
     $inputs=sf_canvas_resource_artist_inputs($inputs);
-    sf_canvas_resource_validate_stories($inputs);
+    sf_canvas_resource_validate_publications($inputs);
     if($sources!==null){
         require_once __DIR__.'/agent-scene-history.php';
         foreach(sf_canvas_resource_source_ids($sources) as $id)if(sf_agent_scene_history_get($uid,$id)===null)
@@ -174,6 +214,7 @@ function sf_canvas_resource_validate(int $uid,?array $inputs,?array $sources=nul
 
 /** Complete picker inventory. These rows describe resources without generating a layout. */
 function sf_canvas_resource_inventory(int $uid,string $kind): array {
+    if($kind==='lyrics')return sf_canvas_resource_lyrics_enabled()?sf_canvas_lyrics_inventory():[];
     if($kind==='stories')return sf_canvas_story_inventory();
     if($kind==='playlists')return sf_canvas_playlists_inventory($uid);
     if($uid<1)throw new InvalidArgumentException('Sign in to choose canvas resources.');
@@ -216,5 +257,5 @@ function sf_canvas_resource_inventory(int $uid,string $kind): array {
         foreach(sf_agent_canvas_ticket_offer_rows() as $row)$items[]=['id'=>$row['offer_id']]+$row;
         return $items;
     }
-    throw new InvalidArgumentException('Choose canvas, story, playlist, merchandise, or ticket resources.');
+    throw new InvalidArgumentException('Choose canvas, story, lyric, playlist, merchandise, or ticket resources.');
 }

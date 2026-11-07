@@ -88,19 +88,19 @@ function sf_song_moments_text(mixed $value,int $max,string $label,bool $required
     return $clean;
 }
 /** Audio identity is shared with the catalog transcription path; no file path leaves the server. */
-function sf_song_moments_audio_fingerprint(array $track): string {
+function sf_song_moments_audio_fingerprint(array $track,bool $current=false): string {
     $releaseId=(string)($track['release_id']??'');
     if($releaseId!==''&&function_exists('sf_seo_public_release')&&!sf_seo_public_release($releaseId))return '';
     $reference=(string)($track['audio']??'');
     $managed='/\Aapi\/media\.php\?id=(M[A-F0-9]{20})(?:&variant=original)?\z/';
     if(!preg_match($managed,$reference,$match))return '';
     if(preg_match($managed,(string)($track['private_master_audio']??''),$master)&&$match[1]===$master[1])return '';
-    $asset=sf_media_asset($match[1]);
+    $asset=sf_media_asset($match[1],$current);
     if(!$asset||($asset['category']??'')!=='audio'||!preg_match('/\A[a-f0-9]{64}\z/',(string)($asset['sha256']??''))
-        ||(function_exists('sf_media_protected_master_asset')&&sf_media_protected_master_asset((int)$asset['id'])))return '';
+        ||(function_exists('sf_media_protected_master_asset')&&sf_media_protected_master_asset((int)$asset['id'],$current)))return '';
     // The public timeline must not disclose text for an asset whose only links
     // are private or members-only, even if stale catalog metadata still names it.
-    $q=sf_db()->prepare("SELECT 1 FROM media_links WHERE asset_id=? AND public_visible=1 AND entity_type<>'member_content' LIMIT 1");
+    $q=sf_db()->prepare("SELECT 1 FROM media_links WHERE asset_id=? AND public_visible=1 AND entity_type<>'member_content' LIMIT 1".($current?sf_media_current_read():''));
     $q->execute([(int)$asset['id']]);$visible=(bool)$q->fetchColumn();$q->closeCursor();if(!$visible)return '';
     return hash('sha256',json_encode([$match[1],$reference,(string)$asset['sha256']],JSON_THROW_ON_ERROR));
 }

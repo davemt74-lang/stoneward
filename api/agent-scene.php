@@ -91,7 +91,7 @@ $respond=static function(array $data,int $status)use(&$streamStarted,$sendEvent,
     }
     $sourceEvents?->flush();
     if($streamStarted){
-        $sendEvent(['type'=>$status>=400?'error':'result','status'=>$status,'data'=>$data]);
+        $sendEvent(sf_agent_scene_result_event($data,$status));
         exit;
     }
     sf_json_response($data,$status);

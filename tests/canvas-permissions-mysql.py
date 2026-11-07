@@ -76,7 +76,7 @@ require getenv('SF_PERMISSION_REPO').'/api/canvas-capabilities.php';
             first = probe("echo json_encode(sf_canvas_permission_policy());")
             check(first['revision'] == 1 and first['disabled'] == [], 'MySQL default policy reads preserve legacy behavior without schema')
             initialized = probe("echo json_encode(sf_canvas_permission_admin_view());")
-            check(len(initialized['capabilities']) == 8, 'MySQL creates and reads eight capability rows through native SQL')
+            check(len(initialized['capabilities']) == 9, 'MySQL creates and reads nine capability rows through native SQL')
             engine = probe("echo json_encode(sf_db()->query(\"SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='canvas_permission_policy'\")->fetchColumn());")
             check(engine == 'InnoDB', 'Native policy table uses transactional InnoDB')
             saved = probe("echo json_encode(sf_canvas_permission_save(['id'=>7,'role'=>'admin'],1,['canvas.data.my_purchases'=>false]));")
@@ -201,19 +201,25 @@ echo json_encode(['failed'=>$failed,'summary'=>$summary,'saved'=>sf_canvas_acces
             check(rollback['failed'] and rollback['summary']['requires_consent'] and rollback['saved'] == [] and
                   rollback['summary']['fingerprint'] == revoked['access']['fingerprint'],
                   'Native consent state failure atomically rolls back grant and revision')
-            for test, database in [('public', 'canvas_story_public'), ('flow', 'canvas_story_flow')]:
+            for test, variable in [
+                ('canvas-stories-public', 'SF_TEST_STORY_DB_CONFIG'),
+                ('canvas-stories-flow', 'SF_TEST_STORY_DB_CONFIG'),
+                ('canvas-lyrics', 'SF_TEST_LYRICS_DB_CONFIG'),
+                ('canvas-lyrics-flow', 'SF_TEST_LYRIC_DB_CONFIG'),
+            ]:
+                database = test.replace('-', '_')
                 dsn = 'mysql:host=127.0.0.1;port=' + str(port)
                 subprocess.run([PHP, '-r', "(new PDO($argv[1],'root',''))->exec('CREATE DATABASE '.$argv[2].' CHARACTER SET utf8mb4');", dsn, database],
                                env=env, check=True, capture_output=True)
                 config = {'driver': 'mysql', 'host': '127.0.0.1', 'port': port, 'database': database,
                           'username': 'root', 'password': ''}
-                result = subprocess.run([PHP, str(ROOT / f'tests/canvas-stories-{test}.php')],
-                                        env={**env, 'SF_TEST_STORY_DB_CONFIG': json.dumps(config)},
+                result = subprocess.run([PHP, str(ROOT / f'tests/{test}.php')],
+                                        env={**env, variable: json.dumps(config)},
                                         capture_output=True, text=True, timeout=60)
                 assert result.returncode == 0, result.stdout + result.stderr
                 print(result.stdout, end='', flush=True)
-                check(True, f'Native MariaDB story {test} suite uses a fresh transactional schema')
-            print(f'{len(checks)} native MariaDB permission, consent and story checks passed', flush=True)
+                check(True, f'Native MariaDB {test} suite uses a fresh transactional schema')
+            print(f'{len(checks)} native MariaDB permission, consent and publication checks passed', flush=True)
         finally:
             server.terminate()
             server.wait(timeout=10)

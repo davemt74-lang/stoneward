@@ -7,7 +7,7 @@ $emit=static function(array $event)use(&$streamed):void {
     if(connection_aborted())return;echo json_encode($event,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR)."\n";if(ob_get_level()>0)@ob_flush();flush();
 };
 $respond=static function(array $data,int $status=200)use(&$streamed,&$events,$emit):never {
-    $events?->flush();if($streamed){$emit(['type'=>$status>=400?'error':'result','status'=>$status,'data'=>$data]);exit;}sf_json_response($data,$status);
+    $events?->flush();if($streamed){$emit(sf_agent_scene_result_event($data,$status));exit;}sf_json_response($data,$status);
 };
 try{
     require __DIR__.'/bootstrap.php';$method=$_SERVER['REQUEST_METHOD']??'GET';

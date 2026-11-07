@@ -111,11 +111,12 @@
     }
     return false;
   }
-  function bindSceneDatasets(html,datasets,currentTrackId,trackDatasets){
+  function bindSceneDatasets(html,datasets,currentTrackId,trackDatasets,includeLyricsData){
     if(!html.includes('sf-dataset-'))return html;
     const source=document.createElement('template');
     source.innerHTML=html;
     const marker='[class*="sf-dataset-"]';
+    const lyrics=includeLyricsData?{declared:false,rows:new Set(),current_rows:new Set(),payload_truncated:false}:null;
     let remainingRows=240;
     for(const container of source.content.querySelectorAll(marker)){
       if(!source.content.contains(container))continue;
@@ -129,24 +130,37 @@
       const data=scoped?trackDatasets:datasets;
       const dataset=ids.length===1&&data&&Object.hasOwn(data,ids[0])?data[ids[0]]:null;
       const storyView=ids.length===1&&ids[0]==='published_stories';
+      const lyricView=ids.length===1&&ids[0]==='published_lyrics';
       const fields=Object.entries(dataset?.fields??{}).filter(([name,type])=>
         /^[a-z][a-z0-9_-]{0,63}$/.test(name)&&(
           type==='text'||type==='number'||
-          storyView&&type==='long_text'&&(name==='summary'||name==='body_text')));
+          type==='long_text'&&(storyView&&(name==='summary'||name==='body_text')||lyricView&&name==='text')));
       const filters=classes.filter(name=>name.startsWith('sf-filter-'))
         .map(name=>name.match(/^sf-filter-([a-z][a-z0-9_-]{0,63}?)--([A-Za-z0-9_-]{1,80})$/));
       const filterFields=Array.isArray(dataset?.filters)?dataset.filters:[];
       const unavailable=dataset?.state==='unavailable';
       const sourceRows=scoped?(currentTrackId&&filterFields.includes('track_id')?dataset?.current_rows:null):dataset?.rows;
-      const matchingRows=!unavailable&&template&&!template.querySelector(marker)&&fields.length&&Array.isArray(sourceRows)
+      const validTemplate=template&&!template.querySelector(marker);
+      const scopeAllowed=!lyricView||scoped||!dataset?.requires_track_filter||filters.some(filter=>filter?.[1]==='track_id');
+      const deliveryLimited=lyricView&&scopeAllowed&&dataset?.payload_truncated===true;
+      const matchingRows=!unavailable&&scopeAllowed&&(validTemplate||lyrics&&lyricView)&&fields.length&&Array.isArray(sourceRows)
         ?sourceRows.filter(row=>row&&typeof row==='object'&&!Array.isArray(row)&&
           (!scoped||row.track_id===currentTrackId)&&filters.every(filter=>
           filter&&filterFields.includes(filter[1])&&Object.hasOwn(row,filter[1])&&row[filter[1]]!==null&&String(row[filter[1]])===filter[2]
         )):[];
-      const rows=matchingRows.slice(0,Math.min(120,remainingRows));
-      const truncated=storyView&&matchingRows.length>rows.length;
+      if(lyrics&&lyricView){
+        lyrics.declared=true;
+        lyrics.payload_truncated||=deliveryLimited;
+        const programRows=scoped?lyrics.current_rows:lyrics.rows;
+        for(const row of matchingRows)programRows.add(row);
+      }
+      const rows=validTemplate?matchingRows.slice(0,Math.min(120,remainingRows)):[];
+      const renderLimited=(storyView||lyricView)&&validTemplate&&matchingRows.length>rows.length;
+      const truncated=renderLimited||deliveryLimited;
+      const deliveryStatus=deliveryLimited?'Lyrics reached the delivery limit. Filter by song, text or cue position to narrow the data.':'';
       if(truncated){
-        const status='Showing '+rows.length+' of '+matchingRows.length+' matching stories.';
+        const displayStatus=renderLimited?'Showing '+rows.length+' of '+matchingRows.length+(storyView?' matching stories.':' delivered lyric rows.'):'';
+        const status=[displayStatus,deliveryStatus].filter(Boolean).join(' ');
         container.setAttribute('aria-description',status);
         container.setAttribute('title',status);
       }
@@ -164,8 +178,11 @@
               values.set('sf-field-'+field,String(value));
             }else if(type==='text'&&typeof value==='string')values.set('sf-field-'+field,value.slice(0,300));
             else if(type==='long_text'&&typeof value==='string'){
-              const limit=field==='summary'?640:4000;
-              values.set('sf-field-'+field,Array.from(value.slice(0,limit*2)).slice(0,limit).join(''));
+              if(lyricView)values.set('sf-field-'+field,value);
+              else{
+                const limit=field==='summary'?640:4000;
+                values.set('sf-field-'+field,Array.from(value.slice(0,limit*2)).slice(0,limit).join(''));
+              }
             }
           }
           for(const target of item.querySelectorAll('[class*="sf-field-"]')){
@@ -194,15 +211,23 @@
       for(const node of children){
         if(node.classList.contains('sf-data-empty')&&(rows.length||hasUnavailable||truncated))node.remove();
         if(node.classList.contains('sf-data-unavailable')&&!unavailable)node.remove();
-        if(storyView&&node.classList.contains('sf-data-truncated')){
+        if((storyView||lyricView)&&node.classList.contains('sf-data-truncated')){
           if(!truncated)node.remove();
           else{
             for(const field of node.querySelectorAll('.sf-field-rendered_count'))field.textContent=String(rows.length);
             for(const field of node.querySelectorAll('.sf-field-matching_count'))field.textContent=String(matchingRows.length);
+            for(const field of node.querySelectorAll('.sf-field-delivery_status'))field.textContent=deliveryStatus;
           }
         }
       }
       for(const node of templates)node.remove();
+    }
+    if(lyrics?.declared){
+      // The authored program receives complete matching public rows, including cues beyond the DOM mount budget.
+      const data=document.createElement('script');
+      data.type='application/json';data.id='sfCanvasLyrics';
+      data.textContent=JSON.stringify({rows:[...lyrics.rows],current_rows:[...lyrics.current_rows],payload_truncated:lyrics.payload_truncated}).replace(/</g,'\\u003c');
+      source.content.append(data);
     }
     return source.innerHTML;
   }
@@ -230,7 +255,7 @@
     // Treat every '<' as the start of a known tag. Text may contain escaped
     // entities, but authored elements can have only a class, never a URL.
     if(html.split('<').slice(1).some(part=>!sceneTag.test(part)))return null;
-    const bound=bindSceneDatasets(script?.js?html:stripLegacyPlayer(html),datasets,currentTrackId,trackDatasets);
+    const bound=bindSceneDatasets(script?.js?html:stripLegacyPlayer(html),datasets,currentTrackId,trackDatasets,!!script?.js);
     const trackActions=bound.includes('data-sf-play-track=');
     const scriptHashes=[reactive?sceneAudioHash:'',images?sceneImageHash:'',trackActions?sceneTrackHash:'',script?.js?script.sdk.hash:'',script?.js?sceneProgramHash:'',script?.hash,probe?.hash].filter(Boolean);
     const scriptPolicy=scriptHashes.length?'; script-src '+scriptHashes.join(' '):'';
@@ -2121,8 +2146,16 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       try{
         const scene=await options.onSceneTrackData(data.id,trackId,request.signal);
         if(!request.signal.aborted&&listeningScene?.trackData===data&&options.canUseScenes?.()&&
-          currentSceneTrackId()===trackId&&(scene?.gallery_id||scene?.id)===data.id&&scene.dataset_track_id===trackId){
-          updateSceneTrackData(data,trackId,scene.datasets);
+          currentSceneTrackId()===trackId&&(scene?.gallery_id||scene?.id)===data.id){
+          const currentMatches=scene.dataset_track_id===trackId;
+          const refreshLyrics=Object.hasOwn(data.datasets??{},'published_lyrics')||scene.datasets?.published_lyrics;
+          if(refreshLyrics){
+            const updated={...data.datasets};
+            if(scene.datasets?.published_lyrics)updated.published_lyrics=scene.datasets.published_lyrics;
+            else delete updated.published_lyrics;
+            data.datasets=updated;
+          }
+          if(currentMatches||refreshLyrics)updateSceneTrackData(data,trackId,currentMatches?scene.datasets:null);
         }
       }catch(_){/* Keep the authored empty state when current-track data cannot be loaded. */}
       finally{if(data.request===request)data.request=null;}
