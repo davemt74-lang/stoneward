@@ -31,7 +31,7 @@ function harness(authenticated=false){
     api:async path=>{
       reads.push(path);
       if(path.startsWith('canvas-gallery.php?')){const id=new URLSearchParams(path.split('?')[1]).get('id');return {ok:true,item:{id,title:'Shared experience'},scene:scene(id)};}
-      if(path.startsWith('canvas-audio.php?'))return {tracks:[{track_id:'published',source_available:true}],releases:[]};
+      if(path.startsWith('canvas-audio.php?'))return {tracks:[{track_id:'published',source_available:true}],releases:[],playlists:[]};
       throw new Error('Unexpected API read: '+path);
     },
     secureJsonPost:async(path,payload)=>{posts.push({path,payload});assert.equal(path,'canvas-gallery.php');assert.equal(payload.action,'remix');return {scene:{id:91}};},
@@ -56,7 +56,8 @@ test('guest canvas audio uses the published catalog and the canonical main playe
   const h=harness();await h.scope.openGalleryCanvas({id:first});
   const catalog=await h.scope.loadCanvasAudioCatalog();assert.equal(catalog.tracks.length,1);
   await h.scope.playCanvasAudio('published');assert.equal(h.plays.length,1);
-  assert.equal(h.plays[0].audio,'api/canvas-audio.php?action=source&track_id=published');
+  assert.equal(h.plays[0].audio,'api/canvas-audio.php?action=source&track_id=published&gallery_id='+first);
+  assert.ok(h.reads.filter(path=>path.startsWith('canvas-audio.php?')).every(path=>new URLSearchParams(path.split('?')[1]).get('gallery_id')===first));
   assert.equal(h.posts.length,0);assert.ok(h.reads.filter(path=>path.includes('action=open')).length>=3);
 });
 test('a public canvas never loosens private canvas audio authorization',()=>{

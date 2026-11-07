@@ -97,7 +97,7 @@ function sf_agent_scene_history_ensure_schema(): void {
         'agent_design'=>($sqlite?'TEXT':'VARCHAR(8)').' NULL',
         'agent_palette'=>'TEXT NULL','design_brief'=>'TEXT NULL','gallery_attribution'=>'TEXT NULL',
         'js'=>($sqlite?'TEXT':'VARCHAR(12000)')." NOT NULL DEFAULT ''",'music_inputs'=>($sqlite?'TEXT':'MEDIUMTEXT').' NULL',
-        'artist_inputs'=>($sqlite?'TEXT':'MEDIUMTEXT').' NULL','workflow_required'=>($sqlite?'INTEGER':'TINYINT(1)').' NOT NULL DEFAULT 0',
+        'artist_inputs'=>($sqlite?'TEXT':'MEDIUMTEXT').' NULL','playlist_inputs'=>($sqlite?'TEXT':'MEDIUMTEXT').' NULL','playlist_manifest'=>($sqlite?'TEXT':'MEDIUMTEXT').' NULL','direct_music_inputs'=>($sqlite?'TEXT':'MEDIUMTEXT').' NULL','workflow_required'=>($sqlite?'INTEGER':'TINYINT(1)').' NOT NULL DEFAULT 0',
         'access_root_id'=>($sqlite?'INTEGER':'BIGINT UNSIGNED').' NULL',
         'verification_parent_id'=>($sqlite?'INTEGER':'BIGINT UNSIGNED').' NULL'] as $field=>$definition){
         if(in_array($field,$existing,true))continue;
@@ -121,6 +121,7 @@ function sf_agent_scene_history_row(array $row): array {
     else unset($row['music_inputs']);
     $artist=sf_canvas_resource_artist_inputs(isset($row['artist_inputs'])?json_decode($row['artist_inputs'],true,4,JSON_THROW_ON_ERROR):null);
     if($artist!==null)$row['artist_inputs']=$artist;else unset($row['artist_inputs']);
+    foreach(['playlist_inputs'=>'sf_canvas_playlists_inputs','playlist_manifest'=>'sf_canvas_playlists_manifest_validate','direct_music_inputs'=>'sf_agent_canvas_music_inputs'] as $field=>$normalize){if(isset($row[$field]))$row[$field]=$normalize(json_decode($row[$field],true,16,JSON_THROW_ON_ERROR));else unset($row[$field]);}
     $attribution=sf_agent_scene_gallery_attribution(isset($row['gallery_attribution'])?json_decode($row['gallery_attribution'],true,8,JSON_THROW_ON_ERROR):null);
     if($attribution!==null)$row['gallery_attribution']=$attribution;else unset($row['gallery_attribution']);
     if(($row['js']??'')==='')unset($row['js']);
@@ -145,7 +146,7 @@ function sf_agent_scene_history_list(int $uid): array {
 function sf_agent_scene_history_get(int $uid,int $id): ?array {
     if($uid<1||$id<1)return null;
     sf_agent_scene_history_ensure_schema();
-    $q=sf_db()->prepare('SELECT id,track_id,title,html,css,js,previous_id,created_at,canvas_kind,lyric_section,catalog_refs,agent_design,agent_palette,music_inputs,design_brief,artist_inputs,workflow_required,verification_parent_id,gallery_attribution FROM agent_scene_history
+    $q=sf_db()->prepare('SELECT id,track_id,title,html,css,js,previous_id,created_at,canvas_kind,lyric_section,catalog_refs,agent_design,agent_palette,music_inputs,design_brief,artist_inputs,workflow_required,verification_parent_id,gallery_attribution,playlist_inputs,playlist_manifest,direct_music_inputs FROM agent_scene_history
         WHERE user_id=? AND id=?');
     $q->execute([$uid,$id]);
     $row=$q->fetch(PDO::FETCH_ASSOC);
@@ -185,6 +186,9 @@ function sf_agent_scene_history_save(int $uid,array $scene,?int $previousId=null
     $music=sf_agent_canvas_music_inputs($scene['music_inputs']??null);
     if($music!==null&&$kind!=='custom')throw new InvalidArgumentException('Music inputs are available for custom canvases.');
     $artist=sf_canvas_resource_artist_inputs($scene['artist_inputs']??null);
+    $playlistInputs=sf_canvas_playlists_inputs($scene['playlist_inputs']??null);$playlistManifest=sf_canvas_playlists_manifest_validate($scene['playlist_manifest']??null);
+    $hasDirect=array_key_exists('direct_music_inputs',$scene);$directMusic=$hasDirect?sf_agent_canvas_music_inputs($scene['direct_music_inputs']):null;
+    if($playlistInputs!==null){if($kind!=='custom'||$playlistManifest===null||!$hasDirect||sf_canvas_playlists_effective_music($directMusic,$playlistManifest)!==$music)throw new InvalidArgumentException('Keep the exact playlist manifest and direct music scope together.');}
     if($artist!==null&&$kind!=='custom')throw new InvalidArgumentException('Artist resource inputs are available for custom canvases.');
     $refs=$scene['catalog_refs']??[];
     if($music!==null&&is_array($refs)&&array_is_list($refs))$refs=sf_agent_canvas_music_catalog_refs($refs);
@@ -214,6 +218,7 @@ function sf_agent_scene_history_save(int $uid,array $scene,?int $previousId=null
     if($palette!==null)$payload['agent_palette']=$palette;
     if($music!==null)$payload['music_inputs']=$music;
     if($artist!==null)$payload['artist_inputs']=$artist;
+    if($playlistInputs!==null){$payload['playlist_inputs']=$playlistInputs;$payload['playlist_manifest']=$playlistManifest;$payload['direct_music_inputs']=$directMusic;}
     if($brief!==null)$payload['design_brief']=$brief;
     if($attribution!==null)$payload['gallery_attribution']=$attribution;
     if($js!=='')$payload['js_hash']=base64_encode(hash('sha256',$js,true));
@@ -228,12 +233,13 @@ function sf_agent_scene_history_save(int $uid,array $scene,?int $previousId=null
         try{$accessRoot=$previousId===null?null:sf_canvas_access_root($uid,$previousId);}
         catch(OutOfBoundsException $e){throw new InvalidArgumentException('The canvas scene or account is unavailable.',0,$e);}
         $created=gmdate('c');
-        $sql='INSERT INTO agent_scene_history(user_id,track_id,title,html,css,js,previous_id,created_at,canvas_kind,lyric_section,catalog_refs,agent_design,agent_palette,music_inputs,design_brief,artist_inputs,workflow_required,verification_parent_id,gallery_attribution)
-            SELECT u.id,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM users u';
+        $sql='INSERT INTO agent_scene_history(user_id,track_id,title,html,css,js,previous_id,created_at,canvas_kind,lyric_section,catalog_refs,agent_design,agent_palette,music_inputs,design_brief,artist_inputs,workflow_required,verification_parent_id,gallery_attribution,playlist_inputs,playlist_manifest,direct_music_inputs)
+            SELECT u.id,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM users u';
         $args=[$payload['track_id'],$payload['title'],$payload['html'],$payload['css'],$js,$previousId,$created,$kind,$section,
             $refs?json_encode($refs,JSON_THROW_ON_ERROR):null,$design,$palette===null?null:json_encode($palette,JSON_THROW_ON_ERROR),$music===null?null:json_encode($music,JSON_THROW_ON_ERROR),$brief,
             $artist===null?null:json_encode($artist,JSON_THROW_ON_ERROR),$workflowRequired?1:0,$verificationParent,
-            $attribution===null?null:json_encode($attribution,JSON_THROW_ON_ERROR)];
+            $attribution===null?null:json_encode($attribution,JSON_THROW_ON_ERROR),
+            $playlistInputs===null?null:json_encode($playlistInputs,JSON_THROW_ON_ERROR),$playlistManifest===null?null:json_encode($playlistManifest,JSON_THROW_ON_ERROR),$playlistInputs===null?null:json_encode($directMusic,JSON_THROW_ON_ERROR)];
         // Test the parent and write its revision in the same statement. Compare IDs byte for byte.
         if($previousId!==null){
             $parentKinds=$kind==='custom'?"(?, 'listening_room', 'space_eq')":'(?)';
@@ -266,7 +272,7 @@ function sf_agent_scene_history_save(int $uid,array $scene,?int $previousId=null
 function sf_agent_scene_history_export(int $uid): array {
     if($uid<1)return [];
     sf_agent_scene_history_ensure_schema();
-    $q=sf_db()->prepare('SELECT id,track_id,title,html,css,js,previous_id,created_at,canvas_kind,lyric_section,catalog_refs,agent_design,agent_palette,music_inputs,design_brief,artist_inputs,workflow_required,verification_parent_id,gallery_attribution FROM agent_scene_history
+    $q=sf_db()->prepare('SELECT id,track_id,title,html,css,js,previous_id,created_at,canvas_kind,lyric_section,catalog_refs,agent_design,agent_palette,music_inputs,design_brief,artist_inputs,workflow_required,verification_parent_id,gallery_attribution,playlist_inputs,playlist_manifest,direct_music_inputs FROM agent_scene_history
         WHERE user_id=? ORDER BY id ASC');
     $q->execute([$uid]);
     return array_map('sf_agent_scene_history_row',$q->fetchAll(PDO::FETCH_ASSOC));

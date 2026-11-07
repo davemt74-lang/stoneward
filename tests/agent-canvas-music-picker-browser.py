@@ -32,8 +32,9 @@ focused = r'''
             if(musicFixture.holdRead){musicFixture.holdRead=false;await new Promise(resolve=>musicFixture.releaseRead=resolve);}
             return JSON.parse(JSON.stringify(musicFixture.catalog));
           };
+          const previousPost=window.secureJsonPost;
           window.secureJsonPost=async(path,body,unused,signal)=>{
-            if(path!=='agent-scene.php')throw Error('Unexpected music write');
+            if(path!=='agent-scene.php')return previousPost(path,body,unused,signal);
             if(body.action==='image_preflight')return {ok:true,preflight:{requested_count:null}};
             musicFixture.posts.push(body);
             const inherited=listeningRoom?.music_inputs;

@@ -8,11 +8,11 @@ if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET'){
     header('Allow: GET');
     sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 }
-$user=sf_require_user(false,false);
 try{
     $kind=$_GET['kind']??'';
+    $user=$kind==='playlists'?(sf_current_user()??[]):sf_require_user(false,false);
     if(!is_string($kind))throw new InvalidArgumentException('Choose canvas, merchandise, or ticket resources.');
-    sf_json_response(['ok'=>true,'kind'=>$kind,'items'=>sf_canvas_resource_inventory((int)$user['id'],$kind)]);
+    sf_json_response(['ok'=>true,'kind'=>$kind,'items'=>sf_canvas_resource_inventory((int)($user['id']??0),$kind)]);
 }catch(InvalidArgumentException $error){
     sf_json_response(['ok'=>false,'error'=>'invalid_canvas_resources','message'=>$error->getMessage()],422);
 }catch(Throwable $error){

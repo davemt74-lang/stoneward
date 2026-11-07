@@ -51,11 +51,20 @@ function sf_canvas_gallery_snapshot(array $scene,string $title): array {
     if(isset($scene['agent_palette']))$snapshot['agent_palette']=sf_agent_scene_palette($scene['agent_palette']);
     if(array_key_exists('music_inputs',$scene))$snapshot['music_inputs']=sf_agent_canvas_music_inputs($scene['music_inputs']);
     if(array_key_exists('artist_inputs',$scene))$snapshot['artist_inputs']=sf_canvas_resource_artist_inputs($scene['artist_inputs']);
+    if(isset($scene['playlist_inputs'])){
+        $inputs=sf_canvas_playlists_inputs($scene['playlist_inputs']);$manifest=sf_canvas_playlists_manifest_validate($scene['playlist_manifest']??null);
+        if($manifest===null)throw new InvalidArgumentException('This canvas needs its reviewed playlist snapshot.');
+        foreach($manifest['playlists'] as $playlist)if($playlist['source']==='own')throw new InvalidArgumentException('This canvas contains private playlist references. Revise it to use public artist playlists or direct song selections before submitting.');
+        $snapshot['playlist_inputs']=$inputs;$snapshot['playlist_manifest']=$manifest;
+        $snapshot['direct_music_inputs']=sf_agent_canvas_music_inputs($scene['direct_music_inputs']??null);
+    }
+
     if(isset($scene['gallery_attribution']))$snapshot['gallery_attribution']=sf_agent_scene_gallery_attribution($scene['gallery_attribution']);
     return $snapshot;
 }
 function sf_canvas_gallery_validate_scopes(array $snapshot,int $uid=0): void {
     if(isset($snapshot['music_inputs']))sf_agent_canvas_music_validate($snapshot['music_inputs']);
+    if(isset($snapshot['playlist_inputs']))sf_canvas_playlists_compile(0,$snapshot['playlist_inputs'],$snapshot['playlist_manifest']??null);
     sf_canvas_resource_validate($uid,$snapshot['artist_inputs']??null);
     foreach(sf_agent_canvas_catalog_blocks($snapshot['catalog_refs']??[],false) as $block)if(empty($block['available']))throw new InvalidArgumentException('A selected public artist resource is no longer available.');
 }
@@ -81,7 +90,10 @@ function sf_canvas_gallery_public(array $row,bool $private=false): array {
 }
 function sf_canvas_gallery_available(string $id): bool {
     $q=sf_db()->prepare("SELECT 1 FROM canvas_gallery_entries e JOIN users u ON u.id=e.user_id WHERE e.id=? AND u.status='active'");$q->execute([$id]);$active=$q->fetchColumn()!==false;$q->closeCursor();
-    if(!$active)return false;require_once __DIR__.'/canvas-gallery-assets.php';return sf_canvas_gallery_assets_references_available($id);
+    if(!$active)return false;
+    $q=sf_db()->prepare('SELECT snapshot_json FROM canvas_gallery_entries WHERE id=?');$q->execute([$id]);$snapshot=json_decode((string)$q->fetchColumn(),true,16,JSON_THROW_ON_ERROR);$q->closeCursor();
+    if(isset($snapshot['playlist_inputs'])){try{sf_canvas_playlists_compile(0,$snapshot['playlist_inputs'],$snapshot['playlist_manifest']??null);}catch(Throwable $e){return false;}}
+    require_once __DIR__.'/canvas-gallery-assets.php';return sf_canvas_gallery_assets_references_available($id);
 }
 function sf_canvas_gallery_list(?int $uid=null,bool $admin=false,array $options=[]): array {
     $page=$options['page']??1;$limit=$options['limit']??24;
@@ -154,6 +166,7 @@ function sf_canvas_gallery_moderate(array $admin,string $id,string $action,strin
     if(($admin['role']??'')!=='admin')throw new InvalidArgumentException('Administrator access is required.');sf_canvas_gallery_id($id);
     if(!in_array($action,['approve','return','decline','unpublish'],true)||preg_match('/\A[a-f0-9]{64}\z/',$hash)!==1)throw new InvalidArgumentException('Review this exact submitted snapshot.');
     $feedback=sf_canvas_gallery_text($feedback,2000,$action==='return');sf_canvas_gallery_ensure_schema();require_once __DIR__.'/canvas-gallery-assets.php';sf_canvas_gallery_assets_prepare();$row=sf_canvas_gallery_row($id);if(!$row)throw new SfCanvasGalleryNotFound('Canvas submission not found.');
+    $snapshotInputs=json_decode($row['snapshot_json'],true,16,JSON_THROW_ON_ERROR);if(isset($snapshotInputs['playlist_inputs'])){sf_canvas_playlists_ensure_schema();sf_media_ensure_schema();}
     $db=sf_db();$db->beginTransaction();
     try{sf_agent_scene_history_lock_account($db,(int)$row['user_id']);
         $q=$db->prepare('SELECT status FROM users WHERE id=?');$q->execute([(int)$row['user_id']]);$ownerStatus=$q->fetchColumn();$q->closeCursor();
@@ -191,7 +204,7 @@ function sf_canvas_gallery_attribution(array $row): array {
 }
 function sf_canvas_gallery_remix(array $user,string $id,string $requestId,?callable $copy=null): array {
     $uid=(int)($user['id']??0);sf_canvas_gallery_id($id);sf_agent_scene_request_id($requestId);if($uid<1)throw new InvalidArgumentException('Sign in to remix this canvas.');sf_canvas_gallery_ensure_schema();$expectedEpoch=sf_agent_scene_history_epoch($uid);
-    require_once __DIR__.'/canvas-gallery-assets.php';sf_canvas_gallery_assets_prepare();$db=sf_db();$db->beginTransaction();$files=[];$committed=false;
+    require_once __DIR__.'/canvas-gallery-assets.php';sf_canvas_gallery_assets_prepare();$preflight=sf_canvas_gallery_row($id);if($preflight&&isset(json_decode($preflight['snapshot_json'],true,16)['playlist_inputs'])){sf_canvas_playlists_ensure_schema();sf_media_ensure_schema();}$db=sf_db();$db->beginTransaction();$files=[];$committed=false;
     try{sf_canvas_build_workflow_account($db,$uid);$epoch=sf_agent_scene_history_epoch($uid);if($epoch!==$expectedEpoch)throw new SfCanvasGalleryConflict('This remix was canceled by a privacy reset.');
         $q=$db->prepare('SELECT entry_id,scene_id,history_epoch FROM canvas_gallery_remixes WHERE user_id=? AND request_id=?');$q->execute([$uid,$requestId]);$old=$q->fetch(PDO::FETCH_ASSOC);$q->closeCursor();
         if($old){if($old['entry_id']!==$id)throw new SfCanvasGalleryConflict('This remix request belongs to another gallery entry.');$scene=sf_agent_scene_saved($uid,(int)$old['scene_id']);if(!$scene||(int)$old['history_epoch']!==$epoch)throw new SfCanvasGalleryConflict('This remix was cleared.');$db->commit();return ['scene'=>$scene,'item'=>sf_canvas_gallery_get($id)];}

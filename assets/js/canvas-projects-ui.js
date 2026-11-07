@@ -260,14 +260,14 @@
       }
       return result.proposal;
     }
-    async function discuss({signal,currentCanvasId,brief='',codingModel,sourceSceneIds,artistInputs,musicInputs,imageReferenceIds}={}){
+    async function discuss({signal,currentCanvasId,brief='',codingModel,sourceSceneIds,artistInputs,musicInputs,playlistInputs,imageReferenceIds}={}){
       setOwner();const captured=epoch;await refresh();
       if(captured!==epoch)throw new DOMException('Project account changed.','AbortError');
       if(!loaded||!current())throw new Error('Project settings could not be loaded.');
       const result=await call({action:'discuss',request_id:requestId(),brief,
         ...(currentCanvasId?{current_canvas_id:currentCanvasId}:{}),...(codingModel?{coding_model:codingModel}:{}),
         ...(sourceSceneIds?{source_scene_ids:sourceSceneIds}:{}),...(artistInputs?{artist_inputs:artistInputs}:{}),
-        ...(musicInputs?{music_inputs:musicInputs}:{}),...(imageReferenceIds?.length?{image_reference_ids:imageReferenceIds}:{})},signal);
+        ...(musicInputs?{music_inputs:musicInputs}:{}),...(playlistInputs?{playlist_inputs:playlistInputs}:{}),...(imageReferenceIds?.length?{image_reference_ids:imageReferenceIds}:{})},signal);
       if(typeof result.reply==='string'&&result.reply.trim())options.onReply?.(result.reply.trim());
       if(result.proposal){
         const record=present(result.proposal,true);

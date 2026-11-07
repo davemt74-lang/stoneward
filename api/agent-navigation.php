@@ -66,6 +66,7 @@ function sf_agent_admin_page_destinations(): array {
         'uploads'=>['label'=>'Folder Import','aliases'=>['folder import','folder upload','bulk import','uploads']],
         'templates'=>['label'=>'Metadata Templates','aliases'=>['metadata templates','templates']],
         'releases'=>['label'=>'Releases','aliases'=>['releases','albums','singles','release manager']],
+        'artist-playlists'=>['label'=>'Artist Playlists','aliases'=>['artist playlists','playlist publication','published playlists']],
         'distribution'=>['label'=>'Distribution','aliases'=>['distribution','music distribution']],
         'press'=>['label'=>'Press','aliases'=>['press','epk','press kit']],
         'shows'=>['label'=>'Shows','aliases'=>['shows','tour dates','concerts']],

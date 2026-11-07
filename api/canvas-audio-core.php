@@ -4,6 +4,65 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-canvas-data.php';
 require_once __DIR__.'/media-stream-range.php';
 
+final class SfCanvasAudioContextUnavailable extends RuntimeException {}
+
+/** Resolve only a host-selected immutable scene/gallery identity, never caller-supplied resource scopes. */
+function sf_canvas_audio_runtime_context(?int $sceneId,?string $galleryId,?array $viewer):?array {
+    if($sceneId===null&&$galleryId===null)return null;
+    if($sceneId!==null&&$galleryId!==null)throw new InvalidArgumentException('Choose one canvas audio context.');
+    require_once __DIR__.'/canvas-playlists-core.php';
+    if($sceneId!==null){
+        $uid=(int)($viewer['id']??0);
+        if($uid<1)throw new SfCanvasAudioContextUnavailable('Canvas audio is unavailable.');
+        $q=sf_db()->prepare("SELECT id FROM users WHERE id=? AND status='active'");$q->execute([$uid]);$active=$q->fetchColumn()!==false;$q->closeCursor();
+        if(!$active)throw new SfCanvasAudioContextUnavailable('Canvas audio is unavailable.');
+        require_once __DIR__.'/agent-scene-history.php';$scene=sf_agent_scene_history_get($uid,$sceneId);
+        if(!$scene)throw new SfCanvasAudioContextUnavailable('Canvas audio is unavailable.');
+        $query=['scene_id'=>$sceneId];
+    }else{
+        require_once __DIR__.'/canvas-gallery-core.php';
+        $row=sf_canvas_gallery_row($galleryId);
+        if(!$row||$row['status']!=='approved'||!sf_canvas_gallery_available($galleryId))throw new SfCanvasAudioContextUnavailable('Canvas audio is unavailable.');
+        $scene=json_decode($row['snapshot_json'],true,16,JSON_THROW_ON_ERROR);$uid=0;$query=['gallery_id'=>$galleryId];
+    }
+    try{
+        $music=sf_agent_canvas_music_inputs($scene['music_inputs']??null);$playlists=[];
+        if(isset($scene['playlist_inputs'])){
+            // Recheck ownership, exact membership and the publication epoch on
+            // every catalog or source request, including HEAD and byte ranges.
+            $compiled=sf_canvas_playlists_compile($uid,$scene['playlist_inputs'],$scene['playlist_manifest']??null);
+            if(!array_key_exists('direct_music_inputs',$scene)||$compiled['manifest']===null||
+                sf_canvas_playlists_effective_music($scene['direct_music_inputs'],$compiled['manifest'])!==$music)
+                throw new InvalidArgumentException('The canvas music scope changed.');
+            $playlists=$compiled['manifest']['playlists'];
+        }
+    }catch(InvalidArgumentException|DomainException $error){throw new SfCanvasAudioContextUnavailable('Canvas audio is unavailable.',0,$error);}
+    return ['music_inputs'=>$music,'playlists'=>$playlists,'query'=>$query];
+}
+
+function sf_canvas_audio_context_allows(?array $context,string $trackId):bool {
+    return $context===null||($context['music_inputs']['mode']??null)!=='selected'||in_array($trackId,$context['music_inputs']['track_ids'],true);
+}
+
+/** Ordered playlist manifests and canonical playable nodes deliberately remain separate. */
+function sf_canvas_audio_runtime_catalog(?array $context,?string $releaseId=null,?string $trackId=null):array {
+    $catalog=sf_canvas_audio_catalog($releaseId,$trackId);
+    if($context===null)return $catalog;
+    if($context['music_inputs']!==null){
+        $available=[];foreach($catalog['tracks'] as $track)if($track['source_available'])$available[$track['track_id']]=$track;
+        $ids=($context['music_inputs']['mode']==='selected')?$context['music_inputs']['track_ids']:array_keys($available);
+        $catalog['tracks']=[];foreach($ids as $id)if(isset($available[$id]))$catalog['tracks'][]=$available[$id];
+        $allowed=array_fill_keys(array_column($catalog['tracks'],'track_id'),true);$releases=[];
+        foreach($catalog['releases'] as $release){$release['track_ids']=array_values(array_filter($release['track_ids'],static fn(string $id):bool=>isset($allowed[$id])));if($release['track_ids'])$releases[]=$release;}
+        $catalog['releases']=$releases;
+    }
+    foreach($catalog['tracks'] as &$track){
+        $url='api/canvas-audio.php?'.http_build_query(['action'=>'source','track_id'=>$track['track_id']]+$context['query']);
+        $track['audio_url']=$url;$track['source_url']=$url;
+    }unset($track);
+    return $catalog+['playlists'=>$context['playlists']];
+}
+
 function sf_canvas_audio_id(mixed $value): ?string {
     if(!is_string($value)||preg_match('/\A[A-Za-z0-9_-]{1,180}\z/',$value)!==1)return null;
     return $value;

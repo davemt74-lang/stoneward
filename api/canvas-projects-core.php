@@ -63,7 +63,7 @@ function sf_canvas_project_text(mixed $raw,int $maximum,string $message): string
 }
 /** Canonical creative inputs only. Operational request/approval IDs are not part of the approved design. */
 function sf_canvas_project_normalize(array $raw,bool $parseResourceTokens=true): array {
-    $allowed=['action','canvas_kind','brief','track_id','context_track_id','previous_id','lyric_section','coding_model','image_reference_ids','image_count','review_images','music_inputs','source_scene_ids','artist_inputs'];
+    $allowed=['action','canvas_kind','brief','track_id','context_track_id','previous_id','lyric_section','coding_model','image_reference_ids','image_count','review_images','music_inputs','source_scene_ids','artist_inputs','playlist_inputs','playlist_manifest'];
     if(array_is_list($raw)||array_diff(array_keys($raw),$allowed))throw new InvalidArgumentException('Choose supported canvas project inputs.');
     if(!in_array($raw['action']??'create',['create','revise'],true))throw new InvalidArgumentException('Canvas projects build or revise canvas code.');
     $kind=$raw['canvas_kind']??'custom';if(!in_array($kind,['custom','listening_room','space_eq'],true))throw new InvalidArgumentException('Choose a supported canvas type.');
@@ -71,6 +71,8 @@ function sf_canvas_project_normalize(array $raw,bool $parseResourceTokens=true):
     $rawSources=array_key_exists('source_scene_ids',$raw)?sf_canvas_project_source_ids($raw['source_scene_ids']):null;
     if($parseResourceTokens)[$brief,$artist,$artistProvided,$sources]=sf_canvas_resource_selection($brief,$raw['artist_inputs']??null,array_key_exists('artist_inputs',$raw),$rawSources);
     else{$artistProvided=array_key_exists('artist_inputs',$raw);$artist=$artistProvided?sf_canvas_resource_artist_inputs($raw['artist_inputs']):null;$sources=$rawSources;}
+    [$brief,$playlists,$playlistsProvided]=sf_canvas_playlists_selection($brief,$raw['playlist_inputs']??null,array_key_exists('playlist_inputs',$raw));
+    $playlistsProvided=$playlistsProvided&&$playlists!==null;
     [$clean,$music,$musicProvided]=sf_agent_canvas_music_selection($brief,$raw['music_inputs']??null,array_key_exists('music_inputs',$raw));
     if(strlen($clean)>1800)throw new InvalidArgumentException('Describe the canvas in 1 to 1800 characters.');
     $project=['action'=>'create','canvas_kind'=>$kind,'brief'=>$brief];
@@ -92,11 +94,24 @@ function sf_canvas_project_normalize(array $raw,bool $parseResourceTokens=true):
     if($count!==null)$project['image_count']=$count;
     $review=$raw['review_images']??false;if(!is_bool($review)||($review&&$count!==null&&$count<2))throw new InvalidArgumentException('Choose valid image review options.');$project['review_images']=$review;
     if($musicProvided)$project['music_inputs']=$music;
+    if($playlistsProvided)$project['playlist_inputs']=$playlists;
+    if(array_key_exists('playlist_manifest',$raw))$project['playlist_manifest']=sf_canvas_playlists_manifest_validate($raw['playlist_manifest']);
     if($artistProvided)$project['artist_inputs']=$artist;
     $project['source_scene_ids']=$sources??[];
-    if($kind!=='custom'&&($project['context_track_id']!==''||$musicProvided||$refs||$count!==null||$review||$project['source_scene_ids']||$artistProvided))throw new InvalidArgumentException('Choose a custom canvas for creative resources.');
+    if($kind!=='custom'&&($project['context_track_id']!==''||$musicProvided||$refs||$count!==null||$review||$project['source_scene_ids']||$artistProvided||$playlistsProvided||isset($project['playlist_manifest'])))throw new InvalidArgumentException('Choose a custom canvas for creative resources.');
     if(($kind==='listening_room'||$section!==null)&&$project['track_id']==='')throw new InvalidArgumentException('Choose a published song.');
     return $project;
+}
+/** Bind selected or inherited playlist membership before approval or any model call. */
+function sf_canvas_project_bind_playlists(int $uid,array $project):array {
+    $parent=null;
+    if(isset($project['previous_id'])){require_once __DIR__.'/agent-scene-history.php';$parent=sf_agent_scene_history_get($uid,$project['previous_id']);if(!$parent)throw new InvalidArgumentException('That canvas is unavailable for your account.');}
+    if(!array_key_exists('playlist_inputs',$project)&&isset($parent['playlist_inputs'])){$project['playlist_inputs']=$parent['playlist_inputs'];$project['playlist_manifest']=$parent['playlist_manifest']??null;}
+    if(!array_key_exists('playlist_inputs',$project)){if(isset($project['playlist_manifest']))throw new InvalidArgumentException('Choose playlist references for this manifest.');return $project;}
+    $compiled=sf_canvas_playlists_compile($uid,$project['playlist_inputs'],$project['playlist_manifest']??null);$project['playlist_manifest']=$compiled['manifest'];
+    if(!array_key_exists('music_inputs',$project)&&$parent!==null)$project['music_inputs']=array_key_exists('direct_music_inputs',$parent)?$parent['direct_music_inputs']:($parent['music_inputs']??null);
+    // Match persisted/read normalization order before computing the approval fingerprint.
+    return sf_canvas_project_normalize($project,false);
 }
 function sf_canvas_project_validate_sources(int $uid,array $ids): void {
     require_once __DIR__.'/agent-scene-history.php';
@@ -127,7 +142,7 @@ function sf_canvas_project_propose(array $user,array $request,string $source='us
     sf_canvas_project_ensure_schema();
     $raw=$request['project']??$request['build_request']??null;if(!is_array($raw))throw new InvalidArgumentException('Describe a canvas project.');
     if(isset($request['source_scene_ids'])&&!isset($raw['source_scene_ids']))$raw['source_scene_ids']=$request['source_scene_ids'];
-    $project=sf_canvas_project_normalize($raw);sf_canvas_resource_validate($uid,$project['artist_inputs']??null,$project['source_scene_ids']);
+    $project=sf_canvas_project_bind_playlists($uid,sf_canvas_project_normalize($raw));sf_canvas_resource_validate($uid,$project['artist_inputs']??null,$project['source_scene_ids']);
     if(isset($project['previous_id']))sf_canvas_project_validate_sources($uid,[$project['previous_id']]);
     if(isset($request['reuse_id'])){
         if(!is_int($request['reuse_id'])||$request['reuse_id']<1)throw new InvalidArgumentException('Choose a canvas project.');
@@ -150,6 +165,7 @@ function sf_canvas_project_propose(array $user,array $request,string $source='us
 function sf_canvas_project_approve(int $uid,int $id): array {
     $proposal=sf_canvas_project_get($uid,$id);if(!$proposal)throw new InvalidArgumentException('Canvas project not found.');
     if(!in_array($proposal['status'],['awaiting_approval','approved'],true))throw new SfCanvasProjectConflict('This canvas project cannot be approved now.');
+    sf_canvas_project_bind_playlists($uid,$proposal['project']);
     sf_db()->prepare("UPDATE canvas_projects SET status='approved',approval_mode='manual',updated_at=? WHERE user_id=? AND id=? AND status IN ('awaiting_approval','approved')")->execute([gmdate('c'),$uid,$id]);
     return sf_canvas_project_get($uid,$id);
 }
@@ -159,14 +175,21 @@ function sf_canvas_project_begin(array $user,array $request): ?array {
     if(($request['project_managed']??false)!==true){if(isset($request['proposal_id']))throw new InvalidArgumentException('Use the canvas project approval flow.');return null;}
     $uid=(int)($user['id']??0);$id=$request['proposal_id']??null;
     if($uid<1||!is_int($id)||$id<1)throw new SfCanvasProjectApprovalRequired('Review and approve this canvas project before building.');
-    $creative=array_intersect_key($request,array_flip(['action','canvas_kind','brief','track_id','context_track_id','previous_id','lyric_section','coding_model','image_reference_ids','image_count','review_images','music_inputs','source_scene_ids','artist_inputs']));
-    $project=sf_canvas_project_normalize($creative);sf_canvas_project_ensure_schema();
+    $creative=array_intersect_key($request,array_flip(['action','canvas_kind','brief','track_id','context_track_id','previous_id','lyric_section','coding_model','image_reference_ids','image_count','review_images','music_inputs','source_scene_ids','artist_inputs','playlist_inputs','playlist_manifest']));
+    sf_canvas_project_ensure_schema();$requestId=$request['request_id']??null;
+    if(!is_string($requestId)||preg_match('/\A[a-f0-9]{32}\z/',$requestId)!==1)throw new InvalidArgumentException('Use a valid canvas request ID.');
+    $existing=sf_canvas_project_get($uid,$id);$project=sf_canvas_project_normalize($creative);
+    if($existing&&in_array($existing['status'],['building','built'],true)&&$existing['request_id']===$requestId){
+        // Replaying an already claimed exact request returns its saved result;
+        // later source edits must neither expand it nor turn recovery into a new build.
+        foreach(['music_inputs','playlist_inputs','playlist_manifest'] as $field)if(!array_key_exists($field,$project)&&array_key_exists($field,$existing['project']))$project[$field]=$existing['project'][$field];
+        $project=sf_canvas_project_normalize($project,false);
+    }else $project=sf_canvas_project_bind_playlists($uid,$project);
     // Approval and the later worker claim share the same privacy epoch.
     // Initialize migrations before the account/project lock transaction.
     require_once __DIR__.'/agent-scene-history.php';
     if(!function_exists('sf_privacy_ensure_schema'))require_once __DIR__.'/privacy-core.php';
     sf_agent_scene_history_ensure_schema();sf_privacy_ensure_schema();
-    $requestId=$request['request_id']??null;if(!is_string($requestId)||preg_match('/\A[a-f0-9]{32}\z/',$requestId)!==1)throw new InvalidArgumentException('Use a valid canvas request ID.');
     $db=sf_db();$own=!$db->inTransaction();if($own)$db->beginTransaction();
     try{
         // Match privacy clearing's account-before-project lock order.
@@ -181,6 +204,7 @@ function sf_canvas_project_begin(array $user,array $request): ?array {
         if($row['status']==='awaiting_approval'||($row['approval_mode']==='automatic'&&!$prefs['auto_approve']&&$row['status']==='approved'))throw new SfCanvasProjectApprovalRequired('Review and approve this canvas project before building.');
         if($row['status']==='canceled')throw new SfCanvasProjectConflict('This canvas project was canceled.');
         if(in_array($row['status'],['building','built'],true)&&$row['request_id']!==$requestId)throw new SfCanvasProjectConflict('This canvas project already has a build request.');
+        if($row['status']==='approved'&&isset($project['playlist_inputs']))sf_canvas_playlists_compile($uid,$project['playlist_inputs'],$project['playlist_manifest']);
         if($row['status']==='approved')sf_canvas_resource_validate($uid,$project['artist_inputs']??null,$project['source_scene_ids']);
         if($row['status']==='approved')$db->prepare("UPDATE canvas_projects SET status='building',approval_mode=?,request_id=?,updated_at=? WHERE user_id=? AND id=? AND status IN ('awaiting_approval','approved')")->execute([$row['approval_mode'],$requestId,gmdate('c'),$uid,$id]);
         if($own)$db->commit();

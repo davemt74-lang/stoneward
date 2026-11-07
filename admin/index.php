@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.296');
+define('SF_ADMIN_BUILD','1.3.297');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -33,6 +33,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/video.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/gallery.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/canvas-gallery.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/canvas-playlists.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/products.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/automations.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/membership.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
@@ -76,6 +77,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
             <button type="button" data-view="uploads"><span>04</span>Folder Scan & Upload</button>
             <button type="button" data-view="templates"><span>05</span>Metadata Templates</button>
             <button type="button" data-view="releases"><span>06</span>Releases</button>
+            <button type="button" data-view="artist-playlists"><span>06B</span>Artist Playlists</button>
             <button type="button" data-view="song-moments"><span>06A</span>Song Moments &amp; Timeline</button>
             <button type="button" data-view="shows"><span>10</span>Shows + Live</button>
           </div>
@@ -271,6 +273,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="../assets/js/public-agent-canvas.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/canvas-permissions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/canvas-gallery.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/canvas-playlists.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/products.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/turntable-modules.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/automations.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>

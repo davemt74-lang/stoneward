@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.296';
+  window.STONEFELLOW_APP_BUILD='1.3.297';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -2044,8 +2044,8 @@
     };
   }
   function canvasDesignBrief(brief){
-    const clean=brief.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all)\}/gi,' ')
-      .replace(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|merch-clear|tickets-clear)\}/gi,' ')
+    const clean=brief.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi,' ')
+      .replace(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|playlists-clear|merch-clear|tickets-clear)\}/gi,' ')
       .replace(/(`?)\{[^\S\r\n]*(?:hide-agent|design-ag(?:ent|net))[^\S\r\n]*\}\1/gi,' ').trim();
     return clean!==brief&&/^[.!?…]+$/.test(clean)?'':clean;
   }
@@ -2134,34 +2134,42 @@
   let chatMusicPicker=null,chatMusicCommandTimer=null;
   let chatResourcePicker=null,chatResourceCommandTimer=null;
   function chatDraftResourceInputs(draft){
-    const sources=[],merch=[],tickets=[];
+    const sources=[],merch=[],tickets=[],playlists=[];
     for(const match of draft.matchAll(/\{(canvas|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
       const kind=match[1].toLowerCase(),id=match[2];
       if(kind==='canvas'){
         const value=Number(id);if(/^[1-9]\d*$/.test(id)&&Number.isSafeInteger(value))sources.push(value);
       }else (kind==='merch'?merch:tickets).push(id);
     }
+    const playlistSeen=new Set();
+    for(const match of draft.matchAll(/\{playlist:((?:own|artist)-[1-9]\d{0,18})@([a-f0-9]{64})\}/gi)){
+      const ref=match[1].toLowerCase(),version=match[2].toLowerCase(),key=ref+'@'+version;
+      if(!playlistSeen.has(key)){playlistSeen.add(key);playlists.push({ref,version});}
+    }
     const artist={};
     if(merch.length||/\{merch-clear\}/i.test(draft))artist.merch_ids=Array.from(new Set(merch));
     if(tickets.length||/\{tickets-clear\}/i.test(draft))artist.ticket_ids=Array.from(new Set(tickets));
     return {...(sources.length?{source_scene_ids:Array.from(new Set(sources))}:{}),
-      ...(Object.keys(artist).length?{artist_inputs:artist}:{})};
+      ...(Object.keys(artist).length?{artist_inputs:artist}:{}),
+      ...(playlists.length||/\{playlists-clear\}/i.test(draft)?{playlist_inputs:{items:playlists}}:{})};
   }
   function chatResourceCommandRange(draft,caret){
-    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|merch|tickets)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|merch|tickets|playlists)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
       if(caret!==undefined&&caret!==end)continue;
       return {kind:match[2].toLowerCase(),start,end,standalone:draft.trim().toLowerCase()==='/'+match[2].toLowerCase()};
     }
     return null;
   }
-  function applyChatResourceSelection(range,ids){
-    const tokenKind=range.kind==='tickets'?'ticket':range.kind;
-    const rule=new RegExp('\\{'+tokenKind+':[A-Za-z0-9_-]{1,180}\\}|\\{'+(range.kind==='tickets'?'tickets':range.kind)+'-clear\\}','gi');
+  function applyChatResourceSelection(range,ids,playlistItems=[]){
+    const tokenKind=range.kind==='tickets'?'ticket':range.kind==='playlists'?'playlist':range.kind;
+    const rule=range.kind==='playlists'?/\{(?:playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|playlists-clear)\}/gi:new RegExp('\\{'+tokenKind+':[A-Za-z0-9_-]{1,180}\\}|\\{'+(range.kind==='tickets'?'tickets':range.kind)+'-clear\\}','gi');
     const strip=value=>value.replace(rule,'');
     const before=strip(input.value.slice(0,range.start)),after=strip(input.value.slice(range.end));
-    const tokens=ids.map(id=>'{'+tokenKind+':'+id+'}').join(' ')||
-      (range.kind==='canvas'?'':'{'+(range.kind==='tickets'?'tickets':'merch')+'-clear}');
+    const versions=new Map(playlistItems.map(item=>[item.ref,item.version]));
+    if(range.kind==='playlists'&&ids.some(id=>!/^(?:own|artist)-[1-9]\d{0,18}$/.test(id)||!/^[a-f0-9]{64}$/.test(versions.get(id)||'')))throw new Error('Choose a verified playlist version before adding it.');
+    const tokens=ids.map(id=>'{'+tokenKind+':'+id+(range.kind==='playlists'?'@'+versions.get(id):'')+'}').join(' ')||
+      (range.kind==='canvas'?'':'{'+(range.kind==='tickets'?'tickets':range.kind==='playlists'?'playlists':'merch')+'-clear}');
     input.value=before+tokens+after;
     syncChatImageDraftLimit();
     input.setSelectionRange(before.length+tokens.length,before.length+tokens.length);
@@ -2171,19 +2179,21 @@
     const requestedDraft=input.value;
     await loadAuth();
     if(input.value!==requestedDraft||chatResourcePicker||chatMusicPicker||chatImagePicker)return;
-    if(!canvasOwner()){popupEntry('notice','Sign in to choose canvas project sources.');return;}
+    if(!canvasOwner()&&range.kind!=='playlists'){popupEntry('notice','Sign in to choose canvas project sources.');return;}
     const open=window.SFCanvasResourcePicker?.open;
     if(typeof open!=='function'){popupEntry('notice','Reload the page to open the source picker.');return;}
-    const draft=input.value,owner=canvasOwner(),resources=chatDraftResourceInputs(draft);
+    const draft=input.value,owner=canvasOwner(),sourceScene=listeningRoom,resources=chatDraftResourceInputs(draft);
     const key=range.kind==='merch'?'merch_ids':'ticket_ids';
-    const selected=range.kind==='canvas'?resources.source_scene_ids:
+    const playlistSelection=resources.playlist_inputs??(directListeningRoomCommand(draft)?.kind==='revise'?listeningRoom?.playlist_inputs:null);
+    const selected=range.kind==='playlists'?(playlistSelection?.items||[]).map(item=>item.ref):range.kind==='canvas'?resources.source_scene_ids:
       resources.artist_inputs?.[key]??(directListeningRoomCommand(draft)?.kind==='revise'?listeningRoom?.artist_inputs?.[key]:[]);
     const picker={owner,request:new AbortController()};chatResourcePicker=picker;
     try{
       const result=await open({kind:range.kind,load:signal=>api('canvas-resources.php?kind='+range.kind,undefined,signal),
-        selectedIds:(selected||[]).map(String),signal:picker.request.signal});
-      if(!result||picker.request.signal.aborted||chatResourcePicker!==picker||owner!==canvasOwner()||input.value!==draft)return;
-      applyChatResourceSelection(range,result.ids);
+        selectedIds:(selected||[]).map(String),selectedVersions:range.kind==='playlists'?Object.fromEntries((playlistSelection?.items||[]).map(item=>[item.ref,item.version])):undefined,signedIn:!!owner,signal:picker.request.signal});
+      if(!result||picker.request.signal.aborted||chatResourcePicker!==picker||owner!==canvasOwner()||input.value!==draft||
+        (range.kind==='playlists'&&directListeningRoomCommand(draft)?.kind==='revise'&&sourceScene!==listeningRoom))return;
+      applyChatResourceSelection(range,result.ids,result.items);
     }catch(error){if(error.name!=='AbortError'&&owner===canvasOwner())popupEntry('notice',error.message||'Sources could not load.');}
     finally{if(chatResourcePicker===picker)chatResourcePicker=null;picker.request.abort();}
   }
@@ -2202,13 +2212,13 @@
   function chatDraftMusicInputs(draft){
     if(/\{music-all\}/i.test(draft))return {mode:'all'};
     const ids=Array.from(new Set(Array.from(draft.matchAll(/\{music-track:([A-Za-z0-9_-]{1,180})\}/gi),match=>match[1])));
-    return ids.length?{mode:'selected',track_ids:ids}:null;
+    return ids.length||/\{music-clear\}/i.test(draft)?{mode:'selected',track_ids:ids}:null;
   }
   function chatDraftBindingLength(draft){
     const placed=Array.from(draft.matchAll(/\{image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
     const references=Array.from(draft.matchAll(/\{reference-image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
-    const music=Array.from(draft.matchAll(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all)\}/gi));
-    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|merch-clear|tickets-clear)\}/gi));
+    const music=Array.from(draft.matchAll(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi));
+    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|playlists-clear|merch-clear|tickets-clear)\}/gi));
     return [...placed,...references,...music,...resources].reduce((length,match)=>length+match[0].length+1,0);
   }
   function syncChatImageDraftLimit(){
@@ -2225,8 +2235,8 @@
     return null;
   }
   function applyChatMusicSelection(range,selection){
-    const bindings=selection.mode==='all'?'{music-all}':selection.track_ids.map(id=>'{music-track:'+id+'}').join(' ');
-    const strip=value=>value.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all)\}/gi,'');
+    const bindings=selection.mode==='all'?'{music-all}':selection.track_ids.map(id=>'{music-track:'+id+'}').join(' ')||'{music-clear}';
+    const strip=value=>value.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi,'');
     const before=strip(input.value.slice(0,range.start)),after=strip(input.value.slice(range.end));
     const inserted=(range.standalone?"Let's build ":'')+bindings;
     input.value=before+inserted+after;
@@ -2239,7 +2249,7 @@
     if(typeof open!=='function'){popupEntry('notice','Reload the page to open the music picker.');return;}
     const draft=input.value,owner=canvasOwner();
     const existing=chatDraftMusicInputs(draft)||
-      (directListeningRoomCommand(draft)?.kind==='revise'?listeningRoom?.music_inputs:null);
+      (directListeningRoomCommand(draft)?.kind==='revise'?(Object.prototype.hasOwnProperty.call(listeningRoom||{},'direct_music_inputs')?listeningRoom.direct_music_inputs:listeningRoom?.music_inputs):null);
     const picker={owner,request:new AbortController()};
     chatMusicPicker=picker;
     try{
@@ -2504,7 +2514,7 @@
     input.addEventListener('paste',event=>{
       if(chatImageDraftLimit<=0||!event.clipboardData)return;
       const draft=input.value.slice(0,input.selectionStart)+event.clipboardData.getData('text')+input.value.slice(input.selectionEnd);
-      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all)|canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
+      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
       input.maxLength=chatImageDraftLimit+chatDraftBindingLength(draft);
       setTimeout(syncChatImageDraftLimit,0);
     });
@@ -2546,7 +2556,7 @@
     if(edit)return {kind:'revise',brief:(edit[1]||'').trim()};
     const command=text.replace(/[.!?…]+$/,'').trim()
       .replace(/^(?:(?:can|could|would|will)\s+you|i(?:['’]d|\s+would)\s+like\s+you\s+to)\s+(?:please\s+)?/i,'');
-    const assetReference=/\{\s*(?:canvas:|merch:|ticket:|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
+    const assetReference=/\{\s*(?:canvas:|merch:|ticket:|playlist:|playlists-clear|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
     if(/^\/review-images$/i.test(text))return {kind:'image_review'};
     const build=command.match(/^let['’]?s\s+build(?:\s*[:,]\s*|\s+|$)([\s\S]*)$/i);
     if(build){
@@ -3130,7 +3140,7 @@
     const resources=chatDraftResourceInputs(brief),music=chatDraftMusicInputs(brief);
     agent('thinking','Reviewing your canvas ideas…');
     const result=await controller.discuss({brief,currentCanvasId:listeningRoom?.id,codingModel:selectedCanvasCodingModel(owner),
-      sourceSceneIds:resources.source_scene_ids,artistInputs:resources.artist_inputs,musicInputs:music,
+      sourceSceneIds:resources.source_scene_ids,artistInputs:resources.artist_inputs,musicInputs:music,playlistInputs:resources.playlist_inputs,
       imageReferenceIds:chatDraftVisualReferenceIds(brief)});
     if(canvasOwner()!==owner)return null;
     return result.reply||(result.proposal?'Your canvas project is ready for review.':'');
@@ -3192,24 +3202,24 @@
       },
       onRetry:()=>{if(active())stage.setSceneCoding?.('generating','Repair Agent is retrying the same approved correction.');},
       test:(scene,{signal,onEvent})=>{
-        const valid=()=>active()&&!signal.aborted;
+        const context=canvasAudioContext(scene),valid=()=>active()&&!signal.aborted;
         const loadCatalog=async(filters={},readSignal)=>{
           if(!valid())throw new DOMException('Project session changed.','AbortError');
-          const params=new URLSearchParams({action:'catalog'});
+          const params=new URLSearchParams({action:'catalog',...context});
           for(const field of ['release_id','track_id'])if(filters[field]!==undefined){
             if(typeof filters[field]!=='string'||!/^[A-Za-z0-9_-]{1,180}$/.test(filters[field]))throw new Error('Choose a valid catalog source.');
             params.set(field,filters[field]);
           }
           const response=await api('canvas-audio.php?'+params,undefined,readSignal);
-          if(!valid()||!Array.isArray(response.tracks)||!Array.isArray(response.releases))throw new Error('The preview catalog is unavailable.');
-          return scopeCanvasMusicCatalog(response,scene);
+          if(!valid()||!Array.isArray(response.tracks)||!Array.isArray(response.releases)||!Array.isArray(response.playlists))throw new Error('The preview catalog is unavailable.');
+          return {...scopeCanvasMusicCatalog(response,scene),playlists:response.playlists};
         };
         return window.SFCanvasSceneTester.test(scene,{signal,onEvent,getOwner:canvasOwner,canUse:valid,getState:canvasAudioState,
           prepareScene:(candidate,probe,previewProgram)=>stage.prepareSceneTest(candidate,{probe,previewProgram,currentTrackId:observedPlayer().track?.id||''}),loadCatalog,
           loadAudio:async(id,readSignal)=>{
             const catalog=await loadCatalog({track_id:id},readSignal),track=catalog.tracks.find(value=>value.track_id===id);
             if(!track?.source_available)throw new Error('The selected MP3 is unavailable.');
-            const response=await fetch((cfg.apiBase||'api')+'/canvas-audio.php?action=source&track_id='+encodeURIComponent(id),
+            const response=await fetch((cfg.apiBase||'api')+'/'+canvasAudioSourcePath(id,scene),
               {credentials:'same-origin',mode:'same-origin',redirect:'error',cache:'no-store',signal:readSignal});
             if(!response.ok||!/^audio\/mpeg(?:\s*;|$)/i.test(response.headers.get('content-type')||'')||
               Number(response.headers.get('content-length'))>128*1024*1024)throw new Error('The preview MP3 could not load.');
@@ -4000,6 +4010,14 @@
     if(!owner||owner!==canvasSceneOwner()||(!st.auth.authenticated&&!isGalleryScene(scene))||!scene||scene!==listeningRoom)
       throw Object.assign(new Error('The canvas audio session is no longer active.'),{code:'audio_session_closed',stage:'session'});
   }
+  function canvasAudioContext(scene){
+    if(isGalleryScene(scene)&&/^[a-f0-9]{32}$/.test(scene.gallery_id))return Object.freeze({gallery_id:scene.gallery_id});
+    if(Number.isSafeInteger(scene?.id)&&scene.id>0)return Object.freeze({scene_id:scene.id});
+    throw Object.assign(new Error('The canvas audio context is unavailable.'),{code:'audio_session_closed',stage:'session'});
+  }
+  function canvasAudioSourcePath(trackId,scene){
+    return 'canvas-audio.php?'+new URLSearchParams({action:'source',track_id:trackId,...canvasAudioContext(scene)});
+  }
   function scopeCanvasMusicCatalog(catalog,scene){
     const inputs=scene?.music_inputs;
     if(inputs==null)return catalog;
@@ -4017,16 +4035,18 @@
   async function loadCanvasAudioCatalog(filters={},signal){
     const owner=canvasSceneOwner(),scene=listeningRoom;
     requireCanvasAudioSession(owner,scene);
+    const context=canvasAudioContext(scene);
     await requirePublishedCanvas(scene,signal);
-    const params=new URLSearchParams({action:'catalog'});
+    requireCanvasAudioSession(owner,scene);
+    const params=new URLSearchParams({action:'catalog',...context});
     for(const field of ['release_id','track_id'])if(filters[field]!==undefined){
       if(typeof filters[field]!=='string'||!/^[A-Za-z0-9_-]{1,180}$/.test(filters[field]))throw new Error('Choose a valid music catalog ID.');
       params.set(field,filters[field]);
     }
     const result=await api('canvas-audio.php?'+params,undefined,signal);
     requireCanvasAudioSession(owner,scene);
-    if(!Array.isArray(result.tracks)||!Array.isArray(result.releases))throw new Error('The music catalog returned an invalid response.');
-    return scopeCanvasMusicCatalog({tracks:result.tracks,releases:result.releases},scene);
+    if(!Array.isArray(result.tracks)||!Array.isArray(result.releases)||!Array.isArray(result.playlists))throw new Error('The music catalog returned an invalid response.');
+    return {...scopeCanvasMusicCatalog({tracks:result.tracks,releases:result.releases},scene),playlists:result.playlists};
   }
   async function loadCanvasAudioSource(trackId,signal){
     const owner=canvasSceneOwner(),scene=listeningRoom;
@@ -4034,7 +4054,7 @@
     const track=catalog.tracks.find(row=>row.track_id===trackId);
     if(!track?.source_available)throw new Error('This song does not have an available hosted MP3 source.');
     requireCanvasAudioSession(owner,scene);
-    const path='canvas-audio.php?action=source&track_id='+encodeURIComponent(trackId);
+    const path=canvasAudioSourcePath(trackId,scene);
     const response=await fetch((cfg.apiBase||'api')+'/'+path,{credentials:'same-origin',mode:'same-origin',cache:'no-store',redirect:'error',signal});
     if(!response.ok||!/^audio\/mpeg(?:\s*;|$)/i.test(response.headers.get('content-type')||''))
       throw new Error('The song’s MP3 source is unavailable.');
@@ -4065,7 +4085,7 @@
       if(String(st.track?.id)===id&&!audio.paused&&!audio.ended)return canvasAudioState();
       // The fresh catalog authorized this source. Keep canonical player state,
       // but do not fall back to a listening URL cached before a media update.
-      track={...track,audio:(cfg.apiBase||'api')+'/canvas-audio.php?action=source&track_id='+encodeURIComponent(id)};
+      track={...track,audio:(cfg.apiBase||'api')+'/'+canvasAudioSourcePath(id,scene)};
       const position=String(st.track?.id)===id?savedPlaybackPosition():0;
       stage='playback';
       let failure;

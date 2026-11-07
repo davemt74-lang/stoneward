@@ -76,10 +76,16 @@ jobs:
                   if os.environ['SF_AUDIO_BROWSER'] == 'chromium':
                       output.write('CHROMIUM_BIN=' + p.chromium.executable_path + '\n')
           PY
-      - name: Actual main, footer, synchronized and independent playback
-        run: |
-          python tests/listening-telemetry-browser.py
-          python tests/canvas-independent-audio-browser.py
+      - name: Actual main, footer and synchronized playback in the bundled Chromium shell
+        if: matrix.browser == 'chromium'
+        env:
+          SF_CANVAS_HEADLESS_SHELL: '1'
+        run: python tests/listening-telemetry-browser.py
+      - name: Actual main, footer and synchronized playback in WebKit
+        if: matrix.browser == 'webkit'
+        run: python tests/listening-telemetry-browser.py
+      - name: Actual independent playback
+        run: python tests/canvas-independent-audio-browser.py
       - name: Full canvas controls in the bundled current headless shell
         if: matrix.browser == 'chromium'
         env:

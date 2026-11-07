@@ -65,7 +65,9 @@ with tempfile.TemporaryDirectory(prefix='stoneward-native-listening-') as tempor
     launch={'headless':True}
     if BROWSER=='chromium':
      launch['args']=['--no-sandbox','--autoplay-policy=no-user-gesture-required']
-     executable=os.environ.get('CHROMIUM_BIN') or shutil.which('chromium')
+     executable=None
+     if os.environ.get('SF_CANVAS_HEADLESS_SHELL')!='1':
+      executable=os.environ.get('CHROMIUM_BIN') or shutil.which('chromium')
      if executable:launch['executable_path']=executable
     browser=getattr(p,BROWSER).launch(**launch)
     for width in [390,1440]:
@@ -80,27 +82,36 @@ with tempfile.TemporaryDirectory(prefix='stoneward-native-listening-') as tempor
      activate(page.locator('#footer'));page.wait_for_function('!audio.paused');page.wait_for_function('audio.ended',timeout=12000);page.wait_for_timeout(100)
      check(len([row for row in reports if row.get('action')=='begin'])==1 and len([row for row in reports if row.get('event_type')=='resume'])==1 and len([row for row in reports if row.get('event_type')=='complete'])==1,f'{BROWSER}/{width}px footer resume shares play identity and natural end reports one complete')
      check(all(row.get('protocol')==2 for row in reports),f'{BROWSER}/{width}px no legacy writer runs alongside native protocol2 observer')
-     page.evaluate('login()');page.evaluate('mountScene()');frame=page.frame_locator('.sf-agent-scene-backdrop iframe')
+     page.evaluate('login()')
+     page.evaluate('mountScene()')
+     frame=page.locator('.sf-agent-scene-backdrop iframe').element_handle().content_frame()
+     frame.wait_for_load_state('load')
      # A parsed button can exist before the srcdoc document is loaded and the
      # authenticated SDK session has completed its handshake. Interact only
      # after both production readiness events, using native input throughout.
      page.wait_for_function('sceneLoaded&&audioDiagnostics.some(detail=>detail.event==="session_ready")')
      expect(frame.locator('.controls')).to_have_attribute('data-audio-ready','true')
      expect(frame.locator('p')).to_have_text('ready')
+     control=frame.get_by_role('button',name='Play synchronized song',exact=True)
+     # The previous action leaves focus on a host control. Confirm the desktop
+     # canvas focus transfer before testing playback with a native pointer.
+     if BROWSER=='chromium' and width>=500:
+      control.focus()
+      expect(control).to_be_focused()
      try:
       with page.expect_request(lambda request: '/api/listening.php' in request.url and request.method=='POST' and request.post_data_json.get('action')=='begin' and request.post_data_json.get('track_id')=='song-2'):
-       activate(frame.get_by_role('button',name='Play synchronized song'))
+       activate(control)
        expect(frame.locator('p')).to_have_text('playing',timeout=5000)
      except BaseException:
       print('Native canvas playback failure',json.dumps({'browser':BROWSER,'width':width,
        'parent':page.evaluate('({sceneLoaded,owner:fixtureOwner,track:st.track?.id,paused:audio.paused,ended:audio.ended,mediaError:audio.error?.code,diagnostics:audioDiagnostics})'),
        'canvas':frame.locator('p').text_content(),
-       'events':page.locator('.sf-agent-scene-backdrop iframe').element_handle().content_frame().evaluate('()=>({clicks:window.canvasClicks,pointerdowns:window.canvasPointerDowns,ready:document.readyState})'),
+       'events':frame.evaluate('()=>({clicks:window.canvasClicks,pointerdowns:window.canvasPointerDowns,ready:document.readyState})'),
        'reports':[{key:row.get(key) for key in ['action','event_type','track_id']} for row in reports],'errors':errors}),flush=True)
       raise
      page.wait_for_function('st.track?.id==="song-2"&&!audio.paused')
      sdk=[row for row in reports if row.get('action')=='begin' and row.get('track_id')=='song-2'];check(len(sdk)==1 and sdk[0]['context']=={'scene_id':saved['id']} and sdk[0]['playback_method']=='main',f'{BROWSER}/{width}px production sandbox SDK uses canonical player with captured canvas attribution')
-     activate(frame.get_by_role('button',name='Play synchronized song'));page.wait_for_timeout(70);check(len([row for row in reports if row.get('action')=='begin' and row.get('track_id')=='song-2'])==1,f'{BROWSER}/{width}px repeated synchronized play request does not duplicate counts')
+     activate(control);page.wait_for_timeout(70);check(len([row for row in reports if row.get('action')=='begin' and row.get('track_id')=='song-2'])==1,f'{BROWSER}/{width}px repeated synchronized play request does not duplicate counts')
      page.evaluate('audio.currentTime=5.4');page.wait_for_function('audio.ended',timeout=5000);page.wait_for_timeout(100)
      completed=[row for row in reports if row.get('event_type')=='complete' and row.get('play_id')==sdk[0]['play_id']];check(len(completed)==1 and completed[0]['elapsed_played_seconds']<2,f'{BROWSER}/{width}px actual seek skips media without adding seek distance to listening seconds')
      # Begin reporting awaits the authorized host response. Native playback can

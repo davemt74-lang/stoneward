@@ -554,3 +554,47 @@ test('disposing during the fresh scope check aborts its read and settles play wi
  await player.dispose();await rejected;assert.equal(signal.aborted,true);
  finish({tracks:[track('song-one')],releases:[]});await flush();assert.equal(h.hostMedia[0].paused,true);assert.equal(h.hostRevoked.length,1);h.destroy();
 });
+
+const orderedPlaylist = () => ({ref:'artist-17',source:'artist',title:'Side sequence',description:'An ordered resource collection',revision_hash:'a'.repeat(64),
+ items:[
+  {item_id:3,position:0,track_id:'song-one',title:'First occurrence',duration_seconds:120,available:true,reason:'available'},
+  {item_id:8,position:2,track_id:null,title:'Unavailable track',duration_seconds:0,available:false,reason:'unavailable'},
+  {item_id:11,position:4,track_id:'song-one',title:'Repeated occurrence',duration_seconds:120,available:true,reason:'available'},
+  {item_id:12,position:7,track_id:'song-remote',title:'Public non-hosted song',duration_seconds:100,available:false,reason:'source_unavailable'}
+ ]});
+
+test('catalog preserves ordered playlist entries and repeated songs separately from deduplicated MP3 nodes',async()=>{
+ const playlist=orderedPlaylist();const h=harness({loadCatalog:async()=>({tracks:[track('song-one')],releases:[],playlists:[playlist]})});
+ h.start();await flush();const result=await h.api.catalog();
+ assert.deepEqual(JSON.parse(JSON.stringify(result.playlists)),[playlist]);assert.equal(result.tracks.length,1);
+ assert.deepEqual(Array.from(result.playlists[0].items,item=>item.position),[0,2,4,7]);
+ assert.deepEqual(Array.from(result.playlists[0].items,item=>item.track_id),['song-one',null,'song-one','song-remote']);
+ assert.equal(h.calls.filter(call=>call[0]==='play').length,0);assert.equal(h.hostMedia.length,0);h.destroy();
+});
+
+test('playlist DTO projection strips private fields and forces unavailable entries to generic placeholders',async()=>{
+ const playlist={...orderedPlaylist(),user_id:47,owner_email:'private-owner',storage_path:'/private/raw',items:orderedPlaylist().items.map(item=>({...item,raw_source:'/private/song'}))};
+ playlist.items[1]={...playlist.items[1],track_id:'hidden-private-song',title:'Hidden private title',duration_seconds:800};
+ const h=harness({loadCatalog:async()=>({tracks:[track('song-one')],releases:[],playlists:[playlist]})});h.start();await flush();
+ const result=await h.api.catalog(),serialized=JSON.stringify(result.playlists);
+ assert.doesNotMatch(serialized,/user_id|owner_email|storage_path|raw_source|private|Hidden|800/);
+ assert.deepEqual(JSON.parse(JSON.stringify(result.playlists[0].items[1])),{item_id:8,position:2,track_id:null,title:'Unavailable track',duration_seconds:0,available:false,reason:'unavailable'});h.destroy();
+});
+
+test('legacy catalogs and explicit empty playlist resources remain usable without expanding audio scope',async()=>{
+ for(const playlists of [undefined,[]]){
+  const h=harness({loadCatalog:async()=>({tracks:[],releases:[],...(playlists===undefined?{}:{playlists})})});h.start();await flush();
+  const result=await h.api.catalog();assert.equal(result.tracks.length,0);assert.equal(result.playlists.length,0);assert.equal(result.releases.length,0);h.destroy();
+ }
+});
+
+test('malformed or authority-conflicting playlist responses fail closed before authored code receives them',async()=>{
+ const invalid=[{...orderedPlaylist(),ref:'own-17'}, {...orderedPlaylist(),revision_hash:'unversioned'},
+  {...orderedPlaylist(),items:[orderedPlaylist().items[0],orderedPlaylist().items[0]]},
+  {...orderedPlaylist(),items:[{...orderedPlaylist().items[0],track_id:null}]},
+  {...orderedPlaylist(),items:[{...orderedPlaylist().items[0],available:false}]}];
+ for(const playlist of invalid){
+  const h=harness({loadCatalog:async()=>({tracks:[],releases:[],playlists:[playlist]})});h.start();await flush();
+  await assert.rejects(h.api.catalog(),error=>error.code==='invalid_catalog');assert.equal(h.calls.filter(call=>call[0]==='play').length,0);h.destroy();
+ }
+});

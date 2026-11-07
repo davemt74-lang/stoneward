@@ -1,6 +1,6 @@
 # Canvas audit and learning build outline
 
-Status: implementation resumed. Capability/admin-policy and remembered-consent phases merged in [PR #346](https://github.com/davemt74-lang/stoneward/pull/346), with 29 GitHub checks passing. See [foundation evidence](canvas-capability-permissions.md). The [account token meter](account-token-meter.md) merged in [PR #347](https://github.com/davemt74-lang/stoneward/pull/347), with all 26 GitHub checks passing. [Canonical cross-experience listening](canvas-listening-attribution.md) is implemented in v1.3.296 with independent scoped review and is entering integration/release CI. Remaining sections are planned work. Image/vision/production expansion stays deferred.
+Status: implementation resumed. Capability/admin-policy and remembered-consent phases merged in [PR #346](https://github.com/davemt74-lang/stoneward/pull/346), with 29 GitHub checks passing. See [foundation evidence](canvas-capability-permissions.md). The [account token meter](account-token-meter.md) merged in [PR #347](https://github.com/davemt74-lang/stoneward/pull/347), with all 26 GitHub checks passing. [Canonical cross-experience listening](canvas-listening-attribution.md) merged in [PR #348](https://github.com/davemt74-lang/stoneward/pull/348) as v1.3.296 with all 30 GitHub checks passing. v1.3.297 adds [playlist selection and artist publication](canvas-resources.md). The remaining phases stay planned. Image/vision/production expansion stays deferred.
 
 ## Current scope hold
 
@@ -52,7 +52,7 @@ All pickers attach stable, server-validated references to the draft/project cont
 | `/canvas` | My Canvases and administrator-approved Public Gallery entries | Owned picker and separate gallery exist; plan a unified picker with ownership and attribution preserved |
 | `/merch`, `/tickets` | Published artist merchandise and ticket offers | Existing searchable multi-select pickers; retain current contracts |
 | `/stories` | Published artist stories, with authorized related songs, releases and media | Planned searchable multi-select picker |
-| `/playlists` | Current-account playlists and explicitly published artist playlists | Planned searchable multi-select picker |
+| `/playlists` | Current-account playlists and explicitly published artist playlists | Searchable multi-select picker with versioned references |
 | `/production` | Authorized AI production/video-editor projects and available project media | Planned integration; editor interfaces and permission mapping require inventory |
 | `/lyrics` | Available authorized song lyrics and timed lyrics, with draft/public status respected | Planned picker; works without playback |
 | `/knowledge` | Approved artist background, production notes and other authorized knowledge | Planned picker; private/admin material excluded from public results |
@@ -93,13 +93,13 @@ Future design must resolve supported reference granularity (whole project, seque
 
 ### Playlists selection
 
-Add `/playlists` as a searchable multi-select picker. Show the current account's own playlists and any explicitly published artist playlists, with clear ownership/visibility labels and track counts. Never expose another account's private playlists. Selecting attaches stable playlist references and their authorized ordered track membership to the project contract; it does not start playback, a build or an AI charge.
+`/playlists` opens a searchable multi-select picker. Show the current account's own playlists and any explicitly published artist playlists, with clear ownership/visibility labels and track counts. Never expose another account's private playlists. Selecting attaches stable playlist references and their authorized ordered track membership to the project contract; it does not start playback, a build or an AI charge.
 
 Resolve every song through the canonical track ID and existing authorized MP3/audio interfaces. Preserve playlist order and repeated entries where supported; show missing, withdrawn or unavailable tracks explicitly. Load the complete selected membership through pagination as needed, with explicit context limits instead of silent sampling. Revalidate ownership, publication status and track availability at build and runtime. Distinguish the approved membership snapshot from later live playlist changes so revisions do not silently change requirements.
 
 Playlists are collections of independent song nodes, not mandatory player widgets. The agent authors the requested presentation and interactions and may synchronize playback with the main player through the existing host interfaces. Selecting a playlist does not authorize changes to its saved membership; playlist writes require separately declared permissions and applicable approval. Retain selections across revisions unless changed or explicitly cleared. Account switching, deletion and permission revocation invalidate stale private results.
 
-Acceptance includes multi-selection/clearing, complete ordered membership, duplicate handling, public/private isolation, canonical playback and main-player synchronization, missing-track diagnostics, selection without execution/spend, and no injected player UI. Final token syntax and endpoint additions remain implementation decisions.
+Acceptance includes multi-selection/clearing, complete ordered membership, duplicate handling, public/private isolation, canonical playback and main-player synchronization, missing-track diagnostics, selection without execution/spend, and no injected player UI. The picker attaches `{playlist:own-ID@VERSION}` or `{playlist:artist-ID@VERSION}` references. `{playlists-clear}` clears inherited playlists. The `playlists` inventory is served by the existing canvas resources endpoint.
 
 ### Stories selection
 

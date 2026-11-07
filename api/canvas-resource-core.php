@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__.'/agent-canvas-public-commerce.php';
+require_once __DIR__.'/canvas-playlists-core.php';
 
 /** Syntax only. An omitted type and an explicitly empty selection have different meanings. */
 function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
@@ -115,6 +116,7 @@ function sf_canvas_resource_validate(int $uid,?array $inputs,?array $sources=nul
 
 /** Complete picker inventory. These rows describe resources without generating a layout. */
 function sf_canvas_resource_inventory(int $uid,string $kind): array {
+    if($kind==='playlists')return sf_canvas_playlists_inventory($uid);
     if($uid<1)throw new InvalidArgumentException('Sign in to choose canvas resources.');
     if($kind==='canvas'){
         require_once __DIR__.'/agent-scene-history.php';

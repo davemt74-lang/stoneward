@@ -5,7 +5,7 @@ $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $html=$read('admin/index.php');$js=$read('admin/assets/sidebar-accordion.js');$css=$read('admin/assets/admin.css');$admin=$read('admin/assets/admin.js');
 $groups=[
  'overview'=>['dashboard','analytics','calendar'],
- 'music'=>['catalog','media','uploads','templates','releases','song-moments','shows'],
+ 'music'=>['catalog','media','uploads','templates','releases','artist-playlists','song-moments','shows'],
  'publishing'=>['distribution','press','rights'],
  'audience'=>['crm','song-moderation','customer','campaigns','automations'],
  'commerce'=>['products','orders','fulfillment','pod','membership','ticketing','packages'],
@@ -23,7 +23,7 @@ foreach($parts as $index=>$match){
  $check['Category '.($key?:$index).' has a caret icon and named summary']=str_contains($match[3],'admin-nav-chevron')&&str_contains($match[3],'aria-hidden="true"');
  $check['Only Overview starts expanded in server HTML']=($index===0)===(trim($match[2])==='open');
 }
-$check['All 37 routes remain unique and reachable']=count($all)===37&&count(array_unique($all))===37;
+$check['All 38 routes remain unique and reachable']=count($all)===38&&count(array_unique($all))===38;
 $check['Native details and summary preserve keyboard accessibility']=str_contains($html,'<details class="admin-nav-category"')&&str_contains($html,'<summary class="admin-nav-summary"');
 $check['Browser state persistence key is versioned']=str_contains($js,'stonefellow.admin.navigation.categories.v1');
 $check['Saved state ignores unknown keys and supports independent groups']=str_contains($js,'hasOwnProperty.call(saved,key)')&&str_contains($js,'currentState(groups)');

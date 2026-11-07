@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 function sf_playlists_ensure_schema(): void {
     static $done=false;if($done)return;$pdo=sf_db();$driver=(string)(sf_db_config()['driver']??'');
+    if($pdo->inTransaction()&&$driver!=='sqlite'){
+        foreach(['user_playlists','user_playlist_tracks'] as $table){
+            $q=$pdo->prepare($driver==='sqlite'?"SELECT 1 FROM sqlite_master WHERE type='table' AND name=?":'SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?');
+            $q->execute([$table]);if($q->fetchColumn()===false)throw new RuntimeException('Initialize playlists before opening a transaction.');
+        }
+        $done=true;return;
+    }
     if($driver==='sqlite'){
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_playlists (id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',visibility TEXT NOT NULL DEFAULT 'private',source_type TEXT NOT NULL DEFAULT 'user',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_user_playlists_user_updated ON user_playlists(user_id,updated_at)");
@@ -29,13 +36,13 @@ function sf_playlist_track_payload(string $trackId): ?array {
     return ['id'=>$trackId,'title'=>(string)($t['title']??$trackId),'release'=>(string)($t['release']??''),'artwork'=>(string)($t['artwork']??''),'duration'=>(int)($t['duration']??0),'audio'=>(string)($t['audio']??'')];
 }
 function sf_playlist_row(int $playlistId): ?array {sf_playlists_ensure_schema();$q=sf_db()->prepare('SELECT * FROM user_playlists WHERE id=? LIMIT 1');$q->execute([$playlistId]);$r=$q->fetch();return $r?:null;}
-function sf_playlist_tracks(int $playlistId): array {
-    sf_playlists_ensure_schema();$q=sf_db()->prepare('SELECT id,track_id,position,added_at FROM user_playlist_tracks WHERE playlist_id=? ORDER BY position ASC,id ASC');$q->execute([$playlistId]);$out=[];
+function sf_playlist_tracks(int $playlistId,bool $current=false): array {
+    sf_playlists_ensure_schema();$q=sf_db()->prepare('SELECT id,track_id,position,added_at FROM user_playlist_tracks WHERE playlist_id=? ORDER BY position ASC,id ASC'.($current?sf_playlist_current_read():''));$q->execute([$playlistId]);$out=[];
     foreach($q->fetchAll() as $r){$t=sf_playlist_track_payload((string)$r['track_id']);if(!$t)continue;$out[]=['item_id'=>(int)$r['id'],'position'=>(int)$r['position'],'added_at'=>$r['added_at']]+$t;}
     return $out;
 }
-function sf_playlist_public_payload(array $r,bool $includeOwner=false): array {
-    $payload=['id'=>(int)$r['id'],'name'=>(string)$r['name'],'description'=>(string)$r['description'],'visibility'=>(string)$r['visibility'],'source_type'=>(string)$r['source_type'],'created_at'=>(string)$r['created_at'],'updated_at'=>(string)$r['updated_at'],'tracks'=>sf_playlist_tracks((int)$r['id'])];
+function sf_playlist_public_payload(array $r,bool $includeOwner=false,bool $current=false): array {
+    $payload=['id'=>(int)$r['id'],'name'=>(string)$r['name'],'description'=>(string)$r['description'],'visibility'=>(string)$r['visibility'],'source_type'=>(string)$r['source_type'],'created_at'=>(string)$r['created_at'],'updated_at'=>(string)$r['updated_at'],'tracks'=>sf_playlist_tracks((int)$r['id'],$current)];
     $payload['track_count']=count($payload['tracks']);$payload['duration_seconds']=array_sum(array_map(fn($x)=>(int)$x['duration'],$payload['tracks']));if($includeOwner)$payload['user_id']=(int)$r['user_id'];return $payload;
 }
 function sf_playlist_get_owned(int $userId,int $playlistId): array {$r=sf_playlist_row($playlistId);if(!$r||(int)$r['user_id']!==$userId)throw new RuntimeException('Playlist not found.');return sf_playlist_public_payload($r,true);}
@@ -44,17 +51,63 @@ function sf_playlist_list(int $userId): array {
     sf_playlists_ensure_schema();$q=sf_db()->prepare('SELECT * FROM user_playlists WHERE user_id=? ORDER BY updated_at DESC,id DESC');$q->execute([$userId]);$out=[];foreach($q->fetchAll() as $r)$out[]=sf_playlist_public_payload($r,true);return $out;
 }
 function sf_playlist_validate_track_ids(array $trackIds,int $limit=200): array {$trackIds=array_slice($trackIds,0,$limit);$out=[];$map=sf_track_map();foreach($trackIds as $id){$id=sf_clean_text($id,180);if($id===''||!isset($map[$id]))throw new InvalidArgumentException('Playlist contains an unknown track.');$out[]=$id;}return $out;}
-function sf_playlist_resequence(int $playlistId): void {$rows=sf_db()->prepare('SELECT id FROM user_playlist_tracks WHERE playlist_id=? ORDER BY position ASC,id ASC');$rows->execute([$playlistId]);$u=sf_db()->prepare('UPDATE user_playlist_tracks SET position=? WHERE id=? AND playlist_id=?');$i=0;foreach($rows->fetchAll() as $r){$u->execute([$i++,(int)$r['id'],$playlistId]);}}
+function sf_playlist_current_read(): string {return sf_db()->inTransaction()&&(sf_db_config()['driver']??'')==='mysql'?' FOR UPDATE':'';}
+function sf_playlist_lock_owned(int $userId,int $playlistId): array {
+    $q=sf_db()->prepare('SELECT * FROM user_playlists WHERE id=? AND user_id=?'.sf_playlist_current_read());$q->execute([$playlistId,$userId]);$row=$q->fetch();
+    if(!$row)throw new RuntimeException('Playlist not found.');return $row;
+}
+/** Every legacy mutation locks the parent before its children, matching canvas compilation. */
+function sf_playlist_mutation(int $userId,int $playlistId,callable $run): mixed {
+    sf_playlists_ensure_schema();$pdo=sf_db();$own=!$pdo->inTransaction();if($own)$pdo->beginTransaction();
+    try{$result=$run(sf_playlist_lock_owned($userId,$playlistId));if($own)$pdo->commit();return $result;}
+    catch(Throwable $error){if($own&&$pdo->inTransaction())$pdo->rollBack();throw $error;}
+}
+function sf_playlist_resequence(int $playlistId): void {$rows=sf_db()->prepare('SELECT id FROM user_playlist_tracks WHERE playlist_id=? ORDER BY position ASC,id ASC'.sf_playlist_current_read());$rows->execute([$playlistId]);$u=sf_db()->prepare('UPDATE user_playlist_tracks SET position=? WHERE id=? AND playlist_id=?');$i=0;foreach($rows->fetchAll() as $r){$u->execute([$i++,(int)$r['id'],$playlistId]);}}
 function sf_playlist_create(int $userId,string $name,string $description='',string $visibility='private',string $source='user',array $trackIds=[]): array {
     sf_playlists_ensure_schema();$name=sf_clean_text($name,120);if($name==='')throw new InvalidArgumentException('Playlist name is required.');$description=sf_clean_text($description,1000);$visibility=sf_playlist_clean_visibility($visibility);$source=sf_playlist_clean_source($source);$trackIds=sf_playlist_validate_track_ids($trackIds);$now=gmdate('c');$pdo=sf_db();
     $pdo->beginTransaction();try{$q=$pdo->prepare('INSERT INTO user_playlists(user_id,name,description,visibility,source_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');$q->execute([$userId,$name,$description,$visibility,$source,$now,$now]);$id=(int)$pdo->lastInsertId();$ins=$pdo->prepare('INSERT INTO user_playlist_tracks(playlist_id,track_id,position,added_at) VALUES(?,?,?,?)');foreach($trackIds as $i=>$trackId)$ins->execute([$id,$trackId,$i,$now]);$pdo->commit();}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     return sf_playlist_get_owned($userId,$id);
 }
-function sf_playlist_update(int $userId,int $playlistId,string $name,string $description,string $visibility): array {$p=sf_playlist_get_owned($userId,$playlistId);$name=sf_clean_text($name,120);if($name==='')throw new InvalidArgumentException('Playlist name is required.');$q=sf_db()->prepare('UPDATE user_playlists SET name=?,description=?,visibility=?,updated_at=? WHERE id=? AND user_id=?');$q->execute([$name,sf_clean_text($description,1000),sf_playlist_clean_visibility($visibility),gmdate('c'),$playlistId,$userId]);return sf_playlist_get_owned($userId,$playlistId);}
-function sf_playlist_delete(int $userId,int $playlistId): void {sf_playlist_get_owned($userId,$playlistId);sf_db()->prepare('DELETE FROM user_playlists WHERE id=? AND user_id=?')->execute([$playlistId,$userId]);}
-function sf_playlist_add_track(int $userId,int $playlistId,string $trackId): array {$p=sf_playlist_get_owned($userId,$playlistId);$track=sf_playlist_track_payload($trackId);if(!$track)throw new InvalidArgumentException('Unknown track.');$pos=count($p['tracks']);$now=gmdate('c');sf_db()->prepare('INSERT INTO user_playlist_tracks(playlist_id,track_id,position,added_at) VALUES(?,?,?,?)')->execute([$playlistId,$trackId,$pos,$now]);sf_db()->prepare('UPDATE user_playlists SET updated_at=? WHERE id=? AND user_id=?')->execute([$now,$playlistId,$userId]);return sf_playlist_get_owned($userId,$playlistId);}
-function sf_playlist_remove_item(int $userId,int $playlistId,int $itemId): array {sf_playlist_get_owned($userId,$playlistId);$q=sf_db()->prepare('DELETE FROM user_playlist_tracks WHERE id=? AND playlist_id=?');$q->execute([$itemId,$playlistId]);if(!$q->rowCount())throw new RuntimeException('Playlist track was not found.');sf_playlist_resequence($playlistId);sf_db()->prepare('UPDATE user_playlists SET updated_at=? WHERE id=? AND user_id=?')->execute([gmdate('c'),$playlistId,$userId]);return sf_playlist_get_owned($userId,$playlistId);}
-function sf_playlist_reorder(int $userId,int $playlistId,array $itemIds): array {$p=sf_playlist_get_owned($userId,$playlistId);$existing=array_map(fn($x)=>(int)$x['item_id'],$p['tracks']);$requested=array_map('intval',$itemIds);if(count($existing)!==count($requested)||array_diff($existing,$requested)||array_diff($requested,$existing))throw new InvalidArgumentException('Playlist order does not match the current playlist.');$pdo=sf_db();$pdo->beginTransaction();try{$q=$pdo->prepare('UPDATE user_playlist_tracks SET position=? WHERE id=? AND playlist_id=?');foreach($requested as $i=>$itemId)$q->execute([$i,$itemId,$playlistId]);$pdo->prepare('UPDATE user_playlists SET updated_at=? WHERE id=? AND user_id=?')->execute([gmdate('c'),$playlistId,$userId]);$pdo->commit();}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}return sf_playlist_get_owned($userId,$playlistId);}
+function sf_playlist_update(int $userId,int $playlistId,string $name,string $description,string $visibility): array {
+    return sf_playlist_mutation($userId,$playlistId,static function()use($userId,$playlistId,$name,$description,$visibility):array {
+        $name=sf_clean_text($name,120);if($name==='')throw new InvalidArgumentException('Playlist name is required.');
+        sf_db()->prepare('UPDATE user_playlists SET name=?,description=?,visibility=?,updated_at=? WHERE id=? AND user_id=?')
+            ->execute([$name,sf_clean_text($description,1000),sf_playlist_clean_visibility($visibility),gmdate('c'),$playlistId,$userId]);
+        return sf_playlist_public_payload(sf_playlist_lock_owned($userId,$playlistId),true,true);
+    });
+}
+function sf_playlist_delete(int $userId,int $playlistId): void {
+    sf_playlist_mutation($userId,$playlistId,static function()use($userId,$playlistId):void {
+        sf_db()->prepare('DELETE FROM user_playlists WHERE id=? AND user_id=?')->execute([$playlistId,$userId]);
+    });
+}
+function sf_playlist_add_track(int $userId,int $playlistId,string $trackId): array {
+    return sf_playlist_mutation($userId,$playlistId,static function()use($userId,$playlistId,$trackId):array {
+        if(!sf_playlist_track_payload($trackId))throw new InvalidArgumentException('Unknown track.');
+        $q=sf_db()->prepare('SELECT position FROM user_playlist_tracks WHERE playlist_id=? ORDER BY position DESC,id DESC LIMIT 1'.sf_playlist_current_read());
+        $q->execute([$playlistId]);$last=$q->fetchColumn();$pos=$last===false?0:(int)$last+1;$now=gmdate('c');
+        sf_db()->prepare('INSERT INTO user_playlist_tracks(playlist_id,track_id,position,added_at) VALUES(?,?,?,?)')->execute([$playlistId,$trackId,$pos,$now]);
+        sf_db()->prepare('UPDATE user_playlists SET updated_at=? WHERE id=? AND user_id=?')->execute([$now,$playlistId,$userId]);
+        return sf_playlist_public_payload(sf_playlist_lock_owned($userId,$playlistId),true,true);
+    });
+}
+function sf_playlist_remove_item(int $userId,int $playlistId,int $itemId): array {
+    return sf_playlist_mutation($userId,$playlistId,static function()use($userId,$playlistId,$itemId):array {
+        $q=sf_db()->prepare('DELETE FROM user_playlist_tracks WHERE id=? AND playlist_id=?');$q->execute([$itemId,$playlistId]);
+        if(!$q->rowCount())throw new RuntimeException('Playlist track was not found.');sf_playlist_resequence($playlistId);
+        sf_db()->prepare('UPDATE user_playlists SET updated_at=? WHERE id=? AND user_id=?')->execute([gmdate('c'),$playlistId,$userId]);
+        return sf_playlist_public_payload(sf_playlist_lock_owned($userId,$playlistId),true,true);
+    });
+}
+function sf_playlist_reorder(int $userId,int $playlistId,array $itemIds): array {
+    return sf_playlist_mutation($userId,$playlistId,static function()use($userId,$playlistId,$itemIds):array {
+        $existing=array_map(static fn(array $item):int=>(int)$item['item_id'],sf_playlist_tracks($playlistId,true));$requested=array_map('intval',$itemIds);
+        if(count($existing)!==count($requested)||array_diff($existing,$requested)||array_diff($requested,$existing))throw new InvalidArgumentException('Playlist order does not match the current playlist.');
+        $q=sf_db()->prepare('UPDATE user_playlist_tracks SET position=? WHERE id=? AND playlist_id=?');foreach($requested as $i=>$itemId)$q->execute([$i,$itemId,$playlistId]);
+        sf_db()->prepare('UPDATE user_playlists SET updated_at=? WHERE id=? AND user_id=?')->execute([gmdate('c'),$playlistId,$userId]);
+        return sf_playlist_public_payload(sf_playlist_lock_owned($userId,$playlistId),true,true);
+    });
+}
 function sf_playlist_recent_agent_track_ids(int $userId,int $limit=20,int $minutes=180): array {sf_ops_ensure_schema();$limit=max(1,min(50,$limit));$since=gmdate('c',time()-max(5,min(1440,$minutes))*60);$q=sf_db()->prepare("SELECT track_id,MAX(id) AS last_id FROM listening_events WHERE user_id=? AND source='agent' AND created_at>=? AND event_type IN ('start','resume','complete') GROUP BY track_id ORDER BY last_id ASC LIMIT ".$limit);$q->execute([$userId,$since]);return array_values(array_filter(array_map(fn($r)=>(string)$r['track_id'],$q->fetchAll()),fn($id)=>isset(sf_track_map()[$id])));}
 function sf_playlist_create_from_agent_session(int $userId,string $name='Agent Listening Session'): array {$ids=sf_playlist_recent_agent_track_ids($userId);if(!$ids)throw new RuntimeException('No recent agent-curated listening session is available to save yet.');return sf_playlist_create($userId,$name,'Saved from your recent Stonefellow agent listening session.','private','agent_session',$ids);}
 function sf_agent_playlist_track_ids(string $message,?string $activeId=null,int $limit=7,?int $userId=null): array {$rows=[];$profile=$userId&&function_exists('sf_personalization_recommendation_profile')?sf_personalization_recommendation_profile($userId):null;$personal=[];if($profile){foreach(sf_personalization_rank_catalog(sf_catalog(),$profile,30,$activeId?[$activeId]:[]) as $r)$personal[(string)$r['track_id']]=(float)$r['score'];}foreach(sf_catalog() as $t){$id=(string)($t['id']??'');$score=sf_agent_track_score($t,$message)*4+(float)($personal[$id]??0);if($activeId&&$id===$activeId)$score+=2;$rows[]=['id'=>$id,'score'=>$score,'energy'=>(int)($t['energy']??3)];}usort($rows,fn($a,$b)=>$b['score']<=>$a['score']?:$a['energy']<=>$b['energy']);return array_values(array_filter(array_map(fn($x)=>$x['id'],array_slice($rows,0,max(1,min(20,$limit))))));}
