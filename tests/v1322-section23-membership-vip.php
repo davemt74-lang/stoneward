@@ -65,7 +65,9 @@ ok(str_contains($core,'early_access_days')&&str_contains($core,"reason='early_ac
 ok(str_contains($core,"\$type==='vip_offer'")&&str_contains($core,'vip_benefit_required'),'VIP content requires configured VIP benefit');
 ok(str_contains($core,"\$type==='download'")&&str_contains($core,'download_benefit_required'),'exclusive downloads require download benefit');
 ok(str_contains($mediaCore,"'member_content'"),'Media Library can attach assets to member content');
-ok(str_contains($media,"entity_type']??'')==='member_content'")&&str_contains($media,'sf_membership_content_access'),'controlled media delivery rechecks member-content entitlement before serving bytes');
+ok(str_contains($media,"if(\$type==='member_content'){")&&str_contains($media,'sf_membership_content_access')&&
+    str_contains($media,"if(empty(\$access['allowed']))continue;"),
+    'controlled media delivery rechecks member-content entitlement before serving bytes');
 
 ok(str_contains($adminShell,'data-view="membership"')&&str_contains($adminShell,'assets/membership.js'),'Membership + VIP is a first-class Admin workspace');
 ok(str_contains($adminJs,"membership:'Membership + VIP'")&&str_contains($adminJs,'SFMembershipAdmin'),'Admin router loads membership module');
