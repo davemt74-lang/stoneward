@@ -38,7 +38,7 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         'scripts/release-zip.sh': (ROOT / 'scripts/release-zip.sh').read_text(),
     }
     live_data_assets = (
-        'api/canvas-data.php', 'assets/js/canvas-data-picker.js',
+        'api/canvas-data.php', 'api/canvas-geography-core.php', 'assets/js/canvas-data-picker.js',
         *(f'config/canvas-data-places/us-places-{part:02}.tsv' for part in range(1, 4)),
     )
     contents.update({name: (ROOT / name).read_text(encoding='utf-8') for name in live_data_assets})

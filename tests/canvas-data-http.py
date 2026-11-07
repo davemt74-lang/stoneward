@@ -24,7 +24,9 @@ finally:
 PHP = os.environ.get('SF_TEST_PHP', 'php')
 ENDPOINT = '/api/canvas-data.php'
 PERMISSION = 'canvas.data.weather_nws'
-PRODUCTS = {'weather.current', 'weather.hourly', 'weather.daily', 'weather.alerts'}
+GEO_PERMISSION = 'canvas.data.geography_public'
+WEATHER_PRODUCTS = {'weather.current', 'weather.hourly', 'weather.daily', 'weather.alerts'}
+GEO_PRODUCTS = {'geography.place', 'geography.shows'}
 
 
 def query(action, **params):
@@ -59,6 +61,15 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
         {'id': 'fixture-private-show', 'title': 'PRIVATE_SHOW_CANARY', 'venue': 'PRIVATE_VENUE_CANARY',
          'city': 'Phoenix', 'region': 'AZ', 'country': 'US', 'date': '2099-01-01', 'status': 'hidden',
          'public_visible': False},
+        {'id': 'fixture-nearby-show', 'title': 'Closest stage', 'venue': 'Phoenix Stage',
+         'city': 'Phoenix', 'region': 'AZ', 'country': 'US', 'date': '2099-01-02', 'status': 'scheduled',
+         'public_visible': True, 'archive_notes': 'PRIVATE_SHOW_NOTES'},
+        {'id': 'fixture-cancelled-show', 'title': 'Former show', 'venue': 'Former Stage',
+         'city': 'Phoenix', 'region': 'AZ', 'country': 'US', 'date': '2099-01-01', 'status': 'canceled',
+         'public_visible': True},
+        {'id': 'fixture-past-show', 'title': 'Past show', 'venue': 'Past Stage',
+         'city': 'Phoenix', 'region': 'AZ', 'country': 'US', 'date': '2000-01-01', 'status': 'scheduled',
+         'public_visible': True},
     ]
     (site / 'data/shows.json').write_text(json.dumps(shows))
     seeded = json.loads(fixture.cli(site, """
@@ -71,13 +82,21 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
                 ['alias'=>'venue','product'=>'weather.hourly','location_id'=>'show-fixture-weather-show'],
             ]],
         ]);
+        $composed=sf_agent_scene_history_save(1,[
+            'canvas_kind'=>'custom','track_id'=>'','title'=>'Map with forecasts','html'=>'<p>Fixture geography</p>','css'=>'',
+            'artist_inputs'=>['data_sources'=>[
+                ['alias'=>'anchor','product'=>'geography.place','location_id'=>'city-0455000'],
+                ['alias'=>'shows','product'=>'geography.shows','location_id'=>'city-0455000'],
+                ['alias'=>'forecast','product'=>'weather.hourly','location_id'=>'published-shows'],
+            ]],
+        ]);
         $owner=['id'=>1,'role'=>'user'];$admin=['id'=>2,'role'=>'admin'];
         $submission=['scene_id'=>$scene['id'],'title'=>'Fixture show weather','description'=>'Two selected public sources',
             'creator_label'=>'Fixture','publication_consent'=>true];
         $public=sf_canvas_gallery_submit($owner,$submission+['request_id'=>str_repeat('aa',16)]);
         $pending=sf_canvas_gallery_submit($owner,$submission+['request_id'=>str_repeat('bb',16)]);
         sf_canvas_gallery_moderate($admin,$public['id'],'approve',$public['snapshot_hash']);
-        echo json_encode(['scene'=>$scene['id'],'gallery'=>$public['id'],'pending'=>$pending['id']]);
+        echo json_encode(['scene'=>$scene['id'],'composed'=>$composed['id'],'gallery'=>$public['id'],'pending'=>$pending['id']]);
     """))
 
     def calls():
@@ -109,10 +128,11 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
 
             inventory = guest.get(query('inventory'))
             products = {row['id']: row for row in inventory.json()['products']}
-            fixture.check(inventory.status == 200 and set(products) == PRODUCTS and
+            fixture.check(inventory.status == 200 and set(products) == WEATHER_PRODUCTS | GEO_PRODUCTS and
                           'temperature_f' in products['weather.current']['fields'] and
+                          'distance_km' in products['geography.shows']['fields'] and
                           'no-store' in inventory.headers.get('cache-control', ''),
-                          'Guests can discover the four weather product schemas without cacheable account data')
+                          'Guests can discover separate weather and geography schemas without cacheable account data')
             city = guest.get(query('places', q='Phoenix, AZ')).json()['items']
             venue = guest.get(query('places', id='show-fixture-weather-show')).json()['items']
             fixture.check(any(row['id'] == 'city-0455000' for row in city) and
@@ -157,8 +177,9 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
             """)
             disabled = owner.get(read).json()['data']
             fixture.check(disabled['status'] == 'unavailable' and disabled['rows'] == [] and
-                          guest.get(query('inventory')).json()['products'] == [] and len(calls()) == 2,
-                          'The admin switch removes public discovery and withholds runtime weather before provider access')
+                          {item['id'] for item in guest.get(query('inventory')).json()['products']} == GEO_PRODUCTS and
+                          len(calls()) == 2,
+                          'The weather switch removes its discovery and runtime access while keeping geography enabled')
             fixture.cli(site, """
                 require_once SF_ROOT.'/api/canvas-capabilities.php';
                 sf_canvas_permission_save(['id'=>2,'role'=>'admin'],sf_canvas_permission_policy()['revision'],['canvas.data.weather_nws'=>true]);
@@ -175,6 +196,47 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
             """)
             fixture.check(guest.get(public_read).status == 404 and len(calls()) == 2,
                           'Withdrawal revokes the public weather route without contacting the provider')
+
+            shows[0]['public_visible'] = True
+            (site / 'data/shows.json').write_text(json.dumps(shows))
+            scene_id = seeded['composed']
+            maps = query('read', scene_id=scene_id, alias='shows')
+            place = owner.get(query('read', scene_id=scene_id, alias='anchor')).json()['data']
+            venue_data = owner.get(maps).json()['data']
+            row_ids = [row['location_id'] for row in venue_data['rows']]
+            fixture.check(place['status'] == 'fresh' and place['rows'][0]['location_id'] == 'city-0455000' and
+                          'precision' in place['rows'][0] and abs(place['rows'][0]['lat'] - 33.5) < .4 and
+                          row_ids == ['show-fixture-nearby-show', 'show-fixture-weather-show'] and
+                          'PRIVATE_SHOW_NOTES' not in json.dumps(venue_data) and len(calls()) == 2,
+                          'Geography returns source-labeled coordinates and eligible nearby-first show IDs without upstream weather')
+            fixture.check(guest.get(maps).status == 404 and other.get(maps).status == 404,
+                          'Composition through a saved scene still requires scene ownership')
+            weather_scope = query('read', scene_id=scene_id, alias='forecast')
+            wrong_place = query('read', scene_id=scene_id, alias='forecast', location_id='city-0455000')
+            override = query('read', scene_id=seeded['scene'], alias='phoenix', location_id=row_ids[0])
+            bad_shape = weather_scope + '&location_id%5B%5D=' + row_ids[0]
+            fixture.check(all(owner.get(path).status == 422 for path in [weather_scope, wrong_place, override, bad_shape]) and len(calls()) == 2,
+                          'Show-scoped reads require a canonical show ID and exact bindings reject overrides')
+            for hidden_id in ['show-fixture-private-show', 'show-fixture-cancelled-show', 'show-fixture-past-show', 'show-fixture-unknown']:
+                unavailable = owner.get(query('read', scene_id=scene_id, alias='forecast', location_id=hidden_id)).json()['data']
+                fixture.check(unavailable['status'] == 'unavailable' and unavailable['rows'] == [] and len(calls()) == 2,
+                              'An ineligible show ID never reaches the weather provider')
+            matched = owner.get(query('read', scene_id=scene_id, alias='forecast', location_id=row_ids[1]))
+            matched_data = matched.json()['data']
+            fixture.check(matched.status == 200 and matched_data['status'] == 'fresh' and
+                          matched_data['location']['id'] == row_ids[1] and matched_data['rows'][0]['temperature_f'] == 91 and
+                          len(calls()) == 3 and calls()[2][2] == 'hourly',
+                          'A map result can supply the exact location for a separately approved weather source')
+            fixture.cli(site, """
+                require_once SF_ROOT.'/api/canvas-capabilities.php';
+                sf_canvas_permission_save(['id'=>2,'role'=>'admin'],sf_canvas_permission_policy()['revision'],['canvas.data.geography_public'=>false]);
+            """)
+            disabled_map = owner.get(maps).json()['data']
+            known_weather = owner.get(query('read', scene_id=scene_id, alias='forecast', location_id=row_ids[0])).json()['data']
+            fixture.check(disabled_map['status'] == 'unavailable' and disabled_map['rows'] == [] and
+                          {item['id'] for item in guest.get(query('inventory')).json()['products']} == WEATHER_PRODUCTS and
+                          known_weather['status'] == 'fresh' and len(calls()) == 4,
+                          'The geography policy is independent of authorized weather and its attached show scope')
             print(f'{fixture.checks} real HTTP canvas data checks passed', flush=True)
         except Exception:
             log.seek(0)

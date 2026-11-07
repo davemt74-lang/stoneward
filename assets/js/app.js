@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.301';
+  window.STONEFELLOW_APP_BUILD='1.3.302';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -4134,13 +4134,16 @@
     });
     return {tracks,releases};
   }
-  async function loadCanvasData(alias,context,signal){
+  async function loadCanvasData(alias,context,signal,locationId){
     const owner=canvasSceneOwner(),scene=listeningRoom;
     requireCanvasAudioSession(owner,scene);
     const selected=canvasAudioContext(scene);
     if(selected.scene_id!==context?.scene_id||selected.gallery_id!==context?.gallery_id||
-      typeof alias!=='string'||!/^[a-z][a-z0-9-]{0,31}$/.test(alias))throw new Error('This canvas data source is unavailable.');
+      typeof alias!=='string'||!/^[a-z][a-z0-9-]{0,31}$/.test(alias)||
+      (locationId!==undefined&&(typeof locationId!=='string'||!/^show-[a-z0-9][a-z0-9-]{0,79}$/.test(locationId))))
+      throw new Error('This canvas data source is unavailable.');
     const params=new URLSearchParams({action:'read',alias,...selected});
+    if(locationId!==undefined)params.set('location_id',locationId);
     const result=await api('canvas-data.php?'+params,undefined,signal);
     requireCanvasAudioSession(owner,scene);
     return result.data;

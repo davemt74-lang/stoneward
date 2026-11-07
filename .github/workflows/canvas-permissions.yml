@@ -60,10 +60,11 @@ jobs:
           php tests/canvas-account-data.php
           php tests/canvas-me-flow.php
           php tests/canvas-me-delivery.php
-      - name: Live data catalog, scoped reads and NWS provider contract
+      - name: Live data catalog, geography, scoped reads and NWS provider contract
         run: |
           php tests/canvas-weather.php
           php tests/canvas-data-places.php
+          php tests/canvas-geography.php
           php tests/canvas-data-flow.php
           python tests/canvas-data-http.py
       - name: Real PHP endpoint authentication, CSRF and current-viewer data

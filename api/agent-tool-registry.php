@@ -64,7 +64,16 @@ function sf_agent_tool_registry(): array {
             'label'=>'National Weather Service data','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-data.php',
             'handler'=>'sf_canvas_data_read','confirmation'=>false,'execution'=>'server',
             'canvas_external'=>[
-                'description'=>'Live observations, forecasts and alerts for selected public locations through named data sources.',
+                'description'=>'Live observations, forecasts and alerts for selected public places or explicitly selected upcoming venue scopes.',
+                'fields'=>['status'=>'text','source'=>'text','fetched_at'=>'datetime','expires_at'=>'datetime','rows'=>'array'],
+                'max_rows'=>48,
+            ],
+        ],
+        'geography_public'=>[
+            'label'=>'Public geography and upcoming shows','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-data.php',
+            'handler'=>'sf_canvas_data_read','confirmation'=>false,'execution'=>'server',
+            'canvas_external'=>[
+                'description'=>'Public city coordinates, venue locations and upcoming shows ordered by distance from a selected public place.',
                 'fields'=>['status'=>'text','source'=>'text','fetched_at'=>'datetime','expires_at'=>'datetime','rows'=>'array'],
                 'max_rows'=>48,
             ],

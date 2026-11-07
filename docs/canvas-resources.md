@@ -39,7 +39,7 @@ History events include start, resume, pause, complete and skip. Measured listeni
 
 ## Live sources with /data
 
-Type `/data` and add up to four named sources. Each record binds an alias to a registered product and an explicitly selected public location. A revision inherits its bindings until replaced or cleared. The catalog describes parameters, typed fields and permissions. Opening it makes no upstream weather request.
+Type `/data` and add up to four named sources. Each record binds an alias to a registered product and an explicitly selected public location or venue scope. A revision inherits its bindings until replaced or cleared. The catalog describes parameters, typed fields and permissions. Opening it makes no upstream weather request.
 
 Read a binding from authored code with `await StonefellowData.get(alias)`. The shared envelope contains `status` (`fresh`, `stale` or `unavailable`), `source`, `fetched_at`, `expires_at`, and typed `rows`. Where available, weather responses also include the location time zone. Optional fields can be null. The registry publishes each product's row schema, including observation timestamps and forecast period boundaries. A canvas can use several aliases together with music, account data or any other authorized capability. Layout, conditions and actions come from the prompt.
 
@@ -49,8 +49,12 @@ Read a binding from authored code with `await StonefellowData.get(alias)`. The s
 | `weather.hourly` | Up to 48 hourly forecast periods, with valid times, temperature, conditions and available precipitation and wind fields |
 | `weather.daily` | Up to 14 day and night forecast periods |
 | `weather.alerts` | Active official alerts for the selected point, with severity, applicable times and available guidance |
+| `geography.place` | One public city or venue, including stable IDs, name, region, coordinates and coordinate provenance |
+| `geography.shows` | Up to 48 upcoming, geocoded shows from the published catalog, nearest first by straight-line distance from the selected city or venue |
 
-The first adapter uses the National Weather Service. U.S. public city coordinates come from the Census Gazetteer. Published venues use the corresponding city point, which the picker labels as city weather. Device location and international providers are future additions. [NWS API documentation](https://www.weather.gov/documentation/services-web-API) · [U.S. Census Gazetteer Files](https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html)
+The weather adapter uses the National Weather Service. Public place coordinates come from the bundled U.S. Census Gazetteer. Venue coordinates use the city's representative point, so distances and forecasts describe the area around the venue. Upcoming shows follow the public calendar's UTC date boundary. Each `date` is the published date or local date and time, with no inferred time zone. [NWS API documentation](https://www.weather.gov/documentation/services-web-API) · [U.S. Census Gazetteer Files](https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html)
+
+A weather alias with **Any upcoming published venue** selected accepts `await StonefellowData.get(alias, {location_id: show.location_id})`. A canvas can choose a show at runtime from `geography.shows` and pass its returned location ID to the weather source. The host verifies the selected scope and checks that the show is still upcoming, public and geocoded. Fixed locations use `get(alias)`. Admins control geography and weather separately in the canvas permission matrix.
 
 The host resolves the alias against the current saved owner canvas or approved gallery. It rechecks the provider policy and location on each read. Detached verification uses an unavailable state so it can test the generated code without depending on live external data. Prefetch before a playback gesture. For a rule based on a current observation, check the returned status, expiry and requested field again when taking the action.
 

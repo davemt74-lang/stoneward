@@ -23,11 +23,17 @@ HTML = ('<!doctype html><html><body><form id="chat">'
         '<label>Prompt<input id="composer" maxlength="2000"></label>'
         '<button type="submit">Send</button></form><p id="notice"></p></body></html>')
 PARAMETERS = {'location_id': {'type': 'public_place', 'label': 'City or venue'}}
+VENUE_SCOPE = {'id': 'published-shows', 'title': 'Any upcoming published venue', 'kind': 'scope'}
+WEATHER_PARAMETERS = {'location_id': {**PARAMETERS['location_id'], 'scope_options': [
+    VENUE_SCOPE,
+    {'id': 'https://example.invalid/location', 'title': 'URL must be rejected', 'kind': 'scope'},
+    {'id': '33.45,-112.07', 'title': 'Coordinates must be rejected', 'kind': 'scope'},
+]}}
 PRODUCTS = [
     {'id': 'weather.current', 'title': 'Current conditions', 'description': 'Recent conditions <b>observed</b>.',
-     'fields': {'temperature_f': 'number', 'observed_at': 'text'}, 'parameters': PARAMETERS},
+     'fields': {'temperature_f': 'number', 'observed_at': 'text'}, 'parameters': WEATHER_PARAMETERS},
     {'id': 'weather.hourly', 'title': 'Hourly forecast',
-     'fields': {'start_at': 'text'}, 'parameters': PARAMETERS},
+     'fields': {'start_at': 'text'}, 'parameters': WEATHER_PARAMETERS},
     {'id': 'maps.points', 'title': 'Map points', 'description': 'Generic source registered by a second service.',
      'fields': {'latitude': 'number'}, 'parameters': PARAMETERS},
     {'id': 'weather.daily', 'title': 'Disabled forecast', 'enabled': False, 'parameters': PARAMETERS},
@@ -115,7 +121,7 @@ with sync_playwright() as playwright:
             composer.press('Enter')
             expect(picker).to_be_visible()
             expect(source).to_be_visible()
-            expect(place.locator('option')).to_have_count(2)
+            expect(place.locator('option')).to_have_count(3)
 
         def find(query, canonical_id):
             search.fill(query)
@@ -149,23 +155,49 @@ with sync_playwright() as playwright:
         name.fill('tucson-map')
         activate(add)
         expect(picker.get_by_text('3 of 4 sources')).to_be_visible()
+
+        scope_option = place.locator('option[value="published-shows"]')
+        expect(scope_option).to_have_count(0)
+        source.select_option('weather.current')
+        expect(scope_option).to_have_text(VENUE_SCOPE['title'])
+        place.select_option(VENUE_SCOPE['id'])
+        source.select_option('maps.points')
+        expect(scope_option).to_have_count(0)
+        expect(place).to_have_value('')
+        expect(add).to_be_disabled()
+        expect(place.locator(f'option[value="{TUCSON["id"]}"]')).to_have_count(1)
+        source.select_option('weather.current')
+        place.select_option(VENUE_SCOPE['id'])
+        search.fill('Missing town')
+        activate(picker.get_by_role('button', name='Search', exact=True))
+        expect(picker.get_by_text('No matching public cities or venues.')).to_be_visible()
+        expect(place).to_have_value(VENUE_SCOPE['id'])
+        name.fill('venue-weather')
+        activate(add)
+        expect(picker.get_by_text('4 of 4 sources')).to_be_visible()
+        expect(add).to_be_disabled()
         activate(attach)
         expect(composer).to_be_focused()
         expected_bindings = ('{data:phoenix-live:weather.current:city-0455000} '
                              '{data:tucson-live:weather.current:city-0477000} '
-                             '{data:tucson-map:maps.points:city-0477000}')
+                             '{data:tucson-map:maps.points:city-0477000} '
+                             '{data:venue-weather:weather.current:published-shows}')
         expect(composer).to_have_value(expected_bindings)
         bindings = page.evaluate('chatDraftResourceInputs(input.value).artist_inputs.data_sources')
         assert bindings == [
             {'alias': 'phoenix-live', 'product': 'weather.current', 'location_id': PHOENIX['id']},
             {'alias': 'tucson-live', 'product': 'weather.current', 'location_id': TUCSON['id']},
             {'alias': 'tucson-map', 'product': 'maps.points', 'location_id': TUCSON['id']},
+            {'alias': 'venue-weather', 'product': 'weather.current', 'location_id': VENUE_SCOPE['id']},
         ]
         assert page.evaluate('canvasDesignBrief(input.value)===""&&input.maxLength>2000')
 
         page.evaluate("(sources)=>{owner='1';listeningRoom={id:8,artist_inputs:{data_sources:sources}}}", bindings)
         open_picker('/edit Restyle {me:my_preferences} {music-track:song} /data')
-        expect(picker.get_by_role('list', name='Selected data sources').get_by_text('Map points · Tucson, AZ')).to_be_visible()
+        selected = picker.get_by_role('list', name='Selected data sources')
+        expect(selected.get_by_text('Map points · Tucson, AZ')).to_be_visible()
+        expect(selected.get_by_text('Current conditions · ' + VENUE_SCOPE['title'])).to_be_visible()
+        expect(attach).to_be_enabled()
         for item in bindings:
             activate(picker.get_by_role('button', name='Remove ' + item['alias'], exact=True))
         activate(attach)
@@ -188,7 +220,8 @@ with sync_playwright() as playwright:
         assert not errors
         assert all(method == 'GET' for method, _ in requests)
         assert any('action=places&id=city-0455000' in url for _, url in requests)
+        assert not any('action=places&id=published-shows' in url for _, url in requests)
         assert all(url == 'https://data.test/' or url.startswith('https://data.test/api/canvas-data.php?') for _, url in requests)
-        print(f'PASS chromium/{width}: multiple named data sources, generic provider selection, clearing and stale edit protection')
+        print(f'PASS chromium/{width}: multiple named data sources, product-scoped venues, safe restoration and stale edit protection')
         context.close()
     browser.close()
