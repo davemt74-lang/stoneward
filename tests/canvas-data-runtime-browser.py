@@ -114,6 +114,57 @@ MAP_PROGRAM = r'''(async () => {
   document.querySelector('.experiment').textContent = `${location.title} · ${chunks.length} chunks · ${count} points`;
 })();'''
 
+EARTHQUAKE_PROGRAM = r'''(() => {
+  const root = document.querySelector('.experiment');
+  const status = document.createElement('p');
+  status.className = 'quake-status';
+  const refresh = document.createElement('button');
+  refresh.textContent = 'Refresh earthquake data';
+  const svg = tag => document.createElementNS('http://www.w3.org/2000/svg', tag);
+  const map = svg('svg');
+  map.setAttribute('viewBox', '0 0 400 168');
+  const boundaries = svg('g'), markers = svg('g');
+  map.append(boundaries, markers);
+  root.append(refresh, status, map);
+  const project = (lon, lat) => [((lon + 117) * 24).toFixed(2), ((50 - lat) * 24).toFixed(2)];
+  let renders = 0;
+  async function render() {
+    const [geometry, quakes] = await Promise.all([StonefellowData.get('boundary'), StonefellowData.get('quakes')]);
+    const rings = new Map();
+    for (const row of geometry.rows) {
+      const key = `${row.region}/${row.part}/${row.ring}`;
+      if (!rings.has(key)) rings.set(key, []);
+      rings.get(key).push(row);
+    }
+    boundaries.replaceChildren(...[...rings.values()].map(rows => {
+      const edge = svg('polyline');
+      const coordinates = rows.sort((a, b) => a.chunk - b.chunk).flatMap(row => JSON.parse(row.coordinates));
+      edge.setAttribute('points', coordinates.map(([lon, lat]) => project(lon, lat).join(',')).join(' '));
+      edge.setAttribute('stroke', 'white');
+      edge.setAttribute('fill', 'none');
+      return edge;
+    }));
+    const records = quakes.status === 'unavailable' ? [] : quakes.rows;
+    markers.replaceChildren(...records.map(quake => {
+      const marker = svg('circle');
+      const label = svg('title');
+      const [x, y] = project(quake.lon, quake.lat);
+      marker.setAttribute('cx', x);
+      marker.setAttribute('cy', y);
+      marker.setAttribute('r', quake.magnitude);
+      marker.setAttribute('data-event', quake.event_id);
+      label.textContent = `${quake.place} · M${quake.magnitude} · ${quake.depth_km} km · ${quake.review_status}`;
+      marker.append(label);
+      return marker;
+    }));
+    status.textContent = quakes.status === 'unavailable' ? 'Earthquake data unavailable'
+      : `${records.length} earthquake readings${quakes.status === 'stale' ? ' · stale feed' : ''} · ${quakes.source}`;
+    status.dataset.renders = ++renders;
+  }
+  refresh.onclick = render;
+  void render();
+})();'''
+
 PROXIMITY_PROGRAM = r'''(async () => {
   const root = document.querySelector('.experiment');
   const make = (tag, text) => {
@@ -193,6 +244,17 @@ def run(page, width):
     map_rows = json.loads((ROOT / 'config/canvas-maps/us-regions.json').read_text())['MT']
     point = 'point-33450000_-112070000_100'
     proximity_available = True
+    earthquake_state = 'fresh'
+    earthquake_rows = [
+        {'event_id': 'test001', 'place': 'Near Helena, Montana', 'magnitude': 3.2, 'magnitude_type': 'ml',
+         'lat': 46.59, 'lon': -112.04, 'depth_km': 8.1, 'occurred_at': '2026-11-07T06:20:00+00:00',
+         'updated_at': '2026-11-07T06:25:00+00:00', 'review_status': 'reviewed',
+         'source_url': 'https://earthquake.usgs.gov/earthquakes/eventpage/test001'},
+        {'event_id': 'test002', 'place': 'Near Bozeman, Montana', 'magnitude': 2.6, 'magnitude_type': 'md',
+         'lat': 45.68, 'lon': -111.04, 'depth_km': 10, 'occurred_at': '2026-11-07T04:10:00+00:00',
+         'updated_at': '2026-11-07T04:12:00+00:00', 'review_status': 'automatic',
+         'source_url': 'https://earthquake.usgs.gov/earthquakes/eventpage/test002'},
+    ]
 
     def route_request(route):
         url = urlparse(route.request.url)
@@ -204,6 +266,16 @@ def run(page, width):
             query = parse_qs(url.query)
             requests.append(query)
             alias = query.get('alias', [''])[0]
+            if alias == 'quakes':
+                assert 'location_id' not in query
+                data = weather(None, '', earthquake_state)
+                data.update(alias=alias, product='earthquakes.recent', source='U.S. Geological Survey', timezone=None,
+                            location={'id': 'm25-day', 'title': 'Worldwide · M2.5+ · Past 24 hours', 'kind': 'scope'},
+                            rows=earthquake_rows)
+                if earthquake_state == 'unavailable':
+                    data.update(status='unavailable', fetched_at=None, expires_at=None, rows=[])
+                route.fulfill(json={'ok': True, 'data': data})
+                return
             if alias in ('boundary', 'map-origin', 'venue-check'):
                 assert 'location_id' not in query
                 if alias == 'venue-check' and not proximity_available:
@@ -369,6 +441,38 @@ def run(page, width):
     frame.get_by_text(f'Selected city · {len(map_rows)} chunks · {points} points', exact=True).wait_for()
     assert {(row['alias'][0], row['scene_id'][0]) for row in requests[count:]} == {('boundary', '88'), ('map-origin', '88')}
     print(f'PASS Chromium/{width} bundled map geometry reaches authored code and composes with public geography', flush=True)
+
+    count = len(requests)
+    assert page.evaluate('([code, sources]) => display(code,false,sources)', [EARTHQUAKE_PROGRAM, [
+        {'alias': 'boundary', 'product': 'map.boundaries', 'location_id': 'city-3035680'},
+        {'alias': 'quakes', 'product': 'earthquakes.recent', 'location_id': 'm25-day'},
+    ]])
+    wait_text('.quake-status', '2 earthquake readings · U.S. Geological Survey')
+    edges = frame.locator('svg polyline')
+    assert edges.count() > 0 and len(edges.first.get_attribute('points').split()) > 100
+    markers = frame.locator('svg circle')
+    assert markers.count() == 2
+    assert markers.first.get_attribute('cx') == '119.04' and markers.first.get_attribute('cy') == '81.84'
+    assert markers.first.get_attribute('data-event') == 'test001'
+    assert markers.first.locator('title').text_content() == 'Near Helena, Montana · M3.2 · 8.1 km · reviewed'
+    refresh = frame.get_by_role('button', name='Refresh earthquake data')
+    activate_refresh = refresh.tap if width == 390 else refresh.click
+    for renders, earthquake_state in enumerate(('stale', 'expired'), start=2):
+        activate_refresh()
+        wait_text(f'.quake-status[data-renders="{renders}"]', '2 earthquake readings · stale feed · U.S. Geological Survey')
+        assert markers.count() == 2
+        assert len(requests) == count + 2 * renders
+    earthquake_state = 'unavailable'
+    activate_refresh()
+    wait_text('.quake-status', 'Earthquake data unavailable')
+    assert markers.count() == 0 and edges.count() > 0
+    quake_requests = requests[count:]
+    assert len(quake_requests) == 8 and all(sorted(row) == ['action', 'alias', 'scene_id'] for row in quake_requests)
+    assert {(row['action'][0], row['alias'][0], row['scene_id'][0]) for row in quake_requests} == {
+        ('read', 'boundary', '88'), ('read', 'quakes', '88'),
+    }
+    assert not unknown_requests
+    print(f'PASS Chromium/{width} authored code plots earthquake readings over bundled boundaries and handles stale or unavailable feeds', flush=True)
 
     count = len(requests)
     sources = [{'alias': 'venue-check', 'product': 'location.proximity', 'location_id': point}]

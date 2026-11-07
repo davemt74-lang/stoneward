@@ -66,6 +66,7 @@ jobs:
           php tests/canvas-data-places.php
           php tests/canvas-geography.php
           php tests/canvas-map.php
+          php tests/canvas-earthquakes.php
           php tests/canvas-data-flow.php
           python tests/canvas-data-http.py
       - name: Real PHP endpoint authentication, CSRF and current-viewer data

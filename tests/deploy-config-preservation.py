@@ -38,7 +38,7 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         'scripts/release-zip.sh': (ROOT / 'scripts/release-zip.sh').read_text(),
     }
     live_data_assets = (
-        'api/canvas-data.php', 'api/canvas-geography-core.php', 'api/canvas-map-core.php',
+        'api/canvas-data.php', 'api/canvas-geography-core.php', 'api/canvas-map-core.php', 'api/canvas-earthquakes-core.php',
         'assets/js/canvas-data-picker.js', 'assets/js/canvas-location.js',
         'config/canvas-maps/us-regions.json', 'config/canvas-maps/us-overview.json',
         *(f'config/canvas-data-places/us-places-{part:02}.tsv' for part in range(1, 4)),

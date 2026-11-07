@@ -39,7 +39,7 @@ History events include start, resume, pause, complete and skip. Measured listeni
 
 ## Live sources with /data
 
-Type `/data` and add up to four named sources. Each record binds an alias to a registered product and a selected public place, scope or exact target point. A revision inherits its bindings until replaced or cleared. The catalog describes parameters, typed fields and permissions. Opening it makes no upstream weather request.
+Type `/data` and add up to four named sources. Each record binds an alias to a registered product and a selected public place, scope, exact target point, or feed. A revision inherits its bindings until replaced or cleared. The catalog describes parameters, typed fields and permissions. Opening it makes no upstream data request.
 
 Read a binding from authored code with `await StonefellowData.get(alias)`. The shared envelope contains `status` (`fresh`, `stale` or `unavailable`), `source`, `fetched_at`, `expires_at`, and typed `rows`. Where available, weather responses also include the location time zone. Optional fields can be null. The registry publishes each product's row schema, including observation timestamps and forecast period boundaries. A canvas can use several aliases together with music, account data or any other authorized capability. Layout, conditions and actions come from the prompt.
 
@@ -53,6 +53,7 @@ Read a binding from authored code with `await StonefellowData.get(alias)`. The s
 | `geography.shows` | Up to 48 upcoming, geocoded shows from the published catalog, nearest first by straight-line distance from the selected city or venue |
 | `map.boundaries` | Simplified Census state and territory boundaries for a selected place or the U.S. overview |
 | `location.proximity` | One-time, viewer-consented proximity result against a selected public point and radius |
+| `earthquakes.recent` | Up to 120 recent USGS events, with a choice of worldwide M2.5+ or M4.5+ feeds covering the past 24 hours or seven days |
 
 The weather adapter uses the National Weather Service. Public place coordinates come from the bundled U.S. Census Gazetteer. Venue coordinates use the city's representative point, so distances and forecasts describe the area around the venue. Upcoming shows follow the public calendar's UTC date boundary. Each `date` is the published date or local date and time, with no inferred time zone. [NWS API documentation](https://www.weather.gov/documentation/services-web-API) · [U.S. Census Gazetteer Files](https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html)
 
@@ -61,6 +62,8 @@ A weather alias with **Any upcoming published venue** selected accepts `await St
 Read `map.boundaries` with `StonefellowData.get(alias)`. Group rows by `region`, `part` and `ring`, sort by `chunk`, and concatenate the parsed `coordinates` arrays. Each point is `[longitude, latitude]`. Ring 0 is the polygon exterior and subsequent rings are holes. The overview generalizes smaller components. Attribute the Census source and draw the geography in the authored layout. The geometry is bundled, so the canvas can use it without external tile requests.
 
 To attach `location.proximity`, enter the public target latitude and longitude and a radius from 10 to 10,000 meters. This target can be shared with the canvas. From a viewer interaction, call `await StonefellowData.checkProximity(alias)`. The host asks the viewer to check their device location once and returns one status, `inside`, `outside`, `uncertain`, `denied` or `unavailable`. The site compares the browser's accuracy estimate with the boundary and keeps the viewer coordinates in the host page. Treat the result as input to the experience. Server-side access rules need independent authorization. Admins can disable map data and device proximity separately.
+
+Read `earthquakes.recent` with `StonefellowData.get(alias)`. The selected feed determines the time window and USGS magnitude category. Rows contain an event ID, location label, longitude, latitude, depth in kilometers, magnitude and its scale, occurrence and revision timestamps in UTC, review status, and a USGS event-page link. Use `event_id` to reconcile updates. The host keeps the newest 120 events by occurrence time and may return a stale snapshot from an earlier feed window if the provider is temporarily unavailable. Admins can disable USGS independently of geography, map boundaries, and weather. [USGS GeoJSON summary feeds](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php)
 
 The host resolves the alias against the current saved owner canvas or approved gallery. It rechecks the provider policy and location on each read. Detached verification uses an unavailable state so it can test the generated code without depending on live external data. Prefetch before a playback gesture. For a rule based on a current observation, check the returned status, expiry and requested field again when taking the action.
 

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/canvas-map-core.php';
+require_once __DIR__.'/canvas-earthquakes-core.php';
 
 const SF_CANVAS_DATA_MAX_SOURCES=4;
 const SF_CANVAS_DATA_SHOW_SCOPE='published-shows';
@@ -69,6 +70,21 @@ function sf_canvas_data_products(): array {
             'min_radius_m'=>SF_CANVAS_DATA_MIN_RADIUS_M,'max_radius_m'=>SF_CANVAS_DATA_MAX_RADIUS_M]],
         'permission_id'=>'canvas.data.location_proximity','capability'=>'location_proximity','provider'=>'Stonefellow public target',
         'operation'=>'proximity','reader'=>'sf_canvas_data_read_proximity',
+    ];
+    $catalog['earthquakes.recent']=[
+        'id'=>'earthquakes.recent','title'=>'Recent earthquakes',
+        'description'=>'Up to 120 of the newest worldwide earthquake records matching the selected USGS time and magnitude feed. Reported events can be delayed or revised. This product describes recorded events and review status.',
+        'fields'=>['event_id'=>'text','place'=>'text','magnitude'=>'number','magnitude_type'=>'text',
+            'lat'=>'number','lon'=>'number','depth_km'=>'number','occurred_at'=>'datetime','updated_at'=>'datetime',
+            'review_status'=>'text','source_url'=>'text'],
+        'parameters'=>['location_id'=>['type'=>'scope','label'=>'Feed','scope_options'=>[
+            ['id'=>'m25-day','title'=>'Worldwide · M2.5+ · Past 24 hours','kind'=>'scope'],
+            ['id'=>'m25-week','title'=>'Worldwide · M2.5+ · Past 7 days','kind'=>'scope'],
+            ['id'=>'m45-day','title'=>'Worldwide · M4.5+ · Past 24 hours','kind'=>'scope'],
+            ['id'=>'m45-week','title'=>'Worldwide · M4.5+ · Past 7 days','kind'=>'scope'],
+        ]]],
+        'permission_id'=>'canvas.data.earthquakes_usgs','capability'=>'earthquakes_usgs','provider'=>SF_CANVAS_EARTHQUAKES_SOURCE,
+        'operation'=>'recent','reader'=>'sf_canvas_data_read_earthquakes',
     ];
     return $catalog;
 }
@@ -140,8 +156,10 @@ function sf_canvas_data_point(string $id): ?array {
 }
 
 function sf_canvas_data_saved_place(array $product,string $location): ?array {
-    if(($product['parameters']['location_id']['type']??null)==='public_point')return sf_canvas_data_point($location);
-    return sf_canvas_data_location_scope($product,$location)??sf_canvas_data_place($location,true);
+    $type=$product['parameters']['location_id']['type'];
+    if($type==='public_point')return sf_canvas_data_point($location);
+    $scope=sf_canvas_data_location_scope($product,$location);
+    return $scope??($type==='public_place'?sf_canvas_data_place($location,true):null);
 }
 
 function sf_canvas_data_source_context(array $sources): array {
@@ -186,6 +204,10 @@ function sf_canvas_data_read_proximity(array $place): array {
     return ['status'=>'fresh','source'=>'Stonefellow public target','fetched_at'=>gmdate('c',$now),
         'expires_at'=>gmdate('c',$now+60),'timezone'=>null,
         'rows'=>[['lat'=>$place['lat'],'lon'=>$place['lon'],'radius_m'=>$place['radius_m']]]];
+}
+
+function sf_canvas_data_read_earthquakes(array $scope,string $operation,?callable $read=null): array {
+    return ($read??sf_canvas_earthquakes_read(...))($scope['id']);
 }
 
 /** Resolve an exact saved place or a runtime venue within an explicitly selected scope. */

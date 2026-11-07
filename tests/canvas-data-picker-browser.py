@@ -29,6 +29,17 @@ WEATHER_PARAMETERS = {'location_id': {**PARAMETERS['location_id'], 'scope_option
     {'id': 'https://example.invalid/location', 'title': 'URL must be rejected', 'kind': 'scope'},
     {'id': '33.45,-112.07', 'title': 'Coordinates must be rejected', 'kind': 'scope'},
 ]}}
+EARTHQUAKES = {
+    'id': 'earthquakes.recent', 'title': 'Recent earthquakes',
+    'fields': {'magnitude': 'number', 'location': 'text'},
+    'parameters': {'location_id': {'type': 'scope', 'label': 'Feed', 'scope_options': [
+        {'id': 'm25-day', 'title': 'Worldwide · M2.5+ · Past 24 hours', 'kind': 'scope'},
+        {'id': 'm25-week', 'title': 'Worldwide · M2.5+ · Past 7 days', 'kind': 'scope'},
+        {'id': 'm45-day', 'title': 'Worldwide · M4.5+ · Past 24 hours', 'kind': 'scope'},
+        {'id': 'm45-week', 'title': 'Worldwide · M4.5+ · Past 7 days', 'kind': 'scope'},
+        {'id': 'https://example.invalid/feed', 'title': 'URL must be rejected', 'kind': 'scope'},
+    ]}},
+}
 PRODUCTS = [
     {'id': 'weather.current', 'title': 'Current conditions', 'description': 'Recent conditions <b>observed</b>.',
      'fields': {'temperature_f': 'number', 'observed_at': 'text'}, 'parameters': WEATHER_PARAMETERS},
@@ -39,6 +50,7 @@ PRODUCTS = [
     {'id': 'location.proximity', 'title': 'Location proximity', 'fields': {'inside': 'number'},
      'parameters': {'location_id': {'type': 'public_point', 'label': 'Public target point',
                                     'min_radius_m': 10, 'max_radius_m': 10000}}},
+    EARTHQUAKES,
     {'id': 'weather.daily', 'title': 'Disabled forecast', 'enabled': False, 'parameters': PARAMETERS},
     {'id': 'malformed', 'title': 'Malformed product', 'parameters': PARAMETERS},
 ]
@@ -69,6 +81,7 @@ with sync_playwright() as playwright:
         context = browser.new_context(viewport={'width': width, 'height': 740}, has_touch=width == 390)
         page = context.new_page()
         errors, requests = [], []
+        inventory = PRODUCTS
         page.on('pageerror', lambda error: errors.append(str(error)))
 
         def route(handler):
@@ -81,7 +94,7 @@ with sync_playwright() as playwright:
             elif parsed.path == '/api/canvas-data.php':
                 action = query.get('action', [''])[0]
                 if action == 'inventory':
-                    body = {'ok': True, 'products': PRODUCTS, 'max_sources': 4}
+                    body = {'ok': True, 'products': inventory, 'max_sources': 4}
                 elif action == 'places':
                     place_id = query.get('id', [None])[0]
                     lookup = query.get('q', [''])[0].lower()
@@ -138,7 +151,7 @@ with sync_playwright() as playwright:
         assert len(requests) == 1
 
         open_picker('/Data')
-        expect(source.locator('option')).to_have_count(4)
+        expect(source.locator('option')).to_have_count(5)
         expect(picker.get_by_text('Recent conditions <b>observed</b>.', exact=True)).to_be_visible()
         assert not picker.locator('b').count()
         activate(picker.get_by_text('Available fields', exact=True))
@@ -286,11 +299,80 @@ with sync_playwright() as playwright:
         activate(attach)
         expect(composer).to_have_value('/edit Update this {data-clear}')
         assert not any('point-' in url or '112.074' in url or '33.448' in url for _, url in requests)
+
+        inventory = [EARTHQUAKES, *[item for item in PRODUCTS if item is not EARTHQUAKES]]
+        feed = picker.get_by_role('combobox', name='Feed', exact=True)
+        inventory_request = ('GET', 'https://data.test/api/canvas-data.php?action=inventory')
+
+        def open_feed_picker(draft):
+            start = len(requests)
+            composer.fill(draft)
+            composer.press('Enter')
+            expect(picker).to_be_visible()
+            expect(source).to_have_value('earthquakes.recent')
+            expect(feed.locator('option')).to_have_count(5)
+            expect(search).not_to_be_visible()
+            expect(point).not_to_be_visible()
+            assert requests[start:] == [inventory_request]
+
+        open_feed_picker('/data')
+        expect(add).to_be_disabled()
+        feed.select_option('m25-day')
+        name.fill('world-quakes')
+        activate(add)
+        expect(selected.get_by_text('Recent earthquakes · Worldwide · M2.5+ · Past 24 hours')).to_be_visible()
+        source.select_option('weather.current')
+        expect(search).to_be_visible()
+        expect(feed).not_to_be_visible()
+        expect(place.locator(f'option[value="{VENUE["id"]}"]')).to_have_count(1)
+        expect(add).to_be_disabled()
+        source.select_option('earthquakes.recent')
+        expect(feed).to_have_value('')
+        expect(feed.locator(f'option[value="{VENUE["id"]}"]')).to_have_count(0)
+        expect(add).to_be_disabled()
+        feed.select_option('m45-week')
+        name.fill('week-quakes')
+        activate(add)
+        expect(selected.get_by_text('Recent earthquakes · Worldwide · M4.5+ · Past 7 days')).to_be_visible()
+        activate(attach)
+        expect(composer).to_have_value('{data:world-quakes:earthquakes.recent:m25-day} '
+                                     '{data:week-quakes:earthquakes.recent:m45-week}')
+        earthquake_sources = page.evaluate('chatDraftResourceInputs(input.value).artist_inputs.data_sources')
+        assert earthquake_sources == [
+            {'alias': 'world-quakes', 'product': 'earthquakes.recent', 'location_id': 'm25-day'},
+            {'alias': 'week-quakes', 'product': 'earthquakes.recent', 'location_id': 'm45-week'},
+        ]
+
+        page.evaluate("(sources)=>{listeningRoom={id:11,artist_inputs:{data_sources:sources}}}", earthquake_sources)
+        open_feed_picker('/edit Restyle /data')
+        expect(selected.get_by_text('Recent earthquakes · Worldwide · M2.5+ · Past 24 hours')).to_be_visible()
+        expect(selected.get_by_text('Recent earthquakes · Worldwide · M4.5+ · Past 7 days')).to_be_visible()
+        expect(attach).to_be_enabled()
+        activate(picker.get_by_role('button', name='Cancel', exact=True))
+        expect(composer).to_have_value('/edit Restyle /data')
+
+        page.evaluate("""() => {
+          listeningRoom.artist_inputs.data_sources=[{alias:'invalid-feed',product:'earthquakes.recent',location_id:'city-0455000'}];
+        }""")
+        open_feed_picker('/edit /data')
+        expect(selected.get_by_text('Recent earthquakes · city-0455000 · Unavailable')).to_be_visible()
+        expect(attach).to_be_disabled()
+        source.select_option('weather.current')
+        expect(place.locator(f'option[value="{VENUE["id"]}"]')).to_have_count(1)
+        find('Phoenix', PHOENIX['id'])
+        source.select_option('earthquakes.recent')
+        expect(feed.locator(f'option[value="{PHOENIX["id"]}"]')).to_have_count(0)
+        expect(selected.get_by_text('Recent earthquakes · city-0455000 · Unavailable')).to_be_visible()
+        expect(attach).to_be_disabled()
+        activate(picker.get_by_role('button', name='Remove invalid-feed', exact=True))
+        activate(attach)
+        expect(composer).to_have_value('/edit {data-clear}')
+        assert not any('action=places&id=m25-day' in url or 'action=places&id=m45-week' in url for _, url in requests)
         assert not errors
         assert all(method == 'GET' for method, _ in requests)
         assert any('action=places&id=city-0455000' in url for _, url in requests)
         assert not any('action=places&id=published-shows' in url for _, url in requests)
         assert all(url == 'https://data.test/' or url.startswith('https://data.test/api/canvas-data.php?') for _, url in requests)
-        print(f'PASS chromium/{width}: multiple named data sources, product-scoped venues, exact public points, safe restoration and stale edit protection')
+        print(f'PASS chromium/{width}: multiple named data sources, public places, exact points and scope-only feeds with safe restoration')
         context.close()
     browser.close()

@@ -414,4 +414,98 @@ data_flow_check($locationOff['status']==='unavailable'&&$locationOff['rows']===[
     'Disabling proximity withholds the target and preserves separate map bindings');
 $spatialPolicy($locationPermission,true);
 data_flow_check(count($requests)===8&&!$db->inTransaction(),'All spatial paths are local and leave no open transaction');
+
+$earthquakePermission='canvas.data.earthquakes_usgs';
+$earthquakeBindings=[
+    ['alias'=>'recent-quakes','product'=>'earthquakes.recent','location_id'=>'m45-day'],
+    ['alias'=>'week-quakes','product'=>'earthquakes.recent','location_id'=>'m25-week'],
+    $spatial[2],
+];
+$quakeBrief='Plot two earthquake feeds over regional boundaries {data:recent-quakes:earthquakes.recent:m45-day} '.
+    '{data:week-quakes:earthquakes.recent:m25-week} {data:regions:map.boundaries:us-regions}';
+$quakeReadings=[['event_id'=>'fixture-quake','place'=>'USGS_LIVE_FIXTURE','magnitude'=>4.8,'magnitude_type'=>'mw',
+    'lat'=>34.1,'lon'=>-117.4,'depth_km'=>8.4,'occurred_at'=>'2026-11-06T17:00:00+00:00',
+    'updated_at'=>'2026-11-06T17:04:00+00:00','review_status'=>'reviewed',
+    'source_url'=>'https://earthquake.usgs.gov/earthquakes/eventpage/fixture-quake']];
+$quakeRequests=[];
+$quakeRead=static function(string $feed)use(&$quakeRequests,$quakeReadings):array {
+    $quakeRequests[]=$feed;
+    $stale=$feed==='m25-week';
+    return ['status'=>$stale?'stale':'fresh','source'=>SF_CANVAS_EARTHQUAKES_SOURCE,'timezone'=>'UTC',
+        'fetched_at'=>gmdate('c',time()-($stale?600:10)),'expires_at'=>gmdate('c',time()+($stale?-540:50)),
+        'rows'=>$quakeReadings];
+};
+$quakeProduct=array_column(sf_canvas_data_inventory()['products'],null,'id')['earthquakes.recent'];
+$quakeScopes=array_column($quakeProduct['parameters']['location_id']['scope_options'],'id');
+sort($quakeScopes);
+data_flow_check($quakeScopes===['m25-day','m25-week','m45-day','m45-week']&&$quakeProduct['permission_id']===$earthquakePermission,
+    'Earthquake discovery declares four fixed public USGS feeds and its own permission');
+foreach(['city-0455000','show-flow-venue','published-shows','m99-week','https://example.invalid/feeds'] as $forged){
+    data_flow_reject(fn()=>sf_canvas_project_propose($owner,['project'=>['brief'=>'Use a quake feed',
+        'artist_inputs'=>['data_sources'=>[['alias'=>'quakes','product'=>'earthquakes.recent','location_id'=>$forged]]]]]),
+        InvalidArgumentException::class,'An earthquake attachment rejects arbitrary feeds, venues and coordinates');
+}
+$quakePlan=sf_canvas_project_propose($owner,['project'=>['brief'=>$quakeBrief]]);
+sf_canvas_project_approve(1,$quakePlan['id']);
+$quakeBuild=$quakePlan['project']+['project_managed'=>true,'proposal_id'=>$quakePlan['id'],'request_id'=>data_flow_request()];
+$changedFeed=$quakeBuild;
+$changedFeed['artist_inputs']['data_sources'][0]['location_id']='m45-week';
+data_flow_reject(fn()=>sf_agent_scene_create($owner,$changedFeed),SfCanvasProjectApprovalRequired::class,
+    'A different feed cannot reuse approval for a saved alias');
+$quakeScene=sf_agent_scene_create($owner,$quakeBuild)['scene'];
+$quakeContext=['scene_id'=>$quakeScene['id']];
+$quakeUses=array_column(sf_canvas_access_summary($owner,$quakeContext)['permissions'],null,'id');
+data_flow_check($quakeScene['artist_inputs']['data_sources']===$earthquakeBindings&&isset($quakeUses[$earthquakePermission],$quakeUses[$mapPermission])&&
+    $quakeUses[$earthquakePermission]['granted']&&!$quakeUses[$earthquakePermission]['personal']&&$quakeRequests===[]&&
+    !str_contains(json_encode([$prompt,$quakeScene],JSON_THROW_ON_ERROR),'USGS_LIVE_FIXTURE'),
+    'A generated canvas can combine earthquake feeds and map geometry without fetching or persisting quake readings');
+data_flow_reject(fn()=>sf_canvas_data_read($other,$quakeContext,'recent-quakes',$quakeRead),OutOfBoundsException::class,
+    'A viewer cannot read another account’s private earthquake binding');
+data_flow_reject(fn()=>sf_canvas_data_read($owner,$quakeContext,'recent-quakes',$quakeRead,'m45-week'),InvalidArgumentException::class,
+    'A runtime caller cannot override a fixed earthquake feed');
+$quakeModelCalls=$calls;$quakeTokenBalance=sf_token_balance(1);
+$recent=sf_canvas_data_read($owner,$quakeContext,'recent-quakes',$quakeRead);
+$stale=sf_canvas_data_read($owner,$quakeContext,'week-quakes',$quakeRead);
+data_flow_check($recent['status']==='fresh'&&$stale['status']==='stale'&&$recent['rows']===$quakeReadings&&$stale['rows']===$quakeReadings&&
+    $stale['location']['id']==='m25-week'&&$stale['fetched_at']<$recent['fetched_at']&&$stale['expires_at']<gmdate('c')&&
+    $quakeRequests===['m45-day','m25-week']&&
+    sf_canvas_data_read($owner,$quakeContext,'regions',$quakeRead)['rows']===$regions['rows']&&
+    $calls===$quakeModelCalls&&sf_token_balance(1)===$quakeTokenBalance,
+    'Saved aliases select distinct feeds, preserve stale readings and compose with the local map without AI charges');
+
+$quakeShareable=sf_agent_scene_history_save(1,['canvas_kind'=>'custom','track_id'=>'','title'=>'Shareable quake map',
+    'html'=>'<p class="map">Fixture earthquake map</p>','css'=>'','artist_inputs'=>['data_sources'=>$earthquakeBindings]]);
+$quakeGallery=sf_canvas_gallery_submit($owner,['scene_id'=>$quakeShareable['id'],'request_id'=>data_flow_request(),
+    'title'=>'Shared quake map','description'=>'Approved feeds and public map','creator_label'=>'Fixture creator','publication_consent'=>true]);
+$quakePublic=['gallery_id'=>$quakeGallery['id']];
+data_flow_reject(fn()=>sf_canvas_data_read([],$quakePublic,'recent-quakes',$quakeRead),OutOfBoundsException::class,
+    'A pending gallery cannot read earthquake feeds');
+sf_canvas_gallery_moderate($admin,$quakeGallery['id'],'approve',$quakeGallery['snapshot_hash']);
+$quakeOpen=sf_canvas_gallery_open($quakeGallery['id']);
+data_flow_check($quakeOpen['scene']['artist_inputs']['data_sources']===$earthquakeBindings&&
+    in_array($earthquakePermission,array_column($quakeOpen['item']['uses'],'id'),true)&&
+    !str_contains(sf_canvas_gallery_row($quakeGallery['id'])['snapshot_json'],'USGS_LIVE_FIXTURE')&&
+    sf_canvas_data_read([],$quakePublic,'recent-quakes',$quakeRead)['rows']===$quakeReadings&&
+    $quakeRequests===['m45-day','m25-week','m45-day'],
+    'Publication discloses the approved earthquake source without storing live readings');
+$quakeRevision=sf_canvas_project_propose($owner,['project'=>['brief'=>'Improve marker contrast','previous_id'=>$quakeScene['id']]]);
+$quakeDuring=sf_canvas_data_read([],$quakePublic,'week-quakes',static function(string $feed)use($quakeRead,$spatialPolicy,$earthquakePermission):array {
+    $reading=$quakeRead($feed);
+    $spatialPolicy($earthquakePermission,false);
+    return $reading;
+});
+$quakeOff=sf_canvas_data_read($owner,$quakeContext,'recent-quakes',$quakeRead);
+data_flow_check($quakeDuring['status']==='unavailable'&&$quakeDuring['rows']===[]&&$quakeOff['status']==='unavailable'&&$quakeOff['rows']===[]&&
+    !in_array('earthquakes.recent',array_column(sf_canvas_data_inventory()['products'],'id'),true)&&
+    sf_canvas_data_read([],$quakePublic,'regions',$quakeRead)['rows']===$regions['rows']&&
+    $quakeRequests===['m45-day','m25-week','m45-day','m25-week'],
+    'Disabling USGS prevents in-flight stale rows and later fetches while keeping the shared map usable');
+data_flow_reject(fn()=>sf_canvas_project_approve(1,$quakeRevision['id']),InvalidArgumentException::class,
+    'An unapproved revision revalidates the inherited USGS policy');
+$spatialPolicy($earthquakePermission,true);
+sf_canvas_gallery_withdraw($owner,$quakeGallery['id']);
+data_flow_reject(fn()=>sf_canvas_data_read([],$quakePublic,'week-quakes',$quakeRead),OutOfBoundsException::class,
+    'Withdrawing the quake map revokes guest access to its saved feed aliases');
+data_flow_check($quakeRequests===['m45-day','m25-week','m45-day','m25-week']&&count($requests)===8&&!$db->inTransaction(),
+    'Quake requests are isolated from other providers and leave no open transaction');
 echo 'Canvas external data flow: '.$checks.' checks passed ('.($mysql?'mysql':'sqlite').')'.PHP_EOL;

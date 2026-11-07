@@ -95,6 +95,15 @@ function sf_agent_tool_registry(): array {
                 'fields'=>['status'=>'text'],'max_rows'=>1,'device_consent'=>true,
             ],
         ],
+        'earthquakes_usgs'=>[
+            'label'=>'USGS earthquake records','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-data.php',
+            'handler'=>'sf_canvas_data_read','confirmation'=>false,'execution'=>'server',
+            'canvas_external'=>[
+                'description'=>'Recent public earthquake locations, times, magnitudes, depths and review status from selected USGS feeds.',
+                'fields'=>['status'=>'text','source'=>'text','fetched_at'=>'datetime','expires_at'=>'datetime','rows'=>'array'],
+                'max_rows'=>120,
+            ],
+        ],
         'personal_listening_stats'=>[
             'label'=>'Personal listening statistics','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/listening.php',
             'handler'=>'sf_listening_analytics','confirmation'=>false,'execution'=>'server',
