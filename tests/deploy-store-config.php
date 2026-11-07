@@ -7,7 +7,7 @@ mkdir($tmp,0700,true);
 $runner= <<<'PHP'
 $source=(string)file_get_contents($argv[2]);
 $start=strpos($source,'function sf_store_config(): array {');
-$end=strpos($source,'function sf_catalog(): array {',$start);
+$end=strpos($source,'function sf_catalog(',$start);
 if($start===false||$end===false)throw new RuntimeException('Production configuration reader missing.');
 define('SF_ROOT',$argv[1]);
 eval(substr($source,$start,$end-$start));
