@@ -223,6 +223,51 @@ function sf_jukebox_message(string $sessionId,string $phoneId,string $sender,arr
         [$sessionId,$phoneId,$sender,$message,$image,time()]);
 }
 
+function sf_jukebox_recap(array $session): array {
+    if(!(int)$session['ended'])throw new DomainException('The recap is available after the session ends.');
+    $id=$session['id'];
+    $phones=sf_jukebox_query('SELECT COUNT(*) AS connections, COUNT(approved) AS approved
+        FROM jukebox_phones WHERE session_id=?',[$id])->fetch();
+    $trackKey=sf_db()->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?'CAST(track_id AS BINARY)':'track_id';
+    $rows=sf_jukebox_query("SELECT $trackKey AS track_id, COUNT(*) AS requests,
+        SUM(CASE WHEN phone_id IS NOT NULL THEN 1 ELSE 0 END) AS guest_requests,
+        SUM(CASE WHEN phone_id IS NULL THEN 1 ELSE 0 END) AS host_requests,
+        COUNT(played) AS confirmed_plays,
+        SUM(CASE WHEN status='ended' THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN status='skipped' THEN 1 ELSE 0 END) AS skipped,
+        SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN status='removed' THEN 1 ELSE 0 END) AS removed,
+        SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) AS left_in_queue,
+        SUM(CASE WHEN status='current' THEN 1 ELSE 0 END) AS current_at_close
+        FROM jukebox_requests WHERE session_id=? GROUP BY $trackKey",[$id])->fetchAll();
+
+    // The first confirmed playback and the eventual request outcome are independent.
+    $totals=['requests'=>0,'guest_requests'=>0,'host_requests'=>0,'confirmed_plays'=>0,
+        'completed'=>0,'skipped'=>0,'failed'=>0,'removed'=>0,'left_in_queue'=>0,'current_at_close'=>0];
+    $titles=[];
+    try{
+        foreach($rows as $row){
+            $trackId=(string)$row['track_id'];
+            $track=sf_canvas_audio_public_track($trackId);
+            $titles[$trackId]=sf_agent_public_artist_text($track['title']??'')?:$trackId;
+        }
+    }catch(RuntimeException){
+        // The historical totals remain available if the current catalog cannot be read.
+    }
+    $tracks=[];
+    foreach($rows as $row){
+        $trackId=(string)$row['track_id'];
+        $counts=array_map('intval',array_intersect_key($row,$totals));
+        foreach($counts as $key=>$count)$totals[$key]+=$count;
+        $tracks[]=['track_id'=>$trackId,'title'=>$titles[$trackId]??$trackId]+$counts;
+    }
+    usort($tracks,static fn(array $a,array $b): int =>
+        ($b['requests']<=>$a['requests'])?:($b['confirmed_plays']<=>$a['confirmed_plays'])?:strcmp($a['track_id'],$b['track_id']));
+
+    return ['session_id'=>$id,'title'=>$session['title'],'created'=>(int)$session['created'],
+        'phones'=>array_map('intval',$phones),'totals'=>$totals,'tracks'=>$tracks];
+}
+
 function sf_jukebox_crm(int $venue): array {
     if(!$venue)return [];
     $guests=sf_jukebox_query('SELECT g.id,g.name,MIN(p.approved) AS first_visit,MAX(p.approved) AS last_visit,

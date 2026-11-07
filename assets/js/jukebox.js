@@ -139,10 +139,12 @@
     await api(action, body);
     await tick();
   }
+  function renderHistory(id, resolveTitle) {
+    list(id, state.history || [], row => [resolveTitle(row.track_id) + ' · ' + date(row.played) + (row.name ? ' · ' + row.name : '')]);
+  }
   function renderHost() {
     if (changed('phones', state.phones)) list('phones', state.phones || [], phone => {
       const label = phone.name + ' · ' + phone.status + (phone.last_visit ? ' · Returning guest, last visit ' + date(phone.last_visit) : '');
-      if (Number(state.ended)) return [label];
       if (phone.status === 'pending') return [label,
         button('Approve', () => mutate('approve', {phone: phone.id})),
         button('Deny', () => mutate('revoke', {phone: phone.id}))];
@@ -159,22 +161,84 @@
         button('Revoke', () => mutate('revoke', {phone: phone.id}))];
       return [label];
     });
-    if (changed('history', [state.history, Boolean(catalog)])) list('history', state.history || [], row =>
-      [title(row.track_id) + ' · ' + date(row.played) + (row.name ? ' · ' + row.name : '')]);
-    if (changed('controls', [state.paused, Boolean(state.current), state.ended])) {
+    if (changed('history', [state.history, Boolean(catalog)])) renderHistory('history', title);
+    if (changed('controls', [state.paused, Boolean(state.current)])) {
       const controls = $('controls');
       controls.replaceChildren();
-      if (!Number(state.ended)) {
-        if (state.current) controls.append(
-          button(Number(state.paused) ? 'Resume' : 'Pause', () => mutate('control', {event: Number(state.paused) ? 'resume' : 'pause'})),
-          button('Skip', () => mutate('control', {event: 'skip'})));
-        controls.append(button('End session', async () => {
-          if (confirm('End this jukebox session for all connected guests?')) await mutate('control', {event: 'end'});
-        }));
+      if (state.current) controls.append(
+        button(Number(state.paused) ? 'Resume' : 'Pause', () => mutate('control', {event: Number(state.paused) ? 'resume' : 'pause'})),
+        button('Skip', () => mutate('control', {event: 'skip'})));
+      controls.append(button('End session', async () => {
+        if (confirm('End this jukebox session for all connected guests?')) await mutate('control', {event: 'end'});
+      }));
+    }
+    $('enable').hidden = active;
+    $('enable').textContent = state.online ? 'Move playback to this device' : 'Enable player on this device';
+  }
+
+  const recapOutcomes = [
+    ['completed', 'Completed'], ['skipped', 'Skipped'], ['failed', 'Failed'], ['removed', 'Removed'],
+    ['left_in_queue', 'Left in queue'], ['current_at_close', 'Current at close']
+  ];
+
+  function renderRecap(recap) {
+    $('recap-start').textContent = 'Session opened ' + date(recap.created);
+    const totals = $('recap-totals');
+    totals.replaceChildren();
+    const metrics = [
+      ['Phone connections', recap.phones.connections], ['Approved phones', recap.phones.approved],
+      ['Requests', recap.totals.requests], ['Guest requests', recap.totals.guest_requests],
+      ['Host requests', recap.totals.host_requests], ['Confirmed plays', recap.totals.confirmed_plays],
+      ...recapOutcomes.map(([key, label]) => [label, recap.totals[key]])
+    ];
+    for (const [label, value] of metrics) {
+      const metric = document.createElement('div');
+      const term = document.createElement('dt');
+      const count = document.createElement('dd');
+      term.textContent = label;
+      count.textContent = value;
+      metric.append(term, count);
+      totals.append(metric);
+    }
+    const table = $('recap-tracks');
+    const rows = table.tBodies[0];
+    rows.replaceChildren();
+    const trackTitles = new Map();
+    for (const track of recap.tracks) {
+      trackTitles.set(track.track_id, track.title);
+      const row = rows.insertRow();
+      const song = document.createElement('th');
+      song.scope = 'row';
+      song.textContent = track.title;
+      row.append(song);
+      row.insertCell().textContent = track.requests;
+      row.insertCell().textContent = track.confirmed_plays;
+      const outcomes = row.insertCell();
+      for (const [key, label] of recapOutcomes) {
+        if (!Number(track[key])) continue;
+        const outcome = document.createElement('span');
+        outcome.textContent = label + ' ' + track[key];
+        outcomes.append(outcome);
       }
     }
-    $('enable').hidden = active || Number(state.ended) !== 0;
-    $('enable').textContent = state.online ? 'Move playback to this device' : 'Enable player on this device';
+    table.hidden = !recap.tracks.length;
+    $('recap-empty').hidden = Boolean(recap.tracks.length);
+    $('recap-history').hidden = !state.history?.length;
+    renderHistory('recap-plays', trackId => trackTitles.get(trackId) || trackId);
+    $('recap-content').hidden = false;
+  }
+
+  async function refreshRecap() {
+    $('recap-retry').hidden = true;
+    $('recap-status').textContent = 'Loading session recap…';
+    try {
+      const {recap} = await api('recap');
+      renderRecap(recap);
+      $('recap-status').textContent = '';
+    } catch (error) {
+      $('recap-status').textContent = 'Could not load the session recap.';
+      $('recap-retry').hidden = false;
+    }
   }
 
   function render() {
@@ -206,7 +270,10 @@
     requestButtons.forEach(control => { control.textContent = playing ? 'Add to Queue' : 'Play'; });
     if (!host) thread = approved ? state.phone.id : '';
     if (host) {
-      renderHost();
+      $('host').hidden = ended;
+      $('recap').hidden = !ended;
+      $('crm').hidden = !Number(state.venue_id);
+      if (!ended) renderHost();
       if (state.phones?.find(phone => phone.id === thread)?.status !== 'approved' || ended) thread = '';
     }
     $('chat').hidden = !thread;
@@ -250,7 +317,10 @@
         entries.append(entry);
       }
       history.append(summary, entries, button('Remove guest record', async () => {
-        if (confirm('Remove this guest from venue visit history?')) await mutate('remove_guest', {guest: guest.id});
+        if (confirm('Remove this guest from venue visit history?')) {
+          await api('remove_guest', {guest: guest.id});
+          await refreshCrm();
+        }
       }));
       return [history];
     });
@@ -269,7 +339,6 @@
   }
   async function syncPlayer() {
     if (!active) return;
-    if (Number(state.ended)) { releasePlayer(); return; }
     try {
       await playerEvent(lastPlaying && !audio.paused ? 'progress' : 'heartbeat');
     } catch (error) {
@@ -328,12 +397,16 @@
           .finally(() => { catalogPending = false; });
       }
       render();
-      if (host) {
-        await syncPlayer();
-        if (changed('crm-visible', state.venue_id)) $('crm').hidden = !Number(state.venue_id);
+      if (Number(state.ended)) {
+        stopped = true;
+        if (host) {
+          if (active) releasePlayer();
+          await refreshRecap();
+        }
+        return;
       }
+      if (host) await syncPlayer();
       await Promise.all([refreshThread(), host ? refreshCrm() : Promise.resolve()]);
-      if (Number(state.ended)) stopped = true;
     } catch (error) {
       notice(error);
       if (error.status === 404 || error.status === 401) stopped = true;
@@ -409,7 +482,8 @@
 
   if (!id) { directory().catch(notice); return; }
   if (host) {
-    $('host').hidden = false;
+    $('mode-link').textContent = 'Your sessions';
+    $('recap-retry').onclick = handle(refreshRecap);
     const join = new URL(page(id, false), location.href);
     $('join-link').href = join.href;
     $('qr').innerHTML = window.StonefellowJukeboxQR.svg(join.href);

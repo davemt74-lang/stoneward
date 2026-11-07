@@ -22,3 +22,12 @@ li button{margin-left:.45rem}
 footer{position:fixed;inset:auto 0 0;background:#172333;border-top:1px solid #63788c;padding:.55rem max(1rem,env(safe-area-inset-left)) calc(.55rem + env(safe-area-inset-bottom));max-height:50vh;overflow:auto}
 footer small{display:block;color:#c5d5e6}
 #status:empty{display:none}
+#recap-status:empty{display:none}
+#recap-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr));gap:.6rem}
+#recap-totals div{padding:.65rem;border:1px solid #63788c;border-radius:.45rem;background:#172333}
+#recap-totals dt{color:#c5d5e6;font-size:.9rem}
+#recap-totals dd{margin:0;font-size:1.35rem;font-weight:bold}
+#recap-tracks{border-collapse:collapse;width:100%;text-align:left}
+#recap-tracks caption{text-align:left;font-size:1.15rem;font-weight:bold;margin-bottom:.35rem}
+#recap-tracks th,#recap-tracks td{padding:.45rem .35rem;border-bottom:1px solid #63788c;vertical-align:top;overflow-wrap:anywhere}
+#recap-tracks td span{display:block}

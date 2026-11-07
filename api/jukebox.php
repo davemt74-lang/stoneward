@@ -75,6 +75,7 @@ try{
             'state'=>['state'=>sf_jukebox_state($session,$phone,$host),'remembered'=>!$host&&sf_jukebox_guest($session)!==null],
             'catalog'=>($host||$approved||(int)$session['listed'])?sf_canvas_audio_catalog():throw new DomainException('Host approval is required.'),
             'thread'=>($host||$approved)&&$thread!==''?['messages'=>sf_jukebox_thread($id,$thread)]:throw new DomainException('Chat access is unavailable.'),
+            'recap'=>$host?['recap'=>sf_jukebox_recap($session)]:throw new DomainException('Host access is required.'),
             'crm'=>$host?['guests'=>sf_jukebox_crm((int)$session['venue_id'])]:throw new DomainException('Venue access is required.'),
             'image'=>[],
             default=>throw new OutOfBoundsException('Unknown jukebox request.')
