@@ -20,13 +20,15 @@ function harness(overrides = {}) {
   const host = new Hub(), child = new Hub(), frame = new Hub(), audio = new Hub();
   Object.assign(audio, { currentTime: 0, duration: 120, paused: true, volume: 0.8, muted: false, ended: false });
   let owner = 1, permitted = true, currentTrack = 'song-one';
+  host.navigator = { userActivation: { isActive: false } };
+  host.document = { activeElement: frame };
   const messages = [], created = [], revoked = [], calls = [], diagnostics = [], hostMedia = [], hostURLs = [], hostRevoked = [];
   class LocalMedia extends Hub {
     constructor() { super(); this.src = ''; this.currentSrc = ''; this.error = null; this.result = Promise.resolve(); }
     play() { return this.result; }
   }
   const nativeMediaPlay = LocalMedia.prototype.play;
-  const parent = { postMessage(data) { messages.push({ direction: 'child', data }); queueMicrotask(() => host.emit('message', { source: frame.contentWindow, origin: 'null', data: structuredClone(data) })); } };
+  const parent = { postMessage(data) { messages.push({ direction: 'child', data }); queueMicrotask(() => host.emit('message', { source: frame.contentWindow, origin: 'null', isTrusted: true, data: structuredClone(data) })); } };
   frame.contentWindow = { postMessage(data) { messages.push({ direction: 'host', data }); queueMicrotask(() => child.emit('message', { source: parent, origin: 'https://artist.example', data: structuredClone(data) })); } };
   class HostMedia extends Hub {
     constructor() { super(); Object.assign(this, { currentTime: 0, duration: 120, paused: true, ended: false, volume: 1, muted: false, src: '' }); hostMedia.push(this); }
@@ -710,4 +712,117 @@ test('venue-scoped data reads coalesce by source and location and refuse scope w
   assert.equal((await h.data.get('weather-nearby', { location_id: 'show-withdrawn' })).status, 'unavailable');
   assert.deepEqual(reads.slice(2), [['fixed-weather', undefined], ['weather-nearby', 'show-withdrawn']]);
   h.destroy();
+});
+
+const proximitySource = { alias: 'venue', product: 'location.proximity', location_id: 'point-33450000_-112070000_100' };
+const proximityTarget = (changes = {}) => observation(null, {
+  alias: proximitySource.alias, product: proximitySource.product,
+  location: { id: proximitySource.location_id, kind: 'point', title: 'Public venue' },
+  rows: [{ lat: 33.45, lon: -112.07, radius_m: 100 }], ...changes
+});
+
+test('proximity checks require a focused and activated frame and return only an approved status', async () => {
+  const loads = [], checks = [];
+  const h = harness({ dataAliases: ['venue', 'weather'], dataProximitySources: [proximitySource],
+    loadData: async (alias, _signal, locationId) => {
+      loads.push([alias, locationId]);
+      h.host.navigator.userActivation.isActive = false;
+      return proximityTarget();
+    }
+  });
+  h.host.SFCanvasLocation = { check: async (point, signal, activated) => {
+    checks.push({ point, signal, activated });
+    return { status: 'inside', coords: { latitude: 20, longitude: 40 }, accuracy: 2 };
+  } };
+  h.start();
+  assert.equal((await h.data.checkProximity('venue')).status, 'denied');
+  h.host.navigator.userActivation.isActive = true;
+  h.host.document.activeElement = {};
+  assert.equal((await h.data.checkProximity('venue')).status, 'denied');
+  h.host.document.activeElement = h.frame;
+  assert.equal((await h.data.checkProximity('weather')).status, 'unavailable');
+  assert.equal((await h.data.checkProximity('point-33450000_-112070000_100')).status, 'unavailable');
+  assert.equal((await h.data.get('venue')).status, 'unavailable');
+  assert.equal(loads.length, 0);
+
+  const result = await h.data.checkProximity('venue');
+  assert.equal(result.status, 'inside');
+  assert.deepEqual(Object.keys(result), ['status']);
+  assert.ok(Object.isFrozen(result));
+  assert.deepEqual(loads, [['venue', undefined], ['venue', undefined]]);
+  assert.equal(checks.length, 1);
+  assert.equal(checks[0].activated, true);
+  assert.equal(checks[0].signal.aborted, false);
+  assert.deepEqual({ ...checks[0].point }, proximityTarget().rows[0]);
+  const response = h.messages.filter(item => item.direction === 'host' && item.data.type === 'response').at(-1).data;
+  assert.deepEqual({ ...response.value }, { status: 'inside' });
+
+  const message = h.messages.filter(item => item.direction === 'child' && item.data.method === 'checkProximity').at(-1).data;
+  h.host.navigator.userActivation.isActive = true;
+  for (const event of [{ source: {} }, { origin: 'https://attacker.example' }, { isTrusted: false }]) {
+    h.host.emit('message', { source: h.frame.contentWindow, origin: 'null', isTrusted: true,
+      data: { ...message, id: 'r-100', activated: true }, ...event });
+  }
+  await flush();
+  assert.equal(checks.length, 1);
+  assert.equal(loads.length, 2);
+  h.destroy();
+});
+
+test('proximity requires the exact attached public point and reauthorizes any location result', async () => {
+  let data = proximityTarget({ status: 'stale' }), result = 'inside', replaceAfterCheck = null;
+  let checks = 0;
+  const h = harness({ dataAliases: ['ordinary'], dataProximitySources: [proximitySource,
+    { ...proximitySource, alias: 'unbound-point', location_id: 'city-0455000' },
+    { ...proximitySource, alias: 'wrong-product', product: 'geography.place' }],
+  loadData: async () => data });
+  h.host.navigator.userActivation.isActive = true;
+  h.host.SFCanvasLocation = { check: async () => {
+    checks++;
+    if (replaceAfterCheck) data = replaceAfterCheck;
+    return { status: result };
+  } };
+  h.start();
+  assert.equal((await h.data.checkProximity('unbound-point')).status, 'unavailable');
+  assert.equal((await h.data.checkProximity('wrong-product')).status, 'unavailable');
+  assert.equal((await h.data.get('ordinary')).status, 'unavailable');
+  for (const changes of [{ status: 'stale' }, { product: 'geography.place' }, { alias: 'wrong' },
+    { expires_at: new Date(Date.now() - 1000).toISOString() }, { location: { kind: 'city', id: 'city-0455000' } },
+    { rows: [{ lat: 33.45, lon: -112.07, radius_m: 200 }] }]) {
+    data = proximityTarget(changes);
+    assert.equal((await h.data.checkProximity('venue')).status, 'unavailable');
+  }
+  assert.equal(checks, 0);
+  for (const status of ['inside', 'outside', 'uncertain', 'denied', 'unavailable', 'unsupported']) {
+    data = proximityTarget(); result = status;
+    assert.equal((await h.data.checkProximity('venue')).status, status === 'unsupported' ? 'unavailable' : status);
+  }
+  data = proximityTarget(); result = 'inside'; replaceAfterCheck = proximityTarget({ status: 'unavailable' });
+  assert.equal((await h.data.checkProximity('venue')).status, 'unavailable');
+  h.destroy();
+});
+
+test('a pending location check is isolated to one live canvas session and aborts on account or scene change', async () => {
+  for (const reason of ['account', 'close', 'unload']) {
+    let finish, signal, loads = 0;
+    const h = harness({ dataProximitySources: [proximitySource], loadData: async () => { loads++; return proximityTarget(); } });
+    h.host.navigator.userActivation.isActive = true;
+    h.host.SFCanvasLocation = { check: async (_point, requestSignal) => {
+      signal = requestSignal;
+      return new Promise(resolve => { finish = resolve; });
+    } };
+    const host = h.start();
+    const read = h.data.checkProximity('venue');
+    await flush();
+    assert.equal(signal.aborted, false);
+    assert.equal((await h.data.checkProximity('venue')).status, 'unavailable');
+    if (reason === 'account') { h.setOwner(2); host.refresh(); }
+    if (reason === 'close') h.destroy();
+    if (reason === 'unload') h.child.emit('pagehide');
+    finish({ status: 'inside' });
+    assert.equal((await read).status, 'unavailable');
+    assert.equal(signal.aborted, true);
+    assert.equal(loads, 1);
+    h.destroy();
+  }
 });

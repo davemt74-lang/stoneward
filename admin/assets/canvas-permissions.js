@@ -20,7 +20,9 @@
     function draw(data){current=data;inputs.clear();rows.replaceChildren();
       for(const card of data.capabilities){const label=node('label');label.style.cssText='display:block;padding:14px 0;border-bottom:1px solid #ffffff22';
         const input=node('input');input.type='checkbox';input.checked=card.enabled;input.disabled=busy;inputs.set(card.permission_id,input);
-        const name=node('strong',' '+card.label);const detail=node('p',card.description);const scope=node('small',card.permission_id+' · Read · '+(card.requires_sign_in?'Signed-in account only':'Public artist data')+' · '+(card.requires_sign_in?'Account authorization and canvas consent required':'No personal data'));
+        const name=node('strong',' '+card.label);const detail=node('p',card.description);
+        const access=card.consent_status==='explicit_device_consent'?'Device location with per-check consent':card.requires_sign_in?'Signed-in account and canvas consent required':'Public data';
+        const scope=node('small',card.permission_id+' · Read · '+access);
         input.addEventListener('change',update,{signal:controller.signal});label.append(input,name,detail,scope);label.dataset.search=(card.label+' '+card.description+' '+card.permission_id).toLowerCase();rows.append(label);}
       history.replaceChildren(node('h2','Policy history'));
       for(const item of data.history)history.append(node('p','Revision '+item.revision+' · Admin #'+item.updated_by+' · '+item.updated_at+' · '+Object.entries(item.changes).map(([id,v])=>id+': '+(v.after?'enabled':'disabled')).join('; ')));

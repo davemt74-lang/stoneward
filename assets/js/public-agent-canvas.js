@@ -1904,6 +1904,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         loadAudio:(trackId,signal)=>options.onCanvasAudioSource?.(trackId,signal),
         dataAliases:listeningScene?.dataAliases,
         dataLocationAliases:listeningScene?.dataLocationAliases,
+        dataProximitySources:listeningScene?.dataProximitySources,
         loadData:(alias,signal,locationId)=>options.onCanvasDataRead?.(alias,context,signal,locationId),
         observeIndependent:(media,track,settings)=>options.onCanvasIndependentAudioObserve?.(media,track,context,settings),
         play:trackId=>options.onCanvasAudioPlay?.(trackId),
@@ -2199,6 +2200,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         layer.setAttribute('aria-hidden','true');
       }else{
         layer.setAttribute('sandbox',reactive||script.js||hasImages||trackActions?'allow-scripts':'');
+        layer.setAttribute('allow',"geolocation 'none'");
         layer.setAttribute('referrerpolicy','no-referrer');
         layer.setAttribute('tabindex',interactive?'0':'-1');
         if(interactive)layer.className='sf-agent-scene-interactive';
@@ -2245,10 +2247,11 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       const sources=scene.artist_inputs?.data_sources;
       const dataSources=custom&&Array.isArray(sources)?sources
         .filter(source=>typeof source?.alias==='string'&&/^[a-z][a-z0-9-]{0,31}$/.test(source.alias)):[];
-      const dataAliases=dataSources.map(source=>source.alias);
+      const dataAliases=dataSources.filter(source=>source.product!=='location.proximity').map(source=>source.alias);
       const dataLocationAliases=dataSources.filter(source=>source.location_id==='published-shows'&&
         typeof source.product==='string'&&source.product.startsWith('weather.')).map(source=>source.alias);
-      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner,dataAliases,dataLocationAliases};
+      const dataProximitySources=dataSources.filter(source=>source.product==='location.proximity');
+      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner,dataAliases,dataLocationAliases,dataProximitySources};
       renderSceneImageChoices();
       renderSceneCatalog(scene.catalog_blocks);
       const artwork=sourceAvailable?sceneArtwork(scene.artwork):'';

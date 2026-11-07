@@ -1,8 +1,12 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/canvas-map-core.php';
 
 const SF_CANVAS_DATA_MAX_SOURCES=4;
 const SF_CANVAS_DATA_SHOW_SCOPE='published-shows';
+const SF_CANVAS_DATA_REGION_SCOPE='us-regions';
+const SF_CANVAS_DATA_MIN_RADIUS_M=10;
+const SF_CANVAS_DATA_MAX_RADIUS_M=10000;
 
 /** Catalog entries describe data, parameters and host permissions. */
 function sf_canvas_data_products(): array {
@@ -47,6 +51,25 @@ function sf_canvas_data_products(): array {
             'permission_id'=>'canvas.data.geography_public','capability'=>'geography_public','provider'=>$provider,
             'operation'=>$operation,'reader'=>'sf_canvas_data_read_geography'];
     }
+    $catalog['map.boundaries']=[
+        'id'=>'map.boundaries','title'=>'U.S. map boundaries',
+        'description'=>'Simplified state and territory outlines for a public place or a U.S. overview. Group rows by region, part and ring, then append coordinates in chunk order. Each coordinates string is JSON containing longitude/latitude pairs. Ring zero is the exterior. Draw and style the geometry to suit the requested design.',
+        'fields'=>['region'=>'text','name'=>'text','part'=>'number','ring'=>'number','chunk'=>'number','coordinates'=>'text'],
+        'parameters'=>['location_id'=>['type'=>'public_place','label'=>'City or venue','scope_options'=>[
+            ['id'=>SF_CANVAS_DATA_REGION_SCOPE,'title'=>'U.S. overview','kind'=>'scope'],
+        ]]],
+        'permission_id'=>'canvas.data.map_public','capability'=>'map_public','provider'=>SF_CANVAS_MAP_SOURCE,
+        'operation'=>'boundaries','reader'=>'sf_canvas_map_read',
+    ];
+    $catalog['location.proximity']=[
+        'id'=>'location.proximity','title'=>'Device proximity to a public point',
+        'description'=>'An explicitly selected public target point and radius. A separate, viewer-initiated check returns only a proximity status. Device coordinates stay in the trusted site page.',
+        'fields'=>['lat'=>'number','lon'=>'number','radius_m'=>'number'],
+        'parameters'=>['location_id'=>['type'=>'public_point','label'=>'Public target point',
+            'min_radius_m'=>SF_CANVAS_DATA_MIN_RADIUS_M,'max_radius_m'=>SF_CANVAS_DATA_MAX_RADIUS_M]],
+        'permission_id'=>'canvas.data.location_proximity','capability'=>'location_proximity','provider'=>'Stonefellow public target',
+        'operation'=>'proximity','reader'=>'sf_canvas_data_read_proximity',
+    ];
     return $catalog;
 }
 
@@ -106,6 +129,21 @@ function sf_canvas_data_location_scope(array $product,string $location): ?array 
     return null;
 }
 
+/** The attachment contains public target coordinates, never a viewer's device location. */
+function sf_canvas_data_point(string $id): ?array {
+    if(preg_match('/\Apoint-(0|-?[1-9][0-9]{0,8})_(0|-?[1-9][0-9]{0,8})_([1-9][0-9]{0,4})\z/',$id,$values)!==1)return null;
+    $lat=(int)$values[1];$lon=(int)$values[2];$radius=(int)$values[3];
+    if(abs($lat)>90000000||abs($lon)>180000000||$radius<SF_CANVAS_DATA_MIN_RADIUS_M||$radius>SF_CANVAS_DATA_MAX_RADIUS_M)return null;
+    $lat=$lat/1000000;$lon=$lon/1000000;
+    return ['id'=>$id,'title'=>sprintf('%.6F°, %.6F° · %d m',$lat,$lon,$radius),'kind'=>'point',
+        'lat'=>$lat,'lon'=>$lon,'radius_m'=>$radius];
+}
+
+function sf_canvas_data_saved_place(array $product,string $location): ?array {
+    if(($product['parameters']['location_id']['type']??null)==='public_point')return sf_canvas_data_point($location);
+    return sf_canvas_data_location_scope($product,$location)??sf_canvas_data_place($location,true);
+}
+
 function sf_canvas_data_source_context(array $sources): array {
     require_once __DIR__.'/canvas-data-places.php';
     $products=array_column(sf_canvas_data_inventory()['products'],null,'id');
@@ -113,7 +151,7 @@ function sf_canvas_data_source_context(array $sources): array {
     foreach($sources as $source){
         $product=$products[$source['product']]??null;
         if($product===null)throw new InvalidArgumentException('A selected live data service is disabled. Update the /data selection.');
-        $place=sf_canvas_data_location_scope($product,$source['location_id'])??sf_canvas_data_place($source['location_id']);
+        $place=sf_canvas_data_saved_place($product,$source['location_id']);
         if($place===null)throw new InvalidArgumentException('A selected live data location is unavailable. Update the /data selection.');
         $out[]=$source+['location'=>sf_canvas_data_public_place($place),'schema'=>$product];
     }
@@ -143,16 +181,23 @@ function sf_canvas_data_read_geography(array $place,string $operation): array {
     return sf_canvas_geography_read($place,$operation);
 }
 
+function sf_canvas_data_read_proximity(array $place): array {
+    $now=time();
+    return ['status'=>'fresh','source'=>'Stonefellow public target','fetched_at'=>gmdate('c',$now),
+        'expires_at'=>gmdate('c',$now+60),'timezone'=>null,
+        'rows'=>[['lat'=>$place['lat'],'lon'=>$place['lon'],'radius_m'=>$place['radius_m']]]];
+}
+
 /** Resolve an exact saved place or a runtime venue within an explicitly selected scope. */
 function sf_canvas_data_read_place(array $product,string $location,?string $requestedLocation): ?array {
-    if(sf_canvas_data_location_scope($product,$location)!==null){
+    if($location===SF_CANVAS_DATA_SHOW_SCOPE&&sf_canvas_data_location_scope($product,$location)!==null){
         if($requestedLocation===null||preg_match('/\Ashow-[a-z0-9][a-z0-9-]{0,79}\z/',$requestedLocation)!==1)
             throw new InvalidArgumentException('Choose a published venue for this live data source.');
         require_once __DIR__.'/canvas-geography-core.php';
         return sf_canvas_geography_upcoming_venue($requestedLocation);
     }
     if($requestedLocation!==null)throw new InvalidArgumentException('This live data source has a fixed location.');
-    return sf_canvas_data_place($location,true);
+    return sf_canvas_data_saved_place($product,$location);
 }
 
 /** Only the current saved scene or approved gallery can select a binding. */

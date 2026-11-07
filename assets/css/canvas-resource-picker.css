@@ -59,3 +59,6 @@ body:has(.sf-canvas-resource-picker[open]) { overflow:hidden; }
 .sf-canvas-data-entry { display:grid;gap:8px;justify-items:stretch; }
 .sf-canvas-data-entry small { color:#b8cbdb; }
 .sf-canvas-data-entry button { justify-self:start; }
+.sf-canvas-data-point { display:grid;gap:8px;min-width:0;margin:0;padding:10px 12px 12px;border:1px solid #a8d7ef55;border-radius:9px; }
+.sf-canvas-data-point legend { padding:0 4px;color:#ecf6ff;font-weight:650; }
+.sf-canvas-data-point .sf-canvas-resource-status { margin:0; }

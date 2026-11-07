@@ -78,6 +78,23 @@ function sf_agent_tool_registry(): array {
                 'max_rows'=>48,
             ],
         ],
+        'map_public'=>[
+            'label'=>'Public map boundaries','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-data.php',
+            'handler'=>'sf_canvas_data_read','confirmation'=>false,'execution'=>'server',
+            'canvas_external'=>[
+                'description'=>'Simplified public U.S. state and territory map geometry for approved sources.',
+                'fields'=>['status'=>'text','source'=>'text','fetched_at'=>'datetime','expires_at'=>'datetime','rows'=>'array'],
+                'max_rows'=>120,
+            ],
+        ],
+        'location_proximity'=>[
+            'label'=>'Device proximity check','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-data.php',
+            'handler'=>'sf_canvas_data_read','confirmation'=>true,'execution'=>'server',
+            'canvas_external'=>[
+                'description'=>'With your permission for each check, the site compares your device location with a public target. The canvas receives only a proximity result.',
+                'fields'=>['status'=>'text'],'max_rows'=>1,'device_consent'=>true,
+            ],
+        ],
         'personal_listening_stats'=>[
             'label'=>'Personal listening statistics','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/listening.php',
             'handler'=>'sf_listening_analytics','confirmation'=>false,'execution'=>'server',

@@ -309,4 +309,109 @@ data_flow_check($composedOpen['scene']['artist_inputs']['data_sources']===$compo
     sf_canvas_data_read([],$composedPublic,'forecast',$weather,$publicRows[0]['location_id'])['status']==='fresh',
     'An approved gallery lets a guest compose map and scoped weather from its reviewed manifest');
 data_flow_check(count($requests)===8&&!$db->inTransaction(),'Mixed-service runtime and rejection paths leave transactions and provider counts consistent');
+
+$mapPermission='canvas.data.map_public';
+$locationPermission='canvas.data.location_proximity';
+$target='point-33448400_-112074000_500';
+$spatial=[
+    ['alias'=>'city-outline','product'=>'map.boundaries','location_id'=>'city-0455000'],
+    ['alias'=>'venue-outline','product'=>'map.boundaries','location_id'=>'show-flow-venue'],
+    ['alias'=>'regions','product'=>'map.boundaries','location_id'=>'us-regions'],
+    ['alias'=>'entrance','product'=>'location.proximity','location_id'=>$target],
+];
+foreach([
+    ['location.proximity','city-0455000'],
+    ['location.proximity','point-90000001_0_500'],
+    ['location.proximity','point-0_-180000001_500'],
+    ['location.proximity','point-33448400_-112074000_9'],
+    ['location.proximity','point-33448400_-112074000_10001'],
+    ['location.proximity','point-033448400_-112074000_500'],
+    ['location.proximity','point--0_0_500'],
+    ['location.proximity','point-33448400__500'],
+    ['map.boundaries',$target],
+    ['map.boundaries','published-shows'],
+    ['map.boundaries','show-flow-hidden'],
+] as [$product,$location]){
+    data_flow_reject(fn()=>sf_canvas_project_propose($owner,['project'=>['brief'=>'Use a spatial source',
+        'artist_inputs'=>['data_sources'=>[['alias'=>'spatial','product'=>$product,'location_id'=>$location]]]]]),
+        InvalidArgumentException::class,'Malformed, out-of-range and unapproved spatial targets are rejected');
+}
+$spatialBrief='Combine regional outlines and a public proximity target';
+foreach($spatial as $source)$spatialBrief.=' {data:'.$source['alias'].':'.$source['product'].':'.$source['location_id'].'}';
+$spatialProposal=sf_canvas_project_propose($owner,['project'=>['brief'=>$spatialBrief]]);
+sf_canvas_project_approve(1,$spatialProposal['id']);
+$spatialBuild=$spatialProposal['project']+['project_managed'=>true,'proposal_id'=>$spatialProposal['id'],'request_id'=>data_flow_request()];
+$changedRadius=$spatialBuild;
+$changedRadius['artist_inputs']['data_sources'][3]['location_id']='point-33448400_-112074000_501';
+data_flow_reject(fn()=>sf_agent_scene_create($owner,$changedRadius),SfCanvasProjectApprovalRequired::class,
+    'An approved proximity target cannot silently grow or change coordinates');
+$spatialScene=sf_agent_scene_create($owner,$spatialBuild)['scene'];
+$spatialContext=['scene_id'=>$spatialScene['id']];
+$spatialUses=array_column(sf_canvas_access_summary($owner,$spatialContext)['permissions'],null,'id');
+data_flow_check($spatialScene['artist_inputs']['data_sources']===$spatial&&
+    isset($spatialUses[$mapPermission],$spatialUses[$locationPermission])&&
+    empty($spatialUses[$mapPermission]['device_consent'])&&($spatialUses[$locationPermission]['device_consent']??false)===true,
+    'Map and proximity sources save separately and disclose the device permission boundary');
+
+$cityBoundary=sf_canvas_data_read($owner,$spatialContext,'city-outline',$weather);
+$venueBoundary=sf_canvas_data_read($owner,$spatialContext,'venue-outline',$weather);
+$firstChunk=$cityBoundary['rows'][0]??[];
+$pairs=json_decode($firstChunk['coordinates']??'[]',true,5,JSON_THROW_ON_ERROR);
+data_flow_check($cityBoundary['status']==='fresh'&&$venueBoundary['status']==='fresh'&&$cityBoundary['rows']!==[]&&
+    array_values(array_unique(array_column($cityBoundary['rows'],'region')))===['AZ']&&
+    $cityBoundary['rows']===$venueBoundary['rows']&&
+    isset($firstChunk['name'],$firstChunk['part'],$firstChunk['ring'],$firstChunk['chunk'],$firstChunk['coordinates'])&&
+    is_array($pairs)&&count($pairs)>=4&&is_array($pairs[0])&&count($pairs[0])===2&&
+    is_numeric($pairs[0][0])&&is_numeric($pairs[0][1]),
+    'A city and a public venue resolve to the same selected regional outline and geometry chunks');
+$regions=sf_canvas_data_read($owner,$spatialContext,'regions',$weather);
+$regionCodes=array_unique(array_column($regions['rows'],'region'));
+data_flow_check($regions['status']==='fresh'&&count($regionCodes)>=52&&in_array('AZ',$regionCodes,true)&&
+    in_array('AK',$regionCodes,true)&&in_array('HI',$regionCodes,true),
+    'The explicitly selected regional overview includes the full national outline set');
+$publicTarget=sf_canvas_data_read($owner+['lat'=>12.34,'lon'=>56.78],$spatialContext,'entrance',$weather);
+$targetRow=$publicTarget['rows'][0]??[];
+data_flow_check($publicTarget['status']==='fresh'&&count($publicTarget['rows'])===1&&
+    abs(($targetRow['lat']??0)-33.4484)<0.000001&&abs(($targetRow['lon']??0)+112.074)<0.000001&&
+    ($targetRow['radius_m']??null)===500&&count($requests)===8,
+    'The proximity endpoint returns the saved public target and radius without using viewer coordinates or fetching weather');
+foreach(['city-outline','regions','entrance'] as $alias){
+    data_flow_reject(fn()=>sf_canvas_data_read($owner,$spatialContext,$alias,$weather,'city-0477000'),
+        InvalidArgumentException::class,'Spatial runtime aliases reject a caller-supplied location override');
+}
+data_flow_reject(fn()=>sf_canvas_data_read($other,$spatialContext,'entrance',$weather),OutOfBoundsException::class,
+    'A viewer cannot inspect a private spatial binding owned by another account');
+
+$spatialShareable=sf_agent_scene_history_save(1,['canvas_kind'=>'custom','track_id'=>'','title'=>'Shareable spatial canvas',
+    'html'=>'<p class="map">Fixture map</p>','css'=>'','artist_inputs'=>['data_sources'=>$spatial]]);
+$spatialGallery=sf_canvas_gallery_submit($owner,['scene_id'=>$spatialShareable['id'],'request_id'=>data_flow_request(),
+    'title'=>'Shared spatial canvas','description'=>'Map and proximity target','creator_label'=>'Fixture creator','publication_consent'=>true]);
+$spatialPublic=['gallery_id'=>$spatialGallery['id']];
+data_flow_reject(fn()=>sf_canvas_data_read([],$spatialPublic,'entrance',$weather),OutOfBoundsException::class,
+    'Pending gallery entries cannot expose spatial bindings');
+sf_canvas_gallery_moderate($admin,$spatialGallery['id'],'approve',$spatialGallery['snapshot_hash']);
+$spatialOpen=sf_canvas_gallery_open($spatialGallery['id']);
+data_flow_check($spatialOpen['scene']['artist_inputs']['data_sources']===$spatial&&
+    !array_diff([$mapPermission,$locationPermission],array_column($spatialOpen['item']['uses'],'id'))&&
+    sf_canvas_data_read([],$spatialPublic,'venue-outline',$weather)['rows']===$venueBoundary['rows']&&
+    sf_canvas_data_read([],$spatialPublic,'entrance',$weather)['rows']===$publicTarget['rows'],
+    'Approved gallery guests can read the same public outline and target without access to a viewer location');
+$spatialPolicy=static function(string $permission,bool $enabled)use($admin):void {
+    sf_canvas_permission_save($admin,sf_canvas_permission_policy()['revision'],[$permission=>$enabled]);
+};
+$spatialPolicy($mapPermission,false);
+$mapOff=sf_canvas_data_read($owner,$spatialContext,'regions',$weather);
+$products=array_column(sf_canvas_data_inventory()['products'],'id');
+data_flow_check($mapOff['status']==='unavailable'&&$mapOff['rows']===[]&&!in_array('map.boundaries',$products,true)&&
+    in_array('location.proximity',$products,true)&&in_array('geography.shows',$products,true)&&
+    sf_canvas_data_read([],$spatialPublic,'entrance',$weather)['rows']===$publicTarget['rows'],
+    'Map boundaries can be disabled independently of public geography and proximity');
+$spatialPolicy($mapPermission,true);
+$spatialPolicy($locationPermission,false);
+$locationOff=sf_canvas_data_read([],$spatialPublic,'entrance',$weather);
+data_flow_check($locationOff['status']==='unavailable'&&$locationOff['rows']===[]&&
+    sf_canvas_data_read([],$spatialPublic,'venue-outline',$weather)['rows']===$venueBoundary['rows'],
+    'Disabling proximity withholds the target and preserves separate map bindings');
+$spatialPolicy($locationPermission,true);
+data_flow_check(count($requests)===8&&!$db->inTransaction(),'All spatial paths are local and leave no open transaction');
 echo 'Canvas external data flow: '.$checks.' checks passed ('.($mysql?'mysql':'sqlite').')'.PHP_EOL;

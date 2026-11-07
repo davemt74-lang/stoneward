@@ -96,7 +96,9 @@ function sf_canvas_access_summary(array $user,array $context): array {
         $fields=sf_canvas_access_fields($card);
         $granted=!$personal||($uid>0&&isset($grants[$card['permission_id']])&&!array_diff($fields,$grants[$card['permission_id']]));
         $enabled=sf_canvas_permission_enabled($id,$policy);if($personal&&$enabled&&!$granted)$needed=true;
-        $permissions[]=['id'=>$card['permission_id'],'label'=>$card['label'],'description'=>$card['description'],'personal'=>$personal,'enabled'=>$enabled,'granted'=>$granted,'version'=>hash('sha256',json_encode($fields,JSON_THROW_ON_ERROR))];
+        $device=$card['consent_status']==='explicit_device_consent';
+        $permissions[]=['id'=>$card['permission_id'],'label'=>$card['label'],'description'=>$card['description'],'personal'=>$personal,'enabled'=>$enabled,'granted'=>$granted&&!$device,'version'=>hash('sha256',json_encode($fields,JSON_THROW_ON_ERROR))]
+            +($device?['device_consent'=>true]:[]);
         $scopes[$card['permission_id']]=$fields;
     }
     // The fingerprint guards consent, not creative execution. Grant reuse is based on scope inclusion.
@@ -166,7 +168,8 @@ function sf_canvas_access_public_uses(string $html,?array $meTools=null,array $d
     foreach(sf_canvas_capability_cards() as $id=>$card){
         $bindings=($card['transport']??null)==='host_read'?$external:$declared;
         if(isset($bindings[$id])&&sf_canvas_access_in_scope($id,$card['requires_sign_in'],$meTools))
-            $uses[]=['id'=>$card['permission_id'],'label'=>$card['label'],'personal'=>$card['requires_sign_in'],'enabled'=>sf_canvas_permission_enabled($id,$policy)];
+            $uses[]=['id'=>$card['permission_id'],'label'=>$card['label'],'personal'=>$card['requires_sign_in'],'enabled'=>sf_canvas_permission_enabled($id,$policy)]
+                +($card['consent_status']==='explicit_device_consent'?['device_consent'=>true]:[]);
     }
     return $uses;
 }
