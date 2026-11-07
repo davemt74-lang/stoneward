@@ -1,6 +1,18 @@
 <?php
 declare(strict_types=1);
 
+/** Large lyric results use the owner-authorized scene GET for dataset delivery. */
+function sf_agent_scene_result_event(array $data,int $status): array {
+    $event=['type'=>$status>=400?'error':'result','status'=>$status,'data'=>$data];
+    // Match the browser's per-event NDJSON limit. Measure bytes as an upper bound on characters.
+    if($status<300&&isset($data['scene']['id'],$data['scene']['datasets']['published_lyrics'])&&
+        strlen(json_encode($event,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR))>1048576){
+        unset($event['data']['scene']['datasets'],$event['data']['scene']['dataset_track_id']);
+        $event['data']['datasets_deferred']=true;
+    }
+    return $event;
+}
+
 final class SfAgentSceneStreamInterrupted extends RuntimeException {
     public function __construct(public readonly string $reason) {
         parent::__construct('Listening room provider stream did not complete.');

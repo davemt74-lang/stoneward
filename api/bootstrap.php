@@ -35,11 +35,13 @@ function sf_store_config(): array {
     return $cfg;
 }
 
-function sf_catalog(): array {
+function sf_catalog(bool $refresh=false): array {
     static $catalog;
+    if($refresh)$catalog=null;
     if ($catalog !== null) return $catalog;
     $path = SF_ROOT . '/data/catalog.json';
-    $data = json_decode((string)file_get_contents($path), true);
+    $bytes = @file_get_contents($path);
+    $data = is_string($bytes) ? json_decode($bytes, true) : null;
     if (!is_array($data)) throw new RuntimeException('Catalog JSON is invalid.');
     $catalog = $data;
     return $catalog;

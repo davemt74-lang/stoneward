@@ -3,7 +3,8 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.298',
+  'stonefellow'=>'1.3.299',
+  'canvas_lyric_sources'=>'published-songbook-and-reviewed-timing-by-canonical-song',
   'canvas_story_sources'=>'published-story-selection-live-all-and-tag-scopes',
   'canvas_playlist_sources'=>'ordered-owned-and-approved-artist-revisions-with-current-audio-authorization',
   'account_token_meter'=>'read-only-net-balance-held-reservations-credited-allowance-percentage-owner-bound-refresh',

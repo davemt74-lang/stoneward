@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.298';
+  window.STONEFELLOW_APP_BUILD='1.3.299';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -1287,6 +1287,29 @@
       reader.releaseLock();
     }
   }
+  // A deferred result is already saved. Read its authorized data without replaying the build.
+  async function hydrateCanvasDatasets(result,contextTrackId,signal){
+    const original=result.scene,id=original?.id;
+    const trackId=typeof contextTrackId==='string'&&/^[A-Za-z0-9_-]{1,180}$/.test(contextTrackId)?contextTrackId:'';
+    if(signal?.aborted)throw new DOMException('Canvas data request canceled.','AbortError');
+    try{
+      if(!Number.isSafeInteger(id)||id<1||original.canvas_kind!=='custom')throw new Error('Invalid saved canvas.');
+      const {scene}=await api('agent-scene.php?id='+encodeURIComponent(id)+'&current_track_id='+encodeURIComponent(trackId),undefined,signal);
+      if(scene?.id!==id||scene.canvas_kind!==original.canvas_kind||scene.track_id!==original.track_id)
+        throw new Error('The saved canvas changed.');
+      const {datasets,dataset_track_id:datasetTrackId}=scene;
+      if(datasetTrackId!==undefined&&datasetTrackId!==trackId||
+        datasets!==undefined&&(!datasets||typeof datasets!=='object'||Array.isArray(datasets)))
+        throw new Error('Invalid saved canvas data.');
+      if(signal?.aborted)throw new DOMException('Canvas data request canceled.','AbortError');
+      const {datasets_deferred,...response}=result;
+      return {...response,scene:{...original,datasets,dataset_track_id:datasetTrackId}};
+    }catch{
+      if(signal?.aborted)throw new DOMException('Canvas data request canceled.','AbortError');
+      throw Object.assign(new Error('Your canvas was saved. Its data could not load. Open Canvas History to try again.'),{
+        payload:{error:'scene_data_unavailable',generated_images:result.generated_images,image_total:result.image_total}});
+    }
+  }
   async function secureJsonPost(path,payload,retried=false,signal,onDelta,onConcept,onRetry,onTrace){
     if(signal?.aborted)throw new Error('The request was canceled.');
     if(!st.auth.csrf)await loadAuth(true);
@@ -1313,6 +1336,10 @@
     if(typeof window!=='undefined')window.SFTokenMeter?.notifyUsage?.();
     if(status===403&&j.error==='csrf_failed'&&!retried){await loadAuth(true);return secureJsonPost(path,payload,true,signal,onDelta,onConcept,onRetry,onTrace)}
     if(status<200||status>=300||j.ok===false){const e=new Error(j.message||j.error||'Request failed.');e.payload=j;e.status=status;throw e}
+    if(streamed&&j.datasets_deferred===true){
+      if(path==='agent-scene.php')return hydrateCanvasDatasets(j,payload?.context_track_id,signal);
+      if(path==='canvas-build-workflow.php'&&payload?.action==='repair')return hydrateCanvasDatasets(j,payload.current_track_id,signal);
+    }
     if(path==='privacy.php'&&['save_profile','clear_history','clear_agent_history','reset_personalization'].includes(payload?.action)||path==='personalization.php'&&payload?.action==='clear_history')
       globalThis.SFListeningTelemetry?.privacyChanged?.();
     return j;
@@ -2045,7 +2072,7 @@
   }
   function canvasDesignBrief(brief){
     const clean=brief.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi,' ')
-      .replace(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|playlists-clear|merch-clear|tickets-clear)\}/gi,' ')
+      .replace(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|playlists-clear|merch-clear|tickets-clear)\}/gi,' ')
       .replace(/(`?)\{[^\S\r\n]*(?:hide-agent|design-ag(?:ent|net))[^\S\r\n]*\}\1/gi,' ').trim();
     return clean!==brief&&/^[.!?…]+$/.test(clean)?'':clean;
   }
@@ -2137,12 +2164,13 @@
     return typeof value==='string'&&value.length<=64&&/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
   }
   function chatDraftResourceInputs(draft){
-    const sources=[],merch=[],tickets=[],playlists=[];
-    for(const match of draft.matchAll(/\{(canvas|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
+    const sources=[],lyrics=[],merch=[],tickets=[],playlists=[];
+    for(const match of draft.matchAll(/\{(canvas|lyrics|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
       const kind=match[1].toLowerCase(),id=match[2];
       if(kind==='canvas'){
         const value=Number(id);if(/^[1-9]\d*$/.test(id)&&Number.isSafeInteger(value))sources.push(value);
-      }else (kind==='merch'?merch:tickets).push(id);
+      }else if(kind==='lyrics')lyrics.push(id);
+      else (kind==='merch'?merch:tickets).push(id);
     }
     const playlistSeen=new Set();
     for(const match of draft.matchAll(/\{playlist:((?:own|artist)-[1-9]\d{0,18})@([a-f0-9]{64})\}/gi)){
@@ -2150,6 +2178,7 @@
       if(!playlistSeen.has(key)){playlistSeen.add(key);playlists.push({ref,version});}
     }
     const artist={};
+    if(lyrics.length||/\{lyrics-clear\}/i.test(draft))artist.lyrics_ids=Array.from(new Set(lyrics));
     if(merch.length||/\{merch-clear\}/i.test(draft))artist.merch_ids=Array.from(new Set(merch));
     if(tickets.length||/\{tickets-clear\}/i.test(draft))artist.ticket_ids=Array.from(new Set(tickets));
     const storyIds=Array.from(new Set(Array.from(draft.matchAll(/\{story:([1-9]\d{0,18})\}/gi),match=>match[1])));
@@ -2162,7 +2191,7 @@
       ...(playlists.length||/\{playlists-clear\}/i.test(draft)?{playlist_inputs:{items:playlists}}:{})};
   }
   function chatResourceCommandRange(draft,caret){
-    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|merch|tickets|playlists|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|merch|tickets|playlists|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
       if(caret!==undefined&&caret!==end)continue;
       const command=match[2].toLowerCase();
@@ -2181,6 +2210,8 @@
     const before=strip(input.value.slice(0,range.start)),after=strip(input.value.slice(range.end));
     const versions=new Map(playlistItems.map(item=>[item.ref,item.version]));
     if(range.kind==='playlists'&&ids.some(id=>!/^(?:own|artist)-[1-9]\d{0,18}$/.test(id)||!/^[a-f0-9]{64}$/.test(versions.get(id)||'')))throw new Error('Choose a verified playlist version before adding it.');
+    if(range.kind==='lyrics'&&ids.some(id=>typeof id!=='string'||!/^[A-Za-z0-9_-]{1,180}$/.test(id)))
+      throw new Error('Choose published lyrics from the picker.');
     if(range.kind==='stories'&&ids.some(id=>typeof id!=='string'||!/^[1-9]\d{0,18}$/.test(id)||(id.length===19&&id>'9223372036854775807')))
       throw new Error('Choose published stories from the picker.');
     let tokens;
@@ -2200,7 +2231,7 @@
     const requestedDraft=input.value;
     await loadAuth();
     if(input.value!==requestedDraft||chatResourcePicker||chatMusicPicker||chatImagePicker)return;
-    if(!canvasOwner()&&!['playlists','stories'].includes(range.kind)){popupEntry('notice','Sign in to choose canvas project sources.');return;}
+    if(!canvasOwner()&&!['lyrics','playlists','stories'].includes(range.kind)){popupEntry('notice','Sign in to choose canvas project sources.');return;}
     const open=window.SFCanvasResourcePicker?.open;
     if(typeof open!=='function'){popupEntry('notice','Reload the page to open the source picker.');return;}
     const draft=input.value,owner=canvasOwner(),sourceScene=listeningRoom,resources=chatDraftResourceInputs(draft);
@@ -2215,7 +2246,7 @@
     else if(range.kind==='stories')selected=stories?.mode==='selected'?stories.story_ids:[];
     else if(range.kind==='canvas')selected=resources.source_scene_ids;
     else {
-      const key=range.kind==='merch'?'merch_ids':'ticket_ids';
+      const key=range.kind==='tickets'?'ticket_ids':range.kind+'_ids';
       selected=resources.artist_inputs?.[key]??previous?.artist_inputs?.[key];
     }
     const picker={owner,request:new AbortController()};chatResourcePicker=picker;
@@ -2226,7 +2257,7 @@
           selectedAll:storyAllSelected}:{}),
         selectedVersions:range.kind==='playlists'?Object.fromEntries((playlistSelection?.items||[]).map(item=>[item.ref,item.version])):undefined,signedIn:!!owner,signal:picker.request.signal});
       if(!result||picker.request.signal.aborted||chatResourcePicker!==picker||owner!==canvasOwner()||input.value!==draft||
-        (revising&&sourceScene!==listeningRoom&&['playlists','stories'].includes(range.kind)))return;
+        (revising&&sourceScene!==listeningRoom&&['lyrics','playlists','stories'].includes(range.kind)))return;
       applyChatResourceSelection(range,result.ids,result.items,result);
     }catch(error){if(error.name!=='AbortError'&&owner===canvasOwner())popupEntry('notice',error.message||'Sources could not load.');}
     finally{if(chatResourcePicker===picker)chatResourcePicker=null;picker.request.abort();}
@@ -2253,7 +2284,7 @@
     const placed=Array.from(draft.matchAll(/\{image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
     const references=Array.from(draft.matchAll(/\{reference-image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
     const music=Array.from(draft.matchAll(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi));
-    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|playlists-clear|merch-clear|tickets-clear)\}/gi));
+    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|playlists-clear|merch-clear|tickets-clear)\}/gi));
     return [...placed,...references,...music,...resources].reduce((length,match)=>length+match[0].length+1,0);
   }
   function syncChatImageDraftLimit(){
@@ -2549,7 +2580,7 @@
     input.addEventListener('paste',event=>{
       if(chatImageDraftLimit<=0||!event.clipboardData)return;
       const draft=input.value.slice(0,input.selectionStart)+event.clipboardData.getData('text')+input.value.slice(input.selectionEnd);
-      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
+      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
       input.maxLength=chatImageDraftLimit+chatDraftBindingLength(draft);
       setTimeout(syncChatImageDraftLimit,0);
     });
@@ -2591,7 +2622,7 @@
     if(edit)return {kind:'revise',brief:(edit[1]||'').trim()};
     const command=text.replace(/[.!?…]+$/,'').trim()
       .replace(/^(?:(?:can|could|would|will)\s+you|i(?:['’]d|\s+would)\s+like\s+you\s+to)\s+(?:please\s+)?/i,'');
-    const assetReference=/\{\s*(?:canvas:|merch:|ticket:|playlist:|story:|stories-(?:all|clear|tag:)|playlists-clear|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
+    const assetReference=/\{\s*(?:canvas:|lyrics:|merch:|ticket:|playlist:|story:|stories-(?:all|clear|tag:)|lyrics-clear|playlists-clear|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
     if(/^\/review-images$/i.test(text))return {kind:'image_review'};
     const build=command.match(/^let['’]?s\s+build(?:\s*[:,]\s*|\s+|$)([\s\S]*)$/i);
     if(build){
@@ -2820,7 +2851,7 @@
     const code=error.payload?.error;
     const codes=['authentication_required','csrf_failed','scene_coding_model_unavailable','invalid_scene_request',
       'scene_provider_required','scene_model_unavailable','scene_image_unavailable','invalid_scene_output','active_tokens_required',
-      'scene_unavailable','response_encoding_failed','scene_request_not_found','scene_request_too_large','invalid_json'];
+      'scene_unavailable','scene_data_unavailable','response_encoding_failed','scene_request_not_found','scene_request_too_large','invalid_json'];
     return {code:codes.includes(code)?code:error.name==='TypeError'?'network_error':'canvas_request_failed',
       ...(Number.isInteger(error.status)&&error.status>=100&&error.status<600?{status:error.status}:{}),
       reason:canvasDebugReason(error.payload?.reason)};
@@ -3509,7 +3540,7 @@
     if(listeningRoomRequest){popupEntry('notice','A canvas request is already in progress.');return;}
     const stage=window.SFPublicAgentCanvas;
     if(!stage?.active?.()||!stage.showScene){popupEntry('notice','Open the Stonefellow home canvas to build or reopen a canvas.');return;}
-    let trackId,brief,previousId,canvasKind=action.canvasKind;
+    let trackId,brief,previousId,previousScene,canvasKind=action.canvasKind;
     const selectedProject=action.kind==='project'?action.proposal:null;
     if(selectedProject&&action.owner!==canvasOwner())return;
     const editingImage=action.kind==='edit_image';
@@ -3546,13 +3577,15 @@
       if(!action.brief){popupEntry('notice','Type /edit followed by what you want to change.');return;}
       trackId=listeningRoom.track_id;
       previousId=listeningRoom.id;
+      previousScene=listeningRoom;
       canvasKind=listeningRoom.canvas_kind;
       brief=action.brief;
     }else if(action.kind==='create'&&canvasKind==='custom'){
       brief=action.brief;
       const design=canvasDesignBrief(brief);
-      const lyricSection=canvasLyricSection(design);
-      const namedSong=canvasTrackTarget(design);
+      const pickedLyrics=chatDraftResourceInputs(brief).artist_inputs?.lyrics_ids;
+      const lyricSection=pickedLyrics?null:canvasLyricSection(design);
+      const namedSong=pickedLyrics?null:canvasTrackTarget(design);
       const matches=namedSong?catalog.filter(track=>norm(track.title)===norm(namedSong)):[];
       if(matches.length>1){popupEntry('notice','More than one song has that title. Play the version you want and use “this song.”');return;}
       if(lyricSection&&namedSong&&!matches.length&&!canvasCurrentTrack(namedSong)){
@@ -3599,6 +3632,7 @@
         if(!action.brief)action={kind:'restore',id:saved.id};
         else{
           trackId=saved.track_id;previousId=saved.id;canvasKind=saved.canvas_kind||'listening_room';brief=action.brief;
+          previousScene=saved;
           action={kind:'revise'};
         }
       }
@@ -3608,7 +3642,8 @@
       const roomImageEdit=(!canvasKind||canvasKind==='listening_room')&&
         (/\{(?:reference-)?image-(?:ref-)?[a-f0-9]{32}\}/i.test(design)||/\b(?:create|generate|make|draw|render|design)\b[^.!?\n]{0,100}\b(?:images?|photos?|pictures?|illustrations?)\b/i.test(design));
       if(previousId&&design&&(canvasKind==='space_eq'||roomImageEdit))canvasKind='custom';
-      const lyricSection=canvasKind==='custom'&&!reading&&!editingImage?canvasLyricSection(design):null;
+      const pickedLyrics=resourceInputs.artist_inputs?.lyrics_ids??selectedProject?.project?.artist_inputs?.lyrics_ids??previousScene?.artist_inputs?.lyrics_ids;
+      const lyricSection=canvasKind==='custom'&&!reading&&!editingImage&&!pickedLyrics?canvasLyricSection(design):null;
       if(lyricSection&&previousId){
         const target=canvasTrackTarget(design);
         const targetMatches=!target||(canvasCurrentTrack(target)?String(st.track?.id??'')===String(trackId??''):
@@ -3755,16 +3790,17 @@
       agent(st.playing?'playing':'idle',message);
     }catch(error){
       if(!requestActive())return;
-      request.sceneBuild?.trace('build_failed',canvasDebugFailure(error));
-      canvasProjects.current?.complete?.(request.sceneBuild?.payload.proposal_id,'failed');
+      const dataUnavailable=error.payload?.error==='scene_data_unavailable';
+      request.sceneBuild?.trace(dataUnavailable?'data_load_failed':'build_failed',canvasDebugFailure(error));
+      canvasProjects.current?.complete?.(request.sceneBuild?.payload.proposal_id,dataUnavailable?'needs_attention':'failed');
       if(error.payload?.error==='scene_coding_model_unavailable')void refreshCanvasCodingModelMenu(true);
-      const message=(editingImage?'Image edit could not finish. ':action.kind==='suggest'?'Canvas suggestions could not be loaded. ':reading?'Canvas history could not be opened. ':
+      const message=dataUnavailable?error.message:(editingImage?'Image edit could not finish. ':action.kind==='suggest'?'Canvas suggestions could not be loaded. ':reading?'Canvas history could not be opened. ':
         canvasKind&&canvasKind!=='listening_room'?'Canvas could not be created. ':'Listening room could not be created. ')+listeningRoomError(error,reading);
       if(!reading){
         showCanvasBuildImages(stage,request.sceneBuild,error.payload);
-        if(request.sceneBuild?.workflowEligible)stage.setSceneWorkflow?.({request_id:request.sceneBuild.payload.request_id,phase:'failed',summary:message});
+        if(request.sceneBuild?.workflowEligible)stage.setSceneWorkflow?.({request_id:request.sceneBuild.payload.request_id,phase:dataUnavailable?'needs_attention':'failed',summary:message});
         request.abort();
-        stage.setSceneImage?.('failed',editingImage?'Image edit did not complete.':'Image generation did not complete.');
+        if(!dataUnavailable)stage.setSceneImage?.('failed',editingImage?'Image edit did not complete.':'Image generation did not complete.');
         stage.setSceneCoding?.('error',message);
       }
       popupEntry('notice',message);agent(st.playing?'playing':'idle',message);

@@ -616,6 +616,33 @@ test('Let’s Build selects Canvas 1, procedural EQ, standalone custom and publi
   assert.equal(h.posts[6].brief, 'a Space EQ with silver rings');
 });
 
+test('picked published lyrics build and revise independently of the player and legacy lyric routing', async () => {
+  const h = harness();
+  h.scope.st.track = null;
+  h.scope.st.playing = false;
+  h.scope.catalog.push({ id: 'other-static', title: 'Static Sky' });
+  const run = text => h.scope.handleListeningRoomCommand(h.scope.directListeningRoomCommand(text));
+  await run('Build a typography scene from the lyrics of Static Sky {lyrics:static} {lyrics:desert}');
+  assert.equal(h.posts[0].track_id, '');
+  assert.equal(h.posts[0].lyric_section, undefined);
+  assert.deepEqual(h.posts[0].artist_inputs, { lyrics_ids: ['static', 'desert'] });
+  assert.deepEqual(h.approvedProjects[0].project.artist_inputs, h.posts[0].artist_inputs);
+  await run('/edit Make the chorus larger {lyrics:desert}');
+  assert.equal(h.posts[1].previous_id, 1);
+  assert.equal(h.posts[1].lyric_section, undefined);
+  assert.deepEqual(h.posts[1].artist_inputs, { lyrics_ids: ['desert'] });
+
+  h.scope.api = async () => ({ scene: { ...h.scene(31, ''), canvas_kind: 'custom', artist_inputs: { lyrics_ids: ['desert'] } } });
+  await h.scope.handleListeningRoomCommand({ kind: 'restore', id: 31 });
+  await run('/edit Recolor the lyrics');
+  assert.equal(h.posts[2].previous_id, 31);
+  assert.equal(h.posts[2].lyric_section, undefined);
+  assert.equal(h.posts[2].artist_inputs, undefined);
+  await run('/edit Remove the lyrics {lyrics-clear}');
+  assert.equal(h.posts[3].lyric_section, undefined);
+  assert.deepEqual(h.posts[3].artist_inputs, { lyrics_ids: [] });
+});
+
 test('the selected canvas restores privately after a reload and stays selected when the song changes', async () => {
   const storage = new Map();
   const first = harness(true, storage);
@@ -1010,8 +1037,8 @@ test('canvas instructions stay in the chat transcript while ordinary chat can ap
   assert.equal(h.scope.voiceTranscriptText.textContent, `You: ${message}`);
 });
 
-function scenePost(fetch) {
-  const scope = { fetch, ReadableStream, TextDecoder, cfg: {}, st: { auth: { csrf: 'fixture' } } };
+function scenePost(fetch, api) {
+  const scope = { fetch, api, DOMException, ReadableStream, TextDecoder, cfg: {}, st: { auth: { csrf: 'fixture' } } };
   vm.runInNewContext(transport, scope);
   return scope.secureJsonPost;
 }
@@ -1052,6 +1079,94 @@ test('truncated streams are recoverable while terminal errors preserve their sta
   const failed = '{"type":"error","status":422,"data":{"ok":false,"error":"invalid_scene_output"}}\n';
   await assert.rejects(makePost(partial + failed)('agent-scene.php', {}, false, undefined, () => {}),
     error => error.status === 422 && error.payload.error === 'invalid_scene_output');
+});
+
+function deferredCanvasResponse(scene) {
+  const data = { ok: true, scene, datasets_deferred: true, active_tokens_used: 20, generated_images: [{ id: 'a'.repeat(32) }] };
+  return new Response(JSON.stringify({ type: 'result', status: 201, data }) + '\n',
+    { headers: { 'Content-Type': 'application/x-ndjson' } });
+}
+
+test('oversized streamed lyric results hydrate exact saved builds and repairs using the original track and signal', async () => {
+  const original = { id: 42, title: 'Saved title', track_id: '', canvas_kind: 'custom' };
+  const datasets = { published_lyrics: { rows: [{ text: 'cue\n'.repeat(300_000) }] } };
+  const trackId = 'song-Exact';
+  for (const [path, payload] of [
+    ['agent-scene.php', { context_track_id: trackId }],
+    ['canvas-build-workflow.php', { action: 'repair', current_track_id: trackId }],
+  ]) {
+    const { signal } = new AbortController();
+    const requests = [];
+    const post = scenePost(async (url, options) => {
+      requests.push(url);
+      assert.equal(options.signal, signal);
+      return deferredCanvasResponse(original);
+    }, async (url, body, readSignal) => {
+      requests.push(url);
+      assert.equal(body, undefined);
+      assert.equal(readSignal, signal);
+      return { scene: { ...original, title: 'Different GET metadata', datasets, dataset_track_id: trackId } };
+    });
+    const result = await post(path, payload, false, signal, () => {});
+    assert.deepEqual(requests, ['api/' + path, 'agent-scene.php?id=42&current_track_id=song-Exact']);
+    assert.equal(result.datasets_deferred, undefined);
+    assert.equal(result.active_tokens_used, 20);
+    assert.equal(result.generated_images[0].id, 'a'.repeat(32));
+    assert.equal(result.scene.title, original.title);
+    assert.equal(result.scene.datasets, datasets);
+    assert.equal(result.scene.dataset_track_id, trackId);
+  }
+});
+
+test('deferred lyric hydration rejects mismatched scene or track context and discards canceled reads', async () => {
+  const scene = { id: 42, track_id: '', canvas_kind: 'custom' };
+  for (const wrong of [{ ...scene, id: 43 }, { ...scene, dataset_track_id: 'wrong-track' }]) {
+    const post = scenePost(async () => deferredCanvasResponse(scene), async () => ({ scene: wrong }));
+    await assert.rejects(post('agent-scene.php', {}, false, undefined, () => {}),
+      error => error.payload?.error === 'scene_data_unavailable');
+  }
+  const controller = new AbortController();
+  let finish, release;
+  const started = new Promise(resolve => { finish = resolve; });
+  const post = scenePost(async () => deferredCanvasResponse(scene), async () => new Promise(resolve => {
+    release = resolve; finish();
+  }));
+  const request = post('agent-scene.php', {}, false, controller.signal, () => {});
+  await started;
+  controller.abort();
+  release({ scene });
+  await assert.rejects(request, { name: 'AbortError' });
+});
+
+test('a deferred lyric read uses current access and ignores markers on unrelated responses', async () => {
+  const scene = { id: 42, track_id: '', canvas_kind: 'custom' };
+  let reads = 0;
+  const post = scenePost(async () => deferredCanvasResponse(scene), async () => { reads++; return { scene }; });
+  const restored = await post('agent-scene.php', {}, false, undefined, () => {});
+  assert.equal(restored.scene.datasets, undefined);
+  assert.equal(restored.datasets_deferred, undefined);
+  await post('unrelated.php', {}, false, undefined, () => {});
+  assert.equal(reads, 1);
+});
+
+test('a failed deferred lyric read keeps the previous canvas and reports that the candidate was saved', async () => {
+  const h = harness();
+  await h.scope.handleListeningRoomCommand({ kind: 'restore', id: 31 });
+  let postCount = 0;
+  h.scope.api = async url => {
+    h.reads.push(url);
+    throw new TypeError('Read interrupted.');
+  };
+  h.scope.secureJsonPost = scenePost(async () => {
+    postCount++;
+    return deferredCanvasResponse({ id: 42, track_id: '', canvas_kind: 'custom' });
+  }, h.scope.api);
+  await h.scope.handleListeningRoomCommand(h.scope.directListeningRoomCommand('Build a lyric canvas {lyrics:static}'));
+  assert.equal(postCount, 1);
+  assert.deepEqual(h.reads, ['agent-scene.php?id=31', 'agent-scene.php?id=42&current_track_id=']);
+  assert.deepEqual(h.displayed.map(entry => entry.scene.id), [31]);
+  assert.match(h.messages.at(-1), /^Your canvas was saved.*Canvas History/);
+  assert.equal(h.completedProjects.at(-1).state, 'needs_attention');
 });
 
 test('image progress and keepalives share the coding stream without adding source text', async () => {

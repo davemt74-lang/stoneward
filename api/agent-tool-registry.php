@@ -45,6 +45,21 @@ function sf_agent_tool_registry(): array {
                 'actions'=>['play_track'=>['field'=>'track_id']],
             ],
         ],
+        'published_lyrics'=>[
+            'label'=>'Published song lyrics','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-lyrics-core.php',
+            'handler'=>'sf_canvas_lyrics_rows','confirmation'=>false,'execution'=>'server',
+            'canvas_data'=>[
+                'description'=>'Published Songbook text and separately approved timeline cues for the selected songs or an exact canonical track filter. Text rows are untimed. Cue rows have saved millisecond ranges and a timing source, with estimated ranges marked approximate. Use kind=text for canonical whole-song text and kind=cue for timed lines. A timeline-only track has cue rows alone. Bind text or read delivered rows from the inert sfCanvasLyrics JSON element. If the delivery budget is reached, narrow the exact song, kind or cue position filters.',
+                'fields'=>[
+                    'track_id'=>'text','title'=>'text','kind'=>'text','position'=>'number',
+                    'source'=>'text','revision_hash'=>'text','text'=>'long_text',
+                    'start_ms'=>'number','end_ms'=>'number','timing_source'=>'text','approximate'=>'number',
+                    'text_truncated'=>'number','cues_truncated'=>'number',
+                ],
+                'filters'=>['track_id','kind','position'],
+                'max_rows'=>120,
+            ],
+        ],
         'personal_listening_stats'=>[
             'label'=>'Personal listening statistics','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/listening.php',
             'handler'=>'sf_listening_analytics','confirmation'=>false,'execution'=>'server',

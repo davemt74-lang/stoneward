@@ -130,7 +130,7 @@ function sf_agent_canvas_image_review_choose(int $userId,string $requestId,strin
             if($row['selected_image_id']!==$imageId)throw new InvalidArgumentException('An image variation has already been selected.');
         }else{
             $scene=json_decode($row['scene_json'],true,16,JSON_THROW_ON_ERROR);
-            sf_canvas_resource_validate_stories($scene['artist_inputs']??null);
+            sf_canvas_resource_validate_publications($scene['artist_inputs']??null);
             if(sf_agent_canvas_image_file($userId,$imageId)===null)
                 throw new InvalidArgumentException('Choose an available image variation.');
             $scene=sf_agent_canvas_image_apply($scene,$imageId,$candidates[0]['id']);

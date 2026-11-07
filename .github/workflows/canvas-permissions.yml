@@ -50,6 +50,11 @@ jobs:
           php tests/canvas-stories-public.php
           php tests/canvas-stories-flow.php
           php tests/canvas-stories-dataset.php
+      - name: Published lyric text, cue authorization and approved canvas builds
+        run: |
+          php tests/canvas-lyrics.php
+          php tests/canvas-lyrics-flow.php
+          php tests/canvas-lyrics-dataset.php
       - name: Real PHP endpoint authentication, CSRF and current-viewer data
         run: |
           python tests/canvas-permissions-http.py
@@ -99,6 +104,10 @@ jobs:
           python tests/canvas-stories-picker-browser.py
           python tests/canvas-stories-admin-tags-browser.py
           python tests/canvas-stories-dataset-browser.py
+      - name: Lyric picker and isolated playback-synced canvas data
+        run: |
+          python tests/canvas-lyrics-picker-browser.py
+          python tests/canvas-lyrics-dataset-browser.py
       - name: Existing public and administrator gallery controls
         run: |
           python tests/canvas-gallery-browser.py

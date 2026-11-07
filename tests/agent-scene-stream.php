@@ -235,3 +235,16 @@ rejected(static function():void {
     $parser=new SfAgentSceneStreamParser('openai');
     $parser->push('data: '.str_repeat('x',260_000));
 },'An unterminated provider event cannot grow without bound');
+
+
+$scene=['id'=>42,'canvas_kind'=>'custom','dataset_track_id'=>'song','datasets'=>[
+    'published_lyrics'=>['rows'=>[['text'=>'Published lyric']]],
+    'published_stories'=>['rows'=>[['body_text'=>'Published story']]],
+]];
+$receipt=['ok'=>true,'scene'=>$scene,'workflow'=>['state'=>'ready']];
+verify(sf_agent_scene_result_event($receipt,200)['data']===$receipt,'Ordinary lyric results stay inline in the existing completion event');
+$receipt['scene']['datasets']['published_stories']['rows'][0]['body_text']=str_repeat('é',530000);
+$event=sf_agent_scene_result_event($receipt,200);
+verify($event['type']==='result'&&$event['data']['datasets_deferred']===true&&
+    $event['data']['workflow']===['state'=>'ready']&&$event['data']['scene']===['id'=>42,'canvas_kind'=>'custom'],
+    'Large mixed lyric results keep the same completion receipt and defer authorized dataset delivery');

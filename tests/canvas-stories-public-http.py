@@ -1,4 +1,4 @@
-"""Exercise real published story, editor and governed media routes through PHP HTTP."""
+"""Exercise public story and lyric pickers, editorial routes and governed media through PHP HTTP."""
 import importlib.util
 import json
 import os
@@ -25,6 +25,8 @@ finally:
 
 ADMIN = '/admin/api/stories.php'
 PUBLIC = '/api/canvas-resources.php?kind=stories'
+LYRICS = '/api/canvas-resources.php?kind=lyrics'
+SONGBOOK = '/admin/api/songbook.php'
 checks = []
 
 
@@ -54,8 +56,21 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-stories-http-') as tem
     site = Path(temporary)
     fixture.seed(site)
     shutil.copytree(ROOT / 'admin', site / 'admin', dirs_exist_ok=True)
+    catalog_path = site / 'data/catalog.json'
+    tracks = json.loads(catalog_path.read_text())
+    lyric_fixture = {'song-1': 'PUBLIC_LYRIC_MARKER', 'song-2': 'DRAFT_LYRIC_MARKER',
+                     'hidden-album-song': 'HIDDEN_ALBUM_LYRIC_MARKER'}
+    for track in tracks:
+        if track['id'] in lyric_fixture:
+            track['lyrics'] = lyric_fixture[track['id']]
+    catalog_path.write_text(json.dumps(tracks))
     seeded = json.loads(fixture.cli(site, """
         sf_db()->exec("INSERT INTO users(id,email,display_name,password_hash,role,status,created_at,updated_at) SELECT 9,'admin@example.invalid','Admin',password_hash,'admin','active',created_at,updated_at FROM users WHERE id=1");
+        foreach(['song-1'=>'published','song-2'=>'draft','hidden-album-song'=>'draft'] as $trackId=>$status){
+            sf_songbook_save(['track_id'=>$trackId,'status'=>$status,'sections'=>[['label'=>'Verse','start_line'=>1,'end_line'=>1]],
+                'annotations'=>[['line'=>1,'note'=>'ANNOTATION_MARKER']],'notes'=>'ADMIN_LYRIC_NOTE_MARKER'],9);
+        }
+        sf_db()->exec("UPDATE songbooks SET status='published' WHERE track_id='hidden-album-song'");
         $published=sf_story_save(['entry_type'=>'track_story','entity_id'=>'song-1','title'=>'Public song story','summary'=>'Public catalog preview','body_text'=>'The song story narrative','status'=>'published','tags'=>['Behind the Song']],9);
         $draft=sf_story_save(['entry_type'=>'essay','title'=>'PRIVATE_DRAFT_MARKER','body_text'=>'Unpublished narrative','status'=>'draft','tags'=>['Private Marker']],9);
         $unready=sf_story_save(['entry_type'=>'track_story','entity_id'=>'hidden-album-song','title'=>'PRIVATE_RELATION_MARKER','body_text'=>'Track in a draft release','status'=>'draft'],9);
@@ -92,6 +107,20 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-stories-http-') as tem
             guest = fixture.HTTPClient(base)
             fan, fan_headers = sign_in(base, 'owner@example.invalid')
             admin, admin_headers = sign_in(base, 'admin@example.invalid')
+            lyrics = guest.get(LYRICS)
+            lyric_inventory = lyrics.json()
+            check(lyrics.status == 200 and lyric_inventory['kind'] == 'lyrics' and
+                  [row['id'] for row in lyric_inventory['items']] == ['song-1'] and lyric_inventory['items'][0]['timed'] is False,
+                  'Guest lyric picker exposes only the canonical song with a published and available Songbook')
+            check(lyric_inventory == fan.get(LYRICS).json() == admin.get(LYRICS).json() and
+                  'no-store' in lyrics.headers.get('cache-control', '') and b'_MARKER' not in lyrics.body(),
+                  'All viewers receive the same non-cacheable lyric metadata without text, draft data or editor notes')
+            draft_lyrics = {'action': 'save', 'confirmed': True, 'songbook': {'track_id': 'song-1', 'status': 'draft',
+                           'sections': [{'label': 'Verse', 'start_line': 1, 'end_line': 1}]}}
+            check(fan.post(SONGBOOK, draft_lyrics, fan_headers).status == 403 and
+                  admin.post(SONGBOOK, draft_lyrics, admin_headers).status == 200 and guest.get(LYRICS).json()['items'] == [],
+                  'Withdrawing Songbook publication through the Admin API updates the public picker immediately')
+
             public = guest.get(PUBLIC)
             inventory = public.json()['items']
             check(public.status == 200 and [row['id'] for row in inventory] == [str(seeded['published'])] and inventory[0]['tags'] == ['behind-the-song'],
@@ -153,4 +182,4 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-stories-http-') as tem
             os.killpg(server.pid, signal.SIGTERM)
             server.wait(timeout=5)
 
-print(f'Canvas public story HTTP: {len(checks)} checks passed')
+print(f'Canvas public story and lyric HTTP: {len(checks)} checks passed')

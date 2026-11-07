@@ -80,8 +80,14 @@ function sf_media_analyze(string $path,string $category,string $ext): array {
     return array_merge(['duration'=>0,'bitrate'=>0,'sample_rate'=>0,'channels'=>0,'bits'=>0,'codec'=>'','width'=>0,'height'=>0,'technical'=>['source'=>'basic']],$a);
 }
 function sf_media_safe_ext(string $ext): string {return preg_replace('/[^a-z0-9]/','',strtolower($ext))?:'bin';}
-function sf_media_asset(int|string $id): ?array {
-    sf_media_ensure_schema();$col=is_int($id)||ctype_digit((string)$id)?'id':'uuid';$q=sf_db()->prepare("SELECT * FROM media_assets WHERE $col=? LIMIT 1");$q->execute([$id]);$r=$q->fetch();if(!$r)return null;$r['technical']=sf_media_decode($r['technical_json']??'',[]);$r['variants']=sf_media_decode($r['variants_json']??'',[]);return $r;
+/** Locking reads see current asset rights inside an existing MySQL approval transaction. */
+function sf_media_current_read(): string {
+    $db=sf_db();
+    return $db->inTransaction()&&$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' LOCK IN SHARE MODE':'';
+}
+function sf_media_asset(int|string $id,bool $current=false): ?array {
+    sf_media_ensure_schema();$col=is_int($id)||ctype_digit((string)$id)?'id':'uuid';$q=sf_db()->prepare("SELECT * FROM media_assets WHERE $col=? LIMIT 1".($current?sf_media_current_read():''));
+    $q->execute([$id]);$r=$q->fetch();$q->closeCursor();if(!$r)return null;$r['technical']=sf_media_decode($r['technical_json']??'',[]);$r['variants']=sf_media_decode($r['variants_json']??'',[]);return $r;
 }
 function sf_media_generate_variants(array $asset): array {
     if(($asset['category']??'')!=='image'||!extension_loaded('gd'))return [];$src=SF_ROOT.'/'.ltrim((string)$asset['stored_path'],'/');if(!is_file($src))return [];if((int)($asset['width']??0)*(int)($asset['height']??0)>60000000)return [];$mime=(string)$asset['mime_type'];$create=$mime==='image/jpeg'?'imagecreatefromjpeg':($mime==='image/png'?'imagecreatefrompng':($mime==='image/webp'?'imagecreatefromwebp':($mime==='image/gif'?'imagecreatefromgif':'')));if($create===''||!function_exists($create))return [];$im=@$create($src);if(!$im)return [];$sw=imagesx($im);$sh=imagesy($im);$dir=SF_ROOT.'/storage/media/variants/'.$asset['uuid'];if(!is_dir($dir)&&!mkdir($dir,0770,true)&&!is_dir($dir)){imagedestroy($im);return [];}
@@ -121,12 +127,12 @@ function sf_media_links(string $entityType,string $entityId): array {
     sf_media_ensure_schema();$q=sf_db()->prepare('SELECT l.*,a.uuid,a.category,a.mime_type,a.extension,a.original_name,a.size_bytes,a.width,a.height,a.duration_seconds,a.bitrate_bps,a.sample_rate_hz,a.channels,a.bits_per_sample,a.codec,a.title,a.caption,a.alt_text,a.credit,a.copyright_text,a.technical_json,a.variants_json FROM media_links l JOIN media_assets a ON a.id=l.asset_id WHERE l.entity_type=? AND l.entity_id=? ORDER BY l.role,l.sort_order,l.id');$q->execute([$entityType,$entityId]);$rows=$q->fetchAll();foreach($rows as &$r){$r['technical']=sf_media_decode($r['technical_json']??'',[]);$r['variants']=sf_media_decode($r['variants_json']??'',[]);$r['link']=sf_media_decode($r['link_json']??'',[]);}unset($r);return $rows;
 }
 /** One private master asset can never be exposed by another public attachment. */
-function sf_media_protected_master_asset(int $assetId):bool {
+function sf_media_protected_master_asset(int $assetId,bool $current=false):bool {
     if($assetId<1)return false;
     sf_media_ensure_schema();
-    $q=sf_db()->prepare("SELECT 1 FROM media_links WHERE asset_id=? AND role IN ('master_audio','stem_audio') LIMIT 1");
+    $q=sf_db()->prepare("SELECT 1 FROM media_links WHERE asset_id=? AND role IN ('master_audio','stem_audio') LIMIT 1".($current?sf_media_current_read():''));
     $q->execute([$assetId]);
-    return (bool)$q->fetchColumn();
+    $protected=(bool)$q->fetchColumn();$q->closeCursor();return $protected;
 }
 function sf_media_guard_generated_image_approval(int $assetId): void {
     // Check the existing asset's provenance, not the UI that initiated the
