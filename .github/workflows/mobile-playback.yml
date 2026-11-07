@@ -42,3 +42,7 @@ jobs:
         env:
           CHROMIUM_EXECUTABLE: /nonexistent/use-playwright-chromium
         run: python3 tests/section91b21b2-browser.py
+      - name: Jukebox pairing, playback, chat and venue CRM
+        run: |
+          python3 tests/jukebox-browser.py --http-only
+          python3 tests/jukebox-browser.py

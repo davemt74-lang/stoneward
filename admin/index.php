@@ -67,6 +67,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
             <button type="button" data-view="dashboard" class="active"><span>01</span>Dashboard</button>
             <button type="button" data-view="analytics"><span>26</span>Performance Intelligence</button>
             <button type="button" data-view="calendar"><span>27</span>Operating Calendar</button>
+            <a href="../jukebox.php?host=1" class="jukebox-admin-link">Jukebox</a>
           </div>
         </details>
         <details class="admin-nav-category" data-nav-category="music">
