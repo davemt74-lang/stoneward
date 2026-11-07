@@ -30,7 +30,9 @@ GEO_PRODUCTS = {'geography.place', 'geography.shows'}
 MAP_PRODUCT = 'map.boundaries'
 PROXIMITY_PRODUCT = 'location.proximity'
 SPATIAL_PRODUCTS = {MAP_PRODUCT, PROXIMITY_PRODUCT}
-ALL_PRODUCTS = WEATHER_PRODUCTS | GEO_PRODUCTS | SPATIAL_PRODUCTS
+EARTHQUAKE_PRODUCT = 'earthquakes.recent'
+EARTHQUAKE_PERMISSION = 'canvas.data.earthquakes_usgs'
+ALL_PRODUCTS = WEATHER_PRODUCTS | GEO_PRODUCTS | SPATIAL_PRODUCTS | {EARTHQUAKE_PRODUCT}
 
 
 def query(action, **params):
@@ -56,6 +58,20 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
     return ['status'=>'fresh','fetched_at'=>gmdate('c'),'expires_at'=>gmdate('c',time()+600),
         'source'=>'National Weather Service','timezone'=>'America/Phoenix',
         'rows'=>[['temperature_f'=>$lat>33?94:91,'condition'=>'LIVE_WEATHER_FIXTURE','observed_at'=>gmdate('c')]]];
+}
+""")
+    (site / 'api/canvas-earthquakes-core.php').write_text("""<?php
+declare(strict_types=1);
+const SF_CANVAS_EARTHQUAKES_SOURCE='U.S. Geological Survey';
+function sf_canvas_earthquakes_read(string $feed):array {
+    file_put_contents(SF_ROOT.'/earthquake-calls.log',$feed."\n",FILE_APPEND|LOCK_EX);
+    $stale=$feed==='m25-week';
+    return ['status'=>$stale?'stale':'fresh','fetched_at'=>gmdate('c',time()-($stale?600:10)),
+        'expires_at'=>gmdate('c',time()+($stale?-540:50)),'source'=>SF_CANVAS_EARTHQUAKES_SOURCE,'timezone'=>'UTC',
+        'rows'=>[['event_id'=>'quake-'.$feed,'place'=>'USGS_LIVE_FIXTURE','magnitude'=>4.8,'magnitude_type'=>'mw',
+            'lat'=>34.1,'lon'=>-117.4,'depth_km'=>8.4,'occurred_at'=>'2026-11-06T17:00:00+00:00',
+            'updated_at'=>'2026-11-06T17:04:00+00:00','review_status'=>'reviewed',
+            'source_url'=>'https://earthquake.usgs.gov/earthquakes/eventpage/fixture-quake']]];
 }
 """)
     shows = [
@@ -92,6 +108,7 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
                 ['alias'=>'anchor','product'=>'geography.place','location_id'=>'city-0455000'],
                 ['alias'=>'shows','product'=>'geography.shows','location_id'=>'city-0455000'],
                 ['alias'=>'forecast','product'=>'weather.hourly','location_id'=>'published-shows'],
+                ['alias'=>'week-quakes','product'=>'earthquakes.recent','location_id'=>'m25-week'],
             ]],
         ]);
         $spatial=sf_agent_scene_history_save(1,[
@@ -100,6 +117,7 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
                 ['alias'=>'outline','product'=>'map.boundaries','location_id'=>'city-0455000'],
                 ['alias'=>'regions','product'=>'map.boundaries','location_id'=>'us-regions'],
                 ['alias'=>'entrance','product'=>'location.proximity','location_id'=>'point-33448400_-112074000_500'],
+                ['alias'=>'quakes','product'=>'earthquakes.recent','location_id'=>'m45-day'],
             ]],
         ]);
         $owner=['id'=>1,'role'=>'user'];$admin=['id'=>2,'role'=>'admin'];
@@ -120,6 +138,10 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
     def calls():
         log = site / 'weather-calls.log'
         return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def quake_calls():
+        log = site / 'earthquake-calls.log'
+        return log.read_text().splitlines() if log.exists() else []
 
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0))
@@ -146,12 +168,18 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
 
             inventory = guest.get(query('inventory'))
             products = {row['id']: row for row in inventory.json()['products']}
+            quake_catalog = products[EARTHQUAKE_PRODUCT]
+            quake_selector = quake_catalog['parameters']['location_id']
             fixture.check(inventory.status == 200 and set(products) == ALL_PRODUCTS and
                           'temperature_f' in products['weather.current']['fields'] and
                           'distance_km' in products['geography.shows']['fields'] and
                           'coordinates' in products[MAP_PRODUCT]['fields'] and 'radius_m' in products[PROXIMITY_PRODUCT]['fields'] and
                           'no-store' in inventory.headers.get('cache-control', ''),
-                          'Guests can discover separate weather, geography, map and proximity schemas without cacheable account data')
+                          'Guests can discover public data schemas without cacheable account data')
+            fixture.check(quake_catalog['permission_id'] == EARTHQUAKE_PERMISSION and quake_selector['type'] == 'scope' and
+                          {item['id'] for item in quake_selector['scope_options']} == {'m25-day', 'm25-week', 'm45-day', 'm45-week'} and
+                          {'event_id', 'lat', 'lon', 'magnitude', 'review_status'} <= quake_catalog['fields'].keys(),
+                          'USGS discovery exposes only the approved feed choices and normalized earthquake fields')
             city = guest.get(query('places', q='Phoenix, AZ')).json()['items']
             venue = guest.get(query('places', id='show-fixture-weather-show')).json()['items']
             fixture.check(any(row['id'] == 'city-0455000' for row in city) and
@@ -162,7 +190,7 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
             fixture.check('show-fixture-private-show' not in {row['id'] for row in listed} and
                           guest.get(query('places', id='show-fixture-private-show')).json()['items'] == [],
                           'A hidden show never appears in search or by direct location ID')
-            fixture.check(calls() == [], 'Inventory and location discovery make no provider requests')
+            fixture.check(calls() == [] and quake_calls() == [], 'Inventory and location discovery make no provider requests')
             fixture.check(owner.post(query('inventory'), {}).status == 405,
                           'The read endpoint rejects write methods')
             fixture.check(guest.get(read).status == 404 and other.get(read).status == 404,
@@ -310,6 +338,43 @@ function sf_canvas_weather_read(float $lat,float $lon,string $product):array {
                           {item['id'] for item in guest.get(query('inventory')).json()['products']} == ALL_PRODUCTS - {PROXIMITY_PRODUCT} and
                           guest.get(gallery_outline).json()['data']['rows'] == map_data['rows'] and len(calls()) == 4,
                           'The proximity switch withholds its public target and leaves map delivery intact')
+
+            quakes = query('read', scene_id=spatial_id, alias='quakes')
+            stale_quakes = query('read', scene_id=scene_id, alias='week-quakes')
+            gallery_quakes = query('read', gallery_id=seeded['spatial_gallery'], alias='quakes')
+            override_quakes = query('read', scene_id=spatial_id, alias='quakes', location_id='m25-week')
+            forged_quakes = query('read', scene_id=spatial_id, alias='quakes', url='https://example.invalid/feeds')
+            fixture.check(guest.get(quakes).status == 404 and other.get(quakes).status == 404 and
+                          owner.get(override_quakes).status == 422 and owner.get(forged_quakes).status == 422 and quake_calls() == [],
+                          'Only an authorized scene can read its exact quake feed and forged requests never reach USGS')
+            live_response = owner.get(quakes)
+            live = live_response.json()['data']
+            stale = owner.get(stale_quakes).json()['data']
+            fixture.check(live_response.status == 200 and 'no-store' in live_response.headers.get('cache-control', '') and
+                          live['status'] == 'fresh' and live['rows'][0]['event_id'] == 'quake-m45-day' and
+                          stale['status'] == 'stale' and stale['rows'][0]['event_id'] == 'quake-m25-week' and
+                          stale['fetched_at'] < stale['expires_at'] < live['fetched_at'] and
+                          quake_calls() == ['m45-day', 'm25-week'],
+                          'The owner can read independent fresh and stale feeds through the saved aliases')
+            gallery = guest.get('/api/canvas-gallery.php?action=open&id=' + seeded['spatial_gallery']).json()
+            fixture.check(EARTHQUAKE_PERMISSION in {entry['id'] for entry in gallery['item']['uses']} and
+                          'USGS_LIVE_FIXTURE' not in json.dumps(gallery) and
+                          guest.get(gallery_quakes).json()['data']['rows'] == live['rows'] and
+                          guest.get(gallery_outline).json()['data']['rows'] == map_data['rows'] and
+                          quake_calls() == ['m45-day', 'm25-week', 'm45-day'],
+                          'A published canvas combines the reviewed public map and quake feed without persisting readings')
+            fixture.cli(site, """
+                require_once SF_ROOT.'/api/canvas-capabilities.php';
+                sf_canvas_permission_save(['id'=>2,'role'=>'admin'],sf_canvas_permission_policy()['revision'],[
+                    'canvas.data.earthquakes_usgs'=>false,
+                ]);
+            """)
+            disabled_quakes = guest.get(gallery_quakes).json()['data']
+            fixture.check(disabled_quakes['status'] == 'unavailable' and disabled_quakes['rows'] == [] and
+                          EARTHQUAKE_PRODUCT not in {item['id'] for item in guest.get(query('inventory')).json()['products']} and
+                          guest.get(gallery_outline).json()['data']['rows'] == map_data['rows'] and
+                          quake_calls() == ['m45-day', 'm25-week', 'm45-day'] and len(calls()) == 4,
+                          'Disabling USGS immediately blocks its discovery and guest reads without affecting the local map')
             print(f'{fixture.checks} real HTTP canvas data checks passed', flush=True)
         except Exception:
             log.seek(0)

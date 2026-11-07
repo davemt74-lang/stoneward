@@ -197,7 +197,8 @@
       function locationFor(productId, locationId) {
         const parameter = parameterFor(productId);
         if (parameter?.type === 'public_point') return restorePoint(locationId, parameter);
-        return scopesFor(productId)?.get(locationId) || places.get(locationId);
+        const scope = scopesFor(productId)?.get(locationId);
+        return parameter?.type === 'scope' ? scope : scope || places.get(locationId);
       }
 
       function draftLocation() {
@@ -219,6 +220,11 @@
         add.disabled = !ready || selected.length >= maxSources || !draftLocation();
       }
 
+      function locationControl() {
+        if (!pointFields.hidden) return latitude;
+        return placeSearch.hidden ? place : query;
+      }
+
       function drawSelected() {
         list.replaceChildren();
         selected.forEach((source, index) => {
@@ -236,7 +242,7 @@
             selected.splice(index, 1);
             drawSelected();
             suggestName();
-            (list.querySelector('button') || (builder.hidden ? attach : pointFields.hidden ? query : latitude)).focus();
+            (list.querySelector('button') || (builder.hidden ? attach : locationControl())).focus();
           });
           row.append(copy, remove);
           list.append(row);
@@ -283,9 +289,16 @@
         const parameter = parameterFor(product.value);
         const parameterLabel = typeof parameter?.label === 'string' ? parameter.label.trim() : '';
         const usesPoint = parameter?.type === 'public_point';
+        const searchesPlaces = parameter?.type === 'public_place';
         locationLabel.firstChild.textContent = parameterLabel || 'Location';
-        locationLabel.hidden = placeSearch.hidden = searchStatus.hidden = usesPoint;
+        locationLabel.hidden = usesPoint;
+        placeSearch.hidden = searchStatus.hidden = !searchesPlaces;
         pointFields.hidden = pointFields.disabled = !usesPoint;
+        if (!searchesPlaces) {
+          placeRequest?.abort();
+          placeRequest = null;
+          search.disabled = false;
+        }
         entryStatus.textContent = '';
         fieldList.replaceChildren();
         for (const [name, type] of Object.entries(metadata?.fields || {})) {
@@ -297,27 +310,26 @@
         }
         fieldDetails.hidden = !fieldList.childElementCount;
         if (usesPoint) {
-          placeRequest?.abort();
-          placeRequest = null;
-          search.disabled = false;
           pointLegend.textContent = parameterLabel || 'Public target point';
           radiusHelp.textContent = 'Enter ' + parameter.min_radius_m + ' to ' + parameter.max_radius_m + ' whole meters.';
           suggestName();
           sync();
         } else {
-          drawPlaces(place.value);
-          if (ready && parameter && !placesLoaded && !placeRequest) void findPlaces('');
+          drawLocationOptions(place.value);
+          if (ready && searchesPlaces && !placesLoaded && !placeRequest) void findPlaces('');
         }
       }
 
-      function drawPlaces(selectedId) {
+      function drawLocationOptions(selectedId) {
         const scopes = scopesFor(product.value);
-        place.replaceChildren(option('', 'Choose a city or venue'));
+        const searchesPlaces = parameterFor(product.value)?.type === 'public_place';
+        const matches = searchesPlaces ? searchResults : null;
+        place.replaceChildren(option('', searchesPlaces ? 'Choose a city or venue' : 'Choose an option'));
         for (const scope of scopes?.values() || []) place.append(option(scope.id, scope.title));
-        for (const match of searchResults.values()) {
+        for (const match of matches?.values() || []) {
           if (!scopes?.has(match.id)) place.append(option(match.id, match.title + (match.kind === 'venue' ? ' · Venue' : '')));
         }
-        place.value = scopes?.has(selectedId) || searchResults.has(selectedId) ? selectedId : '';
+        place.value = scopes?.has(selectedId) || matches?.has(selectedId) ? selectedId : '';
         place.disabled = place.options.length === 1;
         suggestName();
         sync();
@@ -325,10 +337,11 @@
 
       function resetPlaces() {
         searchResults.clear();
-        drawPlaces(place.value);
+        drawLocationOptions(place.value);
       }
 
       async function findPlaces(value) {
+        if (parameterFor(product.value)?.type !== 'public_place') return;
         placeRequest?.abort();
         const pending = new AbortController();
         placeRequest = pending;
@@ -343,7 +356,7 @@
           placesLoaded = true;
           searchResults = matches;
           if (selectedLocationMissing) drawSelected();
-          drawPlaces(place.value);
+          drawLocationOptions(place.value);
           searchStatus.textContent = matches.size ? matches.size + ' locations found.' :
             value ? 'No matching public cities or venues.' : 'Search for a city or venue to find a location.';
         } catch (error) {
@@ -373,15 +386,17 @@
           for (const item of result.products) {
             const parameter = item?.parameters?.location_id;
             if (!item || item.enabled === false || !validProduct(item.id) || typeof item.title !== 'string' ||
-                (parameter?.type !== 'public_place' && !validPointParameter(parameter)) || products.has(item.id)) continue;
+                (!['public_place', 'scope'].includes(parameter?.type) && !validPointParameter(parameter)) ||
+                products.has(item.id)) continue;
             const scopeOptions = new Map();
-            const offeredScopes = parameter.type === 'public_place' ? parameter.scope_options : null;
+            const offeredScopes = parameter.type === 'public_point' ? null : parameter.scope_options;
             for (const scope of Array.isArray(offeredScopes) ? offeredScopes : []) {
               if (scope?.kind === 'scope' && validPlace(scope.id) && typeof scope.title === 'string' &&
                   scope.title.trim() && !scopeOptions.has(scope.id)) {
                 scopeOptions.set(scope.id, {id: scope.id, title: scope.title.trim()});
               }
             }
+            if (parameter.type === 'scope' && !scopeOptions.size) continue;
             products.set(item.id, {...item, scopeOptions});
             product.append(option(item.id, item.title));
           }
@@ -399,7 +414,7 @@
           drawProduct();
           drawSelected();
           if (products.size && document.activeElement === cancel) {
-            (pointFields.hidden ? query : latitude).focus({preventScroll: true});
+            locationControl().focus({preventScroll: true});
           }
         } catch (error) {
           if (settled) return;
