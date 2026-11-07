@@ -57,6 +57,13 @@ function sf_canvas_access_declared(string $html): array {
     foreach($matches[1] as $classes)foreach(explode(' ',$classes) as $class)if(preg_match('/\Asf-dataset-([a-z][a-z0-9_-]{0,63})\z/',$class,$m))$ids[$m[1]]=true;
     return $ids;
 }
+/** External source authority comes from approved bindings instead of HTML markers. */
+function sf_canvas_access_external(array $sources): array {
+    if(!$sources)return [];
+    require_once __DIR__.'/canvas-data-core.php';
+    return sf_canvas_data_declared_capabilities($sources);
+}
+
 /** An explicit account-source selection limits private data; older canvases retain their grants. */
 function sf_canvas_access_in_scope(string $id,bool $personal,?array $meTools): bool {
     return !$personal||$meTools===null||in_array($id,$meTools,true);
@@ -74,6 +81,8 @@ function sf_canvas_access_revision(int $uid): int {
 function sf_canvas_access_summary(array $user,array $context): array {
     $resolved=sf_canvas_access_resolve($user,$context);$scene=$resolved['scene'];$uid=(int)($user['id']??0);$policy=sf_canvas_permission_policy();
     $meTools=$scene['artist_inputs']['me_tools']??null;
+    $dataSources=$scene['artist_inputs']['data_sources']??[];
+    $external=sf_canvas_access_external($dataSources);
     if($uid>0){
         $q=sf_db()->prepare("SELECT 1 FROM users WHERE id=? AND status='active'");$q->execute([$uid]);
         $active=$q->fetchColumn()!==false;$q->closeCursor();
@@ -82,7 +91,8 @@ function sf_canvas_access_summary(array $user,array $context): array {
     $grants=sf_canvas_access_grants($uid,$resolved['key']);$declared=sf_canvas_access_declared($scene['html']);$permissions=[];$needed=false;$scopes=[];
     foreach(sf_canvas_capability_cards() as $id=>$card){
         $personal=$card['requires_sign_in'];
-        if(!isset($declared[$id])||!sf_canvas_access_in_scope($id,$personal,$meTools))continue;
+        $bindings=($card['transport']??null)==='host_read'?$external:$declared;
+        if(!isset($bindings[$id])||!sf_canvas_access_in_scope($id,$personal,$meTools))continue;
         $fields=sf_canvas_access_fields($card);
         $granted=!$personal||($uid>0&&isset($grants[$card['permission_id']])&&!array_diff($fields,$grants[$card['permission_id']]));
         $enabled=sf_canvas_permission_enabled($id,$policy);if($personal&&$enabled&&!$granted)$needed=true;
@@ -92,6 +102,7 @@ function sf_canvas_access_summary(array $user,array $context): array {
     // The fingerprint guards consent, not creative execution. Grant reuse is based on scope inclusion.
     $fingerprintInputs=[$resolved['context'],$scene['html'],$scene['css'],$scene['js']??'', $scopes,$policy['revision'],$uid,$uid>0?sf_agent_scene_history_epoch($uid):0,sf_canvas_access_revision($uid)];
     if($meTools!==null)$fingerprintInputs[]=$meTools;
+    if($dataSources)$fingerprintInputs[]=$dataSources;
     $fingerprint=hash('sha256',json_encode($fingerprintInputs,JSON_THROW_ON_ERROR));
     return ['context'=>$resolved['context'],'fingerprint'=>$fingerprint,'title'=>$scene['title'],'permissions'=>$permissions,'requires_consent'=>$needed,'signed_in'=>$uid>0];
 }
@@ -149,9 +160,13 @@ function sf_canvas_access_revoke_saved(array $user,string $key,array $ids): arra
 }
 
 /** Public projection: declared capabilities only, never creator grants or data. */
-function sf_canvas_access_public_uses(string $html,?array $meTools=null): array {
+function sf_canvas_access_public_uses(string $html,?array $meTools=null,array $dataSources=[]): array {
     $declared=sf_canvas_access_declared($html);$policy=sf_canvas_permission_policy();$uses=[];
-    foreach(sf_canvas_capability_cards() as $id=>$card)if(isset($declared[$id])&&sf_canvas_access_in_scope($id,$card['requires_sign_in'],$meTools))
-        $uses[]=['id'=>$card['permission_id'],'label'=>$card['label'],'personal'=>$card['requires_sign_in'],'enabled'=>sf_canvas_permission_enabled($id,$policy)];
+    $external=sf_canvas_access_external($dataSources);
+    foreach(sf_canvas_capability_cards() as $id=>$card){
+        $bindings=($card['transport']??null)==='host_read'?$external:$declared;
+        if(isset($bindings[$id])&&sf_canvas_access_in_scope($id,$card['requires_sign_in'],$meTools))
+            $uses[]=['id'=>$card['permission_id'],'label'=>$card['label'],'personal'=>$card['requires_sign_in'],'enabled'=>sf_canvas_permission_enabled($id,$policy)];
+    }
     return $uses;
 }

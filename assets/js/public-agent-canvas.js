@@ -269,7 +269,7 @@ ${images?'<style>:where(.sf-scene-image){display:block;max-width:100%;height:aut
 <style>html,body{overflow:${scrollable||trackActions||script?.js?'auto':'hidden'}!important}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
 ${trackActions?'<style>.sf-action-play-track{font:inherit;color:inherit;cursor:pointer;min-height:44px;min-width:44px}.sf-action-play-track:focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>':''}
 ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBridge}</script>`:''}${images?`<script>${sceneImageBridge}</script>`:''}</head>
-<body><main>${bound}</main>${trackActions?`<script>${sceneTrackBridge}</script>`:''}${script?.js?`<script>${script.sdk.source}</script><script type="application/json" id="sfCanvasProgram">${JSON.stringify(script.js).replace(/</g,'\\u003c')}</script><script>${sceneProgramRunner}</script>`:''}</body></html>`;
+<body><main>${bound}</main>${trackActions?`<script>${sceneTrackBridge}</script>`:''}${script?.js?`<script${probe?' data-sf-data-offline="true"':''}>${script.sdk.source}</script><script type="application/json" id="sfCanvasProgram">${JSON.stringify(script.js).replace(/</g,'\\u003c')}</script><script>${sceneProgramRunner}</script>`:''}</body></html>`;
   }
   /** Detached candidates use the production renderer and receive no live canvas controller. */
   function prepareSceneTest(scene,{probe,previewProgram=null,currentTrackId=''}={}){
@@ -1902,6 +1902,8 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         canUse:()=>!destroyed&&listeningScene?.layer===frame&&!!options.canUseScenes?.(),
         loadCatalog:(filters,signal)=>options.onCanvasAudioCatalog?.(filters,signal),
         loadAudio:(trackId,signal)=>options.onCanvasAudioSource?.(trackId,signal),
+        dataAliases:listeningScene?.dataAliases,
+        loadData:(alias,signal)=>options.onCanvasDataRead?.(alias,context,signal),
         observeIndependent:(media,track,settings)=>options.onCanvasIndependentAudioObserve?.(media,track,context,settings),
         play:trackId=>options.onCanvasAudioPlay?.(trackId),
         pause:()=>options.onCanvasAudioPause?.(),
@@ -2239,7 +2241,10 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         images.ready=true;
         postSceneImages(images);
       });
-      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner};
+      const sources=scene.artist_inputs?.data_sources;
+      const dataAliases=custom&&Array.isArray(sources)?sources.map(source=>source?.alias)
+        .filter(alias=>typeof alias==='string'&&/^[a-z][a-z0-9-]{0,31}$/.test(alias)):[];
+      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner,dataAliases};
       renderSceneImageChoices();
       renderSceneCatalog(scene.catalog_blocks);
       const artwork=sourceAvailable?sceneArtwork(scene.artwork):'';

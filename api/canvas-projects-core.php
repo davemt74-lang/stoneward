@@ -107,7 +107,7 @@ function sf_canvas_project_inherit_resource_scopes(array $project,?array $from):
     // Keep the legacy reset marker so the worker can clear artist selections.
     // Its immutable parent still supplies any existing account-data restriction.
     if(array_key_exists('artist_inputs',$project)&&$project['artist_inputs']===null)return $project;
-    $inherited=array_intersect_key($from??[],['stories'=>true,'lyrics_ids'=>true,'me_tools'=>true]);
+    $inherited=array_intersect_key($from??[],['stories'=>true,'lyrics_ids'=>true,'me_tools'=>true,'data_sources'=>true]);
     if(!$inherited)return $project;
     $project['artist_inputs']=($project['artist_inputs']??[])+$inherited;
     return sf_canvas_project_normalize($project,false);

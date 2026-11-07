@@ -83,7 +83,7 @@ function sf_canvas_gallery_public(array $row,bool $private=false): array {
     $snapshot=$row['snapshot_json']??null;
     if($snapshot===null){$q=sf_db()->prepare('SELECT snapshot_json FROM canvas_gallery_entries WHERE id=?');$q->execute([$row['id']]);$snapshot=$q->fetchColumn();$q->closeCursor();}
     $source=is_string($snapshot)?json_decode($snapshot,true,16,JSON_THROW_ON_ERROR):[];
-    $item['uses']=sf_canvas_access_public_uses((string)($source['html']??''),$source['artist_inputs']['me_tools']??null);
+    $item['uses']=sf_canvas_access_public_uses((string)($source['html']??''),$source['artist_inputs']['me_tools']??null,$source['artist_inputs']['data_sources']??[]);
     if($attribution!==null)$item['attribution']=$attribution;
     if($private)$item+=['status'=>$row['status'],'feedback'=>$row['feedback'],'snapshot_hash'=>$row['snapshot_hash'],'source_scene_id'=>(int)$row['source_scene_id'],'reviewed_at'=>$row['reviewed_at'],'updated_at'=>$row['updated_at']];
     return $item;

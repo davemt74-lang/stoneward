@@ -155,6 +155,8 @@
     }
     if(options.signal?.aborted){candidate.frame.remove();report.state='canceled';return report;}
     check('renderer','Production renderer accepted the candidate',true);
+    if(Array.isArray(scene.artist_inputs?.data_sources)&&scene.artist_inputs.data_sources.length)
+      entry(report.manual,'live_data','External data and rules that depend on it need a check in the applied canvas.');
     const frame=candidate.frame;
     const request=new AbortController();
     const dummyAudio=document.createElement('audio');

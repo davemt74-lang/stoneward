@@ -60,6 +60,15 @@ function sf_agent_tool_registry(): array {
                 'max_rows'=>120,
             ],
         ],
+        'weather_nws'=>[
+            'label'=>'National Weather Service data','kind'=>'read','scope'=>'fan','owner'=>'api/canvas-data.php',
+            'handler'=>'sf_canvas_data_read','confirmation'=>false,'execution'=>'server',
+            'canvas_external'=>[
+                'description'=>'Live observations, forecasts and alerts for selected public locations through named data sources.',
+                'fields'=>['status'=>'text','source'=>'text','fetched_at'=>'datetime','expires_at'=>'datetime','rows'=>'array'],
+                'max_rows'=>48,
+            ],
+        ],
         'personal_listening_stats'=>[
             'label'=>'Personal listening statistics','kind'=>'read','scope'=>'signed_in_fan','owner'=>'api/listening.php',
             'handler'=>'sf_listening_analytics','confirmation'=>false,'execution'=>'server',

@@ -60,6 +60,12 @@ jobs:
           php tests/canvas-account-data.php
           php tests/canvas-me-flow.php
           php tests/canvas-me-delivery.php
+      - name: Live data catalog, scoped reads and NWS provider contract
+        run: |
+          php tests/canvas-weather.php
+          php tests/canvas-data-places.php
+          php tests/canvas-data-flow.php
+          python tests/canvas-data-http.py
       - name: Real PHP endpoint authentication, CSRF and current-viewer data
         run: |
           python tests/canvas-permissions-http.py
@@ -117,6 +123,10 @@ jobs:
         run: |
           python tests/canvas-me-picker-browser.py
           python tests/canvas-scene-tester-browser.py
+      - name: Live data discovery and authored source combinations
+        run: |
+          python tests/canvas-data-picker-browser.py
+          python tests/canvas-data-runtime-browser.py
       - name: Existing public and administrator gallery controls
         run: |
           python tests/canvas-gallery-browser.py
