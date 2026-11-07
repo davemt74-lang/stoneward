@@ -30,6 +30,33 @@
   };
   const validProduct = id => typeof id === 'string' && id.length <= 64 && productPattern.test(id);
   const validPlace = id => typeof id === 'string' && placePattern.test(id);
+  const validPointParameter = parameter => parameter?.type === 'public_point' &&
+    Number.isSafeInteger(parameter.min_radius_m) && Number.isSafeInteger(parameter.max_radius_m) &&
+    parameter.min_radius_m > 0 && parameter.max_radius_m >= parameter.min_radius_m && parameter.max_radius_m <= 99999;
+  const validRadius = (radius, parameter) => Number.isSafeInteger(radius) &&
+    radius >= parameter.min_radius_m && radius <= parameter.max_radius_m;
+
+  function microdegrees(raw, maxDegrees) {
+    const value = raw.trim();
+    if (!/^[+-]?(?:[0-9]{1,3}(?:\.[0-9]{1,6})?|\.[0-9]{1,6})$/.test(value)) return null;
+    const units = Math.round(Number(value) * 1000000);
+    return Math.abs(units) <= maxDegrees * 1000000 ? units : null;
+  }
+
+  function pointLocation(latitude, longitude, radius) {
+    return {
+      id: 'point-' + latitude + '_' + longitude + '_' + radius,
+      title: latitude / 1000000 + ', ' + longitude / 1000000 + ' · ' + radius + ' m radius'
+    };
+  }
+
+  function restorePoint(id, parameter) {
+    const match = /^point-(0|-?[1-9][0-9]{0,8})_(0|-?[1-9][0-9]{0,8})_([1-9][0-9]{0,4})$/.exec(id);
+    if (!match) return null;
+    const [latitude, longitude, radius] = match.slice(1).map(Number);
+    if (Math.abs(latitude) > 90000000 || Math.abs(longitude) > 180000000 || !validRadius(radius, parameter)) return null;
+    return pointLocation(latitude, longitude, radius);
+  }
 
   function open(options = {}) {
     if (typeof options.load !== 'function' || typeof options.search !== 'function' ||
@@ -77,6 +104,28 @@
       placeSearch.append(label('Search for a city or venue', query), search);
 
       const place = node('select');
+      const pointFields = node('fieldset', 'sf-canvas-data-point');
+      pointFields.hidden = pointFields.disabled = true;
+      const pointLegend = node('legend', '', 'Public target point');
+      const pointNotice = node('p', 'sf-canvas-resource-status', 'Sharing the canvas makes this target’s coordinates and radius public.');
+      pointNotice.id = prefix + '-point-notice';
+      pointFields.setAttribute('aria-describedby', pointNotice.id);
+      const latitude = node('input');
+      const longitude = node('input');
+      const radius = node('input');
+      latitude.required = longitude.required = radius.required = true;
+      latitude.maxLength = longitude.maxLength = 12;
+      radius.maxLength = 10;
+      radius.inputMode = 'numeric';
+      const coordinateHelp = node('small', '', 'Use up to six decimal places. Latitude is -90 to 90. Longitude is -180 to 180.');
+      const radiusHelp = node('small');
+      coordinateHelp.id = prefix + '-coordinate-help';
+      radiusHelp.id = prefix + '-radius-help';
+      latitude.setAttribute('aria-describedby', coordinateHelp.id);
+      longitude.setAttribute('aria-describedby', coordinateHelp.id);
+      radius.setAttribute('aria-describedby', radiusHelp.id);
+      pointFields.append(pointLegend, pointNotice, label('Latitude (degrees)', latitude), label('Longitude (degrees)', longitude),
+        coordinateHelp, label('Radius (meters)', radius), radiusHelp);
       const alias = node('input');
       alias.type = 'text';
       alias.maxLength = 32;
@@ -91,7 +140,7 @@
       const entryStatus = node('p', 'sf-canvas-resource-status');
       entryStatus.setAttribute('role', 'status');
       add.type = 'submit';
-      entry.append(locationLabel, label('Source name', alias), aliasHelp, entryStatus, add);
+      entry.append(locationLabel, pointFields, label('Source name', alias), aliasHelp, entryStatus, add);
       builder.append(label('Data source', product), productDescription, fieldDetails, placeSearch, searchStatus, entry);
       body.append(status, retry, list, builder);
 
@@ -122,6 +171,7 @@
       let ready = false;
       let settled = false;
       let placeRequest = null;
+      let placesLoaded = false;
       let previousSuggestion = '';
 
       function close(value = null, restoreFocus = true) {
@@ -141,8 +191,24 @@
       const leaving = () => close(null, false);
       current = {dialog, opener, close};
 
+      const parameterFor = productId => products.get(productId)?.parameters.location_id;
       const scopesFor = productId => products.get(productId)?.scopeOptions;
-      const locationFor = (productId, locationId) => scopesFor(productId)?.get(locationId) || places.get(locationId);
+
+      function locationFor(productId, locationId) {
+        const parameter = parameterFor(productId);
+        if (parameter?.type === 'public_point') return restorePoint(locationId, parameter);
+        return scopesFor(productId)?.get(locationId) || places.get(locationId);
+      }
+
+      function draftLocation() {
+        const parameter = parameterFor(product.value);
+        if (parameter?.type !== 'public_point') return locationFor(product.value, place.value);
+        const lat = microdegrees(latitude.value, 90);
+        const lon = microdegrees(longitude.value, 180);
+        const radiusText = radius.value.trim();
+        const meters = /^[0-9]{1,10}$/.test(radiusText) ? Number(radiusText) : null;
+        return lat !== null && lon !== null && validRadius(meters, parameter) ? pointLocation(lat, lon, meters) : null;
+      }
 
       function sync() {
         count.textContent = selected.length + ' of ' + maxSources + ' sources';
@@ -150,7 +216,7 @@
         const unusable = aliases.size !== selected.length || selected.some(source =>
           !products.has(source.product) || !locationFor(source.product, source.location_id));
         attach.disabled = !ready || unusable || selected.length > maxSources;
-        add.disabled = !ready || selected.length >= maxSources || !place.value;
+        add.disabled = !ready || selected.length >= maxSources || !draftLocation();
       }
 
       function drawSelected() {
@@ -170,7 +236,7 @@
             selected.splice(index, 1);
             drawSelected();
             suggestName();
-            (list.querySelector('button') || (builder.hidden ? attach : query)).focus();
+            (list.querySelector('button') || (builder.hidden ? attach : pointFields.hidden ? query : latitude)).focus();
           });
           row.append(copy, remove);
           list.append(row);
@@ -194,10 +260,11 @@
 
       function suggestName() {
         if (alias.value && alias.value !== previousSuggestion) return;
-        const chosen = locationFor(product.value, place.value);
+        const chosen = draftLocation();
         let suggestion = '';
         if (chosen && product.value) {
-          const slug = chosen.title.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+          const sourceLabel = pointFields.hidden ? chosen.title : 'Public point';
+          const slug = sourceLabel.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
           const base = (slug && /^[a-z]/.test(slug) ? slug : 'source') + '-' + product.value.split('.')[1];
           suggestion = base.slice(0, 32).replace(/-+$/g, '');
@@ -213,8 +280,12 @@
       function drawProduct() {
         const metadata = products.get(product.value);
         productDescription.textContent = typeof metadata?.description === 'string' ? metadata.description : '';
-        const parameterLabel = metadata?.parameters.location_id.label;
-        locationLabel.firstChild.textContent = typeof parameterLabel === 'string' && parameterLabel.trim() ? parameterLabel : 'Location';
+        const parameter = parameterFor(product.value);
+        const parameterLabel = typeof parameter?.label === 'string' ? parameter.label.trim() : '';
+        const usesPoint = parameter?.type === 'public_point';
+        locationLabel.firstChild.textContent = parameterLabel || 'Location';
+        locationLabel.hidden = placeSearch.hidden = searchStatus.hidden = usesPoint;
+        pointFields.hidden = pointFields.disabled = !usesPoint;
         entryStatus.textContent = '';
         fieldList.replaceChildren();
         for (const [name, type] of Object.entries(metadata?.fields || {})) {
@@ -225,7 +296,18 @@
           }
         }
         fieldDetails.hidden = !fieldList.childElementCount;
-        drawPlaces(place.value);
+        if (usesPoint) {
+          placeRequest?.abort();
+          placeRequest = null;
+          search.disabled = false;
+          pointLegend.textContent = parameterLabel || 'Public target point';
+          radiusHelp.textContent = 'Enter ' + parameter.min_radius_m + ' to ' + parameter.max_radius_m + ' whole meters.';
+          suggestName();
+          sync();
+        } else {
+          drawPlaces(place.value);
+          if (ready && parameter && !placesLoaded && !placeRequest) void findPlaces('');
+        }
       }
 
       function drawPlaces(selectedId) {
@@ -258,6 +340,7 @@
           if (settled || pending.signal.aborted) return;
           const selectedLocationMissing = selected.some(source => !locationFor(source.product, source.location_id));
           const matches = rememberPlaces(result);
+          placesLoaded = true;
           searchResults = matches;
           if (selectedLocationMissing) drawSelected();
           drawPlaces(place.value);
@@ -266,7 +349,10 @@
         } catch (error) {
           if (!settled && !pending.signal.aborted) searchStatus.textContent = error.message || 'Locations could not load.';
         } finally {
-          if (placeRequest === pending && !settled) search.disabled = false;
+          if (placeRequest === pending && !settled) {
+            placeRequest = null;
+            search.disabled = false;
+          }
         }
       }
 
@@ -285,10 +371,11 @@
           products.clear();
           product.replaceChildren();
           for (const item of result.products) {
+            const parameter = item?.parameters?.location_id;
             if (!item || item.enabled === false || !validProduct(item.id) || typeof item.title !== 'string' ||
-                item.parameters?.location_id?.type !== 'public_place' || products.has(item.id)) continue;
+                (parameter?.type !== 'public_place' && !validPointParameter(parameter)) || products.has(item.id)) continue;
             const scopeOptions = new Map();
-            const offeredScopes = item.parameters.location_id.scope_options;
+            const offeredScopes = parameter.type === 'public_place' ? parameter.scope_options : null;
             for (const scope of Array.isArray(offeredScopes) ? offeredScopes : []) {
               if (scope?.kind === 'scope' && validPlace(scope.id) && typeof scope.title === 'string' &&
                   scope.title.trim() && !scopeOptions.has(scope.id)) {
@@ -299,7 +386,7 @@
             product.append(option(item.id, item.title));
           }
           const unresolved = selected.filter(source =>
-            products.has(source.product) && !scopesFor(source.product)?.has(source.location_id));
+            parameterFor(source.product)?.type === 'public_place' && !scopesFor(source.product)?.has(source.location_id));
           const ids = [...new Set(unresolved.map(source => source.location_id))].slice(0, maxSources);
           await Promise.allSettled(ids.map(async id => {
             const placeResult = await options.resolvePlace(id, request.signal);
@@ -311,9 +398,8 @@
           status.textContent = products.size ? '' : 'Live data sources are currently unavailable.';
           drawProduct();
           drawSelected();
-          if (products.size) {
-            if (document.activeElement === cancel) query.focus({preventScroll: true});
-            void findPlaces('');
+          if (products.size && document.activeElement === cancel) {
+            (pointFields.hidden ? query : latitude).focus({preventScroll: true});
           }
         } catch (error) {
           if (settled) return;
@@ -324,6 +410,7 @@
 
       product.addEventListener('change', drawProduct);
       place.addEventListener('change', () => { suggestName(); sync(); });
+      pointFields.addEventListener('input', () => { suggestName(); sync(); });
       alias.addEventListener('input', () => { entryStatus.textContent = ''; });
       query.addEventListener('input', () => {
         placeRequest?.abort();
@@ -342,7 +429,8 @@
       });
       entry.addEventListener('submit', event => {
         event.preventDefault();
-        if (add.disabled || !products.has(product.value) || !locationFor(product.value, place.value)) return;
+        const target = draftLocation();
+        if (add.disabled || !products.has(product.value) || !target) return;
         const name = alias.value.trim().toLowerCase();
         if (!aliasPattern.test(name)) {
           entryStatus.textContent = 'Enter a source name using a letter followed by letters, numbers or hyphens.';
@@ -354,7 +442,7 @@
           alias.focus();
           return;
         }
-        selected.push({alias: name, product: product.value, location_id: place.value});
+        selected.push({alias: name, product: product.value, location_id: target.id});
         entryStatus.textContent = '';
         alias.value = '';
         suggestName();

@@ -56,7 +56,7 @@
         description.textContent=access.title?'Requested by “'+access.title+'”. Only the listed personal-data access is remembered.':'Only the listed personal-data access is remembered.';
         for(const permission of access.permissions){
           const row=element('div',undefined,'sf-canvas-access-item'),label=element('strong',permission.label),detail=element('p',permission.description);
-          const state=element('small',!permission.enabled?'Disabled by administrator':!permission.personal?'Public artist data':permission.granted?'Allowed for your account':!access.signed_in?'Sign in to use your own data':'Needs your permission');
+          const state=element('small',!permission.enabled?'Disabled by administrator':permission.device_consent?'Asks to check your device location':!permission.personal?'Public artist data':permission.granted?'Allowed for your account':!access.signed_in?'Sign in to use your own data':'Needs your permission');
           row.append(label,detail,state);
           if(permission.personal&&access.signed_in){
             if(permission.granted){const revoke=element('button','Revoke '+permission.label);revoke.type='button';revoke.addEventListener('click',()=>void change('revoke',[permission.id]),{signal:view.request.signal});row.append(revoke);}

@@ -1,6 +1,7 @@
 """Exercise multi-source data reads and authored rules in the production canvas sandbox."""
 import base64
 import io
+import json
 import os
 import shutil
 import wave
@@ -104,6 +105,45 @@ GEOGRAPHY_PROGRAM = r'''(async () => {
   root.append(boundary);
 })();'''
 
+MAP_PROGRAM = r'''(async () => {
+  const [map, origin] = await Promise.all([StonefellowData.get('boundary'), StonefellowData.get('map-origin')]);
+  if (map.status !== 'fresh' || origin.status !== 'fresh') throw new Error('Map unavailable');
+  const location = origin.rows[0];
+  const chunks = map.rows.filter(row => row.region === location.region);
+  const count = chunks.reduce((total, chunk) => total + JSON.parse(chunk.coordinates).length, 0);
+  document.querySelector('.experiment').textContent = `${location.title} · ${chunks.length} chunks · ${count} points`;
+})();'''
+
+PROXIMITY_PROGRAM = r'''(async () => {
+  const root = document.querySelector('.experiment');
+  const make = (tag, text) => {
+    const element = document.createElement(tag);
+    element.textContent = text;
+    root.append(element);
+    return element;
+  };
+  const check = make('button', 'Check access');
+  const play = make('button', 'Play track');
+  const outcome = make('p', 'Pending');
+  play.disabled = true;
+  function update(result) {
+    outcome.textContent = `${result.status}:${Object.keys(result).join(',')}`;
+    play.disabled = result.status !== 'inside';
+  }
+  check.onclick = async () => {
+    play.disabled = true;
+    outcome.textContent = 'Checking';
+    update(await StonefellowData.checkProximity('venue-check'));
+  };
+  play.onclick = async () => {
+    await StonefellowAudio.play('heat-song');
+    outcome.textContent = 'Track playing';
+  };
+  const ordinary = await StonefellowData.get('venue-check');
+  make('p', `Ordinary read: ${ordinary.status}`);
+  update(await StonefellowData.checkProximity('venue-check'));
+})();'''
+
 MOUNT = r'''(sound) => {
   const audio = document.querySelector('audio');
   audio.src = sound;
@@ -150,6 +190,9 @@ def run(page, width):
     modes = {'phoenix': (94, 'Clear', 'fresh'), 'venue': (84, 'Sunny', 'fresh')}
     requests = []
     unknown_requests = []
+    map_rows = json.loads((ROOT / 'config/canvas-maps/us-regions.json').read_text())['MT']
+    point = 'point-33450000_-112070000_100'
+    proximity_available = True
 
     def route_request(route):
         url = urlparse(route.request.url)
@@ -161,6 +204,23 @@ def run(page, width):
             query = parse_qs(url.query)
             requests.append(query)
             alias = query.get('alias', [''])[0]
+            if alias in ('boundary', 'map-origin', 'venue-check'):
+                assert 'location_id' not in query
+                if alias == 'venue-check' and not proximity_available:
+                    route.fulfill(status=404, json={'ok': False, 'error': 'unavailable'})
+                    return
+                data = weather(None, '', 'fresh')
+                data.update(alias=alias, timezone=None)
+                if alias == 'boundary':
+                    data.update(product='map.boundaries', source='U.S. Census Bureau, 2025 Cartographic Boundary Files (1:20m)', rows=map_rows)
+                elif alias == 'map-origin':
+                    data.update(product='geography.place', rows=[{'title': 'Selected city', 'region': 'MT', 'lat': 46.59, 'lon': -112.04}])
+                else:
+                    data.update(product='location.proximity', source='Stonefellow public target',
+                                location={'id': point, 'kind': 'point', 'title': 'Public point'},
+                                rows=[{'lat': 33.45, 'lon': -112.07, 'radius_m': 100}])
+                route.fulfill(json={'ok': True, 'data': data})
+                return
             if alias in ('origin', 'nearby'):
                 assert 'location_id' not in query
                 data = weather(None, '', 'fresh')
@@ -201,7 +261,7 @@ def run(page, width):
     page.route('**/*', route_request)
     page.goto(SITE)
     page.add_style_tag(content=(ROOT / 'assets/css/public-agent-canvas.css').read_text())
-    for name in ('canvas-audio-sdk.js', 'public-agent-canvas.js', 'vendor/acorn.js', 'canvas-preview-guard.js', 'canvas-scene-tester.js'):
+    for name in ('canvas-audio-sdk.js', 'canvas-location.js', 'public-agent-canvas.js', 'vendor/acorn.js', 'canvas-preview-guard.js', 'canvas-scene-tester.js'):
         page.add_script_tag(content=(ROOT / 'assets/js' / name).read_text())
     page.add_script_tag(content=app_function('  function requireCanvasAudioSession(', '  function canvasAudioSourcePath(')
                         + app_function('  async function loadCanvasData(', '  async function loadCanvasAudioCatalog('))
@@ -299,12 +359,78 @@ def run(page, width):
     print(f'PASS Chromium/{width} public geography drives independent authorized venue reads and survives a venue weather outage', flush=True)
     print(f'PASS Chromium/{width} fixed sources cannot accept a new venue and scope reads require a published show', flush=True)
 
+    count = len(requests)
+    assert max(len(row['coordinates']) for row in map_rows) > 3000
+    assert page.evaluate('([code, sources]) => display(code,false,sources)', [MAP_PROGRAM, [
+        {'alias': 'boundary', 'product': 'map.boundaries', 'location_id': 'city-3035680'},
+        {'alias': 'map-origin', 'product': 'geography.place', 'location_id': 'city-3035680'},
+    ]])
+    points = sum(len(json.loads(row['coordinates'])) for row in map_rows)
+    frame.get_by_text(f'Selected city · {len(map_rows)} chunks · {points} points', exact=True).wait_for()
+    assert {(row['alias'][0], row['scene_id'][0]) for row in requests[count:]} == {('boundary', '88'), ('map-origin', '88')}
+    print(f'PASS Chromium/{width} bundled map geometry reaches authored code and composes with public geography', flush=True)
+
+    count = len(requests)
+    sources = [{'alias': 'venue-check', 'product': 'location.proximity', 'location_id': point}]
+    page.context.grant_permissions(['geolocation'], origin='https://fixture.test')
+    page.context.set_geolocation({'latitude': 33.45, 'longitude': -112.07, 'accuracy': 5})
+    assert page.evaluate('([code, sources]) => display(code,false,sources)', [PROXIMITY_PROGRAM, sources])
+    frame.get_by_text('denied:status', exact=True).wait_for()
+    frame.get_by_text('Ordinary read: unavailable', exact=True).wait_for()
+    assert len(requests) == count
+    assert page.locator(SCENE_SELECTOR).get_attribute('allow') == "geolocation 'none'"
+    check = frame.get_by_role('button', name='Check access')
+    play = frame.get_by_role('button', name='Play track')
+    dialog = page.locator('dialog.sf-canvas-location')
+    activate = lambda button: button.tap() if width == 390 else button.click()
+    assert play.is_disabled()
+    activate(check)
+    dialog.get_by_role('heading', name='Check your location').wait_for()
+    assert play.is_disabled() and len(requests) == count + 1
+    activate(dialog.get_by_role('button', name='Cancel'))
+    frame.get_by_text('denied:status', exact=True).wait_for()
+    assert play.is_disabled() and len(requests) == count + 1
+
+    activate(check)
+    activate(dialog.get_by_role('button', name='Check once'))
+    frame.get_by_text('inside:status', exact=True).wait_for()
+    assert len(requests) == count + 3
+    activate(play)
+    frame.get_by_text('Track playing', exact=True).wait_for()
+    assert page.evaluate('played.length') == 2
+    page.evaluate("document.querySelector('audio').pause()")
+
+    page.context.set_geolocation({'latitude': 34, 'longitude': -112.07, 'accuracy': 5})
+    activate(check)
+    activate(dialog.get_by_role('button', name='Check once'))
+    frame.get_by_text('outside:status', exact=True).wait_for()
+    assert play.is_disabled()
+
+    page.context.set_geolocation({'latitude': 33.45, 'longitude': -112.07, 'accuracy': 5})
+    activate(check)
+    dialog.wait_for()
+    proximity_available = False
+    activate(dialog.get_by_role('button', name='Check once'))
+    frame.get_by_text('unavailable:status', exact=True).wait_for()
+    assert play.is_disabled() and page.evaluate('played.length') == 2
+    assert len(requests) == count + 7 and all(row == {'action': ['read'], 'scene_id': ['88'], 'alias': ['venue-check']} for row in requests[count:])
+
+    preview_code = "StonefellowData.checkProximity('venue-check').then(result=>document.querySelector('.experiment').textContent=JSON.stringify(result));"
+    page.evaluate('''async ([code,sources]) => {
+      const {frame}=await SFPublicAgentCanvas.prepareGalleryPreview(await makeScene(code,false,sources));
+      frame.id='proximity-preview';
+      document.body.append(frame);
+    }''', [preview_code, sources])
+    page.frame_locator('#proximity-preview').get_by_text('{"status":"unavailable"}', exact=True).wait_for()
+    assert len(requests) == count + 7 and not unknown_requests
+    print(f'PASS Chromium/{width} trusted canvas gestures and host consent deliver status-only proximity with withdrawal and detached preview isolation', flush=True)
+
 
 with sync_playwright() as playwright:
     executable = os.environ.get('CHROMIUM_BIN') or shutil.which('chromium')
     browser = playwright.chromium.launch(headless=True, executable_path=executable, args=['--no-sandbox'])
     for width in (390, 1280):
-        context = browser.new_context(viewport={'width': width, 'height': 850}, reduced_motion='reduce')
+        context = browser.new_context(viewport={'width': width, 'height': 850}, reduced_motion='reduce', has_touch=width == 390)
         page = context.new_page()
         page.set_default_timeout(8000)
         run(page, width)

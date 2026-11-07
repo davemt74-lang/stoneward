@@ -387,6 +387,16 @@
       }).finally(() => { if (dataReads.get(key) === read) dataReads.delete(key); });
       dataReads.set(key, read);
       return read;
+    },
+    async checkProximity(alias) {
+      let status = 'unavailable';
+      if (!offlineData && typeof alias === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(alias)) {
+        try {
+          const value = await request('checkProximity', [alias]);
+          if (['inside', 'outside', 'uncertain', 'denied'].includes(value?.status)) status = value.status;
+        } catch (_) {}
+      }
+      return Object.freeze({ status });
     }
   }), configurable: false, writable: false });
   observeLocalPlayback();
@@ -399,7 +409,7 @@
   post({ type: 'connect' });
 })();`;
 
-  const hash = "'sha256-6bwYCqgOkABCPxK/AWWRSMYyf5040gz8wKnE716xEIc='";
+  const hash = "'sha256-n6MV5SgUq3a4dA9WD1o1Cm1Pe5VE/4DQiQxq4L6JubQ='";
 
   function token() {
     return Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
@@ -498,6 +508,19 @@
       fetched_at: fetched, expires_at: expires, source: text(result.source, 120) || null,
       timezone: text(result.timezone, 80) || null, rows };
   }
+  function proximityPoint(id) {
+    const match = typeof id === 'string' && /^point-(0|-?[1-9][0-9]{0,8})_(0|-?[1-9][0-9]{0,8})_([1-9][0-9]{0,4})$/.exec(id);
+    if (!match) return null;
+    const lat = Number(match[1]) / 1000000, lon = Number(match[2]) / 1000000, radius_m = Number(match[3]);
+    return Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && radius_m >= 10 && radius_m <= 10000
+      ? { id, lat, lon, radius_m } : null;
+  }
+  function confirmedPoint(result, alias, point) {
+    const row = Array.isArray(result?.rows) && result.rows.length === 1 ? result.rows[0] : null;
+    return result?.status === 'fresh' && result.product === 'location.proximity' && result.alias === alias &&
+      Date.parse(result.expires_at) > Date.now() && result.location?.kind === 'point' && result.location.id === point.id &&
+      row?.lat === point.lat && row.lon === point.lon && row.radius_m === point.radius_m;
+  }
   function validateArgs(method, args) {
     if (!Array.isArray(args)) throw error('Invalid audio request arguments.', 'invalid_audio_request');
     switch (method) {
@@ -515,6 +538,10 @@
         if (args.length < 1 || args.length > 2 || typeof args[0] !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(args[0]) ||
             (args.length === 2 && (typeof args[1] !== 'string' || !/^show-[a-z0-9][a-z0-9-]{0,79}$/.test(args[1]))))
           throw error('Choose a named canvas data source and an allowed show location.', 'invalid_audio_request');
+        return args;
+      case 'checkProximity':
+        if (args.length !== 1 || typeof args[0] !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(args[0]))
+          throw error('Choose a named canvas proximity source.', 'invalid_audio_request');
         return args;
       case 'getTrack':
       case 'getAudio':
@@ -553,6 +580,11 @@
     const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic, observeIndependent, loadData } = options;
     const dataAliases = new Set(Array.isArray(options.dataAliases) ? options.dataAliases : []);
     const dataLocationAliases = new Set(Array.isArray(options.dataLocationAliases) ? options.dataLocationAliases : []);
+    const proximityPoints = new Map();
+    for (const source of Array.isArray(options.dataProximitySources) ? options.dataProximitySources : []) {
+      const point = source?.product === 'location.proximity' ? proximityPoint(source.location_id) : null;
+      if (point) proximityPoints.set(source.alias, point);
+    }
     if (!frame || !audio || [getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume].some(callback => typeof callback !== 'function'))
       throw new TypeError('Canvas audio requires a frame, the canonical audio element and host callbacks.');
     const owner = getOwner();
@@ -727,6 +759,30 @@
       for (const track of result.tracks) session.tracks.set(track.track_id, track);
       return result;
     }
+    async function checkProximity(session, job, alias) {
+      const point = proximityPoints.get(alias);
+      const location = window.SFCanvasLocation;
+      if (!point || typeof loadData !== 'function' || typeof location?.check !== 'function' || session.proximityActive)
+        return { status: 'unavailable' };
+      if (!job.activated) return { status: 'denied' };
+      session.proximityActive = true;
+      const { signal } = job.controller;
+      try {
+        const data = await loadData(alias, signal);
+        if (!active(session) || !confirmedPoint(data, alias, point)) return { status: 'unavailable' };
+        const result = await location.check({ lat: point.lat, lon: point.lon, radius_m: point.radius_m }, signal, job.activated);
+        if (!active(session)) return { status: 'unavailable' };
+        const status = result?.status;
+        if (!['inside', 'outside', 'uncertain'].includes(status))
+          return { status: status === 'denied' ? status : 'unavailable' };
+        const currentTarget = await loadData(alias, signal);
+        return { status: active(session) && confirmedPoint(currentTarget, alias, point) ? status : 'unavailable' };
+      } catch (_) {
+        return { status: 'unavailable' };
+      } finally {
+        session.proximityActive = false;
+      }
+    }
     async function operation(session, job) {
       if (!active(session)) throw error('Canvas audio access ended.', 'audio_session_closed');
       const [argument] = job.args;
@@ -735,15 +791,16 @@
         case 'getData': {
           // Detached previews have no data loader. A live loader is scoped to saved aliases.
           const locationId = job.args[1];
-          if (!dataAliases.has(argument) || dataLocationAliases.has(argument) !== (locationId !== undefined) ||
+          if (!dataAliases.has(argument) || proximityPoints.has(argument) || dataLocationAliases.has(argument) !== (locationId !== undefined) ||
               typeof loadData !== 'function') return unavailableData();
           try {
             const result = await loadData(argument, job.controller.signal, locationId);
-            return active(session) ? normalizeData(result) : unavailableData();
+            return active(session) && result?.product !== 'location.proximity' ? normalizeData(result) : unavailableData();
           } catch (_) {
             return unavailableData();
           }
         }
+        case 'checkProximity': return checkProximity(session, job, argument);
         case 'catalog': return catalog(session, argument, job.controller.signal);
         case 'createPlayer': return createPlayer(session, argument, job.controller.signal);
         case 'getTrack': {
@@ -798,7 +855,8 @@
         if (!current || current.documentId !== message.documentId) {
           abortSession(current, true);
           current = { id: token(), documentId: message.documentId, closed: false, lastRequest: 0,
-            jobs: new Map(), queue: [], mediaActive: 0, controlsActive: 0, tracks: new Map(), players: new Map(), creating: 0, readyReported: false };
+            jobs: new Map(), queue: [], mediaActive: 0, controlsActive: 0, tracks: new Map(), players: new Map(), creating: 0,
+            readyReported: false, proximityActive: false };
         }
         try { post({ type: 'hello', documentId: current.documentId, session: current.id, state: snapshot() }); }
         catch (_) { abortSession(current, true); }
@@ -826,6 +884,11 @@
         return;
       }
       const job = { id: message.id, method: message.method, args, controller: new AbortController() };
+      if (message.method === 'checkProximity') {
+        // Authored message fields cannot assert browser activation.
+        job.activated = event.isTrusted === true && window.navigator?.userActivation?.isActive === true &&
+          window.document?.activeElement === frame;
+      }
       session.jobs.set(job.id, job);
       if (media) { session.queue.push(job); pump(session); }
       else execute(session, job, false);

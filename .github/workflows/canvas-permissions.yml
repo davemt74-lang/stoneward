@@ -65,6 +65,7 @@ jobs:
           php tests/canvas-weather.php
           php tests/canvas-data-places.php
           php tests/canvas-geography.php
+          php tests/canvas-map.php
           php tests/canvas-data-flow.php
           python tests/canvas-data-http.py
       - name: Real PHP endpoint authentication, CSRF and current-viewer data
@@ -128,6 +129,7 @@ jobs:
         run: |
           python tests/canvas-data-picker-browser.py
           python tests/canvas-data-runtime-browser.py
+          python tests/canvas-location-browser.py
       - name: Existing public and administrator gallery controls
         run: |
           python tests/canvas-gallery-browser.py

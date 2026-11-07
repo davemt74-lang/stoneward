@@ -58,6 +58,7 @@ jobs:
           find . -type f -name '*.php' ! -path './storage/*' -print0 | xargs -0 -n1 php -l
           php tests/section91b15a-smart-playlist.php
           php tests/canvas-geography.php
+          php tests/canvas-map.php
           php tests/canvas-data-flow.php
 
       - name: Public JavaScript syntax
@@ -758,6 +759,8 @@ jobs:
           } > dist/deploy/DEPLOY-MANIFEST.txt
           test -s dist/deploy/api/production-pilot.php
           test -s dist/deploy/api/canvas-geography-core.php
+          test -s dist/deploy/api/canvas-map-core.php
+          test -s dist/deploy/assets/js/canvas-location.js
           test -s dist/deploy/docs/section83-production-pilot.md
           grep -Fx "Source commit: $(git rev-parse HEAD)" dist/deploy/DEPLOY-MANIFEST.txt
           (cd dist/deploy && zip -q -r ../stonefellow-section62c-full-deploy.zip .)

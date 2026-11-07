@@ -36,6 +36,9 @@ PRODUCTS = [
      'fields': {'start_at': 'text'}, 'parameters': WEATHER_PARAMETERS},
     {'id': 'maps.points', 'title': 'Map points', 'description': 'Generic source registered by a second service.',
      'fields': {'latitude': 'number'}, 'parameters': PARAMETERS},
+    {'id': 'location.proximity', 'title': 'Location proximity', 'fields': {'inside': 'number'},
+     'parameters': {'location_id': {'type': 'public_point', 'label': 'Public target point',
+                                    'min_radius_m': 10, 'max_radius_m': 10000}}},
     {'id': 'weather.daily', 'title': 'Disabled forecast', 'enabled': False, 'parameters': PARAMETERS},
     {'id': 'malformed', 'title': 'Malformed product', 'parameters': PARAMETERS},
 ]
@@ -135,7 +138,7 @@ with sync_playwright() as playwright:
         assert len(requests) == 1
 
         open_picker('/Data')
-        expect(source.locator('option')).to_have_count(3)
+        expect(source.locator('option')).to_have_count(4)
         expect(picker.get_by_text('Recent conditions <b>observed</b>.', exact=True)).to_be_visible()
         assert not picker.locator('b').count()
         activate(picker.get_by_text('Available fields', exact=True))
@@ -217,11 +220,77 @@ with sync_playwright() as playwright:
         page.evaluate("listeningRoom={id:9}")
         activate(attach)
         expect(composer).to_have_value('/edit /data')
+
+        open_picker('/data')
+        source.select_option('location.proximity')
+        point = picker.get_by_role('group', name='Public target point')
+        latitude = point.get_by_label('Latitude (degrees)', exact=True)
+        longitude = point.get_by_label('Longitude (degrees)', exact=True)
+        radius = point.get_by_label('Radius (meters)', exact=True)
+        expect(point).to_be_visible()
+        expect(search).not_to_be_visible()
+        expect(place).not_to_be_visible()
+        expect(point.get_by_text('Sharing the canvas makes this target’s coordinates and radius public.')).to_be_visible()
+        expect(point.get_by_text('Enter 10 to 10000 whole meters.')).to_be_visible()
+        expect(add).to_be_disabled()
+        latitude.fill('33.448')
+        longitude.fill('-112.0740001')
+        radius.fill('150')
+        expect(add).to_be_disabled()
+        longitude.fill('-180.000001')
+        expect(add).to_be_disabled()
+        longitude.fill('-112.074')
+        latitude.fill('-90.000001')
+        expect(add).to_be_disabled()
+        latitude.fill('33.448')
+        radius.fill('150.5')
+        expect(add).to_be_disabled()
+        radius.fill('9')
+        expect(add).to_be_disabled()
+        radius.fill('10001')
+        expect(add).to_be_disabled()
+        radius.fill('150')
+        expect(add).to_be_enabled()
+        expect(name).to_have_value('public-point-proximity')
+        source.select_option('weather.current')
+        expect(point).not_to_be_visible()
+        expect(search).to_be_visible()
+        expect(add).to_be_disabled()
+        source.select_option('location.proximity')
+        expect(latitude).to_have_value('33.448')
+        expect(longitude).to_have_value('-112.074')
+        expect(radius).to_have_value('150')
+        name.fill('venue-radius')
+        activate(add)
+        expect(selected.get_by_text('Location proximity · 33.448, -112.074 · 150 m radius')).to_be_visible()
+        activate(picker.get_by_role('button', name='Cancel', exact=True))
+        expect(composer).to_have_value('/data')
+
+        open_picker('/data')
+        source.select_option('location.proximity')
+        latitude.fill('33.448000')
+        longitude.fill('-112.074000')
+        radius.fill('0150')
+        name.fill('venue-radius')
+        activate(add)
+        activate(attach)
+        point_id = 'point-33448000_-112074000_150'
+        expect(composer).to_have_value('{data:venue-radius:location.proximity:' + point_id + '}')
+        proximity = page.evaluate('chatDraftResourceInputs(input.value).artist_inputs.data_sources')
+        assert proximity == [{'alias': 'venue-radius', 'product': 'location.proximity', 'location_id': point_id}]
+        page.evaluate("(sources)=>{listeningRoom={id:10,artist_inputs:{data_sources:sources}}}", proximity)
+        open_picker('/edit Update this /data')
+        expect(selected.get_by_text('Location proximity · 33.448, -112.074 · 150 m radius')).to_be_visible()
+        expect(attach).to_be_enabled()
+        activate(picker.get_by_role('button', name='Remove venue-radius', exact=True))
+        activate(attach)
+        expect(composer).to_have_value('/edit Update this {data-clear}')
+        assert not any('point-' in url or '112.074' in url or '33.448' in url for _, url in requests)
         assert not errors
         assert all(method == 'GET' for method, _ in requests)
         assert any('action=places&id=city-0455000' in url for _, url in requests)
         assert not any('action=places&id=published-shows' in url for _, url in requests)
         assert all(url == 'https://data.test/' or url.startswith('https://data.test/api/canvas-data.php?') for _, url in requests)
-        print(f'PASS chromium/{width}: multiple named data sources, product-scoped venues, safe restoration and stale edit protection')
+        print(f'PASS chromium/{width}: multiple named data sources, product-scoped venues, exact public points, safe restoration and stale edit protection')
         context.close()
     browser.close()

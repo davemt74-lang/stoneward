@@ -89,8 +89,8 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
                   'Signed-in non-admin cannot write policy even with a valid account CSRF token')
             initial = admin.get(ENDPOINT)
             data = initial.json()
-            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 14,
-                  'Authenticated admin loads all fourteen dataset permissions over HTTP')
+            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 16,
+                  'Authenticated admin loads all sixteen dataset permissions over HTTP')
             check('no-store' in initial.headers.get('cache-control', ''), 'Policy responses disallow caching')
             check(guest.get(ME_ENDPOINT).status == 401, 'Guest cannot open the account-data picker')
             resources = owner.get(ME_ENDPOINT)
