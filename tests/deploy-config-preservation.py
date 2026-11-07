@@ -37,10 +37,15 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         'DEPLOY-MANIFEST.txt': 'obsolete static manifest\n',
         'scripts/release-zip.sh': (ROOT / 'scripts/release-zip.sh').read_text(),
     }
+    live_data_assets = (
+        'api/canvas-data.php', 'assets/js/canvas-data-picker.js',
+        *(f'config/canvas-data-places/us-places-{part:02}.tsv' for part in range(1, 4)),
+    )
+    contents.update({name: (ROOT / name).read_text(encoding='utf-8') for name in live_data_assets})
     for name, content in contents.items():
         path = repo / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+        path.write_text(content, encoding='utf-8')
     run('git', 'init', '-q', cwd=repo)
     run('git', 'config', 'user.email', 'fixture@example.invalid', cwd=repo)
     run('git', 'config', 'user.name', 'Fixture', cwd=repo)
@@ -56,6 +61,7 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         assert archive.testzip() is None
         names = archive.namelist()
         assert 'index.php' in names and 'config/store.default.php' in names
+        assert set(live_data_assets) <= set(names)
         assert not any(name.endswith('.zip') for name in names)
         assert not any(name.startswith(('storage/', 'uploads/', 'data/', '.github/', 'tests/', 'scripts/', 'speech-gateway/')) for name in names)
         assert not any(name in names for name in ('config/store.php', 'config/database.php', 'config/secrets.php', '.env', '.env.local'))
