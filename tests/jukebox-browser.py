@@ -1,4 +1,4 @@
-"""Venue pairing, shared player, guest chat, and returning guests through production routes."""
+"""Venue pairing, shared player, guest chat, returning guests, and session recaps through production routes."""
 import base64
 import os
 from pathlib import Path
@@ -153,7 +153,21 @@ def scenario(browser, base):
     expect(public.get_by_role('link', name='Next night')).to_have_count(0)
     other = signed_in(3)
     assert request(other, 'state', host=True, session=another)['status'] == 404
-    print('PASS venue pairing, playback, queue persistence and deduplication, private chat, CRM, and isolation')
+    venue.goto(base + '/jukebox.php?host=1&id=' + session)
+    expect(venue.locator('#recap')).to_be_hidden()
+    venue.once('dialog', lambda dialog: dialog.accept())
+    venue.get_by_role('button', name='End session').click()
+    expect(venue.get_by_role('heading', name='Session recap')).to_be_visible()
+    expect(venue.locator('#recap-totals')).not_to_be_empty()
+    expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
+    expect(venue.locator('#recap-tracks')).to_contain_text('Second Song')
+    venue.goto(base + '/jukebox.php?host=1')
+    venue.get_by_role('link', name='Tonight at Test Bar (ended)', exact=True).click()
+    expect(venue.get_by_role('heading', name='Session recap')).to_be_visible()
+    expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
+    second.reload()
+    expect(second.locator('#recap')).to_be_hidden()
+    print('PASS venue pairing, playback, queue persistence and deduplication, private chat, CRM, and reopened session recap')
 
 
 def http_scenario(base):
@@ -232,9 +246,58 @@ def http_scenario(base):
     assert outsider.call('state', next_session)['status'] == 404
     assert first.call('forget', next_session, {})['ok']
     assert venue.call('crm', next_session)['guests'] == []
+    assert venue.call('recap', session)['status'] == 409
+
+    # Add one pending connection and reject another without approving it. The
+    # previously approved and then revoked phone still counts as approved.
+    pending, rejected = Client(), Client()
+    assert pending.call('join', session, {})['ok']
+    assert rejected.call('join', session, {})['ok']
+    rejected_id = rejected.call('state', session)['state']['phone']['id']
+    assert venue.call('revoke', session, {'phone': rejected_id})['ok']
+
+    # Exercise each distinct outcome. A confirmed play can later be skipped,
+    # while a request that fails before playback must never count as a play.
+    current = venue.call('state', session)['state']['current']
+    assert current['track_id'] == 'b' and current['played'] is None
+    assert venue.call('request', session, {'track': 'a', 'nonce': '3'*32})['ok']
+    assert second.call('request', session, {'track': 'b', 'nonce': '4'*32})['ok']
+    remove_item = venue.call('state', session)['state']['queue'][-1]['id']
+    assert venue.call('control', session, {'event': 'remove', 'item': remove_item})['ok']
+    assert second.call('request', session, {'track': 'b', 'nonce': '5'*32})['ok']
+    assert venue.call('player', session, player | {'event': 'failed', 'item': current['id']})['ok']
+    current = venue.call('state', session)['state']['current']
+    assert current['track_id'] == 'a'
+    assert venue.call('player', session, player | {'event': 'playing', 'item': current['id']})['ok']
+    assert venue.call('control', session, {'event': 'skip'})['ok']
+    assert second.call('request', session, {'track': 'b', 'nonce': '6'*32})['ok']
+    assert first.call('request', next_session, {'track': 'a', 'nonce': '7'*32})['ok']
     assert venue.call('control', session, {'event': 'end'})['ok']
-    assert second.call('request', session, {'track': 'a', 'nonce': '3'*32})['status'] == 409
-    print('PASS HTTP pairing, shared queue, player ownership, play history, private chat, CRM, and isolation')
+    assert second.call('request', session, {'track': 'a', 'nonce': '8'*32})['status'] == 409
+
+    assert second.call('recap', session)['status'] == 409
+    assert outsider.call('recap', session)['status'] == 404
+    recap = venue.call('recap', session)['recap']
+    assert recap['session_id'] == session and recap['title'] == 'Tonight'
+    assert 0 < recap['created'] <= time.time()
+    assert recap['phones'] == {'connections': 4, 'approved': 2}
+    totals = dict(requests=6, guest_requests=5, host_requests=1, confirmed_plays=2,
+                  completed=1, skipped=1, failed=1, removed=1, left_in_queue=1, current_at_close=1)
+    assert recap['totals'] == totals
+    assert recap['tracks'] == [
+        dict(track_id='b', title='Second Song', requests=4, guest_requests=4, host_requests=0,
+             confirmed_plays=0, completed=0, skipped=0, failed=1, removed=1, left_in_queue=1, current_at_close=1),
+        dict(track_id='a', title='First Song', requests=2, guest_requests=1, host_requests=1,
+             confirmed_plays=2, completed=1, skipped=1, failed=0, removed=0, left_in_queue=0, current_at_close=0),
+    ]
+    assert admin.call('recap', session)['recap'] == recap
+    assert 'Private hello' not in json.dumps(recap) and 'Dave' not in json.dumps(recap)
+    assert admin.call('control', public, {'event': 'end'})['ok']
+    empty = admin.call('recap', public)['recap']
+    assert empty['phones'] == {'connections': 0, 'approved': 0}
+    assert empty['totals'] == dict.fromkeys(totals, 0) and empty['tracks'] == []
+    assert Client().call('recap', public)['status'] == 409
+    print('PASS HTTP pairing, shared queue, player ownership, play history, private chat, CRM, and host-only session recap')
 
 
 with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:

@@ -20,9 +20,9 @@ header('Referrer-Policy: same-origin');
 <meta name="robots" content="noindex">
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=1">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=2">
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
-<script defer src="assets/js/jukebox.js?v=1"></script>
+<script defer src="assets/js/jukebox.js?v=2"></script>
 </head>
 <body>
 <main>
@@ -52,8 +52,27 @@ header('Referrer-Policy: same-origin');
 <label>Player volume <input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
 <p id="player-status"></p><div id="controls"></div><h3>Play history</h3><ul id="history"></ul></section>
 </div>
-<details id="crm" hidden><summary>Venue guests and visit history</summary><ul id="guests"></ul></details>
 </section>
+<section id="recap" hidden aria-labelledby="recap-heading">
+<h2 id="recap-heading">Session recap</h2>
+<p id="recap-status" role="status"></p>
+<button type="button" id="recap-retry" hidden>Retry recap</button>
+<div id="recap-content" hidden>
+<p id="recap-start"></p>
+<dl id="recap-totals"></dl>
+<p>Confirmed plays count songs that started playing. A song can count as both a confirmed play and a skip.</p>
+<p id="recap-empty" hidden>No songs were requested.</p>
+<table id="recap-tracks" hidden>
+<caption>Song requests and playback</caption>
+<thead><tr><th scope="col">Song</th><th scope="col">Requests</th><th scope="col">Confirmed plays</th><th scope="col">Outcomes</th></tr></thead>
+<tbody></tbody>
+</table>
+<section id="recap-history" hidden>
+<h3>Recent play history</h3><ul id="recap-plays"></ul>
+</section>
+</div>
+</section>
+<details id="crm" hidden><summary>Venue guests and visit history</summary><ul id="guests"></ul></details>
 <section id="chat" hidden>
 <h2 id="chat-title">Private messages</h2><ul id="messages"></ul>
 <form id="send"><label>Message <input name="text" maxlength="1000"></label>
