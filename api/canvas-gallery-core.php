@@ -92,7 +92,10 @@ function sf_canvas_gallery_available(string $id): bool {
     $q=sf_db()->prepare("SELECT 1 FROM canvas_gallery_entries e JOIN users u ON u.id=e.user_id WHERE e.id=? AND u.status='active'");$q->execute([$id]);$active=$q->fetchColumn()!==false;$q->closeCursor();
     if(!$active)return false;
     $q=sf_db()->prepare('SELECT snapshot_json FROM canvas_gallery_entries WHERE id=?');$q->execute([$id]);$snapshot=json_decode((string)$q->fetchColumn(),true,16,JSON_THROW_ON_ERROR);$q->closeCursor();
-    if(isset($snapshot['playlist_inputs'])){try{sf_canvas_playlists_compile(0,$snapshot['playlist_inputs'],$snapshot['playlist_manifest']??null);}catch(Throwable $e){return false;}}
+    try{
+        if(isset($snapshot['playlist_inputs']))sf_canvas_playlists_compile(0,$snapshot['playlist_inputs'],$snapshot['playlist_manifest']??null);
+        sf_canvas_resource_validate_stories($snapshot['artist_inputs']??null);
+    }catch(Throwable $e){return false;}
     require_once __DIR__.'/canvas-gallery-assets.php';return sf_canvas_gallery_assets_references_available($id);
 }
 function sf_canvas_gallery_list(?int $uid=null,bool $admin=false,array $options=[]): array {
@@ -138,7 +141,9 @@ function sf_canvas_gallery_submit(array $user,array $request,?callable $capture=
     if($row=$existing())return sf_canvas_gallery_public($row,true);
     $epoch=sf_agent_scene_history_epoch($uid);$scene=sf_agent_scene_history_get($uid,$sceneId);
     if(!$scene||!sf_canvas_gallery_eligible($uid,$scene))throw new InvalidArgumentException('This saved canvas needs completed verification before it can be submitted.');
-    $snapshot=sf_canvas_gallery_snapshot($scene,$title);sf_canvas_gallery_validate_scopes($snapshot,$uid);$id=bin2hex(random_bytes(16));
+    $snapshot=sf_canvas_gallery_snapshot($scene,$title);
+    sf_canvas_resource_prepare($snapshot['artist_inputs']??null);
+    sf_canvas_gallery_validate_scopes($snapshot,$uid);$id=bin2hex(random_bytes(16));
     require_once __DIR__.'/canvas-gallery-assets.php';$copied=false;$committed=false;
     try{
         $assets=($capture??sf_canvas_gallery_assets_snapshot(...))($uid,$snapshot+['id'=>$sceneId],$id);$copied=true;
@@ -167,6 +172,7 @@ function sf_canvas_gallery_moderate(array $admin,string $id,string $action,strin
     if(!in_array($action,['approve','return','decline','unpublish'],true)||preg_match('/\A[a-f0-9]{64}\z/',$hash)!==1)throw new InvalidArgumentException('Review this exact submitted snapshot.');
     $feedback=sf_canvas_gallery_text($feedback,2000,$action==='return');sf_canvas_gallery_ensure_schema();require_once __DIR__.'/canvas-gallery-assets.php';sf_canvas_gallery_assets_prepare();$row=sf_canvas_gallery_row($id);if(!$row)throw new SfCanvasGalleryNotFound('Canvas submission not found.');
     $snapshotInputs=json_decode($row['snapshot_json'],true,16,JSON_THROW_ON_ERROR);if(isset($snapshotInputs['playlist_inputs'])){sf_canvas_playlists_ensure_schema();sf_media_ensure_schema();}
+    if($action==='approve')sf_canvas_resource_prepare($snapshotInputs['artist_inputs']??null);
     $db=sf_db();$db->beginTransaction();
     try{sf_agent_scene_history_lock_account($db,(int)$row['user_id']);
         $q=$db->prepare('SELECT status FROM users WHERE id=?');$q->execute([(int)$row['user_id']]);$ownerStatus=$q->fetchColumn();$q->closeCursor();
@@ -204,7 +210,13 @@ function sf_canvas_gallery_attribution(array $row): array {
 }
 function sf_canvas_gallery_remix(array $user,string $id,string $requestId,?callable $copy=null): array {
     $uid=(int)($user['id']??0);sf_canvas_gallery_id($id);sf_agent_scene_request_id($requestId);if($uid<1)throw new InvalidArgumentException('Sign in to remix this canvas.');sf_canvas_gallery_ensure_schema();$expectedEpoch=sf_agent_scene_history_epoch($uid);
-    require_once __DIR__.'/canvas-gallery-assets.php';sf_canvas_gallery_assets_prepare();$preflight=sf_canvas_gallery_row($id);if($preflight&&isset(json_decode($preflight['snapshot_json'],true,16)['playlist_inputs'])){sf_canvas_playlists_ensure_schema();sf_media_ensure_schema();}$db=sf_db();$db->beginTransaction();$files=[];$committed=false;
+    require_once __DIR__.'/canvas-gallery-assets.php';sf_canvas_gallery_assets_prepare();$preflight=sf_canvas_gallery_row($id);
+    if($preflight){
+        $snapshotInputs=json_decode($preflight['snapshot_json'],true,16,JSON_THROW_ON_ERROR);
+        if(isset($snapshotInputs['playlist_inputs'])){sf_canvas_playlists_ensure_schema();sf_media_ensure_schema();}
+        sf_canvas_resource_prepare($snapshotInputs['artist_inputs']??null);
+    }
+    $db=sf_db();$db->beginTransaction();$files=[];$committed=false;
     try{sf_canvas_build_workflow_account($db,$uid);$epoch=sf_agent_scene_history_epoch($uid);if($epoch!==$expectedEpoch)throw new SfCanvasGalleryConflict('This remix was canceled by a privacy reset.');
         $q=$db->prepare('SELECT entry_id,scene_id,history_epoch FROM canvas_gallery_remixes WHERE user_id=? AND request_id=?');$q->execute([$uid,$requestId]);$old=$q->fetch(PDO::FETCH_ASSOC);$q->closeCursor();
         if($old){if($old['entry_id']!==$id)throw new SfCanvasGalleryConflict('This remix request belongs to another gallery entry.');$scene=sf_agent_scene_saved($uid,(int)$old['scene_id']);if(!$scene||(int)$old['history_epoch']!==$epoch)throw new SfCanvasGalleryConflict('This remix was cleared.');$db->commit();return ['scene'=>$scene,'item'=>sf_canvas_gallery_get($id)];}

@@ -18,6 +18,7 @@ body:has(.sf-canvas-resource-picker[open]) { overflow:hidden; }
 .sf-canvas-resource-picker-body { min-height:0;padding:0 24px 16px;overflow:auto;overscroll-behavior:contain; }
 .sf-canvas-resource-status { margin:0 0 10px;color:#c6d8e4;overflow-wrap:anywhere; }
 .sf-canvas-resource-status:empty { margin:0; }
+.sf-canvas-resource-tag-filter { display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;overflow-wrap:anywhere;color:#c6d8e4; }
 .sf-canvas-resource-row { display:flex;align-items:center;gap:12px;min-width:0;min-height:56px;margin-bottom:8px;padding:10px 12px;border:1px solid #a8d7ef55;border-radius:9px;background:#142337;cursor:pointer; }
 .sf-canvas-resource-row:has(input:checked) { border-color:#a2dfff;background:#203a50; }
 .sf-canvas-resource-row:has(input:focus-visible) { outline:2px solid #a2dfff;outline-offset:-2px; }

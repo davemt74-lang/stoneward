@@ -47,6 +47,26 @@ rejects(fn()=>sf_canvas_resource_selection('Design {ticket:7}',['ticket_ids'=>[]
 rejects(fn()=>sf_canvas_resource_artist_inputs(['merch_ids'=>[1]]),'Structured resource IDs must be stable strings');
 rejects(fn()=>sf_canvas_resource_artist_inputs(['purchase_ids'=>['secret']]),'Artist resource inputs cannot introduce a personal purchase lookup');
 rejects(fn()=>sf_canvas_resource_selection('Design {canvas:92233720368547758080}'),'Oversized canvas token IDs are rejected');
+verify(sf_canvas_resource_selection('Design {stories-all} {merch:shirt}')===
+    ['Design',['merch_ids'=>['shirt'],'stories'=>['mode'=>'all']],true,null],
+    'All Stories is an explicit live scope alongside other resource kinds');
+verify(sf_canvas_resource_selection('Design `{stories-tag:Behind-The-Song}`')===
+    ['Design',['stories'=>['mode'=>'tag','tag'=>'behind-the-song']],true,null],
+    'Story tag tokens normalize to one live tag scope');
+verify(sf_canvas_resource_selection('Design {story:9} {story:1} {story:9}')===
+    ['Design',['stories'=>['mode'=>'selected','story_ids'=>['9','1']]],true,null],
+    'Individual story IDs retain selection order and deduplicate');
+verify(sf_canvas_resource_selection('Design {stories-clear}', ['ticket_ids'=>['7']],true)===
+    ['Design',['ticket_ids'=>['7'],'stories'=>['mode'=>'selected','story_ids'=>[]]],true,null],
+    'Clearing stories retains independently selected ticket offers');
+rejects(fn()=>sf_canvas_resource_selection('Design {stories-all} {story:1}'),'A story scope cannot select both all and individual IDs');
+rejects(fn()=>sf_canvas_resource_selection('Design {stories-tag:live} {stories-tag:studio}'),'Multiple story tag scopes cannot be attached to one selection');
+rejects(fn()=>sf_canvas_resource_selection('Design {stories-tag:../private}'),'Malformed tag tokens are rejected');
+rejects(fn()=>sf_canvas_resource_selection('Design {story:9223372036854775808}'),'Story IDs must fit the canonical server integer range');
+rejects(fn()=>sf_canvas_resource_selection('Design {stories-all}',['stories'=>['mode'=>'selected','story_ids'=>[]]],true),
+    'A stale All Stories token cannot overwrite an explicit cleared scope');
+rejects(fn()=>sf_canvas_resource_artist_inputs(['stories'=>['mode'=>'all','include_drafts'=>true]]),
+    'Story scopes cannot request drafts or user authority');
 
 $db=sf_db();$db->exec('CREATE TABLE users(id INTEGER PRIMARY KEY)');$db->exec('INSERT INTO users VALUES(1),(2)');
 sf_agent_scene_history_ensure_schema();

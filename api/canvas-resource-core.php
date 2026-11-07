@@ -3,12 +3,28 @@ declare(strict_types=1);
 
 require_once __DIR__.'/agent-canvas-public-commerce.php';
 require_once __DIR__.'/canvas-playlists-core.php';
+require_once __DIR__.'/canvas-stories-core.php';
+
+function sf_canvas_resource_story_scope(mixed $raw): array {
+    if($raw===['mode'=>'all'])return $raw;
+    if(!is_array($raw)||count($raw)!==2)throw new InvalidArgumentException('Choose a story scope from the picker.');
+    if(($raw['mode']??null)==='tag'&&is_string($raw['tag']??null)&&strlen($raw['tag'])<=64&&
+        preg_match('/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/',$raw['tag'])===1)
+        return ['mode'=>'tag','tag'=>$raw['tag']];
+    if(($raw['mode']??null)!=='selected'||!is_array($raw['story_ids']??null)||!array_is_list($raw['story_ids']))
+        throw new InvalidArgumentException('Choose a story scope from the picker.');
+    foreach($raw['story_ids'] as $id){
+        if(!is_string($id)||preg_match('/\A[1-9][0-9]{0,18}\z/',$id)!==1||filter_var($id,FILTER_VALIDATE_INT)===false)
+            throw new InvalidArgumentException('Choose published stories from the picker.');
+    }
+    return ['mode'=>'selected','story_ids'=>array_values(array_unique($raw['story_ids'],SORT_STRING))];
+}
 
 /** Syntax only. An omitted type and an explicitly empty selection have different meanings. */
 function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
     if($raw===null)return null;
-    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids']))
-        throw new InvalidArgumentException('Choose merchandise or ticket resources from the picker.');
+    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids','stories']))
+        throw new InvalidArgumentException('Choose published artist resources from the picker.');
     $inputs=[];
     foreach(['merch_ids','ticket_ids'] as $field){
         if(!array_key_exists($field,$raw))continue;
@@ -18,6 +34,7 @@ function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
             throw new InvalidArgumentException('Choose merchandise or ticket resources from the picker.');
         $inputs[$field]=array_values(array_unique($ids,SORT_STRING));
     }
+    if(array_key_exists('stories',$raw))$inputs['stories']=sf_canvas_resource_story_scope($raw['stories']);
     return $inputs;
 }
 
@@ -29,11 +46,14 @@ function sf_canvas_resource_source_ids(array $raw): array {
 
 /** Resource tokens carry identity without consuming the natural-language design budget. */
 function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $artistProvided=false,?array $rawSources=null): array {
-    $artistTokens=[];$sourceTokens=[];$cleared=[];
-    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket):([^}]*)|(merch-clear|tickets-clear))\}\1/i',
-        static function(array $match)use(&$artistTokens,&$sourceTokens,&$cleared):string {
+    $artistTokens=[];$sourceTokens=[];$cleared=[];$storyIds=[];$storyScopes=[];
+    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket|story|stories-tag):([^}]*)|(merch-clear|tickets-clear|stories-all|stories-clear))\}\1/i',
+        static function(array $match)use(&$artistTokens,&$sourceTokens,&$cleared,&$storyIds,&$storyScopes):string {
             if(($match[4]??'')!==''){
-                $cleared[strtolower($match[4])==='merch-clear'?'merch_ids':'ticket_ids']=true;
+                $command=strtolower($match[4]);
+                if($command==='stories-all')$storyScopes['all']=['mode'=>'all'];
+                elseif($command==='stories-clear')$storyScopes['clear']=['mode'=>'selected','story_ids'=>[]];
+                else $cleared[$command==='merch-clear'?'merch_ids':'ticket_ids']=true;
                 return ' ';
             }
             $kind=strtolower($match[2]);$id=$match[3];
@@ -41,6 +61,11 @@ function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $
                 $number=filter_var($id,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
                 if($number===false||!ctype_digit($id))throw new InvalidArgumentException('Choose a saved canvas from the picker.');
                 $sourceTokens[]=$number;
+            }elseif($kind==='story'){
+                $storyIds[]=$id;
+            }elseif($kind==='stories-tag'){
+                $tag=strtolower($id);
+                $storyScopes['tag:'.$tag]=['mode'=>'tag','tag'=>$tag];
             }else{
                 if(preg_match('/\A[A-Za-z0-9_-]{1,180}\z/',$id)!==1)
                     throw new InvalidArgumentException('Choose merchandise or ticket resources from the picker.');
@@ -49,6 +74,9 @@ function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $
             return ' ';
         },$brief);
     if($clean===null)throw new InvalidArgumentException('Choose valid canvas resources.');
+    if($storyIds)$storyScopes['selected']=['mode'=>'selected','story_ids'=>$storyIds];
+    if(count($storyScopes)>1)throw new InvalidArgumentException('Choose individual stories, all stories, or one story tag.');
+    if($storyScopes)$artistTokens['stories']=reset($storyScopes);
     foreach($cleared as $field=>$_){
         if(!empty($artistTokens[$field]))throw new InvalidArgumentException('Choose resources or clear the selection for each type.');
         $artistTokens[$field]=[];
@@ -77,6 +105,7 @@ function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $
 /** Current published rows, retaining every variant of each explicitly selected product. */
 function sf_canvas_resource_artist_rows(string $toolId,?array $inputs): array {
     $inputs=sf_canvas_resource_artist_inputs($inputs);
+    if($toolId==='published_stories')return sf_canvas_story_rows($inputs['stories']??null,false);
     $field=$toolId==='published_merch'?'merch_ids':'ticket_ids';
     $identity=$toolId==='published_merch'?'product_id':'offer_id';
     $rows=$toolId==='published_merch'?sf_agent_canvas_merch_rows():sf_agent_canvas_ticket_offer_rows();
@@ -94,12 +123,41 @@ function sf_canvas_resource_artist_context(?array $inputs): array {
     foreach(['merch_ids'=>'published_merch','ticket_ids'=>'published_ticket_offers'] as $field=>$tool){
         if($inputs!==null&&array_key_exists($field,$inputs))$context[$tool]=sf_canvas_resource_artist_rows($tool,$inputs);
     }
+    if(isset($inputs['stories'])){
+        $scope=$inputs['stories'];
+        $rows=sf_canvas_story_rows($scope,false);
+        $preview=[];$bytes=0;
+        foreach($rows as $row){
+            $item=array_intersect_key($row,array_flip(['story_id','title','summary','entry_type','event_date','related_type','related_id','related_title','tags']));
+            $bytes+=strlen(json_encode($item,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE));
+            if($bytes>12000)break;
+            $preview[]=$item;
+        }
+        $context['published_stories']=[
+            'scope'=>array_intersect_key($scope,['mode'=>true,'tag'=>true]),'story_count'=>count($rows),
+            'preview'=>$preview,'preview_complete'=>count($preview)===count($rows),
+        ];
+    }
     return $context;
+}
+
+/** Initialize storage before a canvas transaction can resolve its story scope. */
+function sf_canvas_resource_prepare(?array $inputs): void {
+    if(isset($inputs['stories'])&&!sf_db()->inTransaction())sf_canvas_story_prepare();
+}
+
+/** Explicit selections must still exist when an approved project uses them. */
+function sf_canvas_resource_validate_stories(?array $inputs): void {
+    $scope=sf_canvas_resource_artist_inputs($inputs)['stories']??null;
+    if(($scope['mode']??null)!=='selected'||$scope['story_ids']===[])return;
+    if(count(sf_canvas_story_rows($scope,false))!==count($scope['story_ids']))
+        throw new InvalidArgumentException('A selected story is no longer published. Refresh the story picker.');
 }
 
 /** Validate current access before a metered operation, independently of picker contents. */
 function sf_canvas_resource_validate(int $uid,?array $inputs,?array $sources=null): void {
     $inputs=sf_canvas_resource_artist_inputs($inputs);
+    sf_canvas_resource_validate_stories($inputs);
     if($sources!==null){
         require_once __DIR__.'/agent-scene-history.php';
         foreach(sf_canvas_resource_source_ids($sources) as $id)if(sf_agent_scene_history_get($uid,$id)===null)
@@ -116,6 +174,7 @@ function sf_canvas_resource_validate(int $uid,?array $inputs,?array $sources=nul
 
 /** Complete picker inventory. These rows describe resources without generating a layout. */
 function sf_canvas_resource_inventory(int $uid,string $kind): array {
+    if($kind==='stories')return sf_canvas_story_inventory();
     if($kind==='playlists')return sf_canvas_playlists_inventory($uid);
     if($uid<1)throw new InvalidArgumentException('Sign in to choose canvas resources.');
     if($kind==='canvas'){
@@ -157,5 +216,5 @@ function sf_canvas_resource_inventory(int $uid,string $kind): array {
         foreach(sf_agent_canvas_ticket_offer_rows() as $row)$items[]=['id'=>$row['offer_id']]+$row;
         return $items;
     }
-    throw new InvalidArgumentException('Choose canvas, merchandise, or ticket resources.');
+    throw new InvalidArgumentException('Choose canvas, story, playlist, merchandise, or ticket resources.');
 }

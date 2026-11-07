@@ -103,6 +103,14 @@ function sf_agent_canvas_image_review_choose(int $userId,string $requestId,strin
     sf_agent_canvas_image_review_ensure_schema();
     sf_agent_canvas_image_ensure_schema();
     $db=sf_db();
+    $preflight=$db->prepare('SELECT scene_json FROM agent_canvas_image_reviews WHERE user_id=? AND request_id=? AND selected_image_id IS NULL');
+    $preflight->execute([$userId,$requestId]);
+    $candidate=$preflight->fetchColumn();
+    $preflight->closeCursor();
+    if(is_string($candidate)){
+        $scene=json_decode($candidate,true,16,JSON_THROW_ON_ERROR);
+        sf_canvas_resource_prepare($scene['artist_inputs']??null);
+    }
     $db->beginTransaction();
     try{
         sf_agent_canvas_image_request_lock($db,$userId,$requestId);
@@ -121,9 +129,10 @@ function sf_agent_canvas_image_review_choose(int $userId,string $requestId,strin
         if($row['state']==='ready'){
             if($row['selected_image_id']!==$imageId)throw new InvalidArgumentException('An image variation has already been selected.');
         }else{
+            $scene=json_decode($row['scene_json'],true,16,JSON_THROW_ON_ERROR);
+            sf_canvas_resource_validate_stories($scene['artist_inputs']??null);
             if(sf_agent_canvas_image_file($userId,$imageId)===null)
                 throw new InvalidArgumentException('Choose an available image variation.');
-            $scene=json_decode($row['scene_json'],true,16,JSON_THROW_ON_ERROR);
             $scene=sf_agent_canvas_image_apply($scene,$imageId,$candidates[0]['id']);
             $stored=sf_agent_scene_history_save($userId,$scene,$row['previous_id']===null?null:(int)$row['previous_id'],(int)$row['history_epoch']);
             sf_agent_scene_request_finish($userId,$requestId,$stored['id'],(int)$row['active_tokens_used'],

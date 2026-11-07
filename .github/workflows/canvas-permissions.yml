@@ -45,10 +45,16 @@ jobs:
           php tests/canvas-gallery-attribution-history.php
           php tests/canvas-resources.php
           php tests/canvas-resource-scenes.php
+      - name: Published story inventory, tags, approval and live data
+        run: |
+          php tests/canvas-stories-public.php
+          php tests/canvas-stories-flow.php
+          php tests/canvas-stories-dataset.php
       - name: Real PHP endpoint authentication, CSRF and current-viewer data
         run: |
           python tests/canvas-permissions-http.py
           python tests/canvas-access-http.py
+          python tests/canvas-stories-public-http.py
       - name: Native MariaDB transactions, rollback and independent-worker races
         env:
           SF_MARIADB_ROOT: /
@@ -88,6 +94,11 @@ jobs:
           python tests/canvas-access-browser.py
       - name: Real PHP and production consent UI roundtrip
         run: python tests/canvas-access-integration-browser.py
+      - name: Story selection, tag editing and live canvas rendering
+        run: |
+          python tests/canvas-stories-picker-browser.py
+          python tests/canvas-stories-admin-tags-browser.py
+          python tests/canvas-stories-dataset-browser.py
       - name: Existing public and administrator gallery controls
         run: |
           python tests/canvas-gallery-browser.py

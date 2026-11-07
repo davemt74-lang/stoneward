@@ -76,6 +76,7 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
                 'personal_listening_stats'=>sf_agent_canvas_listening_rows($userId,$catalog??=array_column(sf_public_catalog(),null,'id')),
                 'published_merch'=>sf_canvas_resource_artist_rows($id,$artistInputs),
                 'published_ticket_offers'=>sf_canvas_resource_artist_rows($id,$artistInputs),
+                'published_stories'=>sf_canvas_resource_artist_rows($id,$artistInputs),
                 'my_purchases'=>sf_agent_canvas_purchase_rows($user),
                 'my_tickets'=>sf_agent_canvas_owned_ticket_rows($userId),
             };
@@ -89,8 +90,17 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
                 $musicCatalog??=sf_agent_canvas_music_catalog($musicInputs);
                 $rows=sf_agent_canvas_music_rows($rows,$musicCatalog);
             }
+            if($id==='published_stories'&&$musicInputs!==null&&array_filter(array_column($rows,'track_id'))){
+                require_once __DIR__.'/agent-canvas-music-core.php';
+                $musicCatalog??=sf_agent_canvas_music_catalog($musicInputs);
+                $playable=array_fill_keys(array_column($musicCatalog['tracks'],'track_id'),true);
+                foreach($rows as &$row)if(!isset($playable[$row['track_id']]))$row['track_id']='';
+                unset($row);
+            }
             $filteredRows=sf_agent_canvas_filter_rows($rows,$bindings[$id]??[],$tool['filters']);
-            $dataset['rows']=$scopedMusic||$scopedArtist?$filteredRows:array_slice($filteredRows,0,$tool['max_rows']);
+            // Preserve complete story selections. The renderer reports its separate mount limit.
+            $dataset['rows']=$scopedMusic||$scopedArtist||$id==='published_stories'
+                ?$filteredRows:array_slice($filteredRows,0,$tool['max_rows']);
             if($usesCurrentTrack&&$currentTrackId!==''){
                 $catalog??=array_column(sf_public_catalog(),null,'id');
                 $track=$catalog[$currentTrackId]??null;
@@ -210,12 +220,16 @@ function sf_agent_canvas_project_rows(array $source,string $id,array $fields): a
             $sourceRow['track_id']=$sourceRow['id']??'';
             $sourceRow['duration_seconds']=$sourceRow['duration']??0;
         }
+        if($id==='published_stories')$sourceRow['tags']=implode(', ',$sourceRow['tags']??[]);
         $row=[];
         foreach($fields as $field=>$type){
             $value=$sourceRow[$field]??null;
-            $row[$field]=$type==='number'
-                ?(is_numeric($value)?max(0,(int)$value):null)
-                :sf_agent_public_artist_text($value);
+            $row[$field]=match($type){
+                'number'=>is_numeric($value)?max(0,(int)$value):null,
+                // The story source bounds its narrative and preserves line breaks.
+                'long_text'=>is_string($value)?$value:'',
+                default=>sf_agent_public_artist_text($value),
+            };
         }
         $rows[]=$row;
     }

@@ -6,8 +6,30 @@ function sf_story_types(): array { return ['artist_about','essay','release_story
 function sf_story_slug(string $v,string $fallback='story'): string { $v=strtolower(trim($v));$v=preg_replace('/[^a-z0-9]+/','-',$v)??'';$v=trim(substr($v,0,140),'-');return $v!==''?$v:$fallback; }
 function sf_story_clean_long_text(mixed $v,int $max=60000): string { $s=str_replace(["\r\n","\r"],"\n",(string)$v);$s=preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u','',$s)??'';$s=trim($s);return function_exists('mb_substr')?mb_substr($s,0,$max):substr($s,0,$max); }
 
+/** Editors enter labels. Store their stable command slugs. */
+function sf_story_tags(mixed $raw): array {
+    if(!is_array($raw)||!array_is_list($raw))throw new InvalidArgumentException('Story tags must be a list of labels.');
+    $tags=[];
+    foreach($raw as $label){
+        if(!is_string($label)||strlen($label)>256)throw new InvalidArgumentException('Each story tag must be a short text label.');
+        $slug=trim((string)preg_replace('/[^a-z0-9]+/','-',strtolower($label)),'-');
+        if($slug===''||strlen($slug)>64)throw new InvalidArgumentException('Each story tag must produce a command slug of 1 to 64 characters.');
+        $tags[$slug]=$slug;
+        if(count($tags)>24)throw new InvalidArgumentException('Choose up to 24 tags for a story.');
+    }
+    return array_values($tags);
+}
+
+function sf_story_stored_tags(mixed $raw): array {
+    if(!is_string($raw))return [];
+    try{return sf_story_tags(json_decode($raw,true));}
+    catch(InvalidArgumentException){return [];}
+}
+
 function sf_story_ensure_schema(): void {
-    static $done=false;if($done)return;$pdo=sf_db();$driver=(string)(sf_db_config()['driver']??'');
+    static $done=false;if($done)return;$pdo=sf_db();
+    $driver=(string)(sf_db_config()['driver']??'');
+    if($driver==='mysql'&&$pdo->inTransaction())throw new LogicException('Initialize stories before opening a transaction.');
     if($driver==='sqlite'){
         $pdo->exec("CREATE TABLE IF NOT EXISTS story_entries (id INTEGER PRIMARY KEY AUTOINCREMENT,slug TEXT NOT NULL UNIQUE,entry_type TEXT NOT NULL,title TEXT NOT NULL,eyebrow TEXT NOT NULL DEFAULT '',summary TEXT NOT NULL DEFAULT '',body_text TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'draft',entity_type TEXT NOT NULL DEFAULT '',entity_id TEXT NOT NULL DEFAULT '',event_date TEXT NULL,era TEXT NOT NULL DEFAULT '',featured INTEGER NOT NULL DEFAULT 0,position INTEGER NOT NULL DEFAULT 0,seo_title TEXT NOT NULL DEFAULT '',seo_description TEXT NOT NULL DEFAULT '',created_by INTEGER NULL,published_at TEXT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_story_entries_status ON story_entries(status,entry_type,position,updated_at)");
@@ -18,11 +40,19 @@ function sf_story_ensure_schema(): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS story_entries (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,slug VARCHAR(160) NOT NULL UNIQUE,entry_type VARCHAR(40) NOT NULL,title VARCHAR(255) NOT NULL,eyebrow VARCHAR(120) NOT NULL DEFAULT '',summary TEXT NOT NULL,body_text LONGTEXT NOT NULL,status VARCHAR(24) NOT NULL DEFAULT 'draft',entity_type VARCHAR(40) NOT NULL DEFAULT '',entity_id VARCHAR(160) NOT NULL DEFAULT '',event_date VARCHAR(40) NULL,era VARCHAR(160) NOT NULL DEFAULT '',featured TINYINT(1) NOT NULL DEFAULT 0,position INT NOT NULL DEFAULT 0,seo_title VARCHAR(255) NOT NULL DEFAULT '',seo_description VARCHAR(500) NOT NULL DEFAULT '',created_by BIGINT UNSIGNED NULL,published_at VARCHAR(40) NULL,created_at VARCHAR(40) NOT NULL,updated_at VARCHAR(40) NOT NULL,INDEX idx_story_entries_status(status,entry_type,position,updated_at),INDEX idx_story_entries_entity(entity_type,entity_id,status),CONSTRAINT fk_story_entry_admin FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $pdo->exec("CREATE TABLE IF NOT EXISTS story_events (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,story_id BIGINT UNSIGNED NOT NULL,event_type VARCHAR(40) NOT NULL,user_id BIGINT UNSIGNED NULL,detail_json LONGTEXT NOT NULL,created_at VARCHAR(40) NOT NULL,INDEX idx_story_events_story(story_id,event_type,created_at),CONSTRAINT fk_story_event_entry FOREIGN KEY(story_id) REFERENCES story_entries(id) ON DELETE CASCADE,CONSTRAINT fk_story_event_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
+    try{sf_schema_add_column('story_entries','tags_json','TEXT NULL','TEXT NULL');}
+    catch(PDOException $error){
+        if(!sf_schema_column_exists('story_entries','tags_json'))throw $error;
+    }
     $done=true;
 }
 function sf_story_entity(string $type,string $id): ?array {
     if($type===''||$id==='')return null;
-    if($type==='track'){$t=sf_track_map()[$id]??null;if(!$t||($t['public_visible']??true)===false||in_array((string)($t['state']??''),['draft','private','archived'],true))return null;return ['type'=>'track','id'=>$id,'title'=>(string)($t['title']??$id),'url'=>'track/'.$id];}
+    if($type==='track'){
+        $track=sf_seo_public_track($id);
+        if(!$track)return null;
+        return ['type'=>'track','id'=>$id,'title'=>(string)($track['title']??$id),'url'=>'track/'.rawurlencode($id)];
+    }
     if($type==='release'){if(function_exists('sf_seo_public_release'))$r=sf_seo_public_release($id);else{$r=null;foreach(sf_release_rows() as $x)if((string)($x['id']??'')===$id&&($x['state']??'published')==='published'&&($x['public_visible']??true)!==false){$r=$x;break;}}if(!$r)return null;return ['type'=>'release','id'=>$id,'title'=>(string)($r['title']??$id),'url'=>'release/'.$id];}
     if($type==='show'){if(!function_exists('sf_live_show_by_id'))return null;$s=sf_live_show_by_id($id);if(!$s||($s['public_visible']??true)===false)return null;return ['type'=>'show','id'=>$id,'title'=>(string)($s['title']??$s['venue']??$id),'url'=>'show/'.$id];}
     return null;
@@ -31,7 +61,12 @@ function sf_story_required_entity_type(string $entryType): string { return match
 function sf_story_media(int $id,bool $publicOnly=false): array {
     if(!function_exists($publicOnly?'sf_media_public_links':'sf_media_links'))return [];$fn=$publicOnly?'sf_media_public_links':'sf_media_links';return $fn('story_entry',(string)$id);
 }
-function sf_story_readiness(array $e): array {
+/** Use a current read inside an existing MariaDB/MySQL approval transaction. */
+function sf_story_current_read(): string {
+    $db=sf_db();
+    return $db->inTransaction()&&$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' LOCK IN SHARE MODE':'';
+}
+function sf_story_readiness(array $e,bool $includeMediaWarning=true): array {
     $checks=[];$blockers=[];$warnings=[];$add=function(string $key,string $label,bool $ok,string $detail,bool $blocking=true)use(&$checks,&$blockers,&$warnings){$checks[]=['key'=>$key,'label'=>$label,'ok'=>$ok,'detail'=>$detail];if(!$ok){if($blocking)$blockers[]=$detail;else $warnings[]=$detail;}};
     $type=(string)($e['entry_type']??'');$add('type','Story type',in_array($type,sf_story_types(),true),'Choose a supported Stonefellow story type.');
     $title=trim((string)($e['title']??''));$body=trim((string)($e['body_text']??''));$add('title','Title',$title!=='','Story title is required.');$add('body','Body',$body!=='','Story body is required.');
@@ -39,11 +74,32 @@ function sf_story_readiness(array $e): array {
     if($required!==''){$ok=$entityType===$required&&$entityId!==''&&sf_story_entity($entityType,$entityId)!==null;$add('entity','Linked '.$required,$ok,'This story must link to a public Stonefellow '.$required.'.');}
     elseif($entityType!==''||$entityId!==''){$ok=in_array($entityType,['track','release','show'],true)&&$entityId!==''&&sf_story_entity($entityType,$entityId)!==null;$add('entity','Linked content',$ok,'Linked Stonefellow content is not public or no longer exists.');}
     if($type==='milestone')$add('date','Timeline date',trim((string)($e['event_date']??''))!==''&&strtotime((string)$e['event_date'])!==false,'Timeline milestones require a valid date.');
-    if($type==='artist_about'){$q=sf_db()->prepare("SELECT id FROM story_entries WHERE entry_type='artist_about' AND status='published' AND id<>? LIMIT 1");$q->execute([(int)($e['id']??0)]);$add('single_about','Single public About story',!$q->fetchColumn(),'Only one Artist About story may be published at a time.');}
-    $media=(int)($e['id']??0)>0?sf_story_media((int)$e['id'],true):[];$hero=array_values(array_filter($media,fn($m)=>($m['role']??'')==='hero'));if(!$hero)$warnings[]='No public hero image is attached to this story.';
+    if($type==='artist_about'){$q=sf_db()->prepare("SELECT id FROM story_entries WHERE entry_type='artist_about' AND status='published' AND id<>? LIMIT 1".sf_story_current_read());$q->execute([(int)($e['id']??0)]);$add('single_about','Single public About story',!$q->fetchColumn(),'Only one Artist About story may be published at a time.');}
+    if($includeMediaWarning){
+        $media=(int)($e['id']??0)>0?sf_story_media((int)$e['id'],true):[];
+        $hero=array_filter($media,fn($m)=>($m['role']??'')==='hero');
+        if(!$hero)$warnings[]='No public hero image is attached to this story.';
+    }
     $score=count($checks)?(int)round(count(array_filter($checks,fn($c)=>!empty($c['ok'])))*100/count($checks)):0;return ['ready'=>$blockers===[],'score'=>$score,'checks'=>$checks,'blockers'=>array_values(array_unique($blockers)),'warnings'=>array_values(array_unique($warnings))];
 }
+function sf_story_id_valid(mixed $id): bool {
+    return is_string($id)&&preg_match('/\A[1-9][0-9]*\z/',$id)===1
+        &&filter_var($id,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])!==false;
+}
+/** Check the current story independently of media links. A hero is optional. */
+function sf_story_published_ready(string $id): bool {
+    if(!sf_story_id_valid($id))return false;
+    $sql="SELECT id,entry_type,title,body_text,entity_type,entity_id,event_date
+          FROM story_entries WHERE id=? AND status='published' LIMIT 1";
+    $query=sf_db()->prepare($sql.sf_story_current_read());
+    $query->execute([$id]);
+    $row=$query->fetch(PDO::FETCH_ASSOC);
+    $query->closeCursor();
+    return $row!==false&&!empty(sf_story_readiness($row,false)['ready']);
+}
 function sf_story_row(array $r,bool $publicMedia=false): array {
+    $r['tags']=sf_story_stored_tags($r['tags_json']??null);
+    unset($r['tags_json']);
     $r['id']=(int)$r['id'];$r['featured']=!empty($r['featured']);$r['entity']=$r['entity_type']!==''?sf_story_entity((string)$r['entity_type'],(string)$r['entity_id']):null;$r['media']=sf_story_media((int)$r['id'],$publicMedia);$r['readiness']=sf_story_readiness($r);return $r;
 }
 function sf_story_get(int|string $id,bool $publicOnly=false): ?array {
@@ -63,9 +119,10 @@ function sf_story_save(array $raw,int $adminId): array {
     $required=sf_story_required_entity_type($type);$entityType=sf_clean_text($raw['entity_type']??'',40);$entityId=sf_clean_text($raw['entity_id']??'',160);if($required!=='')$entityType=$required;if($entityType===''||$entityId===''){$entityType='';$entityId='';}
     $eventDate=trim((string)($raw['event_date']??''));if($eventDate!==''&&strtotime($eventDate)===false)throw new InvalidArgumentException('Story date is invalid.');
     $existing=$id?sf_story_get($id,false):null;$body=sf_story_clean_long_text($raw['body_text']??'',60000);$candidate=array_merge($existing?:[],['id'=>$id,'entry_type'=>$type,'title'=>$title,'slug'=>$slug,'status'=>$status,'entity_type'=>$entityType,'entity_id'=>$entityId,'event_date'=>$eventDate!==''?$eventDate:null,'era'=>sf_clean_text($raw['era']??'',160),'summary'=>sf_story_clean_long_text($raw['summary']??'',5000),'body_text'=>$body]);
+    $tags=array_key_exists('tags',$raw)?sf_story_tags($raw['tags']):($existing['tags']??[]);
     if($status==='published'){$ready=sf_story_readiness($candidate);if(empty($ready['ready']))throw new RuntimeException('Story is blocked: '.implode(' ',array_slice($ready['blockers'],0,5)));}
-    $now=gmdate('c');$pub=$status==='published'?((string)($existing['published_at']??'')?:$now):null;$vals=[$slug,$type,$title,sf_clean_text($raw['eyebrow']??'',120),sf_story_clean_long_text($raw['summary']??'',5000),$body,$status,$entityType,$entityId,$eventDate!==''?$eventDate:null,sf_clean_text($raw['era']??'',160),!empty($raw['featured'])?1:0,max(0,min(999,(int)($raw['position']??0))),sf_clean_text($raw['seo_title']??'',255),sf_clean_text($raw['seo_description']??'',500),$pub,$now];
-    try{if($id){$q=sf_db()->prepare('UPDATE story_entries SET slug=?,entry_type=?,title=?,eyebrow=?,summary=?,body_text=?,status=?,entity_type=?,entity_id=?,event_date=?,era=?,featured=?,position=?,seo_title=?,seo_description=?,published_at=?,updated_at=? WHERE id=?');$q->execute([...$vals,$id]);}else{$q=sf_db()->prepare('INSERT INTO story_entries(slug,entry_type,title,eyebrow,summary,body_text,status,entity_type,entity_id,event_date,era,featured,position,seo_title,seo_description,created_by,published_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');$q->execute([...array_slice($vals,0,15),$adminId?:null,$pub,$now,$now]);$id=(int)sf_db()->lastInsertId();}}catch(PDOException $e){if(in_array((string)$e->getCode(),['23000','19'],true))throw new InvalidArgumentException('Story slug must be unique.');throw $e;}
+    $now=gmdate('c');$pub=$status==='published'?((string)($existing['published_at']??'')?:$now):null;$vals=[$slug,$type,$title,sf_clean_text($raw['eyebrow']??'',120),sf_story_clean_long_text($raw['summary']??'',5000),$body,$status,$entityType,$entityId,$eventDate!==''?$eventDate:null,sf_clean_text($raw['era']??'',160),!empty($raw['featured'])?1:0,max(0,min(999,(int)($raw['position']??0))),sf_clean_text($raw['seo_title']??'',255),sf_clean_text($raw['seo_description']??'',500),sf_story_json($tags),$pub,$now];
+    try{if($id){$q=sf_db()->prepare('UPDATE story_entries SET slug=?,entry_type=?,title=?,eyebrow=?,summary=?,body_text=?,status=?,entity_type=?,entity_id=?,event_date=?,era=?,featured=?,position=?,seo_title=?,seo_description=?,tags_json=?,published_at=?,updated_at=? WHERE id=?');$q->execute([...$vals,$id]);}else{$q=sf_db()->prepare('INSERT INTO story_entries(slug,entry_type,title,eyebrow,summary,body_text,status,entity_type,entity_id,event_date,era,featured,position,seo_title,seo_description,tags_json,created_by,published_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');$q->execute([...array_slice($vals,0,16),$adminId?:null,$pub,$now,$now]);$id=(int)sf_db()->lastInsertId();}}catch(PDOException $e){if(in_array((string)$e->getCode(),['23000','19'],true))throw new InvalidArgumentException('Story slug must be unique.');throw $e;}
     return sf_story_get($id,false)?:throw new RuntimeException('Story could not be saved.');
 }
 function sf_story_delete(int $id): bool { $e=sf_story_get($id,false);if(!$e)return false;if(($e['status']??'')==='published')throw new RuntimeException('Archive or draft this story before deleting it.');$pdo=sf_db();$tx=false;try{if(!$pdo->inTransaction()){$pdo->beginTransaction();$tx=true;}$q=$pdo->prepare("DELETE FROM media_links WHERE entity_type='story_entry' AND entity_id=?");$q->execute([(string)$id]);$q=$pdo->prepare('DELETE FROM story_entries WHERE id=?');$q->execute([$id]);$ok=$q->rowCount()>0;if($tx)$pdo->commit();return $ok;}catch(Throwable $x){if($tx&&$pdo->inTransaction())$pdo->rollBack();throw $x;} }
