@@ -17,6 +17,9 @@ function sf_jukebox_schema(): void {
             revision BIGINT NOT NULL DEFAULT 0, player CHAR(64) NOT NULL DEFAULT '',
             heartbeat BIGINT NOT NULL DEFAULT 0, current_id BIGINT NULL, paused INTEGER NOT NULL DEFAULT 0,
             seconds INTEGER NOT NULL DEFAULT 0, created BIGINT NOT NULL)",
+        "jukebox_remote (session_id CHAR(32) PRIMARY KEY, enabled INTEGER NOT NULL,
+            status VARCHAR(12) NOT NULL, position_ms BIGINT NOT NULL, sampled_at_ms BIGINT NOT NULL,
+            sample_seq BIGINT NOT NULL, control_revision BIGINT NOT NULL)",
         "jukebox_guests (id CHAR(32) PRIMARY KEY, venue_id BIGINT NOT NULL, token CHAR(64) NOT NULL,
             name VARCHAR(80) NOT NULL, UNIQUE(venue_id,token))",
         "jukebox_phones (id CHAR(32) PRIMARY KEY, session_id CHAR(32) NOT NULL, token CHAR(64) NOT NULL,
@@ -40,7 +43,9 @@ function sf_jukebox_query(string $sql,array $args=[]): PDOStatement {
 }
 
 function sf_jukebox_session(string $id): array {
-    $row=sf_jukebox_query('SELECT * FROM jukebox_sessions WHERE id=?',[$id])->fetch();
+    $row=sf_jukebox_query('SELECT s.*, COALESCE(r.enabled,0) AS remote_enabled,
+        r.status AS remote_status,r.position_ms,r.sampled_at_ms,r.sample_seq,r.control_revision
+        FROM jukebox_sessions s LEFT JOIN jukebox_remote r ON r.session_id=s.id WHERE s.id=?',[$id])->fetch();
     if(!$row)throw new OutOfBoundsException('Jukebox session not found.');
     return $row;
 }
@@ -76,20 +81,71 @@ function sf_jukebox_guest(array $session): ?array {
         [$session['venue_id'],hash('sha256',$token)])->fetch()?:null;
 }
 
+function sf_jukebox_player_online(array $session): bool {
+    return (int)$session['heartbeat']>=time()-12;
+}
+
+function sf_jukebox_remote_access(array $session,?array $phone): bool {
+    $phoneStatus=$phone['status']??null;
+    return (bool)$session['remote_enabled']&&!(int)$session['ended']&&$phoneStatus!=='revoked'
+        &&((bool)$session['listed']||$phoneStatus==='approved');
+}
+
+function sf_jukebox_remote_source(array $session,?array $phone,string $item): ?array {
+    if(!sf_jukebox_remote_access($session,$phone)||!sf_jukebox_player_online($session)
+        ||$session['current_id']===null||(string)$session['current_id']!==$item)return null;
+    $track=sf_jukebox_query("SELECT track_id FROM jukebox_requests WHERE session_id=? AND id=?
+        AND status='current' AND played IS NOT NULL",[$session['id'],$item])->fetchColumn();
+    return $track===false?null:sf_canvas_audio_source((string)$track);
+}
+
+function sf_jukebox_transport(array $session,?array $item,bool $online): array {
+    $now=(int)floor(microtime(true)*1000);
+    $sampledAt=(int)$session['sampled_at_ms'];
+    $status=match(true){
+        !$online=>'offline',
+        $item===null=>'idle',
+        (bool)$session['paused']=>'paused',
+        $session['remote_status']==='playing'&&$item['played']===null=>'starting',
+        $session['remote_status']==='playing'&&$now-$sampledAt>5000=>'buffering',
+        default=>$session['remote_status'],
+    };
+    return ['status'=>$status,'position_ms'=>(int)$session['position_ms'],'sampled_at_ms'=>$sampledAt,'server_time_ms'=>$now];
+}
+
+function sf_jukebox_remote_toggle(array $session,mixed $enabled): void {
+    if(!is_bool($enabled))throw new InvalidArgumentException('Choose whether remote listening is enabled.');
+    if($enabled===(bool)$session['remote_enabled'])return;
+    $mysql=sf_db()->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
+    $sql='INSERT INTO jukebox_remote (session_id,enabled,status,position_ms,sampled_at_ms,sample_seq,control_revision)
+        VALUES (?,?,?,?,0,-1,?)';
+    $sql.=$mysql
+        ?' ON DUPLICATE KEY UPDATE enabled=VALUES(enabled),status=VALUES(status),position_ms=VALUES(position_ms),
+            sampled_at_ms=0,control_revision=VALUES(control_revision)'
+        :' ON CONFLICT(session_id) DO UPDATE SET enabled=excluded.enabled,status=excluded.status,position_ms=excluded.position_ms,
+            sampled_at_ms=0,control_revision=excluded.control_revision';
+    sf_jukebox_query($sql,[$session['id'],(int)$enabled,'starting',(int)$session['seconds']*1000,$session['revision']]);
+}
+
 function sf_jukebox_advance(array $session): void {
     $id=$session['id'];
     $next=sf_jukebox_query("SELECT id FROM jukebox_requests WHERE session_id=? AND status='queued' ORDER BY position,id LIMIT 1",[$id])->fetchColumn();
     if($next!==false)sf_jukebox_query("UPDATE jukebox_requests SET status='current' WHERE id=?",[$next]);
     sf_jukebox_query('UPDATE jukebox_sessions SET current_id=?,paused=0,seconds=0 WHERE id=?',
         [$next===false?null:$next,$id]);
+    if($session['remote_enabled'])sf_jukebox_query("UPDATE jukebox_remote SET status='starting',position_ms=0,
+        sampled_at_ms=0,control_revision=? WHERE session_id=?",[$session['revision'],$id]);
 }
 
 function sf_jukebox_state(array $session,?array $phone,bool $host): array {
     $id=$session['id'];
     $state=array_intersect_key($session,array_flip(['id','title','ended','venue_id','paused','seconds','revision']));
     $state['phone']=$phone?array_intersect_key($phone,array_flip(['id','name','status'])):null;
+    $state['remote_listening']=$host
+        ?(bool)$session['remote_enabled']&&!(int)$session['ended']
+        :sf_jukebox_remote_access($session,$phone);
     if(!$host&&((int)$session['ended']||(!$session['listed']&&($phone['status']??'')!=='approved')))return $state;
-    $state['online']=(int)$session['heartbeat']>=time()-12;
+    $state['online']=sf_jukebox_player_online($session);
     $state['current']=null;
     $state['queue']=[];
     $rows=sf_jukebox_query("SELECT id,track_id,status,played FROM jukebox_requests WHERE session_id=? AND status IN ('queued','current') ORDER BY position,id",[$id])->fetchAll();
@@ -97,6 +153,7 @@ function sf_jukebox_state(array $session,?array $phone,bool $host): array {
         if($row['status']==='current')$state['current']=$row;
         else $state['queue'][]=$row;
     }
+    if($state['remote_listening'])$state['transport']=sf_jukebox_transport($session,$state['current'],$state['online']);
     if($host){
         $state['phones']=sf_jukebox_query("SELECT p.id,p.name,p.status,
             (SELECT MAX(prior.approved) FROM jukebox_phones prior JOIN jukebox_guests g ON g.id=prior.guest_id
@@ -156,23 +213,49 @@ function sf_jukebox_player(array $session,array $body): void {
     if($token==='')throw new InvalidArgumentException('Player identity is required.');
     $hash=hash('sha256',$token);
     $id=$session['id'];
-    if(($body['event']??'')==='claim'){
-        if((int)$session['heartbeat']>=time()-12&&$session['player']!==$hash&&empty($body['takeover']))
+    $event=$body['event']??'';
+    if($event==='claim'){
+        if(sf_jukebox_player_online($session)&&$session['player']!==$hash&&empty($body['takeover']))
             throw new DomainException('A session player is already connected.');
         sf_jukebox_query('UPDATE jukebox_sessions SET player=?,heartbeat=? WHERE id=?',[$hash,time(),$id]);
+        if($session['sample_seq']!==null)sf_jukebox_query("UPDATE jukebox_remote SET status='starting',
+            sampled_at_ms=0,sample_seq=-1,control_revision=? WHERE session_id=?",[$session['revision'],$id]);
         return;
     }
     if(!hash_equals($session['player'],$hash))throw new DomainException('Another player owns this session.');
     sf_jukebox_query('UPDATE jukebox_sessions SET heartbeat=? WHERE id=?',[time(),$id]);
     if($session['current_id']===null||(string)$session['current_id']!==(string)($body['item']??''))return;
-    $event=$body['event']??'';
     if($event==='playing')sf_jukebox_query('UPDATE jukebox_requests SET played=COALESCE(played,?) WHERE id=?',[time(),$session['current_id']]);
-    if(in_array($event,['playing','progress'],true))sf_jukebox_query('UPDATE jukebox_sessions SET seconds=? WHERE id=?',
-        [max(0,min(86400,(int)($body['seconds']??0))),$id]);
     if(in_array($event,['ended','failed'],true)){
         sf_jukebox_query('UPDATE jukebox_requests SET status=? WHERE id=?',[$event,$session['current_id']]);
         sf_jukebox_advance($session);
+        return;
     }
+    $progress=in_array($event,['playing','progress'],true);
+    if(!$progress&&$event!=='heartbeat')return;
+    $seconds=max(0,min(86400,(int)($body['seconds']??0)));
+    if($session['remote_enabled']){
+        $sequence=isset($body['sample_seq'])?filter_var($body['sample_seq'],FILTER_VALIDATE_INT):null;
+        $observed=isset($body['observed_revision'])?filter_var($body['observed_revision'],FILTER_VALIDATE_INT):null;
+        if($sequence===false||($sequence!==null&&$sequence<0)||$observed===false)return;
+        // Host commands are serialized with reports. A report may arrive late
+        // even when its sequence number is newer than the last accepted report.
+        if($observed!==null&&($observed<(int)$session['control_revision']||$observed>(int)$session['revision']))return;
+        $previous=(int)$session['sample_seq'];
+        if($previous>=0&&($sequence===null||$sequence<=$previous))return;
+        $status=$body['transport']??($progress?'playing':null);
+        if(!in_array($status,['playing','buffering','paused','starting'],true))return;
+        if($session['paused']&&$status!=='paused')return;
+        if(!$session['paused']&&$status==='paused')$status='starting';
+        $position=isset($body['position_ms'])?filter_var($body['position_ms'],FILTER_VALIDATE_INT):null;
+        if($position===false)return;
+        $position=max(0,min(86400000,$position??$seconds*1000));
+        sf_jukebox_query('UPDATE jukebox_remote SET status=?,position_ms=?,sampled_at_ms=?,sample_seq=? WHERE session_id=?',
+            [$status,$position,(int)floor(microtime(true)*1000),$sequence??-1,$id]);
+        $seconds=intdiv($position,1000);
+        $progress=$progress||$status==='paused';
+    }
+    if($progress)sf_jukebox_query('UPDATE jukebox_sessions SET seconds=? WHERE id=?',[$seconds,$id]);
 }
 
 function sf_jukebox_controls(array $session,array $body): void {
@@ -180,8 +263,14 @@ function sf_jukebox_controls(array $session,array $body): void {
     $event=$body['event']??'';
     if($event==='end'){
         sf_jukebox_query('UPDATE jukebox_sessions SET ended=1,heartbeat=0 WHERE id=?',[$id]);
+    }elseif($event==='remote_listening'){
+        sf_jukebox_remote_toggle($session,$body['enabled']??null);
     }elseif(in_array($event,['pause','resume'],true)){
-        sf_jukebox_query('UPDATE jukebox_sessions SET paused=? WHERE id=?',[(int)($event==='pause'),$id]);
+        $paused=$event==='pause';
+        sf_jukebox_query('UPDATE jukebox_sessions SET paused=? WHERE id=?',[(int)$paused,$id]);
+        if($session['remote_enabled']&&$paused!==(bool)$session['paused'])
+            sf_jukebox_query("UPDATE jukebox_remote SET status='starting',sampled_at_ms=0,control_revision=? WHERE session_id=?",
+                [$session['revision'],$id]);
     }elseif($event==='skip'){
         sf_jukebox_query("UPDATE jukebox_requests SET status='skipped' WHERE id=? AND session_id=?",[$session['current_id'],$id]);
         sf_jukebox_advance($session);

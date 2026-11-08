@@ -12,6 +12,13 @@
   const player = host ? nonce(32) : '';
   let active = false;
   let currentItem = '';
+  let hostTransport = 'starting';
+  let hostPlayAttempt = null;
+  let playerSequence = 0;
+  let playerReports = Promise.resolve();
+  let remoteChangePending = false;
+  let listener = null;
+  let stateFetchError = '';
   let state = null;
   let catalog = null;
   let catalogPending = false;
@@ -22,6 +29,7 @@
   let stopped = false;
   let ticking = false;
   let tickAgain = false;
+  let directoryPending = false;
   let requestButtons = [];
   const renderKeys = new Map();
 
@@ -37,14 +45,24 @@
       headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
       body: JSON.stringify(body)
     };
-    const response = await fetch(endpoint(action, extra), options);
-    const data = await response.json();
-    if (!response.ok || !data.ok) {
-      const error = new Error(data.message || 'Jukebox request failed.');
-      error.status = response.status;
+    const controller = ['state', 'player'].includes(action) || (!host && action === 'directory') ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
+    if (controller) options.signal = controller.signal;
+    try {
+      const response = await fetch(endpoint(action, extra), options);
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        const error = new Error(data.message || 'Jukebox request failed.');
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      if (controller?.signal.aborted) throw new Error('The session connection timed out.');
       throw error;
+    } finally {
+      if (timer !== null) clearTimeout(timer);
     }
-    return data;
   }
   function notice(error) {
     $('status').textContent = typeof error === 'string' ? error : error.message;
@@ -143,6 +161,7 @@
     list(id, state.history || [], row => [resolveTitle(row.track_id) + ' · ' + date(row.played) + (row.name ? ' · ' + row.name : '')]);
   }
   function renderHost() {
+    if (!remoteChangePending) $('remote-listening').checked = state.remote_listening === true;
     if (changed('phones', state.phones)) list('phones', state.phones || [], phone => {
       const label = phone.name + ' · ' + phone.status + (phone.last_visit ? ' · Returning guest, last visit ' + date(phone.last_visit) : '');
       if (phone.status === 'pending') return [label,
@@ -256,8 +275,10 @@
     $('footer').hidden = !Object.hasOwn(state, 'queue') || ended;
     const playing = state.current;
     $('now').textContent = playing ? title(playing.track_id) : 'Jukebox idle';
+    const transport = state.transport?.status;
     $('progress').textContent = !state.online ? 'Session player offline' : playing ?
-      (Number(state.paused) ? 'Paused · ' : (playing.played ? '' : 'Starting · ')) + time(Number(state.seconds)) : 'Ready';
+      (Number(state.paused) || transport === 'paused' ? 'Paused · ' : transport === 'buffering' ? 'Buffering · ' :
+        (transport === 'starting' || !playing.played ? 'Starting · ' : '')) + time(Number(state.seconds)) : 'Ready';
     $('queue-label').textContent = 'Up Next (' + (state.queue?.length || 0) + ')';
     if (changed('queue', [state.queue, Boolean(catalog), ended])) list('queue', state.queue || [], row => [
       title(row.track_id),
@@ -281,6 +302,19 @@
       $('messages').replaceChildren();
       renderKeys.delete('thread');
     }
+  }
+
+  function updateListener() {
+    if (!listener) return;
+    const transport = state.transport;
+    listener.update({
+      allowed: state.remote_listening === true && !Number(state.ended),
+      online: Boolean(state.online),
+      itemId: state.current?.id ?? '',
+      transport: transport?.status ?? 'offline',
+      seconds: Number(transport?.position_ms || 0) / 1000,
+      sampleAgeMs: Math.max(0, Number(transport?.server_time_ms || 0) - Number(transport?.sampled_at_ms || 0))
+    });
   }
 
   async function refreshThread() {
@@ -327,68 +361,109 @@
   }
 
   function playerEvent(event, item = currentItem, extras = {}) {
-    return api('player', {player, event, item, seconds: Math.floor(audio.currentTime || 0), ...extras});
+    const positionMs = Math.floor((audio.currentTime || 0) * 1000);
+    const sample = {
+      player, event, item, seconds: Math.floor(positionMs / 1000), position_ms: positionMs,
+      transport: hostTransport, sample_seq: ++playerSequence, observed_revision: state?.revision, ...extras
+    };
+    const request = playerReports.then(() => api('player', sample));
+    playerReports = request.catch(() => {});
+    return request;
   }
-  function releasePlayer() {
-    active = false;
+  function clearHostSource() {
+    currentItem = '';
+    lastPlaying = false;
+    hostTransport = 'starting';
+    hostPlayAttempt = null;
+    $('audio-start').hidden = true;
+    if (!audio.hasAttribute('src')) return;
     audio.pause();
     audio.removeAttribute('src');
     audio.load();
-    currentItem = '';
-    lastPlaying = false;
+  }
+  function releasePlayer() {
+    active = false;
+    clearHostSource();
+  }
+  function reportHostError(error) {
+    if (error.status === 409) releasePlayer();
+    notice(error);
+  }
+  function confirmHostPlayback(item) {
+    return playerEvent('playing', item).then(() => {
+      if (item === currentItem) lastPlaying = true;
+    });
+  }
+  function reportNativeTransport(transport) {
+    if (!active || !currentItem || audio.currentSrc !== audio.src || transport === hostTransport) return;
+    hostTransport = transport;
+    const report = transport === 'playing' && !lastPlaying ? confirmHostPlayback(currentItem) : playerEvent('progress');
+    void report.catch(reportHostError);
+  }
+  function startHostAudio() {
+    if (hostPlayAttempt) return;
+    const item = currentItem;
+    const attempt = audio.play().then(() => {
+      if (item !== currentItem || !active) return;
+      $('player-status').textContent = '';
+      $('audio-start').hidden = true;
+    }).catch(async error => {
+      if (item !== currentItem || !active) return;
+      if (error.name === 'NotAllowedError') {
+        $('player-status').textContent = 'Press Start audio on this device to allow playback.';
+        $('audio-start').hidden = false;
+      } else if (error.name !== 'AbortError') {
+        $('player-status').textContent = 'A track was unavailable. Advancing the queue.';
+        await playerEvent('failed', item);
+        await tick();
+      }
+    }).catch(reportHostError).finally(() => {
+      if (hostPlayAttempt === attempt) hostPlayAttempt = null;
+    });
+    hostPlayAttempt = attempt;
   }
   async function syncPlayer() {
     if (!active) return;
+    const item = state.current;
+    if (!item) {
+      clearHostSource();
+    } else if (String(item.id) !== currentItem) {
+      clearHostSource();
+      currentItem = String(item.id);
+      audio.src = 'api/canvas-audio.php?' + new URLSearchParams({action: 'source', track_id: item.track_id, item: item.id});
+      const seconds = Number(state.transport?.position_ms ?? Number(state.seconds) * 1000) / 1000;
+      if (seconds > 0) audio.currentTime = seconds;
+    }
+    if (item && Number(state.paused)) {
+      hostTransport = 'paused';
+      $('audio-start').hidden = true;
+      audio.pause();
+    } else if (hostTransport === 'paused' && audio.paused) {
+      hostTransport = 'starting';
+    }
     try {
-      await playerEvent(lastPlaying && !audio.paused ? 'progress' : 'heartbeat');
+      if (hostTransport === 'playing' && !lastPlaying) await confirmHostPlayback(currentItem);
+      else await playerEvent(item ? 'progress' : 'heartbeat');
     } catch (error) {
       audio.pause();
       if (error.status === 409) releasePlayer();
       throw error;
     }
-    const item = state.current;
-    if (!item) {
-      $('audio-start').hidden = true;
-      audio.pause();
-      currentItem = '';
-      lastPlaying = false;
-      return;
-    }
-    if (String(item.id) !== currentItem) {
-      currentItem = String(item.id);
-      lastPlaying = false;
-      audio.src = 'api/canvas-audio.php?' + new URLSearchParams({action: 'source', track_id: item.track_id});
-      if (Number(state.seconds) > 0) audio.currentTime = Number(state.seconds);
-    }
-    if (Number(state.paused)) {
-      $('audio-start').hidden = true;
-      audio.pause();
-      return;
-    }
-    if (audio.paused && !audio.ended) {
-      try {
-        await audio.play();
-        $('player-status').textContent = '';
-        $('audio-start').hidden = true;
-      } catch (error) {
-        if (error.name === 'NotAllowedError') {
-          $('player-status').textContent = 'Press Start audio on this device to allow playback.';
-          $('audio-start').hidden = false;
-        } else if (error.name !== 'AbortError') {
-          $('player-status').textContent = 'A track was unavailable. Advancing the queue.';
-          await playerEvent('failed');
-        }
-      }
-    }
+    if (active && item && !Number(state.paused) && audio.paused && !audio.ended && $('audio-start').hidden) startHostAudio();
   }
 
   async function tick() {
     if (stopped) return;
     if (ticking) { tickAgain = true; return; }
     ticking = true;
+    let stateReceived = false;
     try {
       const result = await api('state');
       state = result.state;
+      stateReceived = true;
+      if (stateFetchError && $('status').textContent === stateFetchError) notice('');
+      stateFetchError = '';
+      updateListener();
       $('forget').hidden = !result.remembered;
       $('forget').dataset.remembered = String(result.remembered);
       if (!catalog && !catalogPending && !Number(state.ended) && Object.hasOwn(state, 'queue')) {
@@ -408,6 +483,13 @@
       if (host) await syncPlayer();
       await Promise.all([refreshThread(), host ? refreshCrm() : Promise.resolve()]);
     } catch (error) {
+      if (!stateReceived) {
+        stateFetchError = error.message;
+        if (error.status === 404 || error.status === 401) {
+          listener?.update({allowed: false});
+          if (active) releasePlayer();
+        } else listener?.disconnect();
+      }
       notice(error);
       if (error.status === 404 || error.status === 401) stopped = true;
     } finally {
@@ -416,23 +498,60 @@
     }
   }
 
+  function renderPublicSessions(sessions) {
+    const container = $('sessions');
+    const existing = new Map([...container.children].map(item => [item.dataset.sessionId, item]));
+    const visible = new Set(sessions.map(row => row.id));
+    existing.forEach((item, sessionId) => { if (!visible.has(sessionId)) item.remove(); });
+    sessions.forEach((row, index) => {
+      let item = existing.get(row.id);
+      if (!item) {
+        item = document.createElement('li');
+        item.dataset.sessionId = row.id;
+        const badge = document.createElement('span');
+        badge.className = 'session-badge';
+        item.append(link(row.title, page(row.id, false)), badge);
+      }
+      const [title, badge] = item.children;
+      const status = (row.online ? 'Live' : 'Host player offline') + (row.remote_listening ? ' · Phone listening enabled' : '');
+      if (title.textContent !== row.title) title.textContent = row.title;
+      if (badge.textContent !== status) badge.textContent = status;
+      if (container.children[index] !== item) container.insertBefore(item, container.children[index] ?? null);
+    });
+  }
   async function directory() {
-    const data = await api('directory');
-    $('directory').hidden = false;
-    $('session-heading').textContent = host ? 'Your sessions' : 'Live public sessions';
-    $('mode-link').href = host ? 'jukebox.php' : 'jukebox.php?host=1';
-    $('mode-link').textContent = host ? 'Public sessions' : 'Host jukebox';
-    $('create').hidden = !host || (!data.admin && !data.venue);
-    $('venue').hidden = !data.admin;
-    $('listing').hidden = !data.admin;
-    list('sessions', data.sessions, row => [link(row.title + (Number(row.ended) ? ' (ended)' : ''), page(row.id, host))]);
-    if (!data.sessions.length) $('sessions').textContent = 'No sessions yet.';
-    if (host && !data.admin && !data.venue) notice('Ask a Stonefellow admin to enable your venue account.');
+    if (directoryPending) return;
+    directoryPending = true;
+    try {
+      const data = await api('directory');
+      $('directory').hidden = false;
+      $('session-empty').hidden = Boolean(data.sessions.length);
+      if (host) {
+        $('session-heading').textContent = 'Your sessions';
+        $('mode-link').href = 'jukebox.php';
+        $('mode-link').textContent = 'Live Sessions';
+        $('create').hidden = !data.admin && !data.venue;
+        $('venue').hidden = !data.admin;
+        $('listing').hidden = !data.admin;
+        list('sessions', data.sessions, row => [link(row.title + (Number(row.ended) ? ' (ended)' : ''), page(row.id, true))]);
+        if (!data.admin && !data.venue) notice('Ask a Stonefellow admin to enable your venue account.');
+      } else {
+        $('title').textContent = 'Live Sessions';
+        $('session-heading').textContent = 'Public jukeboxes';
+        $('session-intro').hidden = false;
+        notice('');
+        renderPublicSessions(data.sessions);
+      }
+    } finally {
+      directoryPending = false;
+    }
   }
 
   $('create').onsubmit = handle(async event => {
     const values = new FormData(event.currentTarget);
-    const result = await api('create', {title: values.get('title'), listed: values.has('listed')});
+    const result = await api('create', {
+      title: values.get('title'), listed: values.has('listed'), remote_listening: values.has('remote_listening')
+    });
     location.href = page(result.id, true);
   });
   $('venue').onsubmit = handle(async event => {
@@ -480,18 +599,41 @@
     await tick();
   });
 
-  if (!id) { directory().catch(notice); return; }
+  if (!id) {
+    void directory().catch(notice);
+    if (!host) {
+      const refreshDirectory = () => { if (!document.hidden) void directory().catch(notice); };
+      setInterval(refreshDirectory, 8000);
+      document.addEventListener('visibilitychange', refreshDirectory);
+    }
+    return;
+  }
   if (host) {
     $('mode-link').textContent = 'Your sessions';
     $('recap-retry').onclick = handle(refreshRecap);
     const join = new URL(page(id, false), location.href);
     $('join-link').href = join.href;
     $('qr').innerHTML = window.StonefellowJukeboxQR.svg(join.href);
-    const audioStart = button('Start audio', async () => { await audio.play(); audioStart.hidden = true; });
+    const audioStart = button('Start audio', startHostAudio);
     audioStart.id = 'audio-start';
     audioStart.hidden = true;
     $('player-status').after(audioStart);
     $('volume').oninput = () => { audio.volume = Number($('volume').value); };
+    $('remote-listening').onchange = handle(async event => {
+      const setting = event.currentTarget;
+      const enabled = setting.checked;
+      remoteChangePending = true;
+      setting.disabled = true;
+      try {
+        await api('control', {event: 'remote_listening', enabled});
+        state.remote_listening = enabled;
+        await tick();
+      } finally {
+        remoteChangePending = false;
+        setting.disabled = false;
+        if (!Number(state.ended)) renderHost();
+      }
+    });
     $('enable').onclick = handle(async () => {
       const takeover = Boolean(state?.online);
       if (takeover && !confirm('Move this session’s playback to this device?')) return;
@@ -501,15 +643,40 @@
       await tick();
     });
     audio.addEventListener('playing', () => {
-      if (!active || !currentItem || lastPlaying) return;
-      const item = currentItem;
-      void playerEvent('playing', item).then(() => {
-        if (item === currentItem) lastPlaying = true;
-      }).catch(notice);
+      if (!audio.paused && !audio.ended && !Number(state?.paused)) reportNativeTransport('playing');
+    });
+    const reportBuffering = () => {
+      if (!audio.paused && !audio.ended && audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) reportNativeTransport('buffering');
+    };
+    audio.addEventListener('waiting', reportBuffering);
+    audio.addEventListener('stalled', reportBuffering);
+    audio.addEventListener('pause', () => {
+      if (audio.paused && !audio.ended && hostTransport !== 'starting') reportNativeTransport('paused');
     });
     audio.addEventListener('ended', () => {
-      if (active && currentItem) void playerEvent('ended').then(tick).catch(notice);
+      if (active && currentItem && audio.ended && audio.currentSrc === audio.src) {
+        void playerEvent('ended').then(tick).catch(reportHostError);
+      }
     });
+  } else {
+    $('mode-link').href = 'jukebox.php';
+    $('mode-link').textContent = 'Live Sessions';
+    listener = window.StonefellowJukeboxListener.create({
+      audio: $('listener-audio'), urlForItem: item => endpoint('audio', {item}),
+      onChange({allowed, listening, muted, needsGesture, status}) {
+        $('listener').hidden = !allowed;
+        $('listen').hidden = listening && !needsGesture;
+        $('listener-mute').hidden = !listening;
+        $('listener-mute').setAttribute('aria-pressed', String(muted));
+        $('listener-stop').hidden = !listening;
+        $('listener-status').textContent = status;
+      }
+    });
+    $('listen').onclick = listener.listen;
+    $('listener-stop').onclick = listener.stop;
+    $('listener-mute').onclick = listener.toggleMute;
+    window.addEventListener('offline', listener.disconnect);
+    window.addEventListener('online', () => { void tick(); });
   }
   void tick();
   setInterval(tick, 1500);

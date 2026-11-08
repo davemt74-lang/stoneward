@@ -1,13 +1,22 @@
 <?php
 declare(strict_types=1);
 
+@ini_set('display_errors','0');
 require __DIR__.'/bootstrap.php';
 require_once __DIR__.'/jukebox-core.php';
 
 $method=$_SERVER['REQUEST_METHOD']??'GET';
-if(!in_array($method,['GET','POST'],true))sf_json_response(['ok'=>false,'message'=>'Method unavailable.'],405);
+$action=$_GET['action']??'state';
+$audioRequest=$action==='audio';
+if(!in_array($method,$audioRequest?['GET','HEAD']:['GET','POST'],true)){
+    header('Allow: '.($audioRequest?'GET, HEAD':'GET, POST'));
+    sf_json_response(['ok'=>false,'message'=>'Method unavailable.'],405);
+}
+if($audioRequest){
+    header('X-Content-Type-Options: nosniff');
+    header('Cross-Origin-Resource-Policy: same-origin');
+}
 if(!sf_installed())sf_json_response(['ok'=>false,'message'=>'Stonefellow installation required.'],503);
-$action=(string)($_GET['action']??'state');
 $hostMode=($_GET['host']??'')==='1';
 $post=$method==='POST';
 if($post&&(int)($_SERVER['CONTENT_LENGTH']??0)>1_450_000)
@@ -25,7 +34,15 @@ try{
     if(!$post&&$action==='directory'){
         $sessions=$hostMode
             ?sf_jukebox_query('SELECT id,title,ended FROM jukebox_sessions WHERE owner_id=? ORDER BY created DESC LIMIT 50',[$uid])->fetchAll()
-            :sf_jukebox_query('SELECT id,title FROM jukebox_sessions WHERE listed=1 AND ended=0 ORDER BY created DESC LIMIT 50')->fetchAll();
+            :sf_jukebox_query('SELECT s.id,s.title,s.heartbeat,COALESCE(r.enabled,0) AS remote_listening
+                FROM jukebox_sessions s LEFT JOIN jukebox_remote r ON r.session_id=s.id
+                WHERE s.listed=1 AND s.ended=0 ORDER BY s.created DESC LIMIT 50')->fetchAll();
+        if(!$hostMode){
+            $sessions=array_map(static fn(array $session): array => [
+                'id'=>$session['id'],'title'=>$session['title'],
+                'remote_listening'=>(bool)$session['remote_listening'],'online'=>sf_jukebox_player_online($session)
+            ],$sessions);
+        }
         $venue=$hostMode?sf_jukebox_query('SELECT name FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn():false;
         sf_json_response(['ok'=>true,'sessions'=>$sessions,'venue'=>$venue?:null,'admin'=>$admin]);
     }
@@ -47,14 +64,22 @@ try{
         if(!$admin&&!$venue)throw new DomainException('A venue account is required.');
         $title=sf_clean_text($body['title']??'',120);
         if($title==='')throw new InvalidArgumentException('Enter a session name.');
+        $remote=array_key_exists('remote_listening',$body)?$body['remote_listening']:false;
+        if(!is_bool($remote))throw new InvalidArgumentException('Choose whether remote listening is enabled.');
         $id=bin2hex(random_bytes(16));
+        $db->beginTransaction();
         sf_jukebox_query('INSERT INTO jukebox_sessions (id,owner_id,venue_id,title,listed,created) VALUES (?,?,?,?,?,?)',
             [$id,$uid,$venue?$uid:0,$title,(int)$listed,time()]);
+        if($remote)sf_jukebox_controls(sf_jukebox_session($id),['event'=>'remote_listening','enabled'=>true]);
+        $db->commit();
         sf_json_response(['ok'=>true,'id'=>$id],201);
     }
 
     $id=(string)($_GET['id']??'');
     if(!preg_match('/\A[a-f0-9]{32}\z/',$id))throw new OutOfBoundsException('Jukebox session not found.');
+    // Managed MP3 resolution uses lazy media schema setup. MySQL DDL must run
+    // before the session transaction so it cannot commit queue changes early.
+    if(in_array($action,['audio','catalog','request'],true))sf_media_ensure_schema();
     if($post){
         // The first statement is a write on both engines. It serializes changes
         // for this session before reading approvals, the player, or queue order.
@@ -71,6 +96,15 @@ try{
         throw new OutOfBoundsException('Phone connection not found.');
 
     if(!$post){
+        if($audioRequest){
+            $item=$_GET['item']??null;
+            $source=is_string($item)&&preg_match('/\A[1-9][0-9]{0,18}\z/',$item)
+                ?sf_jukebox_remote_source($session,$phone,$item):null;
+            if($source===null)throw new OutOfBoundsException('Session audio is unavailable.');
+            $db->commit();
+            $status=sf_media_stream_mp3($source,$method);
+            sf_json_response(['ok'=>false,'message'=>'Session audio is unavailable.'],$status);
+        }
         $payload=match($action){
             'state'=>['state'=>sf_jukebox_state($session,$phone,$host),'remembered'=>!$host&&sf_jukebox_guest($session)!==null],
             'catalog'=>($host||$approved||(int)$session['listed'])?sf_canvas_audio_catalog():throw new DomainException('Host approval is required.'),

@@ -167,6 +167,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="releases" data-view="releases">Releases</a>
           <a href="archive" data-view="archive">Music Archive</a>
           <a href="shows" data-view="shows">Shows &amp; Live</a>
+          <a href="jukebox.php">Live Sessions</a>
           <a href="videos" data-view="videos">Videos</a>
           <a href="photos" data-view="photos">Photos</a>
           <a href="?view=tickets" data-view="tickets">Tickets &amp; VIP</a>
@@ -188,7 +189,6 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           </div>
           <a href="?view=library" data-view="library" id="menuLibrary">My Library</a>
           <a href="?view=account" data-view="account" id="menuAccount">My account</a>
-          <a href="jukebox.php">Jukebox</a>
           <a href="?view=capture" data-view="capture" id="menuCreativeCapture">Creative Capture</a>
 <?php require_once __DIR__.'/api/team-workspace-core.php'; if(sf_team_can((int)$currentUser['id'],'team.enter')): ?>
           <a href="?view=team" data-view="team" id="menuTeamWorkspace">Team Workspace</a>
