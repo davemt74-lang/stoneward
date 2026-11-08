@@ -135,6 +135,7 @@ jobs:
       - name: Verified local libraries in production canvas sandboxes
         run: |
           python tests/canvas-three-browser.py
+          python tests/canvas-audio-integration-browser.py --matter-only
           python tests/canvas-artwork-palette-browser.py
       - name: Existing public and administrator gallery controls
         run: |
