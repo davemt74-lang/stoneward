@@ -37,13 +37,16 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         'DEPLOY-MANIFEST.txt': 'obsolete static manifest\n',
         'scripts/release-zip.sh': (ROOT / 'scripts/release-zip.sh').read_text(),
     }
-    live_data_assets = (
+    required_assets = (
         'api/canvas-data.php', 'api/canvas-geography-core.php', 'api/canvas-map-core.php', 'api/canvas-earthquakes-core.php',
         'assets/js/canvas-data-picker.js', 'assets/js/canvas-location.js',
+        'api/canvas-libraries.php', 'api/canvas-library-core.php', 'api/media-artwork-palette.php',
+        'assets/js/canvas-library-runtime.js', 'assets/js/media-artwork-palette.js',
+        *(f'assets/vendor/canvas/{library}.{ext}' for library in ('color-thief', 'three') for ext in ('js', 'LICENSE')),
         'config/canvas-maps/us-regions.json', 'config/canvas-maps/us-overview.json',
         *(f'config/canvas-data-places/us-places-{part:02}.tsv' for part in range(1, 4)),
     )
-    contents.update({name: (ROOT / name).read_text(encoding='utf-8') for name in live_data_assets})
+    contents.update({name: (ROOT / name).read_text(encoding='utf-8') for name in required_assets})
     for name, content in contents.items():
         path = repo / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,7 +66,7 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         assert archive.testzip() is None
         names = archive.namelist()
         assert 'index.php' in names and 'config/store.default.php' in names
-        assert set(live_data_assets) <= set(names)
+        assert set(required_assets) <= set(names)
         assert not any(name.endswith('.zip') for name in names)
         assert not any(name.startswith(('storage/', 'uploads/', 'data/', '.github/', 'tests/', 'scripts/', 'speech-gateway/')) for name in names)
         assert not any(name in names for name in ('config/store.php', 'config/database.php', 'config/secrets.php', '.env', '.env.local'))

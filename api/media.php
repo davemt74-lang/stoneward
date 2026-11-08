@@ -34,6 +34,13 @@ if(!$admin){
 }
 $rel=(string)$asset['stored_path'];if($variant!=='original'&&!empty($asset['variants'][$variant]['path']))$rel=(string)$asset['variants'][$variant]['path'];$root=realpath(SF_ROOT.'/storage/media');$file=realpath(SF_ROOT.'/'.ltrim($rel,'/'));if(!$root||!$file||!str_starts_with($file,$root.DIRECTORY_SEPARATOR)||!is_file($file)){http_response_code(404);exit('Media file missing.');}$size=filesize($file)?:0;$mime=$variant==='original'?(string)$asset['mime_type']:(str_ends_with($file,'.webp')?'image/webp':'image/jpeg');if($variant==='original'&&strtolower((string)$asset['extension'])==='vtt')$mime='text/vtt';
 if($size<1){http_response_code(404);exit('Media file empty.');}
+if(($_GET['palette']??null)==='1'&&!$download){
+    require_once __DIR__.'/media-artwork-palette.php';
+    $palette=sf_media_artwork_palette($asset);
+    if($palette&&!sf_media_artwork_source_matches($asset))$palette=null;
+    if($palette)unset($palette['sha256']);
+    sf_json_response(['ok'=>true,'palette'=>$palette]);
+}
 // Authorization is complete. Long/overlapping mobile Range requests must not hold the PHP session lock.
 if(session_status()===PHP_SESSION_ACTIVE&&!session_write_close()){
     http_response_code(503);header('Cache-Control: private, no-store');exit('Media session unavailable.');

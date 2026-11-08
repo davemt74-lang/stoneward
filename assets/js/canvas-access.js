@@ -17,6 +17,7 @@
     function validate(access,expected){
       if(!access||key(access.context)!==key(expected)||!/^[a-f0-9]{64}$/.test(access.fingerprint||'')||typeof access.signed_in!=='boolean'||typeof access.requires_consent!=='boolean'||!Array.isArray(access.permissions))throw Error('Canvas access details were incomplete. Reopen the review.');
       for(const row of access.permissions)if(typeof row.id!=='string'||!/^canvas\.data\.[a-z][a-z0-9_]{0,100}$/.test(row.id)||typeof row.label!=='string'||typeof row.description!=='string'||typeof row.personal!=='boolean'||typeof row.enabled!=='boolean'||typeof row.granted!=='boolean')throw Error('Canvas permission details were incomplete.');
+      if(access.libraries!==undefined&&(!Array.isArray(access.libraries)||access.libraries.some(row=>typeof row?.label!=='string'||typeof row.enabled!=='boolean')))throw Error('Canvas library details were incomplete.');
       return access;
     }
     async function show(scene=options.getScene?.(),{automatic=false}={}){
@@ -64,7 +65,12 @@
           }
           list.append(row);
         }
-        if(!access.permissions.length)list.append(element('p','No registered canvas data permissions are requested.'));
+        for(const library of access.libraries||[]){
+          const row=element('div',undefined,'sf-canvas-access-item');
+          row.append(element('strong',library.label),element('small',library.enabled?'Local script library':'Disabled by administrator'));
+          list.append(row);
+        }
+        if(!access.permissions.length&&!access.libraries?.length)list.append(element('p','No registered tools or data permissions requested.'));
         if(!access.signed_in&&access.permissions.some(p=>p.personal)){const signIn=element('button','Sign in');signIn.type='button';signIn.addEventListener('click',()=>{close();options.onSignIn?.();},{signal:view.request.signal});list.append(signIn);}
         done.textContent=access.requires_consent?'Continue without personal data':'Done';
         allow.hidden=!view.choices.size;status.textContent=access.requires_consent?'You can continue without allowing personal data.':'Existing grants are reused. You can revoke them here.';refresh.hidden=true;update();panel.focus({preventScroll:true});

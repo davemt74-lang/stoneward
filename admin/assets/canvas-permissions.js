@@ -7,7 +7,7 @@
     const api=window.STONEFELLOW_ADMIN_CONTEXT?.api;
     if(!host||!api)return;
     const root=node('section'), title=node('h1','Canvas permissions');
-    const intro=node('p','Control which registered data permissions canvases may use. These switches do not grant user consent or change access to the shop, account pages or administrator tools.');
+    const intro=node('p','Control which registered data sources and local libraries canvases may use. Viewer consent and account access are handled separately.');
     const safety=node('p','Authentication, account isolation, CSRF checks and sandbox protections always remain enforced. Personal datasets also require the current viewer’s remembered canvas consent. Existing account-scoped authorization remains enforced.');
     const status=node('p','Loading permissions…');status.setAttribute('role','status');
     const search=node('input');search.type='search';search.placeholder='Search permissions';search.setAttribute('aria-label','Search permissions');
@@ -16,13 +16,13 @@
     const history=node('div');root.append(title,intro,safety,search,form,status,history);form.append(rows,pending,save,refresh);host.replaceChildren(root);
     let current=null,busy=false;const inputs=new Map();
     const alive=()=>!controller.signal.aborted&&root.isConnected;
-    const update=()=>{let count=0;for(const [id,input] of inputs)if(input.checked!==current.capabilities.find(c=>c.permission_id===id).enabled)count++;pending.textContent=count?count+' pending change(s). Disabling applies to subsequent dataset deliveries; already displayed values cannot be recalled.':'No pending changes.';save.disabled=busy||!count;};
+    const update=()=>{let count=0;for(const [id,input] of inputs)if(input.checked!==current.capabilities.find(c=>c.permission_id===id).enabled)count++;pending.textContent=count?count+' pending change(s). Disabling applies to future data deliveries and library loads.':'No pending changes.';save.disabled=busy||!count;};
     function draw(data){current=data;inputs.clear();rows.replaceChildren();
       for(const card of data.capabilities){const label=node('label');label.style.cssText='display:block;padding:14px 0;border-bottom:1px solid #ffffff22';
         const input=node('input');input.type='checkbox';input.checked=card.enabled;input.disabled=busy;inputs.set(card.permission_id,input);
         const name=node('strong',' '+card.label);const detail=node('p',card.description);
         const access=card.consent_status==='explicit_device_consent'?'Device location with per-check consent':card.requires_sign_in?'Signed-in account and canvas consent required':'Public data';
-        const scope=node('small',card.permission_id+' · Read · '+access);
+        const scope=node('small',card.permission_id+(card.kind==='library'?' · Local library · '+card.version:' · Read · '+access));
         input.addEventListener('change',update,{signal:controller.signal});label.append(input,name,detail,scope);label.dataset.search=(card.label+' '+card.description+' '+card.permission_id).toLowerCase();rows.append(label);}
       history.replaceChildren(node('h2','Policy history'));
       for(const item of data.history)history.append(node('p','Revision '+item.revision+' · Admin #'+item.updated_by+' · '+item.updated_at+' · '+Object.entries(item.changes).map(([id,v])=>id+': '+(v.after?'enabled':'disabled')).join('; ')));

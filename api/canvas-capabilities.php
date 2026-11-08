@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/agent-tool-registry.php';
 
-/** Canvas permissions govern dataset delivery, not the underlying shop/account pages. */
+/** Canvas data capabilities are separate from the permissions for local libraries. */
 function sf_canvas_capability_cards(): array {
     $cards=[];
     foreach(sf_agent_tool_registry() as $id=>$tool){
@@ -50,10 +50,25 @@ function sf_canvas_permission_enabled(string $id,?array $policy=null): bool {
     $policy??=sf_canvas_permission_policy();
     return !in_array($card['permission_id'],$policy['disabled'],true);
 }
+function sf_canvas_library_enabled(string $id,?array $policy=null): bool {
+    require_once __DIR__.'/canvas-library-core.php';
+    if(!isset(sf_canvas_library_registry()[$id]))return false;
+    $policy??=sf_canvas_permission_policy();
+    return !in_array('canvas.library.'.$id,$policy['disabled'],true);
+}
+function sf_canvas_permission_catalog(): array {
+    require_once __DIR__.'/canvas-library-core.php';
+    $cards=array_values(sf_canvas_capability_cards());
+    foreach(sf_canvas_library_registry() as $id=>$library){
+        $cards[]=['id'=>$id,'permission_id'=>'canvas.library.'.$id,'kind'=>'library','label'=>$library['name'],
+            'description'=>$library['when'],'version'=>$library['version'],'requires_sign_in'=>false];
+    }
+    return $cards;
+}
 function sf_canvas_permission_admin_view(): array {
     sf_canvas_permission_schema();
     $policy=sf_canvas_permission_policy();$cards=[];
-    foreach(sf_canvas_capability_cards() as $id=>$card)$cards[]=$card+['enabled'=>sf_canvas_permission_enabled($id,$policy)];
+    foreach(sf_canvas_permission_catalog() as $card)$cards[]=$card+['enabled'=>!in_array($card['permission_id'],$policy['disabled'],true)];
     $history=sf_db()->query('SELECT revision,changes_json,updated_by,updated_at FROM canvas_permission_history ORDER BY revision DESC LIMIT 30')->fetchAll(PDO::FETCH_ASSOC);
     foreach($history as &$row){$row['revision']=(int)$row['revision'];$row['updated_by']=(int)$row['updated_by'];$row['changes']=json_decode($row['changes_json'],true,32,JSON_THROW_ON_ERROR);unset($row['changes_json']);}unset($row);
     return ['policy'=>$policy,'capabilities'=>$cards,'history'=>$history];
@@ -61,7 +76,7 @@ function sf_canvas_permission_admin_view(): array {
 function sf_canvas_permission_save(array $admin,int $revision,array $changes): array {
     if(($admin['role']??'')!=='admin'||(int)($admin['id']??0)<1)throw new DomainException('Administrator access required.');
     if($revision<1||!$changes||array_is_list($changes))throw new InvalidArgumentException('Choose permission changes and the current policy revision.');
-    $cards=sf_canvas_capability_cards();$known=array_column($cards,null,'permission_id');
+    $known=array_column(sf_canvas_permission_catalog(),null,'permission_id');
     foreach($changes as $id=>$enabled)if(!isset($known[$id])||!is_bool($enabled))throw new InvalidArgumentException('Use registered canvas permissions and boolean values.');
     $pdo=sf_db();
     if($pdo->inTransaction())throw new RuntimeException('Policy updates require an independent transaction.');

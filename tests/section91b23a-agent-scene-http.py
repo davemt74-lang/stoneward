@@ -1301,10 +1301,12 @@ def exercise_constrained_output_retry(site, base, first, csrf):
         assert [json.loads(line) for line in response][-1]['type'] == 'error'
     probe = json.loads((site / 'model-retry-request-1.json').read_text())
     message = probe['input'][0]['content'][0]['text']
-    tool_schemas = json.loads(message)['canvas_data_tools']
-    schema_json = json.dumps(tool_schemas, ensure_ascii=False, separators=(',', ':')).replace('/', r'\/')
-    schema_bytes = len(schema_json.encode())
-    fixed_cost = len(probe['instructions'].encode()) + len(message.encode()) - schema_bytes + (schema_bytes + 3) // 4 + 128
+    prompt = json.loads(message)
+    static_bytes = sum(len(json.dumps(prompt[key], ensure_ascii=False, separators=(',', ':')).replace('/', r'\/').encode())
+                       for key in ('canvas_data_tools', 'canvas_libraries'))
+    static_bytes += len(subprocess.check_output(
+        [PHP, '-r', "require 'api/canvas-library-core.php'; echo SF_CANVAS_LIBRARY_BUILD_INSTRUCTIONS;"], cwd=site))
+    fixed_cost = len(probe['instructions'].encode()) + len(message.encode()) - static_bytes + (static_bytes + 3) // 4 + 128
     balance = fixed_cost + 2100
     subprocess.run([PHP, '-r', '''
         require 'api/bootstrap.php';
@@ -1803,6 +1805,7 @@ def exercise_admin_model_catalog(site, base, fan):
 
 def run(site):
     shutil.copytree(ROOT / 'api', site / 'api')
+    shutil.copytree(ROOT / 'assets/vendor/canvas', site / 'assets/vendor/canvas')
     (site / 'admin/api').mkdir(parents=True)
     for file in ('ai-providers.php', 'bootstrap.php'):
         shutil.copy2(ROOT / 'admin/api' / file, site / 'admin/api' / file)

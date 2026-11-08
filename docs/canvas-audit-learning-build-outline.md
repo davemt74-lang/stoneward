@@ -1,6 +1,6 @@
 # Canvas audit and learning build outline
 
-Status: implementation resumed. Capability/admin-policy and remembered-consent phases merged in [PR #346](https://github.com/davemt74-lang/stoneward/pull/346), with 29 GitHub checks passing. See [foundation evidence](canvas-capability-permissions.md). The [account token meter](account-token-meter.md) merged in [PR #347](https://github.com/davemt74-lang/stoneward/pull/347), with all 26 GitHub checks passing. [Canonical cross-experience listening](canvas-listening-attribution.md) merged in [PR #348](https://github.com/davemt74-lang/stoneward/pull/348) as v1.3.296 with all 30 GitHub checks passing. [Playlist selection and artist publication](canvas-resources.md) merged in [PR #349](https://github.com/davemt74-lang/stoneward/pull/349) as v1.3.297 with all 32 GitHub checks passing. v1.3.298 adds story selection, live All Stories, and tag scopes. v1.3.299 adds published lyric selection and live text and timing bindings. v1.3.300 adds the /me account-data picker and viewer-consented runtime fields. Knowledge selection is deferred. v1.3.301 adds the shared /data catalog and reader with National Weather Service as the first provider. v1.3.302 adds Census place details and the published show catalog by distance, with reusable venue-scoped weather lookups. v1.3.303 adds packaged public map geometry and viewer-consented device proximity to approved target points. v1.3.304 adds recent worldwide USGS earthquake records with a choice of time and magnitude feeds. Map tiles and NASA remain planned. Image/vision/production expansion stays deferred.
+Status: implementation resumed. Capability/admin-policy and remembered-consent phases merged in [PR #346](https://github.com/davemt74-lang/stoneward/pull/346), with 29 GitHub checks passing. See [foundation evidence](canvas-capability-permissions.md). The [account token meter](account-token-meter.md) merged in [PR #347](https://github.com/davemt74-lang/stoneward/pull/347), with all 26 GitHub checks passing. [Canonical cross-experience listening](canvas-listening-attribution.md) merged in [PR #348](https://github.com/davemt74-lang/stoneward/pull/348) as v1.3.296 with all 30 GitHub checks passing. [Playlist selection and artist publication](canvas-resources.md) merged in [PR #349](https://github.com/davemt74-lang/stoneward/pull/349) as v1.3.297 with all 32 GitHub checks passing. v1.3.298 adds story selection, live All Stories, and tag scopes. v1.3.299 adds published lyric selection and live text and timing bindings. v1.3.300 adds the /me account-data picker and viewer-consented runtime fields. Knowledge selection is deferred. v1.3.301 adds the shared /data catalog and reader with National Weather Service as the first provider. v1.3.302 adds Census place details and the published show catalog by distance, with reusable venue-scoped weather lookups. v1.3.303 adds packaged public map geometry and viewer-consented device proximity to approved target points. v1.3.304 adds recent worldwide USGS earthquake records with a choice of time and magnitude feeds. v1.3.305 introduces pinned Color Thief and Three.js builds and artwork-based host palettes. Map tiles and NASA remain planned. Image/vision/production expansion stays deferred.
 
 ## Current scope hold
 
@@ -277,11 +277,11 @@ An administrator can approve, enable, retire or revoke exact versions. Test each
 
 ### Libraries approved for Coding Agent integration
 
-All 18 library families below are in the Coding Agent runtime scope, with Three.js explicitly included. Each library needs a discoverable capability card and a usable, version-pinned local bundle. Verify its exact build and dependencies in the production sandbox and on supported devices before enabling it. The agent chooses native APIs, one library or a combination based on the project. Color Thief also has a separate planned integration with the main media library and adaptive host colors.
+All 18 library families below are approved for the Coding Agent. The first two pinned bundles are available through Canvas Permissions. Each remaining library needs a discoverable capability card, a version-pinned local bundle and verification in the production sandbox. The agent chooses native APIs, one library or a combination based on the project. Color Thief also powers the media-library integration for adaptive host colors.
 
 | Library | Role | Planning status |
 | --- | --- | --- |
-| Three.js | General 3D scenes and graphics. | Explicitly approved. Review the exact version, addons, sandbox integration and mobile compatibility. Choose it when it fits the project. |
+| Three.js | General 3D scenes and graphics. | Pinned Three.js 0.187.0 core. The sandbox loads it when the canvas declares the exact version and hash. Addons require separate review. |
 | PixiJS | GPU-accelerated 2D graphics, sprites and interactive visuals. | Approved for Coding Agent integration. Exact-version review pending. |
 | Anime.js | Animation, timelines and SVG/DOM motion. | Approved for Coding Agent integration. Exact-version review pending. |
 | Matter.js | 2D rigid-body physics, collisions and constraints. | Approved for Coding Agent integration. Exact-version review pending. |
@@ -293,22 +293,22 @@ All 18 library families below are in the Coding Agent runtime scope, with Three.
 | chroma.js | Palette blending, color interpolation and data-to-color scales. | Approved for Coding Agent integration. exact-version review pending. |
 | Rapier | 2D/3D physics and simulation through direct JavaScript bindings. | Approved for Coding Agent integration. exact-version, local WASM and CSP/mobile integration review pending. |
 | Phaser | Browser-based 2D game framework with scenes, input, cameras and physics. | Approved for Coding Agent integration. exact-version and complete game/audio lifecycle review pending. |
-| Color Thief | Extract image palettes for media metadata and artwork-derived host colors. | Approved for Coding Agent and media-library integration. Exact-version and image/theme integration review pending. |
+| Color Thief | Extract image palettes for media metadata and artwork-derived host colors. | Pinned Color Thief 3.5.0 for canvas code and platform artwork palettes. |
 | OpenType.js | Read font outlines for custom letterforms and typography. | Approved for Coding Agent integration. exact-version and approved-font parsing/delivery review pending. |
 | Paper.js | Vector paths, curves and generative illustration primitives. | Approved for Coding Agent integration. exact-version and direct-JavaScript/CSP compatibility review pending. |
 | Interact.js | Dragging, resizing, snapping and multitouch interaction. | Approved for Coding Agent integration. exact-version and accessible touch/scroll lifecycle review pending. |
 | Cytoscape.js | Relationship graphs, network layouts and graph analysis. | Approved for Coding Agent integration. exact-version, authorized-data and mobile-complexity review pending. |
 | VexFlow | Render supplied music notation and guitar tablature. | Approved for Coding Agent integration. exact-version and approved-font/asset delivery review pending. |
 
-Native browser Canvas, SVG and Web Audio remain baseline capabilities subject to the existing host policies; using a library is optional. Existing internal dependencies, such as the Acorn parser, are tracked separately from creative libraries exposed to canvas code. The registry is not implemented by this planning update, and the checked source tree does not establish an installed Three.js bundle or version.
+Native browser Canvas, SVG and Web Audio remain baseline capabilities subject to the existing host policies; using a library is optional. Existing internal dependencies, such as the Acorn parser, are tracked separately from creative libraries exposed to canvas code. The installed registry starts with Three.js and Color Thief. Each optional dependency is declared in the first line of the canvas JavaScript, and the host verifies the bundle against that exact pin before execution.
 
 Audio libraries use authorized audio and the reviewed player integration, preserving user-gesture startup, playback synchronization, volume/ducking, Stop and resource cleanup. Microphone access remains a separately declared and authorized capability. Physics and procedural effects need measured phone-browser performance; seeded procedural inputs can support reproducible testing. Overlapping libraries remain alternatives or complementary tools selected by the project's needs.
 
 Font and notation libraries use reviewed, locally delivered font assets. Paper.js uses explicit direct JavaScript APIs compatible with the preview guard; PaperScript compilation and `with`-based usage cannot bypass the existing execution restrictions. Interaction libraries must preserve intended page scrolling, keyboard access and touch behavior.
 
-### Planned media palette and host theme integration
+### Media palette and host theme integration
 
-This is outline-only scope. No Color Thief bundle, extractor, metadata change or new runtime theme behavior is implemented by this document update.
+The local Color Thief build supplies artwork palettes through the existing host theme resolver. The following requirements cover the integration and its ongoing verification.
 
 - Add a reviewed local Color Thief build to the main media-library pipeline. Extract palettes from authorized image pixels and retain validated color metadata with the asset's byte hash, extractor version and extraction status.
 - Reuse existing image, media-metadata and theme interfaces. Cache successful extraction per exact image version and invalidate the palette when its bytes change. Palette extraction should not trigger an AI request or deduct AI tokens.
@@ -321,7 +321,7 @@ This is outline-only scope. No Color Thief bundle, extractor, metadata change or
 
 ### Project-specific library selection loop
 
-This is planned scope, not an existing implemented selector. The coding model currently reasons about a project generally; the checked code has no dedicated approved-library registry, comparison process or outcome-driven library selection loop.
+The coding model receives the enabled library cards and guidance to choose suitable tools for the brief. The broader outcome-driven selection loop remains planned.
 
 1. Interpret the user's intent and expected behavior. Identify requirements for rendering, animation, physics, visualization, audio and interaction without imposing a canvas template.
 2. Identify relevant constraints: target browsers and devices, accessibility, performance, existing player/data bridges, approved permissions, CSP, lifecycle cleanup and dependency availability.

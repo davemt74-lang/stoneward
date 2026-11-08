@@ -1,0 +1,2 @@
+# Preserve the reviewed bytes, including whitespace in generated shaders.
+assets/vendor/canvas/*.js -text -whitespace

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.304');
+define('SF_BUILD', '1.3.305');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -379,6 +379,8 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/listening-telemetry.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-audio-sdk.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-location.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/vendor/canvas/color-thief.js?v=<?=rawurlencode(SF_BUILD)?>" integrity="sha256-9KjGmp30P1mNciedabWfLZ0pVho0/pmxF0ktvJCBY+4="></script>
+  <script src="assets/js/media-artwork-palette.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-agent-theme.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-projects-ui.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-resource-picker.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
@@ -390,6 +392,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/canvas-preview-guard.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-scene-tester.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-build-workflow.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script src="assets/js/canvas-library-runtime.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/public-agent-canvas.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-image-review.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/canvas-image-analysis.js?v=<?=rawurlencode(SF_BUILD)?>"></script>

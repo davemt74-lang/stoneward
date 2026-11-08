@@ -505,6 +505,11 @@ When the requested experience needs programmed interaction, add an optional js s
 
 The canvas can use window.StonefellowAudio. Its async methods are catalog(filters?), getTrack(id), getAudio(id), releaseAudio(id), createPlayer(id), play(id?), pause(), seek(seconds), setVolume(0..1), and getState(). Await their results. catalog accepts optional release_id or track_id filters and returns {tracks,releases}. Each track has track_id, an equivalent id alias, title, duration_seconds, release_ids, source_available, source_reason, audio_url and source_url. Prefer track.track_id; track.id is a compatibility alias for the same catalog ID. Each release has release_id, an equivalent id alias, title and track_ids; albums are groups of independent tracks, not a required UI. getTrack(id) returns that published track's metadata. getTrack, getAudio, releaseAudio, createPlayer and play accept a catalog ID string or a track object containing track_id or id; conflicting identifiers are rejected. Calling play() with no arguments resumes only the main player's currently selected song. It does not select a song; explicit null or undefined arguments are invalid. Always pass the chosen track or its actual ID to start a selected song. For main-player playback from any interaction or completed animation, call await StonefellowAudio.play(track.track_id); the host resolves the currently authorized source and keeps the main player synchronized. For an independent player that does not control the main player, use const player=await StonefellowAudio.createPlayer(track.track_id). This returns an async handle with play(), pause(), seek(seconds), setVolume(0..1), getState(), subscribe(listener) and dispose(). subscribe returns an unsubscribe function. It creates no visible controls; author exactly the interface and interactions requested. Actual native playback from this host-owned player contributes to canonical listening totals with this canvas attribution. Preloading or creating a handle is not a play. Dispose independent handles and subscriptions when no longer needed. getAudio(id) returns {track,blob,url} for authorized published MP3 audio. For custom processing or local Audio elements, use that returned blob or blob URL; catalog audio_url/source_url are host references and cannot be loaded directly inside this sandbox. Use releaseAudio(id) when finished. Raw MP3 retrieval, decoding and audio running entirely inside authored code are unverified and do not generate claimed listening totals; prefer createPlayer for independent playback that needs canonical reporting. Browser audio playback and AudioContext startup may require a user gesture. subscribe(listener) immediately returns an unsubscribe function and reports player state with trackId, currentTime, duration, playing, volume, muted, ended and title. Build the requested visible controls in your own code, use real catalog IDs, handle unavailable audio and rejected operations, and release subscriptions and local resources when finished.
 PROMPT;
+        $libraries=sf_canvas_library_available();
+        $context['offered_canvas_libraries']=array_column($libraries,'lock');
+        $prompt['canvas_libraries']=array_map(static fn(array $card):array=>array_intersect_key($card,
+            array_flip(['id','name','version','global','when','api','lock'])),$libraries);
+        $system.="\n".SF_CANVAS_LIBRARY_BUILD_INSTRUCTIONS;
         $prompt['canvas_data_tools']=sf_agent_canvas_data_tools($artistInputs['me_tools']??null);
         if(isset($artistInputs['me_tools']))$prompt['selected_account_sources']=$artistInputs['me_tools'];
         if(isset($artistInputs['data_sources'])){
@@ -612,10 +617,11 @@ PROMPT;
     $source=SF_AGENT_SCENE_TOKEN_SOURCE;
     $inputReserve=strlen($system)+strlen($message);
     if($custom){
-        // Static tool schemas are mostly ASCII field names. Use the usual
-        // four-byte token estimate for that section while bounding the brief
-        // and prior code by their full byte counts.
+        // Estimate the static tool inventory separately while bounding the
+        // listener's brief and prior code by their full byte counts.
         $schemaBytes=strlen(json_encode($prompt['canvas_data_tools'],JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR));
+        $schemaBytes+=strlen(SF_CANVAS_LIBRARY_BUILD_INSTRUCTIONS)+
+            strlen(json_encode($prompt['canvas_libraries'],JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR));
         $inputReserve-=$schemaBytes-(int)ceil($schemaBytes/4);
     }
     $limit=$inputReserve+SF_AGENT_SCENE_OUTPUT_MIN+128;
@@ -752,6 +758,7 @@ function sf_agent_scene_model_result(array $providers,string $system,string $mes
         }
         if($repair)$system.="\n".match($reason){
             'invalid_markup'=>'The previous design failed markup validation. Preserve the brief and use only the allowed HTML, attributes, and CSS. Check tag nesting and return complete JSON.',
+            'invalid_library'=>'The previous JavaScript declared an unavailable or malformed library lock. Copy exact locks from canvas_libraries into the first-line comment, or use native APIs and omit the comment.',
             'account_scope'=>'The previous design declared a personal data source outside the approved scope. Remove those bindings and use only the listed data tools.',
             'output_too_large'=>'The previous design exceeded the code limit. Preserve the brief with fewer elements and shared CSS rules. Return complete JSON.',
             'invalid_image_binding','invalid_image_request'=>'Use only offered image bindings and authorized reference IDs. Match requested_new_count and provide requests in order for new-1 through new-4, or share only new-1 when reviewing variations. Keep at most four total placements.',
@@ -867,6 +874,11 @@ function sf_agent_scene_render(string $raw,array $context,?array &$imageRequest=
     if(strlen(trim($decoded['html']))>SF_AGENT_SCENE_CODE_LIMIT||strlen(trim($decoded['css']))>SF_AGENT_SCENE_CODE_LIMIT||
         (is_string($decoded['js']??null)&&strlen($decoded['js'])>SF_AGENT_SCENE_CODE_LIMIT))
         throw new SfAgentSceneInvalidOutput('output_too_large');
+    if(is_string($decoded['js']??null)){
+        $locks=sf_canvas_library_declared(str_replace(["\r\n","\r"],"\n",$decoded['js']));
+        if($locks===null||array_diff($locks,$context['offered_canvas_libraries']??[]))
+            throw new SfAgentSceneInvalidOutput('invalid_library');
+    }
     $code=sf_agent_scene_code($decoded);
     if($code===null)throw new SfAgentSceneInvalidOutput('invalid_markup');
     $custom=($context['canvas_kind']??null)==='custom';

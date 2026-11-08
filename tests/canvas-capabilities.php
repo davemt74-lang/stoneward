@@ -30,4 +30,15 @@ $noChange=sf_canvas_permission_save($admin,2,['canvas.data.my_purchases'=>false]
 $saved=sf_canvas_permission_save($admin,2,['canvas.data.my_purchases'=>true]);verify(sf_canvas_permission_enabled('my_purchases')&&$saved['policy']['revision']===3,'Re-enable is explicit and versioned');
 verify(!sf_canvas_permission_enabled('unknown'),'Unknown capabilities fail closed');
 $pdo->beginTransaction();deny(fn()=>sf_canvas_permission_save($admin,3,['canvas.data.my_tickets'=>false]),RuntimeException::class,'Policy mutation cannot commit an outer caller transaction');$pdo->rollBack();
+$libraries=array_column(sf_canvas_permission_admin_view()['capabilities'],null,'permission_id');
+verify(($libraries['canvas.library.three']['kind']??null)==='library'&&
+    ($libraries['canvas.library.color-thief']['kind']??null)==='library'&&
+    sf_canvas_library_enabled('three')&&sf_canvas_library_enabled('color-thief'),'Pinned libraries appear as separate administrator controls');
+$saved=sf_canvas_permission_save($admin,3,['canvas.library.three'=>false]);
+verify($saved['policy']['revision']===4&&!sf_canvas_library_enabled('three')&&sf_canvas_library_enabled('color-thief')&&
+    sf_canvas_permission_enabled('published_catalog')&&isset($saved['history'][0]['changes']['canvas.library.three']),
+    'Library disablement is versioned, audited and independent from data permissions');
+deny(fn()=>sf_canvas_permission_save($admin,4,['canvas.library.unregistered'=>true]),InvalidArgumentException::class,'Unknown library permissions fail closed');
+$saved=sf_canvas_permission_save($admin,4,['canvas.library.three'=>true]);
+verify($saved['policy']['revision']===5&&sf_canvas_library_enabled('three'),'Re-enabling a pinned library uses the same administrator policy');
 echo "$n capability checks passed\n";

@@ -81,6 +81,8 @@ jobs:
           node --check assets/js/canvas-scene-tester.js
           node --check assets/js/canvas-preview-guard.js
           node --check assets/js/vendor/acorn.js
+          node --check assets/js/canvas-library-runtime.js
+          node --check assets/js/media-artwork-palette.js
           node --check assets/js/canvas-agent-theme.js
           node --check assets/js/public-agent-canvas.js
           node --check assets/js/canvas-audio-sdk.js
@@ -763,6 +765,12 @@ jobs:
           test -s dist/deploy/api/canvas-map-core.php
           test -s dist/deploy/api/canvas-earthquakes-core.php
           test -s dist/deploy/assets/js/canvas-location.js
+          for library in color-thief three; do
+            for extension in js LICENSE; do
+              file="assets/vendor/canvas/$library.$extension"
+              cmp "$file" "dist/deploy/$file"
+            done
+          done
           test -s dist/deploy/docs/section83-production-pilot.md
           grep -Fx "Source commit: $(git rev-parse HEAD)" dist/deploy/DEPLOY-MANIFEST.txt
           (cd dist/deploy && zip -q -r ../stonefellow-section62c-full-deploy.zip .)

@@ -37,6 +37,42 @@
   const fmtBytes=n=>{n=Number(n)||0;if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';if(n<1073741824)return(n/1048576).toFixed(1)+' MB';return(n/1073741824).toFixed(2)+' GB'};
   const fmtTime=s=>{s=Math.max(0,Math.round(Number(s)||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
   const mediaUrl=(a,v='original')=>'../api/media.php?id='+encodeURIComponent(a.uuid)+(v!=='original'?'&variant='+encodeURIComponent(v):'');
+  const artworkPaletteJobs = new Map();
+  let artworkPaletteQueue = Promise.resolve();
+  function cacheArtworkPalette(asset, file) {
+    const tool = window.SFArtworkPalette;
+    if (!tool || asset.category !== 'image' || !asset.sha256 || Number(asset.width) * Number(asset.height) > 60_000_000) return null;
+    const saved = asset.technical?.artwork_palette;
+    if (tool.validPalette(saved) && saved.sha256 === asset.sha256) return saved;
+    const key = `${asset.id}:${asset.sha256}`;
+    if (artworkPaletteJobs.has(key)) return artworkPaletteJobs.get(key);
+    const job = artworkPaletteQueue.then(async () => {
+      try {
+        let palette = file ? await tool.extract(file) : null;
+        if (palette?.sha256 !== asset.sha256) palette = await tool.extract(await tool.fetchBlob(mediaUrl(asset)));
+        if (palette?.sha256 !== asset.sha256) return null;
+        return (await api('media.php', {action: 'save_artwork_palette', id: Number(asset.id), palette})).palette;
+      } catch (_) { return null; }
+      finally { artworkPaletteJobs.delete(key); }
+    });
+    artworkPaletteJobs.set(key, job);
+    artworkPaletteQueue = job;
+    return job;
+  }
+  async function showArtworkPalette(overlay, asset) {
+    const details = $('.media-tech-panel dl', overlay);
+    if (!details || asset.category !== 'image') return;
+    const row = document.createElement('div');
+    const label = document.createElement('dt');
+    const value = document.createElement('dd');
+    label.textContent = 'Artwork palette';
+    value.textContent = 'Checking image colors…';
+    row.append(label, value);
+    details.append(row);
+    const palette = await cacheArtworkPalette(asset);
+    if (overlay.isConnected) value.textContent = palette?.status === 'ready' ? palette.colors.join(' · ') :
+      palette?.status === 'insufficient_pixels' ? 'Too little color detail' : 'Unavailable';
+  }
   function technicalLine(a){
     if(a.category==='audio')return [a.codec,Number(a.duration_seconds)>0?fmtTime(a.duration_seconds):'',a.bitrate_bps?Math.round(a.bitrate_bps/1000)+' kbps':'',a.sample_rate_hz?(a.sample_rate_hz/1000).toFixed(1)+' kHz':'',a.channels?(a.channels===1?'mono':a.channels===2?'stereo':a.channels+' ch'):'',a.bits_per_sample?a.bits_per_sample+'-bit':''].filter(Boolean).join(' · ');
     if(a.category==='image')return [a.width&&a.height?a.width+'×'+a.height:'',a.mime_type].filter(Boolean).join(' · ');
@@ -602,7 +638,10 @@
       const fd=new FormData();fd.append('file',file,file.name);const xhr=new XMLHttpRequest();xhr.open('POST','api/media-upload.php');xhr.withCredentials=true;if(app.csrf)xhr.setRequestHeader('X-CSRF-Token',app.csrf);
       xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress&&onProgress(e.loaded/e.total)};
       xhr.onerror=()=>reject(new Error('Upload failed for '+file.name+'.'));
-      xhr.onload=()=>{let j={};try{j=JSON.parse(xhr.responseText||'{}')}catch(_){return reject(new Error('Invalid upload response for '+file.name+'.'))}if(xhr.status<200||xhr.status>=300||j.ok===false)return reject(new Error(j.message||'Upload failed.'));resolve(j.asset)};
+      xhr.onload=()=>{let j={};try{j=JSON.parse(xhr.responseText||'{}')}catch(_){return reject(new Error('Invalid upload response for '+file.name+'.'))}if(xhr.status<200||xhr.status>=300||j.ok===false)return reject(new Error(j.message||'Upload failed.'));
+        if(j.asset)void cacheArtworkPalette(j.asset,file);
+        resolve(j.asset);
+      };
       xhr.send(fd);
     });
   }
@@ -619,6 +658,7 @@
     const overlay=document.createElement('div');overlay.className='media-modal';overlay.innerHTML='<div class="media-modal-card"><div class="panel-title"><div><div class="eyebrow">MEDIA ASSET</div><h2>'+esc(a.title||a.original_name)+'</h2><p>'+esc(technicalLine(a))+'</p></div><button type="button" class="secondary" data-media-close>Close</button></div>'+(a.category==='audio'?'<audio controls preload="metadata" src="'+esc(mediaUrl(a))+'"></audio>':a.category==='image'?'<img class="media-modal-image" src="'+esc(mediaUrl(a,a.variants&&a.variants.medium?'medium':'original'))+'" alt="">':a.category==='video'?'<video class="media-modal-image" controls preload="metadata" src="'+esc(mediaUrl(a))+'"></video>':'')+referenceGalleryControl(a)+'<form id="mediaAssetForm" class="form-grid"><label class="field span2">Title<input name="title" value="'+esc(a.title||'')+'"></label><label class="field span3">Caption<textarea name="caption">'+esc(a.caption||'')+'</textarea></label><label class="field span2">Alt text<input name="alt_text" value="'+esc(a.alt_text||'')+'"></label><label class="field">Credit<input name="credit" value="'+esc(a.credit||'')+'"></label><label class="field span3">Copyright / rights<input name="copyright_text" value="'+esc(a.copyright_text||'')+'"></label><div class="actions span3"><button class="primary" type="submit">Save metadata</button></div></form>'+mediaImageAnalysisPanel(a)+'<section class="media-tech-panel"><strong>Extracted metadata</strong><dl><div><dt>File</dt><dd>'+esc(a.original_name)+' · '+fmtBytes(a.size_bytes)+'</dd></div><div><dt>Technical</dt><dd>'+esc(technicalLine(a))+'</dd></div><div><dt>Analyzer</dt><dd>'+esc(sourceLabel(a))+'</dd></div>'+(tags.title?'<div><dt>Embedded title</dt><dd>'+esc(tags.title)+'</dd></div>':'')+(tags.artist?'<div><dt>Embedded artist</dt><dd>'+esc(tags.artist)+'</dd></div>':'')+(tags.album?'<div><dt>Embedded album</dt><dd>'+esc(tags.album)+'</dd></div>':'')+(a.technical&&a.technical.embedded_artwork?'<div><dt>Embedded artwork</dt><dd>Detected</dd></div>':'')+'</dl></section>'+usageHtml+'</div>';
     let closed=false;const closeAsset=()=>{if(closed)return;closed=true;overlay.remove();options.onClose?.();};
     document.body.appendChild(overlay);bindReferenceGalleryControls(overlay,[a]);bindMediaImageAnalysis(overlay,a,options.analyze===true);$('[data-media-close]',overlay).onclick=closeAsset;$('#mediaAssetForm',overlay).onsubmit=async e=>{e.preventDefault();const d=new FormData(e.currentTarget);try{await api('media.php',{action:'update_asset',id:a.id,asset:{title:d.get('title'),caption:d.get('caption'),alt_text:d.get('alt_text'),credit:d.get('credit'),copyright_text:d.get('copyright_text')}});closeAsset();say('Media metadata saved.');if(app.view==='media')renderMediaLibrary();else reloadCore()}catch(x){alert(x.message)}};
+    void showArtworkPalette(overlay,a);
   }
   async function deleteAsset(id){if(!confirm('Permanently delete this unused media asset and its stored file?'))return;try{await api('media.php',{action:'delete_asset',id});state.imageBatchSelection.delete(id);say('Media asset deleted.');renderMediaLibrary()}catch(e){alert(e.message)}}
 

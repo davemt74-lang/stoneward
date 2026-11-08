@@ -1294,6 +1294,19 @@ body.sf-agent-canvas-active .notification-drawer .drawer-tabs button{font-size:1
 
 /* Canvas colors take precedence over the chosen default atmosphere. */
 .sf-agent-landing[data-agent-palette] .sf-agent-floater .sf-agent-player-dock .player-toggle,
-.sf-agent-landing[data-agent-palette] .sf-agent-state::before{background:var(--sf-atmo-accent);color:var(--sf-agent-surface);}
+.sf-agent-landing[data-agent-palette] .sf-agent-state::before{background:var(--sf-atmo-accent);color:var(--sf-agent-accent-text);}
 .sf-agent-landing[data-agent-palette] .sf-agent-player-dock :is(.player-title,.player-icon,.player-close,.player-release,.player-timeline){color:var(--sf-atmo-text);}
 .sf-agent-landing[data-agent-palette] .sf-agent-player-dock .player-timeline input{accent-color:var(--sf-atmo-accent);}
+body.sf-agent-canvas-active[data-sf-atmosphere] .chat-footer[data-agent-palette] :is(.chatbar,.footer-player){
+  background:var(--sf-agent-surface)!important;border-color:var(--sf-atmo-border)!important;color:var(--sf-atmo-text);
+}
+body.sf-agent-canvas-active[data-sf-atmosphere] .chat-footer[data-agent-palette] .chatbar :is(input,.chat-action),
+body.sf-agent-canvas-active[data-sf-atmosphere] .chat-footer[data-agent-palette] .footer-player :is(.player-title,.player-timeline){color:var(--sf-atmo-text);}
+body.sf-agent-canvas-active[data-sf-atmosphere] .chat-footer[data-agent-palette] .chatbar input::placeholder{color:var(--sf-atmo-text);opacity:1;}
+body.sf-agent-canvas-active[data-sf-atmosphere] .chat-footer[data-agent-palette] .chatbar :is(.send,.mic.active,[aria-expanded="true"]),
+body.sf-agent-canvas-active[data-sf-atmosphere] .chat-footer[data-agent-palette] .footer-player .player-toggle{
+  background:var(--sf-atmo-accent);color:var(--sf-agent-accent-text);
+}
+body.sf-agent-canvas-active[data-sf-atmosphere] .chat-footer[data-agent-palette] :is(input,button):focus-visible{
+  outline:2px solid var(--sf-atmo-accent);outline-offset:2px;
+}
