@@ -1136,8 +1136,9 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         }
       }
       const fallback=sceneTheme?.fallback||null;
-      const source=!destroyed&&!scenePalette&&!imagePending&&(sceneTheme?.artwork||sceneArtwork(options.getTrackArtwork?.()));
-      if(!source||!window.SFArtworkPalette){
+      const artworkPalette=window.SFArtworkPalette;
+      const source=artworkPalette&&!destroyed&&!scenePalette&&!imagePending&&(sceneTheme?.artwork||sceneArtwork(options.getTrackArtwork?.()));
+      if(!source){
         trackTheme?.request.abort();trackTheme=null;
         setAgentPalette(scenePalette||fallback);
         return;
@@ -1147,7 +1148,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       const current={source,owner,request:new AbortController(),palette:null};
       trackTheme=current;
       setAgentPalette(fallback);
-      void window.SFArtworkPalette.forArtwork(source,current.request.signal).then(palette=>{
+      void artworkPalette.forArtwork(source,current.request.signal).then(palette=>{
         if(destroyed||current.request.signal.aborted||trackTheme!==current||options.getSceneOwner?.()!==owner)return;
         current.palette=window.SFCanvasAgentTheme?.fromArtwork(palette)||null;
         syncAgentPalette();
