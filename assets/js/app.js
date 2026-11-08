@@ -3638,7 +3638,9 @@
       if(closeListeningRoom())agent(st.playing?'playing':'idle','Canvas closed.');
       return;
     }
+    const editActive=action.kind==='restore'&&action.editActive;
     await loadAuth(true);
+    if(editActive&&!editActive())return;
     if(!st.auth.authenticated||!st.auth.user?.id){
       popupEntry('notice','Sign in to create or reopen your private canvases.');return;
     }
@@ -3715,7 +3717,7 @@
     const owner=String(st.auth.user.id);
     listeningRoomOwner=owner;
     const requestActive=()=>listeningRoomRequest===request&&!request.signal.aborted&&
-      st.auth.authenticated&&String(st.auth.user?.id)===owner;
+      st.auth.authenticated&&String(st.auth.user?.id)===owner&&(!editActive||editActive());
     try{
       if(action.kind==='suggest'){
         const projects=canvasProjects();
@@ -3833,6 +3835,7 @@
         closeChatPopup();return;
       }
       const scene=response.scene;
+      if(editActive&&scene?.id!==action.id)throw new Error('The selected canvas could not open.');
       if(scene?.workflow_required===true&&!response.workflow&&response.verification?.verified!==true){
         const key='unverified-scene-'+scene.id;
         stage.setSceneWorkflow?.(null);
@@ -3875,7 +3878,7 @@
           throw new Error('The server did not authorize this candidate to open. Your current canvas is still available.');
         response.workflow=committed.workflow;
       }
-      if(!stage.showScene(scene,{standard}))throw new Error('The canvas could not open.');
+      if(!stage.showScene(scene,editActive?{standard,focus:false,revealAgent:true}:{standard}))throw new Error('The canvas could not open.');
       if(response.workflow){
         stage.setSceneWorkflow?.({...response.workflow,phase:'applied',summary:'The checked candidate is now open.'});
       }
@@ -3886,6 +3889,17 @@
       stage.closePage?.(true);
       request.sceneBuild?.trace('canvas_opened',{source:standard?'standard':'model'});
       if(!canvasDebugVisible())closeChatPopup();
+      if(editActive){
+        setChatFooterHidden(false);
+        closeQuickMenu();
+        const draft=input.value;
+        if(!/^\/edit(?:\s|$)/i.test(draft.trimStart()))input.value='/edit '+draft;
+        else if(draft.trim().toLowerCase()==='/edit')input.value='/edit ';
+        syncChatImageDraftLimit();
+        input.focus({preventScroll:true});
+        input.setSelectionRange(input.value.length,input.value.length);
+        return;
+      }
       let message=action.kind==='image_review'||request.sceneBuild?.payload.review_images?'I applied your chosen image.':editingImage?'I updated the image and kept the original in your library.':previousId&&!design?(musicInputs?'I updated your canvas’s music selection.':response.active_tokens_used>0?'I updated how the agent appears.':'I updated how the agent appears. No Active Tokens were used.'):
         scene.canvas_kind==='space_eq'?(reading?'I reopened your Space EQ.':'I built your Space EQ with code. No Active Tokens were used.'):
         scene.canvas_kind==='custom'?(standard?(reading?'I reopened your built-in catalog layout.':'I opened your live catalog in a built-in layout. No Active Tokens were used.'):
@@ -4352,6 +4366,7 @@
       canManageScenes:()=>!!canvasOwner(),
       onOpenSceneHistory:()=>void handleListeningRoomCommand({kind:'history'}),
       onRestoreScene:id=>void handleListeningRoomCommand({kind:'restore',id:Number(id)}),
+      onEditScene:(id,editActive)=>handleListeningRoomCommand({kind:'restore',id,editActive}),
       onDeleteScene:deleteSavedCanvas,
       onSubmitScene:id=>void navigate('canvas-gallery',{tab:'submit',id}),
       onPageClose:view=>{if(view==='canvas-gallery'){canvasGalleryView?.destroy();canvasGalleryView=null;cancelGalleryOpen();}},

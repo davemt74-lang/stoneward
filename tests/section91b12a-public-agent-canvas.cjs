@@ -306,7 +306,7 @@ check('Mounted canvas delegates capture, exposes genuine session UI and cleans u
     const canvas=window.SFPublicAgentCanvas,host=elements['.sf-agent-page-content'];
     fireAction('scene-history');assert.equal(historyOpened,1);
     assert.equal(canvas.showSceneHistory([{id:42,title:'<img src=invalid>',created_at:'2026-11-04T00:00:00Z'},{id:0}]),true);
-    const list=host.children[1],entry=list.children[0],button=entry.children[1];
+    const list=host.children[1],entry=list.children[0],button=entry.children[1].children[0];
     assert.equal(list.childElementCount,1);assert.equal(entry.children[0].children[0].textContent,'<img src=invalid>');
     rootElement.listeners.click({target:{closest:()=>button}});assert.deepEqual(sceneRestores,[42]);
     assert.equal(canvas.closeSceneHistory(),true);assert.equal(host.childElementCount,0);

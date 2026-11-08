@@ -1299,7 +1299,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       workspaceTimer=window.setTimeout(()=>workspace.classList.remove('growing'),850);
       sphere.focus({preventScroll:true});
     }
-    const pageLabels={playlist:'PLAYLIST',shows:'TOUR DATES',show:'LIVE SHOW',store:'MERCH STORE',membership:'MEMBERSHIP + VIP',tickets:'TICKETS + VIP',community:'FAN COMMUNITY',newsletter:'NEWSLETTER',music:'MUSIC LIBRARY',releases:'RELEASES',track:'SONG DETAILS',release:'RELEASE DETAILS',cart:'CART',account:'ACCOUNT',login:'SIGN IN',register:'CREATE ACCOUNT',about:'ABOUT STONEFELLOW',world:'STONEFELLOW WORLD',archive:'MUSIC ARCHIVE',search:'SEARCH',history:'LISTENING HISTORY',library:'MY LIBRARY',photos:'PHOTOS',videos:'VIDEOS',press:'PRESS',contact:'CONTACT',plans:'PLANS',privacy:'PRIVACY',terms:'TERMS',checkout:'CHECKOUT',order:'ORDER',team:'TEAM',capture:'CREATIVE CAPTURE','agent-brain':'AGENT BRAIN','agent-chat':'AGENT CHAT','scene-history':'CANVAS HISTORY','canvas-gallery':'CANVAS CATALOG'};
+    const pageLabels={playlist:'PLAYLIST',shows:'TOUR DATES',show:'LIVE SHOW',store:'MERCH STORE',membership:'MEMBERSHIP + VIP',tickets:'TICKETS + VIP',community:'FAN COMMUNITY',newsletter:'NEWSLETTER',music:'MUSIC LIBRARY',releases:'RELEASES',track:'SONG DETAILS',release:'RELEASE DETAILS',cart:'CART',account:'ACCOUNT',login:'SIGN IN',register:'CREATE ACCOUNT',about:'ABOUT STONEFELLOW',world:'STONEFELLOW WORLD',archive:'MUSIC ARCHIVE',search:'SEARCH',history:'LISTENING HISTORY',library:'MY LIBRARY',photos:'PHOTOS',videos:'VIDEOS',press:'PRESS',contact:'CONTACT',plans:'PLANS',privacy:'PRIVACY',terms:'TERMS',checkout:'CHECKOUT',order:'ORDER',team:'TEAM',capture:'CREATIVE CAPTURE','agent-brain':'AGENT BRAIN','agent-chat':'AGENT CHAT','scene-history':'CANVAS HISTORY','scene-edit':'EDIT CANVAS','canvas-gallery':'CANVAS CATALOG'};
     function openPage(view){
       // The portal overlays the Agent Canvas without replacing, remounting,
       // or hiding it. Existing route renderers mount directly into pageHost.
@@ -1368,7 +1368,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       else pageTimer=window.setTimeout(finish,770);
     }
     function dismissPage(){
-      const history=pageView==='scene-history';
+      const history=pageView==='scene-history'||pageView==='scene-edit';
       closePage();
       if(!history)options.onClosePage?.();
     }
@@ -2141,9 +2141,9 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       if(!hidden&&wasHidden)positionOrbitTools();
       if(motionOff){cloudDraw(0);orbDraw(0);}
     }
-    function setSceneAgentDesign(design){
+    function setSceneAgentDesign(design,revealed=false){
       sceneAgentDesign=design;
-      sceneAgentRevealed=false;
+      sceneAgentRevealed=revealed;
       syncSceneAgentDesign();
     }
     function setAgentHidden(hidden){
@@ -2271,7 +2271,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       }catch(_){/* Keep the authored empty state when current-track data cannot be loaded. */}
       finally{if(data.request===request)data.request=null;}
     }
-    function showScene(scene,{standard=false,focus=true}={}){
+    function showScene(scene,{standard=false,focus=true,revealAgent=false}={}){
       const kind=scene?.canvas_kind,space=kind==='space_eq',custom=kind==='custom';
       const room=!space&&!custom;
       const builtInLabel=standard&&!space?(custom?'Built-in catalog layout':'Built-in layout'):'';
@@ -2393,7 +2393,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       root.classList.add('has-listening-scene');
       root.classList[interactive?'add':'remove']('has-scene-interactive');
       setScenePalette(scene,images,artwork);
-      setSceneAgentDesign(scene.agent_design);
+      setSceneAgentDesign(scene.agent_design,revealAgent);
       syncSceneCue();
       if(space){
         setSceneCoding('idle');
@@ -2459,15 +2459,15 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       syncAgentPalette();
     }
     function closeSceneHistory(){
-      if(pageView!=='scene-history'||pageRail.hidden)return false;
+      if((pageView!=='scene-history'&&pageView!=='scene-edit')||pageRail.hidden)return false;
       closePage(true);
       return true;
     }
-    function showSceneHistory(rows){
+    function showSceneHistory(rows,returnTo){
       if(destroyed||!options.canUseScenes?.()||!Array.isArray(rows))return false;
       const host=openPage('scene-history');
       const intro=document.createElement('p');intro.className='sf-agent-scene-history-intro';
-      intro.textContent='Reopen or delete your saved canvases.';
+      intro.textContent='Open, edit, or manage your saved canvases.';
       const list=document.createElement('ul');list.className='sf-agent-scene-history';
       const status=document.createElement('p');status.className='sf-agent-scene-history-feedback';status.setAttribute('role','status');
       const empty=document.createElement('p');empty.className='sf-agent-scene-history-empty';empty.textContent='No saved canvases yet.';
@@ -2486,22 +2486,64 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         const open=document.createElement('button');open.type='button';open.textContent='Open';
         open.dataset.agentAction='restore-scene';open.dataset.sceneId=String(row.id);
         open.setAttribute('aria-label','Open '+title.textContent);
-        entry.appendChild(details);entry.appendChild(open);
-        const record={entry,open};
+        const actions=document.createElement('div');actions.className='sf-agent-scene-history-actions';
+        actions.appendChild(open);entry.appendChild(details);entry.appendChild(actions);
+        const record={entry,open,actions};
         view.rows.set(row.id,record);
-        if(typeof options.onDeleteScene==='function')addSceneHistoryDelete(view,record,row.id,title.textContent);
+        if(typeof options.onEditScene==='function'){
+          const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';
+          edit.setAttribute('aria-label','Edit '+title.textContent);
+          edit.addEventListener('click',()=>{
+            if(!activeSceneHistory(view)||sceneDeletions.has(row.id))return;
+            const scrollTop=pageViewport.scrollTop;
+            showSavedCanvasEditor(view.owner,row.id,title.textContent,()=>showSceneHistory(rows,{id:row.id,scrollTop}));
+          });
+          record.edit=edit;actions.appendChild(edit);
+        }
         if(row.canvas_kind==='custom'&&typeof options.onSubmitScene==='function'){
           const submit=document.createElement('button');submit.type='button';submit.textContent='Submit';
           submit.setAttribute('aria-label','Submit '+title.textContent+' to the Canvas Catalog');
-          submit.addEventListener('click',()=>{if(activeSceneHistory(view))options.onSubmitScene(row.id);});entry.appendChild(submit);
+          submit.addEventListener('click',()=>{if(activeSceneHistory(view)&&!sceneDeletions.has(row.id))options.onSubmitScene(row.id);});
+          actions.appendChild(submit);
         }
+        if(typeof options.onDeleteScene==='function')addSceneHistoryDelete(view,record,row.id,title.textContent);
         list.appendChild(entry);
       }
       list.hidden=view.rows.size===0;
       empty.hidden=!list.hidden;
       host.replaceChildren(intro,list,status,empty);
       addSceneHistoryImageFolder(host,view);
+      if(returnTo){
+        window.clearTimeout(pageTimer);
+        pageViewport.scrollTop=returnTo.scrollTop;
+        (view.rows.get(returnTo.id)?.edit??by(pageRail,'[data-agent-action="close-page"]'))?.focus({preventScroll:true});
+      }
       return true;
+    }
+    function showSavedCanvasEditor(owner,id,title,goBack){
+      const host=openPage('scene-edit');
+      const view={owner};sceneHistoryView=view;
+      const active=()=>activeSceneHistory(view)&&!sceneDeletions.has(id);
+      const editor=document.createElement('section');editor.className='sf-agent-scene-edit';
+      const back=document.createElement('button');back.type='button';back.textContent='Back to Canvas History';
+      back.addEventListener('click',()=>{if(activeSceneHistory(view))goBack();});
+      const heading=document.createElement('h2');heading.textContent=title;heading.tabIndex=-1;
+      const description=document.createElement('p');description.textContent='Open this saved version in chat to describe your design changes.';
+      const edit=document.createElement('button');edit.type='button';edit.textContent='Edit design';
+      const status=document.createElement('p');status.setAttribute('role','status');
+      edit.addEventListener('click',async()=>{
+        if(!active()||edit.disabled)return;
+        edit.disabled=true;status.textContent='Opening saved canvas…';
+        try{await options.onEditScene(id,active);}
+        catch(_){/* Keep the editor available when the canvas cannot open. */}
+        if(active()){
+          edit.disabled=false;status.textContent='This saved canvas could not open for editing.';
+          edit.focus({preventScroll:true});
+        }
+      });
+      editor.append(back,heading,description,edit,status);host.replaceChildren(editor);
+      window.clearTimeout(pageTimer);
+      heading.focus({preventScroll:true});
     }
     function addSceneHistoryImageFolder(host,view){
       if(typeof options.onLoadSceneImages!=='function'||typeof options.getSceneImageUrl!=='function')return;
@@ -2592,9 +2634,10 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       const confirm=document.createElement('button');confirm.type='button';confirm.textContent='Delete canvas';
       cancel.setAttribute('aria-describedby',question.id);confirm.setAttribute('aria-describedby',question.id);
       confirmation.appendChild(question);confirmation.appendChild(cancel);confirmation.appendChild(confirm);
-      record.entry.appendChild(remove);record.entry.appendChild(confirmation);
+      record.actions.appendChild(remove);record.entry.appendChild(confirmation);
       record.setPending=pending=>{
-        record.open.disabled=remove.disabled=cancel.disabled=confirm.disabled=pending;
+        for(const button of record.actions.children)button.disabled=pending;
+        cancel.disabled=confirm.disabled=pending;
         confirm.textContent=pending?'Deleting…':'Delete canvas';
       };
       record.setPending(sceneDeletions.has(id));
@@ -2638,7 +2681,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       });
     }
     function activeSceneHistory(view){
-      return !destroyed&&sceneHistoryView===view&&pageView==='scene-history'&&options.canUseScenes?.()&&
+      return !destroyed&&sceneHistoryView===view&&(pageView==='scene-history'||pageView==='scene-edit')&&options.canUseScenes?.()&&
         view.owner===options.getSceneOwner?.();
     }
     function handleAction(event){
