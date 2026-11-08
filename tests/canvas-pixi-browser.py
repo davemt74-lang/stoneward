@@ -270,12 +270,20 @@ def run(browser, width, touch):
     expect(status).to_have_text('Graphics restored')
     assert game.get_attribute('data-csp-error') is None
 
-    assert page.evaluate('SFPublicAgentCanvas.closeScene(false)')
-    expect(layer).to_have_count(0)
+    # Check authored cleanup while the child can still report it. Removing the
+    # iframe destroys the document and can discard its queued messages.
+    child = layer.element_handle().content_frame()
+    assert child is not None
+    child.evaluate("dispatchEvent(new PageTransitionEvent('pagehide'))")
     page.wait_for_function('window.pixiLifecycle !== null')
     assert page.evaluate('window.pixiLifecycle') == {
         'wasTicking': True, 'removed': True, 'contextReleased': True, 'bodies': 0
     }
+    expect(canvas).to_have_count(0)
+    with page.expect_event('framedetached', lambda detached: detached == child):
+        assert page.evaluate('SFPublicAgentCanvas.closeScene(false)')
+    expect(layer).to_have_count(0)
+    assert child.is_detached()
     assert len(calls) == 3 and not errors, (calls, errors)
     context.close()
     print(f'PASS Chromium/{width}: approved Pixi sprite, responsive Matter collision, context recovery, and teardown', flush=True)
