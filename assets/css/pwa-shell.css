@@ -1,0 +1,39 @@
+.sf-pwa-launch {
+  box-sizing: border-box;
+  width: min(38rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  padding: clamp(1rem, 5vw, 2rem);
+  color: var(--ink, #f4eee6);
+  background: var(--bg, #151210);
+  border: 1px solid currentColor;
+  border-radius: 1.25rem;
+  text-align: center;
+}
+
+.sf-pwa-launch::backdrop { background: rgba(0, 0, 0, .8); }
+.sf-pwa-splash-art {
+  display: block;
+  width: 100%;
+  max-height: 42vh;
+  aspect-ratio: 16 / 9;
+  margin-block: .8rem;
+  border: 0;
+  border-radius: .75rem;
+  object-fit: contain;
+}
+
+iframe.sf-pwa-splash-art { pointer-events: none; }
+.sf-pwa-launch button {
+  min-height: 44px;
+  padding: .55rem 1.2rem;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sf-pwa-alert-controls { padding: .5rem 0; }
+.sf-pwa-alert-controls p { margin: .4rem 0; font-size: .875rem; }
+.sf-pwa-alert-controls button { min-height: 44px; }

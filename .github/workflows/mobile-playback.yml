@@ -20,6 +20,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+          extensions: pdo_sqlite, openssl, curl
           coverage: none
       - uses: actions/setup-python@v5
         with:
@@ -46,3 +47,9 @@ jobs:
         run: |
           python3 tests/jukebox-browser.py --http-only
           python3 tests/jukebox-browser.py
+      - name: PWA splash publishing, session follows, and Web Push protocol
+        run: |
+          python3 tests/pwa-splash-http.py
+          php tests/jukebox-follow.php
+          php tests/web-push.php
+          node --test tests/pwa-worker.test.cjs

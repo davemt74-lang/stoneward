@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.310');
+define('SF_ADMIN_BUILD','1.3.311');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -27,6 +27,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/production-review.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/story-assembly.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/media.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/pwa-splash.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/image-generation.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/image-mask-editor.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/stem-studio.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
@@ -133,6 +134,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
             <button type="button" data-view="team"><span>19A</span>Team Workspace + Timeline</button>
             <button type="button" data-view="operations"><span>28</span>Operations</button>
             <button type="button" data-view="settings"><span>29</span>Settings</button>
+            <button type="button" data-view="pwa-splash"><span>29A</span>PWA &amp; Splash</button>
           </div>
         </details>
       </nav>
@@ -255,6 +257,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="../assets/vendor/canvas/color-thief.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>" integrity="sha256-9KjGmp30P1mNciedabWfLZ0pVho0/pmxF0ktvJCBY+4="></script>
   <script src="../assets/js/media-artwork-palette.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/media.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="assets/pwa-splash.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/image-mask-editor.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/image-moodboards.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/image-generation.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>

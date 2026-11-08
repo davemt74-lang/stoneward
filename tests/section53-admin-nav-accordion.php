@@ -10,7 +10,7 @@ $groups=[
  'audience'=>['crm','song-moderation','customer','campaigns','automations'],
  'commerce'=>['products','orders','fulfillment','pod','membership','ticketing','packages'],
  'agent'=>['brain','production-review','canvas-permissions','canvas-gallery','knowledge','ai','image-generation'],
- 'administration'=>['users','user-create','team','operations','settings']
+ 'administration'=>['users','user-create','team','operations','settings','pwa-splash']
 ];
 preg_match_all('/<details class="admin-nav-category" data-nav-category="([^"]+)"( open)?>\s*<summary[^>]*>(.*?)<\/summary>\s*<div class="admin-nav-items">(.*?)<\/div>\s*<\/details>/s',$html,$parts,PREG_SET_ORDER);
 $check=[];
@@ -23,7 +23,7 @@ foreach($parts as $index=>$match){
  $check['Category '.($key?:$index).' has a caret icon and named summary']=str_contains($match[3],'admin-nav-chevron')&&str_contains($match[3],'aria-hidden="true"');
  $check['Only Overview starts expanded in server HTML']=($index===0)===(trim($match[2])==='open');
 }
-$check['All 38 routes remain unique and reachable']=count($all)===38&&count(array_unique($all))===38;
+$check['All expected routes remain unique and reachable']=count($all)===array_sum(array_map('count',$groups))&&count(array_unique($all))===count($all);
 $check['Native details and summary preserve keyboard accessibility']=str_contains($html,'<details class="admin-nav-category"')&&str_contains($html,'<summary class="admin-nav-summary"');
 $check['Browser state persistence key is versioned']=str_contains($js,'stonefellow.admin.navigation.categories.v1');
 $check['Saved state ignores unknown keys and supports independent groups']=str_contains($js,'hasOwnProperty.call(saved,key)')&&str_contains($js,'currentState(groups)');

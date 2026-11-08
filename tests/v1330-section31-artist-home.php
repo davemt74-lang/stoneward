@@ -68,7 +68,8 @@ ok31(str_contains($adminBaseCss,'min-height:21px')&&str_contains($adminBaseCss,'
 $build31='0.0.0';if(preg_match("/define\('SF_BUILD', '([^']+)'\)/",$shell,$b31))$build31=$b31[1];ok31(version_compare($build31,'1.3.30','>='),'public shell remains Section 31 compatible or newer');
 ok31(str_contains($shell,"'artistHomepageEnabled'"),'public shell exposes homepage plugin state');
 ok31(str_contains($shell,'data-view="home">Agent Canvas'),'public navigation labels Home when the Artist Homepage plugin is active');
-ok31(str_contains($shell,"siteSettings['splash_enabled']"),'existing splash toggle remains independently supported');
+ok31(str_contains($settings,"sf_meta_get('site.splash_enabled'")&&str_contains($shell,'$pwaSplash=sf_pwa_splash_published()')
+    &&str_contains($shell,'if($showLaunch):'),'legacy splash preferences remain readable and the PWA launch uses its own published settings');
 ok31(str_contains($app,'artistHomepageEnabled')&&str_contains($app,'renderArtistHomepage'),'public app can render the Artist Homepage plugin');
 ok31(str_contains($app,'if(artistHomepageEnabled&&await renderArtistHomepage())return'),'homepage plugin cleanly falls back to the existing Home when disabled/unavailable');
 ok31(str_contains($app,"document.body.classList.add('artist-home-active')")&&str_contains($css,'body.artist-home-active .agent-stage{display:none}'),'artist homepage becomes the visual landing surface rather than stacking under the Agent stage');

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 @ini_set('display_errors','0');
 require __DIR__.'/bootstrap.php';
-require_once __DIR__.'/jukebox-core.php';
+require_once __DIR__.'/jukebox-follow-core.php';
 
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $action=$_GET['action']??'state';
@@ -19,21 +19,28 @@ if($audioRequest){
 if(!sf_installed())sf_json_response(['ok'=>false,'message'=>'Stonefellow installation required.'],503);
 $hostMode=($_GET['host']??'')==='1';
 $post=$method==='POST';
-if($post&&(int)($_SERVER['CONTENT_LENGTH']??0)>($action==='listener'?2048:1_450_000))
+$followRequest=$post&&$action==='follow';
+$guestState=!$post&&!$hostMode&&$action==='state';
+$guestDirectory=!$post&&!$hostMode&&$action==='directory';
+if($post&&(int)($_SERVER['CONTENT_LENGTH']??0)>(in_array($action,['listener','follow'],true)?2048:1_450_000))
     sf_json_response(['ok'=>false,'message'=>'Request is too large.'],413);
 $body=$post?sf_request_json():[];
-$user=$hostMode?sf_require_user(false,$post):null;
-if($post&&!$hostMode)sf_require_csrf();
+$user=$hostMode||$followRequest?sf_require_user(false,$post)
+    :(($guestState||$guestDirectory)&&sf_auth_cookie_value()!==''?sf_current_user():null);
+if($post&&!$hostMode&&!$followRequest)sf_require_csrf();
 if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
 $uid=(int)($user['id']??0);
 $admin=($user['role']??'')==='admin';
+$alertControl=$post&&$hostMode&&$action==='control'&&in_array($body['event']??null,['start','reschedule','cancel','end'],true);
 $db=sf_db();
 
 try{
     sf_jukebox_schema();
+    if($followRequest||(($guestState||$guestDirectory)&&$uid>0)||$alertControl)sf_jukebox_follow_schema();
     if(!$post&&$action==='directory'){
         $directoryFields='s.id,s.title,s.ended,s.created,s.heartbeat,t.scheduled_at,t.started_at';
         $scheduleJoin=' LEFT JOIN jukebox_schedule t ON t.session_id=s.id';
+        $followingSessions=[];
         $sessions=$hostMode
             ?sf_jukebox_query("SELECT $directoryFields FROM jukebox_sessions s $scheduleJoin
                 WHERE s.owner_id=? ORDER BY s.created DESC,s.id DESC LIMIT 50",[$uid])->fetchAll()
@@ -50,15 +57,21 @@ try{
                 sf_jukebox_query("$publicSessions AND t.session_id IS NOT NULL AND t.started_at IS NULL
                     ORDER BY t.scheduled_at,s.id LIMIT 50")->fetchAll()
             );
+            if($uid>0)$followingSessions=sf_jukebox_query("SELECT $directoryFields,COALESCE(r.enabled,0) AS remote_listening
+                FROM jukebox_follows f JOIN jukebox_sessions s ON s.id=f.session_id $scheduleJoin
+                LEFT JOIN jukebox_remote r ON r.session_id=s.id WHERE f.user_id=? AND s.ended=0
+                AND (s.listed=1 OR f.access_scope='invite')
+                ORDER BY COALESCE(t.started_at,t.scheduled_at,s.created) DESC,s.id DESC LIMIT 100",[$uid])->fetchAll();
             $db->commit();
         }
-        $sessions=array_map(static function(array $session)use($hostMode): array {
+        $directoryRow=static function(array $session)use($hostMode): array {
             $row=['id'=>$session['id'],'title'=>$session['title']]+sf_jukebox_schedule_details($session);
             if($hostMode)return $row+['ended'=>$session['ended']];
             return $row+['remote_listening'=>(bool)$session['remote_listening'],'online'=>sf_jukebox_player_online($session)];
-        },$sessions);
+        };
         $venue=$hostMode?sf_jukebox_query('SELECT name FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn():false;
-        sf_json_response(['ok'=>true,'sessions'=>$sessions,'venue'=>$venue?:null,'admin'=>$admin]);
+        sf_json_response(['ok'=>true,'sessions'=>array_map($directoryRow,$sessions),'venue'=>$venue?:null,'admin'=>$admin]
+            +($guestDirectory?['following_sessions'=>array_map($directoryRow,$followingSessions)]:[]));
     }
     if($post&&$hostMode&&$action==='venue'){
         if(!$admin)throw new DomainException('An administrator must enable venue accounts.');
@@ -100,12 +113,18 @@ try{
         // The first statement is a write on both engines. It serializes changes
         // for this session before reading approvals, the player, or queue order.
         $db->beginTransaction();
-        if($action==='listener')sf_jukebox_query('UPDATE jukebox_sessions SET revision=revision WHERE id=?',[$id]);
+        if($action==='listener'||$followRequest)sf_jukebox_query('UPDATE jukebox_sessions SET revision=revision WHERE id=?',[$id]);
         else sf_jukebox_query('UPDATE jukebox_sessions SET revision=revision+1 WHERE id=?',[$id]);
     }else $db->beginTransaction();
     $session=sf_jukebox_session($id);
     $host=$hostMode&&sf_jukebox_owner($session,$user);
     if($hostMode&&!$host)throw new OutOfBoundsException('Jukebox session not found.');
+    if($followRequest){
+        if($hostMode)throw new DomainException('Open the guest session to follow it.');
+        $following=sf_jukebox_follow_set($session,$uid,$body['following']??null);
+        $db->commit();
+        sf_json_response(['ok'=>true,'following'=>$following]);
+    }
     $phase=sf_jukebox_phase($session);
     if($phase==='upcoming'&&(($post&&$action!=='control')||(!$post&&!in_array($action,['state','audio'],true))))
         throw new DomainException('This jukebox session has not started.');
@@ -129,7 +148,8 @@ try{
         }
         $payload=match($action){
             'state'=>['state'=>sf_jukebox_state($session,$phone,$host),
-                'remembered'=>!$host&&!in_array($phase,['upcoming','canceled'],true)&&sf_jukebox_guest($session)!==null],
+                'remembered'=>!$host&&!in_array($phase,['upcoming','canceled'],true)&&sf_jukebox_guest($session)!==null]
+                +($guestState?['signed_in'=>$uid>0,'following'=>sf_jukebox_following($id,$uid)]:[]),
             'catalog'=>($host||$approved||(int)$session['listed'])?sf_canvas_audio_catalog():throw new DomainException('Host approval is required.'),
             'thread'=>($host||$approved)&&$thread!==''?['messages'=>sf_jukebox_thread($id,$thread)]:throw new DomainException('Chat access is unavailable.'),
             'recap'=>$host?['recap'=>sf_jukebox_recap($session)]:throw new DomainException('Host access is required.'),
@@ -185,7 +205,10 @@ try{
             case 'control':
                 if(!$host)throw new DomainException('Host access is required.');
                 if($action==='player')sf_jukebox_player($session,$body);
-                else sf_jukebox_controls($session,$body);
+                else{
+                    sf_jukebox_controls($session,$body);
+                    if($alertControl)sf_jukebox_alert_session_change($session,sf_jukebox_session($id),$body['event']);
+                }
                 break;
             case 'message':
                 if($host)$approved=(bool)sf_jukebox_query("SELECT 1 FROM jukebox_phones WHERE id=? AND session_id=? AND status='approved'",[$thread,$id])->fetchColumn();

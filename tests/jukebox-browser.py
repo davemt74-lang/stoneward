@@ -28,13 +28,13 @@ MANAGED_AUDIO = 'M' + 'A'*20
 
 
 def fixture(site):
-    for directory in ('api', 'assets/js', 'assets/css', 'config', 'data', 'assets/audio', 'storage/media'):
+    for directory in ('config', 'data', 'assets/audio', 'assets/js', 'storage/media'):
         (site / directory).mkdir(parents=True)
-    (site / 'api').rmdir()
-    (site / 'api').symlink_to(ROOT / 'api', target_is_directory=True)
-    (site / 'jukebox.php').symlink_to(ROOT / 'jukebox.php')
-    for file in ('assets/js/jukebox.js', 'assets/js/jukebox-qr.js', 'assets/js/jukebox-listener.js',
-                 'assets/css/jukebox.css'):
+    for directory in ('api', 'assets/css', 'assets/icons', 'assets/images', 'assets/vendor'):
+        (site / directory).symlink_to(ROOT / directory, target_is_directory=True)
+    for file in ('jukebox.php', 'pwa-splash-preview.php', 'manifest.php', 'service-worker.js', 'offline.html',
+                 'assets/js/jukebox.js', 'assets/js/jukebox-qr.js', 'assets/js/jukebox-listener.js',
+                 'assets/js/pwa-shell.js', 'assets/js/pwa-phone-alerts.js'):
         (site / file).symlink_to(ROOT / file)
     (site / 'config/database.php').write_text("<?php return ['driver'=>'sqlite','path'=>__DIR__.'/fixture.sqlite'];")
     (site / 'config/store.php').write_text('<?php return [];')
@@ -78,6 +78,7 @@ def fixture(site):
     (site / 'router.php').write_text("""<?php
         define('SF_ROOT',__DIR__);
         $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
+        if($path==='/manifest.webmanifest')$path='/manifest.php';
         if(str_ends_with($path,'.php') && is_file(__DIR__.$path)){require __DIR__.$path;return true;}
         return false;
     """)
@@ -344,7 +345,18 @@ def remote_scenario(browser, base, phone_options):
     print('PASS anonymous phone listening, mid-song join, venue pause and skip, outage recovery, and local stop')
 
 
-def schedule_scenario(browser, base, phone_options):
+def schedule_scenario(browser, base, phone_options, site):
+    # Publish a harmless authored waiting design, using the same revisioned source as Admin.
+    subprocess.run([PHP, '-r', '''
+        define('SF_ROOT',getcwd());
+        require 'api/bootstrap.php';
+        require 'api/pwa-splash-core.php';
+        sf_pwa_splash_update(1,'publish',0,['backgroundColor'=>'#211922','waiting'=>[
+            'mode'=>'code','title'=>'Tonight at Stonefellow',
+            'html'=>'<section><p class="fixture">Opening soon</p></section>', 'css'=>'p {color: white}',
+            'js'=>'document.querySelector(".fixture").textContent = "Designed waiting screen";',
+        ]],[]);
+    '''], cwd=site, check=True)
     host_zone = ZoneInfo('America/Los_Angeles')
     host = browser.new_context(timezone_id=host_zone.key).new_page()
     host.goto(base + '/login-fixture.php?user=1')
@@ -393,6 +405,14 @@ def schedule_scenario(browser, base, phone_options):
     phone.goto(join)
     splash = phone.locator('#upcoming')
     expect(splash.get_by_role('heading', name='Waiting for the session to start', exact=True)).to_be_visible()
+    expect(splash.get_by_role('heading', name='Tonight at Stonefellow')).to_be_visible()
+    art = splash.locator('iframe')
+    expect(art).to_have_attribute('sandbox', 'allow-scripts')
+    expect(splash.frame_locator('iframe').locator('.fixture')).to_have_text('Designed waiting screen')
+    assert phone.evaluate('document.querySelector("iframe").contentDocument === null')
+    manifest = phone.request.get(base + '/manifest.webmanifest').json()
+    assert manifest['background_color'] == '#211922'
+    assert {'192x192', '512x512'} <= {icon['sizes'] for icon in manifest['icons']}
     scheduled = phone.locator('#scheduled-start')
     expect(scheduled).to_be_visible()
     expect(scheduled).to_have_attribute('datetime', utc_iso(start_at))
@@ -412,6 +432,7 @@ def schedule_scenario(browser, base, phone_options):
 
     host.locator('#start-session').click()
     expect(splash).to_be_hidden(timeout=10_000)
+    expect(art).to_have_count(0)
     expect(phone).to_have_url(join)
     assert host.locator('#join-link').get_attribute('href') == join
     directory.bring_to_front()
@@ -442,14 +463,31 @@ def schedule_scenario(browser, base, phone_options):
     private_join = create_session('Scheduled private cancellation')
     phone.goto(private_join)
     expect(splash).to_be_visible()
+    sign_in = phone.get_by_role('link', name='Sign in to follow')
+    expect(sign_in).to_be_visible()
+    private_id = urllib.parse.parse_qs(urllib.parse.urlparse(private_join).query)['id'][0]
+    expect(sign_in).to_have_attribute('href', base + '/?view=login#return_jukebox=' + private_id)
     directory.reload()
     expect(directory.get_by_role('link', name='Scheduled private cancellation')).to_have_count(0)
+
+    follower = browser.new_context(**phone_options).new_page()
+    follower.goto(base + '/login-fixture.php?user=3')
+    follower.goto(private_join)
+    follower.get_by_role('button', name='Follow this session', exact=True).click()
+    expect(follower.get_by_role('button', name='Unfollow this session')).to_be_visible()
+    follower.goto(base + '/jukebox.php')
+    follower.locator('#following-sessions').get_by_role('link', name='Scheduled private cancellation').click()
+    expect(follower).to_have_url(private_join)
+    follower.get_by_role('button', name='Unfollow this session').click()
+    expect(follower.get_by_role('button', name='Follow this session', exact=True)).to_be_visible()
+    follower.goto(base + '/jukebox.php')
+    expect(follower.locator('#following-directory')).to_be_hidden()
     host.once('dialog', lambda dialog: dialog.accept())
     host.locator('#cancel-session').click()
     expect(splash.get_by_role('heading', name='Session canceled')).to_be_visible(timeout=10_000)
     expect(phone).to_have_url(private_join)
     expect(phone.locator('#pairing')).to_be_hidden()
-    print('PASS scheduled local time, public discovery, QR waiting, same-link start, playback, recap, and private cancellation')
+    print('PASS scheduled local time, QR splash isolation, private following, same-link start, playback, and recap')
 
 
 def http_scenario(base, site):
@@ -973,7 +1011,7 @@ with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
                         for context in browser.contexts:
                             context.close()
                     if '--remote-only' not in sys.argv:
-                        schedule_scenario(browser, base, phone_options)
+                        schedule_scenario(browser, base, phone_options, site)
                         for context in browser.contexts:
                             context.close()
                     if '--schedule-only' not in sys.argv:

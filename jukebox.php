@@ -2,15 +2,23 @@
 declare(strict_types=1);
 
 require __DIR__.'/api/bootstrap.php';
+require __DIR__.'/api/pwa-shell.php';
 $host=($_GET['host']??'')==='1';
-if($host&&!sf_current_user()){
+$viewer=($host||sf_auth_cookie_value()!=='')?sf_current_user():null;
+if($host&&!$viewer){
     header('Location: stonefellow-v120.php?view=login');
     exit;
 }
 $csrf=sf_user_csrf();
 session_write_close();
+$pwaSplash=sf_pwa_splash_published();
+$waitingSplash=$pwaSplash['waiting']??[];
+$showWaiting=!$host&&in_array($waitingSplash['mode']??'', ['image','code'], true);
+$waitingFrame=$showWaiting&&$waitingSplash['mode']==='code'?sf_pwa_splash_surface_url('waiting',(int)$pwaSplash['revision']):'';
+$framePolicy=sf_pwa_shell_frame_policy(sf_public_base_url(),$waitingFrame);
 header('Cache-Control: no-store');
 header('Referrer-Policy: same-origin');
+header('Content-Security-Policy: '.$framePolicy);
 ?>
 <!doctype html>
 <html lang="en">
@@ -19,22 +27,31 @@ header('Referrer-Policy: same-origin');
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
+<?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
 <link rel="stylesheet" href="assets/css/jukebox.css?v=5">
+<link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
+<script defer src="assets/js/pwa-shell.js?v=1"></script>
+<?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=2"></script>
-<script defer src="assets/js/jukebox.js?v=5"></script>
+<script defer src="assets/js/jukebox.js?v=6"></script>
 </head>
 <body>
 <main>
 <header><a href="./">Stonefellow</a> <a id="mode-link" href="jukebox.php?host=1">Host jukebox</a></header>
 <h1 id="title">Jukebox</h1>
 <p id="status" role="status"></p>
+<?php if(!$host): ?><button type="button" data-pwa-install hidden>Install Stonefellow</button><?php endif; ?>
 <section id="directory" hidden>
 <h2 id="session-heading">Live Sessions</h2>
 <p id="session-intro" hidden>Open a public jukebox session to see what’s playing. Sessions with phone listening let you tune in from anywhere.</p>
 <ul id="sessions"></ul>
 <p id="session-empty" hidden>No sessions yet.</p>
+<section id="following-directory" aria-labelledby="following-directory-heading" hidden>
+<h2 id="following-directory-heading">Following</h2>
+<ul id="following-sessions"></ul>
+</section>
 <section id="upcoming-directory" aria-labelledby="upcoming-directory-heading" hidden>
 <h2 id="upcoming-directory-heading">Upcoming</h2>
 <ul id="upcoming-sessions"></ul>
@@ -54,6 +71,13 @@ header('Referrer-Policy: same-origin');
 <h2 id="upcoming-heading">Waiting for the session to start</h2>
 <p id="scheduled-start-line">Scheduled for <time id="scheduled-start"></time></p>
 <p id="upcoming-message" role="status"></p>
+<?php if($showWaiting): ?>
+<div data-pwa-waiting hidden>
+<?php if($waitingSplash['title']!==''): ?><h3><?=sf_pwa_shell_attr($waitingSplash['title'])?></h3><?php endif; ?>
+<?php if($waitingSplash['message']!==''): ?><p><?=sf_pwa_shell_attr($waitingSplash['message'])?></p><?php endif; ?>
+<?php sf_pwa_shell_art($waitingSplash,$waitingFrame); ?>
+</div>
+<?php endif; ?>
 <?php if($host): ?>
 <div id="schedule-controls">
 <div id="upcoming-share"></div>
@@ -69,6 +93,18 @@ header('Referrer-Policy: same-origin');
 </div>
 <?php endif; ?>
 </section>
+<?php if(!$host): ?>
+<div class="sf-pwa-alert-controls" data-pwa-session-follow hidden>
+<button type="button" data-pwa-follow-toggle>Follow this session</button>
+<p role="status" data-pwa-follow-status></p>
+<a href="./?view=login" data-pwa-follow-signin hidden>Sign in to follow</a>
+</div>
+<div class="sf-pwa-alert-controls" data-pwa-phone-alerts hidden>
+<button type="button" data-pwa-alert-toggle>Enable phone alerts</button>
+<p role="status" data-pwa-alert-status></p>
+<a href="./?view=login" data-pwa-alert-signin hidden>Sign in for phone alerts</a>
+</div>
+<?php endif; ?>
 <section id="pairing" hidden>
 <form id="join"><label>Display name (optional) <input name="name" maxlength="80" autocomplete="nickname"></label>
 <label id="remember" hidden><input type="checkbox" name="remember"> Remember me at this venue</label>
