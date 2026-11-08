@@ -68,6 +68,16 @@ Stonefellow can now be installed as a PWA without creating a second application 
 
 The installed experience uses the same single-artist public site, persistent music player and Agent shell. Offline support is deliberately conservative: only the static shell is cached. Account data, API responses, purchases, private media and Admin surfaces always require the network.
 
+Use **Admin → PWA & Splash** to publish an install icon, startup artwork, and separate designs for app opening and the Jukebox QR waiting screen. Use a square PNG of at least 512 pixels for the clearest install icon. A splash can use Media Library artwork, authored HTML/CSS/JavaScript, or an imported saved Agent Canvas. The preview shows the draft. On supported devices, the operating system chooses how to present startup artwork.
+
+Signed-in listeners can follow a session and enable alerts separately on each device. After installation, **Live Sessions → Following** lists their upcoming and live sessions. On iPhone and iPad, add Stonefellow to the Home Screen, open it there, and tap **Enable phone alerts**.
+
+For production reminders, run the alert worker once a minute using the PHP CLI path from your hosting account. The host needs PHP cURL and OpenSSL, HTTPS, writable protected storage, and outbound HTTPS to browser push services. The worker also delivers session updates to the existing Stonefellow inbox.
+
+```cron
+* * * * * /path/to/php /path/to/stonefellow/cron-jukebox-alerts.php
+```
+
 Accessibility improvements include skip navigation, named modal drawers, keyboard focus trapping/restoration, Escape behavior, aria-current navigation, reduced-motion support, forced-colors support, visible focus and coarse-pointer touch targets.
 
 ---

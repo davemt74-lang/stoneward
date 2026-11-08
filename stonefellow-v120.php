@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.310');
+define('SF_BUILD', '1.3.311');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -21,6 +21,8 @@ if($currentUser){
     catch(Throwable $e){$voiceEngineBootstrap='legacy';}
 }
 $siteSettings=sf_site_settings();$themePreview=!empty($_GET['theme_preview'])&&(($currentUser['role']??'')==='admin');$activeTheme=$themePreview?sf_theme_draft():sf_theme_published();$themeMeta=sf_theme_meta_colors($activeTheme);
+require_once __DIR__.'/api/pwa-shell.php';
+$pwaSplash=sf_pwa_splash_published();
 $configuredBase=rtrim(sf_public_base_url(),'/');
 $scriptDir=rtrim(str_replace('\\','/',dirname((string)($_SERVER['SCRIPT_NAME']??'/'))),'/');
 $appBaseHref=$configuredBase!==''?$configuredBase.'/':(($scriptDir!==''?$scriptDir:'').'/');
@@ -28,6 +30,10 @@ $initialView=sf_clean_text($_GET['view']??'',40);$publicInitialViews=['press','c
 $initialId=sf_clean_text($_GET['id']??'',160);$initialSlug=sf_clean_text($_GET['slug']??'',160);
 $initialRoute=['view'=>$initialView,'id'=>$initialId,'slug'=>$initialSlug];
 $seo=sf_seo_resolve($initialView,$initialId,$initialSlug);if($themePreview){$seo['robots']='noindex,nofollow,noarchive';$seo['canonical']='';}
+$launchSplash=$pwaSplash['launch']??[];
+$showLaunch=($_GET['view']??'')===''&&!$themePreview&&in_array($launchSplash['mode']??'', ['image','code'], true);
+$launchFrame=$showLaunch&&$launchSplash['mode']==='code'?sf_pwa_splash_surface_url('launch',(int)$pwaSplash['revision']):'';
+$framePolicy=sf_pwa_shell_frame_policy($appBaseHref,$launchFrame);
 function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES,'UTF-8'); }
 ?>
 <?php if($siteSettings['maintenance_enabled'] && (($currentUser['role']??'')!=='admin')): ?>
@@ -36,14 +42,11 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <!doctype html>
 <html lang="en">
 <head>
-  <meta http-equiv="Content-Security-Policy" content="frame-src 'none'" data-sf-canvas-frame-policy>
+  <meta http-equiv="Content-Security-Policy" content="<?=sf_h($framePolicy)?>" data-sf-canvas-frame-policy>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="<?=sf_h(!empty($siteSettings['media_app_icon'])?$siteSettings['media_app_icon']:'assets/icons/stonefellow-pwa.svg')?>">
+  <base href="<?=sf_h($appBaseHref)?>">
+<?php sf_pwa_shell_head($pwaSplash,(string)($siteSettings['media_app_icon']??'')); ?>
 <?php if($themeMeta['mode']==='system'): ?>  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="<?=sf_h($themeMeta['dark'])?>">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="<?=sf_h($themeMeta['light'])?>">
 <?php else: ?>  <meta name="theme-color" content="<?=sf_h($themeMeta[$themeMeta['mode']])?>">
@@ -62,12 +65,13 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <meta name="twitter:description" content="<?=sf_h((string)$seo['description'])?>">
 <?php if(!empty($seo['image'])): ?>  <meta name="twitter:image" content="<?=sf_h((string)$seo['image'])?>">
 <?php endif; ?><?php if(!empty($siteSettings['media_app_icon'])): ?>  <link rel="icon" href="<?=sf_h($siteSettings['media_app_icon'])?>">
-<?php endif; ?>  <base href="<?=sf_h($appBaseHref)?>">
+<?php endif; ?>
   <meta name="stonefellow-build" content="<?=sf_h(SF_BUILD)?>">
   <title><?=sf_h((string)$seo['title'])?></title>
 <?php foreach((array)$seo['json_ld'] as $structured): ?>  <script type="application/ld+json" data-seo-jsonld="1"><?=json_encode($structured,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script>
 <?php endforeach; ?>
   <link rel="stylesheet" href="assets/css/site.css?v=<?=rawurlencode(SF_BUILD)?>">
+  <link rel="stylesheet" href="assets/css/pwa-shell.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/agent-song-capture.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/public-agent-canvas.css?v=<?=rawurlencode(SF_BUILD)?>">
   <link rel="stylesheet" href="assets/css/canvas-image-review.css?v=<?=rawurlencode(SF_BUILD)?>">
@@ -117,7 +121,14 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
 <a class="skip-link" href="#mainContent">Skip to main content</a>
   <div id="a11yStatus" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <?php if($siteSettings['announcement_enabled'] && $siteSettings['announcement_text']!==''): ?><div class="site-announcement"><?=sf_h($siteSettings['announcement_text'])?></div><?php endif; ?>
-<?php // Legacy $siteSettings['splash_enabled'] is retained for compatibility, but the old splash is not rendered. ?>
+<?php if($showLaunch): ?>
+  <dialog class="sf-pwa-launch" data-pwa-launch="<?=(int)$pwaSplash['revision']?>" aria-labelledby="pwa-launch-title">
+    <h2 id="pwa-launch-title"><?=sf_h($launchSplash['title']?:'Welcome to Stonefellow')?></h2>
+<?php if($launchSplash['message']!==''): ?>    <p><?=sf_h($launchSplash['message'])?></p>
+<?php endif; sf_pwa_shell_art($launchSplash,$launchFrame); ?>
+    <form method="dialog"><button type="submit" autofocus>Continue</button></form>
+  </dialog>
+<?php endif; ?>
   <header class="topbar">
     <a class="wordmark" href="./" id="homeLink" aria-label="Stonefellow home"><?php if(!empty($siteSettings['media_logo'])): ?><img src="<?=sf_h($siteSettings['media_logo'])?>" alt="Stonefellow"><?php else: ?>STONEFELLOW<?php endif; ?></a>
     <div class="header-actions">
@@ -181,6 +192,11 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
           <a href="about" data-view="about">About</a>
           <a href="contact" data-view="contact">Contact</a>
           <button id="installAppButton" class="menu-install" type="button" hidden>Install Stonefellow</button>
+          <div class="sf-pwa-alert-controls" data-pwa-phone-alerts hidden>
+            <button type="button" data-pwa-alert-toggle>Enable phone alerts</button>
+            <p role="status" data-pwa-alert-status></p>
+            <a href="?view=login" data-pwa-alert-signin hidden>Sign in for phone alerts</a>
+          </div>
           <a href="?view=privacy" data-view="privacy">Privacy</a>
           <a href="?view=terms" data-view="terms">Terms</a>
 <?php if($currentUser): ?>
@@ -414,5 +430,7 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
   <script src="assets/js/speech-engine-conversation.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/build-integrity.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
   <script src="assets/js/accessibility.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script defer src="assets/js/pwa-shell.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
+  <script defer src="assets/js/pwa-phone-alerts.js?v=<?=rawurlencode(SF_BUILD)?>"></script>
 </body>
 </html>

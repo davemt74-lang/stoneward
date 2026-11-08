@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.310',
+  'stonefellow'=>'1.3.311',
   'canvas_runtime_libraries'=>'pinned-local-meyda-pixi-anime-matter-d3-three-and-color-thief-optional-canvas-dependencies-with-artwork-derived-host-colors',
   'canvas_live_data'=>'approved-named-sources-public-geography-map-boundaries-venue-scoped-nws-usgs-earthquakes-and-opt-in-proximity',
   'canvas_account_sources'=>'me-field-inventory-and-per-viewer-runtime-consent',
@@ -179,6 +179,8 @@ echo json_encode([
   'public_search_agent'=>'deterministic-open-site-search-without-llm-index',
   'pwa_install'=>'dynamic-manifest-install-prompt-standalone-shell',
   'pwa_offline'=>'static-shell-only-no-api-account-admin-private-cache',
+  'pwa_splash'=>'revisioned-admin-install-assets-and-isolated-app-launch-and-qr-waiting-designs',
+  'jukebox_alerts'=>'explicit-account-follow-and-device-opt-in-with-durable-session-updates',
   'accessibility_keyboard'=>'skip-link-dialog-focus-trap-escape-focus-return-aria-current',
   'accessibility_motion'=>'reduced-motion-forced-colors-coarse-pointer-touch-targets',
   'fan_profile_privacy'=>'timezone-country-locale-listening-history-personalization-controls',

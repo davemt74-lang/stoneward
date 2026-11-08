@@ -593,6 +593,10 @@
     try {
       const result = await api('state');
       state = result.state;
+      if (!host) {
+        window.StonefellowPwaAlerts?.updateSession(result);
+        document.dispatchEvent(new CustomEvent('stonefellow:jukebox-state', {detail: state}));
+      }
       const phase = phaseOf(state);
       stateReceived = true;
       if (stateFetchError && $('status').textContent === stateFetchError) notice('');
@@ -633,24 +637,22 @@
     }
   }
 
-  function renderPublicSessions(containerId, sessions, upcoming = false) {
+  function renderSessionList(containerId, sessions) {
     const container = $(containerId);
     const existing = new Map([...container.children].map(item => [item.dataset.sessionId, item]));
     const visible = new Set(sessions.map(row => row.id));
     existing.forEach((item, sessionId) => { if (!visible.has(sessionId)) item.remove(); });
     sessions.forEach((row, index) => {
+      const upcoming = phaseOf(row) === 'upcoming';
       let item = existing.get(row.id);
       if (!item) {
         item = document.createElement('li');
         item.dataset.sessionId = row.id;
         const badge = document.createElement('span');
         badge.className = 'session-badge';
-        item.append(link(row.title, page(row.id, false)), badge);
-        if (upcoming) {
-          const scheduled = document.createElement('time');
-          scheduled.className = 'session-date';
-          item.append(scheduled);
-        }
+        const scheduled = document.createElement('time');
+        scheduled.className = 'session-date';
+        item.append(link(row.title, page(row.id, false)), badge, scheduled);
       }
       const [title, badge, scheduled] = item.children;
       const status = upcoming ? (row.remote_listening ? 'Phone listening planned' : '')
@@ -658,7 +660,8 @@
       if (title.textContent !== row.title) title.textContent = row.title;
       if (badge.textContent !== status) badge.textContent = status;
       badge.hidden = !status;
-      if (scheduled) setScheduleDate(scheduled, row.scheduled_at);
+      scheduled.hidden = !upcoming;
+      if (upcoming) setScheduleDate(scheduled, row.scheduled_at);
       if (container.children[index] !== item) container.insertBefore(item, container.children[index] ?? null);
     });
   }
@@ -694,12 +697,17 @@
         $('upcoming-directory').hidden = false;
         const live = data.sessions.filter(row => phaseOf(row) === 'live');
         const upcoming = data.sessions.filter(row => phaseOf(row) === 'upcoming');
+        const following = Array.isArray(data.following_sessions) ? data.following_sessions : [];
         $('session-empty').textContent = 'No live public sessions.';
         $('session-empty').hidden = Boolean(live.length);
         $('upcoming-empty').hidden = Boolean(upcoming.length);
         notice('');
-        renderPublicSessions('sessions', live);
-        renderPublicSessions('upcoming-sessions', upcoming, true);
+        renderSessionList('sessions', live);
+        renderSessionList('upcoming-sessions', upcoming);
+        if ($('following-directory')) {
+          $('following-directory').hidden = !following.length;
+          renderSessionList('following-sessions', following);
+        }
       }
     } finally {
       directoryPending = false;

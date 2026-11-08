@@ -9,6 +9,7 @@ $a11y=(string)file_get_contents($root.'/assets/js/accessibility.js');
 $app=(string)file_get_contents($root.'/assets/js/app.js');
 $css=(string)file_get_contents($root.'/assets/css/site.css');
 $shell=(string)file_get_contents($root.'/stonefellow-v120.php');
+$pwaShell=(string)file_get_contents($root.'/api/pwa-shell.php');
 $ht=(string)file_get_contents($root.'/.htaccess');
 $version=(string)file_get_contents($root.'/version.php');
 $admin=(string)file_get_contents($root.'/admin/index.php');
@@ -32,8 +33,8 @@ ok40(str_contains($sw,"!/no-store/i.test"),'service worker refuses to persist no
 ok40(str_contains($offline,'Nothing private is cached for offline use.'),'offline shell explicitly states private data is not cached');
 ok40(str_contains($offline,'Try again'),'offline shell provides a keyboard-accessible retry action');
 
-ok40(str_contains($shell,'rel="manifest" href="manifest.webmanifest"'),'public shell links the web manifest');
-ok40(str_contains($shell,'apple-mobile-web-app-capable'),'public shell includes mobile install metadata');
+ok40(str_contains($shell,'sf_pwa_shell_head($pwaSplash')&&str_contains($pwaShell,'rel="manifest" href="manifest.webmanifest"'),'public shell links the web manifest');
+ok40(str_contains($pwaShell,'apple-mobile-web-app-capable'),'shared PWA head includes mobile install metadata');
 ok40(str_contains($shell,'class="skip-link" href="#mainContent"'),'skip navigation is present');
 ok40(str_contains($shell,'id="mainContent" class="stage" tabindex="-1"'),'skip target can receive focus');
 ok40(str_contains($shell,'id="a11yStatus"')&&str_contains($shell,'aria-live="polite"'),'dedicated accessibility status region exists');
