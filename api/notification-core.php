@@ -134,12 +134,25 @@ function sf_notification_action_context(array $row,string $dedupeKey,array $trac
         $position=min(86400,(int)$m[1]*60+(int)$m[2]);
     return ['type'=>'track','track_id'=>$id,'position_seconds'=>$position];
 }
+/** Share inbox visibility and ordering with consumers that only need a summary. */
+function sf_notification_inbox_rows(int $userId,int $limit,bool $includeDetails): array {
+    sf_notification_ensure_schema();
+    $limit=max(1,min(200,$limit));
+    $fields='n.kind,n.title,n.created_at,n.is_read';
+    if($includeDetails){
+        $fields="n.id,n.kind,n.title,n.body,n.link_url,n.is_read,n.created_at,n.read_at,
+            (SELECT d.dedupe_key FROM notification_delivery_keys d WHERE d.user_id=n.user_id AND d.notification_id=n.id LIMIT 1) AS source_key";
+    }
+    $q=sf_db()->prepare("SELECT $fields FROM user_notifications n WHERE n.user_id=?
+        AND NOT EXISTS(SELECT 1 FROM notification_events e WHERE e.notification_id=n.id AND e.event_type='dismiss')
+        ORDER BY n.id DESC LIMIT $limit");
+    $q->execute([$userId]);
+    $rows=$q->fetchAll();
+    $q->closeCursor();
+    return $rows;
+}
 function sf_smart_user_notifications(int $userId,int $limit=60): array {
-    sf_notification_ensure_schema();$limit=max(1,min(200,$limit));
-    $q=sf_db()->prepare("SELECT n.id,n.kind,n.title,n.body,n.link_url,n.is_read,n.created_at,n.read_at,
-        (SELECT d.dedupe_key FROM notification_delivery_keys d WHERE d.user_id=n.user_id AND d.notification_id=n.id LIMIT 1) AS source_key
-        FROM user_notifications n WHERE n.user_id=? AND NOT EXISTS(SELECT 1 FROM notification_events e WHERE e.notification_id=n.id AND e.event_type='dismiss') ORDER BY n.id DESC LIMIT ".$limit);
-    $q->execute([$userId]);$tracks=sf_track_map();$rows=$q->fetchAll();
+    $rows=sf_notification_inbox_rows($userId,$limit,true);$tracks=sf_track_map();
     foreach($rows as &$row){
         $source=(string)($row['source_key']??'');unset($row['source_key']);
         $action=sf_notification_action_context($row,$source,$tracks);

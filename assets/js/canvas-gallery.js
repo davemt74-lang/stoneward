@@ -38,6 +38,7 @@
     let root=null,content=null,status=null,navigation=null,view='public',epoch=0;
     let owner=String(options.getOwner?.()??options.owner??'');
     let submissionReceipt=null;
+    const installedKeys=new Set();
     const getOwner=()=>String(options.getOwner?.()??options.owner??'');
     const active=captured=>!!root?.isConnected&&captured===epoch;
     function abortRequests(){for(const request of requests)request.abort();requests.clear();}
@@ -70,11 +71,54 @@
     }
     function signIn(){
       if(typeof options.onSignIn==='function')options.onSignIn();
-      else message('Sign in from the account menu to submit or remix a canvas.');
+      else message('Sign in from the account menu to continue.');
     }
     function accountNotice(){
-      content.append(element('p','sf-gallery-empty','Sign in to manage and submit your canvases.'));
+      content.append(element('p','sf-gallery-empty',view==='installed'?'Sign in to see your installed canvas apps.':'Sign in to manage and submit your canvases.'));
       const action=button('Sign in','sf-gallery-primary');action.onclick=signIn;content.append(action);
+    }
+    function rememberInstall(app){
+      if(!publicId(app?.id)||app.installed!==true)return;
+      installedKeys.add(app.id);
+      if(publicId(app.gallery_id))installedKeys.add(app.gallery_id);
+    }
+    function syncInstallButton(control){
+      const installed=installedKeys.has(control.dataset.galleryInstall)||installedKeys.has(control.dataset.appId);
+      const label=installed?'Installed':'Install';
+      control.textContent=label;
+      control.setAttribute('aria-label',label+' '+control.dataset.appTitle);
+      control.disabled=installed||control.dataset.installing==='true';
+    }
+    async function loadInstallState(){
+      if(!owner||typeof api.installed!=='function')return;
+      try{
+        const result=await call(api.installed,[],true);
+        if(!Array.isArray(result?.items))return;
+        result.items.forEach(rememberInstall);
+        root.querySelectorAll('[data-gallery-install]').forEach(syncInstallButton);
+      }catch(_){/* The public catalog stays available when this private read fails. */}
+    }
+    function installButton(item,title,state){
+      const control=button('Install');
+      control.dataset.galleryInstall=item.id;
+      control.dataset.appId=publicId(item.app_id)?item.app_id:'';
+      control.dataset.appTitle=title;
+      syncInstallButton(control);
+      control.onclick=async event=>{
+        if(!event.isTrusted)return;
+        if(!ownsView()){signIn();return;}
+        control.dataset.installing='true';syncInstallButton(control);state.textContent='Installing app…';
+        try{
+          const result=await call(api.install,[item.id],true);
+          if(!publicId(result?.app?.id)||result.app.installed!==true||
+            (publicId(item.app_id)&&result.app.id!==item.app_id))throw new Error('The installation could not be verified.');
+          rememberInstall(result.app);installedKeys.add(item.id);
+          root.querySelectorAll('[data-gallery-install]').forEach(syncInstallButton);
+          state.textContent=result.app.enabled===true?'Installed. App notifications are on.':'Installed. App notifications are off.';
+        }catch(error){if(error.name!=='AbortError')state.textContent=error.message||'The app could not be installed.';}
+        finally{if(control.isConnected){delete control.dataset.installing;syncInstallButton(control);}}
+      };
+      return control;
     }
     function preview(item){
       const frame=element('div','sf-gallery-preview');
@@ -90,13 +134,14 @@
       }
       return frame;
     }
-    async function openCard(item,action,state,buttons){
-      if(action==='remix'&&!ownsView()){signIn();return;}
+    async function openCard(item,action,state,buttons,installed=false){
+      const privateRead=action==='remix'||installed;
+      if(privateRead&&!ownsView()){signIn();return;}
       const callback=action==='remix'?options.onRemix:options.onOpen;
       if(typeof callback!=='function'){state.textContent='This action is unavailable.';return;}
       buttons.forEach(node=>{node.disabled=true;});state.textContent=action==='remix'?'Preparing your remix…':'Opening canvas…';
       try{
-        await call(callback,[item],action==='remix');
+        await call(callback,[item],privateRead);
         state.textContent=action==='remix'?'Remix opened in your canvas.':'Canvas opened.';
       }catch(error){if(error.name!=='AbortError')state.textContent=error.message||'The canvas could not be opened.';}
       finally{if(state.isConnected)buttons.forEach(node=>{node.disabled=false;});}
@@ -146,7 +191,9 @@
         open.setAttribute('aria-label','Open '+heading.textContent);remix.setAttribute('aria-label','Remix '+heading.textContent);
         open.onclick=()=>void openCard(item,'open',state,[open,remix]);
         remix.onclick=()=>void openCard(item,'remix',state,[open,remix]);
-        actions.append(open,remix);
+        actions.append(open);
+        if(typeof api.install==='function')actions.append(installButton(item,heading.textContent,state));
+        actions.append(remix);
         if(typeof options.getItemUrl==='function'){
           const share=button('Copy link');share.setAttribute('aria-label','Copy link to '+heading.textContent);
           const label=element('label','sf-gallery-share');label.hidden=true;label.append(element('span','sf-gallery-label','Share link'));
@@ -168,6 +215,82 @@
         }
       }
       copy.append(actions,state);node.append(copy);return node;
+    }
+    function installedCard(app,grid){
+      const captured=epoch;
+      const node=element('article','sf-gallery-card sf-gallery-installed-card');
+      const copy=element('div','sf-gallery-card-copy');
+      const heading=element('h3');
+      const availability=element('p','sf-gallery-installed-state');
+      const actions=element('div','sf-gallery-card-actions');
+      const state=element('p','sf-gallery-card-state');state.setAttribute('role','status');
+      const open=button('Open','sf-gallery-primary');
+      const alerts=button('Notification settings');
+      const remove=button('Uninstall');
+      const current=()=>active(captured)&&node.isConnected&&owner===getOwner();
+      let hasAlertSettings=false;
+      const update=next=>{
+        app=next;
+        const available=publicId(app.gallery_id),enabled=app.enabled===true,supportsAlerts=app.supports_alerts===true;
+        const title=text(app.title)||'Canvas app';
+        heading.textContent=title;
+        open.setAttribute('aria-label','Open '+title);
+        alerts.setAttribute('aria-label','Notification settings for '+title);
+        remove.setAttribute('aria-label','Uninstall '+title);
+        open.hidden=!available;
+        hasAlertSettings ||= supportsAlerts||enabled;
+        alerts.hidden=typeof options.onAppNotifications!=='function'||!hasAlertSettings;
+        const alertStatus=enabled?(supportsAlerts?'App notifications on.':'App notifications are paused.'):
+          supportsAlerts?'App notifications off.':'This app has no notifications available.';
+        availability.textContent=available?alertStatus:'This app is unavailable right now.'+(enabled?' '+alertStatus:'');
+      };
+      open.onclick=()=>{
+        if(current()&&publicId(app.gallery_id))void openCard({id:app.gallery_id,title:heading.textContent},'open',state,[open],true);
+      };
+      alerts.onclick=()=>{
+        if(current()&&ownsView())options.onAppNotifications?.(app,next=>{
+          if(current()&&next?.id===app.id)update(next);
+        },current);
+      };
+      remove.onclick=async event=>{
+        if(!event.isTrusted||!current()||!ownsView())return;
+        const controls=[open,alerts,remove];
+        controls.forEach(control=>{control.disabled=true;});
+        state.textContent='Uninstalling app…';
+        try{
+          const result=await call(api.uninstall,[app.id],true);
+          if(result?.app?.id!==app.id||result.app.installed!==false||result.app.enabled!==false)
+            throw new Error('The uninstall could not be verified. Refresh Installed apps to check.');
+          const next=node.nextElementSibling||node.previousElementSibling;
+          node.remove();
+          if(!grid.children.length)grid.append(element('p','sf-gallery-empty','You have no installed canvas apps.'));
+          message('App uninstalled. Its notifications are off.');
+          (next?.querySelector('button:not([hidden]):not([disabled])')||navigation.querySelector('[data-view=installed]'))?.focus({preventScroll:true});
+        }catch(error){if(error.name!=='AbortError')state.textContent=error.message||'The app could not be uninstalled.';}
+        finally{if(node.isConnected)controls.forEach(control=>{control.disabled=false;});}
+      };
+      remove.hidden=typeof api.uninstall!=='function';
+      actions.append(open,alerts,remove);
+      copy.append(heading,availability,actions,state);node.append(copy);
+      update(app);
+      return node;
+    }
+    async function installedListing(){
+      const grid=element('div','sf-gallery-grid');grid.setAttribute('aria-label','Installed canvas apps');
+      const retry=button('Try again');retry.hidden=true;retry.onclick=()=>void show('installed');
+      content.append(element('p','sf-gallery-installed-intro','Uninstalling an app turns off its notifications.'),grid,retry);
+      message('Loading your installed apps…');
+      try{
+        const result=await call(api.installed,[],true);
+        if(!Array.isArray(result?.items))throw new Error('Your installed apps could not be read.');
+        const seen=new Set();
+        for(const app of result.items){
+          if(!publicId(app?.id)||app.installed!==true||seen.has(app.id))continue;
+          seen.add(app.id);grid.append(installedCard(app,grid));
+        }
+        if(!seen.size)grid.append(element('p','sf-gallery-empty','You have no installed canvas apps.'));
+        message('');
+      }catch(error){if(error.name!=='AbortError'){message(error.message||'Your installed apps could not load.',true);retry.hidden=false;}}
     }
     async function detail(id){
       message('Loading shared canvas…');
@@ -306,12 +429,14 @@
       message('Choose a saved version and review its public details.');
     }
     async function show(next,parameters={}){
-      if(!root||!['public','mine','submit'].includes(next))return;
+      if(!root||!['public','mine','submit','installed'].includes(next)||(next==='installed'&&typeof api.installed!=='function'))return;
       const nextOwner=getOwner();if(nextOwner!==owner){owner=nextOwner;submissionReceipt=null;}
-      epoch++;abortRequests();view=next;content.replaceChildren();message('');
+      epoch++;abortRequests();installedKeys.clear();view=next;content.replaceChildren();message('');
       for(const item of navigation.children)item.setAttribute('aria-current',item.dataset.view===view?'page':'false');
       if(view!=='public'&&!owner){accountNotice();return;}
+      if(view==='public')void loadInstallState();
       if(view==='submit')await submission(parameters.sceneId);
+      else if(view==='installed')await installedListing();
       else if(view==='public'&&parameters.itemId)await detail(parameters.itemId);
       else await listing(view==='mine');
     }
@@ -322,7 +447,10 @@
       const heading=element('h1','','Canvas Gallery');heading.id=prefix+'-heading';
       header.append(heading,element('p','','Explore shared canvases, open an experience, or make a remix of your own.'));
       navigation=element('nav','sf-gallery-nav');navigation.setAttribute('aria-label','Canvas gallery views');
-      for(const [key,label] of [['public','Gallery'],['mine','My submissions'],['submit','Submit a canvas']]){
+      const views=[['public','Gallery']];
+      if(typeof api.installed==='function')views.push(['installed','Installed apps']);
+      views.push(['mine','My submissions'],['submit','Submit a canvas']);
+      for(const [key,label] of views){
         const action=button(label);action.dataset.view=key;action.onclick=()=>void show(key);navigation.append(action);
       }
       status=element('p','sf-gallery-state');status.setAttribute('role','status');status.setAttribute('aria-live','polite');

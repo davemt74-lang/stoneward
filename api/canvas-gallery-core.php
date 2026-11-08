@@ -84,6 +84,10 @@ function sf_canvas_gallery_public(array $row,bool $private=false): array {
     if($snapshot===null){$q=sf_db()->prepare('SELECT snapshot_json FROM canvas_gallery_entries WHERE id=?');$q->execute([$row['id']]);$snapshot=$q->fetchColumn();$q->closeCursor();}
     $source=is_string($snapshot)?json_decode($snapshot,true,16,JSON_THROW_ON_ERROR):[];
     $item['uses']=sf_canvas_access_public_uses((string)($source['html']??''),$source['artist_inputs']['me_tools']??null,$source['artist_inputs']['data_sources']??[],(string)($source['js']??''));
+    if($row['status']==='approved'){
+        require_once __DIR__.'/canvas-app-core.php';
+        $item['app_id']=sf_canvas_app_id_for_gallery($row['id']);
+    }
     if($attribution!==null)$item['attribution']=$attribution;
     if($private)$item+=['status'=>$row['status'],'feedback'=>$row['feedback'],'snapshot_hash'=>$row['snapshot_hash'],'source_scene_id'=>(int)$row['source_scene_id'],'reviewed_at'=>$row['reviewed_at'],'updated_at'=>$row['updated_at']];
     return $item;
@@ -115,7 +119,7 @@ function sf_canvas_gallery_list(?int $uid=null,bool $admin=false,array $options=
         do{
             $cursor=$after===null?'':' AND (submitted_at<? OR (submitted_at=? AND id<?))';$queryArgs=$args;
             if($after!==null)array_push($queryArgs,$after['submitted_at'],$after['submitted_at'],$after['id']);
-            $q=$db->prepare('SELECT id,title,description,creator_label,preview_asset_id,submitted_at,published_at,attribution_json FROM canvas_gallery_entries'.$sql.$cursor.' ORDER BY submitted_at DESC,id DESC LIMIT 100');
+            $q=$db->prepare('SELECT id,status,title,description,creator_label,preview_asset_id,submitted_at,published_at,attribution_json FROM canvas_gallery_entries'.$sql.$cursor.' ORDER BY submitted_at DESC,id DESC LIMIT 100');
             $q->execute($queryArgs);$batch=$q->fetchAll(PDO::FETCH_ASSOC);$q->closeCursor();
             foreach($batch as $row)if(sf_canvas_gallery_available($row['id'])){if($total>=$offset&&count($rows)<$limit)$rows[]=$row;$total++;}
             $after=$batch?end($batch):null;
@@ -164,7 +168,10 @@ function sf_canvas_gallery_submit(array $user,array $request,?callable $capture=
 function sf_canvas_gallery_withdraw(array $user,string $id): array {
     $uid=(int)($user['id']??0);sf_canvas_gallery_id($id);sf_canvas_gallery_ensure_schema();$db=sf_db();$db->beginTransaction();
     try{sf_agent_scene_history_lock_account($db,$uid);$row=sf_canvas_gallery_row($id,true);if(!$row||(int)$row['user_id']!==$uid)throw new SfCanvasGalleryNotFound('Canvas submission not found.');
-        $db->prepare("UPDATE canvas_gallery_entries SET status='withdrawn',updated_at=? WHERE id=?")->execute([gmdate('c'),$id]);$db->commit();sf_canvas_gallery_cleanup_files([$id]);return sf_canvas_gallery_get($id,$uid);
+        $now=gmdate('c');
+        $db->prepare("UPDATE canvas_gallery_entries SET status='withdrawn',updated_at=? WHERE id=?")->execute([$now,$id]);
+        require_once __DIR__.'/canvas-app-core.php';sf_canvas_app_unpublish($id,$now);
+        $db->commit();sf_canvas_gallery_cleanup_files([$id]);return sf_canvas_gallery_get($id,$uid);
     }catch(Throwable $error){if($db->inTransaction())$db->rollBack();throw $error;}
 }
 function sf_canvas_gallery_moderate(array $admin,string $id,string $action,string $hash,string $feedback=''): array {
@@ -172,7 +179,13 @@ function sf_canvas_gallery_moderate(array $admin,string $id,string $action,strin
     if(!in_array($action,['approve','return','decline','unpublish'],true)||preg_match('/\A[a-f0-9]{64}\z/',$hash)!==1)throw new InvalidArgumentException('Review this exact submitted snapshot.');
     $feedback=sf_canvas_gallery_text($feedback,2000,$action==='return');sf_canvas_gallery_ensure_schema();require_once __DIR__.'/canvas-gallery-assets.php';sf_canvas_gallery_assets_prepare();$row=sf_canvas_gallery_row($id);if(!$row)throw new SfCanvasGalleryNotFound('Canvas submission not found.');
     $snapshotInputs=json_decode($row['snapshot_json'],true,16,JSON_THROW_ON_ERROR);if(isset($snapshotInputs['playlist_inputs'])){sf_canvas_playlists_ensure_schema();sf_media_ensure_schema();}
-    if($action==='approve')sf_canvas_resource_prepare($snapshotInputs['artist_inputs']??null);
+    require_once __DIR__.'/canvas-app-core.php';
+    if($action==='approve'){
+        sf_canvas_resource_prepare($snapshotInputs['artist_inputs']??null);
+        require_once __DIR__.'/canvas-app-alert-core.php';
+        sf_canvas_app_schema();
+        sf_canvas_app_alert_schema();
+    }
     $db=sf_db();$db->beginTransaction();
     try{sf_agent_scene_history_lock_account($db,(int)$row['user_id']);
         $q=$db->prepare('SELECT status FROM users WHERE id=?');$q->execute([(int)$row['user_id']]);$ownerStatus=$q->fetchColumn();$q->closeCursor();
@@ -188,6 +201,8 @@ function sf_canvas_gallery_moderate(array $admin,string $id,string $action,strin
             foreach(json_decode($row['assets_json'],true,8,JSON_THROW_ON_ERROR) as $asset){$file=sf_canvas_gallery_assets_file($id,$asset['id'],$admin);if(!$file)throw new SfCanvasGalleryConflict('A submitted image is unavailable.');fclose($file['handle']);}
         }
         $now=gmdate('c');$db->prepare('UPDATE canvas_gallery_entries SET status=?,feedback=?,reviewed_by=?,reviewed_at=?,published_at=?,updated_at=? WHERE id=?')->execute([$next,$feedback,(int)$admin['id'],$now,$action==='approve'?$now:$row['published_at'],$now,$id]);
+        if($action==='approve')sf_canvas_app_publish($row,$now);
+        elseif($action==='unpublish')sf_canvas_app_unpublish($id,$now);
         $db->commit();return sf_canvas_gallery_get($id,null,true);
     }catch(Throwable $error){if($db->inTransaction())$db->rollBack();throw $error;}
 }
@@ -201,7 +216,19 @@ function sf_canvas_gallery_open(string $id,?array $viewer=null,string $currentTr
     $data=sf_agent_canvas_data_for_scene($admin?[]:($viewer??[]),$scene['html'],$currentTrackId,$scene['music_inputs']??null,$scene['artist_inputs']??null,$admin?null:['gallery_id'=>$id]);
     if(!$admin)$scene['canvas_access']=sf_canvas_access_summary($viewer??[],['gallery_id'=>$id]);
     if($data){$scene['datasets']=$data;foreach($data as $dataset)if(array_key_exists('current_rows',$dataset)){$scene['dataset_track_id']=$currentTrackId;break;}}
-    return ['item'=>sf_canvas_gallery_public($row,$admin),'scene'=>$scene];
+    $result=['item'=>sf_canvas_gallery_public($row,$admin),'scene'=>$scene];
+    if(!$admin){
+        require_once __DIR__.'/canvas-app-core.php';
+        $appId=sf_canvas_app_id_for_gallery($id);
+        // The historical snapshot remains directly openable even if the latest app revision is unavailable.
+        try{
+            $app=sf_canvas_app_get($uid,null,$appId);
+            $result['app']=$app;
+            if($app['gallery_id']===$id&&$app['supports_alerts'])$result['scene']['app_notifications']=true;
+        }
+        catch(SfCanvasGalleryNotFound){}
+    }
+    return $result;
 }
 function sf_canvas_gallery_attribution(array $row): array {
     $snapshot=json_decode($row['snapshot_json'],true,16,JSON_THROW_ON_ERROR);$old=sf_agent_scene_gallery_attribution($snapshot['gallery_attribution']??null);
@@ -237,7 +264,12 @@ function sf_canvas_gallery_export(int $uid): array {
     return array_map(static fn(array $row):array=>sf_canvas_gallery_public($row,true)+['scene'=>json_decode($row['snapshot_json'],true,16,JSON_THROW_ON_ERROR)],$rows);
 }
 function sf_canvas_gallery_clear(int $uid): array {
-    $counts=['canvas_gallery_entries'=>0,'canvas_gallery_remixes'=>0];foreach(['canvas_gallery_remixes','canvas_gallery_entries'] as $table)if(sf_canvas_gallery_exists($table)){$q=sf_db()->prepare('DELETE FROM '.$table.' WHERE user_id=?');$q->execute([$uid]);$counts[$table]=$q->rowCount();}return $counts;
+    require_once __DIR__.'/canvas-app-core.php';
+    $counts=['canvas_gallery_entries'=>0,'canvas_gallery_remixes'=>0,'canvas_apps'=>sf_canvas_app_clear_owned($uid)];
+    foreach(['canvas_gallery_remixes','canvas_gallery_entries'] as $table)if(sf_canvas_gallery_exists($table)){
+        $q=sf_db()->prepare('DELETE FROM '.$table.' WHERE user_id=?');$q->execute([$uid]);$counts[$table]=$q->rowCount();
+    }
+    return $counts;
 }
 function sf_canvas_gallery_owned_ids(int $uid): array {
     if($uid<1||!sf_canvas_gallery_exists())return [];$q=sf_db()->prepare('SELECT id FROM canvas_gallery_entries WHERE user_id=?');$q->execute([$uid]);$ids=$q->fetchAll(PDO::FETCH_COLUMN);$q->closeCursor();return $ids;

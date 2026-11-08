@@ -510,6 +510,9 @@ PROMPT;
         $prompt['canvas_libraries']=array_map(static fn(array $card):array=>array_intersect_key($card,
             array_flip(['id','name','version','global','when','api','lock'])),$libraries);
         $system.="\n".SF_CANVAS_LIBRARY_BUILD_INSTRUCTIONS;
+        if(preg_match('/\b(?:notifications?|notify|alerts?)\b/i',$brief)===1||str_contains($previous['html']??'','sf-action-app-notifications')){
+            $system.="\nFor requested published app alerts, author a styled <span class=\"sf-action-app-notifications\"> with a concise control label. The published host renders it as a button and handles each installed listener's choice and device delivery. Style its data-sf-notification-state attribute (not-installed, off, on, unavailable) to match the app. The supported alert event is approval of a new published revision of this app. Reading the listener's inbox uses the separate account dataset.";
+        }
         $prompt['canvas_data_tools']=sf_agent_canvas_data_tools($artistInputs['me_tools']??null);
         if(isset($artistInputs['me_tools']))$prompt['selected_account_sources']=$artistInputs['me_tools'];
         if(isset($artistInputs['data_sources'])){
@@ -904,10 +907,11 @@ function sf_agent_scene_render(string $raw,array $context,?array &$imageRequest=
                 $context['canvas_title']=trim($title);
         }
         $code=sf_agent_scene_scrub_copy($code,$brief,$context['trusted_canvas_markup']??false);
-        if(isset($context['artist_inputs']['me_tools'])){
-            $declared=sf_canvas_access_declared($code['html']);
+        $declared=sf_canvas_access_declared($code['html']);
+        if($declared){
+            $meTools=$context['artist_inputs']['me_tools']??null;
             foreach(sf_canvas_capability_cards() as $id=>$card){
-                if(isset($declared[$id])&&$card['requires_sign_in']&&!in_array($id,$context['artist_inputs']['me_tools'],true))
+                if(isset($declared[$id])&&!sf_canvas_access_in_scope($id,$card['requires_sign_in'],$meTools))
                     throw new SfAgentSceneInvalidOutput('account_scope');
             }
         }

@@ -34,8 +34,25 @@ A canvas receives the current viewer's records only for sources it declares, the
 | `my_purchases` | Up to 120 recent line items from orders linked to the viewer's account | `purchase_id`, `order_id`, `item_label`, `item_type`, `product_id`, `variant_id`, `track_id`, `release_id`, `quantity`, `item_total_cents`, `order_total_cents`, `currency`, `ordered_at`, `order_status`, `payment_status`, `fulfillment_status`, `vinyl_status` |
 | `my_tickets` | Up to 60 recent Stonefellow reservations | `reservation_id`, `offer_id`, `show_id`, `offer_title`, `offer_type`, `show_title`, `show_date`, `venue`, `location`, `quantity`, `status`, `reserved_at` |
 | `my_preferences` | One row for current settings | `locale`, `timezone`, `country_code`, `listening_history_enabled`, `personalization_enabled` |
+| `my_notifications` | Up to 30 most recent inbox entries, excluding dismissed items | `kind`, `title`, `created_at`, `is_read` |
 
 History events include start, resume, pause, complete and skip. Measured listening seconds come from reported native playback, and legacy event counts indicate coverage without measured time. Listening sources honor the account's listening-history setting. Purchase order totals repeat across lines in one order, so group by `order_id` before summing totals.
+
+## Notifications
+
+Send `/notifications` on its own to open the Notifications drawer. Include it in a build or `/edit` prompt to open the account-data picker with **Notification inbox** selected. Choose **Add selections** to attach `{me:my_notifications}`. You can also select that source directly from `/me`.
+
+Canvas code can use the read-only `my_notifications` binding after the current viewer grants access in **What this canvas uses**. The binding contains notification kind, title, creation time and read status. The **Notification inbox** admin permission controls availability. Use the native drawer to manage notifications.
+
+Jukebox reminders, live starts, time changes and cancellations appear in the signed-in follower's inbox. Canvas code can filter them by `kind` set to `jukebox`. The native notification opens the session link.
+
+### Alerts from installed canvas apps
+
+To build an app control for release alerts, put `sf-action-app-notifications` on a `span` with an accessible text label. Style that element to fit the app. The approved current publication renders the marked element as a native button. The host exposes `aria-pressed` and `data-sf-notification-state` with `not-installed`, `off`, `on` or `unavailable` after checking the current listener's preference.
+
+Install a published app from the Canvas Catalog or through its own alert control. The same control opens the confirmation for enabling or disabling its alerts. The Installed tab lets listeners manage or remove an app. Each new installation starts with alerts off. Device delivery uses the existing Stonefellow phone alert setup.
+
+The first verified event is approval of a new saved revision of an already published app. An approved revision of the current published version advances the installed app. A remix has a separate installation and consent. Each alert opens the published version named by the event. Canvas code can show inbox rows of kind `canvas_app` through the existing consented inbox binding.
 
 ## Live sources with /data
 

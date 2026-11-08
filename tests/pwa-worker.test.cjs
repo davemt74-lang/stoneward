@@ -63,3 +63,46 @@ test('notification taps focus only the exact guest session or open it', async ()
   assert.deepEqual(existing.opened, []);
   assert.deepEqual(missing.opened, [scope + link]);
 });
+
+test('typed canvas app alerts open their exact approved canvas route', async () => {
+  const canvasLink = `index.php?view=canvas-gallery&id=${id}&open=1`;
+  const shownUrl = scope + canvasLink;
+  let focused = 0;
+  const detail = {url: shownUrl.replace('&open=1', ''), focus: async () => assert.fail('catalog detail tab')};
+  const exact = {url: shownUrl, focus: async () => { focused++; }};
+  const app = worker([detail, exact]);
+  await app.dispatch('push', {data: {json: () => ({type: 'canvas-app', title: 'Stonefellow', body: 'Canvas update', url: canvasLink, tag: 'ignored'})}});
+  const [title, options] = app.shown[0];
+  assert.equal(title, 'Stonefellow');
+  assert.equal(options.tag, `stonefellow-canvas-app:${id}`);
+  assert.equal(options.data.url, shownUrl);
+  assert.equal(options.data.type, 'canvas-app');
+  const notification = {data: options.data, close: () => {}};
+  await app.dispatch('notificationclick', {notification});
+  assert.equal(focused, 1);
+  assert.deepEqual(app.opened, []);
+  const missing = worker([detail]);
+  await missing.dispatch('notificationclick', {notification});
+  assert.deepEqual(missing.opened, [shownUrl]);
+});
+
+test('canvas app push routes reject missing type, altered action, and out-of-scope paths', async () => {
+  const canvasLink = `index.php?view=canvas-gallery&id=${id}&open=1`;
+  const app = worker();
+  const blocked = [
+    {url: canvasLink},
+    {type: 'unknown', url: canvasLink},
+    {type: 'canvas-app', url: canvasLink.replace('&open=1', '')},
+    {type: 'canvas-app', url: canvasLink + '&open=1'},
+    {type: 'canvas-app', url: canvasLink.replace('view=canvas-gallery', 'view=account')},
+    {type: 'canvas-app', url: '/' + canvasLink},
+    {type: 'canvas-app', url: 'https://other.test/music-site/' + canvasLink},
+    {type: 'canvas-app', url: link},
+  ];
+  for (const data of blocked) {
+    await app.dispatch('push', {data: {json: () => ({title: 'Stonefellow', body: 'Canvas update', ...data})}});
+    await app.dispatch('notificationclick', {notification: {data, close: () => assert.fail('invalid canvas route')}});
+  }
+  assert.deepEqual(app.shown, []);
+  assert.deepEqual(app.opened, []);
+});

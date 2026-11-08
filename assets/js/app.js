@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.313';
+  window.STONEFELLOW_APP_BUILD='1.3.314';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -24,6 +24,7 @@
   const drawerTitle=$('#activityDrawerTitle'),drawerCartCount=$('#drawerCartCount'),drawerTools=$('#activityDrawerTools'),chatFooterRestore=$('#chatFooterRestore'),chatFooterHide=$('#chatFooterHide');
   let drawerRenderSequence=0;
   let drawerReturnFocus=null,queueReturnFocus=null;
+  st.drawer.owner=canvasOwner();
   let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,voiceTurnGeneration=0,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupHistoryEpoch=0,popupEntries=[];
   let voiceGreetingArmed=false,voiceGreetingDelivered=false;
   const guestProfileKey='stonefellow.guest.profile.v1';
@@ -1196,6 +1197,17 @@
   function syncAuthMenu(){
     // Account navigation is rendered exclusively by PHP on full-page requests.
     document.documentElement.dataset.authState=st.auth.authenticated?'logged-in':'logged-out';
+    const owner=canvasOwner();
+    if(st.drawer&&st.drawer.owner!==owner){
+      st.drawer.owner=owner;
+      st.drawer.requestId=(st.drawer.requestId||0)+1;
+      st.drawer.data=null;
+      updateNotificationBadge(0);
+      if(st.drawer.mode==='activity'){
+        renderDrawer();
+        if(owner&&notificationDrawer&&!notificationDrawer.hidden)void loadNotificationDrawer();
+      }
+    }
     window.SFTokenMeter?.setOwner?.();
     window.SFListeningTelemetry?.setOwner?.();
     syncCanvasDebugOwner();
@@ -1210,6 +1222,7 @@
     if(gallerySceneRequest&&gallerySceneRequest.galleryOwner!==canvasOwner())cancelGalleryOpen();
     if((!st.auth.authenticated&&!isGalleryScene())||(listeningRoomOwner!==null&&listeningRoomOwner!==canvasSceneOwner()))closeListeningRoom(false);
     canvasGalleryView?.setOwner();
+    if(window.SFCanvasAppNotifications)canvasAppNotifications.current?.setOwner();
     canvasAccess.current?.setOwner();
     const canvasPermissionsMenu=document.getElementById('menuCanvasPermissions');if(canvasPermissionsMenu)canvasPermissionsMenu.hidden=!canvasOwner();
     window.SFPublicAgentCanvas?.syncSceneAccess?.();
@@ -1492,10 +1505,16 @@
   async function toggleFavorite(type,id){if(!st.auth.authenticated){say('Sign in to save favorites.',()=>navigate('login'));return}try{const desired=!isFavorite(type,id),j=await secureJsonPost('personalization.php',{action:'set_favorite',item_type:type,item_id:id,favorite:desired});st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;routeFromLocation()}catch(e){say(e.message)}}
   async function clearListeningHistory(){if(!confirm('Clear your personal listening history and Continue Listening positions? Aggregate anonymous listening totals will remain.'))return;try{const j=await secureJsonPost('personalization.php',{action:'clear_history'});st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;say('Your personal listening history was cleared.',()=>navigate('account'))}catch(e){say(e.message)}}
   function resumeTrack(trackId,position){const t=trackById(trackId);if(!t)return;play(t,Number(position)||0);renderStory(t);setUrl('track',{id:t.id})}
-  async function loadPlaylists(force=false){
+  async function loadPlaylists(force=false,isCurrent=()=>true){
     if(!st.auth.authenticated){st.playlists={loaded:true,items:[]};return st.playlists.items}
     if(st.playlists.loaded&&!force)return st.playlists.items;
-    try{const j=await api('playlists.php');st.playlists={loaded:true,items:j.playlists||[]};if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf}catch(_){st.playlists={loaded:true,items:[]}}
+    try{
+      const j=await api('playlists.php');
+      if(isCurrent()){
+        st.playlists={loaded:true,items:j.playlists||[]};
+        if(j.csrf)st.auth.csrf=j.csrf;
+      }
+    }catch(_){if(isCurrent())st.playlists={loaded:true,items:[]}}
     return st.playlists.items;
   }
   async function loadAgentListeningSession(){if(!st.auth.authenticated)return null;try{const j=await api('listening-sessions.php');if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf;if(j.session){st.agentSession={id:j.session.id,title:j.session.title||'Agent Listening Session',mode:j.session.mode||'mix',status:j.session.status||'',currentIndex:Number(j.session.current_index||0),tracks:j.session.tracks||[]};const ids=sessionTrackIds();if(ids.length)st.playlistPlayback={playlistId:'agent-session:'+j.session.id,playlistName:st.agentSession.title,trackIds:ids,index:Math.max(0,Math.min(ids.length-1,st.agentSession.currentIndex))};renderAgentSessionPanel();return j.session}}catch(_){}return null}
@@ -1666,7 +1685,7 @@
         html+='</select>';
       }else html+='<button type="button" data-notification-new-playlist="'+id+'">+ New playlist</button>';
     }else if(n.link_url){
-      const label={release:'Explore release',build:'My builds',community:'Account details',vinyl_production:'Order status',membership:'Membership'}[kind]||'Open details';
+      const label={release:'Explore release',build:'My builds',community:'Account details',vinyl_production:'Order status',membership:'Membership',canvas_app:'Open app'}[kind]||'Open details';
       html+='<button type="button" class="notification-primary-action" data-notification-open="'+id+'">'+label+'</button>';
     }else if(kind==='build'||kind==='community'||kind==='membership'){
       html+='<button type="button" class="notification-primary-action" data-notification-account="'+id+'">'+(kind==='build'?'My builds':'My account')+'</button>';
@@ -1837,7 +1856,28 @@
       Array.from(drawerContent.querySelectorAll('[data-notification-account]')).forEach(b=>b.onclick=()=>{const id=Number(b.dataset.notificationAccount);closeNotificationDrawer();void recordNotificationInteraction(id);navigate('account')});
     }else if(tab==='history'){const rows=d.history||[],listens=d.listening_preview||[];drawerContent.innerHTML=(listens.length?`<div class="drawer-section-title">Recent listening</div>${listens.map(r=>drawerItem(r.title,(r.event_type||'listen')+' · '+fmtWhen(r.created_at),r.release||'')).join('')}<button class="drawer-history-link" type="button" id="drawerOpenHistory">Open full listening history</button>`:'')+(rows.length?`<div class="drawer-section-title">Account activity</div>${rows.map(r=>drawerItem(r.title,(r.event_type||'activity')+' · '+fmtWhen(r.created_at),r.entity_type?`${r.entity_type}${r.entity_id?' · '+r.entity_id:''}`:'' )).join('')}`:'')||'<p class="drawer-empty">Your Stonefellow history will appear here.</p>';const open=$('#drawerOpenHistory',drawerContent);if(open)open.onclick=()=>{closeNotificationDrawer();navigate('history')}}else{const rows=d.brain||[];drawerContent.innerHTML=rows.length?rows.map(r=>`<article class="drawer-item brain"><strong>${esc(r.route||r.phase||'Agent decision')}</strong><p>${esc(r.request_excerpt||r.response_excerpt||'')}</p><small>${esc(r.phase||'')} · ${esc(r.action||'none')} · ${esc(fmtWhen(r.created_at))}</small></article>`).join(''):'<p class="drawer-empty">No Agent Brain events yet.</p>'}}
   function updateNotificationBadge(count){if(!notificationBadge)return;const n=Math.max(0,Number(count)||0);notificationBadge.textContent=n>99?'99+':String(n);notificationBadge.hidden=n===0;if(drawerUnreadCount)drawerUnreadCount.textContent=n?`(${n})`:''}
-  async function loadNotificationDrawer(){if(!st.auth.authenticated||!notificationDrawer)return;try{const [r]=await Promise.all([fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),loadPlaylists(true)]),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'Could not load activity.');st.drawer.data=j;if(j.csrf)st.auth.csrf=j.csrf;updateNotificationBadge(j.unread||0);if(st.drawer.mode==='activity')renderDrawer()}catch(e){if(st.drawer.mode==='activity'&&drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(e.message)}</p>`}}
+  async function loadNotificationDrawer(){
+    const owner=canvasOwner();
+    if(!owner||!notificationDrawer)return;
+    const requestId=st.drawer.requestId=(st.drawer.requestId||0)+1;
+    const current=()=>owner===canvasOwner()&&requestId===st.drawer.requestId;
+    const visible=()=>!notificationDrawer.hidden&&st.drawer.mode==='activity';
+    try{
+      const [response]=await Promise.all([
+        fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),
+        loadPlaylists(true,current)
+      ]);
+      const data=await response.json();
+      if(!current())return;
+      if(!response.ok||data.ok===false)throw new Error(data.message||'Could not load activity.');
+      st.drawer.data=data;
+      if(data.csrf)st.auth.csrf=data.csrf;
+      updateNotificationBadge(data.unread||0);
+      if(visible())renderDrawer();
+    }catch(error){
+      if(current()&&visible()&&drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(error.message)}</p>`;
+    }
+  }
   function openExperienceDrawer(mode='activity',tab=''){
     if(!notificationDrawer)return;
     // A purchase can originate inside a full-screen product detail modal.
@@ -2206,13 +2246,21 @@
       ...(playlists.length||/\{playlists-clear\}/i.test(draft)?{playlist_inputs:{items:playlists}}:{})};
   }
   function chatResourceCommandRange(draft,caret){
-    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|me|merch|tickets|playlists|data|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|me|merch|tickets|playlists|data|notifications|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
       if(caret!==undefined&&caret!==end)continue;
       const command=match[2].toLowerCase();
+      const standalone=draft.trim().toLowerCase()==='/'+command;
+      if(command==='notifications'){
+        const requestedAccountTool='my_notifications';
+        const candidate=draft.slice(0,start)+'{me:'+requestedAccountTool+'}'+draft.slice(end);
+        if(!standalone&&['create','revise','build_on'].includes(directListeningRoomCommand(candidate)?.kind))
+          return {kind:'me',start,end,standalone,requestedAccountTool};
+        continue;
+      }
       const tag=command.startsWith('stories-')?command.slice('stories-'.length):null;
       if(tag&&!validChatStoryTag(tag))continue;
-      return {kind:tag?'stories':command,start,end,standalone:draft.trim().toLowerCase()==='/'+command,...(tag?{tag}:{})};
+      return {kind:tag?'stories':command,start,end,standalone,...(tag?{tag}:{})};
     }
     return null;
   }
@@ -2280,6 +2328,7 @@
       const key=dataPicker?'data_sources':range.kind==='me'?'me_tools':range.kind==='tickets'?'ticket_ids':range.kind+'_ids';
       selected=resources.artist_inputs?.[key]??previous?.artist_inputs?.[key];
     }
+    if(range.requestedAccountTool)selected=Array.from(new Set([...(selected||[]),range.requestedAccountTool]));
     const picker={owner,request:new AbortController()};chatResourcePicker=picker;
     try{
       const result=dataPicker?await open({
@@ -2287,7 +2336,13 @@
         search:(query,signal)=>api('canvas-data.php?action=places&q='+encodeURIComponent(query),undefined,signal),
         resolvePlace:(id,signal)=>api('canvas-data.php?action=places&id='+encodeURIComponent(id),undefined,signal),
         selectedSources:selected,signal:picker.request.signal
-      }):await open({kind:range.kind,load:signal=>api('canvas-resources.php?kind='+range.kind,undefined,signal),
+      }):await open({kind:range.kind,load:async signal=>{
+        const inventory=await api('canvas-resources.php?kind='+range.kind,undefined,signal);
+        if(range.requestedAccountTool&&!(Array.isArray(inventory?.items)&&
+          inventory.items.some(item=>item?.id===range.requestedAccountTool&&item.enabled!==false)))
+          throw new Error('Notifications are unavailable for canvases.');
+        return inventory;
+      },
         selectedIds:(selected||[]).map(String),
         ...(range.kind==='stories'?{storyTag,storyTagLocked:!!range.tag,
           selectedAll:storyAllSelected}:{}),
@@ -2634,6 +2689,12 @@
     event.preventDefault();
     clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
     clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
+    if(input.value.trim().toLowerCase()==='/notifications'){
+      input.value='';
+      syncChatImageDraftLimit();
+      openNotificationDrawer();
+      return;
+    }
     const resourceRange=chatResourceCommandRange(input.value);
     if(resourceRange){void openChatResourcePicker(resourceRange);return;}
     const imageRange=chatImageCommandRange(input.value);
@@ -2788,7 +2849,32 @@
     return canvasAccess.current;
   }
   document.getElementById('menuCanvasPermissions')?.addEventListener('click',()=>{closeMenu();void canvasAccess()?.manage();});
-  async function openGalleryCanvas(item,signal){
+  async function canvasAppNotificationState(ref,signal){
+    const response=await api('canvas-app.php?'+galleryQuery(ref),undefined,signal);
+    return response.app;
+  }
+  function canvasAppNotifications(){
+    if(!canvasAppNotifications.current&&window.SFCanvasAppNotifications?.create){
+      canvasAppNotifications.current=window.SFCanvasAppNotifications.create({
+        getOwner:canvasOwner,
+        api:{
+          status:(ref,signal)=>api('canvas-app.php?'+galleryQuery(ref),undefined,signal),
+          install:(ref,signal)=>secureJsonPost('canvas-app.php',{action:'install',...ref},false,signal),
+          setNotifications:(ref,enabled,signal)=>secureJsonPost('canvas-app.php',{action:'set_notifications',...ref,enabled},false,signal),
+        },
+        onSignIn:()=>navigate('login'),
+        onPhoneAlerts:()=>{
+          const controls=$('[data-pwa-phone-alerts]',menu||document);
+          if(menu&&controls&&!controls.hidden){
+            menu.open=true;
+            $('[data-pwa-alert-toggle]:not([hidden])',controls)?.focus({preventScroll:true});
+          }else popupEntry('notice','Open Stonefellow on your phone to set up phone alerts.');
+        },
+      });
+    }
+    return canvasAppNotifications.current;
+  }
+  async function openGalleryCanvas(item,signal,keepLink=false){
     const id=item?.id,viewer=canvasOwner();
     cancelGalleryOpen();
     const sequence=gallerySceneSequence,request=new AbortController();request.galleryOwner=viewer;gallerySceneRequest=request;
@@ -2807,9 +2893,11 @@
       const previous=listeningRoom,previousOwner=listeningRoomOwner;
       listeningRoom=scene;listeningRoomOwner=canvasSceneOwner();
       if(!stage?.showScene?.(scene,{focus:false})){listeningRoom=previous;listeningRoomOwner=previousOwner;throw new Error('The published canvas could not open.');}
+      canvasAppNotifications.current?.close();
       stage.setSceneWorkflow?.(null);stage.closePage?.();canvas=mainCanvas;
-      selectCanvasId(viewer,null);setUrl('home',{});
-      popupEntry('notice','Opened “'+String(item.title||scene.title)+'” by '+String(item.creator_label||'a Stonefellow creator')+'. Remix it to make your own version.');
+      selectCanvasId(viewer,null);if(!keepLink)setUrl('home',{});
+      popupEntry('notice','Opened “'+String(item.title||scene.title)+'” by '+String(item.creator_label||response.item?.creator_label||'a Stonefellow creator')+'. Remix it to make your own version.');
+      return true;
     }finally{
       signal?.removeEventListener('abort',abort);if(gallerySceneRequest===request)gallerySceneRequest=null;
     }
@@ -2833,8 +2921,15 @@
     }finally{signal?.removeEventListener('abort',abort);if(gallerySceneRequest===request)gallerySceneRequest=null;}
   }
   async function renderCanvasGallery(params={}){
+    canvasAppNotifications.current?.close(false);
     canvasGalleryView?.destroy();
     const host=canvas;
+    const itemId=/^[a-f0-9]{32}$/.test(params.id||'')?params.id:undefined;
+    if(params.open==='1'&&itemId){
+      try{if(await openGalleryCanvas({id:itemId},undefined,true))return;}
+      catch(error){if(error.name!=='AbortError')popupEntry('notice','This canvas update could not open.');}
+      if(canvas!==host)return;
+    }
     if(!window.SFCanvasGallery?.create)throw new Error('The canvas catalog is unavailable. Refresh this page.');
     canvasGalleryView=window.SFCanvasGallery.create({
       getOwner:canvasOwner,getCreatorLabel:()=>st.auth.user?.display_name||'',onSignIn:()=>navigate('login'),
@@ -2842,13 +2937,17 @@
         list:(query,signal)=>api('canvas-gallery.php?'+galleryQuery({action:'list',...query}),undefined,signal),
         detail:(id,signal)=>api('canvas-gallery.php?'+galleryQuery({id}),undefined,signal),
         mine:(query,signal)=>api('canvas-gallery.php?'+galleryQuery({action:'mine',...query}),undefined,signal),
+        installed:signal=>api('canvas-app.php?action=installed',undefined,signal),
+        install:(gallery_id,signal)=>secureJsonPost('canvas-app.php',{action:'install',gallery_id},false,signal),
+        uninstall:(app_id,signal)=>secureJsonPost('canvas-app.php',{action:'uninstall',app_id},false,signal),
         sources:signal=>api('canvas-resources.php?kind=canvas',undefined,signal),
         source:(id,signal)=>api('agent-scene.php?id='+encodeURIComponent(id),undefined,signal),
         submit:(payload,signal)=>secureJsonPost('canvas-gallery.php',{action:'submit',...payload},false,signal),
         withdraw:async(id,signal)=>{const result=await secureJsonPost('canvas-gallery.php',{action:'withdraw',id},false,signal);if(isGalleryScene()&&listeningRoom.gallery_id===id)closeListeningRoom(false);return result;},
       },getPreviewUrl:sceneImagePath,getItemUrl:item=>{const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('view','canvas-gallery');url.searchParams.set('id',item.id);return url.href;},onOpen:openGalleryCanvas,onRemix:remixGalleryCanvas,
+      onAppNotifications:(app,onChange,isCurrent)=>canvasAppNotifications()?.open({app_id:app.id},{onChange,isCurrent}),
     });
-    await canvasGalleryView.mount(host,{view:['mine','submit'].includes(params.tab)?params.tab:'public',sceneId:Number(params.id)||undefined,itemId:/^[a-f0-9]{32}$/.test(params.id||'')?params.id:undefined});
+    await canvasGalleryView.mount(host,{view:['mine','submit','installed'].includes(params.tab)?params.tab:'public',sceneId:Number(params.id)||undefined,itemId});
   }
   const canvasDebugEvents=[];
   let canvasDebugOwner='';
@@ -3138,7 +3237,15 @@
     }
   }
   function clearListeningRoom(){
+    if(isGalleryScene()){
+      const url=new URL(location.href);
+      if(url.searchParams.get('view')==='canvas-gallery'&&url.searchParams.get('id')===listeningRoom.gallery_id&&url.searchParams.get('open')==='1'){
+        url.searchParams.delete('open');
+        history.replaceState(history.state,'',url);
+      }
+    }
     canvasAccess.current?.close();
+    canvasAppNotifications.current?.close();
     setCanvasImageEditDraft(null);
     listeningRoomRequest?.abort();
     listeningRoomRequest=null;
@@ -3578,7 +3685,9 @@
       if(closeListeningRoom())agent(st.playing?'playing':'idle','Canvas closed.');
       return;
     }
+    const editActive=action.kind==='restore'&&action.editActive;
     await loadAuth(true);
+    if(editActive&&!editActive())return;
     if(!st.auth.authenticated||!st.auth.user?.id){
       popupEntry('notice','Sign in to create or reopen your private canvases.');return;
     }
@@ -3655,7 +3764,7 @@
     const owner=String(st.auth.user.id);
     listeningRoomOwner=owner;
     const requestActive=()=>listeningRoomRequest===request&&!request.signal.aborted&&
-      st.auth.authenticated&&String(st.auth.user?.id)===owner;
+      st.auth.authenticated&&String(st.auth.user?.id)===owner&&(!editActive||editActive());
     try{
       if(action.kind==='suggest'){
         const projects=canvasProjects();
@@ -3773,6 +3882,7 @@
         closeChatPopup();return;
       }
       const scene=response.scene;
+      if(editActive&&scene?.id!==action.id)throw new Error('The selected canvas could not open.');
       if(scene?.workflow_required===true&&!response.workflow&&response.verification?.verified!==true){
         const key='unverified-scene-'+scene.id;
         stage.setSceneWorkflow?.(null);
@@ -3815,7 +3925,7 @@
           throw new Error('The server did not authorize this candidate to open. Your current canvas is still available.');
         response.workflow=committed.workflow;
       }
-      if(!stage.showScene(scene,{standard}))throw new Error('The canvas could not open.');
+      if(!stage.showScene(scene,editActive?{standard,focus:false,revealAgent:true}:{standard}))throw new Error('The canvas could not open.');
       if(response.workflow){
         stage.setSceneWorkflow?.({...response.workflow,phase:'applied',summary:'The checked candidate is now open.'});
       }
@@ -3826,6 +3936,17 @@
       stage.closePage?.(true);
       request.sceneBuild?.trace('canvas_opened',{source:standard?'standard':'model'});
       if(!canvasDebugVisible())closeChatPopup();
+      if(editActive){
+        setChatFooterHidden(false);
+        closeQuickMenu();
+        const draft=input.value;
+        if(!/^\/edit(?:\s|$)/i.test(draft.trimStart()))input.value='/edit '+draft;
+        else if(draft.trim().toLowerCase()==='/edit')input.value='/edit ';
+        syncChatImageDraftLimit();
+        input.focus({preventScroll:true});
+        input.setSelectionRange(input.value.length,input.value.length);
+        return;
+      }
       let message=action.kind==='image_review'||request.sceneBuild?.payload.review_images?'I applied your chosen image.':editingImage?'I updated the image and kept the original in your library.':previousId&&!design?(musicInputs?'I updated your canvas’s music selection.':response.active_tokens_used>0?'I updated how the agent appears.':'I updated how the agent appears. No Active Tokens were used.'):
         scene.canvas_kind==='space_eq'?(reading?'I reopened your Space EQ.':'I built your Space EQ with code. No Active Tokens were used.'):
         scene.canvas_kind==='custom'?(standard?(reading?'I reopened your built-in catalog layout.':'I opened your live catalog in a built-in layout. No Active Tokens were used.'):
@@ -4292,9 +4413,10 @@
       canManageScenes:()=>!!canvasOwner(),
       onOpenSceneHistory:()=>void handleListeningRoomCommand({kind:'history'}),
       onRestoreScene:id=>void handleListeningRoomCommand({kind:'restore',id:Number(id)}),
+      onEditScene:(id,editActive)=>handleListeningRoomCommand({kind:'restore',id,editActive}),
       onDeleteScene:deleteSavedCanvas,
       onSubmitScene:id=>void navigate('canvas-gallery',{tab:'submit',id}),
-      onPageClose:view=>{if(view==='canvas-gallery'){canvasGalleryView?.destroy();canvasGalleryView=null;cancelGalleryOpen();}},
+      onPageClose:view=>{if(view==='canvas-gallery'){canvasAppNotifications.current?.close(false);canvasGalleryView?.destroy();canvasGalleryView=null;cancelGalleryOpen();}},
       onSceneFeedback:()=>{
         if(listeningRoom&&canvasOwner())void canvasProjects()?.feedbackForScene?.(listeningRoom)?.catch(error=>{
           if(error.name!=='AbortError')popupEntry('notice',error.message||'Canvas feedback could not open.');
@@ -4307,6 +4429,8 @@
       onLoadSceneImages:(cursor,signal)=>api('agent-canvas-image.php'+(cursor?'?before='+encodeURIComponent(cursor):''),undefined,signal),
       onSceneStop:stopListeningRoomBuild,
       onSceneAccess:()=>void canvasAccess()?.show(),
+      onSceneAppNotificationState:(gallery_id,signal)=>canvasAppNotificationState({gallery_id},signal),
+      onSceneAppNotifications:(gallery_id,isCurrent,onChange)=>canvasAppNotifications()?.open({gallery_id},{isCurrent,onChange}),
       onSceneMounted:scene=>canvasAccess()?.sceneMounted(scene),
       onSceneTrackData:async(sceneId,trackId,signal)=>{
         if(isGalleryScene()&&sceneId===listeningRoom.gallery_id){
@@ -4842,7 +4966,7 @@
     }
   }
   async function renderNavigation(view='home',params={},push=true){
-    if(view!=='canvas-gallery'){canvasGalleryView?.destroy();canvasGalleryView=null;cancelGalleryOpen();}
+    if(view!=='canvas-gallery'){canvasAppNotifications.current?.close(false);canvasGalleryView?.destroy();canvasGalleryView=null;cancelGalleryOpen();}
     closeMenu();hide();
     if(view==='home'&&window.SFPublicAgentCanvas?.active?.()){
       window.SFPublicAgentCanvas.closePage?.();
@@ -4861,7 +4985,7 @@
     const nativePanel=view!=='home'&&view!=='builder'&&homepageTemplate==='agent_canvas'&&window.SFPublicAgentCanvas?.active?.();
     canvas=nativePanel?(window.SFPublicAgentCanvas.openPage?.(view)||mainCanvas):mainCanvas;
     document.body.classList.toggle('builder-workspace-active',view==='builder');if(view!=='home')document.body.classList.remove('artist-home-active','artist-home-chat-hidden');await refreshSiteData();if(st.auth.authenticated&&['home','music','releases','archive','shows','show','community','store','track','release','account','library'].includes(view))await loadPersonalization();if(view==='home'){await renderHome()}else if(view==='press'){await renderPress(params.slug||'',params.token||'')}else if(view==='story'){await renderEditorialStory(params.slug||'')}else if(view==='contact'){await renderContact(params)}else if(view==='canvas-gallery'){await renderCanvasGallery(params)}else if(view==='world'){await renderArtistWorld(params)}else if(view==='videos'){await renderVideos()}else if(view==='video'){await renderVideo(params.slug||'')}else if(view==='photos'){await renderPhotos()}else if(view==='photo'){await renderPhotoGallery(params.slug||'')}else if(view==='search'){await renderSiteSearch(params)}else if(view==='campaign'){await renderCampaign(params.slug||'')}else if(view==='music'){await renderCatalog(params)}else if(view==='releases'){renderReleases()}else if(view==='archive'){renderArchive()}else if(view==='shows'){renderShows()}else if(view==='show'){renderShow(params.id||'')}else if(view==='tickets'){await renderTickets({show_id:params.id||''})}else if(view==='community'){await renderCommunity(params)}else if(view==='newsletter'){renderNewsletter()}else if(view==='store'){await renderStore(params)}else if(view==='playlist'){await renderPlaylist(params.id||0)}else if(view==='history'){await renderListeningHistory(true)}else if(view==='library'){await renderMyLibrary(params)}else if(view==='builder'){window.scrollTo(0,0);renderBuilder()}else if(view==='cart'){await renderCart()}else if(view==='checkout'){await renderCheckout()}else if(view==='about'){await renderAbout()}else if(view==='privacy'){renderLegal('privacy')}else if(view==='terms'){renderLegal('terms')}else if(view==='plans'){await renderPlans()}else if(view==='membership'){await renderMembership()}else if(view==='login'){await loadAuth();st.auth.authenticated?await renderAccount():renderLogin()}else if(view==='register'){await loadAuth();st.auth.authenticated?await renderAccount():renderRegister(params)}else if(view==='forgot-password'){renderForgotPassword()}else if(view==='reset-password'){renderResetPassword(params.token||'')}else if(view==='verify-email'){await renderVerifyEmail(params.token||'')}else if(view==='capture'){await renderCreativeCapture()}else if(view==='team'){await renderTeamWorkspace()}else if(view==='account'){await renderAccount()}else if(view==='account-privacy'){await renderPrivacyCenter()}else if(view==='agent-brain'){await renderMyAgentBrain()}else if(view==='agent-chat'){await renderMyAgentConversation()}else if(view==='order'){await renderOrderDetail(params.id||'')}else if(view==='track'){const t=trackById(params.id);if(t)renderStory(t);else await renderCatalog({})}else if(view==='release'){openRelease(params.id,false)}else{await renderHome();view='home'}bindShareButtons(canvas);if(push)setUrl(view,params);else syncSeo(view,params);document.dispatchEvent(new CustomEvent('stonefellow:navigation',{detail:{view,params}}))}
-  async function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}
+  async function routeFromLocation(){const u=new URL(location.href),initial=window.STONEFELLOW_INITIAL_ROUTE||{},view=u.searchParams.get('view')||initial.view||'home',hashParams=new URLSearchParams(u.hash.replace(/^#/,'')),params={id:u.searchParams.get('id')||initial.id||'',plan:u.searchParams.get('plan')||'',token:u.searchParams.get('token')||hashParams.get('token')||'',q:u.searchParams.get('q')||'',type:u.searchParams.get('type')||'all',mood:u.searchParams.get('mood')||'',theme:u.searchParams.get('theme')||'',release:u.searchParams.get('release')||'',year:u.searchParams.get('year')||'',energy:u.searchParams.get('energy')||'',sort:u.searchParams.get('sort')||'relevance',tab:u.searchParams.get('tab')||'',open:u.searchParams.get('open')||'',collection:u.searchParams.get('collection')||'',newsletter:u.searchParams.get('newsletter')||'',unsubscribe:u.searchParams.get('unsubscribe')||'',slug:u.searchParams.get('slug')||initial.slug||''};if(!window.__STONEFELLOW_DISCOVERY_RECORDED){window.__STONEFELLOW_DISCOVERY_RECORDED=true;recordDiscovery('landing',{route_type:view,route_id:params.id||params.slug||''})}
 
     if(homepageTemplate==='agent_canvas'&&view!=='home'&&view!=='builder'&&!window.SFPublicAgentCanvas?.active?.()){
       canvas=mainCanvas;

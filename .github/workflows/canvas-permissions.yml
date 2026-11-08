@@ -143,3 +143,4 @@ jobs:
         run: |
           python tests/canvas-gallery-browser.py
           python tests/admin-canvas-gallery-browser.py
+          python tests/canvas-app-alerts-browser.py

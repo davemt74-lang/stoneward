@@ -234,13 +234,21 @@ function sf_web_push_payload(array $payload): string {
     $title=$payload['title']??null;
     $body=$payload['body']??null;
     $tag=$payload['tag']??'';
+    $type=$payload['type']??null;
     if(!is_string($url) || !preg_match('~\A/?[a-z0-9_.-]+(?:/[a-z0-9_.-]+)*(?:[?#][^\x00-\x20\x7f\\\\]*)?\z~iD',$url)
         || preg_match('~(?:\A|/)\.\.(?:/|[?#]|\z)~D',$url) || strlen($url)>600
         || !is_string($title) || trim($title)==='' || strlen($title)>300
         || !is_string($body) || strlen($body)>1200 || !is_string($tag) || strlen($tag)>120){
         throw new InvalidArgumentException('Invalid Web Push message.');
     }
-    $json=json_encode(['title'=>$title,'body'=>$body,'url'=>$url,'tag'=>$tag],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);
+    $message=['title'=>$title,'body'=>$body,'url'=>$url,'tag'=>$tag];
+    if(array_key_exists('type',$payload)){
+        if($type!=='canvas-app'||preg_match('~\Aindex\.php\?view=canvas-gallery&id=([a-f0-9]{32})&open=1\z~D',$url,$match)!==1||$tag!=='canvas-app:'.$match[1]){
+            throw new InvalidArgumentException('Invalid canvas app notification.');
+        }
+        $message['type']=$type;
+    }
+    $json=json_encode($message,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);
     if(strlen($json)>3993) throw new InvalidArgumentException('Web Push message is too large.');
     return $json;
 }

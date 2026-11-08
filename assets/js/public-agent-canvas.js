@@ -62,6 +62,23 @@
   });
 })();`;
   const sceneTrackHash = "'sha256-xOZDZuxAbFeAsBdLXjsyCP66Zwpi63Az0JMQPn6zrpA='";
+  const sceneAppNotificationMarker=/<span class="([A-Za-z0-9_ -]{1,160})"\s*>/g;
+  const sceneAppNotificationBridge=`(()=>{
+  const buttons=[...document.querySelectorAll('button[data-sf-notification-state]')];
+  addEventListener('message',event=>{
+    const state=event.data?.stonefellowSceneAppNotificationState;
+    if(event.source!==parent||!['unavailable','not-installed','off','on'].includes(state))return;
+    for(const button of buttons){
+      button.dataset.sfNotificationState=state;
+      button.setAttribute('aria-pressed',String(state==='on'));
+    }
+  });
+  document.addEventListener('click',event=>{
+    if(event.isTrusted&&buttons.includes(event.target.closest?.('button')))
+      parent.postMessage({stonefellowSceneAppNotificationAction:true},'*');
+  });
+})();`;
+  const sceneAppNotificationHash="'sha256-aOI9muee8EgZn7L8rSzx1I1laLv6Lk8K5pr6pnPyX/8='";
   const sceneImageBridge = `(()=>{
   const mounted=new Set();
   addEventListener('message',event=>{
@@ -295,15 +312,28 @@
     if(!locks||(locks.length&&(prepared?.js!==js||prepared.jsHash!==scene.js_hash)))return null;
     return {js,hash:"'sha256-"+scene.js_hash+"'",sdk,libraries:locks.length?prepared.libraries:[]};
   }
-  function sceneDocument(html, css, scrollable, reactive, images, datasets, currentTrackId='', trackDatasets=null,script=null,probe=null) {
+  function bindSceneAppNotificationControls(html){
+    const template=document.createElement('template');template.innerHTML=html;
+    for(const control of template.content.querySelectorAll('span.sf-action-app-notifications')){
+      if(control.parentElement?.closest('.sf-action-app-notifications'))continue;
+      const button=document.createElement('button');button.type='button';button.className=control.className;
+      button.dataset.sfNotificationState='loading';button.setAttribute('aria-pressed','false');
+      button.append(...control.childNodes);
+      if(!button.textContent.trim())button.textContent='App notifications';
+      control.replaceWith(button);
+    }
+    return template.innerHTML;
+  }
+  function sceneDocument(html, css, scrollable, reactive, images, datasets, currentTrackId='', trackDatasets=null,script=null,probe=null,appNotifications=false) {
     if(typeof html!=='string'||!html.trim()||html.length>12000||typeof css!=='string'||css.length>12000||/[<\\]/.test(css))return null;
     // Treat every '<' as the start of a known tag. Text may contain escaped
     // entities, but authored elements can have only a class, never a URL.
     if(html.split('<').slice(1).some(part=>!sceneTag.test(part)))return null;
-    const bound=bindSceneDatasets(script?.js?html:stripLegacyPlayer(html),datasets,currentTrackId,trackDatasets,!!script?.js);
+    const content=bindSceneDatasets(script?.js?html:stripLegacyPlayer(html),datasets,currentTrackId,trackDatasets,!!script?.js);
+    const bound=appNotifications?bindSceneAppNotificationControls(content):content;
     const trackActions=bound.includes('data-sf-play-track=');
     const libraries=script?.libraries||[];
-    const scriptHashes=[reactive?sceneAudioHash:'',images?sceneImageHash:'',trackActions?sceneTrackHash:'',script?.js?script.sdk.hash:'',script?.js?sceneProgramHash:'',script?.hash,probe?.hash,...libraries.map(library=>library.hash)].filter(Boolean);
+    const scriptHashes=[reactive?sceneAudioHash:'',images?sceneImageHash:'',trackActions?sceneTrackHash:'',appNotifications?sceneAppNotificationHash:'',script?.js?script.sdk.hash:'',script?.js?sceneProgramHash:'',script?.hash,probe?.hash,...libraries.map(library=>library.hash)].filter(Boolean);
     const scriptPolicy=scriptHashes.length?'; script-src '+scriptHashes.join(' '):'';
     // Both policies must pass. The second policy prevents a matching integrity attribute from authorizing an external request.
     const inlineScriptPolicy=script?.js?`<meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'">`:'';
@@ -315,10 +345,11 @@ ${inlineScriptPolicy}
 ${trackActions?'<style>:where(.sf-action-play-track){appearance:none;background:transparent;border:0;padding:0;text-align:inherit}</style>':''}
 ${images?'<style>:where(.sf-scene-image){display:block;max-width:100%;height:auto}</style>':''}
 <style>${css}</style>
-<style>html,body{overflow:${scrollable||trackActions||script?.js?'auto':'hidden'}!important}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
+<style>html,body{overflow:${scrollable||trackActions||appNotifications||script?.js?'auto':'hidden'}!important}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
 ${trackActions?'<style>.sf-action-play-track{font:inherit;color:inherit;cursor:pointer;min-height:44px;min-width:44px}.sf-action-play-track:focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>':''}
+${appNotifications?'<style>:where(.sf-action-app-notifications){font:inherit;cursor:pointer;min-height:44px;min-width:44px}:where(.sf-action-app-notifications:focus-visible){outline:2px solid currentColor;outline-offset:2px}</style>':''}
 ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBridge}</script>`:''}${images?`<script>${sceneImageBridge}</script>`:''}</head>
-<body><main>${bound}</main>${trackActions?`<script>${sceneTrackBridge}</script>`:''}${script?.js?`<script${probe?' data-sf-data-offline="true"':''}>${script.sdk.source}</script>${libraries.map(library=>`<script>${library.source}</script>`).join('')}<script type="application/json" id="sfCanvasProgram">${JSON.stringify(script.js).replace(/</g,'\\u003c')}</script><script>${sceneProgramRunner}</script>`:''}</body></html>`;
+<body><main>${bound}</main>${trackActions?`<script>${sceneTrackBridge}</script>`:''}${appNotifications?`<script>${sceneAppNotificationBridge}</script>`:''}${script?.js?`<script${probe?' data-sf-data-offline="true"':''}>${script.sdk.source}</script>${libraries.map(library=>`<script>${library.source}</script>`).join('')}<script type="application/json" id="sfCanvasProgram">${JSON.stringify(script.js).replace(/</g,'\\u003c')}</script><script>${sceneProgramRunner}</script>`:''}</body></html>`;
   }
   /** Detached candidates use the production renderer and receive no live canvas controller. */
   function prepareSceneTest(scene,{probe,previewProgram=null,currentTrackId=''}={}){
@@ -1299,7 +1330,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       workspaceTimer=window.setTimeout(()=>workspace.classList.remove('growing'),850);
       sphere.focus({preventScroll:true});
     }
-    const pageLabels={playlist:'PLAYLIST',shows:'TOUR DATES',show:'LIVE SHOW',store:'MERCH STORE',membership:'MEMBERSHIP + VIP',tickets:'TICKETS + VIP',community:'FAN COMMUNITY',newsletter:'NEWSLETTER',music:'MUSIC LIBRARY',releases:'RELEASES',track:'SONG DETAILS',release:'RELEASE DETAILS',cart:'CART',account:'ACCOUNT',login:'SIGN IN',register:'CREATE ACCOUNT',about:'ABOUT STONEFELLOW',world:'STONEFELLOW WORLD',archive:'MUSIC ARCHIVE',search:'SEARCH',history:'LISTENING HISTORY',library:'MY LIBRARY',photos:'PHOTOS',videos:'VIDEOS',press:'PRESS',contact:'CONTACT',plans:'PLANS',privacy:'PRIVACY',terms:'TERMS',checkout:'CHECKOUT',order:'ORDER',team:'TEAM',capture:'CREATIVE CAPTURE','agent-brain':'AGENT BRAIN','agent-chat':'AGENT CHAT','scene-history':'CANVAS HISTORY','canvas-gallery':'CANVAS CATALOG'};
+    const pageLabels={playlist:'PLAYLIST',shows:'TOUR DATES',show:'LIVE SHOW',store:'MERCH STORE',membership:'MEMBERSHIP + VIP',tickets:'TICKETS + VIP',community:'FAN COMMUNITY',newsletter:'NEWSLETTER',music:'MUSIC LIBRARY',releases:'RELEASES',track:'SONG DETAILS',release:'RELEASE DETAILS',cart:'CART',account:'ACCOUNT',login:'SIGN IN',register:'CREATE ACCOUNT',about:'ABOUT STONEFELLOW',world:'STONEFELLOW WORLD',archive:'MUSIC ARCHIVE',search:'SEARCH',history:'LISTENING HISTORY',library:'MY LIBRARY',photos:'PHOTOS',videos:'VIDEOS',press:'PRESS',contact:'CONTACT',plans:'PLANS',privacy:'PRIVACY',terms:'TERMS',checkout:'CHECKOUT',order:'ORDER',team:'TEAM',capture:'CREATIVE CAPTURE','agent-brain':'AGENT BRAIN','agent-chat':'AGENT CHAT','scene-history':'CANVAS HISTORY','scene-edit':'EDIT CANVAS','canvas-gallery':'CANVAS CATALOG'};
     function openPage(view){
       // The portal overlays the Agent Canvas without replacing, remounting,
       // or hiding it. Existing route renderers mount directly into pageHost.
@@ -1368,7 +1399,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       else pageTimer=window.setTimeout(finish,770);
     }
     function dismissPage(){
-      const history=pageView==='scene-history';
+      const history=pageView==='scene-history'||pageView==='scene-edit';
       closePage();
       if(!history)options.onClosePage?.();
     }
@@ -2022,6 +2053,35 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     function postSceneTrackState(){
       if(sceneTracks?.ready)sceneTracks.frame.contentWindow?.postMessage({stonefellowSceneTrackState:{revision:sceneTracks.revision}},'*');
     }
+    function sceneAppNotificationActive(control){
+      return !!control&&!destroyed&&listeningScene?.notificationControl===control&&
+        control.owner===options.getSceneOwner?.()&&!!options.canUseScenes?.();
+    }
+    function postSceneAppNotificationState(control,app){
+      if(!sceneAppNotificationActive(control))return;
+      const state=app?.supports_alerts!==true?'unavailable':app.installed!==true?'not-installed':app.enabled===true?'on':'off';
+      control.frame.contentWindow?.postMessage({stonefellowSceneAppNotificationState:state},'*');
+    }
+    async function readSceneAppNotificationState(control){
+      if(!sceneAppNotificationActive(control))return;
+      control.request?.abort();
+      const request=new AbortController();control.request=request;
+      try{
+        const app=await options.onSceneAppNotificationState?.(control.galleryId,request.signal);
+        if(!request.signal.aborted)postSceneAppNotificationState(control,app);
+      }catch(_){if(!request.signal.aborted)postSceneAppNotificationState(control,null);}
+      finally{if(control.request===request)control.request=null;}
+    }
+    function receiveSceneAppNotification(event){
+      const control=listeningScene?.notificationControl;
+      if(!event.isTrusted||event.origin!=='null'||!sceneAppNotificationActive(control)||
+        event.source!==control.frame.contentWindow||document.activeElement!==control.frame||event.data?.stonefellowSceneAppNotificationAction!==true||
+        window.navigator?.userActivation?.isActive!==true)return;
+      options.onSceneAppNotifications(control.galleryId,()=>sceneAppNotificationActive(control),app=>{
+        control.request?.abort();
+        postSceneAppNotificationState(control,app);
+      });
+    }
     function catalogButton(label,title,callback){
       const button=document.createElement('button');
       button.type='button';button.textContent=label;
@@ -2141,9 +2201,9 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       if(!hidden&&wasHidden)positionOrbitTools();
       if(motionOff){cloudDraw(0);orbDraw(0);}
     }
-    function setSceneAgentDesign(design){
+    function setSceneAgentDesign(design,revealed=false){
       sceneAgentDesign=design;
-      sceneAgentRevealed=false;
+      sceneAgentRevealed=revealed;
       syncSceneAgentDesign();
     }
     function setAgentHidden(hidden){
@@ -2224,7 +2284,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     }
     function updateSceneTrackData(data,trackId,trackDatasets=null){
       const images=listeningScene.images;
-      const source=sceneDocument(data.html,data.css,data.disclosure,data.reactive,!!images,data.datasets,trackId,trackDatasets,data.script);
+      const source=sceneDocument(data.html,data.css,data.disclosure,data.reactive,!!images,data.datasets,trackId,trackDatasets,data.script,null,!!listeningScene.notificationControl);
       if(!source||source===data.layer.srcdoc)return;
       // The same frame, audio tap and canvas shell survive a track-data change.
       destroyCanvasAudio();
@@ -2271,7 +2331,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       }catch(_){/* Keep the authored empty state when current-track data cannot be loaded. */}
       finally{if(data.request===request)data.request=null;}
     }
-    function showScene(scene,{standard=false,focus=true}={}){
+    function showScene(scene,{standard=false,focus=true,revealAgent=false}={}){
       const kind=scene?.canvas_kind,space=kind==='space_eq',custom=kind==='custom';
       const room=!space&&!custom;
       const builtInLabel=standard&&!space?(custom?'Built-in catalog layout':'Built-in layout'):'';
@@ -2292,21 +2352,25 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       const owner=options.getSceneOwner?.();
       const editableImages=hasImages&&!!owner&&Number.isSafeInteger(scene.id)&&scene.id>0&&
         (typeof options.onEditSceneImage==='function'||typeof options.onReplaceSceneImage==='function');
-      const source=space?'':sceneDocument(scene.html,scene.css,disclosure,reactive,hasImages,custom?scene.datasets:null,currentTrackId,trackDatasets,script);
+      const appNotifications=custom&&scene.app_notifications===true&&/^[a-f0-9]{32}$/.test(scene.gallery_id||'')&&
+        typeof options.onSceneAppNotifications==='function'&&typeof scene.html==='string'&&Array.from(scene.html.matchAll(sceneAppNotificationMarker),match=>match[1].split(' '))
+          .some(classes=>classes.includes('sf-action-app-notifications'));
+      const source=space?'':sceneDocument(scene.html,scene.css,disclosure,reactive,hasImages,custom?scene.datasets:null,currentTrackId,trackDatasets,script,null,appNotifications);
       if(!space&&!source)return false;
       const trackIds=source?sceneTrackIds(source):new Set();
       const trackActions=custom&&typeof options.onSceneCatalogPlay==='function'&&scene.html.includes('sf-action-play-track')&&
         Object.values(scene.datasets||{}).some(dataset=>dataset?.actions?.play_track?.field==='track_id');
-      const interactive=disclosure||!!script.js||trackActions;
+      const interactive=disclosure||!!script.js||trackActions||appNotifications;
       listeningScene?.trackData?.request?.abort();
       listeningScene?.images?.request.abort();
+      listeningScene?.notificationControl?.request?.abort();
       destroyCanvasAudio();
       const layer=document.createElement(space?'canvas':'iframe');
       if(space){
         layer.className='sf-agent-space-eq';
         layer.setAttribute('aria-hidden','true');
       }else{
-        layer.setAttribute('sandbox',reactive||script.js||hasImages||trackActions?'allow-scripts':'');
+        layer.setAttribute('sandbox',reactive||script.js||hasImages||trackActions||appNotifications?'allow-scripts':'');
         layer.setAttribute('allow',"geolocation 'none'");
         layer.setAttribute('referrerpolicy','no-referrer');
         layer.setAttribute('tabindex',interactive?'0':'-1');
@@ -2358,7 +2422,9 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       const dataLocationAliases=dataSources.filter(source=>source.location_id==='published-shows'&&
         typeof source.product==='string'&&source.product.startsWith('weather.')).map(source=>source.alias);
       const dataProximitySources=dataSources.filter(source=>source.product==='location.proximity');
-      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner,dataAliases,dataLocationAliases,dataProximitySources};
+      const notificationControl=appNotifications?{galleryId:scene.gallery_id,frame:layer,owner,request:null}:null;
+      if(notificationControl)layer.addEventListener('load',()=>void readSceneAppNotificationState(notificationControl));
+      listeningScene={id:scene.id,galleryId:scene.gallery_id,trackId,story,cue,trackData,images,layer,script,owner,notificationControl,dataAliases,dataLocationAliases,dataProximitySources};
       renderSceneImageChoices();
       renderSceneCatalog(scene.catalog_blocks);
       const artwork=sourceAvailable?sceneArtwork(scene.artwork):'';
@@ -2393,7 +2459,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       root.classList.add('has-listening-scene');
       root.classList[interactive?'add':'remove']('has-scene-interactive');
       setScenePalette(scene,images,artwork);
-      setSceneAgentDesign(scene.agent_design);
+      setSceneAgentDesign(scene.agent_design,revealAgent);
       syncSceneCue();
       if(space){
         setSceneCoding('idle');
@@ -2415,6 +2481,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       if(!listeningScene)return false;
       listeningScene.trackData?.request?.abort();
       listeningScene.images?.request.abort();
+      listeningScene.notificationControl?.request?.abort();
       listeningScene=null;
       renderSceneImageChoices();
       releaseSpaceAudio((spaceScene||reactiveScene)?.tap);
@@ -2451,7 +2518,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       if(codingImageBatch&&codingImageBatch.owner!==options.getSceneOwner?.())setSceneImage('clear');
       if(sceneHistoryView&&sceneHistoryView.owner!==options.getSceneOwner?.())closeSceneHistory();
       if(listeningScene?.images?.editable&&listeningScene.images.owner!==options.getSceneOwner?.())closeScene(false);
-      if(sceneAudioHost&&listeningScene?.owner!==options.getSceneOwner?.())closeScene(false);
+      if((sceneAudioHost||listeningScene?.notificationControl)&&listeningScene?.owner!==options.getSceneOwner?.())closeScene(false);
       if(!allowed){
         if(!closeScene(false))setSceneCoding('idle');
         closeSceneHistory();
@@ -2459,15 +2526,15 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       syncAgentPalette();
     }
     function closeSceneHistory(){
-      if(pageView!=='scene-history'||pageRail.hidden)return false;
+      if((pageView!=='scene-history'&&pageView!=='scene-edit')||pageRail.hidden)return false;
       closePage(true);
       return true;
     }
-    function showSceneHistory(rows){
+    function showSceneHistory(rows,returnTo){
       if(destroyed||!options.canUseScenes?.()||!Array.isArray(rows))return false;
       const host=openPage('scene-history');
       const intro=document.createElement('p');intro.className='sf-agent-scene-history-intro';
-      intro.textContent='Reopen or delete your saved canvases.';
+      intro.textContent='Open, edit, or manage your saved canvases.';
       const list=document.createElement('ul');list.className='sf-agent-scene-history';
       const status=document.createElement('p');status.className='sf-agent-scene-history-feedback';status.setAttribute('role','status');
       const empty=document.createElement('p');empty.className='sf-agent-scene-history-empty';empty.textContent='No saved canvases yet.';
@@ -2486,22 +2553,64 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         const open=document.createElement('button');open.type='button';open.textContent='Open';
         open.dataset.agentAction='restore-scene';open.dataset.sceneId=String(row.id);
         open.setAttribute('aria-label','Open '+title.textContent);
-        entry.appendChild(details);entry.appendChild(open);
-        const record={entry,open};
+        const actions=document.createElement('div');actions.className='sf-agent-scene-history-actions';
+        actions.appendChild(open);entry.appendChild(details);entry.appendChild(actions);
+        const record={entry,open,actions};
         view.rows.set(row.id,record);
-        if(typeof options.onDeleteScene==='function')addSceneHistoryDelete(view,record,row.id,title.textContent);
+        if(typeof options.onEditScene==='function'){
+          const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';
+          edit.setAttribute('aria-label','Edit '+title.textContent);
+          edit.addEventListener('click',()=>{
+            if(!activeSceneHistory(view)||sceneDeletions.has(row.id))return;
+            const scrollTop=pageViewport.scrollTop;
+            showSavedCanvasEditor(view.owner,row.id,title.textContent,()=>showSceneHistory(rows,{id:row.id,scrollTop}));
+          });
+          record.edit=edit;actions.appendChild(edit);
+        }
         if(row.canvas_kind==='custom'&&typeof options.onSubmitScene==='function'){
           const submit=document.createElement('button');submit.type='button';submit.textContent='Submit';
           submit.setAttribute('aria-label','Submit '+title.textContent+' to the Canvas Catalog');
-          submit.addEventListener('click',()=>{if(activeSceneHistory(view))options.onSubmitScene(row.id);});entry.appendChild(submit);
+          submit.addEventListener('click',()=>{if(activeSceneHistory(view)&&!sceneDeletions.has(row.id))options.onSubmitScene(row.id);});
+          actions.appendChild(submit);
         }
+        if(typeof options.onDeleteScene==='function')addSceneHistoryDelete(view,record,row.id,title.textContent);
         list.appendChild(entry);
       }
       list.hidden=view.rows.size===0;
       empty.hidden=!list.hidden;
       host.replaceChildren(intro,list,status,empty);
       addSceneHistoryImageFolder(host,view);
+      if(returnTo){
+        window.clearTimeout(pageTimer);
+        pageViewport.scrollTop=returnTo.scrollTop;
+        (view.rows.get(returnTo.id)?.edit??by(pageRail,'[data-agent-action="close-page"]'))?.focus({preventScroll:true});
+      }
       return true;
+    }
+    function showSavedCanvasEditor(owner,id,title,goBack){
+      const host=openPage('scene-edit');
+      const view={owner};sceneHistoryView=view;
+      const active=()=>activeSceneHistory(view)&&!sceneDeletions.has(id);
+      const editor=document.createElement('section');editor.className='sf-agent-scene-edit';
+      const back=document.createElement('button');back.type='button';back.textContent='Back to Canvas History';
+      back.addEventListener('click',()=>{if(activeSceneHistory(view))goBack();});
+      const heading=document.createElement('h2');heading.textContent=title;heading.tabIndex=-1;
+      const description=document.createElement('p');description.textContent='Open this saved version in chat to describe your design changes.';
+      const edit=document.createElement('button');edit.type='button';edit.textContent='Edit design';
+      const status=document.createElement('p');status.setAttribute('role','status');
+      edit.addEventListener('click',async()=>{
+        if(!active()||edit.disabled)return;
+        edit.disabled=true;status.textContent='Opening saved canvas…';
+        try{await options.onEditScene(id,active);}
+        catch(_){/* Keep the editor available when the canvas cannot open. */}
+        if(active()){
+          edit.disabled=false;status.textContent='This saved canvas could not open for editing.';
+          edit.focus({preventScroll:true});
+        }
+      });
+      editor.append(back,heading,description,edit,status);host.replaceChildren(editor);
+      window.clearTimeout(pageTimer);
+      heading.focus({preventScroll:true});
     }
     function addSceneHistoryImageFolder(host,view){
       if(typeof options.onLoadSceneImages!=='function'||typeof options.getSceneImageUrl!=='function')return;
@@ -2592,9 +2701,10 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       const confirm=document.createElement('button');confirm.type='button';confirm.textContent='Delete canvas';
       cancel.setAttribute('aria-describedby',question.id);confirm.setAttribute('aria-describedby',question.id);
       confirmation.appendChild(question);confirmation.appendChild(cancel);confirmation.appendChild(confirm);
-      record.entry.appendChild(remove);record.entry.appendChild(confirmation);
+      record.actions.appendChild(remove);record.entry.appendChild(confirmation);
       record.setPending=pending=>{
-        record.open.disabled=remove.disabled=cancel.disabled=confirm.disabled=pending;
+        for(const button of record.actions.children)button.disabled=pending;
+        cancel.disabled=confirm.disabled=pending;
         confirm.textContent=pending?'Deleting…':'Delete canvas';
       };
       record.setPending(sceneDeletions.has(id));
@@ -2638,7 +2748,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       });
     }
     function activeSceneHistory(view){
-      return !destroyed&&sceneHistoryView===view&&pageView==='scene-history'&&options.canUseScenes?.()&&
+      return !destroyed&&sceneHistoryView===view&&(pageView==='scene-history'||pageView==='scene-edit')&&options.canUseScenes?.()&&
         view.owner===options.getSceneOwner?.();
     }
     function handleAction(event){
@@ -2776,6 +2886,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     cleanup.push(on(floater,'focusout',e=>{if(!floater.contains(e.relatedTarget)){hovered=false;roam.start=0;roam.delay=0;schedulePlayerHide();}}));
     cleanup.push(on(window,'pointermove',e=>gazeAt(e.clientX,e.clientY),{passive:true}));
     cleanup.push(on(window,'message',receiveSceneTrack));
+    cleanup.push(on(window,'message',receiveSceneAppNotification));
     cleanup.push(on(window,'keydown',e=>{
       if(e.key!=='Escape'||e.defaultPrevented||document.body?.classList?.contains('sf-song-moments-open'))return;
       if(sceneImagePicker.open&&sceneImagePicker.contains(document.activeElement)){

@@ -76,7 +76,7 @@ In **AI Image Studio**, choose **Use as install icon** on an approved result to 
 
 Signed-in listeners can follow a session and enable alerts separately on each device. After installation, **Live Sessions → Following** lists their upcoming and live sessions. On iPhone and iPad, add Stonefellow to the Home Screen, open it there, and tap **Enable phone alerts**.
 
-For production reminders, run the alert worker once a minute using the PHP CLI path from your hosting account. The host needs PHP cURL and OpenSSL, HTTPS, writable protected storage, and outbound HTTPS to browser push services. The worker also delivers session updates to the existing Stonefellow inbox.
+For production reminders and canvas updates, run the alert worker once a minute using the PHP CLI path from your hosting account. The host needs PHP cURL and OpenSSL, HTTPS, writable protected storage, and outbound HTTPS to browser push services. The worker delivers Jukebox session updates and approved canvas revisions to the existing Stonefellow inbox and opted-in phone devices.
 
 ```cron
 * * * * * /path/to/php /path/to/stonefellow/cron-jukebox-alerts.php
