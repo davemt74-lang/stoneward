@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.311';
+  window.STONEFELLOW_APP_BUILD='1.3.312';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -24,6 +24,7 @@
   const drawerTitle=$('#activityDrawerTitle'),drawerCartCount=$('#drawerCartCount'),drawerTools=$('#activityDrawerTools'),chatFooterRestore=$('#chatFooterRestore'),chatFooterHide=$('#chatFooterHide');
   let drawerRenderSequence=0;
   let drawerReturnFocus=null,queueReturnFocus=null;
+  st.drawer.owner=canvasOwner();
   let recognition=null,recognitionActive=false,conversationRestartTimer=null,voiceTurnBusy=false,voiceTurnGeneration=0,pendingReply=Promise.resolve(),popupHistoryLoaded=false,popupHistoryEpoch=0,popupEntries=[];
   let voiceGreetingArmed=false,voiceGreetingDelivered=false;
   const guestProfileKey='stonefellow.guest.profile.v1';
@@ -1196,6 +1197,17 @@
   function syncAuthMenu(){
     // Account navigation is rendered exclusively by PHP on full-page requests.
     document.documentElement.dataset.authState=st.auth.authenticated?'logged-in':'logged-out';
+    const owner=canvasOwner();
+    if(st.drawer&&st.drawer.owner!==owner){
+      st.drawer.owner=owner;
+      st.drawer.requestId=(st.drawer.requestId||0)+1;
+      st.drawer.data=null;
+      updateNotificationBadge(0);
+      if(st.drawer.mode==='activity'){
+        renderDrawer();
+        if(owner&&notificationDrawer&&!notificationDrawer.hidden)void loadNotificationDrawer();
+      }
+    }
     window.SFTokenMeter?.setOwner?.();
     window.SFListeningTelemetry?.setOwner?.();
     syncCanvasDebugOwner();
@@ -1492,10 +1504,16 @@
   async function toggleFavorite(type,id){if(!st.auth.authenticated){say('Sign in to save favorites.',()=>navigate('login'));return}try{const desired=!isFavorite(type,id),j=await secureJsonPost('personalization.php',{action:'set_favorite',item_type:type,item_id:id,favorite:desired});st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;routeFromLocation()}catch(e){say(e.message)}}
   async function clearListeningHistory(){if(!confirm('Clear your personal listening history and Continue Listening positions? Aggregate anonymous listening totals will remain.'))return;try{const j=await secureJsonPost('personalization.php',{action:'clear_history'});st.personalization={loaded:true,...(j.personalization||{})};st.home.loaded=false;say('Your personal listening history was cleared.',()=>navigate('account'))}catch(e){say(e.message)}}
   function resumeTrack(trackId,position){const t=trackById(trackId);if(!t)return;play(t,Number(position)||0);renderStory(t);setUrl('track',{id:t.id})}
-  async function loadPlaylists(force=false){
+  async function loadPlaylists(force=false,isCurrent=()=>true){
     if(!st.auth.authenticated){st.playlists={loaded:true,items:[]};return st.playlists.items}
     if(st.playlists.loaded&&!force)return st.playlists.items;
-    try{const j=await api('playlists.php');st.playlists={loaded:true,items:j.playlists||[]};if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf}catch(_){st.playlists={loaded:true,items:[]}}
+    try{
+      const j=await api('playlists.php');
+      if(isCurrent()){
+        st.playlists={loaded:true,items:j.playlists||[]};
+        if(j.csrf)st.auth.csrf=j.csrf;
+      }
+    }catch(_){if(isCurrent())st.playlists={loaded:true,items:[]}}
     return st.playlists.items;
   }
   async function loadAgentListeningSession(){if(!st.auth.authenticated)return null;try{const j=await api('listening-sessions.php');if(j.csrf)st.auth.csrf=j.csrf||st.auth.csrf;if(j.session){st.agentSession={id:j.session.id,title:j.session.title||'Agent Listening Session',mode:j.session.mode||'mix',status:j.session.status||'',currentIndex:Number(j.session.current_index||0),tracks:j.session.tracks||[]};const ids=sessionTrackIds();if(ids.length)st.playlistPlayback={playlistId:'agent-session:'+j.session.id,playlistName:st.agentSession.title,trackIds:ids,index:Math.max(0,Math.min(ids.length-1,st.agentSession.currentIndex))};renderAgentSessionPanel();return j.session}}catch(_){}return null}
@@ -1837,7 +1855,28 @@
       Array.from(drawerContent.querySelectorAll('[data-notification-account]')).forEach(b=>b.onclick=()=>{const id=Number(b.dataset.notificationAccount);closeNotificationDrawer();void recordNotificationInteraction(id);navigate('account')});
     }else if(tab==='history'){const rows=d.history||[],listens=d.listening_preview||[];drawerContent.innerHTML=(listens.length?`<div class="drawer-section-title">Recent listening</div>${listens.map(r=>drawerItem(r.title,(r.event_type||'listen')+' · '+fmtWhen(r.created_at),r.release||'')).join('')}<button class="drawer-history-link" type="button" id="drawerOpenHistory">Open full listening history</button>`:'')+(rows.length?`<div class="drawer-section-title">Account activity</div>${rows.map(r=>drawerItem(r.title,(r.event_type||'activity')+' · '+fmtWhen(r.created_at),r.entity_type?`${r.entity_type}${r.entity_id?' · '+r.entity_id:''}`:'' )).join('')}`:'')||'<p class="drawer-empty">Your Stonefellow history will appear here.</p>';const open=$('#drawerOpenHistory',drawerContent);if(open)open.onclick=()=>{closeNotificationDrawer();navigate('history')}}else{const rows=d.brain||[];drawerContent.innerHTML=rows.length?rows.map(r=>`<article class="drawer-item brain"><strong>${esc(r.route||r.phase||'Agent decision')}</strong><p>${esc(r.request_excerpt||r.response_excerpt||'')}</p><small>${esc(r.phase||'')} · ${esc(r.action||'none')} · ${esc(fmtWhen(r.created_at))}</small></article>`).join(''):'<p class="drawer-empty">No Agent Brain events yet.</p>'}}
   function updateNotificationBadge(count){if(!notificationBadge)return;const n=Math.max(0,Number(count)||0);notificationBadge.textContent=n>99?'99+':String(n);notificationBadge.hidden=n===0;if(drawerUnreadCount)drawerUnreadCount.textContent=n?`(${n})`:''}
-  async function loadNotificationDrawer(){if(!st.auth.authenticated||!notificationDrawer)return;try{const [r]=await Promise.all([fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),loadPlaylists(true)]),j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.message||'Could not load activity.');st.drawer.data=j;if(j.csrf)st.auth.csrf=j.csrf;updateNotificationBadge(j.unread||0);if(st.drawer.mode==='activity')renderDrawer()}catch(e){if(st.drawer.mode==='activity'&&drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(e.message)}</p>`}}
+  async function loadNotificationDrawer(){
+    const owner=canvasOwner();
+    if(!owner||!notificationDrawer)return;
+    const requestId=st.drawer.requestId=(st.drawer.requestId||0)+1;
+    const current=()=>owner===canvasOwner()&&requestId===st.drawer.requestId;
+    const visible=()=>!notificationDrawer.hidden&&st.drawer.mode==='activity';
+    try{
+      const [response]=await Promise.all([
+        fetch((cfg.apiBase||'api')+'/notifications.php',{cache:'no-store',credentials:'same-origin'}),
+        loadPlaylists(true,current)
+      ]);
+      const data=await response.json();
+      if(!current())return;
+      if(!response.ok||data.ok===false)throw new Error(data.message||'Could not load activity.');
+      st.drawer.data=data;
+      if(data.csrf)st.auth.csrf=data.csrf;
+      updateNotificationBadge(data.unread||0);
+      if(visible())renderDrawer();
+    }catch(error){
+      if(current()&&visible()&&drawerContent)drawerContent.innerHTML=`<p class="drawer-empty">${esc(error.message)}</p>`;
+    }
+  }
   function openExperienceDrawer(mode='activity',tab=''){
     if(!notificationDrawer)return;
     // A purchase can originate inside a full-screen product detail modal.
@@ -2206,13 +2245,21 @@
       ...(playlists.length||/\{playlists-clear\}/i.test(draft)?{playlist_inputs:{items:playlists}}:{})};
   }
   function chatResourceCommandRange(draft,caret){
-    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|me|merch|tickets|playlists|data|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|me|merch|tickets|playlists|data|notifications|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
       if(caret!==undefined&&caret!==end)continue;
       const command=match[2].toLowerCase();
+      const standalone=draft.trim().toLowerCase()==='/'+command;
+      if(command==='notifications'){
+        const requestedAccountTool='my_notifications';
+        const candidate=draft.slice(0,start)+'{me:'+requestedAccountTool+'}'+draft.slice(end);
+        if(!standalone&&['create','revise','build_on'].includes(directListeningRoomCommand(candidate)?.kind))
+          return {kind:'me',start,end,standalone,requestedAccountTool};
+        continue;
+      }
       const tag=command.startsWith('stories-')?command.slice('stories-'.length):null;
       if(tag&&!validChatStoryTag(tag))continue;
-      return {kind:tag?'stories':command,start,end,standalone:draft.trim().toLowerCase()==='/'+command,...(tag?{tag}:{})};
+      return {kind:tag?'stories':command,start,end,standalone,...(tag?{tag}:{})};
     }
     return null;
   }
@@ -2280,6 +2327,7 @@
       const key=dataPicker?'data_sources':range.kind==='me'?'me_tools':range.kind==='tickets'?'ticket_ids':range.kind+'_ids';
       selected=resources.artist_inputs?.[key]??previous?.artist_inputs?.[key];
     }
+    if(range.requestedAccountTool)selected=Array.from(new Set([...(selected||[]),range.requestedAccountTool]));
     const picker={owner,request:new AbortController()};chatResourcePicker=picker;
     try{
       const result=dataPicker?await open({
@@ -2287,7 +2335,13 @@
         search:(query,signal)=>api('canvas-data.php?action=places&q='+encodeURIComponent(query),undefined,signal),
         resolvePlace:(id,signal)=>api('canvas-data.php?action=places&id='+encodeURIComponent(id),undefined,signal),
         selectedSources:selected,signal:picker.request.signal
-      }):await open({kind:range.kind,load:signal=>api('canvas-resources.php?kind='+range.kind,undefined,signal),
+      }):await open({kind:range.kind,load:async signal=>{
+        const inventory=await api('canvas-resources.php?kind='+range.kind,undefined,signal);
+        if(range.requestedAccountTool&&!(Array.isArray(inventory?.items)&&
+          inventory.items.some(item=>item?.id===range.requestedAccountTool&&item.enabled!==false)))
+          throw new Error('Notifications are unavailable for canvases.');
+        return inventory;
+      },
         selectedIds:(selected||[]).map(String),
         ...(range.kind==='stories'?{storyTag,storyTagLocked:!!range.tag,
           selectedAll:storyAllSelected}:{}),
@@ -2634,6 +2688,12 @@
     event.preventDefault();
     clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
     clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
+    if(input.value.trim().toLowerCase()==='/notifications'){
+      input.value='';
+      syncChatImageDraftLimit();
+      openNotificationDrawer();
+      return;
+    }
     const resourceRange=chatResourceCommandRange(input.value);
     if(resourceRange){void openChatResourcePicker(resourceRange);return;}
     const imageRange=chatImageCommandRange(input.value);

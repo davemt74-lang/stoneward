@@ -53,7 +53,7 @@ function me_flow_private_tool_ids(array $tools):array {
 }
 function me_flow_no_values(mixed $value):bool {
     $json=json_encode($value,JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);
-    foreach(['Pacific/Tahiti','Asia/Tokyo','PRIVATE_ME_EMAIL','PRIVATE_ME_NAME'] as $sentinel){
+    foreach(['Pacific/Tahiti','Asia/Tokyo','PRIVATE_ME_EMAIL','PRIVATE_ME_NAME','PRIVATE_ME_INBOX_TITLE','PRIVATE_ME_INBOX_BODY'] as $sentinel){
         if(str_contains($json,$sentinel))return false;
     }
     return true;
@@ -77,7 +77,8 @@ $prefFields=['locale'=>'fr-PF','country_code'=>'PF','listening_history_enabled'=
 sf_privacy_save_profile(1,$prefFields+['timezone'=>'Pacific/Tahiti']);
 sf_privacy_save_profile(2,array_replace($prefFields,['locale'=>'ja-JP','country_code'=>'JP','timezone'=>'Asia/Tokyo']));
 $preference='my_preferences';$ticket='my_tickets';$permission='canvas.data.'.$preference;
-$expected=['my_listening_history','my_listening_summary','my_preferences','my_purchases','my_tickets','personal_listening_stats'];
+$expected=['my_listening_history','my_listening_summary','my_notifications','my_preferences','my_purchases','my_tickets','personal_listening_stats'];
+sf_notify_user(1,'service','PRIVATE_ME_INBOX_TITLE','PRIVATE_ME_INBOX_BODY','https://example.invalid/private');
 
 $before=sf_token_balance(1);
 $inventory=sf_canvas_resource_inventory(1,'me');
@@ -86,7 +87,7 @@ me_flow_check($ids===$expected&&array_column($inventory,null,'id')[$preference][
     array_key_exists('timezone',array_column($inventory,null,'id')[$preference]['fields'])&&
     me_flow_no_values($inventory)&&!isset($inventory[0]['rows'])&&$calls===0&&sf_token_balance(1)===$before&&
     sf_canvas_access_export(1)===[],
-    'Account picker shows all six field inventories without values, consent, inference, or token changes');
+    'Account picker shows every field inventory without values, consent, inference, or token changes');
 me_flow_reject(fn()=>sf_canvas_resource_inventory(0,'me'),'Guest inventory requires an account');
 me_flow_reject(fn()=>sf_canvas_project_propose($user,['project'=>['brief'=>'Show account details {me:published_catalog}']]),
     'Public tool IDs are rejected as account attachments');
@@ -227,5 +228,41 @@ me_flow_check($calls===$priorCalls&&sf_token_balance(1)===$before,
 sf_canvas_permission_save($admin,$policy['policy']['revision'],[$permission=>true]);
 me_flow_check(me_flow_rows(sf_canvas_gallery_open($share['id'],$viewer)['scene'])===$viewerRows,
     'Re-enabling policy respects the viewer’s existing independent grant');
+$modelTools=['my_notifications'];
+me_flow_reject(fn()=>sf_agent_scene_create($user,['canvas_kind'=>'custom','brief'=>'Draw a quiet abstract pattern',
+    'request_id'=>me_flow_request()]),'The model cannot add inbox access to a build without an attachment',SfAgentSceneInvalidOutput::class);
+$inbox=sf_agent_scene_create($user,['canvas_kind'=>'custom','brief'=>'Use the selected inbox data {me:my_notifications}',
+    'request_id'=>me_flow_request()])['scene'];
+$inboxContext=['scene_id'=>$inbox['id']];
+$inboxView=me_flow_saved($user,$inbox['id']);
+$inboxPermission='canvas.data.my_notifications';
+me_flow_check($inbox['artist_inputs']['me_tools']===['my_notifications']&&
+    me_flow_private_tool_ids($prompt['canvas_data_tools'])===['my_notifications']&&
+    me_flow_no_values([$prompt,$system,$inbox,$inboxView])&&$inboxView['canvas_access']['requires_consent']&&
+    array_column($inboxView['canvas_access']['permissions'],'id')===[$inboxPermission]&&
+    $inboxView['datasets']['my_notifications']['rows']===[],
+    'An attached inbox contributes only its schema to generation and requires separate viewer consent');
+sf_canvas_access_change($user,$inboxContext,'grant',$inboxView['canvas_access']['fingerprint'],[$inboxPermission]);
+$inboxRows=me_flow_saved($user,$inbox['id'])['datasets']['my_notifications']['rows'];
+me_flow_check(count($inboxRows)===1&&$inboxRows[0]['title']==='PRIVATE_ME_INBOX_TITLE'&&
+    array_keys($inboxRows[0])===['kind','title','created_at','is_read'],
+    'Only projected notification fields arrive after the viewer grants access');
+
+sf_notify_user(2,'service','Viewer inbox item');
+$inboxShare=sf_canvas_gallery_submit($user,['scene_id'=>$inbox['id'],'title'=>'Inbox Lens',
+    'description'=>'Shows the selected inbox when its viewer allows it.','creator_label'=>'Fixture maker',
+    'publication_consent'=>true,'request_id'=>me_flow_request()]);
+sf_canvas_gallery_moderate($admin,$inboxShare['id'],'approve',$inboxShare['snapshot_hash']);
+$inboxSnapshot=json_decode(sf_canvas_gallery_row($inboxShare['id'])['snapshot_json'],true,16,JSON_THROW_ON_ERROR);
+$inboxVisitor=sf_canvas_gallery_open($inboxShare['id'],$viewer)['scene'];
+me_flow_check($inboxSnapshot['artist_inputs']['me_tools']===['my_notifications']&&
+    !isset($inboxSnapshot['datasets'])&&me_flow_no_values([$inboxSnapshot,$inboxVisitor])&&
+    $inboxVisitor['canvas_access']['requires_consent']&&$inboxVisitor['datasets']['my_notifications']['rows']===[],
+    'Sharing a consented inbox canvas preserves its scope and gives a new viewer no inbox rows');
+sf_canvas_access_change($viewer,['gallery_id'=>$inboxShare['id']],'grant',
+    $inboxVisitor['canvas_access']['fingerprint'],[$inboxPermission]);
+$inboxVisitor=sf_canvas_gallery_open($inboxShare['id'],$viewer)['scene'];
+me_flow_check(array_column($inboxVisitor['datasets']['my_notifications']['rows'],'title')===['Viewer inbox item']&&
+    me_flow_no_values($inboxVisitor),'Gallery inbox consent reads only the granting viewer’s notifications');
 me_flow_check(!$db->inTransaction(),'All accepted and rejected account-data workflows close their transactions');
 echo 'Canvas me flow: '.$checks.' checks passed ('.($mysql?'mysql':'sqlite').')'.PHP_EOL;

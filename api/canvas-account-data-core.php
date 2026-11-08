@@ -109,3 +109,13 @@ function sf_canvas_account_preferences(int $uid): array {
         'listening_history_enabled'=>(int)$profile['listening_history_enabled'],
         'personalization_enabled'=>(int)$profile['personalization_enabled']]];
 }
+
+/** Project only read-only inbox metadata after canvas access is granted. */
+function sf_canvas_account_notifications(int $uid): array {
+    if($uid<1)return [];
+    require_once __DIR__.'/operations.php';
+    require_once __DIR__.'/notification-core.php';
+    sf_ops_ensure_schema();
+    $limit=sf_agent_tool_registry()['my_notifications']['canvas_data']['max_rows'];
+    return sf_notification_inbox_rows($uid,$limit,false);
+}
