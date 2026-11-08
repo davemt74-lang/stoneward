@@ -166,3 +166,44 @@ me_data_grant($buyer,$purchaseContext,['canvas.data.my_purchases']);
 $purchases=sf_agent_canvas_data_for_scene($buyer,$purchaseHtml,'',null,null,$purchaseContext)['my_purchases']['rows'];
 check(array_column($purchases,'order_id')===['SF-ME-LINKED']&&$purchases[0]['item_label']==='Owned physical media',
     'Purchases follow the linked account ID and exclude guest or other-owner email lookalikes');
+
+$inboxTool='my_notifications';
+$inboxPermission='canvas.data.'.$inboxTool;
+$inboxHtml=me_data_binding($inboxTool);
+$unscopedInbox=me_data_scene($inboxHtml);
+$unscopedInboxContext=['scene_id'=>$unscopedInbox['id']];
+check(!in_array($inboxTool,array_column(sf_agent_canvas_data_tools(),'id'),true)&&
+    sf_canvas_access_summary($user,$unscopedInboxContext)['permissions']===[]&&
+    sf_agent_canvas_data_for_scene($user,$inboxHtml,'',null,null,$unscopedInboxContext)===[]&&
+    sf_canvas_access_public_uses($inboxHtml)===[],
+    'An unattached inbox marker creates no provider schema, permission, dataset or gallery disclosure');
+$inbox=me_data_scene($inboxHtml,[$inboxTool]);
+$inboxContext=['scene_id'=>$inbox['id']];
+$readInbox=static fn():array=>sf_agent_canvas_data_for_scene($user,$inboxHtml,'',null,null,$inboxContext);
+for($i=1;$i<=32;$i++){
+    $notificationId=sf_notify_user(1,'service','Inbox item '.$i,'PRIVATE_INBOX_BODY','https://example.invalid/private');
+    if($i===31)sf_notification_mark_read(1,$notificationId);
+    if($i===32)sf_notification_dismiss(1,$notificationId);
+}
+sf_notify_user(2,'service','Another account inbox title','private body');
+$deliveryEvents=(int)$db->query('SELECT COUNT(*) FROM notification_events')->fetchColumn();
+check($readInbox()[$inboxTool]['state']==='consent_required'&&$readInbox()[$inboxTool]['rows']===[],
+    'The inbox dataset is withheld until its viewer grants consent');
+me_data_grant($user,$inboxContext,[$inboxPermission]);
+$inboxRows=$readInbox()[$inboxTool]['rows'];
+check(count($inboxRows)===30&&array_column($inboxRows,'title')===array_map(static fn(int $i):string=>'Inbox item '.$i,range(31,2))&&
+    $inboxRows[0]['is_read']===1&&$inboxRows[1]['is_read']===0&&
+    array_keys($inboxRows[0])===['kind','title','created_at','is_read']&&strtotime($inboxRows[0]['created_at'])!==false,
+    'Inbox data contains the thirty newest visible notifications from the granting viewer with only the approved fields');
+check((int)$db->query('SELECT COUNT(*) FROM notification_events')->fetchColumn()===$deliveryEvents&&
+    (int)$db->query('SELECT COUNT(*) FROM notification_generation_state')->fetchColumn()===0,
+    'Reading the inbox neither modifies notification activity nor triggers generation');
+$policy=sf_canvas_permission_policy();
+sf_canvas_permission_save(['id'=>2,'role'=>'admin'],$policy['revision'],[$inboxPermission=>false]);
+check(!isset($readInbox()[$inboxTool]),'Disabling inbox access in the admin policy stops delivery after consent');
+$policy=sf_canvas_permission_policy();
+sf_canvas_permission_save(['id'=>2,'role'=>'admin'],$policy['revision'],[$inboxPermission=>true]);
+$access=sf_canvas_access_summary($user,$inboxContext);
+sf_canvas_access_change($user,$inboxContext,'revoke',$access['fingerprint'],[$inboxPermission]);
+check($readInbox()[$inboxTool]['state']==='consent_required'&&$readInbox()[$inboxTool]['rows']===[],
+    'Withdrawing the inbox grant withholds the dataset on the next read');

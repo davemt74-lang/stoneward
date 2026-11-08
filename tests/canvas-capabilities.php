@@ -7,8 +7,10 @@ $n=0;
 function verify(bool $ok,string $label):void{if(!$ok)throw new RuntimeException($label);$GLOBALS['n']++;echo 'PASS '.$label.PHP_EOL;}
 function deny(callable $run,string $type,string $label):void{try{$run();}catch(Throwable $e){if($e instanceof $type){verify(true,$label);return;}throw $e;}throw new RuntimeException('Expected denial: '.$label);}
 $cards=sf_canvas_capability_cards();$admin=['id'=>7,'role'=>'admin'];
-verify(count($cards)===17,'Every existing canvas dataset has a capability card');
-verify(count(array_unique(array_column($cards,'permission_id')))===17,'Permission IDs are stable and unique');
+verify(count($cards)===18,'Every existing canvas dataset has a capability card');
+verify(count(array_unique(array_column($cards,'permission_id')))===18,'Permission IDs are stable and unique');
+verify($cards['my_notifications']['requires_sign_in']&&$cards['my_notifications']['permission_id']==='canvas.data.my_notifications',
+    'Inbox data has its own signed-in permission');
 verify($cards['my_purchases']['requires_sign_in']&&!$cards['published_catalog']['requires_sign_in'],'Cards distinguish public and current-account scopes');
 verify(!isset($cards['my_purchases']['handler'],$cards['my_purchases']['api_key']),'Cards do not expose handlers or credentials');
 verify(sf_canvas_permission_policy()['revision']===1&&sf_canvas_permission_enabled('published_catalog'),'Legacy default preserves enabled behavior');

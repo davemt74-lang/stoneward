@@ -64,9 +64,11 @@ function sf_canvas_access_external(array $sources): array {
     return sf_canvas_data_declared_capabilities($sources);
 }
 
-/** An explicit account-source selection limits private data; older canvases retain their grants. */
+/** Explicit selections limit private data. Legacy implicit sources retain their grants. */
 function sf_canvas_access_in_scope(string $id,bool $personal,?array $meTools): bool {
-    return !$personal||$meTools===null||in_array($id,$meTools,true);
+    if(!$personal)return true;
+    if($meTools!==null)return in_array($id,$meTools,true);
+    return empty(sf_agent_tool_registry()[$id]['canvas_data']['requires_attachment']);
 }
 function sf_canvas_access_grants(int $uid,string $key): array {
     if($uid<1||!sf_canvas_access_table_exists())return [];

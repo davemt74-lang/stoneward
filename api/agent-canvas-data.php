@@ -102,6 +102,7 @@ function sf_agent_canvas_data_for_scene(array $user,string $html,string $current
                 'my_listening_summary'=>sf_canvas_account_listening_summary($userId,$accountCatalog),
                 'my_listening_history'=>sf_canvas_account_listening_history($userId,$accountCatalog),
                 'my_preferences'=>sf_canvas_account_preferences($userId),
+                'my_notifications'=>sf_canvas_account_notifications($userId),
                 'published_merch'=>sf_canvas_resource_artist_rows($id,$artistInputs),
                 'published_ticket_offers'=>sf_canvas_resource_artist_rows($id,$artistInputs),
                 'published_stories'=>sf_canvas_resource_artist_rows($id,$artistInputs),

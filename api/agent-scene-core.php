@@ -899,10 +899,11 @@ function sf_agent_scene_render(string $raw,array $context,?array &$imageRequest=
                 $context['canvas_title']=trim($title);
         }
         $code=sf_agent_scene_scrub_copy($code,$brief,$context['trusted_canvas_markup']??false);
-        if(isset($context['artist_inputs']['me_tools'])){
-            $declared=sf_canvas_access_declared($code['html']);
+        $declared=sf_canvas_access_declared($code['html']);
+        if($declared){
+            $meTools=$context['artist_inputs']['me_tools']??null;
             foreach(sf_canvas_capability_cards() as $id=>$card){
-                if(isset($declared[$id])&&$card['requires_sign_in']&&!in_array($id,$context['artist_inputs']['me_tools'],true))
+                if(isset($declared[$id])&&!sf_canvas_access_in_scope($id,$card['requires_sign_in'],$meTools))
                     throw new SfAgentSceneInvalidOutput('account_scope');
             }
         }
