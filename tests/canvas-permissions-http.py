@@ -86,22 +86,22 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
             guest = fixture.HTTPClient(base)
             owner, owner_headers = sign_in(base, 'owner@example.invalid')
             admin, headers = sign_in(base, 'other@example.invalid')
-            change = {'revision': 1, 'changes': {'canvas.data.my_purchases': False, 'canvas.library.matter': False}}
+            change = {'revision': 1, 'changes': {'canvas.data.my_purchases': False, 'canvas.library.anime': False}}
             check(guest.get(ENDPOINT).status == 401, 'Guest cannot read administrator permission policy')
             check(owner.get(ENDPOINT).status == 403, 'Signed-in non-admin cannot read administrator policy')
             check(owner.post(ENDPOINT, change, owner_headers).status == 403,
                   'Signed-in non-admin cannot write policy even with a valid account CSRF token')
             initial = admin.get(ENDPOINT)
             data = initial.json()
-            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 21 and
+            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 22 and
                   {row['permission_id'] for row in data['capabilities'] if row['kind'] == 'library'} ==
-                  {'canvas.library.three', 'canvas.library.color-thief', 'canvas.library.d3', 'canvas.library.matter'},
+                  {'canvas.library.three', 'canvas.library.color-thief', 'canvas.library.d3', 'canvas.library.matter', 'canvas.library.anime'},
                   'Authenticated admin loads data and library permissions over HTTP')
             check('no-store' in initial.headers.get('cache-control', ''), 'Policy responses disallow caching')
             inventory = guest.get(LIBRARY_ENDPOINT)
             libraries = {library['id']: library for library in inventory.json()['libraries']}
             check(inventory.status == 200 and 'no-store' in inventory.headers.get('cache-control', '') and
-                  set(libraries) == {'three', 'color-thief', 'd3', 'matter'},
+                  set(libraries) == {'three', 'color-thief', 'd3', 'matter', 'anime'},
                   'The public canvas library inventory returns only enabled pins without caching')
             for name, card in libraries.items():
                 path = f'assets/vendor/canvas/{name}.js'
@@ -146,8 +146,8 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
                   'Explicit administrator save persists disablement through HTTP')
             check({item['id'] for item in owner.get(ME_ENDPOINT).json()['items']} == ACCOUNT_TOOLS - {'my_purchases'},
                   'Disabled account source disappears from the picker immediately')
-            check([item['id'] for item in guest.get(LIBRARY_ENDPOINT).json()['libraries']] == ['color-thief', 'd3', 'three'],
-                  'Disabling Matter.js withdraws its public runtime pin and keeps other pins available')
+            check([item['id'] for item in guest.get(LIBRARY_ENDPOINT).json()['libraries']] == ['color-thief', 'd3', 'matter', 'three'],
+                  'Disabling Anime.js withdraws its public runtime pin and keeps other pins available')
             check(len(data['history']) == 1 and data['history'][0]['updated_by'] == 2 and
                   data['history'][0]['changes']['canvas.data.my_purchases'] == {'before': True, 'after': False},
                   'Saved policy records authenticated actor and exact before/after change')
@@ -161,7 +161,7 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
             check(admin.get(ENDPOINT).status == 403 and admin.post(ENDPOINT, {'revision': 2, 'changes': {'canvas.data.my_purchases': True}}, headers).status == 403,
                   'Revoked administrator role blocks subsequent reads and writes using an existing session')
             persisted = json.loads(fixture.cli(site, "require SF_ROOT.'/api/canvas-capabilities.php';echo json_encode(sf_canvas_permission_policy());"))
-            check(persisted['revision'] == 2 and persisted['disabled'] == ['canvas.data.my_purchases', 'canvas.library.matter'],
+            check(persisted['revision'] == 2 and persisted['disabled'] == ['canvas.data.my_purchases', 'canvas.library.anime'],
                   'Rejected auth/CSRF/stale calls leave persisted policy unchanged')
             check(not (site / 'unexpected-provider.log').exists(), 'Policy flows do not invoke model providers')
             print(f'{len(checks)} real HTTP permission checks passed', flush=True)

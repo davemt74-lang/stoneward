@@ -42,7 +42,7 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         'assets/js/canvas-data-picker.js', 'assets/js/canvas-location.js',
         'api/canvas-libraries.php', 'api/canvas-library-core.php', 'api/media-artwork-palette.php',
         'assets/js/canvas-library-runtime.js', 'assets/js/media-artwork-palette.js',
-        *(f'assets/vendor/canvas/{library}.{ext}' for library in ('color-thief', 'd3', 'matter', 'three') for ext in ('js', 'LICENSE')),
+        *(f'assets/vendor/canvas/{library}.{ext}' for library in ('anime', 'color-thief', 'd3', 'matter', 'three') for ext in ('js', 'LICENSE')),
         'config/canvas-maps/us-regions.json', 'config/canvas-maps/us-overview.json',
         *(f'config/canvas-data-places/us-places-{part:02}.tsv' for part in range(1, 4)),
     )

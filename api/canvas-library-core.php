@@ -8,6 +8,15 @@ PROMPT;
 /** Reviewed browser bundles. A lock identifies these exact bytes, even across deployments. */
 function sf_canvas_library_registry(): array {
     $cards = [
+        'anime' => [
+            'name' => 'Anime.js',
+            'version' => '4.5.0',
+            'global' => 'anime',
+            'sha256' => 'jVs6WKH2QCOgSkzt7vE1oiY7GNoEs1F3rBNDigutAzs=',
+            'bytes' => 118043,
+            'when' => 'The requested experience benefits from coordinated DOM or SVG motion, easing, or animation timelines.',
+            'api' => 'Use anime.animate and anime.createTimeline for the requested DOM or SVG elements. Respect prefers-reduced-motion with a usable static state. Revert timelines and animations on pagehide.',
+        ],
         'color-thief' => [
             'name' => 'Color Thief',
             'version' => '3.5.0',

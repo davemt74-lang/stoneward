@@ -53,6 +53,11 @@ function sf_openai_call(array $provider,string $system,array $history,string $me
         $design=['html'=>'<section class="game"></section>','css'=>'','js'=>"// sf-libraries: ".$pin."\n"
             .'const engine = Matter.Engine.create();'];
     }
+    if($mode==='anime'){
+        $pin=array_column($prompt['canvas_libraries'],null,'id')['anime']['lock'];
+        $design=['html'=>'<section class="motion"></section>','css'=>'','js'=>"// sf-libraries: ".$pin."\n"
+            .'const timeline = anime.createTimeline({autoplay:false});'];
+    }
     if($mode==='generate_image')$design=['html'=>'<figure class="sf-image-new"></figure>',
         'css'=>'figure{background-image:var(--sf-image-new,none)}','image_request'=>[
             'prompt'=>'Rain on a glass greenhouse at dusk','title'=>'Glass Greenhouse','size'=>'1536x1024']];
@@ -325,9 +330,9 @@ $adminAccount=['id'=>4,'role'=>'admin'];
 $mode='library_repair';$before=$providerCalls;
 $generated=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Build an explorable 3D sculpture.']);
 $offered=array_column($prompt['canvas_libraries'],null,'id');
-verify(array_keys($offered)===['color-thief','d3','matter','three']&&$offered['three']['global']==='THREE'&&
+verify(array_keys($offered)===['anime','color-thief','d3','matter','three']&&$offered['three']['global']==='THREE'&&
     $offered['color-thief']['global']==='ColorThief'&&$offered['d3']['global']==='d3'&&
-    $offered['matter']['global']==='Matter'&&str_contains($providerSystem,'use native HTML, CSS, Canvas 2D'),
+    $offered['matter']['global']==='Matter'&&$offered['anime']['global']==='anime'&&str_contains($providerSystem,'use native HTML, CSS, Canvas 2D'),
     'The normal coding prompt offers verified optional libraries and criteria for choosing native APIs first');
 verify($providerCalls===$before+2&&str_starts_with($generated['scene']['js'],'// sf-libraries: '.$offered['three']['lock']."\n")&&
     sf_agent_scene_history_get(4,$generated['scene']['id'])['js']===$generated['scene']['js'],
@@ -342,7 +347,12 @@ $game=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Use
 verify(str_starts_with($game['scene']['js'],'// sf-libraries: '.$offered['matter']['lock']."\n")&&
     sf_agent_scene_history_get(4,$game['scene']['id'])['js']===$game['scene']['js'],
     'An explicit Matter.js build receives the exact pin and persists the authored source');
-sf_canvas_permission_save($adminAccount,1,['canvas.library.three'=>false,'canvas.library.d3'=>false,'canvas.library.matter'=>false]);
+$mode='anime';
+$motion=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Use Anime.js to animate SVG and DOM elements.']);
+verify(str_starts_with($motion['scene']['js'],'// sf-libraries: '.$offered['anime']['lock']."\n")&&
+    sf_agent_scene_history_get(4,$motion['scene']['id'])['js']===$motion['scene']['js'],
+    'An explicit Anime.js build receives the exact pin and persists the authored source');
+sf_canvas_permission_save($adminAccount,1,['canvas.library.three'=>false,'canvas.library.d3'=>false,'canvas.library.matter'=>false,'canvas.library.anime'=>false]);
 $mode='success';
 $native=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Create a quiet reading backdrop.']);
 verify(array_column($prompt['canvas_libraries'],'id')===['color-thief']&&!isset($native['scene']['js'])&&

@@ -4,6 +4,7 @@ The browser bundles in this directory come from pinned upstream npm releases. Th
 
 | Bundle | Package and version | Browser global | Bytes | SHA-256 |
 | --- | --- | --- | ---: | --- |
+| `anime.js` | `animejs@4.5.0` | `anime` | 118,043 | `8d5b3a58a1f64023a04a4cedeef135a2263b18da04b35177ac13438a0bad033b` |
 | `color-thief.js` | `colorthief@3.5.0` | `ColorThief` | 22,281 | `f4a8c69a9df43f598d72279d69b59f2d9d29561a34fe99b117492dbc908163ee` |
 | `d3.js` | `d3@7.9.2` | `d3` | 280,622 | `912111098ea99503a6f4967361d2bbdc9dbf58cf9c678c8e27e5b02d1a07f0c1` |
 | `matter.js` | `matter-js@0.20.0` | `Matter` | 84,834 | `961faf813d745b243f016800013fbc8ed75ed02c393bc2ca9bc0123270200b46` |
@@ -11,28 +12,32 @@ The browser bundles in this directory come from pinned upstream npm releases. Th
 
 ## Reproduce the bundles
 
-Run these commands from a scratch directory on Linux x64. The commands verify the source archives before extracting them. Color Thief uses the published browser global build with its source map reference removed. D3 uses the published minified UMD bundle byte for byte. Matter.js uses the published browser build with the local property merge and path guards below. Three.js bundles the WebGL package entry into a single classic script using esbuild 0.25.12. The source archive URLs also identify the exact npm releases. [Color Thief](https://github.com/lokesh/color-thief) · [D3](https://d3js.org/getting-started) · [Matter.js](https://github.com/liabru/matter-js) · [Three.js](https://github.com/mrdoob/three.js) · [esbuild](https://github.com/evanw/esbuild)
+Run these commands from a scratch directory on Linux x64. The commands verify the source archives before extracting them. Anime.js and D3 use the published minified UMD bundles byte for byte. Color Thief uses the published browser global build with its source map reference removed. Matter.js uses the published browser build with the local property merge and path guards below. Three.js bundles the WebGL package entry into a single classic script using esbuild 0.25.12. The source archive URLs also identify the exact npm releases. [Anime.js](https://animejs.com/documentation/getting-started/installation) · [Color Thief](https://github.com/lokesh/color-thief) · [D3](https://d3js.org/getting-started) · [Matter.js](https://github.com/liabru/matter-js) · [Three.js](https://github.com/mrdoob/three.js) · [esbuild](https://github.com/evanw/esbuild)
 
 ```sh
 set -eu
+curl -fLsS https://registry.npmjs.org/animejs/-/animejs-4.5.0.tgz -o anime.tgz
 curl -fLsS https://registry.npmjs.org/colorthief/-/colorthief-3.5.0.tgz -o colorthief.tgz
 curl -fLsS https://registry.npmjs.org/d3/-/d3-7.9.2.tgz -o d3.tgz
 curl -fLsS https://registry.npmjs.org/matter-js/-/matter-js-0.20.0.tgz -o matter.tgz
 curl -fLsS https://registry.npmjs.org/three/-/three-0.187.0.tgz -o three.tgz
 curl -fLsS https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.25.12.tgz -o esbuild.tgz
 sha256sum -c <<'SUMS'
+f1bf4be22ae739bbfefd3ec3651a37a7d178dfa8ce782b0ebe5e39347fcb1706  anime.tgz
 9f10d792d8dc1402e4ce24a26d7eb5ae0669db41415f03003f0fa1f02ebfa8fc  colorthief.tgz
 f0c1d2c2479907a6e3265370d0fd715f7aef0f561cdd2b415df385ba7df9d1aa  d3.tgz
 c2594c16b67adf76d32d9c4576a388a32cee80e5dfe2823cd3bf1b8fb93cc7f2  matter.tgz
 ff540832ded0cfe919764d24a3d88f3e2a05f23303f876423e4f893841e90728  three.tgz
 f7efc127658a108dcda9d4210b01804ee8f5d6b3acbd6d63f20aa51d3b50bd5f  esbuild.tgz
 SUMS
-mkdir -p colorthief d3 matter three esbuild
+mkdir -p anime colorthief d3 matter three esbuild
+tar -xzf anime.tgz -C anime
 tar -xzf colorthief.tgz -C colorthief
 tar -xzf d3.tgz -C d3
 tar -xzf matter.tgz -C matter
 tar -xzf three.tgz -C three
 tar -xzf esbuild.tgz -C esbuild
+cp anime/package/dist/bundles/anime.umd.min.js anime.js
 sed '/^\/\/# sourceMappingURL=/d' colorthief/package/dist/umd/color-thief.global.js > color-thief.js
 cp d3/package/dist/d3.min.js d3.js
 python3 - matter/package/build/matter.min.js matter.js <<'PYTHON'
@@ -99,11 +104,13 @@ PYTHON
 ./esbuild/package/bin/esbuild three/package/build/three.module.js \
   --bundle --platform=browser --format=iife --global-name=THREE \
   --target=safari15,chrome90,firefox90 --minify --legal-comments=inline --outfile=three.js
+cp anime/package/LICENSE.md anime.LICENSE
 cp colorthief/package/LICENSE color-thief.LICENSE
 cp d3/package/LICENSE d3.UPSTREAM-LICENSE
 cp matter/package/LICENSE matter.LICENSE
 cp three/package/LICENSE three.LICENSE
 sha256sum -c <<'SUMS'
+8d5b3a58a1f64023a04a4cedeef135a2263b18da04b35177ac13438a0bad033b  anime.js
 f4a8c69a9df43f598d72279d69b59f2d9d29561a34fe99b117492dbc908163ee  color-thief.js
 912111098ea99503a6f4967361d2bbdc9dbf58cf9c678c8e27e5b02d1a07f0c1  d3.js
 961faf813d745b243f016800013fbc8ed75ed02c393bc2ca9bc0123270200b46  matter.js
@@ -116,3 +123,5 @@ The D3 npm provenance identifies source commit `db118c93a429e82b83f091dbaa18fd0a
 D3's array, scale, shape, geographic projection, and DOM/SVG APIs work with data passed to the canvas. The sandbox blocks network loaders and dynamic JavaScript evaluation. Use `d3.csvParseRows` or `d3.tsvParseRows` for local delimited text. The upstream object parsers `d3.csvParse`, `d3.tsvParse`, and `d3.dsvFormat(delimiter).parse` require dynamic evaluation. [D3 DSV](https://d3js.org/d3-dsv)
 
 The Matter.js npm release declares zero runtime dependencies. The registry signature and tarball integrity verified, and its unmodified browser build matches source commit `acb99b6f8784c809b940f1d2cf745427e088e088` byte for byte. The local guards address prototype pollution through `Common.extend` and `Common.set`. Merges skip inherited source keys and reserved prototype keys and recurse only into own target objects. The setter rejects reserved path segments and inherited traversal before writing. [Matter.js source](https://github.com/liabru/matter-js/tree/acb99b6f8784c809b940f1d2cf745427e088e088) · [Upstream report](https://github.com/liabru/matter-js/issues/1351)
+
+Anime.js 4.5.0 declares zero runtime dependencies. The npm registry signature and tarball integrity verified, and the npm source commit matches upstream tag `v4.5.0` at `2c9cf8ea00329f6768c7d7902252ed977d75ce42`. The bundle exposes the v4 APIs under `anime`. A scope can track reduced-motion preferences and revert its animations and timelines as a unit. [Anime.js source](https://github.com/juliangarnier/anime/tree/2c9cf8ea00329f6768c7d7902252ed977d75ce42) · [Scope](https://animejs.com/documentation/scope)
