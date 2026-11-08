@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__.'/canvas-audio-core.php';
+require_once __DIR__.'/jukebox-listener-metrics.php';
 
 function sf_jukebox_schema(): void {
     static $ready=false;
@@ -33,6 +34,7 @@ function sf_jukebox_schema(): void {
             sender VARCHAR(8) NOT NULL, body VARCHAR(1000) NOT NULL, image $blob NULL, created BIGINT NOT NULL)"
     ];
     foreach($tables as $table) sf_db()->exec("CREATE TABLE IF NOT EXISTS ".$table.$engine);
+    sf_jukebox_listener_schema($mysql,$engine);
     $ready=true;
 }
 
@@ -110,12 +112,14 @@ function sf_jukebox_transport(array $session,?array $item,bool $online): array {
         $session['remote_status']==='playing'&&$now-$sampledAt>5000=>'buffering',
         default=>$session['remote_status'],
     };
-    return ['status'=>$status,'position_ms'=>(int)$session['position_ms'],'sampled_at_ms'=>$sampledAt,'server_time_ms'=>$now];
+    return ['status'=>$status,'position_ms'=>(int)$session['position_ms'],'sampled_at_ms'=>$sampledAt,
+        'server_time_ms'=>$now,'generation'=>(int)$session['control_revision']];
 }
 
 function sf_jukebox_remote_toggle(array $session,mixed $enabled): void {
     if(!is_bool($enabled))throw new InvalidArgumentException('Choose whether remote listening is enabled.');
     if($enabled===(bool)$session['remote_enabled'])return;
+    if(!$enabled)sf_jukebox_listener_invalidate($session['id']);
     $mysql=sf_db()->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
     $sql='INSERT INTO jukebox_remote (session_id,enabled,status,position_ms,sampled_at_ms,sample_seq,control_revision)
         VALUES (?,?,?,?,0,-1,?)';
@@ -133,8 +137,11 @@ function sf_jukebox_advance(array $session): void {
     if($next!==false)sf_jukebox_query("UPDATE jukebox_requests SET status='current' WHERE id=?",[$next]);
     sf_jukebox_query('UPDATE jukebox_sessions SET current_id=?,paused=0,seconds=0 WHERE id=?',
         [$next===false?null:$next,$id]);
-    if($session['remote_enabled'])sf_jukebox_query("UPDATE jukebox_remote SET status='starting',position_ms=0,
-        sampled_at_ms=0,control_revision=? WHERE session_id=?",[$session['revision'],$id]);
+    if($session['remote_enabled']){
+        sf_jukebox_listener_invalidate($id);
+        sf_jukebox_query("UPDATE jukebox_remote SET status='starting',position_ms=0,
+            sampled_at_ms=0,control_revision=? WHERE session_id=?",[$session['revision'],$id]);
+    }
 }
 
 function sf_jukebox_state(array $session,?array $phone,bool $host): array {
@@ -155,6 +162,7 @@ function sf_jukebox_state(array $session,?array $phone,bool $host): array {
     }
     if($state['remote_listening'])$state['transport']=sf_jukebox_transport($session,$state['current'],$state['online']);
     if($host){
+        $state['listener_metrics']=sf_jukebox_listener_metrics($session,$state['transport']??null);
         $state['phones']=sf_jukebox_query("SELECT p.id,p.name,p.status,
             (SELECT MAX(prior.approved) FROM jukebox_phones prior JOIN jukebox_guests g ON g.id=prior.guest_id
              WHERE prior.guest_id=p.guest_id AND prior.session_id<>p.session_id AND g.venue_id=?) AS last_visit
@@ -218,6 +226,7 @@ function sf_jukebox_player(array $session,array $body): void {
         if(sf_jukebox_player_online($session)&&$session['player']!==$hash&&empty($body['takeover']))
             throw new DomainException('A session player is already connected.');
         sf_jukebox_query('UPDATE jukebox_sessions SET player=?,heartbeat=? WHERE id=?',[$hash,time(),$id]);
+        if($session['remote_enabled'])sf_jukebox_listener_invalidate($id);
         if($session['sample_seq']!==null)sf_jukebox_query("UPDATE jukebox_remote SET status='starting',
             sampled_at_ms=0,sample_seq=-1,control_revision=? WHERE session_id=?",[$session['revision'],$id]);
         return;
@@ -250,8 +259,13 @@ function sf_jukebox_player(array $session,array $body): void {
         $position=isset($body['position_ms'])?filter_var($body['position_ms'],FILTER_VALIDATE_INT):null;
         if($position===false)return;
         $position=max(0,min(86400000,$position??$seconds*1000));
+        $now=(int)floor(microtime(true)*1000);
+        // Do not revive pre-buffer activity when transport starts moving again.
+        if($session['remote_status']==='playing'&&($status!=='playing'||$now-(int)$session['sampled_at_ms']>5000))
+            sf_jukebox_listener_invalidate($id);
+        else sf_jukebox_listener_clear_expired($id,$now);
         sf_jukebox_query('UPDATE jukebox_remote SET status=?,position_ms=?,sampled_at_ms=?,sample_seq=? WHERE session_id=?',
-            [$status,$position,(int)floor(microtime(true)*1000),$sequence??-1,$id]);
+            [$status,$position,$now,$sequence??-1,$id]);
         $seconds=intdiv($position,1000);
         $progress=$progress||$status==='paused';
     }
@@ -263,14 +277,18 @@ function sf_jukebox_controls(array $session,array $body): void {
     $event=$body['event']??'';
     if($event==='end'){
         sf_jukebox_query('UPDATE jukebox_sessions SET ended=1,heartbeat=0 WHERE id=?',[$id]);
+        // The recap needs only aggregate totals, never player or phone identifiers.
+        sf_jukebox_query('DELETE FROM jukebox_listener_players WHERE session_id=?',[$id]);
     }elseif($event==='remote_listening'){
         sf_jukebox_remote_toggle($session,$body['enabled']??null);
     }elseif(in_array($event,['pause','resume'],true)){
         $paused=$event==='pause';
         sf_jukebox_query('UPDATE jukebox_sessions SET paused=? WHERE id=?',[(int)$paused,$id]);
-        if($session['remote_enabled']&&$paused!==(bool)$session['paused'])
+        if($session['remote_enabled']&&$paused!==(bool)$session['paused']){
+            sf_jukebox_listener_invalidate($id);
             sf_jukebox_query("UPDATE jukebox_remote SET status='starting',sampled_at_ms=0,control_revision=? WHERE session_id=?",
                 [$session['revision'],$id]);
+        }
     }elseif($event==='skip'){
         sf_jukebox_query("UPDATE jukebox_requests SET status='skipped' WHERE id=? AND session_id=?",[$session['current_id'],$id]);
         sf_jukebox_advance($session);
@@ -354,7 +372,8 @@ function sf_jukebox_recap(array $session): array {
         ($b['requests']<=>$a['requests'])?:($b['confirmed_plays']<=>$a['confirmed_plays'])?:strcmp($a['track_id'],$b['track_id']));
 
     return ['session_id'=>$id,'title'=>$session['title'],'created'=>(int)$session['created'],
-        'phones'=>array_map('intval',$phones),'totals'=>$totals,'tracks'=>$tracks];
+        'phones'=>array_map('intval',$phones),'totals'=>$totals,'tracks'=>$tracks,
+        'listener_metrics'=>sf_jukebox_listener_metrics($session)];
 }
 
 function sf_jukebox_crm(int $venue): array {
