@@ -275,30 +275,30 @@ Known library bytes can be inventoried separately from authored code. A package 
 
 An administrator can approve, enable, retire or revoke exact versions. Test each exact bundle with the production CSP and SDK, phone-browser capability fallbacks, existing canvases, remixes and reduced-motion behavior. Repeated mount, Stop and unmount must release WebGL contexts, animation frames, listeners, workers and audio nodes as applicable. Dependency or SDK drift invalidates matching audit evidence. Routine updates preserve pinned versions; confirmed security revocations identify affected publications for the established response process. The agent may suggest an unavailable library for administrator review without fetching or executing it.
 
-Candidate inventory and recommendations, with no default selection:
+### Libraries approved for Coding Agent integration
 
-The user approved adding Meyda, Tone.js, Konva, simplex-noise, chroma.js, Rapier, Phaser, Color Thief, OpenType.js, Paper.js, Interact.js, Cytoscape.js and VexFlow to the planned registry inventory. Color Thief additionally has an approved planned integration with the main media library and adaptive host colors. Family-level inclusion does not enable an unchecked version; exact bundles, dependencies and integrations still require the registry's security and compatibility evidence. This update changes the outline only.
+All 18 library families below are in the Coding Agent runtime scope, with Three.js explicitly included. Each library needs a discoverable capability card and a usable, version-pinned local bundle. Verify its exact build and dependencies in the production sandbox and on supported devices before enabling it. The agent chooses native APIs, one library or a combination based on the project. Color Thief also has a separate planned integration with the main media library and adaptive host colors.
 
 | Library | Role | Planning status |
 | --- | --- | --- |
-| Three.js | General 3D scenes and graphics. | User-named candidate; verify the exact version, addons and sandbox/mobile integration before enabling a runtime entry. Select only when it best fits the project. |
-| PixiJS | GPU-accelerated 2D graphics, sprites and interactive visuals. | Suggested candidate; version review and approval pending. |
-| Anime.js | Animation, timelines and SVG/DOM motion. | Suggested candidate; version review and approval pending. |
-| Matter.js | 2D rigid-body physics, collisions and constraints. | Suggested candidate; version review and approval pending. |
-| D3 | Low-level data-driven graphics and custom visualization primitives. | Suggested candidate; version review and approval pending. |
-| Meyda | Audio feature extraction for richer sound-responsive visuals. | User-approved inventory addition; exact-version review pending. |
-| Tone.js | Interactive music, synthesis, effects and sequencing. | User-approved inventory addition; exact-version and host-audio integration review pending. |
-| Konva | Interactive 2D objects, drawing, layering, dragging and transforms. | User-approved inventory addition; exact-version and touch/lifecycle review pending. |
-| simplex-noise | Procedural noise primitives for textures, patterns and organic motion. | User-approved inventory addition; exact-version review pending. |
-| chroma.js | Palette blending, color interpolation and data-to-color scales. | User-approved inventory addition; exact-version review pending. |
-| Rapier | 2D/3D physics and simulation through direct JavaScript bindings. | User-approved inventory addition; exact-version, local WASM and CSP/mobile integration review pending. |
-| Phaser | Browser-based 2D game framework with scenes, input, cameras and physics. | User-approved inventory addition; exact-version and complete game/audio lifecycle review pending. |
-| Color Thief | Extract image palettes for media metadata and artwork-derived host colors. | User-approved planned media-library integration and inventory addition; exact-version and image/theme integration review pending. |
-| OpenType.js | Read font outlines for custom letterforms and typography. | User-approved inventory addition; exact-version and approved-font parsing/delivery review pending. |
-| Paper.js | Vector paths, curves and generative illustration primitives. | User-approved inventory addition; exact-version and direct-JavaScript/CSP compatibility review pending. |
-| Interact.js | Dragging, resizing, snapping and multitouch interaction. | User-approved inventory addition; exact-version and accessible touch/scroll lifecycle review pending. |
-| Cytoscape.js | Relationship graphs, network layouts and graph analysis. | User-approved inventory addition; exact-version, authorized-data and mobile-complexity review pending. |
-| VexFlow | Render supplied music notation and guitar tablature. | User-approved inventory addition; exact-version and approved-font/asset delivery review pending. |
+| Three.js | General 3D scenes and graphics. | Explicitly approved. Review the exact version, addons, sandbox integration and mobile compatibility. Choose it when it fits the project. |
+| PixiJS | GPU-accelerated 2D graphics, sprites and interactive visuals. | Approved for Coding Agent integration. Exact-version review pending. |
+| Anime.js | Animation, timelines and SVG/DOM motion. | Approved for Coding Agent integration. Exact-version review pending. |
+| Matter.js | 2D rigid-body physics, collisions and constraints. | Approved for Coding Agent integration. Exact-version review pending. |
+| D3 | Low-level data-driven graphics and custom visualization primitives. | Approved for Coding Agent integration. Exact-version review pending. |
+| Meyda | Audio feature extraction for richer sound-responsive visuals. | Approved for Coding Agent integration. exact-version review pending. |
+| Tone.js | Interactive music, synthesis, effects and sequencing. | Approved for Coding Agent integration. exact-version and host-audio integration review pending. |
+| Konva | Interactive 2D objects, drawing, layering, dragging and transforms. | Approved for Coding Agent integration. exact-version and touch/lifecycle review pending. |
+| simplex-noise | Procedural noise primitives for textures, patterns and organic motion. | Approved for Coding Agent integration. exact-version review pending. |
+| chroma.js | Palette blending, color interpolation and data-to-color scales. | Approved for Coding Agent integration. exact-version review pending. |
+| Rapier | 2D/3D physics and simulation through direct JavaScript bindings. | Approved for Coding Agent integration. exact-version, local WASM and CSP/mobile integration review pending. |
+| Phaser | Browser-based 2D game framework with scenes, input, cameras and physics. | Approved for Coding Agent integration. exact-version and complete game/audio lifecycle review pending. |
+| Color Thief | Extract image palettes for media metadata and artwork-derived host colors. | Approved for Coding Agent and media-library integration. Exact-version and image/theme integration review pending. |
+| OpenType.js | Read font outlines for custom letterforms and typography. | Approved for Coding Agent integration. exact-version and approved-font parsing/delivery review pending. |
+| Paper.js | Vector paths, curves and generative illustration primitives. | Approved for Coding Agent integration. exact-version and direct-JavaScript/CSP compatibility review pending. |
+| Interact.js | Dragging, resizing, snapping and multitouch interaction. | Approved for Coding Agent integration. exact-version and accessible touch/scroll lifecycle review pending. |
+| Cytoscape.js | Relationship graphs, network layouts and graph analysis. | Approved for Coding Agent integration. exact-version, authorized-data and mobile-complexity review pending. |
+| VexFlow | Render supplied music notation and guitar tablature. | Approved for Coding Agent integration. exact-version and approved-font/asset delivery review pending. |
 
 Native browser Canvas, SVG and Web Audio remain baseline capabilities subject to the existing host policies; using a library is optional. Existing internal dependencies, such as the Acorn parser, are tracked separately from creative libraries exposed to canvas code. The registry is not implemented by this planning update, and the checked source tree does not establish an installed Three.js bundle or version.
 
