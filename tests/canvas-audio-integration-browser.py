@@ -19,6 +19,7 @@ import urllib.request
 HTTP_ONLY='--http-only' in sys.argv
 AUTOPLAY_ONLY='--autoplay-only' in sys.argv
 MUSIC_ID_ONLY='--music-id-only' in sys.argv
+MATTER_ONLY='--matter-only' in sys.argv
 if not HTTP_ONLY:
     from playwright.sync_api import expect, sync_playwright
 
@@ -188,9 +189,9 @@ def seed(site):
     saved=json.loads(cli(site,"require_once SF_ROOT.'/api/agent-scene-core.php';$scene=json_decode(base64_decode('"+encoded+"'),true);echo json_encode(sf_agent_scene_history_save(1,$scene));"))
     scene.update(saved)
     fixture_tracks=[{'id':track['id'],'title':track['title'],'duration':track.get('duration',6),'audio':'api/canvas-audio.php?action=source&track_id='+track['id']} for track in tracks if track.get('state')=='published']
-    page='''<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="assets/css/site.css"><link rel="stylesheet" href="assets/css/public-agent-canvas.css"><style>body{margin:0;background:#111;color:white}#target{min-height:90vh}.chat-footer{position:fixed;bottom:0;left:0;right:0}.social-links{min-height:45px}</style><div id="target"></div><footer class="chat-footer"><div id="canonicalPlayer"><audio id="canonical"></audio></div><div class="social-links"></div></footer>'''
+    page='''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="assets/css/site.css"><link rel="stylesheet" href="assets/css/public-agent-canvas.css"><style>body{margin:0;background:#111;color:white}#target{min-height:90vh}.chat-footer{position:fixed;bottom:0;left:0;right:0}.social-links{min-height:45px}</style><div id="target"></div><footer class="chat-footer"><div id="canonicalPlayer"><audio id="canonical"></audio></div><div class="social-links"></div></footer>'''
     page+='<script>window.fixtureScene='+json.dumps(scene).replace('<','\\u003c')+';window.fixtureTracks='+json.dumps(fixture_tracks)+'</script>'
-    page+='<script src="assets/js/canvas-audio-sdk.js"></script><script src="assets/js/public-agent-canvas.js"></script>'
+    page+='<script src="assets/js/canvas-library-runtime.js"></script><script src="assets/js/canvas-audio-sdk.js"></script><script src="assets/js/public-agent-canvas.js"></script>'
     page+='<script>'+SETUP+CALLBACKS+MOUNT+'</script>'
     (site/'fixture.html').write_text(page)
     return mp3.read_bytes(),scene
@@ -488,6 +489,132 @@ def login(page,base,email):
     assert response.status==200,response.text()
 
 
+MATTER_CODE=r'''(async()=>{
+ const output=document.querySelector('.matter-output');
+ const canvas=document.createElement('canvas');
+ canvas.width=200;canvas.height=80;canvas.className='matter-stage';
+ const controls=document.querySelector('.matter-controls');
+ controls.append(canvas);
+ const context=canvas.getContext('2d');
+ const engine=Matter.Engine.create({gravity:{x:0,y:0}});
+ const bottle=Matter.Bodies.rectangle(25,40,12,30,{frictionAir:0});
+ const target=Matter.Bodies.rectangle(170,40,12,50,{isStatic:true});
+ Matter.Composite.add(engine.world,[bottle,target]);
+ function draw(){
+  context.clearRect(0,0,canvas.width,canvas.height);
+  for(const body of [bottle,target]){
+   context.beginPath();context.moveTo(body.vertices[0].x,body.vertices[0].y);
+   for(const point of body.vertices.slice(1))context.lineTo(point.x,point.y);
+   context.closePath();context.fillStyle=body===bottle?'#468a72':'#e8b35a';context.fill();
+  }
+ }
+ const {tracks}=await StonefellowAudio.catalog();
+ if(tracks.length!==1)throw new Error('Unexpected song selection');
+ const selected=tracks[0];
+ let hit=false,frames=0;
+ Matter.Events.on(engine,'collisionStart',({pairs})=>{
+  if(hit||!pairs.some(({bodyA,bodyB})=>(bodyA===bottle&&bodyB===target)||(bodyA===target&&bodyB===bottle)))return;
+  hit=true;
+  output.dataset.hitAfter=String(frames);
+  StonefellowAudio.play(selected.track_id).then(
+   state=>{output.textContent=state.playing?'played '+state.trackId:'playback did not start'},
+   error=>{output.textContent='playback failed '+error.code}
+  );
+ });
+ function advance(){
+  frames++;
+  Matter.Engine.update(engine,1000/60);
+  draw();
+  if(hit)return;
+  if(frames>=120){output.textContent='missed';return}
+  requestAnimationFrame(advance);
+ }
+ const launch=document.createElement('button');launch.type='button';launch.textContent='Throw bottle';
+ launch.addEventListener('click',event=>{
+  if(!event.isTrusted)return;
+  launch.disabled=true;
+  output.dataset.input=event.pointerType||'mouse';
+  Matter.Body.setVelocity(bottle,{x:8,y:0});
+  requestAnimationFrame(advance);
+ });
+ controls.prepend(launch);draw();
+ output.textContent='ready '+selected.track_id;
+ parent.postMessage({stonefellowMatterReady:{track:selected.track_id,activated:navigator.userActivation.hasBeenActive}},'*');
+})().catch(error=>{document.querySelector('.matter-output').textContent='fixture error '+error.message});'''
+
+
+def run_matter_browser(pw,site,base,scene):
+    """Exercise a pinned library, trusted input, collision and authorized MP3 playback."""
+    path=Path('assets/vendor/canvas/matter.js')
+    (site/path).parent.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(ROOT/path,site/path)
+    inventory=HTTPClient(base).get('/api/canvas-libraries.php').json()
+    pin=next((card for card in inventory['libraries'] if card['id']=='matter'),None)
+    assert pin is not None,'The registered Matter.js pin is unavailable in the fixture'
+    track='song-2'
+    saved=save_fixture_scene(site,{**scene,'title':'Physics-triggered playback',
+        'html':'<section class="matter-controls"></section><p class="matter-output"></p>',
+        'css':'.matter-controls{padding:90px 20px 0}.matter-stage{display:block;max-width:100%;background:#222}button{min-height:44px;touch-action:manipulation}',
+        'music_inputs':{'mode':'selected','track_ids':[track]},
+        'js':'// sf-libraries: '+pin['lock']+'\n'+MATTER_CODE})
+    # No autoplay override. An actual click or tap starts the authored throw.
+    options={'args':['--no-sandbox']}
+    if CHROME:options['executable_path']=CHROME
+    browser=pw.chromium.launch(**options)
+    try:
+        for width,touch in ((1280,False),(390,True)):
+            context=browser.new_context(viewport={'width':width,'height':850},is_mobile=touch,has_touch=touch)
+            page=context.new_page()
+            errors=[]
+            page.on('pageerror',lambda error:errors.append(str(error)))
+            scene_id=saved['id']
+            page.add_init_script('''if(window===window.top){
+                addEventListener('message',event=>{
+                    if(event.data?.stonefellowMatterReady)window.matterReady=event.data.stonefellowMatterReady;
+                });
+                addEventListener('DOMContentLoaded',async()=>{
+                    const {scene}=await api('agent-scene.php?id='''+str(scene_id)+'''');
+                    await SFPublicAgentCanvas.prepareSceneLibraries(scene);
+                    showFixture(scene);
+                });
+            }''')
+            login(page,base,'owner@example.invalid')
+            page.goto(base+'/fixture.html?music=1')
+            # A Playwright locator assertion can grant activation while the sandbox starts.
+            cdp=context.new_cdp_session(page)
+            ready=None
+            deadline=time.monotonic()+12
+            while time.monotonic()<deadline and not ready:
+                response=cdp.send('Runtime.evaluate',{'expression':
+                    'window.matterReady&&{...matterReady,hostActivated:navigator.userActivation.hasBeenActive,calls:playCalls.length}',
+                    'returnByValue':True,'userGesture':False})
+                assert not response.get('exceptionDetails'),response
+                ready=response['result'].get('value')
+                if not ready:time.sleep(.05)
+            assert ready=={'track':track,'activated':False,'hostActivated':False,'calls':0},(ready,errors)
+            frame=page.frame_locator('.sf-agent-scene-backdrop iframe')
+            output=frame.locator('.matter-output')
+            button=frame.get_by_role('button',name='Throw bottle')
+            if touch:button.tap()
+            else:button.click()
+            expect(output).to_have_text('played '+track)
+            expect(output).to_have_attribute('data-input','touch' if touch else 'mouse')
+            page.wait_for_function('audio.currentTime>0')
+            check(int(output.get_attribute('data-hit-after'))>1 and
+                page.evaluate('''({track,sceneId})=>{
+                    const source=new URL(audio.currentSrc);
+                    return typeof window.Matter==='undefined'&&playCalls.length===1&&playCalls[0]===track&&st.track?.id===track&&!audio.paused&&
+                        source.pathname==='/api/canvas-audio.php'&&source.searchParams.get('action')==='source'&&
+                        source.searchParams.get('track_id')===track&&source.searchParams.get('scene_id')===String(sceneId);
+                }''',{'track':track,'sceneId':scene_id}),
+                f'Chromium/{width}: a Matter collision starts the one selected MP3 on the canonical player')
+            denied=frame.locator('body').evaluate("async()=>StonefellowAudio.play('song-1').then(()=>null,error=>error.code)")
+            check(denied=='track_unavailable' and page.evaluate('playCalls.length===1') and not errors,
+                f'Chromium/{width}: the same physics scene cannot start unselected audio and runs without browser errors')
+            context.close()
+    finally:browser.close()
+
+
 def run_music_http(client,site,scene):
     saved=save_music_scenes(site,scene)
     route='/api/agent-scene.php';selected=saved['selected'];other=saved['other']
@@ -628,11 +755,14 @@ def main():
                             run_gesture_browser(pw,site,base,scene)
                         elif MUSIC_ID_ONLY:
                             run_music_browser(pw,site,base,mp3,scene)
+                        elif MATTER_ONLY:
+                            run_matter_browser(pw,site,base,scene)
                         else:
                             run_http(pw.request.new_context(base_url=base),site,mp3)
                             run_browser(pw,site,base,mp3,scene)
                             run_music_browser(pw,site,base,mp3,scene)
                             run_gesture_browser(pw,site,base,scene)
+                            run_matter_browser(pw,site,base,scene)
                             run_music_http(HTTPClient(base),site,scene)
             except BaseException:
                 log.seek(0);print(log.read()[-7000:]);raise

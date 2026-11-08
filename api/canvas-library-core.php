@@ -27,6 +27,15 @@ function sf_canvas_library_registry(): array {
             'when' => 'The requested experience benefits from data-driven visuals, geographic projections, scales, layouts, or interactive SVG and Canvas graphics.',
             'api' => 'Use host-authorized data or local values with d3 scales, shapes, projections and selections. Use StonefellowData for selected live sources and pass their records or GeoJSON to D3. URL loaders and dynamic evaluation are blocked. For supplied CSV or TSV text, use csvParseRows or tsvParseRows.',
         ],
+        'matter' => [
+            'name' => 'Matter.js',
+            'version' => '0.20.0',
+            'global' => 'Matter',
+            'sha256' => 'lh+vgT10WyQ/AWgAAT+8jtde0Cw5O8LKm8ASMnAgC0Y=',
+            'bytes' => 84834,
+            'when' => 'The requested experience needs 2D rigid bodies, gravity, throws, collisions, or constraints.',
+            'api' => 'Use Matter.Engine, Bodies, Body, Composite and Events with the requested visuals and controls. Stop the runner or cancel animation frames on pagehide. For a collision-triggered song, deduplicate the hit and call StonefellowAudio.play(trackId) with the selected canonical track ID. If audio_gesture_required occurs, surface the message and let the listener use the player’s Play control.',
+        ],
         'three' => [
             'name' => 'Three.js',
             'version' => '0.187.0',
