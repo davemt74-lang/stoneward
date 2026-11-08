@@ -20,10 +20,10 @@ header('Referrer-Policy: same-origin');
 <meta name="robots" content="noindex">
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=3">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=4">
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
-<script defer src="assets/js/jukebox-listener.js?v=1"></script>
-<script defer src="assets/js/jukebox.js?v=3"></script>
+<script defer src="assets/js/jukebox-listener.js?v=2"></script>
+<script defer src="assets/js/jukebox.js?v=4"></script>
 </head>
 <body>
 <main>
@@ -58,6 +58,7 @@ header('Referrer-Policy: same-origin');
 <label>Player volume <input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
 <label class="remote-setting"><input id="remote-listening" type="checkbox" aria-describedby="remote-help"> Allow remote listening</label>
 <small id="remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
+<p id="remote-listener-count" role="status" hidden></p>
 <p id="player-status"></p><div id="controls"></div><h3>Play history</h3><ul id="history"></ul></section>
 </div>
 </section>
@@ -67,8 +68,13 @@ header('Referrer-Policy: same-origin');
 <button type="button" id="recap-retry" hidden>Retry recap</button>
 <div id="recap-content" hidden>
 <p id="recap-start"></p>
-<dl id="recap-totals"></dl>
+<dl id="recap-totals" class="recap-metrics"></dl>
 <p>Confirmed plays count songs that started playing. A song can count as both a confirmed play and a skip.</p>
+<section id="recap-listeners" hidden>
+<h3>Phone listening</h3>
+<dl id="recap-listener-totals" class="recap-metrics"></dl>
+<p>These totals reflect recorded phone playback. Phone approvals and host playback appear in the session totals above.</p>
+</section>
 <p id="recap-empty" hidden>No songs were requested.</p>
 <table id="recap-tracks" hidden>
 <caption>Song requests and playback</caption>

@@ -45,6 +45,7 @@
       headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
       body: JSON.stringify(body)
     };
+    if (action === 'listener' && body?.active === false) options.keepalive = true;
     const controller = ['state', 'player'].includes(action) || (!host && action === 'directory') ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
     if (controller) options.signal = controller.signal;
@@ -63,6 +64,46 @@
     } finally {
       if (timer !== null) clearTimeout(timer);
     }
+  }
+
+  function createListenerReporter() {
+    const storageKey = 'stonefellow:jukebox-listener:' + id;
+    let playerId, sequence, pending;
+
+    function send(item, generation, advancedMs, isActive) {
+      if (!playerId) {
+        let stored;
+        try { stored = JSON.parse(sessionStorage.getItem(storageKey)); } catch {}
+        playerId = /^[0-9a-f]{32}$/.test(stored?.player ?? '') ? stored.player : nonce();
+        sequence = Number.isSafeInteger(stored?.seq) && stored.seq >= 0 ? stored.seq : 0;
+      }
+      const seq = ++sequence;
+      try { sessionStorage.setItem(storageKey, JSON.stringify({player: playerId, seq})); } catch {}
+      void api('listener', {player: playerId, seq, item, generation, advanced_ms: advancedMs, active: isActive}).catch(() => {});
+    }
+
+    return ({itemId, generation, advancedMs, active: isActive, baseline}) => {
+      if (!/^[1-9]\d{0,18}$/.test(itemId) || !Number.isSafeInteger(generation) || generation < 0) return;
+      const matches = pending?.itemId === itemId && pending?.generation === generation;
+      if (!isActive && !baseline) {
+        if (matches) {
+          send(itemId, generation, pending.advancedMs, false);
+          pending = null;
+        }
+        return;
+      }
+      const now = performance.now();
+      if (baseline || !matches) {
+        pending = {itemId, generation, advancedMs: 0, reportAt: now + 1000};
+        send(itemId, generation, 0, false);
+      }
+      if (!isActive) return;
+      pending.advancedMs += advancedMs;
+      if (now < pending.reportAt) return;
+      send(itemId, generation, pending.advancedMs, true);
+      pending.advancedMs = 0;
+      pending.reportAt = now + 4000;
+    };
   }
   function notice(error) {
     $('status').textContent = typeof error === 'string' ? error : error.message;
@@ -162,6 +203,12 @@
   }
   function renderHost() {
     if (!remoteChangePending) $('remote-listening').checked = state.remote_listening === true;
+    const audience = $('remote-listener-count');
+    const count = state.listener_metrics?.active_players;
+    audience.hidden = state.remote_listening !== true || count == null;
+    if (!audience.hidden && changed('listener-count', count)) {
+      audience.textContent = count + (Number(count) === 1 ? ' phone listening now' : ' phones listening now');
+    }
     if (changed('phones', state.phones)) list('phones', state.phones || [], phone => {
       const label = phone.name + ' · ' + phone.status + (phone.last_visit ? ' · Returning guest, last visit ' + date(phone.last_visit) : '');
       if (phone.status === 'pending') return [label,
@@ -200,16 +247,9 @@
     ['left_in_queue', 'Left in queue'], ['current_at_close', 'Current at close']
   ];
 
-  function renderRecap(recap) {
-    $('recap-start').textContent = 'Session opened ' + date(recap.created);
-    const totals = $('recap-totals');
+  function renderMetrics(id, metrics) {
+    const totals = $(id);
     totals.replaceChildren();
-    const metrics = [
-      ['Phone connections', recap.phones.connections], ['Approved phones', recap.phones.approved],
-      ['Requests', recap.totals.requests], ['Guest requests', recap.totals.guest_requests],
-      ['Host requests', recap.totals.host_requests], ['Confirmed plays', recap.totals.confirmed_plays],
-      ...recapOutcomes.map(([key, label]) => [label, recap.totals[key]])
-    ];
     for (const [label, value] of metrics) {
       const metric = document.createElement('div');
       const term = document.createElement('dt');
@@ -219,6 +259,30 @@
       metric.append(term, count);
       totals.append(metric);
     }
+  }
+
+  function listeningDuration(milliseconds) {
+    if (milliseconds > 0 && milliseconds < 1000) return '<1 sec';
+    const seconds = Math.floor(Number(milliseconds) / 1000);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor(seconds % 3600 / 60);
+    return [hours ? hours + ' hr' : '', minutes ? minutes + ' min' : '', seconds % 60 + ' sec'].filter(Boolean).join(' ');
+  }
+
+  function renderRecap(recap) {
+    $('recap-start').textContent = 'Session opened ' + date(recap.created);
+    renderMetrics('recap-totals', [
+      ['Phone connections', recap.phones.connections], ['Approved phones', recap.phones.approved],
+      ['Requests', recap.totals.requests], ['Guest requests', recap.totals.guest_requests],
+      ['Host requests', recap.totals.host_requests], ['Confirmed plays', recap.totals.confirmed_plays],
+      ...recapOutcomes.map(([key, label]) => [label, recap.totals[key]])
+    ]);
+    const listening = recap.listener_metrics;
+    $('recap-listeners').hidden = !listening;
+    if (listening) renderMetrics('recap-listener-totals', [
+      ['Distinct phone players', listening.unique_players], ['Peak simultaneous players', listening.peak_players],
+      ['Total phone listening time', listeningDuration(listening.listening_ms)]
+    ]);
     const table = $('recap-tracks');
     const rows = table.tBodies[0];
     rows.replaceChildren();
@@ -311,6 +375,7 @@
       allowed: state.remote_listening === true && !Number(state.ended),
       online: Boolean(state.online),
       itemId: state.current?.id ?? '',
+      generation: Number(transport?.generation ?? -1),
       transport: transport?.status ?? 'offline',
       seconds: Number(transport?.position_ms || 0) / 1000,
       sampleAgeMs: Math.max(0, Number(transport?.server_time_ms || 0) - Number(transport?.sampled_at_ms || 0))
@@ -663,6 +728,7 @@
     $('mode-link').textContent = 'Live Sessions';
     listener = window.StonefellowJukeboxListener.create({
       audio: $('listener-audio'), urlForItem: item => endpoint('audio', {item}),
+      onActivity: createListenerReporter(),
       onChange({allowed, listening, muted, needsGesture, status}) {
         $('listener').hidden = !allowed;
         $('listen').hidden = listening && !needsGesture;

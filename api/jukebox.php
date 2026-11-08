@@ -19,7 +19,7 @@ if($audioRequest){
 if(!sf_installed())sf_json_response(['ok'=>false,'message'=>'Stonefellow installation required.'],503);
 $hostMode=($_GET['host']??'')==='1';
 $post=$method==='POST';
-if($post&&(int)($_SERVER['CONTENT_LENGTH']??0)>1_450_000)
+if($post&&(int)($_SERVER['CONTENT_LENGTH']??0)>($action==='listener'?2048:1_450_000))
     sf_json_response(['ok'=>false,'message'=>'Request is too large.'],413);
 $body=$post?sf_request_json():[];
 $user=$hostMode?sf_require_user(false,$post):null;
@@ -84,7 +84,8 @@ try{
         // The first statement is a write on both engines. It serializes changes
         // for this session before reading approvals, the player, or queue order.
         $db->beginTransaction();
-        sf_jukebox_query('UPDATE jukebox_sessions SET revision=revision+1 WHERE id=?',[$id]);
+        if($action==='listener')sf_jukebox_query('UPDATE jukebox_sessions SET revision=revision WHERE id=?',[$id]);
+        else sf_jukebox_query('UPDATE jukebox_sessions SET revision=revision+1 WHERE id=?',[$id]);
     }else $db->beginTransaction();
     $session=sf_jukebox_session($id);
     $host=$hostMode&&sf_jukebox_owner($session,$user);
@@ -153,6 +154,10 @@ try{
             case 'request':
                 if(!$host&&!$approved)throw new DomainException('Host approval is required.');
                 sf_jukebox_request($session,$phone,$body);
+                break;
+            case 'listener':
+                if($host||!sf_jukebox_remote_access($session,$phone))throw new DomainException('Remote listening access is required.');
+                sf_jukebox_listener_report($session,$phone,$body);
                 break;
             case 'player':
             case 'control':

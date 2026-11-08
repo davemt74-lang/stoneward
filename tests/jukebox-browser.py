@@ -98,6 +98,23 @@ def player_sample(player, event, item, sequence, position_ms, transport='playing
                 position_ms=position_ms, sample_seq=sequence, transport=transport, **extra)
 
 
+def listener_sample(player, item, generation, sequence, advanced_ms=0, active=False):
+    return dict(player=player, item=str(item), generation=generation, seq=sequence,
+                advanced_ms=advanced_ms, active=active)
+
+
+def audience(active=0, unique=0, peak=0, listening_ms=0):
+    return dict(active_players=active, unique_players=unique, peak_players=peak, listening_ms=listening_ms)
+
+
+def rewind_listener_clock(site, session, ms):
+    # Advance the isolated fixture's receipt interval without sleeping or
+    # making the venue transport stale.
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('UPDATE jukebox_listener_players SET sampled_at_ms=sampled_at_ms-? WHERE session_id=?',
+                   (ms, session))
+
+
 def scenario(browser, base):
     def signed_in(user):
         page = browser.new_context().new_page()
@@ -138,13 +155,29 @@ def scenario(browser, base):
     expect(venue.locator('#history')).to_contain_text('First Song')
     expect(first.locator('#now')).to_have_text('First Song')
     assert first.locator('#audio').evaluate('(audio) => !audio.src && audio.paused')
-    expect(first.get_by_role('button', name='Listen on this phone')).to_be_visible()
+    listen = first.get_by_role('button', name='Listen on this phone')
+    expect(listen).to_be_visible()
     assert first.locator('#listener-audio').evaluate('(audio) => audio.paused && !audio.currentSrc')
     first.wait_for_function("""async () => {
       const id = new URLSearchParams(location.search).get('id');
       const {state} = await (await fetch('api/jukebox.php?action=state&id=' + id)).json();
       return state.transport?.status === 'playing' && state.transport.position_ms > 0;
     }""", polling=250)
+    listeners = venue.locator('#remote-listener-count')
+    expect(listeners).to_have_text('0 phones listening now')
+    assert request(venue, 'state', host=True)['state']['listener_metrics'] == audience()
+    assert 'listener_metrics' not in request(first, 'state')['state']
+    expect(first.locator('#remote-listener-count')).to_be_hidden()
+    listen.click()
+    first.wait_for_function("!document.querySelector('#listener-audio').paused")
+    expect(listeners).to_have_text('1 phone listening now', timeout=15_000)
+    metrics = request(venue, 'state', host=True)['state']['listener_metrics']
+    assert metrics['unique_players'] == metrics['peak_players'] == 1 and metrics['listening_ms'] > 0
+    first.get_by_role('button', name='Stop listening').click()
+    expect(listen).to_be_visible()
+    expect(listeners).to_have_text('0 phones listening now')
+    assert request(venue, 'state', host=True)['state']['transport']['status'] == 'playing'
+    listen.click()
     second.get_by_role('button', name='Request access').click()
     venue.locator('#phones li').filter(has_text='pending').get_by_role('button', name='Approve').click()
     expect(second.locator('#now')).to_have_text('First Song')
@@ -162,9 +195,11 @@ def scenario(browser, base):
     expect(first.locator('#messages img')).to_be_visible()
     first.wait_for_function("document.querySelector('#messages img').naturalWidth === 1")
     assert 'Private hello' not in str(request(second, 'thread'))
+    expect(listeners).to_have_text('1 phone listening now', timeout=15_000)
     venue.get_by_role('button', name='Pause', exact=True).click()
     expect(first.locator('#progress')).to_contain_text('Paused')
     assert request(first, 'state')['state']['transport']['status'] == 'paused'
+    expect(listeners).to_have_text('0 phones listening now')
     venue.reload()
     expect(venue.locator('#queue-label')).to_have_text('Up Next (2)')
     venue.get_by_role('button', name='Skip', exact=True).click()
@@ -196,13 +231,23 @@ def scenario(browser, base):
     expect(venue.locator('#recap-totals')).not_to_be_empty()
     expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
     expect(venue.locator('#recap-tracks')).to_contain_text('Second Song')
+    recap_audience = venue.locator('#recap-listener-totals')
+    expect(recap_audience).to_be_visible()
+    for label in ('Distinct phone players', 'Peak simultaneous players'):
+        expect(recap_audience.locator('div').filter(has_text=label).locator('dd')).to_have_text('1')
+    elapsed = recap_audience.locator('div').filter(has_text='Total phone listening time').locator('dd')
+    expect(elapsed).to_contain_text('sec')
+    expect(elapsed).not_to_have_text('0 sec')
+    recap = request(venue, 'recap', host=True)['recap']['listener_metrics']
+    assert recap['unique_players'] == recap['peak_players'] == 1
+    assert recap['active_players'] == 0 and recap['listening_ms'] >= metrics['listening_ms']
     venue.goto(base + '/jukebox.php?host=1')
     venue.get_by_role('link', name='Tonight at Test Bar (ended)', exact=True).click()
     expect(venue.get_by_role('heading', name='Session recap')).to_be_visible()
     expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
     second.reload()
     expect(second.locator('#recap')).to_be_hidden()
-    print('PASS venue pairing, playback, queue persistence and deduplication, private chat, CRM, and reopened session recap')
+    print('PASS venue pairing, playback, listener progression and stop, chat, CRM, and reopened session recap')
 
 
 def remote_scenario(browser, base, phone_options):
@@ -428,6 +473,7 @@ def http_scenario(base, site):
     assert Client().call('recap', public)['status'] == 409
     print('PASS HTTP pairing, shared queue, player ownership, play history, private chat, CRM, and host-only session recap')
     http_remote_scenario(Client, admin, venue, site)
+    http_listener_scenario(Client, venue, outsider, site)
 
 
 def http_remote_scenario(Client, admin, venue, site):
@@ -478,6 +524,17 @@ def http_remote_scenario(Client, admin, venue, site):
         assert response.status == 416 and response.headers['Content-Range'] == f'bytes */{length}'
     blocked(anonymous, public, '')
     blocked(anonymous, disabled, first)
+    telemetry = listener_sample('f'*32, first, transport['generation'], 0)
+    assert anonymous.call('listener', disabled, telemetry)['status'] == 409
+    assert anonymous.call('listener', public, telemetry)['ok']
+    assert admin.call('state', public)['state']['listener_metrics'] == audience()
+    rewind_listener_clock(site, public, 800)
+    assert anonymous.call('listener', public, telemetry | {'seq': 1, 'advanced_ms': 500, 'active': True}) == {
+        'status': 200, 'ok': True}
+    assert admin.call('state', public)['state']['listener_metrics'] == audience(1, 1, 1, 500)
+    assert 'listener_metrics' not in anonymous.call('state', public)['state']
+    directory = {row['id']: row for row in anonymous.call('directory')['sessions']}
+    assert 'listener_metrics' not in directory[public]
 
     stale_revision = admin.call('state', public)['state']['revision']
     assert admin.call('control', public, {'event': 'pause'})['ok']
@@ -485,6 +542,7 @@ def http_remote_scenario(Client, admin, venue, site):
                                                       observed_revision=stale_revision))['ok']
     transport = anonymous.call('state', public)['state']['transport']
     assert transport['status'] == 'paused' and transport['position_ms'] == 6500
+    assert admin.call('state', public)['state']['listener_metrics'] == audience(0, 1, 1, 500)
     assert admin.call('control', public, {'event': 'resume'})['ok']
     play(admin, public, first, 3, 7600)
     assert admin.call('player', public, player_sample(player['player'], 'progress', first, 2, 1000))['ok']
@@ -504,6 +562,8 @@ def http_remote_scenario(Client, admin, venue, site):
         assert response.status == 200
     assert admin.call('revoke', public, {'phone': phone_id})['ok']
     blocked(phone, public, second)
+    generation = admin.call('state', public)['state']['transport']['generation']
+    assert phone.call('listener', public, listener_sample('e'*32, second, generation, 0))['status'] == 409
     with anonymous.response('audio', public, item=second, method='HEAD') as response:
         assert response.status == 200
     with sqlite3.connect(site / 'config/fixture.sqlite') as db:
@@ -518,6 +578,9 @@ def http_remote_scenario(Client, admin, venue, site):
     assert admin.call('control', public, {'event': 'remote_listening', 'enabled': True})['ok']
     assert admin.call('control', public, {'event': 'end'})['ok']
     blocked(anonymous, public, second)
+    recap = admin.call('recap', public)['recap']
+    assert recap['phones'] == {'connections': 1, 'approved': 1}
+    assert recap['listener_metrics'] == audience(0, 1, 1, 500)
 
     assert venue.call('request', private, {'track': 'b', 'nonce': '1'*32})['ok']
     assert venue.call('player', private, player | {'event': 'claim'})['ok']
@@ -542,6 +605,118 @@ def http_remote_scenario(Client, admin, venue, site):
     assert venue.call('revoke', private, {'phone': phone_id})['ok']
     blocked(phone, private, private_item)
     print('PASS HTTP remote access, range delivery, transport sample ordering, and stale request rejection')
+
+
+def http_listener_scenario(Client, venue, outsider, site):
+    session = venue.call('create', data={'title': 'Listener metrics', 'remote_listening': True})['id']
+    phone = Client()
+    main_player = 'c'*64
+    first, second = '1'*32, '2'*32
+    assert venue.call('request', session, {'track': 'a', 'nonce': '1'*32})['ok']
+    assert venue.call('player', session, {'player': main_player, 'event': 'claim'})['ok']
+
+    def state():
+        return venue.call('state', session)['state']
+
+    item = state()['current']['id']
+
+    def playing(seq, position_ms):
+        assert venue.call('player', session, player_sample(main_player, 'playing', item, seq, position_ms,
+                                                           observed_revision=state()['revision']))['ok']
+        return state()['transport']['generation']
+
+    generation = playing(1, 6500)
+
+    def send(player, seq, advanced_ms=0, active=False, **extra):
+        data = listener_sample(player, item, generation, seq, advanced_ms, active) | extra
+        return phone.call('listener', session, data)
+
+    baseline = listener_sample(first, item, generation, 0)
+    assert venue.call('listener', session, baseline)['status'] == 409
+    assert send(first, 0)['status'] == 409
+    assert phone.call('join', session, {'name': 'Private listener'})['ok']
+    phone_id = phone.call('state', session)['state']['phone']['id']
+    assert send(first, 0)['status'] == 409
+    assert venue.call('approve', session, {'phone': phone_id})['ok']
+    assert send('malformed', 0)['status'] == 400
+    with phone.response('audio', session, item=item, headers={'Range': 'bytes=0-7'}) as response:
+        assert response.status == 206
+    assert state()['listener_metrics'] == audience()
+    assert 'listener_metrics' not in phone.call('state', session)['state']
+    assert venue.call('recap', session)['status'] == 409
+
+    # Two playback tabs can use the same approved phone. A join, range request,
+    # or first report alone does not earn time or make either tab a listener.
+    assert send(first, 0, 900, True)['ok']
+    assert send(second, 0)['ok']
+    assert state()['listener_metrics'] == audience()
+    rewind_listener_clock(site, session, 1200)
+    assert send(first, 1, 900, True)['ok']
+    assert state()['listener_metrics'] == audience(1, 1, 1, 900)
+    assert send(first, 1, 900, True)['ok']
+    assert send(first, 0)['ok']
+    assert state()['listener_metrics'] == audience(1, 1, 1, 900)
+
+    assert send(second, 1, 700, True)['ok']
+    assert state()['listener_metrics'] == audience(2, 2, 2, 1600)
+    rewind_listener_clock(site, session, 300)
+    assert send(first, 2, 200)['ok']
+    assert send(first, 2, 200)['ok']
+    assert state()['listener_metrics'] == audience(1, 2, 2, 1800)
+
+    # Simulate a closed/disconnected client whose final request never arrived.
+    # Its historical time and peak survive after its last heartbeat expires.
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('''UPDATE jukebox_listener_players SET sampled_at_ms=0, active_until_ms=0
+                      WHERE session_id=?''', (session,))
+    assert state()['listener_metrics'] == audience(0, 2, 2, 1800)
+    assert send(second, 1, 700, True)['ok']
+    assert send(second, 2, 0, True)['ok']
+    assert state()['listener_metrics'] == audience(0, 2, 2, 1800)
+    assert send(first, 3)['ok']
+    rewind_listener_clock(site, session, 900)
+    assert send(first, 4, 800, True)['ok']
+    assert state()['listener_metrics'] == audience(1, 2, 2, 2600)
+
+    previous_generation = generation
+    assert venue.call('control', session, {'event': 'pause'})['ok']
+    assert state()['listener_metrics'] == audience(0, 2, 2, 2600)
+    assert venue.call('control', session, {'event': 'resume'})['ok']
+    generation = playing(2, 7200)
+    assert generation != previous_generation
+    assert send(first, 5, 600, True, generation=previous_generation)['ok']
+    assert send(first, 5, 600, True, item=str(int(item) + 1))['ok']
+    assert state()['listener_metrics'] == audience(0, 2, 2, 2600)
+    assert send(first, 6)['ok']
+    rewind_listener_clock(site, session, 800)
+    assert send(first, 7, 500, True)['ok']
+    assert state()['listener_metrics'] == audience(1, 2, 2, 3100)
+
+    # A report cannot turn an inflated position delta into more listening time
+    # than the server observed between its receipts.
+    start = state()['transport']['server_time_ms']
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('UPDATE jukebox_listener_players SET sampled_at_ms=? WHERE session_id=?', (start - 1100, session))
+    assert send(first, 8, 50_000, True)['ok']
+    after_report = state()
+    total = after_report['listener_metrics']['listening_ms']
+    elapsed = after_report['transport']['server_time_ms'] - start + 1100
+    assert 1100 <= total - 3100 <= min(elapsed, 6000)
+    assert venue.call('revoke', session, {'phone': phone_id})['ok']
+    assert send(first, 9, 500, True)['status'] == 409
+    assert state()['listener_metrics'] == audience(0, 2, 2, total)
+
+    assert venue.call('control', session, {'event': 'end'})['ok']
+    assert send(first, 9, 500, True)['status'] == 409
+    assert phone.call('recap', session)['status'] == 409
+    assert outsider.call('recap', session)['status'] == 404
+    recap = venue.call('recap', session)['recap']
+    assert recap['listener_metrics'] == audience(0, 2, 2, total)
+    assert recap['phones'] == {'connections': 1, 'approved': 1}
+    assert recap['totals']['confirmed_plays'] == 1
+    encoded = json.dumps(recap)
+    assert all(value not in encoded for value in ('Private listener', first, second))
+    print('PASS HTTP listener authorization, deduplication, distinct tabs, peak, expiry, and host-only listening recap')
 
 
 with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
