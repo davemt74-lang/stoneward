@@ -17,6 +17,16 @@ function sf_canvas_library_registry(): array {
             'when' => 'The requested experience needs colors sampled from an approved, loaded image or an origin-clean canvas.',
             'api' => 'ColorThief.getPaletteSync(image, {colorCount: 6}) returns swatches with hex() methods. Handle missing or unreadable images.',
         ],
+        'd3' => [
+            'name' => 'D3',
+            'version' => '7.9.2',
+            'global' => 'd3',
+            'sha256' => 'kSERCY6plQOm9JZzYdK73J2/WM+cZ4yOJ+WwLRoH8ME=',
+            'bytes' => 280622,
+            'license' => 'ISC',
+            'when' => 'The requested experience benefits from data-driven visuals, geographic projections, scales, layouts, or interactive SVG and Canvas graphics.',
+            'api' => 'Use host-authorized data or local values with d3 scales, shapes, projections and selections. Use StonefellowData for selected live sources and pass their records or GeoJSON to D3. URL loaders and dynamic evaluation are blocked. For supplied CSV or TSV text, use csvParseRows or tsvParseRows.',
+        ],
         'three' => [
             'name' => 'Three.js',
             'version' => '0.187.0',
