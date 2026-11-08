@@ -68,7 +68,11 @@ Stonefellow can now be installed as a PWA without creating a second application 
 
 The installed experience uses the same single-artist public site, persistent music player and Agent shell. Offline support is deliberately conservative: only the static shell is cached. Account data, API responses, purchases, private media and Admin surfaces always require the network.
 
-Use **Admin → PWA & Splash** to publish an install icon, startup artwork, and separate designs for app opening and the Jukebox QR waiting screen. Use a square PNG of at least 512 pixels for the clearest install icon. A splash can use Media Library artwork, authored HTML/CSS/JavaScript, or an imported saved Agent Canvas. The preview shows the draft. On supported devices, the operating system chooses how to present startup artwork.
+Use **Admin → PWA & Splash** to publish an install icon, startup artwork, and designs for app opening and QR waiting. Every hosted Jukebox session uses one published waiting design. Stonefellow shows the session's title, start time, and status alongside it. Use a square PNG of at least 512 pixels for the clearest install icon. On supported devices, the operating system chooses how to present startup artwork.
+
+Choose **Code** to write HTML, CSS, and JavaScript or describe a design or edit to the inline Coding Agent. Select approved Media Library images as named artwork slots before generating code. Review and stage the proposed code, then save the draft to load its isolated preview. Publishing makes the selected artwork and design visible to visitors. The splash draft is stored with PWA settings.
+
+In **AI Image Studio**, choose **Use as install icon** on an approved result to stage a square 512 × 512 PNG in the PWA draft. Conversion from WebP uses PHP GD with WebP and PNG support. You can also upload a square PNG from the PWA editor.
 
 Signed-in listeners can follow a session and enable alerts separately on each device. After installation, **Live Sessions → Following** lists their upcoming and live sessions. On iPhone and iPad, add Stonefellow to the Home Screen, open it there, and tap **Enable phone alerts**.
 

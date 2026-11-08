@@ -724,19 +724,24 @@ function sf_agent_scene_model_failure(RuntimeException $error): string {
     return $error instanceof SfAgentSceneStreamInterrupted?$error->reason:'provider_unavailable';
 }
 
-function sf_agent_scene_model_result(array $providers,string $system,string $message,int $outputLimit,int $retryOutputLimit,bool $canRetry,string $requestId,?callable $onDelta,?callable $onRetry,array $context,?callable $checkCanceled=null): array {
+function sf_agent_scene_model_result(array $providers,string $system,string $message,int $outputLimit,int $retryOutputLimit,bool $canRetry,string $requestId,?callable $onDelta,?callable $onRetry,array $context,?callable $checkCanceled=null,?callable $render=null): array {
     $primary=$providers[0];
     $alternate=$canRetry?($providers[1]??null):null;
     $streamed=$onDelta!==null;
     $customStream=$canRetry&&$streamed;
     $firstTimeout=$streamed?null:($alternate===null?SF_AGENT_SCENE_TIMEOUT:12);
     $deadline=$streamed?null:hrtime(true)+SF_AGENT_SCENE_TIMEOUT*1_000_000_000;
-    $call=static function(array $provider,int $limit,?int $timeout,string $system)use($message,$onDelta,$customStream,$context,$checkCanceled):array {
+    $call=static function(array $provider,int $limit,?int $timeout,string $system)use($message,$onDelta,$customStream,$context,$checkCanceled,$render):array {
         if($onDelta!==null)$result=sf_agent_scene_stream($provider,$system,$message,$limit,$timeout,$onDelta,$customStream,null,$checkCanceled);
         else $result=$provider['provider']==='openai'
                 ?sf_openai_call($provider,$system,[],$message,$limit,$timeout)
                 :sf_anthropic_call($provider,$system,[],$message,$limit,$timeout);
-        $result['scene']=sf_agent_scene_render((string)($result['text']??''),$context,$imageRequest);
+        $text=(string)($result['text']??'');
+        if($render!==null){
+            $result['scene']=$render($text);
+            return $result;
+        }
+        $result['scene']=sf_agent_scene_render($text,$context,$imageRequest);
         if($imageRequest)$result['image_requests']=$imageRequest;
         return $result;
     };
