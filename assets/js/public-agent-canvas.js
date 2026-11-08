@@ -1157,9 +1157,10 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     function setScenePalette(scene,images,artwork=''){
       const theme=window.SFCanvasAgentTheme;
       const explicit=theme?.explicit(scene)||null;
+      const extractArtwork=!!window.SFArtworkPalette;
       sceneTheme=scene?{explicit,artwork,owner:options.getSceneOwner?.(),palettes:new Map(),
-        imageIds:!explicit&&images?(theme?.preferredImages(scene)||[]).filter(id=>images.assets.has(id)):[],
-        fallback:explicit?null:theme?.resolve(scene,{includeImageMetadata:false})}:null;
+        imageIds:extractArtwork&&!explicit&&images?(theme?.preferredImages(scene)||[]).filter(id=>images.assets.has(id)):[],
+        fallback:explicit?null:theme?.resolve(scene,{includeImageMetadata:!extractArtwork&&options.canUseScenes?.()===true})}:null;
       syncAgentPalette();
     }
     function meshDraw(t) {
