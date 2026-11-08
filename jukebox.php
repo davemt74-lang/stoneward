@@ -20,9 +20,10 @@ header('Referrer-Policy: same-origin');
 <meta name="robots" content="noindex">
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=2">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=3">
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
-<script defer src="assets/js/jukebox.js?v=2"></script>
+<script defer src="assets/js/jukebox-listener.js?v=1"></script>
+<script defer src="assets/js/jukebox.js?v=3"></script>
 </head>
 <body>
 <main>
@@ -30,10 +31,15 @@ header('Referrer-Policy: same-origin');
 <h1 id="title">Jukebox</h1>
 <p id="status" role="status"></p>
 <section id="directory" hidden>
-<h2 id="session-heading">Live sessions</h2>
+<h2 id="session-heading">Live Sessions</h2>
+<p id="session-intro" hidden>Open a public jukebox session to see what’s playing. Sessions with phone listening let you tune in from anywhere.</p>
 <ul id="sessions"></ul>
+<p id="session-empty" hidden>No sessions yet.</p>
 <form id="create" hidden><label>Session name <input name="title" maxlength="120" required></label>
-<label id="listing" hidden><input type="checkbox" name="listed"> Public universal session</label><button>Create session</button></form>
+<label id="listing" hidden><input type="checkbox" name="listed"> Public universal session</label>
+<label><input type="checkbox" name="remote_listening" aria-describedby="create-remote-help"> Allow remote listening</label>
+<small id="create-remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
+<button>Create session</button></form>
 <form id="venue" hidden><h2>Enable a venue account</h2><label>Account ID <input type="number" name="owner" min="1" required></label>
 <label>Venue name <input name="name" maxlength="120" required></label><button>Save venue</button></form>
 </section>
@@ -50,6 +56,8 @@ header('Referrer-Policy: same-origin');
 <section><h3>Phone connections</h3><div id="qr"></div><a id="join-link">Open guest join page</a><ul id="phones"></ul></section>
 <section><h3>Session player</h3><audio id="audio" preload="none"></audio><button id="enable">Enable player on this device</button>
 <label>Player volume <input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+<label class="remote-setting"><input id="remote-listening" type="checkbox" aria-describedby="remote-help"> Allow remote listening</label>
+<small id="remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
 <p id="player-status"></p><div id="controls"></div><h3>Play history</h3><ul id="history"></ul></section>
 </div>
 </section>
@@ -84,6 +92,15 @@ header('Referrer-Policy: same-origin');
 </section>
 </main>
 <footer id="footer" hidden><div><strong id="now">Idle</strong><small id="progress"></small></div>
+<div id="listener" hidden>
+<audio id="listener-audio" preload="none"></audio>
+<div class="actions">
+<button type="button" id="listen">Listen on this phone</button>
+<button type="button" id="listener-mute" aria-pressed="false" hidden>Mute phone</button>
+<button type="button" id="listener-stop" hidden>Stop listening</button>
+</div>
+<small id="listener-status" role="status"></small>
+</div>
 <details><summary id="queue-label">Up Next</summary><ol id="queue"></ol></details></footer>
 </body>
 </html>

@@ -86,6 +86,11 @@ jobs:
         run: python tests/listening-telemetry-browser.py
       - name: Actual independent playback
         run: python tests/canvas-independent-audio-browser.py
+      - name: Jukebox remote listening on iPhone-sized WebKit
+        if: matrix.browser == 'webkit'
+        env:
+          SF_JUKEBOX_BROWSER: webkit
+        run: python tests/jukebox-browser.py --remote-only
       - name: Full canvas controls in the bundled current headless shell
         if: matrix.browser == 'chromium'
         env:

@@ -31,3 +31,10 @@ footer small{display:block;color:#c5d5e6}
 #recap-tracks caption{text-align:left;font-size:1.15rem;font-weight:bold;margin-bottom:.35rem}
 #recap-tracks th,#recap-tracks td{padding:.45rem .35rem;border-bottom:1px solid #63788c;vertical-align:top;overflow-wrap:anywhere}
 #recap-tracks td span{display:block}
+.remote-setting{display:block;margin:.55rem 0}
+.remote-help{display:block;color:#c5d5e6}
+#listener{margin:.45rem 0}
+#listener-status{margin-top:.3rem}
+#listener-status:empty{display:none}
+body:has(#listener:not([hidden])) main{padding-bottom:12rem}
+.session-badge{display:inline-block;margin-left:.5rem;color:#c5d5e6;font-size:.85rem}
