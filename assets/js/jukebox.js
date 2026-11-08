@@ -152,7 +152,45 @@
   const title = track => catalog?.tracks.find(row => row.track_id === track)?.title || track;
   const date = seconds => new Date(Number(seconds) * 1000).toLocaleString();
   const time = seconds => Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
-  const canRequest = () => state && !Number(state.ended) && (host || state.phone?.status === 'approved');
+  const phaseOf = row => row.phase || (Number(row.ended) ? 'ended' : 'live');
+  const canRequest = () => state && phaseOf(state) === 'live' && (host || state.phone?.status === 'approved');
+  const scheduleDate = new Intl.DateTimeFormat(undefined, {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+  });
+
+  function localScheduleValue(seconds) {
+    const instant = new Date(seconds * 1000);
+    return new Date(instant.getTime() - instant.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+
+  function scheduleTimestamp(value) {
+    if (!value) return null;
+    const instant = new Date(value);
+    const seconds = instant.getTime() / 1000;
+    if (!Number.isFinite(seconds) || localScheduleValue(seconds) !== value) {
+      throw new Error('Choose a valid local date and time.');
+    }
+    const offset = instant.getTimezoneOffset();
+    // During a fall-back hour, one local time maps to two possible instants.
+    for (const day of [-86400, 86400]) {
+      const otherOffset = new Date((seconds + day) * 1000).getTimezoneOffset();
+      if (otherOffset !== offset && localScheduleValue(seconds + (otherOffset - offset) * 60) === value) {
+        throw new Error('That local time occurs twice because the clocks change. Choose a different time.');
+      }
+    }
+    if (seconds <= Date.now() / 1000) throw new Error('Choose a date and time in the future.');
+    return seconds;
+  }
+
+  function setScheduleDate(element, seconds) {
+    const instant = new Date(seconds * 1000);
+    const timestamp = instant.toISOString();
+    if (element.dateTime !== timestamp) {
+      element.dateTime = timestamp;
+      element.textContent = scheduleDate.format(instant);
+    }
+  }
 
   function renderCatalog() {
     if (!catalog) return;
@@ -270,7 +308,7 @@
   }
 
   function renderRecap(recap) {
-    $('recap-start').textContent = 'Session opened ' + date(recap.created);
+    $('recap-start').textContent = 'Session opened ' + date(recap.started_at ?? state.started_at ?? recap.created);
     renderMetrics('recap-totals', [
       ['Phone connections', recap.phones.connections], ['Approved phones', recap.phones.approved],
       ['Requests', recap.totals.requests], ['Guest requests', recap.totals.guest_requests],
@@ -324,19 +362,49 @@
     }
   }
 
+  function renderSchedule(phase) {
+    const upcoming = phase === 'upcoming';
+    const canceled = phase === 'canceled';
+    $('upcoming').hidden = !upcoming && !canceled;
+    if (host && changed('share-position', upcoming)) {
+      $(upcoming ? 'upcoming-share' : 'active-share').append($('session-share'));
+      $('session-share-description').hidden = !upcoming;
+      $('join-link').textContent = upcoming ? 'Open guest session page' : 'Open guest join page';
+      $('qr').querySelector('svg')?.setAttribute('aria-label', upcoming ? 'Scan to open the session waiting page' : 'Scan to pair your phone');
+    }
+    if ((!upcoming && !canceled) || !changed('schedule', [phase, state.scheduled_at, state.listed])) return;
+    $('upcoming-heading').textContent = canceled ? 'Session canceled' : host ? 'Upcoming session' : 'Waiting for the session to start';
+    $('upcoming-message').textContent = canceled ? 'The host canceled this session.' : host
+      ? 'Guests who open the link or scan the code will wait here until you start the session.'
+      : 'This page will open the jukebox when the host starts the session.';
+    $('scheduled-start-line').hidden = !upcoming;
+    if (upcoming) setScheduleDate($('scheduled-start'), state.scheduled_at);
+    if (host) {
+      $('schedule-controls').hidden = !upcoming;
+      if (upcoming) {
+        $('session-share-description').textContent = state.listed
+          ? 'Share this public session with your guests.' : 'Private session. Share this link with your guests.';
+        $('reschedule').elements.scheduled_at.value = localScheduleValue(state.scheduled_at);
+      }
+    }
+  }
+
   function render() {
-    const approved = state.phone?.status === 'approved' && !Number(state.ended);
-    const ended = Boolean(Number(state.ended));
+    const phase = phaseOf(state);
+    const live = phase === 'live';
+    const ended = phase === 'ended';
+    const approved = live && state.phone?.status === 'approved';
     $('title').textContent = state.title;
-    $('pairing').hidden = host;
-    $('join').hidden = host || Boolean(state.phone) || ended;
+    renderSchedule(phase);
+    $('pairing').hidden = host || (!live && !ended);
+    $('join').hidden = host || !live || Boolean(state.phone);
     $('remember').hidden = !Number(state.venue_id) || $('forget').dataset.remembered === 'true';
     $('approval').textContent = ended ? 'This session has ended.' : ({
       pending: 'Waiting for the host to approve this phone.',
       revoked: 'The host closed this connection.'
     }[state.phone?.status] || '');
-    $('music').hidden = !catalog || ended || !Object.hasOwn(state, 'queue');
-    $('footer').hidden = !Object.hasOwn(state, 'queue') || ended;
+    $('music').hidden = !catalog || !live || !Object.hasOwn(state, 'queue');
+    $('footer').hidden = !live || !Object.hasOwn(state, 'queue');
     const playing = state.current;
     $('now').textContent = playing ? title(playing.track_id) : 'Jukebox idle';
     const transport = state.transport?.status;
@@ -344,9 +412,9 @@
       (Number(state.paused) || transport === 'paused' ? 'Paused · ' : transport === 'buffering' ? 'Buffering · ' :
         (transport === 'starting' || !playing.played ? 'Starting · ' : '')) + time(Number(state.seconds)) : 'Ready';
     $('queue-label').textContent = 'Up Next (' + (state.queue?.length || 0) + ')';
-    if (changed('queue', [state.queue, Boolean(catalog), ended])) list('queue', state.queue || [], row => [
+    if (changed('queue', [state.queue, Boolean(catalog), live])) list('queue', state.queue || [], row => [
       title(row.track_id),
-      ...(host && !ended ? [
+      ...(host && live ? [
         button('Move up', () => mutate('control', {event: 'up', item: row.id})),
         button('Remove', () => mutate('control', {event: 'remove', item: row.id}))
       ] : [])
@@ -355,11 +423,11 @@
     requestButtons.forEach(control => { control.textContent = playing ? 'Add to Queue' : 'Play'; });
     if (!host) thread = approved ? state.phone.id : '';
     if (host) {
-      $('host').hidden = ended;
+      $('host').hidden = !live;
       $('recap').hidden = !ended;
       $('crm').hidden = !Number(state.venue_id);
-      if (!ended) renderHost();
-      if (state.phones?.find(phone => phone.id === thread)?.status !== 'approved' || ended) thread = '';
+      if (live) renderHost();
+      if (state.phones?.find(phone => phone.id === thread)?.status !== 'approved' || !live) thread = '';
     }
     $('chat').hidden = !thread;
     if (!thread) {
@@ -372,7 +440,7 @@
     if (!listener) return;
     const transport = state.transport;
     listener.update({
-      allowed: state.remote_listening === true && !Number(state.ended),
+      allowed: state.remote_listening === true && phaseOf(state) === 'live',
       online: Boolean(state.online),
       itemId: state.current?.id ?? '',
       generation: Number(transport?.generation ?? -1),
@@ -525,26 +593,28 @@
     try {
       const result = await api('state');
       state = result.state;
+      const phase = phaseOf(state);
       stateReceived = true;
       if (stateFetchError && $('status').textContent === stateFetchError) notice('');
       stateFetchError = '';
       updateListener();
       $('forget').hidden = !result.remembered;
       $('forget').dataset.remembered = String(result.remembered);
-      if (!catalog && !catalogPending && !Number(state.ended) && Object.hasOwn(state, 'queue')) {
+      if (!catalog && !catalogPending && phase === 'live' && Object.hasOwn(state, 'queue')) {
         catalogPending = true;
         api('catalog').then(data => { catalog = data; render(); }).catch(notice)
           .finally(() => { catalogPending = false; });
       }
       render();
-      if (Number(state.ended)) {
+      if (phase === 'ended' || phase === 'canceled') {
         stopped = true;
         if (host) {
           if (active) releasePlayer();
-          await refreshRecap();
+          if (phase === 'ended') await refreshRecap();
         }
         return;
       }
+      if (phase === 'upcoming') return;
       if (host) await syncPlayer();
       await Promise.all([refreshThread(), host ? refreshCrm() : Promise.resolve()]);
     } catch (error) {
@@ -563,8 +633,8 @@
     }
   }
 
-  function renderPublicSessions(sessions) {
-    const container = $('sessions');
+  function renderPublicSessions(containerId, sessions, upcoming = false) {
+    const container = $(containerId);
     const existing = new Map([...container.children].map(item => [item.dataset.sessionId, item]));
     const visible = new Set(sessions.map(row => row.id));
     existing.forEach((item, sessionId) => { if (!visible.has(sessionId)) item.remove(); });
@@ -576,11 +646,19 @@
         const badge = document.createElement('span');
         badge.className = 'session-badge';
         item.append(link(row.title, page(row.id, false)), badge);
+        if (upcoming) {
+          const scheduled = document.createElement('time');
+          scheduled.className = 'session-date';
+          item.append(scheduled);
+        }
       }
-      const [title, badge] = item.children;
-      const status = (row.online ? 'Live' : 'Host player offline') + (row.remote_listening ? ' · Phone listening enabled' : '');
+      const [title, badge, scheduled] = item.children;
+      const status = upcoming ? (row.remote_listening ? 'Phone listening planned' : '')
+        : (row.online ? 'Live' : 'Host player offline') + (row.remote_listening ? ' · Phone listening enabled' : '');
       if (title.textContent !== row.title) title.textContent = row.title;
       if (badge.textContent !== status) badge.textContent = status;
+      badge.hidden = !status;
+      if (scheduled) setScheduleDate(scheduled, row.scheduled_at);
       if (container.children[index] !== item) container.insertBefore(item, container.children[index] ?? null);
     });
   }
@@ -590,22 +668,38 @@
     try {
       const data = await api('directory');
       $('directory').hidden = false;
-      $('session-empty').hidden = Boolean(data.sessions.length);
       if (host) {
+        $('session-empty').hidden = Boolean(data.sessions.length);
         $('session-heading').textContent = 'Your sessions';
         $('mode-link').href = 'jukebox.php';
         $('mode-link').textContent = 'Live Sessions';
         $('create').hidden = !data.admin && !data.venue;
         $('venue').hidden = !data.admin;
         $('listing').hidden = !data.admin;
-        list('sessions', data.sessions, row => [link(row.title + (Number(row.ended) ? ' (ended)' : ''), page(row.id, true))]);
+        list('sessions', data.sessions, row => {
+          const phase = phaseOf(row);
+          const suffix = phase === 'ended' || phase === 'canceled' ? ` (${phase})` : '';
+          const entry = link(row.title + suffix, page(row.id, true));
+          if (phase !== 'upcoming') return [entry];
+          const scheduled = document.createElement('time');
+          scheduled.className = 'session-date';
+          setScheduleDate(scheduled, row.scheduled_at);
+          return [entry, ' · Upcoming', scheduled];
+        });
         if (!data.admin && !data.venue) notice('Ask a Stonefellow admin to enable your venue account.');
       } else {
         $('title').textContent = 'Live Sessions';
-        $('session-heading').textContent = 'Public jukeboxes';
+        $('session-heading').textContent = 'Live';
         $('session-intro').hidden = false;
+        $('upcoming-directory').hidden = false;
+        const live = data.sessions.filter(row => phaseOf(row) === 'live');
+        const upcoming = data.sessions.filter(row => phaseOf(row) === 'upcoming');
+        $('session-empty').textContent = 'No live public sessions.';
+        $('session-empty').hidden = Boolean(live.length);
+        $('upcoming-empty').hidden = Boolean(upcoming.length);
         notice('');
-        renderPublicSessions(data.sessions);
+        renderPublicSessions('sessions', live);
+        renderPublicSessions('upcoming-sessions', upcoming, true);
       }
     } finally {
       directoryPending = false;
@@ -615,10 +709,14 @@
   $('create').onsubmit = handle(async event => {
     const values = new FormData(event.currentTarget);
     const result = await api('create', {
-      title: values.get('title'), listed: values.has('listed'), remote_listening: values.has('remote_listening')
+      title: values.get('title'), listed: values.has('listed'), remote_listening: values.has('remote_listening'),
+      scheduled_at: scheduleTimestamp(values.get('scheduled_at'))
     });
     location.href = page(result.id, true);
   });
+  for (const label of document.querySelectorAll('[data-schedule-zone]')) {
+    label.textContent = ` (${scheduleDate.resolvedOptions().timeZone})`;
+  }
   $('venue').onsubmit = handle(async event => {
     await api('venue', Object.fromEntries(new FormData(event.currentTarget)));
     notice('Venue account enabled.');
@@ -679,6 +777,29 @@
     const join = new URL(page(id, false), location.href);
     $('join-link').href = join.href;
     $('qr').innerHTML = window.StonefellowJukeboxQR.svg(join.href);
+    $('session-link-value').value = join.href;
+    $('copy-session-link').onclick = handle(async () => {
+      const status = $('copy-session-status');
+      try {
+        await navigator.clipboard.writeText(join.href);
+        $('manual-session-copy').hidden = true;
+        status.textContent = 'Session link copied.';
+      } catch {
+        $('manual-session-copy').hidden = false;
+        const field = $('session-link-value');
+        field.focus();
+        field.select();
+        status.textContent = 'Copy the selected session link.';
+      }
+    });
+    $('reschedule').onsubmit = handle(async event => {
+      const values = new FormData(event.currentTarget);
+      await mutate('control', {event: 'reschedule', scheduled_at: scheduleTimestamp(values.get('scheduled_at'))});
+    });
+    $('start-session').onclick = handle(() => mutate('control', {event: 'start'}));
+    $('cancel-session').onclick = handle(async () => {
+      if (confirm('Cancel this scheduled jukebox session?')) await mutate('control', {event: 'cancel'});
+    });
     const audioStart = button('Start audio', startHostAudio);
     audioStart.id = 'audio-start';
     audioStart.hidden = true;
@@ -744,7 +865,11 @@
     window.addEventListener('offline', listener.disconnect);
     window.addEventListener('online', () => { void tick(); });
   }
-  void tick();
-  setInterval(tick, 1500);
+  function poll() {
+    if (stopped) return;
+    void tick();
+    setTimeout(poll, state?.phase === 'upcoming' ? 3000 : 1500);
+  }
+  poll();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void tick(); });
 })();

@@ -20,10 +20,10 @@ header('Referrer-Policy: same-origin');
 <meta name="robots" content="noindex">
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=4">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=5">
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=2"></script>
-<script defer src="assets/js/jukebox.js?v=4"></script>
+<script defer src="assets/js/jukebox.js?v=5"></script>
 </head>
 <body>
 <main>
@@ -35,13 +35,39 @@ header('Referrer-Policy: same-origin');
 <p id="session-intro" hidden>Open a public jukebox session to see what’s playing. Sessions with phone listening let you tune in from anywhere.</p>
 <ul id="sessions"></ul>
 <p id="session-empty" hidden>No sessions yet.</p>
+<section id="upcoming-directory" aria-labelledby="upcoming-directory-heading" hidden>
+<h2 id="upcoming-directory-heading">Upcoming</h2>
+<ul id="upcoming-sessions"></ul>
+<p id="upcoming-empty" hidden>No upcoming public sessions.</p>
+</section>
 <form id="create" hidden><label>Session name <input name="title" maxlength="120" required></label>
 <label id="listing" hidden><input type="checkbox" name="listed"> Public universal session</label>
 <label><input type="checkbox" name="remote_listening" aria-describedby="create-remote-help"> Allow remote listening</label>
 <small id="create-remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
+<label>Scheduled date and time (optional) <input type="datetime-local" name="scheduled_at" aria-describedby="create-schedule-help"></label>
+<small id="create-schedule-help" class="remote-help">Use your local time<span data-schedule-zone></span>. Leave blank to open the session now.</small>
 <button>Create session</button></form>
 <form id="venue" hidden><h2>Enable a venue account</h2><label>Account ID <input type="number" name="owner" min="1" required></label>
 <label>Venue name <input name="name" maxlength="120" required></label><button>Save venue</button></form>
+</section>
+<section id="upcoming" aria-labelledby="upcoming-heading" hidden>
+<h2 id="upcoming-heading">Waiting for the session to start</h2>
+<p id="scheduled-start-line">Scheduled for <time id="scheduled-start"></time></p>
+<p id="upcoming-message" role="status"></p>
+<?php if($host): ?>
+<div id="schedule-controls">
+<div id="upcoming-share"></div>
+<form id="reschedule">
+<label>New date and time <input type="datetime-local" name="scheduled_at" aria-describedby="reschedule-help" required></label>
+<small id="reschedule-help" class="remote-help">Use your local time<span data-schedule-zone></span>.</small>
+<button>Save new time</button>
+</form>
+<div class="actions">
+<button type="button" id="start-session">Start session</button>
+<button type="button" id="cancel-session">Cancel session</button>
+</div>
+</div>
+<?php endif; ?>
 </section>
 <section id="pairing" hidden>
 <form id="join"><label>Display name (optional) <input name="name" maxlength="80" autocomplete="nickname"></label>
@@ -53,7 +79,13 @@ header('Referrer-Policy: same-origin');
 <section id="host" hidden>
 <h2>Tonight</h2>
 <div class="host-grid">
-<section><h3>Phone connections</h3><div id="qr"></div><a id="join-link">Open guest join page</a><ul id="phones"></ul></section>
+<section><h3>Phone connections</h3><div id="active-share"><div id="session-share">
+<p id="session-share-description" hidden></p>
+<div id="qr"></div>
+<div class="actions"><a id="join-link">Open guest join page</a><button type="button" id="copy-session-link">Copy session link</button></div>
+<p id="copy-session-status" role="status"></p>
+<label id="manual-session-copy" hidden>Guest session link <input id="session-link-value" type="url" readonly></label>
+</div></div><ul id="phones"></ul></section>
 <section><h3>Session player</h3><audio id="audio" preload="none"></audio><button id="enable">Enable player on this device</button>
 <label>Player volume <input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
 <label class="remote-setting"><input id="remote-listening" type="checkbox" aria-describedby="remote-help"> Allow remote listening</label>

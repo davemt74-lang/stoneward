@@ -1,5 +1,6 @@
-"""Venue pairing, shared playback, remote listening, chat, and recaps through production routes."""
+"""Scheduled sessions, venue pairing, shared playback, remote listening, chat, and recaps."""
 import base64
+from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import socket
@@ -12,6 +13,7 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+from zoneinfo import ZoneInfo
 
 if '--http-only' not in sys.argv:
     from playwright.sync_api import expect, sync_playwright
@@ -342,6 +344,114 @@ def remote_scenario(browser, base, phone_options):
     print('PASS anonymous phone listening, mid-song join, venue pause and skip, outage recovery, and local stop')
 
 
+def schedule_scenario(browser, base, phone_options):
+    host_zone = ZoneInfo('America/Los_Angeles')
+    host = browser.new_context(timezone_id=host_zone.key).new_page()
+    host.goto(base + '/login-fixture.php?user=1')
+    host.goto(base + '/jukebox.php?host=1')
+    create = host.locator('#create')
+    start_at = (datetime.now(host_zone) + timedelta(days=2)).replace(hour=19, minute=30, second=0, microsecond=0)
+
+    def local_input(form, date):
+        form.locator('input[name=scheduled_at]').fill(date.strftime('%Y-%m-%dT%H:%M'))
+
+    def utc_iso(date):
+        return date.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+
+    def create_session(title, listed=False):
+        create.locator('input[name=title]').fill(title)
+        create.locator('input[name=listed]').set_checked(listed)
+        create.get_by_label('Allow remote listening').check()
+        local_input(create, start_at)
+        create.get_by_role('button', name='Create session').click()
+        expect(host.get_by_role('heading', name=title, exact=True)).to_be_visible()
+        expect(host.locator('#qr svg')).to_be_visible()
+        expect(host.locator('#join-link')).to_be_visible()
+        return host.locator('#join-link').get_attribute('href')
+
+    title = 'Scheduled browser session'
+    join = create_session(title, listed=True)
+    state = request(host, 'state', host=True)['state']
+    assert state['phase'] == 'upcoming' and state['scheduled_at'] == int(start_at.timestamp())
+    expect(host.locator('#enable')).to_be_hidden()
+    host.evaluate("Object.defineProperty(navigator, 'clipboard', {value: undefined})")
+    host.locator('#copy-session-link').click()
+    manual_link = host.locator('#session-link-value')
+    expect(manual_link).to_be_visible()
+    expect(manual_link).to_have_value(join)
+    phone_context = browser.new_context(**phone_options, timezone_id='Europe/Berlin')
+    directory = phone_context.new_page()
+    directory.goto(base + '/jukebox.php')
+    upcoming = directory.locator('#upcoming-sessions').get_by_role('link', name=title)
+    live = directory.locator('#sessions').get_by_role('link', name=title)
+    expect(upcoming).to_be_visible()
+    expect(live).to_have_count(0)
+    assert urllib.parse.urljoin(directory.url, upcoming.get_attribute('href')) == join
+    expect(directory.locator('#upcoming-sessions time')).to_have_attribute('datetime', utc_iso(start_at))
+
+    phone = phone_context.new_page()
+    phone.goto(join)
+    splash = phone.locator('#upcoming')
+    expect(splash.get_by_role('heading', name='Waiting for the session to start', exact=True)).to_be_visible()
+    scheduled = phone.locator('#scheduled-start')
+    expect(scheduled).to_be_visible()
+    expect(scheduled).to_have_attribute('datetime', utc_iso(start_at))
+    before = scheduled.inner_text()
+    for element in ('#pairing', '#music', '#footer', '#chat'):
+        expect(phone.locator(element)).to_be_hidden()
+    assert phone.locator('#listener-audio').evaluate('(audio) => audio.paused && !audio.currentSrc')
+
+    edited_at = start_at + timedelta(hours=1)
+    reschedule = host.locator('#reschedule')
+    local_input(reschedule, edited_at)
+    reschedule.get_by_role('button', name='Save new time').click()
+    expect(scheduled).not_to_have_text(before, timeout=10_000)
+    expect(scheduled).to_have_attribute('datetime', utc_iso(edited_at))
+    assert request(phone, 'state')['state']['scheduled_at'] == int(edited_at.timestamp())
+    assert host.locator('#join-link').get_attribute('href') == join
+
+    host.locator('#start-session').click()
+    expect(splash).to_be_hidden(timeout=10_000)
+    expect(phone).to_have_url(join)
+    assert host.locator('#join-link').get_attribute('href') == join
+    directory.bring_to_front()
+    expect(upcoming).to_have_count(0, timeout=12_000)
+    expect(live).to_be_visible(timeout=12_000)
+    assert urllib.parse.urljoin(directory.url, live.get_attribute('href')) == join
+
+    phone.locator('#join input[name=name]').fill('Scheduled guest')
+    phone.get_by_role('button', name='Request access').click()
+    host.locator('#phones li').filter(has_text='Scheduled guest').get_by_role('button', name='Approve').click()
+    phone.locator('#catalog li').filter(has_text='First Song').get_by_role('button', name='Play', exact=True).click()
+    host.get_by_role('button', name='Enable player on this device').click()
+    host.locator('#history li, #audio-start:visible').first.wait_for()
+    if host.locator('#audio-start').is_visible():
+        host.locator('#audio-start').click()
+    expect(host.locator('#history')).to_contain_text('First Song')
+    expect(phone.locator('#progress')).to_have_text(re.compile(r'^0:\d{2}$'))
+    phone.get_by_role('button', name='Listen on this phone').click()
+    phone.wait_for_function("!document.querySelector('#listener-audio').paused")
+    phone.locator('#catalog li').filter(has_text='Second Song').get_by_role('button', name='Add to Queue').click()
+    expect(host.locator('#queue-label')).to_have_text('Up Next (1)')
+    host.once('dialog', lambda dialog: dialog.accept())
+    host.get_by_role('button', name='End session').click()
+    expect(host.get_by_role('heading', name='Session recap')).to_be_visible()
+    expect(host.locator('#recap-tracks')).to_contain_text('First Song')
+
+    host.goto(base + '/jukebox.php?host=1')
+    private_join = create_session('Scheduled private cancellation')
+    phone.goto(private_join)
+    expect(splash).to_be_visible()
+    directory.reload()
+    expect(directory.get_by_role('link', name='Scheduled private cancellation')).to_have_count(0)
+    host.once('dialog', lambda dialog: dialog.accept())
+    host.locator('#cancel-session').click()
+    expect(splash.get_by_role('heading', name='Session canceled')).to_be_visible(timeout=10_000)
+    expect(phone).to_have_url(private_join)
+    expect(phone.locator('#pairing')).to_be_hidden()
+    print('PASS scheduled local time, public discovery, QR waiting, same-link start, playback, recap, and private cancellation')
+
+
 def http_scenario(base, site):
     class Client:
         def __init__(self, user=None):
@@ -474,6 +584,7 @@ def http_scenario(base, site):
     print('PASS HTTP pairing, shared queue, player ownership, play history, private chat, CRM, and host-only session recap')
     http_remote_scenario(Client, admin, venue, site)
     http_listener_scenario(Client, venue, outsider, site)
+    http_schedule_scenario(Client, admin, venue, outsider, site)
 
 
 def http_remote_scenario(Client, admin, venue, site):
@@ -719,6 +830,116 @@ def http_listener_scenario(Client, venue, outsider, site):
     print('PASS HTTP listener authorization, deduplication, distinct tabs, peak, expiry, and host-only listening recap')
 
 
+def http_schedule_scenario(Client, admin, venue, outsider, site):
+    guest = Client()
+    now = int(time.time())
+    future = now + 86_400
+    for invalid in (now - 60, str(future), future + 0.5, True):
+        response = admin.call('create', data={'title': 'Invalid start', 'scheduled_at': invalid})
+        assert response['status'] == 400, response
+
+    immediate = admin.call('create', data={'title': 'Immediate', 'listed': True, 'scheduled_at': None})['id']
+    public = admin.call('create', data={'title': 'Public scheduled', 'listed': True,
+                                      'scheduled_at': future, 'remote_listening': True})['id']
+    private = venue.call('create', data={'title': 'Private scheduled', 'scheduled_at': future,
+                                        'remote_listening': True})['id']
+
+    def directory(client):
+        return {row['id']: row for row in client.call('directory')['sessions']}
+
+    def state(client, session):
+        return client.call('state', session)['state']
+
+    listings = directory(guest)
+    assert listings[immediate]['phase'] == 'live' and listings[immediate]['scheduled_at'] is None
+    assert listings[public]['phase'] == 'upcoming' and listings[public]['scheduled_at'] == future
+    assert listings[public]['started_at'] is None and private not in listings
+    assert directory(venue)[private]['phase'] == 'upcoming'
+    assert admin.call('control', immediate, {'event': 'start'})['status'] == 409
+
+    player = 'd'*64
+    for session, host in ((public, admin), (private, venue)):
+        waiting = state(guest, session)
+        assert waiting['phase'] == 'upcoming' and waiting['scheduled_at'] == future
+        assert waiting['started_at'] is None and not waiting.get('remote_listening')
+        assert not waiting.get('current') and not waiting.get('queue') and not waiting.get('phone')
+        assert guest.call('catalog', session)['status'] == 409
+        assert guest.call('thread', session)['status'] == 409
+        assert guest.call('join', session, {'name': 'Early arrival'})['status'] == 409
+        assert guest.call('request', session, {'track': 'a', 'nonce': '1'*32})['status'] == 409
+        assert guest.call('listener', session, listener_sample('1'*32, '1', 0, 1))['status'] == 409
+        with guest.response('audio', session, item='1', method='HEAD') as response:
+            assert response.status == 404
+        assert host.call('catalog', session)['status'] == 409
+        assert host.call('request', session, {'track': 'a', 'nonce': '1'*32})['status'] == 409
+        assert host.call('player', session, {'player': player, 'event': 'claim'})['status'] == 409
+        for event in ('start', 'reschedule', 'cancel'):
+            change = {'event': event, 'scheduled_at': future + 120}
+            assert guest.call('control', session, change)['status'] == 409
+            assert outsider.call('control', session, change)['status'] == 404
+        assert host.call('control', session, {'event': 'end'})['status'] == 409
+
+    assert admin.call('control', public, {'event': 'reschedule', 'scheduled_at': now - 60})['status'] == 400
+    updated = future + 3600
+    assert admin.call('control', public, {'event': 'reschedule', 'scheduled_at': updated})['ok']
+    assert state(guest, public)['scheduled_at'] == directory(guest)[public]['scheduled_at'] == updated
+
+    # Cross the published time without waiting or implicitly starting playback.
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('UPDATE jukebox_schedule SET scheduled_at=? WHERE session_id IN (?,?)', (now - 60, public, private))
+    assert directory(guest)[public]['phase'] == 'upcoming'
+    assert state(guest, private)['phase'] == 'upcoming'
+    assert directory(venue)[private]['phase'] == 'upcoming'
+    assert guest.call('join', private, {})['status'] == 409
+
+    assert admin.call('control', public, {'event': 'cancel'})['ok']
+    canceled = state(guest, public)
+    assert canceled['phase'] == 'canceled' and canceled['started_at'] is None
+    assert public not in directory(guest) and directory(admin)[public]['phase'] == 'canceled'
+    assert admin.call('control', public, {'event': 'start'})['status'] == 409
+    assert admin.call('recap', public)['status'] == 409
+    assert guest.call('join', public, {})['status'] == 409
+
+    assert venue.call('control', private, {'event': 'start'})['ok']
+    live = state(guest, private)
+    assert live['phase'] == 'live' and live['scheduled_at'] == now - 60
+    assert now <= live['started_at'] <= time.time()
+    assert private not in directory(guest)
+
+    # Give the retry a prior-second timestamp to ensure an accidental rewrite is detectable.
+    started = now - 10
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('UPDATE jukebox_schedule SET started_at=? WHERE session_id=?', (started, private))
+    assert venue.call('control', private, {'event': 'start'})['ok']
+    assert state(guest, private)['started_at'] == started
+    assert venue.call('control', private, {'event': 'reschedule', 'scheduled_at': updated})['status'] == 409
+    assert venue.call('control', private, {'event': 'cancel'})['status'] == 409
+    assert state(guest, private)['phase'] == 'live'
+    assert guest.call('request', private, {'track': 'a', 'nonce': '1'*32})['status'] == 409
+    assert guest.call('join', private, {'name': 'On time'})['ok']
+    phone_id = state(guest, private)['phone']['id']
+    assert venue.call('approve', private, {'phone': phone_id})['ok']
+    assert guest.call('catalog', private)['ok']
+    assert guest.call('request', private, {'track': 'a', 'nonce': '1'*32})['ok']
+    assert guest.call('request', private, {'track': 'b', 'nonce': '2'*32})['ok']
+    assert venue.call('player', private, {'player': player, 'event': 'claim'})['ok']
+    playing = state(venue, private)
+    current = playing['current']['id']
+    assert [row['track_id'] for row in playing['queue']] == ['b']
+    assert venue.call('player', private, player_sample(player, 'playing', current, 1, 1000,
+                                                       observed_revision=playing['revision']))['ok']
+    assert state(guest, private)['remote_listening'] is True
+    with guest.response('audio', private, item=current, headers={'Range': 'bytes=0-7'}) as response:
+        assert response.status == 206 and len(response.read()) == 8
+    assert venue.call('control', private, {'event': 'end'})['ok']
+    assert state(guest, private)['phase'] == 'ended'
+    recap = venue.call('recap', private)['recap']
+    assert recap['session_id'] == private and recap['phones'] == {'connections': 1, 'approved': 1}
+    assert recap['phase'] == 'ended' and recap['scheduled_at'] == now - 60 and recap['started_at'] == started
+    assert recap['totals']['confirmed_plays'] == 1 and recap['totals']['left_in_queue'] == 1
+    print('PASS HTTP schedule validation, discovery, waiting access, host controls, and explicit playback lifecycle')
+
+
 with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
     site = Path(temp)
     fixture(site)
@@ -747,11 +968,16 @@ with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
                         phone_options.pop('default_browser_type', None)
                     else:
                         browser = playwright.chromium.launch(executable_path=CHROME, args=['--no-sandbox'])
-                    if '--remote-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv:
                         scenario(browser, base)
                         for context in browser.contexts:
                             context.close()
-                    remote_scenario(browser, base, phone_options)
+                    if '--remote-only' not in sys.argv:
+                        schedule_scenario(browser, base, phone_options)
+                        for context in browser.contexts:
+                            context.close()
+                    if '--schedule-only' not in sys.argv:
+                        remote_scenario(browser, base, phone_options)
         except Exception:
             log.seek(0)
             print(log.read()[-16000:])

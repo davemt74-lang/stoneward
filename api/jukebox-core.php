@@ -18,6 +18,7 @@ function sf_jukebox_schema(): void {
             revision BIGINT NOT NULL DEFAULT 0, player CHAR(64) NOT NULL DEFAULT '',
             heartbeat BIGINT NOT NULL DEFAULT 0, current_id BIGINT NULL, paused INTEGER NOT NULL DEFAULT 0,
             seconds INTEGER NOT NULL DEFAULT 0, created BIGINT NOT NULL)",
+        "jukebox_schedule (session_id CHAR(32) PRIMARY KEY, scheduled_at BIGINT NOT NULL, started_at BIGINT NULL)",
         "jukebox_remote (session_id CHAR(32) PRIMARY KEY, enabled INTEGER NOT NULL,
             status VARCHAR(12) NOT NULL, position_ms BIGINT NOT NULL, sampled_at_ms BIGINT NOT NULL,
             sample_seq BIGINT NOT NULL, control_revision BIGINT NOT NULL)",
@@ -46,10 +47,36 @@ function sf_jukebox_query(string $sql,array $args=[]): PDOStatement {
 
 function sf_jukebox_session(string $id): array {
     $row=sf_jukebox_query('SELECT s.*, COALESCE(r.enabled,0) AS remote_enabled,
-        r.status AS remote_status,r.position_ms,r.sampled_at_ms,r.sample_seq,r.control_revision
-        FROM jukebox_sessions s LEFT JOIN jukebox_remote r ON r.session_id=s.id WHERE s.id=?',[$id])->fetch();
+        r.status AS remote_status,r.position_ms,r.sampled_at_ms,r.sample_seq,r.control_revision,
+        j.scheduled_at,j.started_at FROM jukebox_sessions s
+        LEFT JOIN jukebox_remote r ON r.session_id=s.id
+        LEFT JOIN jukebox_schedule j ON j.session_id=s.id WHERE s.id=?',[$id])->fetch();
     if(!$row)throw new OutOfBoundsException('Jukebox session not found.');
     return $row;
+}
+
+function sf_jukebox_phase(array $session): string {
+    $waiting=isset($session['scheduled_at'])&&!isset($session['started_at']);
+    if((int)($session['ended']??0))return $waiting?'canceled':'ended';
+    return $waiting?'upcoming':'live';
+}
+
+function sf_jukebox_schedule_time(mixed $timestamp): int {
+    if(!is_int($timestamp)||$timestamp<=time()||$timestamp>253402300799)
+        throw new InvalidArgumentException('Choose a scheduled time in the future.');
+    return $timestamp;
+}
+
+function sf_jukebox_schedule_create(string $id,int $timestamp): void {
+    sf_jukebox_query('INSERT INTO jukebox_schedule (session_id,scheduled_at) VALUES (?,?)',[$id,$timestamp]);
+}
+
+function sf_jukebox_schedule_details(array $session): array {
+    $scheduled=isset($session['scheduled_at'])?(int)$session['scheduled_at']:null;
+    // An unscheduled session opens when created. A scheduled one opens when the host starts it.
+    $started=$session['started_at']??($scheduled===null?($session['created']??null):null);
+    return ['phase'=>sf_jukebox_phase($session),'scheduled_at'=>$scheduled,
+        'started_at'=>$started===null?null:(int)$started];
 }
 
 function sf_jukebox_token(mixed $token): string {
@@ -84,12 +111,12 @@ function sf_jukebox_guest(array $session): ?array {
 }
 
 function sf_jukebox_player_online(array $session): bool {
-    return (int)$session['heartbeat']>=time()-12;
+    return sf_jukebox_phase($session)==='live'&&(int)$session['heartbeat']>=time()-12;
 }
 
 function sf_jukebox_remote_access(array $session,?array $phone): bool {
     $phoneStatus=$phone['status']??null;
-    return (bool)$session['remote_enabled']&&!(int)$session['ended']&&$phoneStatus!=='revoked'
+    return (bool)$session['remote_enabled']&&sf_jukebox_phase($session)==='live'&&$phoneStatus!=='revoked'
         &&((bool)$session['listed']||$phoneStatus==='approved');
 }
 
@@ -146,7 +173,17 @@ function sf_jukebox_advance(array $session): void {
 
 function sf_jukebox_state(array $session,?array $phone,bool $host): array {
     $id=$session['id'];
-    $state=array_intersect_key($session,array_flip(['id','title','ended','venue_id','paused','seconds','revision']));
+    $schedule=sf_jukebox_schedule_details($session);
+    $phase=$schedule['phase'];
+    if($phase==='upcoming'||$phase==='canceled'){
+        $state=array_intersect_key($session,array_flip(['id','title','ended']))+$schedule;
+        if($host&&$phase==='upcoming'){
+            $state['remote_listening']=(bool)$session['remote_enabled'];
+            $state['listed']=(bool)$session['listed'];
+        }
+        return $state;
+    }
+    $state=array_intersect_key($session,array_flip(['id','title','ended','venue_id','paused','seconds','revision']))+$schedule;
     $state['phone']=$phone?array_intersect_key($phone,array_flip(['id','name','status'])):null;
     $state['remote_listening']=$host
         ?(bool)$session['remote_enabled']&&!(int)$session['ended']
@@ -275,7 +312,23 @@ function sf_jukebox_player(array $session,array $body): void {
 function sf_jukebox_controls(array $session,array $body): void {
     $id=$session['id'];
     $event=$body['event']??'';
-    if($event==='end'){
+    $phase=sf_jukebox_phase($session);
+    if($event==='start'){
+        if($phase==='live'&&isset($session['started_at']))return;
+        if($phase!=='upcoming')throw new DomainException('Only an upcoming scheduled session can start.');
+        sf_jukebox_query('UPDATE jukebox_schedule SET started_at=? WHERE session_id=? AND started_at IS NULL',[time(),$id]);
+        return;
+    }
+    if($event==='reschedule'){
+        if($phase!=='upcoming')throw new DomainException('Only an upcoming session can be rescheduled.');
+        $timestamp=sf_jukebox_schedule_time($body['scheduled_at']??null);
+        sf_jukebox_query('UPDATE jukebox_schedule SET scheduled_at=? WHERE session_id=? AND started_at IS NULL',[$timestamp,$id]);
+        return;
+    }
+    if($event==='cancel'&&$phase!=='upcoming')throw new DomainException('Only an upcoming session can be canceled.');
+    if($phase==='upcoming'&&!in_array($event,['cancel','remote_listening'],true))
+        throw new DomainException('This jukebox session has not started.');
+    if(in_array($event,['end','cancel'],true)){
         sf_jukebox_query('UPDATE jukebox_sessions SET ended=1,heartbeat=0 WHERE id=?',[$id]);
         // The recap needs only aggregate totals, never player or phone identifiers.
         sf_jukebox_query('DELETE FROM jukebox_listener_players WHERE session_id=?',[$id]);
@@ -331,6 +384,7 @@ function sf_jukebox_message(string $sessionId,string $phoneId,string $sender,arr
 }
 
 function sf_jukebox_recap(array $session): array {
+    if(sf_jukebox_phase($session)==='canceled')throw new DomainException('This scheduled session was canceled.');
     if(!(int)$session['ended'])throw new DomainException('The recap is available after the session ends.');
     $id=$session['id'];
     $phones=sf_jukebox_query('SELECT COUNT(*) AS connections, COUNT(approved) AS approved
@@ -373,7 +427,7 @@ function sf_jukebox_recap(array $session): array {
 
     return ['session_id'=>$id,'title'=>$session['title'],'created'=>(int)$session['created'],
         'phones'=>array_map('intval',$phones),'totals'=>$totals,'tracks'=>$tracks,
-        'listener_metrics'=>sf_jukebox_listener_metrics($session)];
+        'listener_metrics'=>sf_jukebox_listener_metrics($session)]+sf_jukebox_schedule_details($session);
 }
 
 function sf_jukebox_crm(int $venue): array {

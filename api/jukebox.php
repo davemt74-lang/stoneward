@@ -32,17 +32,31 @@ $db=sf_db();
 try{
     sf_jukebox_schema();
     if(!$post&&$action==='directory'){
+        $directoryFields='s.id,s.title,s.ended,s.created,s.heartbeat,t.scheduled_at,t.started_at';
+        $scheduleJoin=' LEFT JOIN jukebox_schedule t ON t.session_id=s.id';
         $sessions=$hostMode
-            ?sf_jukebox_query('SELECT id,title,ended FROM jukebox_sessions WHERE owner_id=? ORDER BY created DESC LIMIT 50',[$uid])->fetchAll()
-            :sf_jukebox_query('SELECT s.id,s.title,s.heartbeat,COALESCE(r.enabled,0) AS remote_listening
-                FROM jukebox_sessions s LEFT JOIN jukebox_remote r ON r.session_id=s.id
-                WHERE s.listed=1 AND s.ended=0 ORDER BY s.created DESC LIMIT 50')->fetchAll();
+            ?sf_jukebox_query("SELECT $directoryFields FROM jukebox_sessions s $scheduleJoin
+                WHERE s.owner_id=? ORDER BY s.created DESC,s.id DESC LIMIT 50",[$uid])->fetchAll()
+            :[];
         if(!$hostMode){
-            $sessions=array_map(static fn(array $session): array => [
-                'id'=>$session['id'],'title'=>$session['title'],
-                'remote_listening'=>(bool)$session['remote_listening'],'online'=>sf_jukebox_player_online($session)
-            ],$sessions);
+            $publicSessions="SELECT $directoryFields,COALESCE(r.enabled,0) AS remote_listening
+                FROM jukebox_sessions s $scheduleJoin LEFT JOIN jukebox_remote r ON r.session_id=s.id
+                WHERE s.listed=1 AND s.ended=0";
+            // Keep the Upcoming and Live groups on the same read snapshot.
+            $db->beginTransaction();
+            $sessions=array_merge(
+                sf_jukebox_query("$publicSessions AND (t.session_id IS NULL OR t.started_at IS NOT NULL)
+                    ORDER BY COALESCE(t.started_at,s.created) DESC,s.id DESC LIMIT 50")->fetchAll(),
+                sf_jukebox_query("$publicSessions AND t.session_id IS NOT NULL AND t.started_at IS NULL
+                    ORDER BY t.scheduled_at,s.id LIMIT 50")->fetchAll()
+            );
+            $db->commit();
         }
+        $sessions=array_map(static function(array $session)use($hostMode): array {
+            $row=['id'=>$session['id'],'title'=>$session['title']]+sf_jukebox_schedule_details($session);
+            if($hostMode)return $row+['ended'=>$session['ended']];
+            return $row+['remote_listening'=>(bool)$session['remote_listening'],'online'=>sf_jukebox_player_online($session)];
+        },$sessions);
         $venue=$hostMode?sf_jukebox_query('SELECT name FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn():false;
         sf_json_response(['ok'=>true,'sessions'=>$sessions,'venue'=>$venue?:null,'admin'=>$admin]);
     }
@@ -66,10 +80,12 @@ try{
         if($title==='')throw new InvalidArgumentException('Enter a session name.');
         $remote=array_key_exists('remote_listening',$body)?$body['remote_listening']:false;
         if(!is_bool($remote))throw new InvalidArgumentException('Choose whether remote listening is enabled.');
+        $scheduledAt=($body['scheduled_at']??null)===null?null:sf_jukebox_schedule_time($body['scheduled_at']);
         $id=bin2hex(random_bytes(16));
         $db->beginTransaction();
         sf_jukebox_query('INSERT INTO jukebox_sessions (id,owner_id,venue_id,title,listed,created) VALUES (?,?,?,?,?,?)',
             [$id,$uid,$venue?$uid:0,$title,(int)$listed,time()]);
+        if($scheduledAt!==null)sf_jukebox_schedule_create($id,$scheduledAt);
         if($remote)sf_jukebox_controls(sf_jukebox_session($id),['event'=>'remote_listening','enabled'=>true]);
         $db->commit();
         sf_json_response(['ok'=>true,'id'=>$id],201);
@@ -90,6 +106,11 @@ try{
     $session=sf_jukebox_session($id);
     $host=$hostMode&&sf_jukebox_owner($session,$user);
     if($hostMode&&!$host)throw new OutOfBoundsException('Jukebox session not found.');
+    $phase=sf_jukebox_phase($session);
+    if($phase==='upcoming'&&(($post&&$action!=='control')||(!$post&&!in_array($action,['state','audio'],true))))
+        throw new DomainException('This jukebox session has not started.');
+    if($phase==='canceled'&&($post||!in_array($action,['state','audio'],true)))
+        throw new DomainException('This scheduled session was canceled.');
     $phone=$host?null:sf_jukebox_phone($session);
     $approved=($phone['status']??'')==='approved'&&!(int)$session['ended'];
     $thread=$host?(string)($_GET['phone']??$body['phone']??''):(string)($phone['id']??'');
@@ -107,7 +128,8 @@ try{
             sf_json_response(['ok'=>false,'message'=>'Session audio is unavailable.'],$status);
         }
         $payload=match($action){
-            'state'=>['state'=>sf_jukebox_state($session,$phone,$host),'remembered'=>!$host&&sf_jukebox_guest($session)!==null],
+            'state'=>['state'=>sf_jukebox_state($session,$phone,$host),
+                'remembered'=>!$host&&!in_array($phase,['upcoming','canceled'],true)&&sf_jukebox_guest($session)!==null],
             'catalog'=>($host||$approved||(int)$session['listed'])?sf_canvas_audio_catalog():throw new DomainException('Host approval is required.'),
             'thread'=>($host||$approved)&&$thread!==''?['messages'=>sf_jukebox_thread($id,$thread)]:throw new DomainException('Chat access is unavailable.'),
             'recap'=>$host?['recap'=>sf_jukebox_recap($session)]:throw new DomainException('Host access is required.'),
