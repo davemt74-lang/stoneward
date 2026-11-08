@@ -30,8 +30,22 @@
 .pwa-asset-selected { display: flex; align-items: center; gap: .65rem; margin-bottom: .55rem; overflow-wrap: anywhere; }
 .pwa-asset-selected img { width: 3rem; height: 3rem; object-fit: contain; background: var(--bg); }
 .pwa-code textarea { font: .82rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
-.pwa-code a.secondary { display: inline-flex; align-items: center; }
 .pwa-code > .pwa-help { margin-top: .65rem; }
+.pwa-code > .status-line:empty { display: none; }
+.pwa-code-artwork { margin: .85rem 0; padding: .8rem; border: 1px solid var(--line); }
+.pwa-code-image-slot { margin-bottom: .7rem; padding-bottom: .7rem; border-bottom: 1px solid var(--line); }
+.pwa-code-help, .pwa-agent-proposal { margin-top: .65rem; font-size: .8rem; }
+.pwa-code-help summary, .pwa-agent-proposal summary { cursor: pointer; }
+.pwa-code-help pre, .pwa-agent-proposal pre {
+  max-height: 13rem;
+  margin: .5rem 0;
+  padding: .6rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 .pwa-preview { position: sticky; top: 5.5rem; }
 .pwa-phone-preview {

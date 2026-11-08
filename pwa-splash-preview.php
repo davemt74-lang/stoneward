@@ -9,6 +9,7 @@ header('Cache-Control: no-store');
 header('Content-Type: text/html; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
+header('X-DNS-Prefetch-Control: off');
 header('Referrer-Policy: no-referrer');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()');
 $policy = "sandbox allow-scripts; default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
@@ -23,6 +24,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 $surface = $_GET['surface'] ?? null;
 $revision = filter_var($_GET['revision'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>0]]);
 $draft = ($_GET['draft'] ?? null) === '1';
+$shell = $draft && ($_GET['shell'] ?? null) === '1';
 if (!in_array($surface, SF_PWA_SPLASH_SURFACES, true) || $revision === false) {
     http_response_code(404);
     exit('Splash design unavailable.');
@@ -31,7 +33,7 @@ if (!in_array($surface, SF_PWA_SPLASH_SURFACES, true) || $revision === false) {
 try {
     if ($draft) {
         $user = sf_current_user();
-        if (!$user || $user['role'] !== 'admin') {
+        if (!$user || $user['role'] !== 'admin' || (!$shell && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? 'iframe') !== 'iframe')) {
             http_response_code(404);
             exit('Splash design unavailable.');
         }
@@ -42,7 +44,28 @@ try {
         http_response_code(404);
         exit('Splash design unavailable.');
     }
+    if ($shell) {
+        require_once SF_ROOT.'/api/pwa-shell.php';
+        $url = sf_pwa_splash_surface_url($surface, $revision, true);
+        $framePolicy = sf_pwa_shell_frame_policy(sf_public_base_url(), $url);
+        header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; ".$framePolicy
+            ."; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
+        ?>
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Stonefellow draft preview</title>
+<style>html,body,iframe{width:100%;height:100%;margin:0;border:0;display:block}</style>
+<iframe title="Sandboxed splash draft" sandbox="allow-scripts" referrerpolicy="no-referrer" src="<?=sf_pwa_shell_attr($url)?>"></iframe>
+</html>
+        <?php
+        exit;
+    }
     $design = sf_pwa_splash_code($snapshot[$surface]);
+    $images = sf_pwa_splash_image_slots($snapshot[$surface]['imageSlots'], true);
+    $imageJson = json_encode((object)array_column($images, 'url', 'name'), JSON_HEX_TAG|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);
     $sources = [];
     foreach ($design['libraries'] as $library) {
         $source = file_get_contents(SF_ROOT.'/'.$library['path'], false, null, 0, $library['bytes'] + 1);
@@ -56,6 +79,10 @@ try {
         // Keeping the script bytes in inert JSON prevents raw-text parsing from
         // changing code or ending its enclosing script element prematurely.
         $runner = <<<'JS'
+// WebRTC can open sockets outside CSP fetch directives.
+for (const key of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'mozRTCPeerConnection']) {
+    Object.defineProperty(globalThis, key, {value: undefined, configurable: false, writable: false});
+}
 for (const source of JSON.parse(document.getElementById('sf-splash-source').textContent)) {
     const script = document.createElement('script');
     script.textContent = source;
@@ -87,6 +114,7 @@ JS;
 <style>html,body{margin:0;min-height:100%;color:inherit}<?=$design['css']?></style>
 <body>
 <?=$design['html']?>
+<script type="application/json" id="sf-splash-media"><?=$imageJson?></script>
 <?php if ($sources): ?>
 <script type="application/json" id="sf-splash-source"><?=$sourceJson?></script>
 <script><?=$runner?></script>

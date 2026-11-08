@@ -5,6 +5,8 @@ import http.cookiejar
 import json
 import os
 from pathlib import Path
+import random
+import re
 import socket
 import sqlite3
 import struct
@@ -23,10 +25,12 @@ ADMIN = PREFIX + "/admin/api/pwa-splash.php"
 SCRIPT = 'document.querySelector(".splash").textContent = "</script><script>escape</script>";'
 
 
-def png(width, height):
+def png(width, height, noise=False):
     def chunk(kind, data):
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
-    pixels = zlib.compress((b"\0" + b"\x65\x15\x74" * width) * height)
+    rng = random.Random(42)
+    pixels = zlib.compress(b"".join(b"\0" + (rng.randbytes(width * 3) if noise else b"\x65\x15\x74" * width)
+                                    for _ in range(height)))
     return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
             + chunk(b"IDAT", pixels) + chunk(b"IEND", b""))
 
@@ -50,6 +54,9 @@ def fixture(webroot):
         """)
     (site / "storage/media/icon.png").write_bytes(png(192, 192))
     (site / "storage/media/art.png").write_bytes(png(48, 96))
+    (site / "storage/media/slot.png").write_bytes(png(80, 120))
+    (site / "storage/media/large-slot.png").write_bytes(png(400, 400, noise=True))
+    (site / "storage/media/oversize-slot.png").write_bytes(png(480, 480, noise=True))
     (site / "login-fixture.php").write_text("""<?php
         require __DIR__.'/api/bootstrap.php';
         sf_auth_issue_persistent_session((int)$_GET['user']);
@@ -76,6 +83,9 @@ def fixture(webroot):
         require 'api/agent-scene-core.php';
         sf_media_register_existing_file('storage/media/icon.png', 'icon.png', 1);
         sf_media_register_existing_file('storage/media/art.png', 'art.png', 1);
+        sf_media_register_existing_file('storage/media/slot.png', 'slot.png', 1);
+        sf_media_register_existing_file('storage/media/large-slot.png', 'large-slot.png', 1);
+        sf_media_register_existing_file('storage/media/oversize-slot.png', 'oversize-slot.png', 1);
         $scene=['track_id'=>'', 'title'=>'Welcome canvas', 'canvas_kind'=>'custom',
             'html'=>'<section class="splash">Canvas welcome</section>', 'css'=>'.splash{color:red}', 'js'=>$argv[1]];
         sf_agent_scene_history_save(1, $scene);
@@ -130,13 +140,48 @@ def exercise(origin, webroot):
     assert request(admin, origin, saved["draft"]["iconUrl"])[0] == 200
     update("save", 0, 409, settings={"backgroundColor": "#ffffff"})
 
-    imported = update("import", 1, 200, surface="launch", canvasId=1)
+    image_slot = {"name": "hero", "assetId": 3}
+    for invalid_slots in ([image_slot, image_slot], [{"name": "Invalid", "assetId": 3}],
+                          [{"name": "hero", "assetId": 5}],
+                          [{"name": name, "assetId": 4} for name in ["one", "two", "three"]],
+                          [{"name": "hero", "assetUrl": "https://example.test/image.png"}]):
+        update("save", 1, 422, settings={"launch": {"imageSlots": invalid_slots}})
+    site = webroot / PREFIX.strip("/")
+    with sqlite3.connect(site / "config/test.sqlite") as db:
+        db.execute("CREATE TABLE image_generation_jobs(id INTEGER PRIMARY KEY, status TEXT, media_asset_id INTEGER)")
+        db.execute("INSERT INTO image_generation_jobs VALUES(1, 'awaiting_review', 3)")
+        db.execute("UPDATE media_assets SET technical_json=? WHERE id=3",
+                   (json.dumps({"source": "openai_image_generation", "image_job_id": 1}),))
+        key = "site.pwa_splash"
+        state = json.loads(db.execute("SELECT meta_value FROM app_meta WHERE meta_key=?", (key,)).fetchone()[0])
+        for snapshot in state.values():
+            for surface in ["launch", "waiting"]:
+                del snapshot[surface]["imageSlots"]
+        db.execute("UPDATE app_meta SET meta_value=? WHERE meta_key=?", (json.dumps(state), key))
+    pending = update("save", 1, 422, settings={"launch": {"imageSlots": [image_slot]}})
+    assert "Approve" in pending["message"]
+    with sqlite3.connect(site / "config/test.sqlite") as db:
+        db.execute("UPDATE image_generation_jobs SET status='ready' WHERE id=1")
+    assert request(admin, origin, ADMIN)[1]["draft"]["launch"]["imageSlots"] == []
+    imported = update("import", 1, 200, surface="launch", canvasId=1,
+                      settings={"launch": {"imageSlots": [image_slot]}})
     assert imported["draft"]["launch"]["js"] == SCRIPT
-    draft_url = imported["draft"]["launch"]["previewUrl"]
-    assert draft_url == PREFIX + "/pwa-splash-preview.php?surface=launch&revision=2&draft=1"
+    slot = imported["draft"]["launch"]["imageSlots"][0]
+    assert slot["name"] == "hero" and slot["assetId"] == 3
+    assert request(guest, origin, slot["assetUrl"])[0] == 404
+    assert request(admin, origin, slot["assetUrl"])[0] == 200
+    draft_shell = imported["draft"]["launch"]["previewUrl"]
+    assert draft_shell == PREFIX + "/pwa-splash-preview.php?surface=launch&revision=2&draft=1&shell=1"
+    assert request(guest, origin, draft_shell)[0] == 404
+    status, shell, headers = request(admin, origin, draft_shell)
+    assert status == 200 and b'sandbox="allow-scripts"' in shell and b"data:image" not in shell
+    assert "frame-src " + origin + PREFIX + "/pwa-splash-preview.php" in headers["Content-Security-Policy"]
+    draft_url = draft_shell.replace("&shell=1", "")
     assert request(guest, origin, draft_url)[0] == request(customer, origin, draft_url)[0] == 404
     status, preview, headers = request(admin, origin, draft_url)
     assert status == 200 and b"Canvas welcome" in preview and b"<script>escape</script>" not in preview
+    media = json.loads(re.search(rb'id="sf-splash-media">(.*?)</script>', preview).group(1))
+    assert media == {"hero": "data:image/png;base64," + base64.b64encode(png(80, 120)).decode()}
     assert base64.b64encode(hashlib.sha256(SCRIPT.encode()).digest()).decode() in headers["Content-Security-Policy"]
     assert "sandbox allow-scripts" in headers["Content-Security-Policy"]
     assert "default-src 'none'" in headers["Content-Security-Policy"]
@@ -150,13 +195,19 @@ def exercise(origin, webroot):
     assert published["draft"]["revision"] == published["published"]["revision"] == 3
     assert request(admin, origin, draft_url)[0] == 404
     live_url = published["published"]["launch"]["previewUrl"]
-    assert request(guest, origin, live_url)[0] == 200
+    status, preview, _ = request(guest, origin, live_url)
+    assert status == 200 and media["hero"].encode() in preview
+    assert request(guest, origin, slot["assetUrl"])[0] == 404
+    slot_file = site / "storage/media/slot.png"
+    slot_file.write_bytes(png(100, 100))
+    assert request(guest, origin, live_url)[0] == 422
+    slot_file.write_bytes(png(80, 120))
     assert request(guest, origin, published["published"]["startupUrl"])[0] == 200
     assert request(guest, origin, published["published"]["iconUrl"])[0] == 200
     public = request(guest, origin, PREFIX + "/public-fixture.php")[1]
     assert public["iconSize"] == 192 and public["iconMime"] == "image/png"
     assert public["launch"]["mode"] == "code" and public["waiting"]["mode"] == "image"
-    assert "html" not in public["launch"] and public["backgroundColor"] == "#3a206f"
+    assert "html" not in public["launch"] and "imageSlots" not in public["launch"] and public["backgroundColor"] == "#3a206f"
 
     update("save", 3, 200, settings={"launch": {"mode": "default"}})
     restored = update("restore", 4, 200)

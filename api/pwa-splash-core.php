@@ -3,11 +3,15 @@ declare(strict_types=1);
 
 const SF_PWA_SPLASH_META_KEY = 'site.pwa_splash';
 const SF_PWA_SPLASH_SURFACES = ['launch', 'waiting'];
+const SF_PWA_SPLASH_MAX_SLOTS = 4;
+const SF_PWA_SPLASH_SLOT_BYTES = 512 * 1024;
+const SF_PWA_SPLASH_IMAGE_BYTES = 1024 * 1024;
+const SF_PWA_SPLASH_SLOT_EDGE = 1600;
 
 final class SfPwaSplashConflict extends RuntimeException {}
 
 function sf_pwa_splash_defaults(): array {
-    $surface = ['mode'=>'default', 'assetId'=>0, 'asset'=>null, 'title'=>'', 'message'=>'', 'html'=>'', 'css'=>'', 'js'=>''];
+    $surface = ['mode'=>'default', 'assetId'=>0, 'asset'=>null, 'title'=>'', 'message'=>'', 'html'=>'', 'css'=>'', 'js'=>'', 'imageSlots'=>[]];
     return [
         'revision'=>0, 'backgroundColor'=>'', 'iconAssetId'=>0, 'startupAssetId'=>0,
         'icon'=>null, 'startup'=>null, 'launch'=>$surface, 'waiting'=>$surface,
@@ -31,6 +35,11 @@ function sf_pwa_splash_decode(string $value): array {
             foreach (['title', 'message', 'html', 'css', 'js'] as $field) {
                 if (!is_string($design[$field] ?? null)) throw new UnexpectedValueException('Invalid splash text.');
             }
+            $slots = $design['imageSlots'] ?? [];
+            if (!is_array($slots) || !array_is_list($slots) || count($slots) > SF_PWA_SPLASH_MAX_SLOTS) {
+                throw new UnexpectedValueException('Invalid splash image slots.');
+            }
+            $state[$key][$surface]['imageSlots'] = $slots;
         }
         if (!is_int($snapshot['revision'] ?? null) || !is_string($snapshot['backgroundColor'] ?? null)) {
             throw new UnexpectedValueException('Invalid splash settings.');
@@ -55,9 +64,9 @@ function sf_pwa_splash_public_path(string $path): string {
     return '/'.($base === '' ? '' : $base.'/').$path;
 }
 
-function sf_pwa_splash_surface_url(string $surface, int $revision, bool $draft = false): string {
+function sf_pwa_splash_surface_url(string $surface, int $revision, bool $draft = false, bool $shell = false): string {
     return sf_pwa_splash_public_path('pwa-splash-preview.php?surface='.rawurlencode($surface)
-        .'&revision='.$revision.($draft ? '&draft=1' : ''));
+        .'&revision='.$revision.($draft ? '&draft=1'.($shell ? '&shell=1' : '') : ''));
 }
 
 function sf_pwa_splash_media_url(?array $asset): string {
@@ -76,9 +85,17 @@ function sf_pwa_splash_present(array $snapshot, bool $draft = false, bool $admin
         $design = &$snapshot[$surface];
         $design['assetUrl'] = $admin || $design['mode'] === 'image' ? sf_pwa_splash_media_url($design['asset'] ?? null) : '';
         $design['previewUrl'] = $admin || $design['mode'] === 'code'
-            ? sf_pwa_splash_surface_url($surface, $snapshot['revision'], $draft) : '';
+            ? sf_pwa_splash_surface_url($surface, $snapshot['revision'], $draft, $draft) : '';
         unset($design['asset']);
-        if (!$admin) unset($design['html'], $design['css'], $design['js']);
+        if ($admin) {
+            $design['imageSlots'] = array_map(static fn(array $slot): array => [
+                'name'=>$slot['name'],
+                'assetId'=>$slot['assetId'],
+                'assetUrl'=>sf_pwa_splash_media_url($slot['asset']),
+            ], $design['imageSlots']);
+        } else {
+            unset($design['html'], $design['css'], $design['js'], $design['imageSlots']);
+        }
         unset($design);
     }
     return $snapshot;
@@ -99,6 +116,15 @@ function sf_pwa_splash_asset_id(mixed $value): int {
         ? filter_var($value, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) : false;
     if ($id === false) throw new InvalidArgumentException('Choose a valid Media Library asset.');
     return $id;
+}
+
+function sf_pwa_splash_guard_asset(int $id, string $role): void {
+    try {
+        sf_media_guard_link_exposure($id, 'pwa_'.$role, true, false);
+    } catch (RuntimeException $error) {
+        if ($error instanceof PDOException) throw $error;
+        throw new InvalidArgumentException($error->getMessage(), 0, $error);
+    }
 }
 
 function sf_pwa_splash_asset(int $id, string $role): ?array {
@@ -126,18 +152,83 @@ function sf_pwa_splash_asset(int $id, string $role): ?array {
     if ($role === 'icon' && ($image[0] !== $image[1] || $image[0] < 192)) {
         throw new InvalidArgumentException('The install icon must be a square PNG at least 192 pixels wide.');
     }
-    try {
-        sf_media_guard_link_exposure($id, 'pwa_'.$role, true, false);
-    } catch (RuntimeException $error) {
-        if ($error instanceof PDOException) throw $error;
-        throw new InvalidArgumentException($error->getMessage(), 0, $error);
-    }
+    sf_pwa_splash_guard_asset($id, $role);
     $variant = 'original';
     if (in_array($role, SF_PWA_SPLASH_SURFACES, true) && $image['mime'] !== 'image/gif' &&
         isset($asset['variants']['large']['path']) && is_file(SF_ROOT.'/'.$asset['variants']['large']['path'])) {
         $variant = 'large';
     }
     return ['uuid'=>(string)$asset['uuid'], 'variant'=>$variant, 'width'=>$image[0], 'mime'=>$image['mime']];
+}
+
+/** Read one bounded, verified raster rendition from managed storage. */
+function sf_pwa_splash_slot_image(int $id, ?array $expected = null): array {
+    $types = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+    $asset = sf_media_asset($id, true);
+    if (!$asset || $asset['category'] !== 'image' || !in_array($asset['mime_type'], $types, true)) {
+        throw new InvalidArgumentException('Choose a PNG, JPEG, WebP, or GIF from the Media Library for each slot.');
+    }
+    sf_pwa_splash_guard_asset($id, 'image_slot');
+    $variants = ['original'=>$asset['stored_path']];
+    if ($asset['mime_type'] !== 'image/gif') {
+        foreach (['medium', 'thumb'] as $variant) {
+            if (is_string($asset['variants'][$variant]['path'] ?? null)) $variants[$variant] = $asset['variants'][$variant]['path'];
+        }
+    }
+    $root = realpath(SF_ROOT.'/storage/media');
+    foreach ($variants as $variant => $path) {
+        if ($expected !== null && ($expected['variant'] ?? null) !== $variant) continue;
+        $file = realpath(SF_ROOT.'/'.ltrim($path, '/'));
+        if (!$root || !$file || !str_starts_with($file, $root.DIRECTORY_SEPARATOR) || !is_file($file)) continue;
+        $bytes = @file_get_contents($file, false, null, 0, SF_PWA_SPLASH_SLOT_BYTES + 1);
+        if (!is_string($bytes) || strlen($bytes) > SF_PWA_SPLASH_SLOT_BYTES) continue;
+        $image = @getimagesizefromstring($bytes);
+        if (!$image || max($image[0], $image[1]) > SF_PWA_SPLASH_SLOT_EDGE) continue;
+        $mime = $image['mime'];
+        $hash = hash('sha256', $bytes);
+        if ($variant === 'original' && ($mime !== $asset['mime_type'] || !hash_equals($asset['sha256'], $hash))) continue;
+        if ($variant !== 'original' && !in_array($mime, ['image/jpeg', 'image/webp'], true)) continue;
+        $rendition = ['uuid'=>(string)$asset['uuid'], 'variant'=>$variant, 'mime'=>$mime, 'sha256'=>$hash];
+        if ($expected !== null && $expected !== $rendition) continue;
+        return ['asset'=>$rendition, 'bytes'=>$bytes];
+    }
+    throw new InvalidArgumentException($expected === null
+        ? 'Choose a splash slot image with a rendition up to 512 KiB and 1600 pixels per side.'
+        : 'A saved splash slot image is unavailable. Select the image again to update it.');
+}
+
+/** Accept only explicit slot names and managed IDs; never accept client URLs or bytes. */
+function sf_pwa_splash_image_slots(mixed $slots, bool $render = false): array {
+    if (!is_array($slots) || !array_is_list($slots) || count($slots) > SF_PWA_SPLASH_MAX_SLOTS) {
+        throw new InvalidArgumentException('Choose up to four Media Library image slots per splash.');
+    }
+    $result = [];
+    $names = [];
+    $size = 0;
+    foreach ($slots as $slot) {
+        $name = $slot['name'] ?? null;
+        if (!is_string($name) || !preg_match('/\A[a-z][a-z0-9-]{0,23}\z/', $name) || isset($names[$name])) {
+            throw new InvalidArgumentException('Give each image slot a unique name using lowercase letters, numbers or hyphens. Start with a letter and use up to 24 characters.');
+        }
+        $names[$name] = true;
+        $id = sf_pwa_splash_asset_id($slot['assetId'] ?? null);
+        if (!$id) throw new InvalidArgumentException('Choose a Media Library image for the '.$name.' slot.');
+        $expected = $slot['asset'] ?? null;
+        if ($render && !is_array($expected)) throw new InvalidArgumentException('A saved splash slot image is unavailable.');
+        $image = sf_pwa_splash_slot_image($id, $render ? $expected : null);
+        $size += strlen($image['bytes']);
+        if ($size > SF_PWA_SPLASH_IMAGE_BYTES) {
+            throw new InvalidArgumentException('Splash image slots may use up to 1 MiB total per screen.');
+        }
+        $result[] = $render
+            ? ['name'=>$name, 'url'=>'data:'.$image['asset']['mime'].';base64,'.base64_encode($image['bytes'])]
+            : ['name'=>$name, 'assetId'=>$id, 'asset'=>$image['asset']];
+    }
+    return $result;
+}
+
+function sf_pwa_splash_image_slot_names(mixed $imageSlots): array {
+    return array_column(sf_pwa_splash_image_slots($imageSlots), 'name');
 }
 
 function sf_pwa_splash_text(mixed $value, int $limit, string $field): string {
@@ -178,6 +269,7 @@ function sf_pwa_splash_normalize(array $settings, array $previous): array {
             'html'=>sf_pwa_splash_text($design['html'], 12000, 'HTML'),
             'css'=>sf_pwa_splash_text($design['css'], 12000, 'CSS'),
             'js'=>sf_pwa_splash_text($design['js'], 12000, 'JavaScript'),
+            'imageSlots'=>sf_pwa_splash_image_slots($design['imageSlots']),
         ];
         foreach (['title'=>100, 'message'=>300] as $field => $limit) {
             if (preg_match_all('/./us', $snapshot[$surface][$field]) > $limit) {
@@ -245,6 +337,10 @@ function sf_pwa_splash_sync_media(PDO $db, array $snapshot, bool $draft): void {
     foreach (SF_PWA_SPLASH_SURFACES as $surface) {
         $design = $snapshot[$surface];
         if ($draft || $design['mode'] === 'image') $assets[$surface] = $design['assetId'];
+        foreach ($design['imageSlots'] as $slot) {
+            // The frame exposes the published bytes. Ordinary Media Library requests remain private.
+            sf_media_attach($slot['assetId'], 'site', $entity, 'pwa_'.$surface.'_slot_'.$slot['name']);
+        }
     }
     foreach ($assets as $role => $id) {
         if ($id) sf_media_attach($id, 'site', $entity, 'pwa_'.$role, ['public_visible'=>!$draft]);

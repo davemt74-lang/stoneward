@@ -21,6 +21,27 @@
   const dailyCapLabel=cap=>cap===null?'Unlimited':fmt(cap);
   const usd=cents=>'$'+(Number(cents||0)/100).toFixed(2);
   const imageUrl=uuid=>uuid?'../api/media.php?id='+encodeURIComponent(uuid):'';
+  function installIconActions(job){
+    if(job.status!=='ready'||!job.asset_approved_by||!job.media_asset_id)return '';
+    return `<div data-imagegen-icon-actions><div class="actions"><button type="button" class="secondary" data-imagegen-icon="${Number(job.id)}">Use as install icon</button><button type="button" class="secondary" data-imagegen-open-splash hidden>Open PWA &amp; Splash</button></div><p role="status" data-imagegen-icon-status></p></div>`;
+  }
+  function bindInstallIconActions(root,close){
+    for(const actions of $$('[data-imagegen-icon-actions]',root)){
+      const stage=$('[data-imagegen-icon]',actions),open=$('[data-imagegen-open-splash]',actions),status=$('[data-imagegen-icon-status]',actions);
+      open.onclick=()=>{if(close)close();openView('pwa-splash')};
+      stage.onclick=async()=>{
+        if(busy)return;
+        busy=true;stage.disabled=true;open.hidden=true;status.textContent='Preparing a square install icon…';
+        try{
+          const {draft}=await api('pwa-splash.php');
+          await api('pwa-icon-stage.php',{jobId:Number(stage.dataset.imagegenIcon),revision:draft.revision});
+          status.textContent='512 × 512 PNG staged in the PWA draft. Open PWA & Splash to review and publish.';
+          open.hidden=false;
+        }catch(error){status.textContent=error.message;}
+        finally{busy=false;stage.disabled=false;}
+      };
+    }
+  }
   async function refresh(){const r=await api('image-generation.php');state={settings:r.settings||{},openai:r.openai||{},jobs:r.jobs||[],models:r.models||[],presets:r.presets||[],styles:r.styles||[],dashboard:r.dashboard||{}};referenceAssets=r.references||[];}
   function galleryHtml(){
     const withAssets=state.jobs.filter(j=>j.asset_uuid);
@@ -40,7 +61,7 @@
     overlay.innerHTML='<section class="imagegen-compare-shell" role="dialog" aria-modal="true" aria-labelledby="imagegenCompareHeading"><header><div><small>91B20E · PRIVATE VARIATION REVIEW</small><h2 id="imagegenCompareHeading">Artwork #'+Number(job.id)+' · '+(before?'Reference vs. variation':'Original generation')+'</h2><p>'+esc(job.model+' · '+job.size+' · '+job.quality+' · '+(job.background||'auto')+' background')+'</p></div><button type="button" class="secondary" data-compare-close>Close ×</button></header>'+
       '<div class="imagegen-compare-frame '+(before?'':'single')+'" style="--reveal:50%">'+(before?'<img class="imagegen-compare-before" src="'+before+'" alt="Original reference image">':'')+'<img class="imagegen-compare-after" src="'+after+'" alt="Generated artwork variation">'+(before?'<span class="imagegen-compare-handle" aria-hidden="true"></span>':'')+'</div>'+
       (before?'<label class="imagegen-compare-control">Reveal generated variation <input type="range" min="0" max="100" value="50" data-compare-range aria-label="Percentage of generated variation shown"></label><div class="imagegen-compare-labels"><span>Reference image</span><span>Generated result</span></div>':'<p class="hint">No source image for this original generation.</p>')+
-      '<p class="imagegen-compare-prompt">'+esc(job.prompt)+'</p><div class="actions">'+(job.status==='ready'&&job.media_asset_id?'<button type="button" class="primary" data-compare-vary="'+Number(job.media_asset_id)+'">Use approved result as reference</button>':'<span class="hint">Approve this image before it can become a new reference.</span>')+(job.status==='ready'?'<button type="button" class="secondary" data-compare-preview="'+Number(job.id)+'">Preview placements</button>':'')+'</div></section>';
+      '<p class="imagegen-compare-prompt">'+esc(job.prompt)+'</p><div class="actions">'+(job.status==='ready'&&job.media_asset_id?'<button type="button" class="primary" data-compare-vary="'+Number(job.media_asset_id)+'">Use approved result as reference</button>':'<span class="hint">Approve this image before it can become a new reference.</span>')+(job.status==='ready'?'<button type="button" class="secondary" data-compare-preview="'+Number(job.id)+'">Preview placements</button>':'')+'</div>'+installIconActions(job)+'</section>';
     document.body.appendChild(overlay);document.body.classList.add('imagegen-placement-open');
     const close=()=>{overlay.remove();if(compareOverlay===overlay)compareOverlay=null;document.body.classList.remove('imagegen-placement-open')};
     $('[data-compare-close]',overlay).onclick=close;
@@ -49,6 +70,7 @@
     if(before)$('[data-compare-range]',overlay).oninput=e=>$('.imagegen-compare-frame',overlay).style.setProperty('--reveal',Number(e.target.value)+'%');
     const vary=$('[data-compare-vary]',overlay);if(vary)vary.onclick=()=>{const assetId=Number(vary.dataset.compareVary);close();selectVariationAsset(assetId)};
     const preview=$('[data-compare-preview]',overlay);if(preview)preview.onclick=()=>{close();previewPlacement(Number(preview.dataset.comparePreview))};
+    bindInstallIconActions(overlay,close);
     $('[data-compare-close]',overlay).focus();
   }
   function selectVariationAsset(assetId){
@@ -84,7 +106,7 @@
       ${j.status==='ready'&&j.media_asset_id?`<button type="button" class="secondary" data-imagegen-vary="${j.media_asset_id}">Create a variation</button>`:''}
       ${view?`<button type="button" class="secondary" data-imagegen-compare="${j.id}">Compare versions</button>`:''}
       ${j.started_at&&['ready','needs_review','failed'].includes(j.status)?`<button type="button" class="secondary" data-imagegen-reconcile="${j.id}">Record invoice cost</button>`:''}
-      ${j.status==='ready'&&view?`<button type="button" class="secondary" data-imagegen-preview="${j.id}">Preview placements</button>`:''}</div></div></div>
+      ${j.status==='ready'&&view?`<button type="button" class="secondary" data-imagegen-preview="${j.id}">Preview placements</button>`:''}</div>${installIconActions(j)}</div></div>
     </section>`;
   }
   async function previewPlacement(jobId){
@@ -500,6 +522,7 @@
       await act('approve_asset',Number(btn.dataset.imagegenApproveAsset),'Image approved. Attach it from Media Library when ready.');
     });
     $$('[data-imagegen-preview]',canvas).forEach(btn=>btn.onclick=()=>previewPlacement(Number(btn.dataset.imagegenPreview)));
+    bindInstallIconActions(canvas);
     $$('[data-imagegen-vary]',canvas).forEach(btn=>btn.onclick=()=>selectVariationAsset(Number(btn.dataset.imagegenVary)));
     $$('[data-imagegen-reconcile]',canvas).forEach(btn=>btn.onclick=async()=>{
       if(busy)return;const job=state.jobs.find(j=>Number(j.id)===Number(btn.dataset.imagegenReconcile));if(!job)return;

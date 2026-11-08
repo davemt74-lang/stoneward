@@ -23,14 +23,15 @@ PHP = os.environ.get('SF_TEST_PHP', 'php')
 CHROME = os.environ.get('CHROMIUM_BIN')
 BROWSER = os.environ.get('SF_JUKEBOX_BROWSER', 'chromium')
 PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aH1sAAAAASUVORK5CYII='
+SPLASH_ART = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAGCAIAAABxZ0isAAAAEUlEQVR4nGNIFS3BihgGUgIAEWksoW5LtJgAAAAASUVORK5CYII='
 TRACK_SECONDS = 45
 MANAGED_AUDIO = 'M' + 'A'*20
 
 
 def fixture(site):
-    for directory in ('config', 'data', 'assets/audio', 'assets/js', 'storage/media'):
+    for directory in ('config', 'data', 'assets/audio', 'assets/js', 'storage/media', 'admin'):
         (site / directory).mkdir(parents=True)
-    for directory in ('api', 'assets/css', 'assets/icons', 'assets/images', 'assets/vendor'):
+    for directory in ('api', 'assets/css', 'assets/icons', 'assets/images', 'assets/vendor', 'admin/api', 'admin/assets'):
         (site / directory).symlink_to(ROOT / directory, target_is_directory=True)
     for file in ('jukebox.php', 'pwa-splash-preview.php', 'manifest.php', 'service-worker.js', 'offline.html',
                  'assets/js/jukebox.js', 'assets/js/jukebox-qr.js', 'assets/js/jukebox-listener.js',
@@ -48,6 +49,7 @@ def fixture(site):
     subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc', '-t', str(TRACK_SECONDS),
                     str(site / 'assets/audio/test.mp3')], check=True)
     (site / 'storage/media/test.mp3').write_bytes((site / 'assets/audio/test.mp3').read_bytes())
+    (site / 'storage/media/waiting-room.png').write_bytes(base64.b64decode(SPLASH_ART))
     with sqlite3.connect(site / 'config/fixture.sqlite') as db:
         db.executescript('''CREATE TABLE users(id INTEGER PRIMARY KEY,email TEXT UNIQUE,display_name TEXT,
           role TEXT,status TEXT,created_at TEXT,updated_at TEXT,last_login_at TEXT,password_hash TEXT);
@@ -67,11 +69,39 @@ def fixture(site):
             VALUES(?,'audio','audio/mpeg','mp3','test.mp3',?,?,?,?,?,?)")
             ->execute([$argv[1],$path,hash_file('sha256',$path),filesize($path),(int)$argv[2],$now,$now]);
         sf_media_attach((int)$db->lastInsertId(),'track','b','primary_audio',['public_visible'=>true]);
+        sf_media_register_existing_file('storage/media/waiting-room.png', 'Waiting room artwork.png', 1);
     ''', MANAGED_AUDIO, str(TRACK_SECONDS)], cwd=site, check=True)
     (site / 'login-fixture.php').write_text("""<?php
         require __DIR__.'/api/bootstrap.php';
         sf_auth_issue_persistent_session((int)$_GET['user']);
         echo 'ok';
+    """)
+    # Mount the production editor with the Admin shell adapter, keeping the
+    # real settings, CSRF, media picker and publication endpoints in use.
+    (site / 'admin/splash-browser-fixture.html').write_text("""<!doctype html>
+      <meta charset="utf-8">
+      <link rel="stylesheet" href="assets/pwa-splash.css">
+      <main></main>
+      <script>
+      let csrf;
+      window.STONEFELLOW_ADMIN_CONTEXT = {
+        canvas: document.querySelector('main'),
+        head: () => '<h1>PWA &amp; Splash</h1>',
+        async api(path, body) {
+          const options = body === undefined ? {} : {method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+            body: JSON.stringify(body)};
+          const response = await fetch('api/' + path, options);
+          const data = await response.json();
+          if (!response.ok || !data.ok) throw new Error(data.message || 'Request failed');
+          csrf = data.csrfToken || csrf;
+          return data;
+        }
+      };
+      </script>
+      <script src="assets/admin-confirm.js"></script>
+      <script src="assets/pwa-splash.js"></script>
+      <script>window.SFPwaSplashAdmin.render();</script>
     """)
     # Symlinked PHP entry points resolve __DIR__ to the repo; the router fixes SF_ROOT
     # for fixture storage while leaving the production endpoint implementations intact.
@@ -345,18 +375,116 @@ def remote_scenario(browser, base, phone_options):
     print('PASS anonymous phone listening, mid-song join, venue pause and skip, outage recovery, and local stop')
 
 
-def schedule_scenario(browser, base, phone_options, site):
-    # Publish a harmless authored waiting design, using the same revisioned source as Admin.
-    subprocess.run([PHP, '-r', '''
-        define('SF_ROOT',getcwd());
-        require 'api/bootstrap.php';
-        require 'api/pwa-splash-core.php';
-        sf_pwa_splash_update(1,'publish',0,['backgroundColor'=>'#211922','waiting'=>[
-            'mode'=>'code','title'=>'Tonight at Stonefellow',
-            'html'=>'<section><p class="fixture">Opening soon</p></section>', 'css'=>'p {color: white}',
-            'js'=>'document.querySelector(".fixture").textContent = "Designed waiting screen";',
-        ]],[]);
-    '''], cwd=site, check=True)
+def inline_splash_editor(browser, base):
+    context = browser.new_context()
+    editor = context.new_page()
+    editor.goto(base + '/login-fixture.php?user=1')
+    editor.goto(base + '/admin/splash-browser-fixture.html')
+    endpoint = base + '/admin/api/pwa-splash.php'
+    waiting = editor.locator('[data-surface=waiting]')
+    waiting.locator('select[name="waiting.mode"]').select_option('code')
+    waiting.locator('input[name="waiting.title"]').fill('Tonight at Stonefellow')
+    editor.locator('input[name=inheritColor]').uncheck()
+    editor.locator('input[name=backgroundColor]').fill('#211922')
+    waiting.locator('[data-add-code-image]').click()
+    slot = waiting.locator('[data-code-image-slot]')
+    slot.locator('[data-code-image-name]').fill('hero')
+    slot.locator('[data-choose-code-image]').click()
+    editor.locator('[data-media-results]').get_by_role('button', name=re.compile(r'^Waiting room artwork(?:\.png)?$')).click()
+
+    # Simulate a draft design trying to navigate its own frame with private
+    # data. The fixture intercepts the alternate origin before any network send.
+    alternate_origin = base.replace('127.0.0.1', 'localhost')
+    navigation_probe = alternate_origin + '/splash-navigation-probe'
+    escaped = []
+
+    def trap_navigation(route):
+        escaped.append(route.request.url)
+        route.fulfill(body='The splash left its preview frame')
+
+    editor.route(navigation_probe + '**', trap_navigation)
+    code = {
+        'html': '<section><p class="fixture">Opening soon</p><figure class="splash-art"></figure></section>',
+        'css': 'p {color: white} .splash-art img {width: 40px; height: 40px}',
+        'js': '''
+const media = JSON.parse(document.getElementById('sf-splash-media').textContent);
+const art = document.createElement('img');
+art.src = media.hero;
+art.alt = 'Waiting room artwork';
+document.querySelector('.splash-art').append(art);
+document.querySelector('.fixture').textContent = 'Designed waiting screen';
+'''.strip() + """
+globalThis.attemptPreviewNavigation = () => {
+  setTimeout(() => {
+    location.href = """ + json.dumps(navigation_probe) + """ + '?sample=' + encodeURIComponent(media.hero.slice(-12));
+  }, 20);
+};
+"""
+    }
+    brief = 'Design a calm listening room welcome around the selected hero image.'
+    generated = []
+
+    def fake_model(route):
+        request_body = route.request.post_data_json
+        generated.append(request_body)
+        route.fulfill(json={'ok': True, 'surface': 'waiting', 'revision': 0, 'code': code})
+
+    # Model generation is the only intercepted route. No provider is contacted.
+    editor.route('**/admin/api/pwa-splash-code.php', fake_model)
+    waiting.locator('[data-agent-brief]').fill(brief)
+    waiting.locator('[data-agent-generate]').click()
+    stage = waiting.locator('[data-agent-stage]')
+    expect(stage).to_be_visible()
+    expect(stage).to_be_enabled()
+    assert len(generated) == 1 and generated[0]['brief'] == brief
+    assert generated[0]['surface'] == 'waiting' and generated[0]['revision'] == 0
+    image_slots = generated[0]['imageSlots']
+    assert len(image_slots) == 1 and image_slots[0]['name'] == 'hero' and int(image_slots[0]['assetId']) > 0
+    expect(waiting.locator('textarea[name="waiting.html"]')).to_have_value('')
+    assert editor.request.get(endpoint).json()['draft']['revision'] == 0
+
+    stage.click()
+    expect(waiting.locator('textarea[name="waiting.html"]')).to_have_value(code['html'])
+    expect(editor.locator('[data-publish-splash]')).to_be_disabled()
+    assert editor.request.get(endpoint).json()['draft']['revision'] == 0
+    editor.locator('[data-save-draft]').click()
+    expect(editor.locator('[data-splash-status]')).to_contain_text('Draft saved')
+    preview_shell = editor.frame_locator('[data-preview-code]')
+    preview = preview_shell.frame_locator('iframe')
+    expect(preview.locator('.fixture')).to_have_text('Designed waiting screen')
+    expect(preview_shell.locator('iframe')).to_have_attribute('sandbox', 'allow-scripts')
+    assert preview_shell.locator('iframe').evaluate('frame => frame.contentDocument === null')
+    assert_splash_image(preview)
+    if BROWSER == 'chromium':
+        with editor.expect_console_message(
+            lambda msg: alternate_origin in msg.text and 'Content Security Policy' in msg.text, timeout=5000
+        ):
+            preview.locator('.fixture').evaluate('() => globalThis.attemptPreviewNavigation()')
+        assert not escaped, escaped
+    snapshot = editor.request.get(endpoint).json()
+    assert snapshot['draft']['revision'] == 1 and snapshot['published']['revision'] == 0
+    assert snapshot['published']['waiting']['mode'] == 'default'
+
+    editor.locator('[data-publish-splash]').click()
+    editor.get_by_role('button', name='Publish splash settings').click()
+    expect(editor.locator('[data-splash-status]')).to_contain_text('Splash settings published')
+    snapshot = editor.request.get(endpoint).json()
+    assert snapshot['published']['revision'] == 2 and snapshot['published']['waiting']['mode'] == 'code'
+    published_slot = snapshot['published']['waiting']['imageSlots'][0]
+    assert int(published_slot['assetId']) == int(image_slots[0]['assetId'])
+    context.close()
+    print('PASS inline Agent code generation, staging, isolated draft preview with managed artwork, and explicit publication')
+    return published_slot['assetUrl']
+
+
+def assert_splash_image(frame):
+    artwork = frame.get_by_role('img', name='Waiting room artwork')
+    expect(artwork).to_have_attribute('src', 'data:image/png;base64,' + SPLASH_ART)
+    expect(artwork).to_be_visible()
+    assert artwork.evaluate('async (image) => { await image.decode(); return image.naturalWidth }') == 8
+
+
+def schedule_scenario(browser, base, phone_options):
     host_zone = ZoneInfo('America/Los_Angeles')
     host = browser.new_context(timezone_id=host_zone.key).new_page()
     host.goto(base + '/login-fixture.php?user=1')
@@ -370,11 +498,11 @@ def schedule_scenario(browser, base, phone_options, site):
     def utc_iso(date):
         return date.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
-    def create_session(title, listed=False):
+    def create_session(title, listed=False, date=start_at):
         create.locator('input[name=title]').fill(title)
         create.locator('input[name=listed]').set_checked(listed)
         create.get_by_label('Allow remote listening').check()
-        local_input(create, start_at)
+        local_input(create, date)
         create.get_by_role('button', name='Create session').click()
         expect(host.get_by_role('heading', name=title, exact=True)).to_be_visible()
         expect(host.locator('#qr svg')).to_be_visible()
@@ -382,7 +510,12 @@ def schedule_scenario(browser, base, phone_options, site):
         return host.locator('#join-link').get_attribute('href')
 
     title = 'Scheduled browser session'
+    private_title = 'Scheduled private cancellation'
+    private_at = start_at + timedelta(hours=2)
+    private_join = create_session(private_title, date=private_at)
+    host.goto(base + '/jukebox.php?host=1')
     join = create_session(title, listed=True)
+    private_artwork_url = inline_splash_editor(browser, base)
     state = request(host, 'state', host=True)['state']
     assert state['phase'] == 'upcoming' and state['scheduled_at'] == int(start_at.timestamp())
     expect(host.locator('#enable')).to_be_hidden()
@@ -409,7 +542,19 @@ def schedule_scenario(browser, base, phone_options, site):
     art = splash.locator('iframe')
     expect(art).to_have_attribute('sandbox', 'allow-scripts')
     expect(splash.frame_locator('iframe').locator('.fixture')).to_have_text('Designed waiting screen')
+    assert_splash_image(splash.frame_locator('iframe'))
+    assert phone.request.get(base + private_artwork_url).status == 404
     assert phone.evaluate('document.querySelector("iframe").contentDocument === null')
+    other_phone = phone_context.new_page()
+    other_phone.goto(private_join)
+    other_splash = other_phone.locator('#upcoming')
+    expect(other_phone.locator('#title')).to_have_text(private_title)
+    expect(other_phone.locator('#scheduled-start')).to_have_attribute('datetime', utc_iso(private_at))
+    expect(other_splash.frame_locator('iframe').locator('.fixture')).to_have_text('Designed waiting screen')
+    assert_splash_image(other_splash.frame_locator('iframe'))
+    assert other_splash.locator('iframe').get_attribute('src') == art.get_attribute('src')
+    expect(phone.locator('#title')).to_have_text(title)
+    phone.bring_to_front()
     manifest = phone.request.get(base + '/manifest.webmanifest').json()
     assert manifest['background_color'] == '#211922'
     assert {'192x192', '512x512'} <= {icon['sizes'] for icon in manifest['icons']}
@@ -433,6 +578,8 @@ def schedule_scenario(browser, base, phone_options, site):
     host.locator('#start-session').click()
     expect(splash).to_be_hidden(timeout=10_000)
     expect(art).to_have_count(0)
+    expect(other_splash).to_be_visible()
+    assert_splash_image(other_splash.frame_locator('iframe'))
     expect(phone).to_have_url(join)
     assert host.locator('#join-link').get_attribute('href') == join
     directory.bring_to_front()
@@ -459,8 +606,7 @@ def schedule_scenario(browser, base, phone_options, site):
     expect(host.get_by_role('heading', name='Session recap')).to_be_visible()
     expect(host.locator('#recap-tracks')).to_contain_text('First Song')
 
-    host.goto(base + '/jukebox.php?host=1')
-    private_join = create_session('Scheduled private cancellation')
+    host.goto(private_join + '&host=1')
     phone.goto(private_join)
     expect(splash).to_be_visible()
     sign_in = phone.get_by_role('link', name='Sign in to follow')
@@ -487,7 +633,7 @@ def schedule_scenario(browser, base, phone_options, site):
     expect(splash.get_by_role('heading', name='Session canceled')).to_be_visible(timeout=10_000)
     expect(phone).to_have_url(private_join)
     expect(phone.locator('#pairing')).to_be_hidden()
-    print('PASS scheduled local time, QR splash isolation, private following, same-link start, playback, and recap')
+    print('PASS shared QR splash design with distinct session details, private following, same-link start, playback, and recap')
 
 
 def http_scenario(base, site):
@@ -1011,7 +1157,7 @@ with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
                         for context in browser.contexts:
                             context.close()
                     if '--remote-only' not in sys.argv:
-                        schedule_scenario(browser, base, phone_options, site)
+                        schedule_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
                     if '--schedule-only' not in sys.argv:

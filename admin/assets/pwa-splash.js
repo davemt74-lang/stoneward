@@ -4,14 +4,18 @@
   if (!context) return;
   const {api, uploadApi, canvas, head} = context;
   const endpoint = 'pwa-splash.php';
+  const artworkMime = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
   const assetTypes = {
     iconAssetId: {title: 'Install icon', help: 'Use a square PNG at least 192 × 192. A 512 × 512 image is recommended. Leaving this empty uses the site icon.', mime: ['image/png']},
     startupAssetId: {title: 'iOS startup artwork', help: 'Use a PNG, JPEG, or WebP. Device support and cropping vary.', mime: ['image/png', 'image/jpeg', 'image/webp']},
-    'launch.assetId': {title: 'App splash artwork', help: 'Use a PNG, JPEG, WebP, or GIF.', mime: ['image/png', 'image/jpeg', 'image/webp', 'image/gif']},
-    'waiting.assetId': {title: 'QR waiting splash artwork', help: 'Use a PNG, JPEG, WebP, or GIF.', mime: ['image/png', 'image/jpeg', 'image/webp', 'image/gif']}
+    'launch.assetId': {title: 'App splash artwork', help: 'Use a PNG, JPEG, WebP, or GIF.', mime: artworkMime},
+    'waiting.assetId': {title: 'QR waiting splash artwork', help: 'Use a PNG, JPEG, WebP, or GIF.', mime: artworkMime}
   };
   const surfaces = {launch: 'App splash', waiting: 'QR waiting splash'};
   const surfaceNames = Object.keys(surfaces);
+  const codeFields = ['html', 'css', 'js'];
+  const maxImageSlots = 4;
+  const maxBriefBytes = 1800;
   const assetSource = asset => '../api/media.php?' + new URLSearchParams({id: asset.uuid});
 
   function safePath(value) {
@@ -22,6 +26,14 @@
     } catch {
       return '';
     }
+  }
+
+  function draftPreviewPath(value) {
+    const path = safePath(value);
+    if (!path) return '';
+    const url = new URL(path, location.origin);
+    return url.pathname.endsWith('/pwa-splash-preview.php') &&
+      url.searchParams.get('draft') === '1' && url.searchParams.get('shell') === '1' ? path : '';
   }
 
   function assetField(key) {
@@ -41,7 +53,7 @@
   function surfaceEditor(key) {
     const description = key === 'launch'
       ? 'Shown in Stonefellow after the app opens.'
-      : 'Shown when a guest opens the link or scans the QR code before the host starts.';
+      : 'Shared by scheduled jukeboxes. Guests see their session name and start time around the design.';
     return `<section class="pwa-card" data-surface="${key}">
       <div class="panel-title"><h2>${surfaces[key]}</h2>
         <button type="button" class="secondary" data-surface-preview>Preview</button>
@@ -59,14 +71,35 @@
       <div data-image-fields hidden>${assetField(key + '.assetId')}</div>
       <div class="pwa-code" data-code-fields hidden>
         <h3>Agent Code Editor</h3>
-        <p class="pwa-help">Ask the Agent to build a responsive splash canvas with standalone HTML, CSS, and JavaScript. Open its Code panel to review the result, then return here to import it from Canvas History.</p>
+        <p class="pwa-help">Describe a new design or how to revise the current code. The Agent will use the artwork slot names you provide.</p>
+        <label class="field">Design instructions <textarea data-agent-brief rows="3" maxlength="${maxBriefBytes}" placeholder="Make the artwork fade in over a dark background, with a still version for reduced motion."></textarea></label>
         <div class="actions">
-          <a class="secondary" href="../stonefellow-v120.php?view=home" target="_blank" rel="noopener">Open Agent Code Editor</a>
-          <button type="button" class="secondary" data-scene-refresh>Refresh saved canvases</button>
+          <button type="button" class="secondary" data-agent-generate disabled>Generate code</button>
+          <button type="button" class="secondary" data-agent-stage hidden>Stage code</button>
         </div>
-        <label class="field">Saved canvas <select data-scene-select><option value="">Choose a saved canvas</option></select></label>
-        <button type="button" class="secondary" data-scene-import disabled>Import code into draft</button>
-        <p class="pwa-help" data-scene-status></p>
+        <p class="status-line" data-agent-status role="status"></p>
+        <details class="pwa-agent-proposal" data-agent-proposal hidden>
+          <summary>Review generated code</summary><pre data-agent-source></pre>
+        </details>
+        <section class="pwa-code-artwork">
+          <h3>Code artwork</h3>
+          <p class="pwa-help">Choose up to four images from Media Library and name each one. Use lowercase letters, digits, and hyphens. Each name starts with a letter and can be up to 24 characters.</p>
+          <p class="pwa-help">Images can be up to 1,600 × 1,600 pixels and 512 KiB each, with a 1 MiB total for this splash. Published code artwork is visible to visitors who open this splash.</p>
+          <div data-code-image-slots></div>
+          <button type="button" class="secondary" data-add-code-image>Add image slot</button>
+          <details class="pwa-code-help">
+            <summary>Use artwork in JavaScript</summary>
+            <pre>const images = JSON.parse(document.getElementById('sf-splash-media').textContent);
+const artwork = document.querySelector('.splash-art');
+if (artwork &amp;&amp; images.background) {
+  const image = document.createElement('img');
+  image.src = images.background;
+  image.alt = '';
+  artwork.append(image);
+}</pre>
+            <p class="pwa-help">Add an empty figure with the class <code>splash-art</code> in HTML and select an image named <code>background</code> above.</p>
+          </details>
+        </section>
         <p class="pwa-help">The preview runs in an isolated frame. The waiting page supplies the session name, start time, and waiting status around the artwork.</p>
         <label class="field">HTML <textarea name="${key}.html" rows="6" maxlength="12000" spellcheck="false"></textarea></label>
         <label class="field">CSS <textarea name="${key}.css" rows="5" maxlength="12000" spellcheck="false"></textarea></label>
@@ -103,7 +136,7 @@
           <div class="pwa-preview-copy" data-preview-copy>
             <img alt="" hidden><strong></strong><span></span>
           </div>
-          <iframe data-preview-code title="Sandboxed splash code preview" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
+          <iframe data-preview-code title="Splash code preview" referrerpolicy="no-referrer" hidden></iframe>
         </div>
         <p class="pwa-help" data-preview-note></p>
       </aside>
@@ -129,13 +162,14 @@
     const status = $('[data-splash-status]');
     const picker = $('[data-media-picker]');
     const selected = new Map();
+    const imageSlots = {launch: [], waiting: []};
+    const agent = {launch: {epoch: 0}, waiting: {epoch: 0}};
+    const surfaceSection = key => $(`[data-surface="${key}"]`);
     let state = initial;
     let busy = false;
     let dirty = false;
-    let mediaKey = '';
+    let mediaSelection = null;
     let mediaRequest = 0;
-    let scenes = null;
-    let scenesLoading = false;
 
     function announce(message, error = false) {
       status.textContent = message;
@@ -156,6 +190,86 @@
       image.hidden = !url;
     }
 
+    function readImageSlots(key, ignoreIncomplete = false) {
+      const names = new Set();
+      const slots = [];
+      for (const slot of imageSlots[key]) {
+        const name = slot.name.trim();
+        if (!/^[a-z][a-z0-9-]{0,23}$/.test(name) || names.has(name)) {
+          if (ignoreIncomplete) continue;
+          throw new Error(`${surfaces[key]} needs a unique name for each code image. Start with a lowercase letter and use up to 24 letters, digits, or hyphens.`);
+        }
+        if (!slot.assetId) {
+          if (ignoreIncomplete) continue;
+          throw new Error(`Choose an image for the ${surfaces[key]} slot “${name}” or remove the slot.`);
+        }
+        names.add(name);
+        slots.push({name, assetId: slot.assetId});
+      }
+      return slots;
+    }
+
+    function renderImageSlots(key) {
+      const section = surfaceSection(key);
+      const list = section.querySelector('[data-code-image-slots]');
+      list.replaceChildren();
+      for (const slot of imageSlots[key]) {
+        const row = document.createElement('div');
+        row.className = 'pwa-code-image-slot';
+        row.dataset.codeImageSlot = '';
+        row.innerHTML = `<label class="field">Image slot name <input data-code-image-name maxlength="24" autocapitalize="none" spellcheck="false"></label>
+          <div class="pwa-asset-selected"><img alt="" hidden><span></span></div>
+          <div class="actions">
+            <button type="button" class="secondary" data-choose-code-image>Choose from Media Library</button>
+            <button type="button" class="secondary" data-remove-code-image>Remove slot</button>
+          </div>`;
+        const name = row.querySelector('[data-code-image-name]');
+        name.value = slot.name;
+        name.oninput = () => {
+          slot.name = name.value;
+          invalidateAgent(key);
+          edited();
+        };
+        const showImage = () => {
+          const image = row.querySelector('img');
+          image.hidden = !slot.assetUrl;
+          if (slot.assetUrl) image.src = slot.assetUrl;
+          row.querySelector('span').textContent = slot.assetId ? slot.label || 'Media Library asset #' + slot.assetId : 'No image selected';
+        };
+        row.querySelector('[data-choose-code-image]').onclick = () => openMediaPicker('code', asset => {
+          slot.assetId = Number(asset.id);
+          slot.assetUrl = assetSource(asset);
+          slot.label = asset.title || asset.original_name;
+          showImage();
+          invalidateAgent(key);
+          edited();
+        });
+        row.querySelector('[data-remove-code-image]').onclick = () => {
+          const index = imageSlots[key].indexOf(slot);
+          imageSlots[key].splice(index, 1);
+          renderImageSlots(key);
+          invalidateAgent(key);
+          edited();
+          section.querySelector('[data-add-code-image]').focus();
+        };
+        showImage();
+        list.append(row);
+      }
+      section.querySelector('[data-add-code-image]').disabled = imageSlots[key].length >= maxImageSlots;
+    }
+
+    function addImageSlot(key) {
+      if (imageSlots[key].length >= maxImageSlots) return;
+      const names = new Set(imageSlots[key].map(slot => slot.name));
+      let name = 'artwork';
+      for (let suffix = 2; names.has(name); suffix++) name = 'artwork-' + suffix;
+      imageSlots[key].push({name, assetId: 0});
+      renderImageSlots(key);
+      invalidateAgent(key);
+      edited();
+      surfaceSection(key).querySelector('[data-code-image-slot]:last-child input').focus();
+    }
+
     function readSettings() {
       const settings = {
         iconAssetId: selected.get('iconAssetId').id,
@@ -166,6 +280,7 @@
         settings[key] = Object.fromEntries(['mode', 'title', 'message', 'html', 'css', 'js'].map(name =>
           [name, field(key + '.' + name).value]));
         settings[key].assetId = selected.get(key + '.assetId').id;
+        settings[key].imageSlots = readImageSlots(key, settings[key].mode !== 'code');
       }
       return settings;
     }
@@ -179,7 +294,7 @@
       const frame = $('[data-preview-code]');
       const saved = state.draft[key];
       const artwork = mode === 'image' ? selected.get(key + '.assetId')?.url : '';
-      const preview = mode === 'code' && saved.mode === 'code' && safePath(saved.previewUrl);
+      const preview = mode === 'code' && saved.mode === 'code' && draftPreviewPath(saved.previewUrl);
       const heading = field(key + '.title').value || (key === 'launch' ? 'Welcome to Stonefellow' : '');
       const message = field(key + '.message').value;
       box.style.backgroundColor = field('inheritColor').checked ? '' : field('backgroundColor').value;
@@ -208,11 +323,16 @@
       $('[data-reload-splash]').disabled = busy;
       $('[data-revisions]').textContent = `Draft ${state.draft.revision} · Published ${state.published.revision}${dirty ? ' · Unsaved changes' : ''}`;
       for (const key of surfaceNames) {
-        const section = $(`[data-surface="${key}"]`);
+        const section = surfaceSection(key);
         const mode = field(key + '.mode').value;
+        const {request, proposal} = agent[key];
         section.querySelector('[data-image-fields]').hidden = mode !== 'image';
         section.querySelector('[data-code-fields]').hidden = mode !== 'code';
-        section.querySelector('[data-scene-import]').disabled = scenesLoading || !section.querySelector('[data-scene-select]').value;
+        const generate = section.querySelector('[data-agent-generate]');
+        generate.disabled = Boolean(request) || !section.querySelector('[data-agent-brief]').value.trim();
+        generate.textContent = request ? 'Generating code…' : 'Generate code';
+        section.querySelector('[data-agent-stage]').hidden = !proposal;
+        section.querySelector('[data-agent-proposal]').hidden = !proposal;
       }
       updatePreview();
     }
@@ -228,6 +348,12 @@
         const surface = draft[key];
         for (const name of ['mode', 'title', 'message', 'html', 'css', 'js']) field(key + '.' + name).value = surface[name] ?? '';
         setAsset(key + '.assetId', surface.assetId, safePath(surface.assetUrl));
+        imageSlots[key] = (surface.imageSlots || []).map(slot => ({
+          name: slot.name, assetId: Number(slot.assetId), assetUrl: safePath(slot.assetUrl)
+        }));
+        renderImageSlots(key);
+        if (!agent[key].request && !agent[key].proposal) announceAgent(key, '');
+        invalidateAgent(key);
       }
       dirty = false;
       updateControls();
@@ -257,8 +383,95 @@
       }
     }
 
+    function announceAgent(key, message, error = false) {
+      const label = surfaceSection(key).querySelector('[data-agent-status]');
+      label.textContent = message;
+      label.classList.toggle('form-error', error);
+    }
+
+    function invalidateAgent(key) {
+      const panel = agent[key];
+      panel.epoch++;
+      if (!panel.proposal) return;
+      panel.proposal = null;
+      announceAgent(key, 'The draft inputs changed. Generate again to get updated code.');
+    }
+
+    function currentRequest(key, request) {
+      return root.isConnected && request.revision === state.draft.revision &&
+        request.epoch === agent[key].epoch && field(key + '.mode').value === 'code';
+    }
+
+    async function generateCode(key) {
+      const panel = agent[key];
+      if (busy || panel.request || field(key + '.mode').value !== 'code') return;
+      const brief = surfaceSection(key).querySelector('[data-agent-brief]').value.trim();
+      if (!brief || new TextEncoder().encode(brief).length > maxBriefBytes) {
+        announceAgent(key, 'Enter design instructions up to 1,800 UTF-8 bytes.', true);
+        return;
+      }
+      let slots;
+      try {
+        slots = readImageSlots(key);
+      } catch (error) {
+        announceAgent(key, error.message, true);
+        return;
+      }
+      const request = {revision: state.draft.revision, epoch: panel.epoch};
+      const design = Object.fromEntries(codeFields.map(name => [name, field(key + '.' + name).value]));
+      panel.request = request;
+      panel.proposal = null;
+      announceAgent(key, 'The Agent is preparing splash code…');
+      updateControls();
+      try {
+        const result = await api('pwa-splash-code.php', {surface: key, revision: request.revision, brief, design, imageSlots: slots});
+        if (panel.request !== request || !root.isConnected) return;
+        if (!currentRequest(key, request)) {
+          announceAgent(key, 'The draft inputs changed while the Agent was working. Generate again with the current inputs.');
+          return;
+        }
+        if (result.surface !== key || result.revision !== request.revision ||
+            !codeFields.every(name => typeof result.code?.[name] === 'string')) {
+          throw new Error('The Agent returned an invalid splash design.');
+        }
+        panel.proposal = {request, code: result.code};
+        const details = surfaceSection(key).querySelector('[data-agent-proposal]');
+        details.open = false;
+        details.querySelector('pre').textContent = codeFields.map(name => name.toUpperCase() + '\n' + result.code[name]).join('\n\n');
+        announceAgent(key, 'Code is ready to review and stage.');
+      } catch (error) {
+        if (panel.request !== request || !root.isConnected) return;
+        if (!currentRequest(key, request)) {
+          announceAgent(key, 'The draft inputs changed while the Agent was working. Generate again with the current inputs.');
+        } else {
+          announceAgent(key, error.status === 409 ? 'The saved draft changed. Reload the editor before generating again.' : error.message, true);
+        }
+      } finally {
+        if (panel.request === request) panel.request = null;
+        if (root.isConnected) updateControls();
+      }
+    }
+
+    function stageCode(key) {
+      const panel = agent[key];
+      const proposal = panel.proposal;
+      if (busy || !proposal) return;
+      if (!currentRequest(key, proposal.request)) {
+        invalidateAgent(key);
+        updateControls();
+        return;
+      }
+      for (const name of codeFields) field(key + '.' + name).value = proposal.code[name];
+      panel.proposal = null;
+      panel.epoch++;
+      $('[data-preview-surface]').value = key;
+      edited();
+      announceAgent(key, 'Code staged. Edit it here, then save the draft to preview.');
+      field(key + '.html').focus();
+    }
+
     function eligible(key, asset) {
-      if (!assetTypes[key].mime.includes(asset.mime_type)) return false;
+      if (!(key === 'code' ? artworkMime : assetTypes[key].mime).includes(asset.mime_type)) return false;
       return key !== 'iconAssetId' || Number(asset.width) >= 192 && Number(asset.width) === Number(asset.height);
     }
 
@@ -267,9 +480,17 @@
       edited();
     }
 
+    function openMediaPicker(key, choose) {
+      mediaSelection = {key, choose};
+      $('[data-media-search]').reset();
+      picker.showModal();
+      void searchMedia();
+    }
+
     async function searchMedia() {
+      if (!mediaSelection) return;
       const token = ++mediaRequest;
-      const key = mediaKey;
+      const {key, choose} = mediaSelection;
       const mediaStatus = $('[data-media-status]');
       const results = $('[data-media-results]');
       const query = $('[data-media-search]').elements.query.value.trim();
@@ -291,7 +512,7 @@
           const label = document.createElement('span');
           label.textContent = asset.title || asset.original_name;
           button.append(image, label);
-          button.onclick = () => { chooseAsset(key, asset); picker.close(); };
+          button.onclick = () => { choose(asset); picker.close(); };
           results.append(button);
         }
       } catch (error) {
@@ -319,44 +540,33 @@
       }
     }
 
-    async function loadScenes() {
-      if (scenesLoading) return;
-      scenesLoading = true;
-      const labels = root.querySelectorAll('[data-scene-status]');
-      labels.forEach(label => { label.textContent = 'Loading saved canvases…'; });
-      updateControls();
-      try {
-        const response = await fetch('../api/canvas-resources.php?kind=canvas', {cache: 'no-store'});
-        const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.message || 'Could not load saved canvases.');
-        scenes = (data.items || []).filter(row => row.canvas_kind === 'custom');
-        for (const select of root.querySelectorAll('[data-scene-select]')) {
-          const previous = select.value;
-          select.replaceChildren(new Option('Choose a saved canvas', ''));
-          for (const row of scenes) select.add(new Option(row.title + ' · #' + row.id, row.id));
-          if (scenes.some(row => row.id === previous)) select.value = previous;
-        }
-        labels.forEach(label => { label.textContent = scenes.length ? '' : 'No saved custom canvases. Open the Agent Code Editor to make one.'; });
-      } catch (error) {
-        labels.forEach(label => { label.textContent = error.message; });
-      } finally {
-        scenesLoading = false;
-        if (root.isConnected) updateControls();
-      }
-    }
-
     form.addEventListener('submit', event => event.preventDefault());
     form.addEventListener('input', event => {
-      if (event.target.name) edited();
-      if (event.target.name?.endsWith('.mode') && event.target.value === 'code' && scenes === null) void loadScenes();
+      const name = event.target.name || '';
+      const key = event.target.closest('[data-surface]')?.dataset.surface;
+      if (key && (event.target.matches('[data-agent-brief]') || ['mode', ...codeFields].includes(name.split('.')[1]))) {
+        invalidateAgent(key);
+        if (!name) updateControls();
+      }
+      if (name) edited();
     });
     $('[data-preview-surface]').onchange = updatePreview;
-    $('[data-save-draft]').onclick = () => apply('save', {settings: readSettings()}, 'Draft saved. Preview updated.');
+    $('[data-save-draft]').onclick = async () => {
+      try {
+        await apply('save', {settings: readSettings()}, 'Draft saved. Preview updated.');
+      } catch (error) {
+        announce(error.message, true);
+      }
+    };
     $('[data-publish-splash]').onclick = async () => {
-      if (await window.SFAdminConfirm.ask({
-        title: 'Publish PWA & Splash?', description: 'Visitors will see this draft’s launch settings, app splash, and QR waiting splash.',
+      const revision = state.draft.revision;
+      const confirmed = await window.SFAdminConfirm.ask({
+        title: 'Publish PWA & Splash?', description: 'Visitors will see this draft’s launch settings, app splash, QR waiting splash, and artwork used in those designs.',
         actionLabel: 'Publish splash settings'
-      })) await apply('publish', {}, 'Splash settings published.');
+      });
+      if (confirmed && root.isConnected && !dirty && revision === state.draft.revision) {
+        await apply('publish', {}, 'Splash settings published.');
+      }
     };
     $('[data-restore-splash]').onclick = async () => {
       if (await window.SFAdminConfirm.ask({
@@ -375,12 +585,7 @@
     for (const key of Object.keys(assetTypes)) {
       const row = $(`[data-asset-field="${key}"]`);
       const input = row.querySelector('input');
-      row.querySelector('[data-choose]').onclick = () => {
-        mediaKey = key;
-        $('[data-media-search]').reset();
-        picker.showModal();
-        void searchMedia();
-      };
+      row.querySelector('[data-choose]').onclick = () => openMediaPicker(key, asset => chooseAsset(key, asset));
       row.querySelector('[data-upload]').onclick = () => input.click();
       row.querySelector('[data-clear]').onclick = () => { setAsset(key, 0); edited(); };
       input.onchange = () => {
@@ -390,30 +595,18 @@
       };
     }
     for (const key of surfaceNames) {
-      const section = $(`[data-surface="${key}"]`);
-      const select = section.querySelector('[data-scene-select]');
+      const section = surfaceSection(key);
       section.querySelector('[data-surface-preview]').onclick = () => {
         $('[data-preview-surface]').value = key;
         updatePreview();
         $('.pwa-preview').scrollIntoView({block: 'nearest'});
         $('.pwa-preview').focus({preventScroll: true});
       };
-      select.onchange = updateControls;
-      section.querySelector('[data-scene-refresh]').onclick = loadScenes;
-      section.querySelector('[data-scene-import]').onclick = async () => {
-        const canvasId = select.value;
-        if (!canvasId) return;
-        const confirmed = await window.SFAdminConfirm.ask({
-          title: 'Import this saved canvas?', description: 'The selected canvas will replace the code for ' + surfaces[key] + ' in the draft.',
-          actionLabel: 'Import into draft'
-        });
-        if (!confirmed) return;
-        $('[data-preview-surface]').value = key;
-        await apply('import', {surface: key, canvasId, settings: readSettings()}, 'Canvas code imported. Review the draft preview before publishing.');
-      };
+      section.querySelector('[data-agent-generate]').onclick = () => generateCode(key);
+      section.querySelector('[data-agent-stage]').onclick = () => stageCode(key);
+      section.querySelector('[data-add-code-image]').onclick = () => addImageSlot(key);
     }
     hydrate();
-    if (surfaceNames.some(key => field(key + '.mode').value === 'code')) void loadScenes();
   }
 
   async function render() {
