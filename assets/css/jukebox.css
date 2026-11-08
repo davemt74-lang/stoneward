@@ -38,3 +38,11 @@ footer small{display:block;color:#c5d5e6}
 #listener-status:empty{display:none}
 body:has(#listener:not([hidden])) main{padding-bottom:12rem}
 .session-badge{display:inline-block;margin-left:.5rem;color:#c5d5e6;font-size:.85rem}
+#upcoming{max-width:42rem;padding:1.1rem;margin-top:1rem;background:#172333;border:1px solid #63788c;border-radius:.6rem}
+#upcoming-heading{margin:0}
+#scheduled-start-line{font-weight:600}
+#upcoming-message,.session-date{color:#c5d5e6}
+.session-date{display:block}
+#session-share .actions{margin-top:.5rem}
+#copy-session-status:empty{display:none}
+#manual-session-copy{display:block;max-width:34rem;margin-top:.5rem}
