@@ -106,6 +106,11 @@ if($method==='GET'){
 if($method!=='POST')sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $b=sf_request_json();$action=(string)($b['action']??'');
 try{
+    if($action==='save_artwork_palette'){
+        require_once SF_ROOT.'/api/media-artwork-palette.php';
+        $palette=sf_media_save_artwork_palette((int)($b['id']??0),$b['palette']??null);
+        sf_json_response(['ok'=>true,'palette'=>$palette]);
+    }
     if($action==='analyze_image'){
         require_once SF_ROOT.'/api/media-image-analysis.php';
         $id=(int)($b['id']??0);$requestId=$b['request_id']??null;

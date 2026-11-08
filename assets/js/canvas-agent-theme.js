@@ -74,8 +74,8 @@
     }
     return result;
   }
-  function imageColors(scene) {
-    if (!Array.isArray(scene.image_assets)) return [];
+  function preferredImages(scene) {
+    if (!Array.isArray(scene?.image_assets)) return [];
     const css = typeof scene.css === 'string' ? scene.css.slice(0, 12000).replace(/\/\*[\s\S]*?\*\/|(['"])(?:\\.|(?!\1)[^\\])*\1/gi, ' ') : '';
     const html = typeof scene.html === 'string' ? scene.html.slice(0, 12000) : '';
     const bindings = value => Array.from(value.matchAll(/--sf-image-((?:ref-)?[a-f0-9]{32})(?![a-z0-9-])/g), match => match[1]);
@@ -86,31 +86,33 @@
       const match = name.match(/^sf-image-((?:ref-)?[a-f0-9]{32})$/);
       if (match) used.add(match[1]);
     }
-    const assets = new Map(scene.image_assets.filter(image => typeof image?.id === 'string' && /^(?:ref-)?[a-f0-9]{32}$/.test(image.id)).map(image => [image.id, image]));
-    for (const ids of [new Set(background), used]) {
-      const result = [];
-      for (const id of ids) {
-        const image = assets.get(id);
-        if (Array.isArray(image?.colors)) for (const description of image.colors) result.push(...colors(description));
-      }
-      if (result.length) return result;
+    const assets = new Map(scene.image_assets.filter(image => typeof image?.id === 'string').map(image => [image.id, image]));
+    return [...new Set([...background, ...used])].filter(id => assets.has(id));
+  }
+  function imageColors(scene) {
+    if (!Array.isArray(scene.image_assets)) return [];
+    const assets = new Map(scene.image_assets.map(image => [image?.id, image]));
+    for (const id of preferredImages(scene)) {
+      const image = assets.get(id);
+      const choices = Array.isArray(image?.colors) ? image.colors.flatMap(colors) : [];
+      if (choices.length) return choices;
     }
     return [];
   }
   function finish(accent, secondary, surface) {
     const visible = readable(accent, surface, 3);
-    const text = contrast([245, 245, 245], surface) >= contrast([20, 20, 20], surface) ? '#f5f5f5' : '#141414';
+    const textFor = rgb => contrast([255, 255, 255], rgb) >= contrast([0, 0, 0], rgb) ? '#ffffff' : '#000000';
     return Object.freeze({accent:hex(visible), secondary:hex(readable(secondary, surface, 2)), surface:hex(surface),
-      rgb:Object.freeze(visible.map(clamp)), text, border:hex(visible) + '80'});
+      rgb:Object.freeze(visible.map(clamp)), text:textFor(surface), accentText:textFor(visible), border:hex(visible) + '80'});
   }
-  function resolve(scene) {
-    if (!scene || typeof scene !== 'object') return null;
-    const supplied = scene.agent_palette;
+  function explicit(scene) {
+    const supplied = scene?.agent_palette;
     if (supplied && ['accent', 'secondary', 'surface'].every(key => typeof supplied[key] === 'string' && hexColor.test(supplied[key]))) {
       return finish(canonicalColor(supplied.accent), canonicalColor(supplied.secondary), canonicalColor(supplied.surface));
     }
-    const metadata = imageColors(scene);
-    const choices = metadata.length ? metadata : cssColors(scene.css);
+    return null;
+  }
+  function fromColors(choices) {
     if (!choices.length) return null;
     // Keep neutral scenes neutral. Prefer a colored accent only when supplied.
     const saturation = rgb => (Math.max(...rgb) - Math.min(...rgb)) / 255;
@@ -120,5 +122,16 @@
     const accent = sorted[0], secondary = sorted.find(rgb => hex(rgb) !== hex(accent)) || accent;
     return finish(accent, secondary, surface);
   }
-  window.SFCanvasAgentTheme = Object.freeze({resolve});
+  function fromArtwork(palette) {
+    if (!Array.isArray(palette?.colors)) return null;
+    return fromColors(palette.colors.filter(color => typeof color === 'string' && hexColor.test(color)).slice(0, 6).map(canonicalColor));
+  }
+  function resolve(scene, {includeImageMetadata = true} = {}) {
+    if (!scene || typeof scene !== 'object') return null;
+    const authored = explicit(scene);
+    if (authored) return authored;
+    const metadata = includeImageMetadata ? imageColors(scene) : [];
+    return fromColors(metadata.length ? metadata : cssColors(scene.css));
+  }
+  window.SFCanvasAgentTheme = Object.freeze({resolve, explicit, preferredImages, fromArtwork});
 })();

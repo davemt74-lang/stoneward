@@ -113,9 +113,9 @@
         const uses=element('details','sf-gallery-uses'),summary=element('summary','','What this canvas uses'),list=element('ul');uses.append(summary,list);
         for(const permission of item.uses){
           if(typeof permission?.label!=='string'||typeof permission.personal!=='boolean'||typeof permission.enabled!=='boolean')continue;
-          list.append(element('li','',permission.label+' · '+(permission.device_consent?'Asks to check your device location':permission.personal?'Your data; permission required':'Public artist data')+(!permission.enabled?' · Disabled by administrator':'')));
+          list.append(element('li','',permission.label+' · '+(permission.library?'Local script library':permission.device_consent?'Asks to check your device location':permission.personal?'Your data; permission required':'Public artist data')+(!permission.enabled?' · Disabled by administrator':'')));
         }
-        if(!list.children.length)list.append(element('li','','No registered data permissions requested.'));
+        if(!list.children.length)list.append(element('li','','No registered tools or data permissions requested.'));
         copy.append(uses);
       }
       const state=element('p','sf-gallery-card-state');state.setAttribute('role','status');

@@ -230,6 +230,24 @@ test('the apply acknowledgement is awaited before the checked candidate can repl
   assert.deepEqual(h.displayed.map(row=>row.scene.id),[31,1]);
 });
 
+test('a required canvas library must resolve before the app applies a checked candidate',async()=>{
+  const h=await checkedGateHarness();
+  let startPreparation,rejectPreparation;
+  const started=new Promise(resolve=>{startPreparation=resolve;}),preparation=new Promise((_,reject)=>{rejectPreparation=reject;});
+  h.scope.window.SFPublicAgentCanvas.prepareSceneLibraries=(scene,{signal})=>{
+    assert.equal(scene.id,1);assert.equal(signal.aborted,false);startPreparation();return preparation;
+  };
+  const building=h.scope.handleListeningRoomCommand(h.scope.directListeningRoomCommand('Let’s build an approved paper board'));
+  await started;
+  assert.deepEqual(h.displayed.map(row=>row.scene.id),[31]);
+  assert.deepEqual(h.workflowPosts,[]);
+  rejectPreparation(Object.assign(new Error('An approved library required by this canvas is unavailable.'),{code:'canvas_library_unavailable'}));
+  await building;
+  assert.deepEqual(h.displayed.map(row=>row.scene.id),[31]);
+  assert.deepEqual(h.workflowPosts,[]);
+  assert.match(h.messages.at(-1),/approved library required by this canvas is unavailable/);
+});
+
 test('a conflicting or mismatched apply acknowledgement keeps the old canvas', async()=>{
   for(const mode of ['conflict','wrong-candidate','not-applied']){
     const h=await checkedGateHarness();
@@ -699,6 +717,18 @@ test('closing during a quiet restore keeps an old response from reopening the ca
   release({ scene: h.scene(31) });
   await pending;
   assert.deepEqual(h.displayed, []);
+});
+
+test('closing during library preparation keeps a quiet restore from reopening the canvas',async()=>{
+  const h=harness();h.scope.selectCanvasId('7',31);
+  let startPreparation,release;
+  const started=new Promise(resolve=>{startPreparation=resolve;}),preparation=new Promise(resolve=>{release=resolve;});
+  h.scope.window.SFPublicAgentCanvas.prepareSceneLibraries=()=>{startPreparation();return preparation;};
+  const pending=h.scope.restoreActiveCanvas();
+  await started;
+  h.scope.closeListeningRoom();
+  release();await pending;
+  assert.deepEqual(h.displayed,[]);
 });
 
 test('startup restore refuses unverified new candidates and unsafe existing workflow states without starting models',async()=>{

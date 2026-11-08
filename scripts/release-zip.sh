@@ -33,6 +33,9 @@ rm -f "$stage/site/AUDIT-REPORT.md" "$stage/site/RELEASE-NOTES.md" \
 } > "$stage/site/DEPLOY-MANIFEST.txt"
 for file in index.php upgrade.php admin/index.php api/bootstrap.php config/store.default.php \
   api/canvas-data.php api/canvas-geography-core.php api/canvas-map-core.php api/canvas-earthquakes-core.php \
+  api/canvas-libraries.php api/canvas-library-core.php api/media-artwork-palette.php \
+  assets/js/canvas-library-runtime.js assets/js/media-artwork-palette.js \
+  assets/vendor/canvas/{color-thief,three}.{js,LICENSE} \
   assets/js/canvas-data-picker.js assets/js/canvas-location.js \
   config/canvas-data-places/us-places-{01,02,03}.tsv config/canvas-maps/us-{regions,overview}.json; do
   test -s "$stage/site/$file" || { echo "Missing required deploy file: $file" >&2; exit 1; }

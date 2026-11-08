@@ -2,6 +2,11 @@
 declare(strict_types=1);
 require __DIR__.'/canvas-projects.php';
 require_once $root.'/api/canvas-access-core.php';
+require_once $root.'/api/canvas-library-core.php';
+$library=sf_canvas_library_registry()['three'];
+$libraryJs='// sf-libraries: '.$library['lock']."\nconsole.log(THREE.REVISION);";
+$publicUses=sf_canvas_access_public_uses('<main></main>',null,[],$libraryJs);
+check(count($publicUses)===1&&$publicUses[0]['label']==='Three.js '.$library['version']&&$publicUses[0]['library']&&!$publicUses[0]['personal'],'Pinned library is disclosed separately from personal data');
 $uid=(int)$user['id'];$template=['canvas_kind'=>'custom','track_id'=>'','title'=>'My data display','html'=>'<section class="sf-dataset-my_purchases"></section>','css'=>''];
 $first=sf_agent_scene_history_save($uid,$template);$context=['scene_id'=>$first['id']];
 $access=sf_canvas_access_summary($user,$context);

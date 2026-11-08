@@ -95,3 +95,36 @@ verify(sf_agent_scene_strip_legacy_player('<section><div class="transport-row">'
     'Retiring the transport removes its empty strip while preserving the requested track list and neighboring content');
 verify(sf_agent_scene_history_clear(1)===4&&sf_agent_scene_history_export(1)===[]&&sf_agent_scene_history_get(2,$legacySaved['id'])!==null,
     'History clearing removes this owner’s executable source without affecting another canvas owner');
+
+$libraries=sf_canvas_library_registry();
+$three=$libraries['three']['lock'];$color=$libraries['color-thief']['lock'];
+$declaration='// sf-libraries: '.$three.','.$color;
+$librarySource=$declaration."\nconst scene = new THREE.Scene();";
+$validLibraries=sf_agent_scene_code($base+['js'=>str_replace("\n","\r\n",$librarySource)]);
+verify(sf_canvas_library_declared($librarySource)===[$three,$color]&&$validLibraries['js']===$librarySource&&
+    $validLibraries['js_hash']===base64_encode(hash('sha256',$librarySource,true)),
+    'Ordered exact library locks form part of the canonical saved JavaScript hash');
+foreach ([
+    '// sf-libraries: three@0.187.0',
+    '// sf-libraries: '.str_replace('0.187.0','0.188.0',$three),
+    '// sf-libraries: '.strstr($three,'#',true).'#'.str_repeat('A',43).'=',
+    '// sf-libraries: '.$three.','.$three,
+    '// sf-libraries: '.$three.', '.$color,
+    '// SF-Libraries: '.$three,
+    ' '.$declaration,
+    "\n".$declaration,
+    "const unrelated = 1;\u{2028}".$declaration,
+    $declaration."\n// sf-libraries: ".$three,
+] as $invalid) {
+    if(sf_agent_scene_code($base+['js'=>$invalid."\nconst ordinary = 1;"])!==null)
+        throw new RuntimeException('Malformed library declaration was accepted.');
+}
+verify(sf_canvas_library_declared($js)===[],
+    'Malformed, unreviewed and duplicate declarations are rejected while native source remains valid');
+rejects(fn()=>sf_agent_scene_render(json_encode($base+['js'=>$librarySource],JSON_THROW_ON_ERROR),
+    $context+['offered_canvas_libraries'=>[$three]]),'Model output cannot declare an unoffered dependency');
+require_once dirname(__DIR__).'/api/canvas-gallery-core.php';
+$lockedScene=sf_agent_scene_history_save(1,array_replace($scene,['js'=>$librarySource]));
+$lockedSnapshot=sf_canvas_gallery_snapshot(sf_agent_scene_history_get(1,$lockedScene['id']),'Shared library scene');
+verify($lockedSnapshot['js']===$librarySource&&$lockedSnapshot['js_hash']===$validLibraries['js_hash'],
+    'Private history and the gallery snapshot preserve the exact library declaration and source hash');

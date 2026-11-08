@@ -139,9 +139,12 @@
       const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(source));
       const hash="'sha256-"+btoa(String.fromCharCode(...new Uint8Array(bytes)))+"'";
       const prepare=options.prepareScene||((value,probe,previewProgram)=>window.SFPublicAgentCanvas?.prepareSceneTest(value,{probe,previewProgram,currentTrackId:options.currentTrackId||''}));
+      await window.SFPublicAgentCanvas?.prepareSceneLibraries?.(preview.candidate,{signal:options.signal});
+      if(options.signal?.aborted){report.state='canceled';return report;}
       candidate=await prepare(preview.candidate,{source,hash},guard);
       if(!candidate?.frame||candidate.frame.tagName!=='IFRAME')throw new Error('Candidate document unavailable.');
     }catch(error){
+      if(options.signal?.aborted){report.state='canceled';return report;}
       if(error?.code==='sf_preview_unsupported'){
         entry(report.manual,'sf_preview_unsupported','This program uses JavaScript features that the preview check cannot safely verify.');
         report.state='incomplete';report.observed={guarded:false,verification_complete:false,
@@ -149,7 +152,8 @@
         emit('complete',{report});return report;
       }
       check('renderer','Production renderer accepted the candidate',false);
-      entry(report.errors,'invalid_candidate','The candidate could not be prepared with the production canvas renderer.');
+      if(error?.code==='canvas_library_unavailable')entry(report.errors,error.code,'An approved library required by this canvas is unavailable.');
+      else entry(report.errors,'invalid_candidate','The candidate could not be prepared with the production canvas renderer.');
       report.state='failed';report.observed={guarded:!!guard,verification_complete:true,execution_budget_exhausted:false};
       emit('complete',{report});return report;
     }

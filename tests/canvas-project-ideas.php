@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $root=dirname(__DIR__);$fixture=sys_get_temp_dir().'/stonefellow-canvas-ideas-'.bin2hex(random_bytes(6));
-foreach(['config','data','assets/js'] as $dir)mkdir($fixture.'/'.$dir,0700,true);
+foreach(['config','data','assets/js','assets/vendor/canvas'] as $dir)mkdir($fixture.'/'.$dir,0700,true);
 symlink($root.'/api',$fixture.'/api');
 register_shutdown_function(static function()use($fixture):void {
     foreach(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($fixture,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST) as $entry){
@@ -19,6 +19,7 @@ file_put_contents($fixture.'/data/releases.json','[]');file_put_contents($fixtur
 define('SF_ROOT',$fixture);
 require $root.'/api/bootstrap.php';require_once $root.'/api/migrations.php';
 require_once $root.'/api/canvas-projects-core.php';require_once $root.'/api/canvas-project-ideas.php';
+foreach(sf_canvas_library_registry() as $library)copy($root.'/'.$library['path'],$fixture.'/'.$library['path']);
 function verify(bool $ok,string $message): void {if(!$ok)throw new RuntimeException($message);echo 'PASS '.$message.PHP_EOL;}
 function rejects(callable $run,string $message): void {
     try{$run();}catch(InvalidArgumentException|UnexpectedValueException|DomainException|RuntimeException){verify(true,$message);return;}
@@ -64,6 +65,10 @@ $infer=static function(array $provider,string $prompt,string $message,int $outpu
 $before=sf_token_balance(1);$result=sf_canvas_project_ideas_suggest($user,$request,$infer,$provider);$project=$result['proposal'];
 verify($calls===1&&$result['state']==='ready'&&$project['status']==='awaiting_approval'&&$project['source']==='agent',
     'One explicit idea request creates an approval proposal without beginning a canvas or image build');
+verify(array_column($received['references']['available_canvas_libraries'],'name')===['Color Thief','Three.js']&&
+    array_keys($received['references']['available_canvas_libraries'][0])===['name','when']&&
+    str_contains($system,'Consider native browser capabilities first'),
+    'Planning sees optional library selection criteria while keeping proposals focused on the experience');
 verify(count($received['references']['canvas_history'])===12&&
     $received['references']['canvas_history'][1]['design_brief']==='Original private creative instruction 14'&&
     isset($received['references']['canvas_history'][0]['existing_styles'])&&
@@ -310,3 +315,14 @@ $adminResult=sf_canvas_project_ideas_discuss(['id'=>3,'role'=>'admin'],['request
 verify($adminResult['state']==='ready'&&$adminResult['active_tokens_used']===0&&$adminResult['active_tokens_remaining']===null&&
     sf_token_balance(3)===$adminBalance&&sf_canvas_project_ideas_row(3,$adminId)['reservation_key']===null,
     'Unlimited administrator discussion succeeds with a null reservation and preserves the account balance');
+
+$libraries=sf_canvas_library_registry();
+$threeFile=$fixture.'/'.$libraries['three']['path'];
+$tampered=file_get_contents($threeFile);
+$tampered[0]=$tampered[0]==='A'?'B':'A';
+file_put_contents($threeFile,$tampered);
+verify(array_column(sf_canvas_library_available(),'id')===['color-thief'],
+    'A same-size modified local bundle is withheld from the approved inventory');
+unlink($fixture.'/'.$libraries['color-thief']['path']);
+verify(sf_canvas_library_available()===[],
+    'A missing local bundle is also withheld without expanding the approved inventory');

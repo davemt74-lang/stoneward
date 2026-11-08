@@ -78,6 +78,19 @@ function sf_canvas_access_revision(int $uid): int {
     if($uid<1||!sf_canvas_access_table_exists())return 0;
     $q=sf_db()->prepare('SELECT revision FROM canvas_access_state WHERE user_id=?');$q->execute([$uid]);return (int)$q->fetchColumn();
 }
+/** Describe pinned tools without adding any consent scope. */
+function sf_canvas_access_libraries(string $js,array $policy): array {
+    require_once __DIR__.'/canvas-library-core.php';
+    $locks=sf_canvas_library_declared($js)??[];
+    $registry=array_column(sf_canvas_library_registry(),null,'lock');
+    $uses=[];
+    foreach($locks as $lock){
+        $card=$registry[$lock];
+        $uses[]=['id'=>'canvas.library.'.$card['id'],'label'=>$card['name'].' '.$card['version'],
+            'personal'=>false,'enabled'=>sf_canvas_library_enabled($card['id'],$policy),'library'=>true];
+    }
+    return $uses;
+}
 function sf_canvas_access_summary(array $user,array $context): array {
     $resolved=sf_canvas_access_resolve($user,$context);$scene=$resolved['scene'];$uid=(int)($user['id']??0);$policy=sf_canvas_permission_policy();
     $meTools=$scene['artist_inputs']['me_tools']??null;
@@ -106,7 +119,7 @@ function sf_canvas_access_summary(array $user,array $context): array {
     if($meTools!==null)$fingerprintInputs[]=$meTools;
     if($dataSources)$fingerprintInputs[]=$dataSources;
     $fingerprint=hash('sha256',json_encode($fingerprintInputs,JSON_THROW_ON_ERROR));
-    return ['context'=>$resolved['context'],'fingerprint'=>$fingerprint,'title'=>$scene['title'],'permissions'=>$permissions,'requires_consent'=>$needed,'signed_in'=>$uid>0];
+    return ['context'=>$resolved['context'],'fingerprint'=>$fingerprint,'title'=>$scene['title'],'permissions'=>$permissions,'libraries'=>sf_canvas_access_libraries($scene['js']??'',$policy),'requires_consent'=>$needed,'signed_in'=>$uid>0];
 }
 function sf_canvas_access_change(array $user,array $context,string $action,string $fingerprint,array $ids): array {
     $uid=(int)($user['id']??0);if($uid<1)throw new DomainException('Sign in to manage canvas access.');
@@ -162,7 +175,7 @@ function sf_canvas_access_revoke_saved(array $user,string $key,array $ids): arra
 }
 
 /** Public projection: declared capabilities only, never creator grants or data. */
-function sf_canvas_access_public_uses(string $html,?array $meTools=null,array $dataSources=[]): array {
+function sf_canvas_access_public_uses(string $html,?array $meTools=null,array $dataSources=[],string $js=''): array {
     $declared=sf_canvas_access_declared($html);$policy=sf_canvas_permission_policy();$uses=[];
     $external=sf_canvas_access_external($dataSources);
     foreach(sf_canvas_capability_cards() as $id=>$card){
@@ -171,5 +184,5 @@ function sf_canvas_access_public_uses(string $html,?array $meTools=null,array $d
             $uses[]=['id'=>$card['permission_id'],'label'=>$card['label'],'personal'=>$card['requires_sign_in'],'enabled'=>sf_canvas_permission_enabled($id,$policy)]
                 +($card['consent_status']==='explicit_device_consent'?['device_consent'=>true]:[]);
     }
-    return $uses;
+    return array_merge($uses,sf_canvas_access_libraries($js,$policy));
 }

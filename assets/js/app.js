@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.304';
+  window.STONEFELLOW_APP_BUILD='1.3.305';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -2773,6 +2773,8 @@
         if(!active())return;
         const next=result.scene;
         if(!next||(isGalleryScene(scene)?next.gallery_id!==scene.gallery_id:next.id!==scene.id))throw new Error('The canvas access response changed. Reopen this canvas.');
+        await stage.prepareSceneLibraries?.(next,{signal});
+        if(!active())return;
         if(stage.showScene(next,{focus:false})){listeningRoom=next;listeningRoomOwner=canvasSceneOwner();}
         else throw new Error('The updated canvas could not display. Reopen this canvas.');
       },
@@ -2793,10 +2795,11 @@
       const scene=response.scene;
       if(scene?.gallery_id!==id||scene.canvas_kind!=='custom'||Number.isSafeInteger(scene.id))throw new Error('The catalog returned an invalid canvas.');
       if(!window.SFPublicAgentCanvas?.active?.())await renderAgentCanvas();
+      const stage=window.SFPublicAgentCanvas;
+      await stage?.prepareSceneLibraries?.(scene,{signal:request.signal});
       if(!active())return;
       const previous=listeningRoom,previousOwner=listeningRoomOwner;
       listeningRoom=scene;listeningRoomOwner=canvasSceneOwner();
-      const stage=window.SFPublicAgentCanvas;
       if(!stage?.showScene?.(scene,{focus:false})){listeningRoom=previous;listeningRoomOwner=previousOwner;throw new Error('The published canvas could not open.');}
       stage.setSceneWorkflow?.(null);stage.closePage?.();canvas=mainCanvas;
       selectCanvasId(viewer,null);setUrl('home',{});
@@ -2874,15 +2877,15 @@
   function canvasDebugReason(reason){
     if(typeof reason==='string'&&/^http_[45]\d{2}$/.test(reason))return reason;
     return ['timeout','stream_incomplete','output_limit','provider_busy','provider_refused','provider_unavailable',
-      'invalid_json','invalid_markup','output_too_large','missing_player_slot','invalid_code','invalid_image_request','invalid_image_binding',
+      'invalid_json','invalid_markup','output_too_large','missing_player_slot','invalid_code','invalid_library','invalid_image_request','invalid_image_binding',
       'image_provider_unavailable','image_daily_limit','image_account_disabled','image_generation_failed','image_storage_failed','image_generation_disabled',
       'image_already_started'].includes(reason)?reason:undefined;
   }
   function canvasDebugFailure(error){
-    const code=error.payload?.error;
+    const code=error.payload?.error||(error.code==='canvas_library_unavailable'?error.code:undefined);
     const codes=['authentication_required','csrf_failed','scene_coding_model_unavailable','invalid_scene_request',
       'scene_provider_required','scene_model_unavailable','scene_image_unavailable','invalid_scene_output','active_tokens_required',
-      'scene_unavailable','scene_data_unavailable','response_encoding_failed','scene_request_not_found','scene_request_too_large','invalid_json'];
+      'scene_unavailable','scene_data_unavailable','canvas_library_unavailable','response_encoding_failed','scene_request_not_found','scene_request_too_large','invalid_json'];
     return {code:codes.includes(code)?code:error.name==='TypeError'?'network_error':'canvas_request_failed',
       ...(Number.isInteger(error.status)&&error.status>=100&&error.status<600?{status:error.status}:{}),
       reason:canvasDebugReason(error.payload?.reason)};
@@ -3081,6 +3084,8 @@
       if(!savedCanvasCanOpen(response)){
         selectCanvasId(owner,null);popupEntry('notice','The saved candidate has not completed its checks. Open Canvas History to review its source.');return;
       }
+      await stage.prepareSceneLibraries?.(scene);
+      if(!canRestore())return;
       let workflow=response.workflow;
       if(workflow){
         const committed=await secureJsonPost('canvas-build-workflow.php',{action:'apply',request_id:workflow.request_id,scene_id:scene.id});
@@ -3098,6 +3103,7 @@
       }
     }catch(error){
       if(error.payload?.error==='scene_not_found'&&canRestore())selectCanvasId(owner,null);
+      if(error.code==='canvas_library_unavailable'&&canRestore())popupEntry('notice',error.message);
     }
   }
   function savedCanvasCanOpen(response){
@@ -3550,8 +3556,10 @@
       const requestId=Array.from(window.crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
       const result=await secureJsonPost('agent-scene.php',{action:'swap_image',request_id:requestId,
         previous_id:previous.id,image_id:asset.id,replacement_id:id},false,request.signal);
-      if(!active()||!listeningRoomHasResult(result,String(previous.track_id??''),'custom')||!stage.showScene(result.scene))
+      if(!active()||!listeningRoomHasResult(result,String(previous.track_id??''),'custom'))
         throw new Error('The replacement canvas could not open.');
+      await stage.prepareSceneLibraries?.(result.scene,{signal:request.signal});
+      if(!active()||!stage.showScene(result.scene))throw new Error('The replacement canvas could not open.');
       listeningRoom=result.scene;selectCanvasId(owner,result.scene.id);
       popupEntry('assistant','I replaced the image. The previous version is saved in Canvas History.');
       return true;
@@ -3790,6 +3798,8 @@
       if(editingImage&&(scene.id===previousId||!Array.isArray(scene.image_assets)||
         !scene.image_assets.some(asset=>asset?.id===request.sceneBuild?.payload.request_id)))
         throw new Error('The server could not confirm the revised image on the canvas.');
+      await stage.prepareSceneLibraries?.(scene,{signal:request.signal});
+      if(!requestActive()||request.sceneBuild?.stopRequested)return;
       if(reading)stage.setSceneImage?.('clear');
       if(reading&&action.kind!=='image_review'&&!response.workflow)stage.setSceneWorkflow?.(null);
       if(response.workflow){
@@ -4271,6 +4281,7 @@
       onOpenMoments:()=>songMoments?.open(),
       onOpenMoment:(id,trigger)=>songMoments?.openMoment(id,trigger),
       getTrackId:()=>st.track?.id,
+      getTrackArtwork:()=>trackArtwork(st.track),
       canUseScenes:()=>!!canvasOwner()||isGalleryScene(),
       canManageScenes:()=>!!canvasOwner(),
       onOpenSceneHistory:()=>void handleListeningRoomCommand({kind:'history'}),

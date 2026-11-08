@@ -36,6 +36,7 @@ jobs:
           php tests/section44a-tool-registry.php
           php tests/canvas-capabilities.php
           php tests/canvas-access.php
+          php tests/media-artwork-palette.php
           php tests/canvas-permission-delivery.php
       - name: Project, gallery and resource compatibility
         run: |
@@ -131,6 +132,10 @@ jobs:
           python tests/canvas-data-picker-browser.py
           python tests/canvas-data-runtime-browser.py
           python tests/canvas-location-browser.py
+      - name: Verified local libraries in production canvas sandboxes
+        run: |
+          python tests/canvas-three-browser.py
+          python tests/canvas-artwork-palette-browser.py
       - name: Existing public and administrator gallery controls
         run: |
           python tests/canvas-gallery-browser.py

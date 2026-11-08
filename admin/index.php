@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.304');
+define('SF_ADMIN_BUILD','1.3.305');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -252,6 +252,8 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="assets/agent-media-review.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-media-link-review.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-canvas.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/vendor/canvas/color-thief.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>" integrity="sha256-9KjGmp30P1mNciedabWfLZ0pVho0/pmxF0ktvJCBY+4="></script>
+  <script src="../assets/js/media-artwork-palette.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/media.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/image-mask-editor.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/image-moodboards.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
@@ -271,6 +273,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="../assets/js/canvas-audio-sdk.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="../assets/js/vendor/acorn.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="../assets/js/canvas-preview-guard.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/js/canvas-library-runtime.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="../assets/js/public-agent-canvas.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/canvas-permissions.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/canvas-gallery.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>

@@ -5,6 +5,7 @@
 (() => {
   'use strict';
   let current = null;
+  const sceneLibraries=new WeakMap();
   const by = (root, selector) => root.querySelector(selector);
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const songMomentKinds = Object.freeze({ story: 'Story', photo: 'Photo', comment: 'Listener comment' });
@@ -241,6 +242,47 @@
     }
     return template.innerHTML;
   }
+  function libraryLocks(source){
+    const declarations=Array.from(source.matchAll(/^[\t ]*\/\/[\t ]*sf-libraries\b[^\r\n]*/gim));
+    if(!declarations.length)return [];
+    const [line]=declarations[0];
+    if(declarations.length!==1||declarations[0].index!==0||!line.startsWith('// sf-libraries: '))return null;
+    const locks=new Map();
+    for(const lock of line.slice('// sf-libraries: '.length).split(',')){
+      const parts=/^([a-z][a-z0-9-]{0,39})@(\d+\.\d+\.\d+)#([A-Za-z0-9+/]{43}=)$/.exec(lock);
+      if(!parts||locks.has(parts[1]))return null;
+      locks.set(parts[1],{id:parts[1],version:parts[2],sha256:parts[3]});
+    }
+    return [...locks.values()];
+  }
+  async function sha256(bytes){
+    const digest=await crypto.subtle.digest('SHA-256',bytes);
+    return btoa(String.fromCharCode(...new Uint8Array(digest)));
+  }
+  function libraryUnavailable(){
+    const error=new Error('An approved library required by this canvas is unavailable.');
+    error.code='canvas_library_unavailable';
+    return error;
+  }
+  async function prepareSceneLibraries(scene,{signal}={}){
+    const js=scene?.js;
+    if(typeof js!=='string'||js==='')return;
+    sceneLibraries.delete(scene);
+    const locks=libraryLocks(js);
+    if(!locks)throw libraryUnavailable();
+    if(!locks.length)return;
+    try{
+      const jsHash=scene.js_hash;
+      const bytes=new TextEncoder().encode(js);
+      if(scene.canvas_kind!=='custom'||bytes.length>12000||await sha256(bytes)!==jsHash)throw libraryUnavailable();
+      const libraries=await window.SFCanvasLibraryRuntime.resolve(locks,{signal});
+      if(signal?.aborted)throw signal.reason;
+      sceneLibraries.set(scene,{js,jsHash,libraries});
+    }catch(error){
+      if(signal?.aborted)throw error;
+      throw libraryUnavailable();
+    }
+  }
   function sceneScript(scene){
     const js=scene.js??'';
     if(js==='')return {js:'',hash:'',sdk:null};
@@ -248,7 +290,10 @@
     if(typeof js!=='string'||new TextEncoder().encode(js).length>12000||
       typeof scene.js_hash!=='string'||!/^[A-Za-z0-9+/]{43}=$/.test(scene.js_hash)||
       typeof sdk?.source!=='string'||typeof sdk.createHost!=='function'||!/^'sha256-[A-Za-z0-9+/]{43}='$/.test(sdk.hash))return null;
-    return {js,hash:"'sha256-"+scene.js_hash+"'",sdk};
+    const locks=libraryLocks(js),prepared=sceneLibraries.get(scene);
+    sceneLibraries.delete(scene);
+    if(!locks||(locks.length&&(prepared?.js!==js||prepared.jsHash!==scene.js_hash)))return null;
+    return {js,hash:"'sha256-"+scene.js_hash+"'",sdk,libraries:locks.length?prepared.libraries:[]};
   }
   function sceneDocument(html, css, scrollable, reactive, images, datasets, currentTrackId='', trackDatasets=null,script=null,probe=null) {
     if(typeof html!=='string'||!html.trim()||html.length>12000||typeof css!=='string'||css.length>12000||/[<\\]/.test(css))return null;
@@ -257,10 +302,14 @@
     if(html.split('<').slice(1).some(part=>!sceneTag.test(part)))return null;
     const bound=bindSceneDatasets(script?.js?html:stripLegacyPlayer(html),datasets,currentTrackId,trackDatasets,!!script?.js);
     const trackActions=bound.includes('data-sf-play-track=');
-    const scriptHashes=[reactive?sceneAudioHash:'',images?sceneImageHash:'',trackActions?sceneTrackHash:'',script?.js?script.sdk.hash:'',script?.js?sceneProgramHash:'',script?.hash,probe?.hash].filter(Boolean);
+    const libraries=script?.libraries||[];
+    const scriptHashes=[reactive?sceneAudioHash:'',images?sceneImageHash:'',trackActions?sceneTrackHash:'',script?.js?script.sdk.hash:'',script?.js?sceneProgramHash:'',script?.hash,probe?.hash,...libraries.map(library=>library.hash)].filter(Boolean);
     const scriptPolicy=scriptHashes.length?'; script-src '+scriptHashes.join(' '):'';
+    // Both policies must pass. The second policy prevents a matching integrity attribute from authorizing an external request.
+    const inlineScriptPolicy=script?.js?`<meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'">`:'';
     return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'none'; media-src blob:; img-src blob:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'${scriptPolicy}">
+${inlineScriptPolicy}
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
 <style>html{color-scheme:dark}body{margin:0;color:#fff8ee;background:#151322;font:16px/1.5 system-ui,sans-serif}*{box-sizing:border-box}main{min-height:100vh;overflow-wrap:anywhere}:where(main>:first-child){padding:76px clamp(14px,3vw,48px) 0}</style>
 ${trackActions?'<style>:where(.sf-action-play-track){appearance:none;background:transparent;border:0;padding:0;text-align:inherit}</style>':''}
@@ -269,7 +318,7 @@ ${images?'<style>:where(.sf-scene-image){display:block;max-width:100%;height:aut
 <style>html,body{overflow:${scrollable||trackActions||script?.js?'auto':'hidden'}!important}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}</style>
 ${trackActions?'<style>.sf-action-play-track{font:inherit;color:inherit;cursor:pointer;min-height:44px;min-width:44px}.sf-action-play-track:focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>':''}
 ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBridge}</script>`:''}${images?`<script>${sceneImageBridge}</script>`:''}</head>
-<body><main>${bound}</main>${trackActions?`<script>${sceneTrackBridge}</script>`:''}${script?.js?`<script${probe?' data-sf-data-offline="true"':''}>${script.sdk.source}</script><script type="application/json" id="sfCanvasProgram">${JSON.stringify(script.js).replace(/</g,'\\u003c')}</script><script>${sceneProgramRunner}</script>`:''}</body></html>`;
+<body><main>${bound}</main>${trackActions?`<script>${sceneTrackBridge}</script>`:''}${script?.js?`<script${probe?' data-sf-data-offline="true"':''}>${script.sdk.source}</script>${libraries.map(library=>`<script>${library.source}</script>`).join('')}<script type="application/json" id="sfCanvasProgram">${JSON.stringify(script.js).replace(/</g,'\\u003c')}</script><script>${sceneProgramRunner}</script>`:''}</body></html>`;
   }
   /** Detached candidates use the production renderer and receive no live canvas controller. */
   function prepareSceneTest(scene,{probe,previewProgram=null,currentTrackId=''}={}){
@@ -314,6 +363,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     }
     const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(source));
     const hash="'sha256-"+btoa(String.fromCharCode(...new Uint8Array(digest)))+"'";
+    await prepareSceneLibraries(scene);
     const prepared=prepareSceneTest(scene,{probe:{source,hash},previewProgram:program});
     if(!prepared)throw new Error('This canvas cannot be previewed with the supported renderer.');
     prepared.frame.removeAttribute('inert');prepared.frame.removeAttribute('aria-hidden');
@@ -327,7 +377,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       .filter(id=>/^[A-Za-z0-9_-]{1,160}$/.test(id)));
   }
   function sceneArtwork(source){
-    if(typeof source!=='string'||!(/^api\/media\.php\?id=[a-zA-Z0-9_-]{1,80}(?:&variant=(?:medium|thumb))?$/.test(source)||
+    if(typeof source!=='string'||!(/^api\/media\.php\?id=[a-zA-Z0-9_-]{1,80}(?:&variant=(?:large|medium|thumb))?$/.test(source)||
       /^assets\/(?:[a-z0-9_-]+\/)*[a-z0-9_-][a-z0-9_.-]*\.(?:png|jpe?g|gif|webp|avif)$/i.test(source)))return '';
     try{
       const url=new URL(source,document.baseURI);
@@ -568,6 +618,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     const sceneCode = by(sceneFooterActions, '[data-agent-action="toggle-scene-code"]');
     const sceneFeedback = by(sceneFooterActions, '[data-agent-action="feedback-scene"]');
     const sceneAccess = by(sceneFooterActions, '[data-agent-action="canvas-access"]');
+    const chatFooter = document.querySelector?.('.chat-footer');
     const sceneSocialLinks = document.querySelector?.('.chat-footer .social-links');
     if(sceneSocialLinks)sceneSocialLinks.appendChild(sceneFooterActions);
     const sceneHistory = by(root, '[data-agent-action="scene-history"]');
@@ -603,6 +654,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     const codingImageReplace=by(codingImageDialog,'.sf-agent-coding-image-replace');
     let listeningScene=null,spaceScene=null,reactiveScene=null,sceneAudioHost=null,sceneTracks=null,sceneTrackRevision=0;
     let sceneAgentDesign,sceneAgentRevealed=false,manualAgentHidden=options.initialAgentHidden===true,agentPalette=null;
+    let sceneTheme=null,trackTheme=null;
     let codingCode=null,codingImageBatch=null,codingImageModalTrigger=null;
     let codingVisible=false,codingDismissed=false;
     let workflow=null,workflowTab='coding';
@@ -868,6 +920,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       updateDock();
       refreshCanvasAudio();
       void syncSceneTrackData();
+      syncAgentPalette();
     }
     function syncVoice(){
       if(!chatStart)return;
@@ -1054,17 +1107,61 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       if(motionOff){meshDraw(0);cloudDraw(0);orbDraw(0)}
       return name;
     }
-    function setAgentPalette(scene){
-      agentPalette=scene?window.SFCanvasAgentTheme?.resolve(scene)||null:null;
-      for(const name of ['--sf-atmo-rgb','--sf-atmo-accent','--sf-atmo-text','--sf-atmo-border','--sf-agent-secondary','--sf-agent-surface'])root.style.removeProperty(name);
-      if(agentPalette){
-        root.dataset.agentPalette='1';
-        const values={'--sf-atmo-rgb':agentPalette.rgb.join(','),'--sf-atmo-accent':agentPalette.accent,
-          '--sf-atmo-text':agentPalette.text,'--sf-atmo-border':agentPalette.border,
-          '--sf-agent-secondary':agentPalette.secondary,'--sf-agent-surface':agentPalette.surface};
-        for(const [name,value]of Object.entries(values))root.style.setProperty(name,value);
-      }else delete root.dataset.agentPalette;
+    function setAgentPalette(palette){
+      if(agentPalette===palette)return;
+      agentPalette=palette;
+      const values={'--sf-atmo-rgb':palette?.rgb.join(','),'--sf-atmo-accent':palette?.accent,
+        '--sf-atmo-text':palette?.text,'--sf-atmo-border':palette?.border,
+        '--sf-agent-secondary':palette?.secondary,'--sf-agent-surface':palette?.surface,'--sf-agent-accent-text':palette?.accentText};
+      for(const element of [root,chatFooter]){
+        if(!element)continue;
+        if(palette)element.dataset.agentPalette='1';
+        else delete element.dataset.agentPalette;
+        for(const [name,value]of Object.entries(values)){
+          if(value)element.style.setProperty(name,value);
+          else element.style.removeProperty(name);
+        }
+      }
       if(motionOff){cloudDraw(0);orbDraw(0);}
+    }
+    function syncAgentPalette(){
+      const owner=options.getSceneOwner?.();
+      let scenePalette=sceneTheme?.explicit;
+      let imagePending=false;
+      if(!scenePalette&&sceneTheme?.owner===owner&&options.canUseScenes?.()){
+        for(const id of sceneTheme?.imageIds??[]){
+          if(!sceneTheme.palettes.has(id)){imagePending=true;break;}
+          scenePalette=sceneTheme.palettes.get(id);
+          if(scenePalette)break;
+        }
+      }
+      const fallback=sceneTheme?.fallback||null;
+      const artworkPalette=window.SFArtworkPalette;
+      const source=artworkPalette&&!destroyed&&!scenePalette&&!imagePending&&(sceneTheme?.artwork||sceneArtwork(options.getTrackArtwork?.()));
+      if(!source){
+        trackTheme?.request.abort();trackTheme=null;
+        setAgentPalette(scenePalette||fallback);
+        return;
+      }
+      if(trackTheme?.source===source&&trackTheme.owner===owner){setAgentPalette(trackTheme.palette||fallback);return;}
+      trackTheme?.request.abort();
+      const current={source,owner,request:new AbortController(),palette:null};
+      trackTheme=current;
+      setAgentPalette(fallback);
+      void artworkPalette.forArtwork(source,current.request.signal).then(palette=>{
+        if(destroyed||current.request.signal.aborted||trackTheme!==current||options.getSceneOwner?.()!==owner)return;
+        current.palette=window.SFCanvasAgentTheme?.fromArtwork(palette)||null;
+        syncAgentPalette();
+      });
+    }
+    function setScenePalette(scene,images,artwork=''){
+      const theme=window.SFCanvasAgentTheme;
+      const explicit=theme?.explicit(scene)||null;
+      const extractArtwork=!!window.SFArtworkPalette;
+      sceneTheme=scene?{explicit,artwork,owner:options.getSceneOwner?.(),palettes:new Map(),
+        imageIds:extractArtwork&&!explicit&&images?(theme?.preferredImages(scene)||[]).filter(id=>images.assets.has(id)):[],
+        fallback:explicit?null:theme?.resolve(scene,{includeImageMetadata:!extractArtwork&&options.canUseScenes?.()===true})}:null;
+      syncAgentPalette();
     }
     function meshDraw(t) {
       const ctx=contexts[0];if(!ctx)return;
@@ -2104,8 +2201,10 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       }
     }
     async function loadSceneImage(images,id,title){
+      const {signal}=images.request;
+      const theme=sceneTheme;
+      let palette=null;
       try{
-        const {signal}=images.request;
         const preview=codingImageBatch?.images.get(id);
         let blob=preview&&activeCodingImage(preview)?await preview.result:null;
         if(signal.aborted||listeningScene?.images!==images||!options.canUseScenes?.())return;
@@ -2113,7 +2212,15 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         if(signal.aborted||listeningScene?.images!==images||!options.canUseScenes?.()||!validSceneImageBlob(blob))return;
         images.loaded.set(id,{id,title,blob});
         postSceneImages(images);
+        if(theme?.imageIds.includes(id))palette=await window.SFArtworkPalette?.extract(blob);
       }catch(_){/* Keep the authored fallback while an image is unavailable. */}
+      finally{
+        if(!destroyed&&!signal.aborted&&listeningScene?.images===images&&sceneTheme===theme&&theme?.imageIds.includes(id)&&
+          options.canUseScenes?.()&&images.owner===options.getSceneOwner?.()){
+          theme.palettes.set(id,window.SFCanvasAgentTheme?.fromArtwork(palette)||null);
+          syncAgentPalette();
+        }
+      }
     }
     function updateSceneTrackData(data,trackId,trackDatasets=null){
       const images=listeningScene.images;
@@ -2285,7 +2392,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       if(sceneAccess)sceneAccess.hidden=typeof options.onSceneAccess!=='function'||(!Number.isSafeInteger(scene.id)&&!scene.gallery_id);
       root.classList.add('has-listening-scene');
       root.classList[interactive?'add':'remove']('has-scene-interactive');
-      setAgentPalette(scene);
+      setScenePalette(scene,images,artwork);
       setSceneAgentDesign(scene.agent_design);
       syncSceneCue();
       if(space){
@@ -2328,7 +2435,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
       sceneSignal.hidden=true;sceneSignalText('');
       renderSceneCatalog(null);
       root.classList.remove('has-listening-scene');root.classList.remove('has-scene-interactive');root.classList.remove('has-scene-lyric-cue');
-      setAgentPalette();
+      setScenePalette();
       setSceneAgentDesign();
       setSceneCoding('idle');
       if(focus){
@@ -2349,6 +2456,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         if(!closeScene(false))setSceneCoding('idle');
         closeSceneHistory();
       }
+      syncAgentPalette();
     }
     function closeSceneHistory(){
       if(pageView!=='scene-history'||pageRail.hidden)return false;
@@ -2706,6 +2814,8 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         setSceneAgentDesign();
         setSceneCoding('idle');
       }
+      trackTheme?.request.abort();trackTheme=null;
+      setAgentPalette(null);
       closeGuide(false);guideLayer.remove();
       document.body?.classList?.remove('sf-agent-page-open');
       resizeObserver?.disconnect();playerObserver?.disconnect();cleanup.forEach(fn=>fn());
@@ -2730,5 +2840,5 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
     const named=match[1]==='blue mesh'?'mesh':match[1]==='violet signal'?'violet':['moonlit horizon','moonlight'].includes(match[1])?'lunar':match[1];
     return current?.setAtmosphere(named)||null;
   }
-  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncPlaylist:()=>current?.syncPlaylist(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),setWelcomeState:state=>current?.setWelcomeState(state),setSongMoment:moment=>current?.setSongMoment(moment)||false,showScene:(scene,options)=>current?.showScene(scene,options)||false,closeScene:(focus=true)=>current?.closeScene(focus)||false,setAgentHidden:hidden=>current?.setAgentHidden(hidden)||false,sceneActive:()=>current?.sceneActive()||false,showSceneHistory:rows=>current?.showSceneHistory(rows)||false,closeSceneHistory:()=>current?.closeSceneHistory()||false,syncSceneAccess:()=>current?.syncSceneAccess(),setSceneCoding:(state,text)=>current?.setSceneCoding(state,text)||false,setSceneWorkflow:update=>current?.setSceneWorkflow(update)||false,setSceneCandidateCode:scene=>current?.setSceneCandidateCode(scene)||false,prepareSceneTest,prepareGalleryPreview,setSceneImage:(state,asset,progress)=>current?.setSceneImage(state,asset,progress)||false,appendSceneCode:(kind,text)=>current?.appendSceneCode(kind,text)||false,startGuide:()=>current?.startGuide(),openPage:view=>current?.openPage(view),openLyrics:()=>current?.openLyrics(),closePage:(immediate=false)=>current?.closePage(immediate),active:()=>!!current});
+  window.SFPublicAgentCanvas=Object.freeze({mount,unmount,applyCommand,setAtmosphere:name=>current?.setAtmosphere(name)||false,getAtmosphere:()=>current?.getAtmosphere(),listAtmospheres:()=>['ember','mesh','violet','lunar'],setState:(mode,label)=>current?.state(mode,label),syncSongExperience:()=>current?.session(),syncPlayer:()=>current?.syncPlayer(),syncPlaylist:()=>current?.syncPlaylist(),syncVoice:()=>current?.syncVoice(),syncTranscript:()=>current?.syncTranscript(),showConversation:(role,text)=>current?.showConversation(role,text),setWelcomeState:state=>current?.setWelcomeState(state),setSongMoment:moment=>current?.setSongMoment(moment)||false,showScene:(scene,options)=>current?.showScene(scene,options)||false,closeScene:(focus=true)=>current?.closeScene(focus)||false,setAgentHidden:hidden=>current?.setAgentHidden(hidden)||false,sceneActive:()=>current?.sceneActive()||false,showSceneHistory:rows=>current?.showSceneHistory(rows)||false,closeSceneHistory:()=>current?.closeSceneHistory()||false,syncSceneAccess:()=>current?.syncSceneAccess(),setSceneCoding:(state,text)=>current?.setSceneCoding(state,text)||false,setSceneWorkflow:update=>current?.setSceneWorkflow(update)||false,setSceneCandidateCode:scene=>current?.setSceneCandidateCode(scene)||false,prepareSceneLibraries,prepareSceneTest,prepareGalleryPreview,setSceneImage:(state,asset,progress)=>current?.setSceneImage(state,asset,progress)||false,appendSceneCode:(kind,text)=>current?.appendSceneCode(kind,text)||false,startGuide:()=>current?.startGuide(),openPage:view=>current?.openPage(view),openLyrics:()=>current?.openLyrics(),closePage:(immediate=false)=>current?.closePage(immediate),active:()=>!!current});
 })();

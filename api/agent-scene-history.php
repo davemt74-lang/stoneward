@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/agent-canvas-music-core.php';
 require_once __DIR__.'/agent-scene-palette.php';
 require_once __DIR__.'/canvas-resource-core.php';
+require_once __DIR__.'/canvas-library-core.php';
 
 function sf_agent_scene_kind(mixed $value): string {
     if(!in_array($value,['listening_room','space_eq','custom'],true))throw new InvalidArgumentException('Choose a supported canvas type.');
@@ -20,6 +21,7 @@ function sf_agent_scene_javascript(mixed $value): ?string {
     if(!is_string($value)||strlen($value)>12000||preg_match('//u',$value)!==1||
         preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u',$value)!==0)return null;
     $value=str_replace(["\r\n","\r"],"\n",$value);
+    if(sf_canvas_library_declared($value)===null)return null;
     return trim($value)===''?'':$value;
 }
 
