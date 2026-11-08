@@ -43,6 +43,11 @@ function sf_openai_call(array $provider,string $system,array $history,string $me
         $lock=str_contains($system,'previous JavaScript declared')?$three:str_replace('0.187.0','0.188.0',$three);
         $design=['html'=>'<section class="art"></section>','css'=>'','js'=>"// sf-libraries: ".$lock."\nconst stage = new THREE.Scene();"];
     }
+    if($mode==='d3'){
+        $pin=array_column($prompt['canvas_libraries'],null,'id')['d3']['lock'];
+        $design=['html'=>'<section class="chart"></section>','css'=>'','js'=>"// sf-libraries: ".$pin."\n"
+            .'d3.select(".chart").text(d3.sum([1,2,3]));'];
+    }
     if($mode==='generate_image')$design=['html'=>'<figure class="sf-image-new"></figure>',
         'css'=>'figure{background-image:var(--sf-image-new,none)}','image_request'=>[
             'prompt'=>'Rain on a glass greenhouse at dusk','title'=>'Glass Greenhouse','size'=>'1536x1024']];
@@ -315,16 +320,21 @@ $adminAccount=['id'=>4,'role'=>'admin'];
 $mode='library_repair';$before=$providerCalls;
 $generated=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Build an explorable 3D sculpture.']);
 $offered=array_column($prompt['canvas_libraries'],null,'id');
-verify(array_keys($offered)===['color-thief','three']&&$offered['three']['global']==='THREE'&&
-    $offered['color-thief']['global']==='ColorThief'&&str_contains($providerSystem,'use native HTML, CSS, Canvas 2D'),
+verify(array_keys($offered)===['color-thief','d3','three']&&$offered['three']['global']==='THREE'&&
+    $offered['color-thief']['global']==='ColorThief'&&$offered['d3']['global']==='d3'&&str_contains($providerSystem,'use native HTML, CSS, Canvas 2D'),
     'The normal coding prompt offers verified optional libraries and criteria for choosing native APIs first');
 verify($providerCalls===$before+2&&str_starts_with($generated['scene']['js'],'// sf-libraries: '.$offered['three']['lock']."\n")&&
     sf_agent_scene_history_get(4,$generated['scene']['id'])['js']===$generated['scene']['js'],
     'The build repairs an unreviewed dependency and persists the corrected pinned source');
-sf_canvas_permission_save($adminAccount,1,['canvas.library.three'=>false]);
+$mode='d3';
+$chart=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Use D3 to render a data-driven chart.']);
+verify(str_starts_with($chart['scene']['js'],'// sf-libraries: '.$offered['d3']['lock']."\n")&&
+    sf_agent_scene_history_get(4,$chart['scene']['id'])['js']===$chart['scene']['js'],
+    'An explicit D3 build receives the exact pin and persists the authored source');
+sf_canvas_permission_save($adminAccount,1,['canvas.library.three'=>false,'canvas.library.d3'=>false]);
 $mode='success';
 $native=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Create a quiet reading backdrop.']);
 verify(array_column($prompt['canvas_libraries'],'id')===['color-thief']&&!isset($native['scene']['js'])&&
     sf_agent_scene_history_get(4,$generated['scene']['id'])['js']===$generated['scene']['js'],
-    'Disabling Three.js removes it from new build inventory while preserving earlier source and native builds');
+    'Disabling D3 and Three.js removes both from new build inventory while preserving earlier source and native builds');
 echo "$checks listening-room checks passed\n";

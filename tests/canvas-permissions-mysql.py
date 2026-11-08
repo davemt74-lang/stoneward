@@ -76,7 +76,7 @@ require getenv('SF_PERMISSION_REPO').'/api/canvas-capabilities.php';
             first = probe("echo json_encode(sf_canvas_permission_policy());")
             check(first['revision'] == 1 and first['disabled'] == [], 'MySQL default policy reads preserve legacy behavior without schema')
             initialized = probe("echo json_encode(sf_canvas_permission_admin_view());")
-            check(len(initialized['capabilities']) == 19, 'MySQL loads all data and library capabilities through native SQL')
+            check(len(initialized['capabilities']) == 20, 'MySQL loads all data and library capabilities through native SQL')
             engine = probe("echo json_encode(sf_db()->query(\"SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='canvas_permission_policy'\")->fetchColumn());")
             check(engine == 'InnoDB', 'Native policy table uses transactional InnoDB')
             saved = probe("echo json_encode(sf_canvas_permission_save(['id'=>7,'role'=>'admin'],1,['canvas.data.my_purchases'=>false]));")

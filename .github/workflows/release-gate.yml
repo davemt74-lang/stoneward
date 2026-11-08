@@ -765,7 +765,7 @@ jobs:
           test -s dist/deploy/api/canvas-map-core.php
           test -s dist/deploy/api/canvas-earthquakes-core.php
           test -s dist/deploy/assets/js/canvas-location.js
-          for library in color-thief three; do
+          for library in color-thief d3 three; do
             for extension in js LICENSE; do
               file="assets/vendor/canvas/$library.$extension"
               cmp "$file" "dist/deploy/$file"

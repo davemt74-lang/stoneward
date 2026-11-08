@@ -33,7 +33,9 @@ $pdo->beginTransaction();deny(fn()=>sf_canvas_permission_save($admin,3,['canvas.
 $libraries=array_column(sf_canvas_permission_admin_view()['capabilities'],null,'permission_id');
 verify(($libraries['canvas.library.three']['kind']??null)==='library'&&
     ($libraries['canvas.library.color-thief']['kind']??null)==='library'&&
-    sf_canvas_library_enabled('three')&&sf_canvas_library_enabled('color-thief'),'Pinned libraries appear as separate administrator controls');
+    ($libraries['canvas.library.d3']['kind']??null)==='library'&&
+    sf_canvas_library_enabled('three')&&sf_canvas_library_enabled('color-thief')&&sf_canvas_library_enabled('d3'),
+    'Pinned libraries appear as separate administrator controls');
 $saved=sf_canvas_permission_save($admin,3,['canvas.library.three'=>false]);
 verify($saved['policy']['revision']===4&&!sf_canvas_library_enabled('three')&&sf_canvas_library_enabled('color-thief')&&
     sf_canvas_permission_enabled('published_catalog')&&isset($saved['history'][0]['changes']['canvas.library.three']),
