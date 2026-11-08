@@ -29,6 +29,7 @@ def bundle_pin(id_, version, global_, digest):
 THREE, THREE_SOURCE = bundle_pin('three', '0.187.0', 'THREE', 'x4iVrN/195Rpb8aECJMAa4ZA8cSt+X/Nx7yIkaptnQY=')
 COLOR, COLOR_SOURCE = bundle_pin('color-thief', '3.5.0', 'ColorThief', '9KjGmp30P1mNciedabWfLZ0pVho0/pmxF0ktvJCBY+4=')
 D3, D3_SOURCE = bundle_pin('d3', '7.9.2', 'd3', 'kSERCY6plQOm9JZzYdK73J2/WM+cZ4yOJ+WwLRoH8ME=')
+ANIME, ANIME_SOURCE = bundle_pin('anime', '4.5.0', 'anime', 'jVs6WKH2QCOgSkzt7vE1oiY7GNoEs1F3rBNDigutAzs=')
 OUTSIDE = 'https://outside.test/pin.js'
 OUTSIDE_DATA = 'https://outside.test/shows.json'
 
@@ -101,6 +102,63 @@ DATA_DESIGN = PALETTE + r"""
 """.replace('OUTSIDE_DATA', json.dumps(OUTSIDE_DATA))
 
 
+MOTION_DESIGN = r"""
+(() => {
+  const root = document.querySelector('.fixture');
+  const status = root.querySelector('.result');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = 'Show artwork';
+  const label = document.createElement('p');
+  label.textContent = 'Evening artwork';
+  label.className = 'motion-label';
+  label.style.opacity = '0.25';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 120 40');
+  svg.setAttribute('width', '120');
+  svg.setAttribute('height', '40');
+  const moon = document.createElementNS(svg.namespaceURI, 'circle');
+  moon.setAttribute('cx', '12');
+  moon.setAttribute('cy', '20');
+  moon.setAttribute('r', '8');
+  moon.setAttribute('fill', '#ffe1a6');
+  svg.append(moon);
+  root.prepend(button, svg, label);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timeline;
+  function showStill() {
+    moon.setAttribute('cx', '92');
+    label.style.opacity = '1';
+    status.textContent = 'Still artwork ready';
+  }
+  if (reduce) showStill();
+  button.addEventListener('click', () => {
+    if (reduce) {
+      status.textContent = 'Still artwork selected';
+      return;
+    }
+    if (timeline) timeline.revert();
+    root.dataset.motion = 'starting';
+    timeline = anime.createTimeline({
+      autoplay: false, loop: true, alternate: true,
+      onUpdate() {
+        const x = Number(moon.getAttribute('cx'));
+        const opacity = Number(label.style.opacity);
+        if (x > 12 && x < 92 && opacity > 0.25 && opacity < 1) root.dataset.motion = 'advanced';
+      },
+    }).add(moon, {cx: 92, duration: 700, ease: 'linear'}, 0)
+      .add(label, {opacity: 1, duration: 700, ease: 'linear'}, 0);
+    timeline.play();
+  });
+  addEventListener('pagehide', () => {
+    if (!timeline) return;
+    timeline.revert();
+    root.dataset.motion = 'reverted';
+  }, {once: true});
+})();
+"""
+
+
 def canvas_data():
     now = datetime.now(timezone.utc)
     fresh = {'status': 'fresh', 'fetched_at': now.isoformat(), 'expires_at': (now + timedelta(minutes=5)).isoformat()}
@@ -116,12 +174,12 @@ def canvas_data():
 SETUP = r"""
 (data) => {
 window.dataReads = [];
-window.makeScene = async (program, pin = '', dataSources = []) => {
+window.makeScene = async (program, pin = '', dataSources = [], css = '.fixture{padding:80px 20px}') => {
     const js = pin ? '// sf-libraries: ' + pin + '\n' + program : program;
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(js));
     return {id:1, canvas_kind:'custom', track_id:'', title:'Pinned library test canvas',
         html:'<section class="fixture"><span class="result"></span></section>',
-        css:'.fixture{padding:80px 20px}', js, artist_inputs:{data_sources:dataSources},
+        css, js, artist_inputs:{data_sources:dataSources},
         js_hash:btoa(String.fromCharCode(...new Uint8Array(digest)))};
 };
 window.mountScene = async (scene) => {
@@ -142,7 +200,8 @@ SFPublicAgentCanvas.mount(document.querySelector('#target'), {
 
 
 def run(browser, width):
-    context = browser.new_context(viewport={'width': width, 'height': 850}, reduced_motion='reduce')
+    touch = width == 390
+    context = browser.new_context(viewport={'width': width, 'height': 850}, reduced_motion='reduce', is_mobile=touch, has_touch=touch)
     page = context.new_page()
     page.set_default_timeout(10000)
     calls = []
@@ -161,7 +220,7 @@ def run(browser, width):
             route.fulfill(content_type='text/javascript', body=(ROOT / path).read_bytes())
         elif url.startswith(SITE) and path == 'api/canvas-libraries.php':
             calls.append('manifest')
-            route.fulfill(json={'ok': True, 'libraries': [THREE, COLOR, D3] if mode != 'denied' else []})
+            route.fulfill(json={'ok': True, 'libraries': [THREE, COLOR, D3, ANIME] if mode != 'denied' else []})
         elif url.startswith(SITE) and path == THREE['path']:
             calls.append('three')
             body = THREE_SOURCE if mode != 'corrupt' else bytes([THREE_SOURCE[0] ^ 1]) + THREE_SOURCE[1:]
@@ -172,6 +231,9 @@ def run(browser, width):
         elif url.startswith(SITE) and path == D3['path']:
             calls.append('d3')
             route.fulfill(content_type='text/javascript', body=D3_SOURCE)
+        elif url.startswith(SITE) and path == ANIME['path']:
+            calls.append('anime')
+            route.fulfill(content_type='text/javascript', body=ANIME_SOURCE)
         elif url in (OUTSIDE, OUTSIDE_DATA):
             calls.append('outside')
             route.abort()
@@ -254,8 +316,65 @@ def run(browser, width):
     assert not page.evaluate('async ([program,pin]) => mountScene(await makeScene(program,pin))', [GEOMETRY, pin])
     assert calls[before:] == ['manifest', 'three'], calls
     expect(iframe).to_have_count(0)
-    context.close()
     print(f'PASS Chromium/{width}: pinned geometry and palette, preview and network isolation, absent and denied dependencies, corrupted bytes', flush=True)
+
+    mode = 'allowed'
+    anime_pin = f"anime@{ANIME['version']}#{ANIME['sha256']}"
+    motion_args = [MOTION_DESIGN, anime_pin, [], '.fixture{padding:12px;display:grid;justify-items:start;gap:4px}.motion-label{margin:0}']
+
+    def mount_motion():
+        before = len(calls)
+        assert page.evaluate('async args => mountScene(await makeScene(...args))', motion_args)
+        assert calls[before:] == ['manifest', 'anime'], calls
+
+    def show_artwork():
+        button = frame.get_by_role('button', name='Show artwork')
+        if touch:
+            button.tap()
+        else:
+            button.click()
+
+    mount_motion()
+    expect(frame.locator('.result')).to_have_text('Still artwork ready')
+    expect(frame.locator('circle')).to_have_attribute('cx', '92')
+    show_artwork()
+    expect(frame.locator('.result')).to_have_text('Still artwork selected')
+    expect(frame.locator('.motion-label')).to_have_css('opacity', '1')
+    assert frame.locator('.fixture').get_attribute('data-motion') is None
+
+    page.emulate_media(reduced_motion='no-preference')
+    mount_motion()
+    expect(frame.locator('circle')).to_have_attribute('cx', '12')
+    expect(frame.locator('.motion-label')).to_have_css('opacity', '0.25')
+    show_artwork()
+    expect(frame.locator('.fixture')).to_have_attribute('data-motion', 'advanced')
+    assert page.evaluate('typeof window.anime') == 'undefined'
+
+    animated_frame = iframe.element_handle().content_frame()
+    animated_frame.evaluate("dispatchEvent(new Event('pagehide'))")
+    expect(frame.locator('.fixture')).to_have_attribute('data-motion', 'reverted')
+    expect(frame.locator('circle')).to_have_attribute('cx', '12')
+    expect(frame.locator('.motion-label')).to_have_css('opacity', '0.25')
+
+    show_artwork()
+    expect(frame.locator('.fixture')).to_have_attribute('data-motion', 'advanced')
+    assert page.evaluate('SFPublicAgentCanvas.closeScene(false)')
+    expect(iframe).to_have_count(0)
+    assert animated_frame.is_detached()
+    assert page.evaluate('typeof window.anime') == 'undefined'
+    before = len(calls)
+    assert page.evaluate("async () => mountScene(await makeScene(\"document.querySelector('.result').textContent = typeof anime;\"))")
+    expect(frame.locator('.result')).to_have_text('undefined')
+    assert len(calls) == before, calls
+
+    result = page.evaluate("""async args => SFCanvasSceneTester.test(await makeScene(...args),
+        {getOwner:()=>'owner-one', canUse:()=>true})""", motion_args)
+    assert result['state'] == 'passed', result
+    assert result['observed']['interactive'] == 1, result
+    assert calls[before:] == ['manifest', 'anime'], calls
+    expect(frame.locator('.result')).to_have_text('undefined')
+    context.close()
+    print(f'PASS Chromium/{width}: Anime.js coordinates SVG and DOM, supports reduced motion, and passes isolated teardown and preview', flush=True)
 
 
 with sync_playwright() as playwright:

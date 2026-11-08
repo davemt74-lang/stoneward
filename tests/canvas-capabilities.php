@@ -35,7 +35,8 @@ verify(($libraries['canvas.library.three']['kind']??null)==='library'&&
     ($libraries['canvas.library.color-thief']['kind']??null)==='library'&&
     ($libraries['canvas.library.d3']['kind']??null)==='library'&&
     ($libraries['canvas.library.matter']['kind']??null)==='library'&&
-    sf_canvas_library_enabled('three')&&sf_canvas_library_enabled('color-thief')&&
+    ($libraries['canvas.library.anime']['kind']??null)==='library'&&
+    sf_canvas_library_enabled('anime')&&sf_canvas_library_enabled('three')&&sf_canvas_library_enabled('color-thief')&&
     sf_canvas_library_enabled('d3')&&sf_canvas_library_enabled('matter'),
     'Pinned libraries appear as separate administrator controls');
 $saved=sf_canvas_permission_save($admin,3,['canvas.library.three'=>false]);
