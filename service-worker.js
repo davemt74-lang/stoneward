@@ -1,7 +1,7 @@
-/* Stonefellow 1.3.313: version-exact, network-first static assets.
+/* Stonefellow 1.3.314: version-exact, network-first static assets.
    Cache-first with ignoreSearch was serving stale app.js with new CSS after deployment. */
-const BUILD='1.3.313';
-const CACHE='stonefellow-static-v1.3.313';
+const BUILD='1.3.314';
+const CACHE='stonefellow-static-v1.3.314';
 const SHELL=['offline.html','assets/js/vendor/acorn.js','assets/js/canvas-preview-guard.js','assets/js/canvas-scene-tester.js','assets/js/canvas-build-workflow.js','assets/js/canvas-gallery.js','assets/css/canvas-gallery.css','assets/js/canvas-resource-picker.js','assets/js/canvas-data-picker.js','assets/css/canvas-resource-picker.css','assets/js/canvas-projects-ui.js','assets/css/canvas-projects.css','assets/vendor/canvas/color-thief.js','assets/js/media-artwork-palette.js','assets/js/canvas-library-runtime.js','assets/js/canvas-agent-theme.js','assets/js/canvas-music-picker.js','assets/css/canvas-music-picker.css','assets/js/canvas-audio-sdk.js','assets/js/canvas-location.js','assets/js/canvas-image-analysis.js','assets/css/canvas-image-analysis.css','assets/js/canvas-image-review.js','assets/css/canvas-image-review.css','assets/css/site.css','assets/css/agent-song-capture.css','assets/css/public-agent-canvas.css','assets/css/fan-vocal-studio.css','assets/css/song-moments.css','assets/images/agent-atmosphere-ember.webp','assets/images/agent-atmosphere-lunar.webp','assets/css/turntable-builder.css','assets/css/artist-world.css','assets/js/turntable-parts.js','assets/js/conversation-barge-in.js','assets/js/speech-segments.js','assets/js/agent-audio-player-skill.js','assets/js/agent-song-capture-skill.js','assets/js/agent-song-catalog-listening.js','assets/js/fan-vocal-studio.js','assets/js/song-moments.js','assets/js/agent-song-experience-ui.js','assets/js/public-agent-canvas.js','assets/js/player-playback-lifecycle.js','assets/js/app.js','assets/js/build-integrity.js','assets/js/artist-home-renderer.js','assets/js/library.js','assets/js/owned-music.js','assets/js/agent-brain.js','assets/js/agent-chat-canvas.js','assets/icons/stonefellow-pwa.svg'];
 const scope=()=>self.registration.scope;
 const abs=p=>new URL(p,scope()).href;
@@ -32,30 +32,57 @@ function jukeboxNotificationUrl(value) {
   }
 }
 
+function canvasNotificationUrl(value) {
+  if (typeof value !== 'string' || value.length > 300) return null;
+  try {
+    const url = new URL(value, scope());
+    const page = new URL('index.php', scope());
+    const id = url.searchParams.get('id');
+    if (url.origin !== page.origin || url.pathname !== page.pathname || url.username || url.password || url.hash ||
+        [...url.searchParams].length !== 3 || url.searchParams.get('view') !== 'canvas-gallery' ||
+        url.searchParams.get('open') !== '1' || !/^[a-f0-9]{32}$/.test(id ?? '')) return null;
+    page.searchParams.set('view', 'canvas-gallery');
+    page.searchParams.set('id', id);
+    page.searchParams.set('open', '1');
+    return page;
+  } catch {
+    return null;
+  }
+}
+
+function notificationUrl(value, type) {
+  if (type === 'canvas-app') return canvasNotificationUrl(value);
+  return type === undefined ? jukeboxNotificationUrl(value) : null;
+}
+
 self.addEventListener('push', event => {
   let payload;
   try { payload = event.data?.json(); } catch { return; }
-  const url = jukeboxNotificationUrl(payload?.url);
+  const url = notificationUrl(payload?.url, payload?.type);
   if (!url || typeof payload.title !== 'string' || !payload.title.trim() || typeof payload.body !== 'string') return;
-  const sessionTag = 'jukebox:' + url.searchParams.get('id');
-  const eventTag = typeof payload.tag === 'string' && payload.tag.startsWith(sessionTag + ':')
-    && /^[a-z0-9:]{1,50}$/.test(payload.tag.slice(sessionTag.length + 1)) ? payload.tag : sessionTag;
+  const canvas = payload.type === 'canvas-app';
+  const targetTag = (canvas ? 'canvas-app:' : 'jukebox:') + url.searchParams.get('id');
+  const eventTag = !canvas && typeof payload.tag === 'string' && payload.tag.startsWith(targetTag + ':')
+    && /^[a-z0-9:]{1,50}$/.test(payload.tag.slice(targetTag.length + 1)) ? payload.tag : targetTag;
+  const data = {url: url.href};
+  if (canvas) data.type = payload.type;
   event.waitUntil(self.registration.showNotification(payload.title.slice(0, 100), {
     body: payload.body.slice(0, 240),
     icon: abs('assets/icons/stonefellow-pwa-192.png'),
     tag: 'stonefellow-' + eventTag,
-    data: {url: url.href}
+    data
   }));
 });
 
 self.addEventListener('notificationclick', event => {
-  const url = jukeboxNotificationUrl(event.notification.data?.url);
+  const type = event.notification.data?.type;
+  const url = notificationUrl(event.notification.data?.url, type);
   if (!url) return;
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
     for (const client of windows) {
-      if (jukeboxNotificationUrl(client.url)?.href === url.href) {
+      if (notificationUrl(client.url, type)?.href === url.href) {
         try { await client.focus(); return; } catch { /* The tab may have closed. */ }
       }
     }
@@ -66,7 +93,7 @@ self.addEventListener('notificationclick', event => {
 function isStatic(url){
   if(url.origin!==self.location.origin)return false;
   const path=url.pathname;
-  return ['/assets/js/vendor/acorn.js','/assets/js/canvas-preview-guard.js','/assets/js/canvas-scene-tester.js','/assets/js/canvas-build-workflow.js','/assets/js/canvas-gallery.js','/assets/css/canvas-gallery.css','/assets/js/canvas-resource-picker.js','/assets/js/canvas-data-picker.js','/assets/css/canvas-resource-picker.css','/assets/js/canvas-projects-ui.js','/assets/css/canvas-projects.css','/assets/vendor/canvas/color-thief.js','/assets/js/media-artwork-palette.js','/assets/js/canvas-library-runtime.js','/assets/js/canvas-agent-theme.js','/assets/js/canvas-music-picker.js','/assets/css/canvas-music-picker.css','/assets/js/canvas-audio-sdk.js','/assets/js/canvas-location.js','/assets/js/canvas-image-analysis.js','/assets/css/canvas-image-analysis.css','/assets/js/canvas-image-review.js','/assets/css/canvas-image-review.css','/assets/css/site.css','/assets/css/agent-song-capture.css','/assets/css/public-agent-canvas.css','/assets/css/fan-vocal-studio.css','/assets/css/song-moments.css','/assets/css/turntable-builder.css','/assets/css/artist-world.css',
+  return ['/assets/js/vendor/acorn.js','/assets/js/canvas-preview-guard.js','/assets/js/canvas-scene-tester.js','/assets/js/canvas-build-workflow.js','/assets/js/canvas-gallery.js','/assets/js/canvas-app-notifications.js','/assets/css/canvas-gallery.css','/assets/js/canvas-resource-picker.js','/assets/js/canvas-data-picker.js','/assets/css/canvas-resource-picker.css','/assets/js/canvas-projects-ui.js','/assets/css/canvas-projects.css','/assets/vendor/canvas/color-thief.js','/assets/js/media-artwork-palette.js','/assets/js/canvas-library-runtime.js','/assets/js/canvas-agent-theme.js','/assets/js/canvas-music-picker.js','/assets/css/canvas-music-picker.css','/assets/js/canvas-audio-sdk.js','/assets/js/canvas-location.js','/assets/js/canvas-image-analysis.js','/assets/css/canvas-image-analysis.css','/assets/js/canvas-image-review.js','/assets/css/canvas-image-review.css','/assets/css/site.css','/assets/css/agent-song-capture.css','/assets/css/public-agent-canvas.css','/assets/css/fan-vocal-studio.css','/assets/css/song-moments.css','/assets/css/turntable-builder.css','/assets/css/artist-world.css',
     '/assets/js/app.js','/assets/js/public-agent-canvas.js','/assets/js/fan-vocal-studio.js','/assets/js/song-moments.js','/assets/js/player-playback-lifecycle.js','/assets/js/conversation-barge-in.js','/assets/js/speech-segments.js','/assets/js/agent-audio-player-skill.js','/assets/js/agent-song-capture-skill.js','/assets/js/agent-song-catalog-listening.js','/assets/js/build-integrity.js','/assets/js/turntable-parts.js',
     '/assets/js/artist-home-renderer.js','/assets/js/library.js','/assets/js/owned-music.js',
     '/assets/js/agent-brain.js','/assets/js/agent-chat-canvas.js'].some(p=>path.endsWith(p))

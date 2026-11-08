@@ -22,6 +22,7 @@ FIXTURE = r'''() => {
   window.owner='';window.calls=[];window.opened=[];window.remixed=[];window.signIns=0;window.copied=[];
   window.failList=true;window.failSubmit=true;window.deferMine=false;window.deferList=false;window.pendingMine=null;window.pendingList=null;
   window.publicItems=Array.from({length:26},(_,index)=>({id:(index+1).toString(16).padStart(32,'0'),
+    app_id:(index+101).toString(16).padStart(32,'0'),
     title:index===0?'<img src=x onerror=alert(1)>':'Published canvas '+(index+1),
     description:'An independently designed Stonefellow experience.',creator_label:index===0?'<script>Creator</script>':'Community creator',
     uses:[{id:'canvas.data.personal_listening_stats',label:'Personal listening statistics',personal:true,enabled:true},{id:'canvas.data.published_catalog',label:'Published songs',personal:false,enabled:false}],
@@ -35,12 +36,55 @@ FIXTURE = r'''() => {
   const imageId='abcdef0123456789abcdef0123456789';
   const listing=(rows,query)=>{const selected=rows.filter(row=>(row.title+' '+row.creator_label).toLowerCase().includes(query.q.toLowerCase()));
     return {ok:true,items:selected.slice((query.page-1)*query.limit,query.page*query.limit),page:query.page,total:selected.length,has_more:query.page*query.limit<selected.length};};
+  window.appCalls=[];window.phoneSettings=0;
+  const appState=new Map();
+  const apps=()=>{if(!appState.has(owner))appState.set(owner,new Map());return appState.get(owner);};
+  const getApp=ref=>{
+    const item=publicItems.find(item=>item.app_id===ref.app_id||item.id===ref.gallery_id);
+    const id=ref.app_id||item?.app_id;
+    return apps().get(id)||{id,gallery_id:item?.id??null,title:item?.title??'',installed:false,enabled:false,supports_alerts:!!item};
+  };
+  window.publishAppUpdate=app_id=>{
+    const app={...getApp({app_id}),gallery_id:'e'.repeat(32),title:'Updated canvas app'};
+    apps().set(app.id,app);
+  };
+  const appApi={
+    status:async(ref,signal)=>{
+      appCalls.push({action:'status',ref});
+      const app=getApp(ref);
+      if(window.deferAppStatus)return new Promise(resolve=>{window.pendingAppStatus={signal,resolve:()=>resolve({app})};});
+      return {app};
+    },
+    install:async(ref,signal)=>{
+      appCalls.push({action:'install',ref,signal});
+      const current=getApp(ref);
+      const app={...current,installed:true};apps().set(app.id,app);return {app};
+    },
+    setNotifications:async(ref,enabled,signal)=>{
+      appCalls.push({action:'set_notifications',ref,enabled,signal});
+      const current=getApp(ref);
+      if(enabled&&ref.expected_gallery_id!==current.gallery_id)
+        throw Object.assign(new Error('The app was updated.'),{status:409});
+      const app={...current,enabled};apps().set(app.id,app);return {app};
+    }
+  };
+  owner='owner-one';
+  const installed=getApp({gallery_id:publicItems[1].id});
+  apps().set(installed.id,{...installed,installed:true});
+  apps().set('f'.repeat(32),{id:'f'.repeat(32),gallery_id:null,title:'Withdrawn app',installed:true,enabled:true,supports_alerts:false});
+  owner='';
+  window.appNotifications=SFCanvasAppNotifications.create({getOwner:()=>owner,api:appApi,
+    onSignIn:()=>signIns++,onPhoneAlerts:()=>phoneSettings++});
   window.api={
     list:async(query,signal)=>{calls.push({action:'list',query,signal});
       if(deferList)return new Promise(resolve=>{pendingList={resolve,signal};});
       if(failList){failList=false;throw new Error('Gallery is temporarily unavailable.');}return listing(publicItems,query);},
     detail:async(id,signal)=>{calls.push({action:'detail',id,signal});const item=publicItems.find(row=>row.id===id);if(!item)throw new Error('Canvas unavailable.');return {ok:true,item};},
     mine:async(query,signal)=>{calls.push({action:'mine',query,signal});if(deferMine)return new Promise(resolve=>{pendingMine={resolve,signal};});return listing(mine,query);},
+    installed:async(signal)=>{appCalls.push({action:'installed',signal});return {items:[...apps().values()].filter(app=>app.installed)};},
+    install:(gallery_id,signal)=>appApi.install({gallery_id},signal),
+    uninstall:async(app_id,signal)=>{appCalls.push({action:'uninstall',app_id,signal});
+      const app={...getApp({app_id}),installed:false,enabled:false};apps().set(app_id,app);return {app};},
     sources:async(signal)=>{calls.push({action:'sources',signal});return {scenes:sources};},
     source:async(id,signal)=>{calls.push({action:'source',id,signal});return {scene:{...sources.find(row=>row.id===id),image_assets:id===11?[{id:imageId,title:'Existing canvas artwork'}]:[]}};},
     submit:async(payload,signal)=>{calls.push({action:'submit',payload,signal});if(failSubmit){failSubmit=false;throw new Error('Submission connection interrupted. Try again.');}
@@ -51,6 +95,7 @@ FIXTURE = r'''() => {
   window.gallery=SFCanvasGallery.create({api,getOwner:()=>owner,getCreatorLabel:()=> 'Listener creator',
     getPreviewUrl:id=>'/api/private-canvas-image.php?id='+id,
     getItemUrl:item=>location.origin+'/?view=canvas-gallery&id='+item.id,
+    onAppNotifications:(app,onChange,isCurrent)=>appNotifications.open({app_id:app.id},{onChange,isCurrent}),
     onOpen:async(item,signal)=>{opened.push({id:item.id,signal});},
     onRemix:async(item,signal)=>{remixed.push({id:item.id,signal});},onSignIn:()=>{signIns++;}});
   gallery.mount(document.querySelector('#target'));
@@ -86,6 +131,7 @@ with sync_playwright() as playwright:
         page.goto(SITE)
         page.add_style_tag(content=(ROOT / 'assets/css/canvas-gallery.css').read_text())
         page.add_script_tag(content=(ROOT / 'assets/js/canvas-gallery.js').read_text())
+        page.add_script_tag(content=(ROOT / 'assets/js/canvas-app-notifications.js').read_text())
         page.evaluate(FIXTURE)
         expect(page.get_by_role('alert')).to_contain_text('temporarily unavailable')
         page.get_by_role('button', name='Try again', exact=True).click()
@@ -183,9 +229,125 @@ with sync_playwright() as playwright:
         buttons = page.locator('.sf-gallery-card-actions button')
         buttons.first.focus()
         page.keyboard.press('Tab')
-        check(page.evaluate('document.activeElement.textContent') == 'Remix' and buttons.evaluate_all('(rows)=>rows.every(row=>row.getBoundingClientRect().height>=44)'),
+        check(page.evaluate('document.activeElement.textContent') == 'Install' and buttons.evaluate_all('(rows)=>rows.every(row=>row.getBoundingClientRect().height>=44)'),
               prefix + 'card controls follow native keyboard order and retain touch targets')
         page.screenshot(path=f'/tmp/canvas-gallery-{width}.png')
+
+        page.get_by_role('button', name='Install Published canvas 3', exact=True).click()
+        check(page.evaluate('signIns===2&&appCalls.every(row=>row.action!=="install")'),
+              prefix + 'guest install requests sign-in and performs no write')
+        page.get_by_role('button', name='Installed apps', exact=True).click()
+        expect(page.get_by_text('Sign in to see your installed canvas apps.')).to_be_visible()
+        page.evaluate('window.beforeGuestAppCalls=appCalls.length;appNotifications.open({gallery_id:publicItems[2].id})')
+        dialog = page.get_by_role('dialog', name='App notifications')
+        expect(dialog.get_by_role('button',name='Sign in',exact=True)).to_be_visible()
+        dialog.get_by_role('button',name='Close',exact=True).click()
+        check(page.evaluate('appCalls.length===beforeGuestAppCalls'), prefix + 'guest app notification control makes no private read')
+
+        page.evaluate('owner="owner-one";gallery.setOwner();appNotifications.setOwner()')
+        installed_card = page.locator('.sf-gallery-installed-card').filter(has_text='Published canvas 2')
+        unavailable_card = page.locator('.sf-gallery-installed-card').filter(has_text='Withdrawn app')
+        expect(unavailable_card.get_by_text('This app is unavailable right now. App notifications are paused.')).to_be_visible()
+        expect(unavailable_card.get_by_role('button',name='Open Withdrawn app')).to_be_hidden()
+        installed_card.get_by_role('button',name='Open Published canvas 2',exact=True).click()
+        check(page.evaluate('opened.at(-1).id===publicItems[1].id'),
+              prefix + 'Installed opens the current gallery pointer using the existing public canvas opener')
+        settings = installed_card.get_by_role('button',name='Notification settings for Published canvas 2',exact=True)
+        settings.click()
+        dialog = page.get_by_role('dialog',name='Notifications for Published canvas 2')
+        enable = dialog.get_by_role('button',name='Enable app notifications',exact=True)
+        expect(enable).to_be_visible()
+        expect(dialog.get_by_role('button',name='Close',exact=True)).to_be_focused()
+        check(page.evaluate('appCalls.every(row=>row.action!=="set_notifications")'),
+              prefix + 'opening trusted settings reads a preference without enabling it')
+        check(page.evaluate('''()=>{
+          const dialog=document.querySelector('.sf-canvas-app-notifications'), count=appCalls.length;
+          return appNotifications.open({app_id:publicItems[1].app_id})&&
+            document.querySelector('.sf-canvas-app-notifications')===dialog&&appCalls.length===count;
+        }'''), prefix + 'duplicate opens preserve the existing trusted dialog and its loaded preference')
+        check(dialog.bounding_box()['width'] < width and enable.bounding_box()['height'] >= 44,
+              prefix + 'trusted settings fit the viewport and keep a full-size touch target')
+        expect(dialog.get_by_text('Get an inbox alert when a new version of this app is published. Phone delivery is optional.')).to_be_visible()
+        enable.evaluate('button=>button.click()')
+        check(page.evaluate('appCalls.every(row=>row.action!=="set_notifications")'),
+              prefix + 'synthetic clicks cannot change notification consent')
+        enable.click()
+        turn_off = dialog.get_by_role('button',name='Turn off app notifications',exact=True)
+        expect(turn_off).to_be_visible()
+        expect(installed_card.get_by_text('App notifications on.')).to_be_visible()
+        dialog.get_by_role('button',name='Manage phone alerts',exact=True).click()
+        expect(dialog).to_be_hidden()
+        check(page.evaluate('phoneSettings===1&&appCalls.filter(row=>row.action==="set_notifications").length===1'),
+              prefix + 'phone settings are a separate explicit action')
+        settings.click()
+        expect(turn_off).to_be_visible()
+        turn_off.click()
+        expect(enable).to_be_visible()
+        dialog.get_by_role('button',name='Close',exact=True).click()
+        expect(settings).to_be_focused()
+        expect(installed_card.get_by_text('App notifications off.')).to_be_visible()
+        check(page.evaluate('''()=>{
+          const [enable,disable]=appCalls.filter(row=>row.action==='set_notifications');
+          return enable.ref.app_id===publicItems[1].app_id&&enable.ref.expected_gallery_id===publicItems[1].id&&
+            disable.ref.app_id===publicItems[1].app_id&&!('expected_gallery_id' in disable.ref);
+        }'''), prefix + 'opt-in confirms the reviewed version while opt-out targets only the stable app ID')
+
+        settings.click()
+        expect(enable).to_be_visible()
+        page.evaluate('publishAppUpdate(publicItems[1].app_id)')
+        enable.click()
+        updated_dialog = page.get_by_role('dialog',name='Notifications for Updated canvas app',exact=True)
+        expect(updated_dialog.get_by_role('status')).to_have_text(
+            'This app was updated. Review its current notification settings before continuing.')
+        expect(updated_dialog.get_by_role('button',name='Close',exact=True)).to_be_focused()
+        check(page.evaluate('appCalls.at(-1).action==="status"&&appCalls.filter(row=>row.action==="set_notifications").length===3'),
+              prefix + 'a stale publication reloads the current settings without retrying consent')
+        updated_dialog.get_by_role('button',name='Enable app notifications',exact=True).click()
+        expect(updated_dialog.get_by_role('button',name='Turn off app notifications',exact=True)).to_be_visible()
+        check(page.evaluate('appCalls.at(-1).ref.expected_gallery_id==="e".repeat(32)'),
+              prefix + 'a new confirmation is bound to the refreshed publication')
+        updated_dialog.get_by_role('button',name='Close',exact=True).click()
+
+        paused_settings = unavailable_card.get_by_role('button',name='Notification settings for Withdrawn app',exact=True)
+        paused_settings.click()
+        paused_dialog = page.get_by_role('dialog',name='Notifications for Withdrawn app',exact=True)
+        expect(paused_dialog.get_by_text('This app can’t send alerts right now. Its notifications are paused, and you can still turn them off.')).to_be_visible()
+        expect(paused_dialog.get_by_role('button',name='Manage phone alerts',exact=True)).to_be_hidden()
+        paused_dialog.get_by_role('button',name='Turn off app notifications',exact=True).click()
+        expect(paused_dialog.get_by_text('This app has no notifications available.')).to_be_visible()
+        paused_dialog.get_by_role('button',name='Close',exact=True).click()
+        expect(paused_settings).to_be_focused()
+        check(page.evaluate('''()=>{
+          const row=appCalls.at(-1);
+          return row.action==='set_notifications'&&row.enabled===false&&row.ref.app_id==='f'.repeat(32)&&
+            !('expected_gallery_id' in row.ref);
+        }'''), prefix + 'unavailable apps keep an account-level path to revoke paused notifications')
+        unavailable_card.get_by_role('button',name='Uninstall Withdrawn app',exact=True).click()
+        expect(unavailable_card).to_have_count(0)
+        check(page.evaluate('appCalls.at(-1).action==="uninstall"&&appCalls.at(-1).app_id==="f".repeat(32)'),
+              prefix + 'unpublished installs can still be removed by stable ID')
+        page.get_by_role('button',name='Gallery',exact=True).click()
+        expect(page.get_by_role('button',name='Installed Published canvas 2',exact=True)).to_be_disabled()
+        public_app = page.locator('.sf-gallery-card').filter(has_text='Published canvas 3')
+        public_app.get_by_role('button',name='Install Published canvas 3',exact=True).click()
+        expect(public_app.get_by_text('Installed. App notifications are off.')).to_be_visible()
+        check(page.evaluate('appCalls.at(-1).action==="install"&&appCalls.at(-1).ref.gallery_id===publicItems[2].id'),
+              prefix + 'catalog install uses the published alias and leaves notifications off')
+
+        page.evaluate('appNotifications.open({gallery_id:publicItems[3].id})')
+        install_dialog = page.get_by_role('dialog',name='Notifications for Published canvas 4')
+        install_dialog.get_by_role('button',name='Install app',exact=True).dblclick()
+        expect(install_dialog.get_by_role('button',name='Enable app notifications',exact=True)).to_be_visible()
+        check(page.evaluate('appCalls.at(-1).action==="install"&&appCalls.at(-1).ref.app_id===publicItems[3].app_id'),
+              prefix + 'double-clicking Install cannot opt in when the control changes to Enable')
+        install_dialog.get_by_role('button',name='Close',exact=True).click()
+        page.evaluate('''window.deferAppStatus=true;appNotifications.open({gallery_id:publicItems[3].id});''')
+        page.wait_for_function('window.pendingAppStatus')
+        page.evaluate('''owner='owner-two';appNotifications.setOwner();gallery.setOwner();pendingAppStatus.resolve();''')
+        expect(page.locator('.sf-canvas-app-notifications')).to_have_count(0)
+        expect(page.get_by_role('button',name='Install Published canvas 2',exact=True)).to_be_visible()
+        check(page.evaluate('pendingAppStatus.signal.aborted'), prefix + 'account switch aborts stale dialog reads and clears installed state')
+
         page.evaluate('deferList=true;void gallery.show("public")')
         page.wait_for_function('window.pendingList!==null')
         page.evaluate('gallery.destroy();pendingList.resolve({ok:true,items:publicItems,page:1,total:26,has_more:true})')

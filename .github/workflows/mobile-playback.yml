@@ -55,5 +55,6 @@ jobs:
           python3 tests/pwa-icon-http.py
           php tests/pwa-splash-code.php
           php tests/jukebox-follow.php
+          php tests/canvas-app-alerts.php
           php tests/web-push.php
           node --test tests/pwa-worker.test.cjs

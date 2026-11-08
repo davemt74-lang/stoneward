@@ -42,19 +42,19 @@ $db=sf_db();$mysql=$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
 $db->exec($mysql?'CREATE TABLE users(id BIGINT UNSIGNED PRIMARY KEY) ENGINE=InnoDB':'CREATE TABLE users(id INTEGER PRIMARY KEY)');
 $db->exec('INSERT INTO users(id) VALUES(1),(2),(3)');
 $tools=sf_canvas_account_data_inventory();
-$expectedIds=['personal_listening_stats','my_listening_summary','my_listening_history','my_purchases','my_tickets','my_preferences'];
-account_data_check(array_column($tools,'id')===$expectedIds,'The six registered account source categories each have their own picker entry');
+$expectedIds=['personal_listening_stats','my_listening_summary','my_listening_history','my_purchases','my_tickets','my_preferences','my_notifications'];
+account_data_check(array_column($tools,'id')===$expectedIds,'Each registered account source has its own picker entry');
 foreach($tools as $tool){
     account_data_check(array_keys($tool['fields'])===array_keys($tool['field_labels'])&&$tool['time_window']!==''&&
         $tool['permission_id']==='canvas.data.'.$tool['id']&&!array_intersect(array_keys($tool),['rows','values','endpoint','handler']),
         'Picker lists only typed field names, labels and usage metadata for '.$tool['id']);
 }
-$personalTables=$db->query($mysql?"SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('listening_events','user_profiles','canvas_access_grants')":
-    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('listening_events','user_profiles','canvas_access_grants')")->fetchColumn();
+$personalTables=$db->query($mysql?"SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('listening_events','user_profiles','canvas_access_grants','user_notifications')":
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('listening_events','user_profiles','canvas_access_grants','user_notifications')")->fetchColumn();
 account_data_check((int)$personalTables===0,'Discovery does not initialize or read personal record and grant tables');
 $admin=['id'=>1,'role'=>'admin'];
 sf_canvas_permission_save($admin,1,['canvas.data.my_tickets'=>false]);
-account_data_check(!in_array('my_tickets',array_column(sf_canvas_account_data_inventory(),'id'),true)&&count(sf_canvas_account_data_inventory())===5,
+account_data_check(array_column(sf_canvas_account_data_inventory(),'id')===array_values(array_diff($expectedIds,['my_tickets'])),
     'The inventory respects a disabled scope without disabling other account categories');
 account_data_check(sf_canvas_account_data_ids([])===[]&&
     sf_canvas_account_data_ids(['my_preferences','my_purchases','my_preferences'])===['my_preferences','my_purchases'],

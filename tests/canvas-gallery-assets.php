@@ -111,7 +111,12 @@ $small=pixels(64,64,9);$relative='storage/media/library/image/reference.png';fil
 $db->prepare('INSERT INTO media_assets(uuid,category,mime_type,extension,original_name,stored_path,sha256,size_bytes,title,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
     ->execute(['reference','image','image/png','png','Private-original-name.png',$relative,hash('sha256',$small),strlen($small),'Artist reference',gmdate('c'),gmdate('c')]);
 $mediaId=(int)$db->lastInsertId();$ref=sf_agent_canvas_reference_set($mediaId,true)['reference_image_id'];
-$refScene=savedScene(2,$ref);$refItem=submitScene($owner,$refScene,$ref);approve($refItem,$admin);
+$refScene=savedScene(2,$ref);
+$refScene=sf_agent_scene_history_save(2,array_replace($refScene,[
+    'html'=>'<section class="art sf-image-'.$ref.'"><span class="sf-action-app-notifications">Updates</span></section>']),$refScene['id']);
+$refItem=submitScene($owner,$refScene,$ref);approve($refItem,$admin);
+sf_canvas_app_change(3,'install',$refItem['id'],null);
+sf_canvas_app_change(3,'set_notifications',null,$refItem['id'],true,$refItem['id']);
 $refOpen=sf_canvas_gallery_open($refItem['id']);$refAsset=$refOpen['scene']['image_assets'][0]['id'];
 verify(delivered($refItem['id'],$refAsset)===$small&&!str_contains(json_encode($refOpen['scene']),$ref)&&
     !str_contains(json_encode($refOpen['scene']),'Private-original-name'),
@@ -123,6 +128,10 @@ sf_agent_canvas_reference_set($mediaId,false);
 verify(delivered($refItem['id'],$refAsset)===null&&sf_canvas_gallery_get($refItem['id'])===null&&
     file_get_contents(sf_agent_canvas_image_file(3,$refCopy)['path'])===$small,
     'Removing artist public permission immediately revokes gallery copies without deleting a valid prior private remix');
+$outage=sf_canvas_app_get(3,null,$refItem['id']);
+verify($outage['gallery_id']===null&&$outage['enabled']&&!$outage['supports_alerts']&&
+    !sf_canvas_app_change(3,'set_notifications',null,$refItem['id'],false)['enabled'],
+    'An app unavailable due to a revoked reference still exposes its saved opt-in so the installer can turn it off');
 // Independent publication from the other account survives owner-specific clearing.
 $otherItem=submitScene($other,savedScene(3,$foreignId));approve($otherItem,$admin);
 $otherAsset=sf_canvas_gallery_open($otherItem['id'])['scene']['image_assets'][0]['id'];

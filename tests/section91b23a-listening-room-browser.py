@@ -1975,6 +1975,74 @@ with sync_playwright() as p:
                 }''') and not errors,
                   prefix + 'the replace-image control swaps a saved image without another generation request')
             page.evaluate('imageActionsFixture.restore()')
+
+        edit_title = '<b>History edit fixture</b>'
+        page.evaluate('''title => {
+          closeListeningRoom(false);
+          SFPublicAgentCanvas.closePage(true);
+          setChatFooterHidden(true);
+          input.value='';
+          st.auth={authenticated:true,user:{id:4}};
+          syncAuthMenu();
+          const active={id:801,canvas_kind:'custom',track_id:'',title:'Other active canvas',
+            html:'<h1>Other active canvas</h1>',css:'h1{color:linen}'};
+          const selected={...active,id:802,title,html:'<h1>Selected saved canvas</h1>'};
+          window.historyEditFixture={reads:[],writes:[]};
+          window.api=async path=>{
+            historyEditFixture.reads.push(path);
+            if(path==='agent-scene.php')return {ok:true,scenes:[
+              {id:active.id,canvas_kind:active.canvas_kind,title:active.title},
+              {id:selected.id,canvas_kind:selected.canvas_kind,title:selected.title}
+            ]};
+            if(path==='agent-scene.php?id=802')return {ok:true,scene:selected};
+            throw Error('Unexpected canvas history edit read: '+path);
+          };
+          window.secureJsonPost=async (path,body)=>{
+            historyEditFixture.writes.push({path,body});
+            throw Error('Opening an edit draft should not write');
+          };
+          if(!SFPublicAgentCanvas.showScene(active,{focus:false}))throw Error('Edit fixture could not open');
+          listeningRoom=active;
+          listeningRoomOwner=canvasOwner();
+        }''', edit_title)
+        activate(history_button)
+        history_edit_rail = page.locator('.sf-agent-page-rail[data-view="scene-history"]')
+        history_edit_row = history_edit_rail.locator('li').filter(has_text=edit_title)
+        edit_actions = history_edit_row.locator('.sf-agent-scene-history-actions')
+        edit_button = edit_actions.get_by_role('button', name='Edit ' + edit_title, exact=True)
+        expect(edit_button).to_be_visible()
+        expect(edit_actions.get_by_role('button', name=f'Submit {edit_title} to the Canvas Catalog', exact=True)).to_be_visible()
+        check(edit_actions.evaluate('''actions => {
+          const bounds=actions.getBoundingClientRect();
+          const viewport=actions.closest('.sf-agent-page-viewport').getBoundingClientRect();
+          return bounds.left>=viewport.left-1&&bounds.right<=viewport.right+1&&
+            [...actions.querySelectorAll('button')].every(button=>{
+              const target=button.getBoundingClientRect();
+              return target.width>=44&&target.height>=44;
+            });
+        }'''), prefix + 'saved canvas actions fit the history rail and retain 44px touch targets')
+
+        activate(edit_button)
+        editor_rail = page.locator('.sf-agent-page-rail[data-view="scene-edit"]')
+        expect(editor_rail.get_by_role('heading', name=edit_title, exact=True)).to_be_visible()
+        check(not history_edit_rail.is_visible() and editor_rail.locator('h2 b').count() == 0 and
+              page.evaluate('listeningRoom.id===801&&historyEditFixture.writes.length===0'),
+              prefix + 'Edit opens a native page for the exact saved title without replacing the active canvas')
+        activate(editor_rail.get_by_role('button', name='Back to Canvas History', exact=True))
+        expect(edit_button).to_be_focused()
+        check(not editor_rail.is_visible(), prefix + 'returning to Canvas History focuses the same saved row')
+
+        activate(edit_button)
+        activate(editor_rail.get_by_role('button', name='Edit design', exact=True))
+        expect(frame.get_by_role('heading', name='Selected saved canvas', exact=True)).to_be_visible()
+        edit_composer = page.locator('#composer-input')
+        expect(edit_composer).to_be_visible()
+        expect(edit_composer).to_be_focused()
+        expect(edit_composer).to_have_value('/edit ')
+        check(not editor_rail.is_visible() and page.evaluate('''listeningRoom.id===802&&
+              historyEditFixture.reads.filter(path=>path==='agent-scene.php?id=802').length>=1&&
+              historyEditFixture.writes.length===0'''),
+              prefix + 'Edit design restores the selected saved canvas and prepares an unsent revision')
         context.close()
     browser.close()
 

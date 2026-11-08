@@ -64,3 +64,23 @@
 .sf-gallery-uses summary{cursor:pointer;min-height:30px;color:var(--ink,#f1f0e9)}
 .sf-gallery-uses ul{margin:4px 0 12px;padding-left:18px}
 .sf-gallery-uses li{margin:4px 0}
+.sf-gallery-installed-intro,.sf-gallery-installed-state{color:var(--muted,#b4c4d3);font-size:14px}
+.sf-gallery-installed-state{margin:8px 0 0}
+
+.sf-canvas-app-notifications{
+  box-sizing:border-box;width:min(460px,calc(100% - 24px));max-width:none;max-height:calc(100dvh - 24px);
+  margin:auto;padding:20px;border:1px solid #759ab866;border-radius:14px;background:#101a2a;color:#eef6fb;
+  overflow:auto;overflow-wrap:anywhere;font:15px/1.5 system-ui,sans-serif
+}
+.sf-canvas-app-notifications::backdrop{background:#060b16d4}
+.sf-canvas-app-notifications h2{margin:0;font:650 20px/1.3 system-ui,sans-serif}
+.sf-canvas-app-notifications p{margin:9px 0 0;color:#c7d9e7}
+.sf-canvas-app-notifications [role=status]:empty{position:absolute}
+.sf-canvas-app-notification-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.sf-canvas-app-notification-actions button{
+  min-width:44px;min-height:44px;padding:7px 11px;border:1px solid #759ab899;border-radius:8px;
+  background:#172a40;color:inherit;font:600 14px/1.35 system-ui,sans-serif;cursor:pointer
+}
+.sf-canvas-app-notification-actions button:first-child{background:#c4e2f1;color:#0c1927;border-color:transparent}
+.sf-canvas-app-notification-actions button:disabled{opacity:.58;cursor:default}
+.sf-canvas-app-notification-actions button:focus-visible{outline:2px solid #a5d6ef;outline-offset:2px}

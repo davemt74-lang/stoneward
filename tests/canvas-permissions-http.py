@@ -31,7 +31,7 @@ ENDPOINT = '/admin/api/canvas-permissions.php'
 ME_ENDPOINT = '/api/canvas-resources.php?kind=me'
 LIBRARY_ENDPOINT = '/api/canvas-libraries.php'
 ACCOUNT_TOOLS = {'personal_listening_stats', 'my_listening_summary', 'my_listening_history',
-                 'my_purchases', 'my_tickets', 'my_preferences'}
+                 'my_purchases', 'my_tickets', 'my_preferences', 'my_notifications'}
 checks = []
 
 
@@ -93,7 +93,7 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
                   'Signed-in non-admin cannot write policy even with a valid account CSRF token')
             initial = admin.get(ENDPOINT)
             data = initial.json()
-            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 24 and
+            check(initial.status == 200 and data['policy']['revision'] == 1 and len(data['capabilities']) == 25 and
                   {row['permission_id'] for row in data['capabilities'] if row['kind'] == 'library'} ==
                   {'canvas.library.three', 'canvas.library.color-thief', 'canvas.library.d3', 'canvas.library.matter',
                    'canvas.library.anime', 'canvas.library.meyda', 'canvas.library.pixi'},
@@ -118,6 +118,8 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-permissions-http-') as
             items = {item['id']: item for item in resources.json()['items']}
             check(resources.status == 200 and set(items) == ACCOUNT_TOOLS and
                   items['my_preferences']['fields']['timezone'] == 'text' and
+                  items['my_notifications']['fields'] == {
+                      'kind': 'text', 'title': 'text', 'created_at': 'text', 'is_read': 'number'} and
                   'no-store' in resources.headers.get('cache-control', '') and
                   b'Europe/Berlin' not in resources.body() and b'owner@example.invalid' not in resources.body(),
                   'Signed-in picker exposes the complete field inventory over no-store HTTP')

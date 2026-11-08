@@ -150,5 +150,63 @@ sf_db()->prepare('UPDATE agent_scene_history SET gallery_attribution=? WHERE use
     sf_canvas_build_workflow_json(sf_canvas_gallery_attribution(sf_canvas_gallery_row($recovered['id']))),$committedSceneId]);
 gallery_check(sf_canvas_gallery_remix($user,$recovered['id'],$failedRemixRequest)['scene']['id']===$committedSceneId,
     'Remix recovery reuses the committed owned copy after a transient reply failure');
+
+$noticeMarkup='<section><span class="decorative sf-action-app-notifications">Updates</span></section>';
+$noticeScene=['canvas_kind'=>'custom','track_id'=>'','title'=>'App update fixture','html'=>$noticeMarkup,'css'=>''];
+$publishApp=static function(int $scene)use($user,$admin):array {
+    $pending=sf_canvas_gallery_submit($user,gallery_request($scene,bin2hex(random_bytes(16))));
+    return sf_canvas_gallery_moderate($admin,$pending['id'],'approve',$pending['snapshot_hash']);
+};
+$appSource=sf_agent_scene_history_save(1,$noticeScene);
+$appFirst=$publishApp($appSource['id']);
+$appId=$appFirst['app_id'];
+// Model a publication approved by a previous release before app identities existed.
+sf_canvas_app_query('DELETE FROM canvas_apps WHERE id=?',[$appId]);
+gallery_check(sf_canvas_app_get(0,$appFirst['id'],null)['id']===$appId&&sf_canvas_app_row($appId)===null,
+    'A legacy approved publication has public install metadata without creating an app');
+sf_canvas_app_change(2,'install',$appFirst['id'],null);
+sf_canvas_app_change(2,'set_notifications',null,$appId,true);
+$firstConsent=sf_canvas_app_installation($appId,2)['consent_key'];
+sf_canvas_app_change(2,'set_notifications',null,$appId,true);
+gallery_check(sf_canvas_app_installation($appId,2)['consent_key']===$firstConsent&&$firstConsent!==''&&
+    (int)sf_canvas_app_query('SELECT COUNT(*) FROM canvas_app_alerts WHERE app_id=?',[$appId])->fetchColumn()===0,
+    'Legacy installation persists its app identity and a repeated opt-in keeps its original consent key');
+$duplicateApp=$publishApp($appSource['id']);
+gallery_check($duplicateApp['app_id']===$appId&&sf_canvas_app_get(2,$duplicateApp['id'],null)['gallery_id']===$appFirst['id']&&
+    (int)sf_canvas_app_query('SELECT COUNT(*) FROM canvas_app_alerts WHERE app_id=?',[$appId])->fetchColumn()===0,
+    'Another approved submission of the identical saved scene becomes an alias without replacing the current version or queuing an alert');
+$appRevision=sf_agent_scene_history_save(1,$noticeScene,$appSource['id']);
+$appSecond=$publishApp($appRevision['id']);
+sf_canvas_gallery_moderate($admin,$appSecond['id'],'approve',$appSecond['snapshot_hash']);
+$latestApp=sf_canvas_app_get(2,$appFirst['id'],null);
+gallery_check($appSecond['app_id']===$appId&&$latestApp['gallery_id']===$appSecond['id']&&$latestApp['enabled']&&
+    sf_canvas_app_installation($appId,2)['consent_key']===$firstConsent&&
+    sf_canvas_app_query('SELECT user_id FROM canvas_app_alerts WHERE app_id=? AND gallery_id=?',[$appId,$appSecond['id']])->fetchAll(PDO::FETCH_COLUMN)===[2],
+    'A newly approved descendant preserves identity and opt-in, and approval retry does not duplicate the opted-in recipient');
+gallery_check(!isset(sf_canvas_gallery_open($appFirst['id'],$admin)['scene']['app_notifications'])&&
+    sf_canvas_gallery_open($appSecond['id'],$admin)['scene']['app_notifications']===true&&
+    !isset(sf_canvas_gallery_open($appSecond['id'],$admin,'',true)['scene']['app_notifications']),
+    'Only the exact current reviewed public snapshot enables its app notification control');
+sf_canvas_app_change(2,'set_notifications',null,$appId,false);
+sf_canvas_app_change(2,'set_notifications',null,$appId,true);
+gallery_check(sf_canvas_app_installation($appId,2)['consent_key']!==$firstConsent,
+    'Disabling and reenabling creates a new consent key for future alerts');
+$branchScene=sf_agent_scene_history_save(1,$noticeScene,$appSource['id']);
+$branchApp=$publishApp($branchScene['id']);
+$appRemix=sf_canvas_gallery_remix($user,$appSecond['id'],bin2hex(random_bytes(16)));
+$remixApp=$publishApp($appRemix['scene']['id']);
+gallery_check($branchApp['app_id']!==$appId&&$remixApp['app_id']!==$appId&&$remixApp['app_id']!==$branchApp['app_id']&&
+    sf_canvas_app_get(2,null,$appId)['gallery_id']===$appSecond['id'],
+    'Branches from obsolete revisions and remixes are independent apps and cannot replace the current one');
+sf_canvas_gallery_withdraw($user,$appFirst['id']);
+gallery_check(sf_canvas_app_get(2,null,$appId)['enabled'],
+    'Withdrawing an obsolete publication does not revoke the current app preference');
+$noSupport=sf_agent_scene_history_save(1,array_replace($noticeScene,['html'=>'<section class="sf-action-app-notifications"><span class="sf-action-app-notifications-more">Updates</span></section>']),$appRevision['id']);
+$noAlerts=$publishApp($noSupport['id']);
+$revokedApp=sf_canvas_app_get(2,null,$appId);
+gallery_check($noAlerts['app_id']===$appId&&$revokedApp['installed']&&!$revokedApp['supports_alerts']&&!$revokedApp['enabled']&&
+    sf_canvas_app_installation($appId,2)['consent_key']==='',
+    'Only the exact class token on a span declares support, and removing support clears existing consent');
+
 gallery_check($calls===$providerCalls&&sf_token_balance(1)===$balanceBeforeGallery,'Submit review Open Remix and paging never call a model or deduct Active Tokens');
 echo 'Canvas Gallery: '.$galleryChecks.' checks passed'.PHP_EOL;

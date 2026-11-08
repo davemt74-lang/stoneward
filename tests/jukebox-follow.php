@@ -89,10 +89,29 @@ control($session,'start');
 verify(sf_jukebox_alert_run()['done']===1&&array_column(notices(2),'title')===['Jukebox reminder','Jukebox time changed','Jukebox is live']&&!notices(3),
     'Actual start supersedes reminders and sends once only to current followers');
 
+require_once $root.'/api/agent-scene-core.php';
+$follower=['id'=>2,'role'=>'customer'];
+$inboxHtml='<section class="sf-dataset-my_notifications"></section>';
+$inbox=sf_agent_scene_history_save(2,['canvas_kind'=>'custom','title'=>'Inbox','track_id'=>'',
+    'html'=>$inboxHtml,'css'=>'','artist_inputs'=>['me_tools'=>['my_notifications']]]);
+$inboxContext=['scene_id'=>$inbox['id']];
+$readInbox=static fn():array=>sf_agent_canvas_data_for_scene($follower,$inboxHtml,'',null,null,$inboxContext)['my_notifications'];
+verify($readInbox()['state']==='consent_required'&&$readInbox()['rows']===[],
+    'Canvas delivery withholds Jukebox inbox alerts before consent');
+$access=sf_canvas_access_summary($follower,$inboxContext);
+sf_canvas_access_change($follower,$inboxContext,'grant',$access['fingerprint'],['canvas.data.my_notifications']);
+$rows=$readInbox()['rows'];
+verify(array_column($rows,'title')===['Jukebox is live','Jukebox time changed','Jukebox reminder']&&
+    array_column($rows,'kind')===['jukebox','jukebox','jukebox']&&
+    array_keys($rows[0])===['kind','title','created_at','is_read'],
+    'Consented notification source reads actual Jukebox inbox deliveries without private session details');
+
 foreach([2,3] as $userId)change($canceled,static fn(array $row)=>sf_jukebox_follow_set($row,$userId,true));
 control($canceled,'cancel');
 verify(sf_jukebox_alert_run()['done']===2&&array_column(notices(3),'title')===['Jukebox canceled'],
     'Canceling supersedes the reminder and informs each follower');
+verify(array_column($readInbox()['rows'],'title')===['Jukebox canceled','Jukebox is live','Jukebox time changed','Jukebox reminder'],
+    'The already authorized canvas receives new Jukebox alerts when it reloads');
 $closed=sf_privacy_close_account(2,sf_user_by_email('fixture2@example.invalid'),$password,'DELETE');
 verify($closed['closed']&&!sf_jukebox_following($session,2)&&!sf_jukebox_following($canceled,2)
     &&!sf_jukebox_query('SELECT 1 FROM jukebox_alerts WHERE user_id=2')->fetchColumn()&&!notices(2)

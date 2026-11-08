@@ -3,10 +3,12 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.313',
+  'stonefellow'=>'1.3.314',
   'canvas_runtime_libraries'=>'pinned-local-meyda-pixi-anime-matter-d3-three-and-color-thief-optional-canvas-dependencies-with-artwork-derived-host-colors',
   'canvas_live_data'=>'approved-named-sources-public-geography-map-boundaries-venue-scoped-nws-usgs-earthquakes-and-opt-in-proximity',
   'canvas_account_sources'=>'me-field-inventory-and-per-viewer-runtime-consent',
+  'canvas_notifications'=>'jukebox-and-account-inbox-shortcut-and-consented-canvas-source',
+  'canvas_app_alerts'=>'installed-app-consent-and-reviewed-revision-inbox-and-device-delivery',
   'canvas_lyric_sources'=>'published-songbook-and-reviewed-timing-by-canonical-song',
   'canvas_story_sources'=>'published-story-selection-live-all-and-tag-scopes',
   'canvas_playlist_sources'=>'ordered-owned-and-approved-artist-revisions-with-current-audio-authorization',

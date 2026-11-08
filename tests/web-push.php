@@ -67,6 +67,20 @@ try{
         throw new RuntimeException('Unsafe notification link accepted.');
     }
     verify_push(true,'Push notification links stay in the Stonefellow application');
+    $canvasId=str_repeat('b',32);
+    $canvasPayload=['title'=>'Stonefellow','body'=>'An installed canvas has an update.',
+        'url'=>'index.php?view=canvas-gallery&id='.$canvasId.'&open=1','tag'=>'canvas-app:'.$canvasId,'type'=>'canvas-app'];
+    verify_push(json_decode(sf_web_push_payload($canvasPayload),true)===$canvasPayload,'A typed canvas alert retains its approved canvas launch route');
+    foreach([['type'=>'invalid'],['url'=>$canvasPayload['url'].'&tab=mine'],['url'=>'/?view=canvas-gallery&id='.$canvasId.'&open=1'],
+        ['url'=>$payload['url']],['tag'=>'canvas-app:'.str_repeat('a',32)]] as $invalid){
+        try{
+            sf_web_push_payload(array_replace($canvasPayload,$invalid));
+        }catch(InvalidArgumentException $e){
+            continue;
+        }
+        throw new RuntimeException('Unsafe canvas notification message accepted.');
+    }
+    verify_push(true,'Typed canvas alerts reject mismatched or altered launch routes');
 
     $db=sf_db();
     $db->exec("CREATE TABLE users(id INTEGER PRIMARY KEY,status TEXT NOT NULL); INSERT INTO users VALUES(1,'active'),(2,'active')");

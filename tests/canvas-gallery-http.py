@@ -25,6 +25,7 @@ finally:
 PHP = os.environ.get('SF_TEST_PHP', 'php')
 PUBLIC = '/api/canvas-gallery.php'
 ADMIN = '/admin/api/canvas-gallery.php'
+APP = '/api/canvas-app.php'
 checks = []
 
 
@@ -44,7 +45,7 @@ def sign_in(base, email):
 
 
 def public_item(item):
-    return set(item).issubset({'id', 'title', 'description', 'creator_label', 'preview_url', 'submitted_at', 'published_at', 'attribution', 'uses'}) and isinstance(item.get('uses'), list) and all(
+    return set(item).issubset({'id', 'title', 'description', 'creator_label', 'preview_url', 'submitted_at', 'published_at', 'attribution', 'uses', 'app_id'}) and isinstance(item.get('uses'), list) and all(
         set(permission) == {'id', 'label', 'personal', 'enabled'} and isinstance(permission['id'], str) and
         isinstance(permission['label'], str) and isinstance(permission['personal'], bool) and isinstance(permission['enabled'], bool)
         for permission in item['uses'])
@@ -66,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-gallery-http-') as tem
         require_once SF_ROOT.'/api/canvas-gallery-core.php';
         sf_db()->exec("UPDATE users SET role='admin' WHERE id=2");
         $source=sf_agent_scene_history_save(1,['canvas_kind'=>'custom','track_id'=>'','title'=>'PRIVATE_SOURCE_TITLE',
-            'html'=>'<section class="paper"><p>Shared paper shape</p></section>','css'=>'.paper{color:#ead9b6}',
+            'html'=>'<section class="paper"><p>Shared paper shape</p><span class="sf-action-app-notifications">Updates</span></section>','css'=>'.paper{color:#ead9b6}',
             'design_brief'=>'PRIVATE_ORIGINAL_PROMPT do not publish this request',
             'music_inputs'=>['mode'=>'selected','track_ids'=>['song-2','song-1']]]);
         $foreign=sf_agent_scene_history_save(2,['canvas_kind'=>'custom','track_id'=>'','title'=>'ADMIN_PRIVATE_SOURCE',
@@ -112,6 +113,9 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-gallery-http-') as tem
             item = submitted.json()['item']
             check(item['status'] == 'pending' and item['source_scene_id'] == saved['id'] and len(item['snapshot_hash']) == 64,
                   'publication freezes a private reviewable submission pending administrator approval')
+            check(guest.get(APP + '?gallery_id=' + item['id']).status == 404 and
+                  owner.post(APP, {'action': 'install', 'gallery_id': item['id']}, owner_headers).status == 404,
+                  'pending publication cannot expose or install a canvas app')
             replay = owner.post(PUBLIC, request, owner_headers)
             check(replay.status == 201 and replay.json()['item']['id'] == item['id'] and
                   len(owner.get(PUBLIC + '?action=mine').json()['items']) == 1,
@@ -151,6 +155,28 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-gallery-http-') as tem
                   'no-store' in opened.headers.get('cache-control', ''),
                   'approved public catalog and detail DTOs contain only intended publication metadata')
             public_scene = opened.json()['scene']
+            app_id = opened.json()['app']['id']
+            app_detail = APP + '?gallery_id=' + item['id']
+            install = {'action': 'install', 'gallery_id': item['id']}
+            toggle = {'action': 'set_notifications', 'app_id': app_id, 'enabled': True, 'expected_gallery_id': item['id']}
+            check(detail.json()['item']['app_id'] == app_id and public_scene['app_notifications'] is True and
+                  guest.get(app_detail).json()['app'] == {'id': app_id, 'gallery_id': item['id'], 'title': request['title'],
+                                                        'installed': False, 'enabled': False, 'supports_alerts': True},
+                  'approved canvas exposes only public app metadata and a host-authorized notification control')
+            check(guest.get(APP + '?action=installed').status == 401 and guest.post(APP, install).status == 401 and
+                  owner.post(APP, install).status == 403 and owner.post(APP, install, admin_headers).status == 403,
+                  'canvas installation requires sign-in and the current account CSRF token')
+            check(owner.post(APP, toggle, owner_headers).status == 422 and
+                  owner.post(APP, install, owner_headers).json()['app']['enabled'] is False and
+                  owner.post(APP, {**toggle, 'enabled': 'true'}, owner_headers).status == 422 and
+                  owner.post(APP, {k: v for k, v in toggle.items() if k != 'expected_gallery_id'}, owner_headers).status == 422,
+                  'installation leaves notifications off and enabling requires installation, a JSON boolean and reviewed gallery ID')
+            check(owner.post(APP, toggle, owner_headers).json()['app']['enabled'] is True and
+                  owner.post(APP, install, owner_headers).json()['app']['enabled'] is True and
+                  owner.get(APP + '?action=installed').json()['items'] == [owner.get(app_detail).json()['app']] and
+                  admin.get(APP + '?action=installed').json()['items'] == [] and
+                  admin.get(app_detail).json()['app']['installed'] is False,
+                  'installation and notification settings are idempotent and isolated to the current account')
             check(public_scene['html'] == saved['html'] and public_scene['title'] == request['title'] and
                   public_scene['music_inputs'] == saved['music_inputs'] and 'id' not in public_scene and
                   public_scene['gallery_attribution']['source'] == {'id': item['id'], 'title': 'Paper orbit', 'creator_label': 'Stonefellow Fan'},
@@ -188,14 +214,37 @@ with tempfile.TemporaryDirectory(prefix='stoneward-canvas-gallery-http-') as tem
                   guest.get(PUBLIC).json()['items'] == [] and guest.get(PUBLIC + '?id=' + item['id']).status == 404 and
                   guest.get(PUBLIC + '?action=open&id=' + item['id']).status == 404,
                   'owner withdrawal immediately removes the publication from public browsing and opening')
+            stable_app = APP + '?app_id=' + app_id
+            unavailable_app = owner.get(stable_app).json()['app']
+            check(guest.get(stable_app).status == 404 and unavailable_app['gallery_id'] is None and
+                  unavailable_app['installed'] is True and unavailable_app['enabled'] is False and
+                  owner.post(APP, toggle, owner_headers).status == 422 and
+                  owner.post(APP, {'action': 'uninstall', 'app_id': app_id}, owner_headers).json()['app']['installed'] is False and
+                  owner.get(APP + '?action=installed').json()['items'] == [],
+                  'withdrawal revokes delivery consent and an installer can remove the unavailable app')
             check(owner.post(PUBLIC, {**remix_request, 'request_id': '4' * 32}, owner_headers).status == 404 and
                   owner.get('/api/agent-scene.php?id=' + str(remix['id'])).status == 200 and
                   admin.get('/api/agent-scene.php?id=' + str(admin_remix.json()['scene']['id'])).status == 200,
                   'withdrawal blocks new remixes while preserving previously imported private copies')
+            revision = json.loads(fixture.cli(site, '''
+                echo json_encode(sf_agent_scene_history_save(1,['canvas_kind'=>'custom','track_id'=>'','title'=>'Paper orbit revision',
+                    'html'=>'<section><span class="sf-action-app-notifications">Updates</span></section>','css'=>''],''' + str(saved['id']) + '''));
+            '''))
+            revised = owner.post(PUBLIC, {**request, 'scene_id': revision['id'], 'request_id': '5' * 32}, owner_headers).json()['item']
+            approved_revision = admin.post(ADMIN, {**approve, 'id': revised['id'], 'snapshot_hash': revised['snapshot_hash']}, admin_headers)
+            assert approved_revision.status == 200, approved_revision.json()
+            check(approved_revision.json()['item']['app_id'] == app_id and
+                  owner.post(APP, {**install, 'gallery_id': revised['id'], 'expected_gallery_id': item['id']}, owner_headers).status == 409 and
+                  owner.post(APP, {'action': 'install', 'app_id': app_id}, owner_headers).json()['app']['enabled'] is False and
+                  owner.post(APP, toggle, owner_headers).status == 409 and
+                  owner.get(stable_app).json()['app']['enabled'] is False and
+                  owner.post(APP, {**toggle, 'expected_gallery_id': revised['id']}, owner_headers).json()['app']['enabled'] is True and
+                  owner.post(APP, {**toggle, 'enabled': False}, owner_headers).json()['app']['enabled'] is False,
+                  'a new review preserves identity, rejects stale install and opt-in confirmation, and allows disabling across revisions')
             with sqlite3.connect(site / 'fixture.sqlite') as connection:
                 publications = connection.execute('SELECT COUNT(*) FROM canvas_gallery_entries').fetchone()[0]
                 remixes = connection.execute('SELECT COUNT(*) FROM canvas_gallery_remixes').fetchone()[0]
-            check(publications == 1 and remixes == 2 and not (site / 'unexpected-provider.log').exists(),
+            check(publications == 2 and remixes == 2 and not (site / 'unexpected-provider.log').exists(),
                   'gallery lifecycle operations create only expected records and never invoke a paid provider')
             log.flush()
             log.seek(0)

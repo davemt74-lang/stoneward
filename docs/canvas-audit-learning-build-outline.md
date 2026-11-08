@@ -57,6 +57,7 @@ All pickers attach stable, server-validated references to the draft/project cont
 | `/lyrics` | Available authorized song lyrics and timed lyrics, with draft/public status respected | Searchable multi-select; works without playback |
 | `/knowledge` | Approved artist background, production notes and other authorized knowledge | Planned picker; private/admin material excluded from public results |
 | `/me` | Current viewer's listening history, purchases, tickets and supported preferences | Searchable account-data picker with field metadata and separate viewer consent per category |
+| `/notifications` | Current viewer's notification inbox | Standalone shortcut to the Notifications drawer and optional read-only canvas source |
 | `/data` | Enabled artist and approved public-data capabilities, including weather, maps and NASA | Data Explorer with NWS weather and public geography |
 
 The Data Explorer shows available fields, safe example responses, required permissions, location choices, units, source/freshness, attribution and usage limits. Samples are labeled fixtures or dated observations, never presented as live facts. Private examples contain no other account's data. The authoritative registry and Admin Permissions controls determine availability; cards cannot bypass disabled permissions. Users may attach a source directly, while the agent may select appropriate capabilities during planning.

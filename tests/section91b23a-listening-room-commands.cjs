@@ -810,6 +810,54 @@ test('deleting from Canvas History only clears the selected backdrop when its re
   assert.deepEqual(h.posts, [['agent-scene.php', 'delete', 42], ['agent-scene.php', 'delete', 31], ['agent-scene.php', 'delete', 31]]);
 });
 
+test('the app edit page restores the exact saved version and prepares chat without submitting a build', async () => {
+  const h = harness();
+  const stage = h.scope.window.SFPublicAgentCanvas;
+  let editing = true;
+  let footerHidden = true;
+  let focused = false;
+  h.scope.input = {
+    value: 'Use a warmer palette', focus: () => { focused = true; }, setSelectionRange() {},
+  };
+  h.scope.setChatFooterHidden = hidden => { footerHidden = hidden; };
+  h.scope.closeQuickMenu = () => {};
+  h.scope.syncChatImageDraftLimit = () => {};
+  stage.closePage = () => { editing = false; };
+  h.scope.api = async path => {
+    h.reads.push(path);
+    return { scene: { ...h.scene(42), canvas_kind: 'custom' } };
+  };
+  await h.scope.handleListeningRoomCommand({ kind: 'restore', id: 42, editActive: () => editing });
+  assert.deepEqual(h.reads, ['agent-scene.php?id=42']);
+  assert.equal(h.scope.selectedCanvasId('7'), 42);
+  assert.equal(footerHidden, false);
+  assert.equal(focused, true);
+  assert.equal(h.scope.input.value, '/edit Use a warmer palette');
+  assert.deepEqual(h.posts, []);
+});
+
+test('a closed app editor or mismatched scene response cannot change the active canvas or draft', async () => {
+  for (const cancel of [false, true]) {
+    const h = harness();
+    await h.scope.handleListeningRoomCommand({ kind: 'restore', id: 31 });
+    let editing = true;
+    let started;
+    let complete;
+    const readStarted = new Promise(resolve => { started = resolve; });
+    h.scope.api = () => new Promise(resolve => { complete = resolve; started(); });
+    h.scope.input = { value: 'Keep this draft' };
+    const request = h.scope.handleListeningRoomCommand({ kind: 'restore', id: 42, editActive: () => editing });
+    await readStarted;
+    if (cancel) editing = false;
+    complete({ scene: { ...h.scene(cancel ? 42 : 43), canvas_kind: 'custom' } });
+    await request;
+    assert.equal(h.scope.selectedCanvasId('7'), 31);
+    assert.equal(h.scope.input.value, 'Keep this draft');
+    assert.deepEqual(h.displayed.map(({ scene }) => scene.id), [31]);
+    assert.deepEqual(h.posts, []);
+  }
+});
+
 test('the Space EQ sample stays in history instead of reopening automatically', async () => {
   const storage = new Map();
   const h = harness(true, storage);

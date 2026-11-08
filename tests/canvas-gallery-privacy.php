@@ -27,11 +27,13 @@ $q=$db->prepare('INSERT INTO users(id,email,display_name,password_hash,role,stat
 for($id=1;$id<=3;$id++)$q->execute([$id,"fixture$id@example.invalid","Fixture $id",password_hash('fixture-password',PASSWORD_DEFAULT),$id===1?'admin':'user','active',gmdate('c'),gmdate('c')]);
 sf_migration_run_all(1,'');
 $export=sf_privacy_export(2,sf_user_by_email('fixture2@example.invalid'));
-verify($export['canvas_gallery']===[]&&sf_canvas_gallery_export(2)===[]&&galleryTables($db)===[],
+verify($export['canvas_gallery']===[]&&$export['canvas_app_installations']===[]&&sf_canvas_gallery_export(2)===[]&&galleryTables($db)===[],
     'Unused gallery export does not initialize optional publication storage');
 $empty=sf_privacy_clear_agent_history(2);
 verify($empty['canvas_gallery_entries']===0&&galleryTables($db)===[],
     'Unused gallery clearing joins the privacy transaction without creating gallery tables');
+verify(!sf_canvas_app_exists()&&!sf_canvas_app_table_exists('canvas_app_alerts'),
+    'Unused gallery privacy actions do not initialize canvas app or alert storage');
 
 $admin=['id'=>1,'role'=>'admin'];$fan=['id'=>2,'role'=>'user'];$other=['id'=>3,'role'=>'user'];
 $pixels=fixturePixels();
@@ -53,6 +55,8 @@ $ownApproved=$submit($fan,$ownScene,str_repeat('b',32),'Owner published');
 $otherApproved=$submit($other,$otherScene,str_repeat('c',32),'Other publication');
 sf_canvas_gallery_moderate($admin,$ownApproved['id'],'approve',$ownApproved['snapshot_hash']);
 sf_canvas_gallery_moderate($admin,$otherApproved['id'],'approve',$otherApproved['snapshot_hash']);
+sf_canvas_app_change(3,'install',$ownApproved['id'],null);
+sf_canvas_app_change(2,'install',$otherApproved['id'],null);
 $ownDirectory=sf_canvas_gallery_assets_directory($ownApproved['id']);$pendingDirectory=sf_canvas_gallery_assets_directory($ownPending['id']);
 $otherDirectory=sf_canvas_gallery_assets_directory($otherApproved['id']);
 $ownAsset=sf_canvas_gallery_open($ownApproved['id'])['scene']['image_assets'][0]['id'];
@@ -64,6 +68,10 @@ $ownRemix=sf_canvas_gallery_remix($fan,$otherApproved['id'],str_repeat('d',32));
 $otherRemix=sf_canvas_gallery_remix($other,$ownApproved['id'],str_repeat('e',32));
 $otherCopy=sf_agent_canvas_image_file(3,$otherRemix['scene']['image_assets'][0]['id'])['path'];
 $export=sf_privacy_export(2,sf_user_by_email('fixture2@example.invalid'));
+$installed=$export['canvas_app_installations'];
+verify(count($installed)===1&&$installed[0]['app_id']===$otherApproved['id']&&$installed[0]['enabled']===false&&
+    array_keys($installed[0])===['app_id','enabled','installed_at','updated_at'],
+    'Privacy export includes only the current account’s app identities, preference and timestamps');
 $ids=array_column($export['canvas_gallery'],'id');sort($ids);$expected=[$ownPending['id'],$ownApproved['id']];sort($expected);
 verify($ids===$expected&&array_column($export['canvas_gallery'],'status')!==[],
     'Gallery privacy export contains only the caller pending and published submissions');
@@ -98,6 +106,8 @@ verify(!file_exists($ownDirectory)&&!file_exists($pendingDirectory)&&file_get_co
 verify(sf_agent_scene_history_epoch(2)>$epoch&&sf_canvas_gallery_get($otherApproved['id'])!==null&&
     sf_agent_scene_history_get(3,$otherRemix['scene']['id'])['gallery_attribution']['source']['id']===$ownApproved['id']&&file_get_contents($otherCopy)===$pixels,
     'Another creator publication and already imported private copy survive source-owner history clearing');
+verify(sf_canvas_app_installed(3)===[]&&count(sf_canvas_app_installed(2))===1,
+    'History clearing removes installations of the deleted publication and preserves unrelated installs');
 $q=$db->prepare('SELECT COUNT(*) FROM canvas_gallery_remixes WHERE user_id=?');$q->execute([3]);
 verify((int)$q->fetchColumn()===1,'History clearing preserves another listener remix receipt');
 
@@ -126,6 +136,7 @@ $closureFailed=false;try{sf_privacy_close_account(2,sf_user_by_email('fixture2@e
 verify($closureFailed&&sf_canvas_gallery_get($closing['id'])!==null&&file_get_contents($closingPath)===$pixels&&
     sf_user_by_email('fixture2@example.invalid')['status']==='active',
     'A failed outer account closure preserves its publication rows and physical image bytes');
+verify(count(sf_canvas_app_installed(2))===1,'A rolled-back account closure preserves its installed app preferences');
 $db->exec('DROP TRIGGER fixture_reject_gallery_closure');
 $closed=sf_privacy_close_account(2,sf_user_by_email('fixture2@example.invalid'),'fixture-password','DELETE');
 verify($closed['closed']===true&&sf_canvas_gallery_export(2)===[]&&sf_canvas_gallery_get($closing['id'])===null&&
@@ -136,6 +147,8 @@ verify(!file_exists($closingDirectory)&&file_get_contents($otherPath)===$pixels&
 $q=$db->prepare('SELECT COUNT(*) FROM canvas_gallery_remixes WHERE user_id=?');$q->execute([2]);
 verify((int)$q->fetchColumn()===0&&sf_canvas_gallery_get($otherApproved['id'])!==null&&sf_canvas_gallery_export(3)!==[],
     'Account closure purges only the closing owner remix receipts and gallery records');
+verify(sf_canvas_app_installed(2)===[]&&sf_canvas_app_row($closing['id'])===null,
+    'Account closure removes the closing account’s installations and its owned app identities');
 rejects(fn()=>$submit($fan,$closingScene,str_repeat('3',32),'Late closed-account publication'),
     'A late submission cannot recreate gallery data for a closed account');
 verify(sf_canvas_gallery_export(2)===[]&&sf_agent_scene_history_get(3,$otherRemix['scene']['id'])!==null,
