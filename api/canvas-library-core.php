@@ -45,6 +45,15 @@ function sf_canvas_library_registry(): array {
             'when' => 'The requested experience needs 2D rigid bodies, gravity, throws, collisions, or constraints.',
             'api' => 'Use Matter.Engine, Bodies, Body, Composite and Events with the requested visuals and controls. Stop the runner or cancel animation frames on pagehide. For a collision-triggered song, deduplicate the hit and call StonefellowAudio.play(trackId) with the selected canonical track ID. If audio_gesture_required occurs, surface the message and let the listener use the player’s Play control.',
         ],
+        'pixi' => [
+            'name' => 'PixiJS',
+            'version' => '8.22.0',
+            'global' => 'PIXI',
+            'sha256' => '28NrL5LScPjXco5gNXKw4CokVRumQ9cPtMUjwc2GjQo=',
+            'bytes' => 938936,
+            'when' => 'The requested experience benefits from GPU-accelerated 2D sprites, particles, interactive visuals, or compositing.',
+            'api' => 'Create a PIXI.Application and await app.init with preference: "webgl". Use generated textures or approved image blobs, resize to the canvas container, and handle renderer initialization failure and context loss. Use pointer events for mouse and touch and destroy the app, scene textures and animation or physics loops on pagehide.',
+        ],
         'three' => [
             'name' => 'Three.js',
             'version' => '0.187.0',
