@@ -20,6 +20,7 @@ HTTP_ONLY='--http-only' in sys.argv
 AUTOPLAY_ONLY='--autoplay-only' in sys.argv
 MUSIC_ID_ONLY='--music-id-only' in sys.argv
 MATTER_ONLY='--matter-only' in sys.argv
+MEYDA_ONLY='--meyda-only' in sys.argv
 if not HTTP_ONLY:
     from playwright.sync_api import expect, sync_playwright
 
@@ -615,6 +616,196 @@ def run_matter_browser(pw,site,base,scene):
     finally:browser.close()
 
 
+MEYDA_CODE=r'''(async()=>{
+ const controls=document.querySelector('.meyda-controls');
+ const output=document.querySelector('.meyda-output');
+ const meter=document.querySelector('.meyda-meter');
+ const {tracks}=await StonefellowAudio.catalog();
+ if(tracks.length!==1)throw new Error('Expected one authorized song');
+ const track=tracks[0];
+ const frameSize=512;
+ let buffer=null,off=null,closed=false,lastSample=-1,frames=0;
+ function dispose(){
+  closed=true;
+  const subscribed=typeof off==='function';
+  const hadBuffer=buffer!==null;
+  off?.();
+  off=null;
+  buffer=null;
+  return {released:hadBuffer&&buffer===null&&off===null,subscribed,frames};
+ }
+ function draw(state){
+  if(closed)return;
+  if(state.trackId!==track.track_id){
+   dispose();
+   meter.style.width='0%';
+   output.textContent='song changed';
+   return;
+  }
+  if(!buffer)return;
+  if(!state.playing){
+   meter.style.width='0%';
+   output.textContent='paused';
+   return;
+  }
+  const index=Math.floor(state.currentTime*buffer.sampleRate);
+  if(index===lastSample||index+frameSize>buffer.length)return;
+  lastSample=index;
+  const input=buffer.getChannelData(0).slice(index,index+frameSize);
+  const {rms,amplitudeSpectrum}=Meyda.extract(['rms','amplitudeSpectrum'],input);
+  let peak=0;
+  for(let bin=1;bin<amplitudeSpectrum.length;bin++){
+   if(amplitudeSpectrum[bin]>amplitudeSpectrum[peak])peak=bin;
+  }
+  output.dataset.peak=String(Math.round(peak*buffer.sampleRate/frameSize));
+  output.dataset.frames=String(++frames);
+  meter.style.width=Math.round(Math.min(1,rms*10)*100)+'%';
+  output.textContent='playing '+state.trackId;
+ }
+ addEventListener('pagehide',()=>{
+  parent.postMessage({stonefellowMeydaCleanup:dispose()},'*');
+ },{once:true});
+ function button(label,action){
+  const element=document.createElement('button');
+  element.type='button';element.textContent=label;
+  element.addEventListener('click',event=>{
+   if(event.isTrusted)action(element).catch(error=>{if(!closed)output.textContent='analysis error '+(error.code||error.message)});
+  });
+  controls.append(element);
+ }
+ button('Play and analyze',async(element)=>{
+  element.disabled=true;
+  const initial=await StonefellowAudio.play(track.track_id);
+  if(closed)return;
+  if(initial.trackId!==track.track_id||[track.duration_seconds,initial.duration].some(value=>!(value>0&&value<=15))){
+   throw new Error('Fixture duration exceeds its decode bound');
+  }
+  let watch=false;
+  off=StonefellowAudio.subscribe(state=>{if(watch)draw(state)});
+  watch=true;
+  try{
+   const {blob}=await StonefellowAudio.getAudio(track.track_id);
+   if(closed)return;
+   if(blob.size>1024*1024)throw new Error('Fixture audio exceeds its decode bound');
+   const bytes=await blob.arrayBuffer();
+   if(closed)return;
+   const decoder=new OfflineAudioContext(1,1,22050);
+   const decoded=await decoder.decodeAudioData(bytes);
+   if(closed)return;
+   if(decoded.duration>15)throw new Error('Decoded fixture audio exceeds its duration bound');
+   const state=await StonefellowAudio.getState();
+   if(closed||state.trackId!==track.track_id)return;
+   buffer=decoded;
+   Meyda.bufferSize=frameSize;
+   Meyda.sampleRate=decoded.sampleRate;
+   draw(state);
+  }catch(error){
+   if(!closed){
+    dispose();
+    output.textContent='analysis error '+(error.code||error.message);
+   }
+  }finally{
+   await StonefellowAudio.releaseAudio(track.track_id);
+  }
+ });
+ button('Seek to second tone',async()=>{await StonefellowAudio.seek(4)});
+ button('Pause',async()=>{await StonefellowAudio.pause()});
+ output.textContent='ready';
+})().catch(error=>{document.querySelector('.meyda-output').textContent='fixture error '+error.message});'''
+
+
+def run_meyda_browser(pw,site,base,scene):
+    """Draw actual audio features at the authorized player's current position."""
+    vendor=Path('assets/vendor/canvas/meyda.js')
+    (site/vendor).parent.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(ROOT/vendor,site/vendor)
+    inventory=HTTPClient(base).get('/api/canvas-libraries.php').json()
+    pin=next(card for card in inventory['libraries'] if card['id']=='meyda')
+    track='song-2'
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=frequency=320:sample_rate=22050:duration=3',
+                    '-f','lavfi','-i','sine=frequency=960:sample_rate=22050:duration=9',
+                    '-filter_complex','[0:a]volume=0.25[quiet];[quiet][1:a]concat=n=2:v=0:a=1',
+                    '-ac','1','-b:a','32k',str(site/'assets/audio/analysis.mp3')],check=True)
+    catalog_path=site/'data/catalog.json'
+    tracks=json.loads(catalog_path.read_text())
+    next(row for row in tracks if row['id']==track).update(audio='assets/audio/analysis.mp3',duration=12)
+    catalog_path.write_text(json.dumps(tracks))
+    saved=save_fixture_scene(site,{**scene,'title':'Authorized playback spectrum',
+        'html':'<section class="meyda-controls"></section><p class="meyda-output"></p><div class="meyda-meter"></div>',
+        'css':'.meyda-controls{padding:75px 20px 0;max-width:260px}button{min-height:44px;touch-action:manipulation;display:block}.meyda-meter{width:0;height:12px;background:#60da90}',
+        'music_inputs':{'mode':'selected','track_ids':[track]},
+        'js':'// sf-libraries: '+pin['lock']+'\n'+MEYDA_CODE})
+    options={'args':['--no-sandbox']}
+    if CHROME:options['executable_path']=CHROME
+    browser=pw.chromium.launch(**options)
+    try:
+        for width,touch in ((1280,False),(390,True)):
+            context=browser.new_context(viewport={'width':width,'height':850},is_mobile=touch,has_touch=touch)
+            page=context.new_page()
+            errors=[]
+            requests=[]
+            page.on('pageerror',lambda error:errors.append(str(error)))
+            page.on('request',lambda request:requests.append(request.url))
+            page.add_init_script('''if(window===window.top){
+                addEventListener('message',event=>{
+                    if(event.data?.stonefellowMeydaCleanup)window.meydaCleanup=event.data.stonefellowMeydaCleanup;
+                });
+                addEventListener('DOMContentLoaded',async()=>{
+                    const {scene}=await api('agent-scene.php?id='''+str(saved['id'])+'''');
+                    await SFPublicAgentCanvas.prepareSceneLibraries(scene);
+                    showFixture(scene);
+                });
+            }''')
+            login(page,base,'owner@example.invalid')
+            page.goto(base+'/fixture.html?music=1')
+            frame=page.frame_locator('.sf-agent-scene-backdrop iframe')
+            output=frame.locator('.meyda-output')
+            meter=frame.locator('.meyda-meter')
+            expect(output).to_have_text('ready',timeout=12000)
+
+            def click(label):
+                control=frame.get_by_role('button',name=label)
+                if touch:control.tap()
+                else:control.click()
+
+            click('Play and analyze')
+            expect(output).to_have_text('playing '+track,timeout=12000)
+            first_peak=int(output.get_attribute('data-peak'))
+            first_width=int(meter.evaluate('element=>parseInt(element.style.width,10)'))
+            check(275<=first_peak<=365 and first_width>0 and page.evaluate(
+                'typeof window.Meyda==="undefined"&&playCalls.length===1&&st.track?.id==="song-2"&&!audio.paused'),
+                f'Chromium/{width}: Meyda draws the actual low tone from the authorized canonical playback')
+            click('Seek to second tone')
+            expect(output).to_have_attribute('data-peak','947')
+            check(int(meter.evaluate('element=>parseInt(element.style.width,10)'))>first_width,
+                f'Chromium/{width}: seeking moves analysis to the loud, higher-frequency tone')
+            denied=output.evaluate("async()=>StonefellowAudio.getAudio('song-1').then(()=>null,error=>error.code)")
+            check(denied=='audio_unavailable' and not any('action=source&track_id=song-1&' in url for url in requests),
+                f'Chromium/{width}: the analysis canvas cannot load unselected audio')
+            click('Pause')
+            expect(output).to_have_text('paused')
+            expect(meter).to_have_attribute('style','width: 0%;')
+            frames=output.get_attribute('data-frames')
+            page.wait_for_timeout(300)
+            check(output.get_attribute('data-frames')==frames and page.evaluate('audio.paused'),
+                f'Chromium/{width}: pausing stops the meter updates and the host player')
+            # Check authored pagehide cleanup while the child can still report it.
+            # Removing the iframe can discard messages queued by that document.
+            layer=page.locator('.sf-agent-scene-backdrop iframe')
+            child=layer.element_handle().content_frame()
+            assert child is not None
+            child.evaluate("dispatchEvent(new PageTransitionEvent('pagehide'))")
+            page.wait_for_function('window.meydaCleanup !== undefined')
+            assert page.evaluate('window.meydaCleanup')=={'released':True,'subscribed':True,'frames':int(frames)}
+            assert output.get_attribute('data-frames')==frames
+            assert page.evaluate('SFPublicAgentCanvas.closeScene(false)')
+            expect(layer).to_have_count(0)
+            check(child.is_detached() and not errors,
+                f'Chromium/{width}: pagehide releases analysis resources and host close detaches the frame')
+            context.close()
+    finally:browser.close()
+
+
 def run_music_http(client,site,scene):
     saved=save_music_scenes(site,scene)
     route='/api/agent-scene.php';selected=saved['selected'];other=saved['other']
@@ -757,12 +948,15 @@ def main():
                             run_music_browser(pw,site,base,mp3,scene)
                         elif MATTER_ONLY:
                             run_matter_browser(pw,site,base,scene)
+                        elif MEYDA_ONLY:
+                            run_meyda_browser(pw,site,base,scene)
                         else:
                             run_http(pw.request.new_context(base_url=base),site,mp3)
                             run_browser(pw,site,base,mp3,scene)
                             run_music_browser(pw,site,base,mp3,scene)
                             run_gesture_browser(pw,site,base,scene)
                             run_matter_browser(pw,site,base,scene)
+                            run_meyda_browser(pw,site,base,scene)
                             run_music_http(HTTPClient(base),site,scene)
             except BaseException:
                 log.seek(0);print(log.read()[-7000:]);raise

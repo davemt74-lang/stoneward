@@ -63,6 +63,11 @@ function sf_openai_call(array $provider,string $system,array $history,string $me
         $design=['html'=>'<section class="game"></section>','css'=>'','js'=>"// sf-libraries: ".$pin."\n"
             .'const app = new PIXI.Application();'];
     }
+    if($mode==='meyda'){
+        $pin=array_column($prompt['canvas_libraries'],null,'id')['meyda']['lock'];
+        $design=['html'=>'<section class="visualizer"></section>','css'=>'','js'=>"// sf-libraries: ".$pin."\n"
+            .'document.querySelector(".visualizer").textContent = Meyda.extract("rms", new Float32Array(512));'];
+    }
     if($mode==='generate_image')$design=['html'=>'<figure class="sf-image-new"></figure>',
         'css'=>'figure{background-image:var(--sf-image-new,none)}','image_request'=>[
             'prompt'=>'Rain on a glass greenhouse at dusk','title'=>'Glass Greenhouse','size'=>'1536x1024']];
@@ -335,9 +340,10 @@ $adminAccount=['id'=>4,'role'=>'admin'];
 $mode='library_repair';$before=$providerCalls;
 $generated=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Build an explorable 3D sculpture.']);
 $offered=array_column($prompt['canvas_libraries'],null,'id');
-verify(array_keys($offered)===['anime','color-thief','d3','matter','pixi','three']&&$offered['three']['global']==='THREE'&&
+verify(array_keys($offered)===['anime','color-thief','d3','matter','meyda','pixi','three']&&$offered['three']['global']==='THREE'&&
     $offered['color-thief']['global']==='ColorThief'&&$offered['d3']['global']==='d3'&&
-    $offered['matter']['global']==='Matter'&&$offered['anime']['global']==='anime'&&$offered['pixi']['global']==='PIXI'&&str_contains($providerSystem,'use native HTML, CSS, Canvas 2D'),
+    $offered['matter']['global']==='Matter'&&$offered['anime']['global']==='anime'&&
+    $offered['meyda']['global']==='Meyda'&&$offered['pixi']['global']==='PIXI'&&str_contains($providerSystem,'use native HTML, CSS, Canvas 2D'),
     'The normal coding prompt offers verified optional libraries and criteria for choosing native APIs first');
 verify($providerCalls===$before+2&&str_starts_with($generated['scene']['js'],'// sf-libraries: '.$offered['three']['lock']."\n")&&
     sf_agent_scene_history_get(4,$generated['scene']['id'])['js']===$generated['scene']['js'],
@@ -362,7 +368,13 @@ $sprites=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'
 verify(str_starts_with($sprites['scene']['js'],'// sf-libraries: '.$offered['pixi']['lock']."\n")&&
     sf_agent_scene_history_get(4,$sprites['scene']['id'])['js']===$sprites['scene']['js'],
     'An explicit PixiJS build receives the exact pin and persists the authored source');
-sf_canvas_permission_save($adminAccount,1,['canvas.library.three'=>false,'canvas.library.d3'=>false,'canvas.library.matter'=>false,'canvas.library.anime'=>false,'canvas.library.pixi'=>false]);
+$mode='meyda';
+$visualizer=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Use Meyda to display an audio feature.']);
+verify(str_starts_with($visualizer['scene']['js'],'// sf-libraries: '.$offered['meyda']['lock']."\n")&&
+    sf_agent_scene_history_get(4,$visualizer['scene']['id'])['js']===$visualizer['scene']['js'],
+    'An explicit Meyda build receives the exact pin and persists the authored source');
+sf_canvas_permission_save($adminAccount,1,['canvas.library.three'=>false,'canvas.library.d3'=>false,
+    'canvas.library.matter'=>false,'canvas.library.anime'=>false,'canvas.library.meyda'=>false,'canvas.library.pixi'=>false]);
 $mode='success';
 $native=sf_agent_scene_create($adminAccount,['canvas_kind'=>'custom','brief'=>'Create a quiet reading backdrop.']);
 verify(array_column($prompt['canvas_libraries'],'id')===['color-thief']&&!isset($native['scene']['js'])&&
