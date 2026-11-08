@@ -65,7 +65,7 @@ $infer=static function(array $provider,string $prompt,string $message,int $outpu
 $before=sf_token_balance(1);$result=sf_canvas_project_ideas_suggest($user,$request,$infer,$provider);$project=$result['proposal'];
 verify($calls===1&&$result['state']==='ready'&&$project['status']==='awaiting_approval'&&$project['source']==='agent',
     'One explicit idea request creates an approval proposal without beginning a canvas or image build');
-verify(array_column($received['references']['available_canvas_libraries'],'name')===['Anime.js','Color Thief','D3','Matter.js','PixiJS','Three.js']&&
+verify(array_column($received['references']['available_canvas_libraries'],'name')===['Anime.js','Color Thief','D3','Matter.js','Meyda','PixiJS','Three.js']&&
     array_keys($received['references']['available_canvas_libraries'][0])===['name','when']&&
     str_contains($system,'Consider native browser capabilities first'),
     'Planning sees optional library selection criteria while keeping proposals focused on the experience');
@@ -321,8 +321,8 @@ $threeFile=$fixture.'/'.$libraries['three']['path'];
 $tampered=file_get_contents($threeFile);
 $tampered[0]=$tampered[0]==='A'?'B':'A';
 file_put_contents($threeFile,$tampered);
-verify(array_column(sf_canvas_library_available(),'id')===['anime','color-thief','d3','matter','pixi'],
+verify(array_column(sf_canvas_library_available(),'id')===['anime','color-thief','d3','matter','meyda','pixi'],
     'A same-size modified local bundle is withheld from the approved inventory');
 unlink($fixture.'/'.$libraries['color-thief']['path']);
-verify(array_column(sf_canvas_library_available(),'id')===['anime','d3','matter','pixi'],
+verify(array_column(sf_canvas_library_available(),'id')===['anime','d3','matter','meyda','pixi'],
     'A missing local bundle is also withheld without expanding the approved inventory');

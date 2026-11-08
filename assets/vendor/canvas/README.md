@@ -8,6 +8,7 @@ The browser bundles in this directory come from pinned upstream npm releases. Th
 | `color-thief.js` | `colorthief@3.5.0` | `ColorThief` | 22,281 | `f4a8c69a9df43f598d72279d69b59f2d9d29561a34fe99b117492dbc908163ee` |
 | `d3.js` | `d3@7.9.2` | `d3` | 280,622 | `912111098ea99503a6f4967361d2bbdc9dbf58cf9c678c8e27e5b02d1a07f0c1` |
 | `matter.js` | `matter-js@0.20.0` | `Matter` | 84,834 | `961faf813d745b243f016800013fbc8ed75ed02c393bc2ca9bc0123270200b46` |
+| `meyda.js` | `meyda@5.6.3` | `Meyda` | 16,056 | `d358ac115ae2f4e182f88401accdf51e2cb393561f8f24e9c6212e97b3e1f36a` |
 | `pixi.js` | `pixi.js@8.22.0` | `PIXI` | 938,936 | `dbc36b2f92d270f8d7728e603572b0e02a24551ba643d70fb4c523c1cd868d0a` |
 | `three.js` | `three@0.187.0` | `THREE` | 749,788 | `c78895acdff5f794696fc6840893006b8640f1c4adf97fcdc7bc8891aa6d9d06` |
 
@@ -166,3 +167,39 @@ echo 'dbc36b2f92d270f8d7728e603572b0e02a24551ba643d70fb4c523c1cd868d0a  pixi.js'
 ```
 
 The distribution includes `pixi.LICENSE` with the notices for the eight embedded packages. The published `@pixi/colord` tarball declares MIT. Its source license has SHA-256 `7613d4594ee8b6163926af3435dae61c9e3d5a27cd137bd76a543ba40002d8fc` at the commit declared by npm. [Colord license](https://raw.githubusercontent.com/omgovich/colord/5344fbf77b736f81cd33c21050021bc09bc9dd1d/LICENSE.md)
+
+## Meyda audio feature bundle
+
+The npm archive resolves to commit `48f442230e5c1cd75ca7732e578bed1344b1f7ae`. The browser bundle contains `dct@0.1.0`, `fftjs@0.0.4`, and `tslib@2.5.3`. The embedded source-map inputs match their pinned npm archives, and `meyda.LICENSE` preserves their notices with normalized line endings. Stonefellow strips the source-map reference when packaging the browser bundle. [Meyda source](https://github.com/meyda/meyda/tree/48f442230e5c1cd75ca7732e578bed1344b1f7ae) · [Meyda feature reference](https://meyda.js.org/audio-features.html)
+
+```sh
+set -eu
+curl -fLsS https://registry.npmjs.org/meyda/-/meyda-5.6.3.tgz -o meyda.tgz
+curl -fLsS https://registry.npmjs.org/dct/-/dct-0.1.0.tgz -o dct.tgz
+curl -fLsS https://registry.npmjs.org/fftjs/-/fftjs-0.0.4.tgz -o fftjs.tgz
+curl -fLsS https://registry.npmjs.org/tslib/-/tslib-2.5.3.tgz -o tslib.tgz
+sha256sum -c <<'SUMS'
+5a983543b4cc8aa70a2dc2ac081f4d9f0f8eb7d9f848be689c0a4e7f4f17a48a  meyda.tgz
+18a33c8e4a207e6a23fe1be2ac1ff8f9889b8f42711162c19d9ee0afd6626ba9  dct.tgz
+8f718a979fe8c3f383744589a37c3ca356e1efc68b443c53afa7859ac0ea5fac  fftjs.tgz
+91783e1ef77be75d6bc0f1a2752a0e768ae5912f09593793d1a7fbe0493d5921  tslib.tgz
+SUMS
+for name in meyda dct fftjs tslib; do
+  mkdir -p "$name"
+  tar --no-same-owner -xzf "$name.tgz" -C "$name"
+done
+sed '/^\/\/# sourceMappingURL=/d' meyda/package/dist/web/meyda.min.js > meyda.js
+{
+  printf '%s\n\n' 'Meyda 5.6.3'
+  cat meyda/package/LICENSE.md
+  printf '\n%s\n\n' 'Bundled dct 0.1.0'
+  cat dct/package/LICENSE
+  printf '\n%s\n\n' 'Bundled fftjs 0.0.4'
+  cat fftjs/package/LICENSE.md
+  printf '\n%s\n\n' 'Bundled tslib 2.5.3'
+  cat tslib/package/LICENSE.txt
+  printf '\n'
+  cat tslib/package/CopyrightNotice.txt
+} | sed 's/\r$//; ${/^$/d;}' > meyda.LICENSE
+printf '%s\n' 'd358ac115ae2f4e182f88401accdf51e2cb393561f8f24e9c6212e97b3e1f36a  meyda.js' | sha256sum -c
+```

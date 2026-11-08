@@ -45,6 +45,15 @@ function sf_canvas_library_registry(): array {
             'when' => 'The requested experience needs 2D rigid bodies, gravity, throws, collisions, or constraints.',
             'api' => 'Use Matter.Engine, Bodies, Body, Composite and Events with the requested visuals and controls. Stop the runner or cancel animation frames on pagehide. For a collision-triggered song, deduplicate the hit and call StonefellowAudio.play(trackId) with the selected canonical track ID. If audio_gesture_required occurs, surface the message and let the listener use the player’s Play control.',
         ],
+        'meyda' => [
+            'name' => 'Meyda',
+            'version' => '5.6.3',
+            'global' => 'Meyda',
+            'sha256' => '01isEVri9OGC+IQBrM31Hiyzk1YfjyTpxiEul7Ph82o=',
+            'bytes' => 16056,
+            'when' => 'The requested experience needs RMS, spectral features, or other analysis of local audio samples.',
+            'api' => 'Use Meyda.extract with power-of-two Float32Array windows. Set Meyda.bufferSize to the window length and Meyda.sampleRate to the actual rate. Analyze local synthetic samples or an authorized StonefellowAudio.getAudio track. For playback sync match the selected track and currentTime from StonefellowAudio.subscribe. Before decoding require known catalog and player duration up to eight minutes and a blob up to 8 MiB. Decode one track at a modest sample rate. Release the blob after reading it, skip updates on pause, and drop stale data and subscriptions on source change or pagehide. Use a still view or clearly labeled synthetic data when audio is unsuitable.',
+        ],
         'pixi' => [
             'name' => 'PixiJS',
             'version' => '8.22.0',
