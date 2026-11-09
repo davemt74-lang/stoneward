@@ -108,20 +108,54 @@
   function notice(error) {
     $('status').textContent = typeof error === 'string' ? error : error.message;
   }
-  function handle(work) {
+  function handle(work, report = notice) {
     return async event => {
       event?.preventDefault();
       const control = event?.submitter || (event?.currentTarget instanceof HTMLButtonElement ? event.currentTarget : null);
       if (control) control.disabled = true;
       try {
-        notice('');
+        report('');
         await work(event);
       } catch (error) {
-        notice(error);
+        report(error);
       } finally {
         if (control) control.disabled = false;
       }
     };
+  }
+  function bindFormDialog(name, save, afterSave) {
+    const dialog = $(name + '-dialog');
+    if (!dialog) return;
+    const opener = $('open-' + name);
+    const form = $(name);
+    const dismiss = dialog.querySelectorAll('[data-jukebox-dialog-close]');
+    let saving = false;
+    const report = error => {
+      $(name + '-status').textContent = typeof error === 'string' ? error : error.message;
+    };
+    opener.onclick = () => dialog.showModal();
+    dismiss.forEach(control => { control.onclick = () => dialog.close(); });
+    dialog.addEventListener('cancel', event => {
+      if (saving) event.preventDefault();
+    });
+    dialog.addEventListener('close', () => {
+      form.reset();
+      report('');
+      opener.focus({preventScroll: true});
+    });
+    form.onsubmit = handle(async () => {
+      saving = true;
+      report('Saving…');
+      dismiss.forEach(control => { control.disabled = true; });
+      try {
+        const result = await save(new FormData(form));
+        dialog.close();
+        afterSave(result);
+      } finally {
+        saving = false;
+        dismiss.forEach(control => { control.disabled = false; });
+      }
+    }, report);
   }
   function button(label, work) {
     const control = document.createElement('button');
@@ -643,7 +677,8 @@
     const visible = new Set(sessions.map(row => row.id));
     existing.forEach((item, sessionId) => { if (!visible.has(sessionId)) item.remove(); });
     sessions.forEach((row, index) => {
-      const upcoming = phaseOf(row) === 'upcoming';
+      const phase = phaseOf(row);
+      const upcoming = phase === 'upcoming';
       let item = existing.get(row.id);
       if (!item) {
         item = document.createElement('li');
@@ -652,14 +687,18 @@
         badge.className = 'session-badge';
         const scheduled = document.createElement('time');
         scheduled.className = 'session-date';
-        item.append(link(row.title, page(row.id, false)), badge, scheduled);
+        item.append(link(row.title, page(row.id, host)), badge, scheduled);
       }
       const [title, badge, scheduled] = item.children;
-      const status = upcoming ? (row.remote_listening ? 'Phone listening planned' : '')
+      const label = host && (phase === 'ended' || phase === 'canceled') ? `${row.title} (${phase})` : row.title;
+      const status = host ? ({upcoming: 'Upcoming', live: 'Open'}[phase] || '')
+        : upcoming ? (row.remote_listening ? 'Phone listening planned' : '')
         : (row.online ? 'Live' : 'Host player offline') + (row.remote_listening ? ' · Phone listening enabled' : '');
-      if (title.textContent !== row.title) title.textContent = row.title;
+      if (title.textContent !== label) title.textContent = label;
       if (badge.textContent !== status) badge.textContent = status;
       badge.hidden = !status;
+      badge.classList.toggle('session-badge-live', phase === 'live' && Boolean(row.online));
+      badge.classList.toggle('session-badge-upcoming', upcoming);
       scheduled.hidden = !upcoming;
       if (upcoming) setScheduleDate(scheduled, row.scheduled_at);
       if (container.children[index] !== item) container.insertBefore(item, container.children[index] ?? null);
@@ -676,19 +715,10 @@
         $('session-heading').textContent = 'Your sessions';
         $('mode-link').href = 'jukebox.php';
         $('mode-link').textContent = 'Live Sessions';
-        $('create').hidden = !data.admin && !data.venue;
-        $('venue').hidden = !data.admin;
+        $('open-create').hidden = !data.admin && !data.venue;
+        $('open-venue').hidden = !data.admin;
         $('listing').hidden = !data.admin;
-        list('sessions', data.sessions, row => {
-          const phase = phaseOf(row);
-          const suffix = phase === 'ended' || phase === 'canceled' ? ` (${phase})` : '';
-          const entry = link(row.title + suffix, page(row.id, true));
-          if (phase !== 'upcoming') return [entry];
-          const scheduled = document.createElement('time');
-          scheduled.className = 'session-date';
-          setScheduleDate(scheduled, row.scheduled_at);
-          return [entry, ' · Upcoming', scheduled];
-        });
+        renderSessionList('sessions', data.sessions);
         if (!data.admin && !data.venue) notice('Ask a Stonefellow admin to enable your venue account.');
       } else {
         $('title').textContent = 'Live Sessions';
@@ -714,21 +744,26 @@
     }
   }
 
-  $('create').onsubmit = handle(async event => {
-    const values = new FormData(event.currentTarget);
-    const result = await api('create', {
-      title: values.get('title'), listed: values.has('listed'), remote_listening: values.has('remote_listening'),
-      scheduled_at: scheduleTimestamp(values.get('scheduled_at'))
-    });
-    location.href = page(result.id, true);
-  });
+  bindFormDialog('create', values => api('create', {
+    title: values.get('title'), listed: values.has('listed'), remote_listening: values.has('remote_listening'),
+    scheduled_at: scheduleTimestamp(values.get('scheduled_at'))
+  }), result => { location.href = page(result.id, true); });
   for (const label of document.querySelectorAll('[data-schedule-zone]')) {
     label.textContent = ` (${scheduleDate.resolvedOptions().timeZone})`;
   }
-  $('venue').onsubmit = handle(async event => {
-    await api('venue', Object.fromEntries(new FormData(event.currentTarget)));
+  bindFormDialog('venue', values => api('venue', Object.fromEntries(values)), () => {
     notice('Venue account enabled.');
-    await directory();
+    void directory().catch(notice);
+  });
+  const profile = $('jukebox-profile');
+  document.addEventListener('click', event => {
+    if (profile.open && !profile.contains(event.target)) profile.open = false;
+  });
+  profile.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !profile.open) return;
+    event.preventDefault();
+    profile.open = false;
+    profile.querySelector('summary').focus();
   });
   $('join').onsubmit = handle(async event => {
     const values = new FormData(event.currentTarget);
