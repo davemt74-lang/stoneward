@@ -16,6 +16,7 @@
   let hostPlayAttempt = null;
   let playerSequence = 0;
   let playerReports = Promise.resolve();
+  let playerActionPending = false;
   let remoteChangePending = false;
   let listener = null;
   let stateFetchError = '';
@@ -27,8 +28,8 @@
   let album = '';
   let lastPlaying = false;
   let stopped = false;
-  let ticking = false;
-  let tickAgain = false;
+  let tickTask = null;
+  let queuedTick = null;
   let directoryPending = false;
   let requestButtons = [];
   const renderKeys = new Map();
@@ -108,6 +109,9 @@
   function notice(error) {
     $('status').textContent = typeof error === 'string' ? error : error.message;
   }
+  function playerNotice(error) {
+    $('player-status').textContent = typeof error === 'string' ? error : error.message;
+  }
   function handle(work, report = notice) {
     return async event => {
       event?.preventDefault();
@@ -120,6 +124,23 @@
         report(error);
       } finally {
         if (control) control.disabled = false;
+      }
+    };
+  }
+  function handlePlayerAction(work) {
+    return async () => {
+      if (playerActionPending) return;
+      playerActionPending = true;
+      const controls = ['player-toggle', 'player-skip', 'enable', 'audio-start'].map($);
+      controls.forEach(control => control.setAttribute('aria-disabled', 'true'));
+      try {
+        playerNotice('');
+        await work();
+      } catch (error) {
+        playerNotice(error);
+      } finally {
+        playerActionPending = false;
+        controls.forEach(control => control.removeAttribute('aria-disabled'));
       }
     };
   }
@@ -171,11 +192,26 @@
     return item;
   }
   function list(id, rows, build) {
-    $(id).replaceChildren(...rows.map(row => {
+    $(id).replaceChildren(...rows.map((row, index) => {
       const item = document.createElement('li');
-      item.append(...build(row));
+      item.append(...build(row, index));
       return item;
     }));
+  }
+  function hostRow(label, ...buttons) {
+    const row = document.createElement('div');
+    row.className = 'jukebox-host-row';
+    const text = document.createElement('span');
+    text.className = 'jukebox-host-row-label';
+    text.textContent = label;
+    row.append(text);
+    if (buttons.length) {
+      const actions = document.createElement('div');
+      actions.className = 'jukebox-host-row-actions';
+      actions.append(...buttons);
+      row.append(actions);
+    }
+    return [row];
   }
   function changed(key, value) {
     const encoded = JSON.stringify(value);
@@ -281,12 +317,14 @@
     if (!audience.hidden && changed('listener-count', count)) {
       audience.textContent = count + (Number(count) === 1 ? ' phone listening now' : ' phones listening now');
     }
-    if (changed('phones', state.phones)) list('phones', state.phones || [], phone => {
+    const phones = state.phones || [];
+    if (changed('phones', phones)) list('phones', [...phones].sort((a, b) =>
+      Number(b.status === 'pending') - Number(a.status === 'pending')), phone => {
       const label = phone.name + ' · ' + phone.status + (phone.last_visit ? ' · Returning guest, last visit ' + date(phone.last_visit) : '');
-      if (phone.status === 'pending') return [label,
+      if (phone.status === 'pending') return hostRow(label,
         button('Approve', () => mutate('approve', {phone: phone.id})),
-        button('Deny', () => mutate('revoke', {phone: phone.id}))];
-      if (phone.status === 'approved') return [label,
+        button('Deny', () => mutate('revoke', {phone: phone.id})));
+      if (phone.status === 'approved') return hostRow(label,
         button('Chat', async () => {
           if (thread !== phone.id) {
             $('messages').replaceChildren();
@@ -295,20 +333,23 @@
           thread = phone.id;
           $('chat-title').textContent = 'Private messages with ' + phone.name;
           await tick();
+          if (thread === phone.id && !$('chat').hidden) {
+            $('chat').scrollIntoView({block: 'start'});
+            $('chat-title').focus({preventScroll: true});
+          }
         }),
-        button('Revoke', () => mutate('revoke', {phone: phone.id}))];
-      return [label];
+        button('Revoke', () => mutate('revoke', {phone: phone.id})));
+      return hostRow(label);
     });
     if (changed('history', [state.history, Boolean(catalog)])) renderHistory('history', title);
+    const controls = $('controls');
+    const toggle = $('player-toggle');
     if (changed('controls', [state.paused, Boolean(state.current)])) {
-      const controls = $('controls');
-      controls.replaceChildren();
-      if (state.current) controls.append(
-        button(Number(state.paused) ? 'Resume' : 'Pause', () => mutate('control', {event: Number(state.paused) ? 'resume' : 'pause'})),
-        button('Skip', () => mutate('control', {event: 'skip'})));
-      controls.append(button('End session', async () => {
-        if (confirm('End this jukebox session for all connected guests?')) await mutate('control', {event: 'end'});
-      }));
+      const focused = controls.contains(document.activeElement);
+      const hasTrack = Boolean(state.current);
+      controls.hidden = toggle.hidden = $('player-skip').hidden = !hasTrack;
+      toggle.textContent = Number(state.paused) ? 'Resume' : 'Pause';
+      if (!hasTrack && focused) $('volume').focus({preventScroll: true});
     }
     $('enable').hidden = active;
     $('enable').textContent = state.online ? 'Move playback to this device' : 'Enable player on this device';
@@ -440,23 +481,29 @@
     $('music').hidden = !catalog || !live || !Object.hasOwn(state, 'queue');
     $('footer').hidden = !live || !Object.hasOwn(state, 'queue');
     const playing = state.current;
-    $('now').textContent = playing ? title(playing.track_id) : 'Jukebox idle';
+    const now = playing ? title(playing.track_id) : 'Jukebox idle';
     const transport = state.transport?.status;
-    $('progress').textContent = !state.online ? 'Session player offline' : playing ?
+    const progress = !state.online ? 'Session player offline' : playing ?
       (Number(state.paused) || transport === 'paused' ? 'Paused · ' : transport === 'buffering' ? 'Buffering · ' :
         (transport === 'starting' || !playing.played ? 'Starting · ' : '')) + time(Number(state.seconds)) : 'Ready';
-    $('queue-label').textContent = 'Up Next (' + (state.queue?.length || 0) + ')';
-    if (changed('queue', [state.queue, Boolean(catalog), live])) list('queue', state.queue || [], row => [
-      title(row.track_id),
-      ...(host && live ? [
-        button('Move up', () => mutate('control', {event: 'up', item: row.id})),
-        button('Remove', () => mutate('control', {event: 'remove', item: row.id}))
-      ] : [])
-    ]);
+    $('now').textContent = now;
+    $('progress').textContent = progress;
+    const queued = state.queue?.length || 0;
+    $('queue-label').textContent = 'Up Next (' + queued + ')';
+    if (changed('queue', [state.queue, Boolean(catalog), live])) list('queue', state.queue || [], (row, index) => {
+      const label = title(row.track_id);
+      if (!host || !live) return [label];
+      const move = button('Move up', () => mutate('control', {event: 'up', item: row.id}));
+      move.disabled = index === 0;
+      return hostRow(label, move, button('Remove', () => mutate('control', {event: 'remove', item: row.id})));
+    });
     if (changed('catalog-rights', [canRequest(), Boolean(catalog)])) renderCatalog();
     requestButtons.forEach(control => { control.textContent = playing ? 'Add to Queue' : 'Play'; });
     if (!host) thread = approved ? state.phone.id : '';
     if (host) {
+      $('host-now').textContent = now;
+      $('host-progress').textContent = progress;
+      $('queue-empty').hidden = queued > 0;
       $('host').hidden = !live;
       $('recap').hidden = !ended;
       $('crm').hidden = !Number(state.venue_id);
@@ -554,7 +601,8 @@
   }
   function reportHostError(error) {
     if (error.status === 409) releasePlayer();
-    notice(error);
+    if ($('footer').hidden) notice(error);
+    else playerNotice(error);
   }
   function confirmHostPlayback(item) {
     return playerEvent('playing', item).then(() => {
@@ -568,19 +616,19 @@
     void report.catch(reportHostError);
   }
   function startHostAudio() {
-    if (hostPlayAttempt) return;
+    if (hostPlayAttempt) return hostPlayAttempt;
     const item = currentItem;
     const attempt = audio.play().then(() => {
       if (item !== currentItem || !active) return;
-      $('player-status').textContent = '';
+      playerNotice('');
       $('audio-start').hidden = true;
     }).catch(async error => {
       if (item !== currentItem || !active) return;
       if (error.name === 'NotAllowedError') {
-        $('player-status').textContent = 'Press Start audio on this device to allow playback.';
+        playerNotice('Press Start audio on this device to allow playback.');
         $('audio-start').hidden = false;
       } else if (error.name !== 'AbortError') {
-        $('player-status').textContent = 'A track was unavailable. Advancing the queue.';
+        playerNotice('A track was unavailable. Advancing the queue.');
         await playerEvent('failed', item);
         await tick();
       }
@@ -588,6 +636,7 @@
       if (hostPlayAttempt === attempt) hostPlayAttempt = null;
     });
     hostPlayAttempt = attempt;
+    return attempt;
   }
   async function syncPlayer() {
     if (!active) return;
@@ -613,16 +662,27 @@
       else await playerEvent(item ? 'progress' : 'heartbeat');
     } catch (error) {
       audio.pause();
-      if (error.status === 409) releasePlayer();
-      throw error;
+      reportHostError(error);
+      return;
     }
     if (active && item && !Number(state.paused) && audio.paused && !audio.ended && $('audio-start').hidden) startHostAudio();
   }
 
-  async function tick() {
+  function tick() {
     if (stopped) return;
-    if (ticking) { tickAgain = true; return; }
-    ticking = true;
+    if (tickTask) {
+      // Actions await a refresh that starts after their mutation, even if a poll is in flight.
+      queuedTick ??= tickTask.then(() => {
+        queuedTick = null;
+        return tick();
+      });
+      return queuedTick;
+    }
+    tickTask = refreshSession().finally(() => { tickTask = null; });
+    return tickTask;
+  }
+
+  async function refreshSession() {
     let stateReceived = false;
     try {
       const result = await api('state');
@@ -665,9 +725,6 @@
       }
       notice(error);
       if (error.status === 404 || error.status === 401) stopped = true;
-    } finally {
-      ticking = false;
-      if (tickAgain) { tickAgain = false; void tick(); }
     }
   }
 
@@ -843,10 +900,14 @@
     $('cancel-session').onclick = handle(async () => {
       if (confirm('Cancel this scheduled jukebox session?')) await mutate('control', {event: 'cancel'});
     });
-    const audioStart = button('Start audio', startHostAudio);
-    audioStart.id = 'audio-start';
-    audioStart.hidden = true;
-    $('player-status').after(audioStart);
+    $('audio-start').onclick = handlePlayerAction(startHostAudio);
+    $('player-toggle').onclick = handlePlayerAction(() => mutate('control', {
+      event: Number(state.paused) ? 'resume' : 'pause'
+    }));
+    $('player-skip').onclick = handlePlayerAction(() => mutate('control', {event: 'skip'}));
+    $('end-session').onclick = handle(async () => {
+      if (confirm('End this jukebox session for all connected guests?')) await mutate('control', {event: 'end'});
+    });
     $('volume').oninput = () => { audio.volume = Number($('volume').value); };
     $('remote-listening').onchange = handle(async event => {
       const setting = event.currentTarget;
@@ -863,7 +924,7 @@
         if (!Number(state.ended)) renderHost();
       }
     });
-    $('enable').onclick = handle(async () => {
+    $('enable').onclick = handlePlayerAction(async () => {
       const takeover = Boolean(state?.online);
       if (takeover && !confirm('Move this session’s playback to this device?')) return;
       await playerEvent('claim', '', {takeover});
