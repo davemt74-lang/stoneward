@@ -13,7 +13,7 @@ body.sf-agent-hidden-by-scene :is(.agent-stage,#voiceButton,#voiceTranscript,#ag
 body.sf-agent-hidden-by-scene:not(.sf-agent-manually-hidden) :is(.sf-chat-footer-restore,#menuAgentChat,#myAgentCanvasForm),
 body.sf-agent-hidden-by-scene:not(.sf-agent-manually-hidden,.sf-canvas-debug-open,.sf-canvas-image-editing) .chat-footer:not(:has(> .footer-player:not([hidden]),.sf-agent-scene-footer-actions:not([hidden]))),
 body.sf-agent-hidden-by-scene:not(.sf-agent-manually-hidden,.sf-canvas-debug-open,.sf-canvas-image-editing) .chat-footer .chat-composer-shell,
-body.sf-agent-hidden-by-scene:not(.sf-agent-manually-hidden) .chat-footer :is(.chat-quick-menu,.social-links:not(:has(.sf-agent-scene-footer-actions:not([hidden])))),
+body.sf-agent-hidden-by-scene:not(.sf-agent-manually-hidden) .chat-footer .social-links:not(:has(.sf-agent-scene-footer-actions:not([hidden]))),
 body.sf-agent-hidden-by-scene:not(.sf-agent-manually-hidden) .chat-footer .social-links > a { display:none!important; }
 .sf-canvas-debug { display:grid;gap:6px;padding:9px 12px;border-top:1px solid var(--line);flex:none; }
 .sf-canvas-debug[hidden] { display:none!important; }
