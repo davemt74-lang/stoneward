@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 echo json_encode([
-  'stonefellow'=>'1.3.318',
+  'stonefellow'=>'1.3.319',
   'canvas_runtime_libraries'=>'pinned-local-meyda-pixi-anime-matter-d3-three-and-color-thief-optional-canvas-dependencies-with-artwork-derived-host-colors',
   'canvas_live_data'=>'approved-named-sources-public-geography-map-boundaries-venue-scoped-nws-usgs-earthquakes-and-opt-in-proximity',
   'canvas_account_sources'=>'me-field-inventory-and-per-viewer-runtime-consent',

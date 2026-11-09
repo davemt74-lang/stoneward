@@ -23,6 +23,12 @@ body {
   min-height: 100vh;
   background: radial-gradient(ellipse 47rem 22rem at 10% 0, #261e16 0%, transparent 100%);
 }
+.jukebox-host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.jukebox-host > main { flex: 1 0 auto; }
 a { color: var(--jukebox-gold); text-underline-offset: .18em; }
 button, input { font: inherit; }
 button, input, summary, a { -webkit-tap-highlight-color: transparent; }
@@ -36,11 +42,11 @@ button {
   color: inherit;
   cursor: pointer;
 }
-button:hover:not(:disabled) { background: #312920; }
+button:hover:not(:disabled, [aria-disabled=true]) { background: #312920; }
 button:disabled { opacity: .55; cursor: default; }
 button[aria-pressed=true] { background: #453521; border-color: var(--jukebox-gold); }
 button.jukebox-primary { color: #24190e; background: var(--jukebox-gold); border-color: var(--jukebox-gold); font-weight: 700; }
-button.jukebox-primary:hover:not(:disabled) { background: #f4d8ae; }
+button.jukebox-primary:hover:not(:disabled, [aria-disabled=true]) { background: #f4d8ae; }
 input:not([type=checkbox]) {
   width: 100%;
   min-width: 0;
@@ -209,6 +215,7 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
 .jukebox-directory, .host-grid { display: grid; gap: .85rem; }
 .jukebox-directory { margin-top: 1.25rem; }
 .jukebox-directory-guest, .host-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.jukebox-host-view { display: grid; gap: .85rem; }
 #following-directory { grid-column: 1 / -1; }
 .jukebox-panel {
   min-width: 0;
@@ -273,6 +280,44 @@ main > .jukebox-panel, #host { margin-top: .85rem; }
 .session-badge-live { background: #233628; color: var(--jukebox-green); }
 .session-badge-upcoming { background: #382a1c; color: var(--jukebox-gold); }
 .session-date { display: block; flex-basis: 100%; color: var(--jukebox-muted); font-size: .92rem; }
+
+.jukebox-host-overview {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: .8rem 1.25rem;
+  background: linear-gradient(110deg, #302217, var(--jukebox-panel) 75%);
+  border-color: #594331;
+}
+.jukebox-host-overview > div { min-width: 0; }
+.jukebox-host-track {
+  margin: 0;
+  font: 400 clamp(1.55rem, 4vw, 2.4rem)/1.12 Georgia, serif;
+}
+#host-progress { margin: .35rem 0 0; }
+.jukebox-host-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 44px;
+  padding: .45rem .65rem;
+  border: 1px solid var(--jukebox-input-line);
+  border-radius: .55rem;
+  text-decoration: none;
+}
+.jukebox-host-jump:hover { background: var(--jukebox-raised); }
+.jukebox-host-view :is(#queue, #phones, #history) { margin: 0; }
+.jukebox-host-view :is(#queue, #phones, #history):empty { display: none; }
+.jukebox-host-queue:has(#queue:not(:empty)) #queue-empty,
+#phones:not(:empty) + .jukebox-phones-empty,
+#history:not(:empty) + .jukebox-history-empty { display: none; }
+.jukebox-host-view :is(#queue, #phones, #history) li + li { border-top: 1px solid var(--jukebox-line); }
+.jukebox-host-row, .jukebox-host-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .65rem; }
+.jukebox-host-row-label { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; }
+.jukebox-host-row-actions button { margin-inline-start: 0; }
+#remote-listener-count { margin: .55rem 0; color: var(--jukebox-green); font-size: .9rem; }
+.jukebox-host-settings #end-session { margin-top: 1rem; color: #ffccbe; }
 
 .jukebox-dialog {
   width: min(34rem, calc(100% - 1.5rem));
@@ -347,9 +392,43 @@ main > .jukebox-panel, #host { margin-top: .85rem; }
 #footer summary { width: fit-content; min-height: 36px; padding-block: .3rem; color: var(--jukebox-gold); }
 #listener { margin: .45rem 0; }
 #listener-status { margin-top: .3rem; }
-body:has(#footer:not([hidden])) main { padding-bottom: 8rem; }
+body:has(#footer:not(.jukebox-host-player, [hidden])) main { padding-bottom: 8rem; }
 body:has(#listener:not([hidden])) main { padding-bottom: 13rem; }
 body:has(#footer details[open]) main { padding-bottom: 52vh; padding-bottom: 52dvh; }
+
+html:has(.jukebox-host-player:not([hidden])) { scroll-padding-block-end: calc(10rem + env(safe-area-inset-bottom)); }
+#footer.jukebox-host-player {
+  position: sticky;
+  bottom: 0;
+  box-shadow: 0 -.35rem 1.25rem #0005;
+}
+.jukebox-host-player-inner {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) auto minmax(7rem, 12rem);
+  align-items: center;
+  gap: .35rem 1rem;
+}
+.jukebox-host-player-inner > audio { display: none; }
+.jukebox-host-player-track, .jukebox-host-player-actions, .jukebox-host-volume {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: .55rem;
+}
+.jukebox-host-player-track > div { min-width: 0; }
+.jukebox-host-player-track strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jukebox-host-player-track small { font-size: .8rem; overflow-wrap: anywhere; }
+.jukebox-host-player-actions { flex-wrap: wrap; }
+.jukebox-host-player-actions:not(:has(button:not([hidden]))) { display: none; }
+.jukebox-host-volume { font-size: .84rem; }
+.jukebox-host-volume input { flex: 1; padding: 0; border: 0; background: transparent; }
+.jukebox-host-player button[aria-disabled=true] { opacity: .55; cursor: progress; }
+.jukebox-host-player #player-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ffdfb9;
+  font-size: .87rem;
+}
 
 @media (max-width: 42rem) {
   .jukebox-directory-guest, .host-grid { grid-template-columns: minmax(0, 1fr); }
@@ -357,6 +436,10 @@ body:has(#footer details[open]) main { padding-bottom: 52vh; padding-bottom: 52d
   .jukebox-profile-name { max-width: 5.5rem; }
   .jukebox-session-list a { flex-basis: 100%; }
   #recap-tracks { font-size: .84rem; }
+  html:has(.jukebox-host-player:not([hidden])) { scroll-padding-block-end: calc(12rem + env(safe-area-inset-bottom)); }
+  .jukebox-host-player-inner { grid-template-columns: minmax(0, 1fr) minmax(6rem, 7.75rem); gap: .2rem .65rem; }
+  .jukebox-host-player-actions { grid-column: 1 / -1; grid-row: 2; }
+  .jukebox-host-volume { grid-column: 2; grid-row: 1; }
 }
 @media (max-width: 30rem) {
   .jukebox-brand { gap: .35rem; }
