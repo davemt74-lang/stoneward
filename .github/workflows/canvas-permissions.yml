@@ -114,6 +114,10 @@ jobs:
           python tests/canvas-access-browser.py
       - name: Real PHP and production consent UI roundtrip
         run: python tests/canvas-access-integration-browser.py
+      - name: Songs and albums from the chat footer
+        env:
+          SF_CANVAS_HEADLESS_SHELL: '1'
+        run: python tests/agent-canvas-music-picker-browser.py
       - name: Story selection, tag editing and live canvas rendering
         run: |
           python tests/canvas-stories-picker-browser.py

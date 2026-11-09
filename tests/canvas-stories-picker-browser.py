@@ -97,9 +97,16 @@ with sync_playwright() as playwright:
         composer = page.locator('#composer')
         prefix = f'chromium/{width}: '
 
-        def open_picker(draft):
-            composer.fill(draft)
-            composer.press('Enter')
+        def type_draft(draft):
+            composer.fill('')
+            composer.press_sequentially(draft, delay=12)
+
+        def open_picker(draft, submit=True):
+            if submit:
+                composer.fill(draft)
+                composer.press('Enter')
+            else:
+                type_draft(draft)
             picker = page.get_by_role('dialog', name='Choose stories', exact=True)
             expect(picker).to_be_visible()
             expect(picker.get_by_role('checkbox', name='All Stories', exact=True)).to_be_visible()
@@ -116,12 +123,25 @@ with sync_playwright() as playwright:
         def selection():
             return page.evaluate('chatDraftResourceInputs(input.value).artist_inputs')
 
-        for draft in ('/stories', '/stories-behind', '/stories-behind-the'):
-            composer.fill(draft)
-            assert page.evaluate('chatResourceCommandTimer===null && apiCalls.length===0 && !document.querySelector("dialog")')
-        check(True, prefix + 'typing story command prefixes schedules no automatic picker or request')
+        type_draft('/stories')
+        composer.press_sequentially('-behind-the-song', delay=20)
+        page.wait_for_timeout(425)
+        expect(composer).to_have_value('/stories-behind-the-song')
+        check(page.evaluate('apiCalls.length===0 && !document.querySelector("dialog")'),
+              prefix + 'typing a tag cancels the base picker and waits without interrupting the tag name')
 
-        picker = open_picker("/edit {music-all} {merch:hoodie} {story:2} /stories")
+        composer.press('Space')
+        picker = page.get_by_role('dialog', name='Choose stories', exact=True)
+        expect(picker.get_by_text('Showing stories tagged “behind-the-song”', exact=True)).to_be_visible()
+        picker.get_by_label('Search stories', exact=True).press('Escape')
+        expect(picker).not_to_be_visible()
+        expect(composer).to_have_value('/stories-behind-the-song ')
+        check(page.evaluate('apiCalls.length===1'), prefix + 'a space delimiter opens the completed story tag without submitting chat')
+
+        draft = '/edit {music-all} {merch:hoodie} {story:2} /stories'
+        picker = open_picker(draft, submit=False)
+        expect(composer).to_have_value(draft)
+        check(True, prefix + 'the base stories command opens after a pause without pressing Enter')
         all_stories = picker.get_by_role('checkbox', name='All Stories', exact=True)
         search = picker.get_by_label('Search stories', exact=True)
         expect(search).to_be_focused()
@@ -192,8 +212,7 @@ with sync_playwright() as playwright:
         check(selection() == {'stories': {'mode': 'selected', 'story_ids': []}}, prefix + 'removing an archived selection emits an explicit clear')
 
         page.evaluate('holdInventory=true')
-        composer.fill('/stories')
-        composer.press('Enter')
+        type_draft('/stories')
         picker = page.get_by_role('dialog', name='Choose stories', exact=True)
         expect(picker).to_be_visible()
         page.wait_for_function('typeof releaseInventory==="function"')

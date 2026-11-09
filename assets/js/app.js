@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.314';
+  window.STONEFELLOW_APP_BUILD='1.3.315';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -2252,9 +2252,10 @@
       const command=match[2].toLowerCase();
       const standalone=draft.trim().toLowerCase()==='/'+command;
       if(command==='notifications'){
+        if(standalone)return {kind:command,start,end,standalone};
         const requestedAccountTool='my_notifications';
         const candidate=draft.slice(0,start)+'{me:'+requestedAccountTool+'}'+draft.slice(end);
-        if(!standalone&&['create','revise','build_on'].includes(directListeningRoomCommand(candidate)?.kind))
+        if(['create','revise','build_on'].includes(directListeningRoomCommand(candidate)?.kind))
           return {kind:'me',start,end,standalone,requestedAccountTool};
         continue;
       }
@@ -2304,6 +2305,12 @@
   }
   async function openChatResourcePicker(range){
     if(chatResourcePicker||chatMusicPicker||chatImagePicker)return;
+    if(range.kind==='notifications'){
+      input.value='';
+      syncChatImageDraftLimit();
+      openNotificationDrawer();
+      return;
+    }
     const requestedDraft=input.value;
     await loadAuth();
     if(input.value!==requestedDraft||chatResourcePicker||chatMusicPicker||chatImagePicker)return;
@@ -2358,11 +2365,14 @@
     const read=event=>{
       clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
       if(event?.isComposing||input.selectionStart!==input.selectionEnd)return;
-      const draft=input.value,range=chatResourceCommandRange(draft,input.selectionEnd),owner=canvasOwner();
-      // Wait for submission when a command could grow into another resource command.
-      if(!range||['stories','me','data'].includes(range.kind))return;
+      const draft=input.value,caret=input.selectionEnd,owner=canvasOwner();
+      const range=chatResourceCommandRange(draft,draft.slice(0,caret).trimEnd().length);
+      // An unfinished tag can itself look like a valid tag. A space or Send finishes it.
+      if(!range||(range.tag&&range.end===caret))return;
       chatResourceCommandTimer=setTimeout(()=>{
-        if(input.value===draft&&owner===canvasOwner())void openChatResourcePicker(range);
+        chatResourceCommandTimer=null;
+        if(input.value===draft&&owner===canvasOwner()&&document.activeElement===input&&
+          input.selectionStart===caret&&input.selectionEnd===caret)void openChatResourcePicker(range);
       },350);
     };
     input.addEventListener('input',read);input.addEventListener('compositionend',read);
@@ -2384,11 +2394,11 @@
     input.maxLength=chatImageDraftLimit+chatDraftBindingLength(input.value);
   }
   function chatMusicCommandRange(draft){
-    for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music|songs|albums)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
-      const standalone=draft.trim().toLowerCase()==='/'+match[2].toLowerCase();
+      const command=match[2].toLowerCase(),standalone=draft.trim().toLowerCase()==='/'+command;
       if(standalone||['create','revise','build_on'].includes(directListeningRoomCommand(draft)?.kind))
-        return {start,end,standalone,all:match[2].toLowerCase()==='music-all'};
+        return {start,end,standalone,all:command==='music-all',tab:command==='albums'?'albums':'songs'};
     }
     return null;
   }
@@ -2411,7 +2421,7 @@
     const picker={owner,request:new AbortController()};
     chatMusicPicker=picker;
     try{
-      const selection=await open({api,signal:picker.request.signal,selection:existing,selectedIds:existing?.mode==='selected'?existing.track_ids:[]});
+      const selection=await open({api,signal:picker.request.signal,selection:existing,tab:range.tab,selectedIds:existing?.mode==='selected'?existing.track_ids:[]});
       if(!selection||picker.request.signal.aborted||chatMusicPicker!==picker||canvasOwner()!==owner||input.value!==draft)return;
       applyChatMusicSelection(range,selection);
     }finally{
@@ -2423,11 +2433,13 @@
     const readDraft=event=>{
       clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
       if(event?.isComposing||input.selectionStart!==input.selectionEnd)return;
-      const draft=input.value,range=chatMusicCommandRange(draft),owner=canvasOwner();
+      const draft=input.value,caret=input.selectionEnd,owner=canvasOwner();
+      const range=chatMusicCommandRange(draft);
       if(!range)return;
       const apply=()=>{
         chatMusicCommandTimer=null;
-        if(input.value!==draft||canvasOwner()!==owner||chatImagePicker||chatMusicPicker||chatResourcePicker)return;
+        if(input.value!==draft||canvasOwner()!==owner||document.activeElement!==input||
+          input.selectionStart!==caret||input.selectionEnd!==caret||chatImagePicker||chatMusicPicker||chatResourcePicker)return;
         if(range.all)applyChatMusicSelection(range,{mode:'all'});
         else void openChatMusicPicker(range);
       };
@@ -2689,12 +2701,6 @@
     event.preventDefault();
     clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
     clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
-    if(input.value.trim().toLowerCase()==='/notifications'){
-      input.value='';
-      syncChatImageDraftLimit();
-      openNotificationDrawer();
-      return;
-    }
     const resourceRange=chatResourceCommandRange(input.value);
     if(resourceRange){void openChatResourcePicker(resourceRange);return;}
     const imageRange=chatImageCommandRange(input.value);

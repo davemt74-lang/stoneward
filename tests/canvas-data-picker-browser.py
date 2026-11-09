@@ -132,9 +132,13 @@ with sync_playwright() as playwright:
         def activate(control):
             control.tap() if width == 390 else control.click()
 
-        def open_picker(draft):
-            composer.fill(draft)
-            composer.press('Enter')
+        def open_picker(draft, submit=True):
+            if submit:
+                composer.fill(draft)
+                composer.press('Enter')
+            else:
+                composer.fill('')
+                composer.press_sequentially(draft, delay=12)
             expect(picker).to_be_visible()
             expect(source).to_be_visible()
             expect(place.locator('option')).to_have_count(3)
@@ -145,12 +149,8 @@ with sync_playwright() as playwright:
             expect(place.locator(f'option[value="{canonical_id}"]')).to_have_count(1)
             place.select_option(canonical_id)
 
-        composer.fill('/data')
-        page.wait_for_timeout(400)
-        expect(picker).not_to_be_visible()
-        assert len(requests) == 1
-
-        open_picker('/Data')
+        open_picker('/Data', submit=False)
+        expect(composer).to_have_value('/Data')
         expect(source.locator('option')).to_have_count(5)
         expect(picker.get_by_text('Recent conditions <b>observed</b>.', exact=True)).to_be_visible()
         assert not picker.locator('b').count()

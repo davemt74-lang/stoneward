@@ -4,13 +4,15 @@ Type `/canvas`, `/merch` or `/tickets` anywhere in the public chat composer to o
 
 The composer inserts `{canvas:ID}`, `{merch:ID}` or `{ticket:ID}`. Each type can be selected independently alongside `/images` and `/music`. Clearing merchandise or tickets inserts `{merch-clear}` or `{tickets-clear}`, so an `/edit` can explicitly clear an inherited type. An omitted type keeps its previous selection. Selected IDs are validated by the server, preserved in the project approval snapshot and checked again before a new build. Reopening a saved canvas reads current public availability; withdrawn merchandise and offers disappear from its live datasets.
 
+Type `/songs` or `/albums` to open the corresponding tab of the `/music` picker. Selecting an album attaches its available songs in release order.
+
 Type `/playlists` to choose your saved playlists or published artist playlists. In **Admin → Music → Artist Playlists**, review the complete ordered list and publish its exact revision. A user's ordinary public sharing does not publish to the artist catalog.
 
 The picker attaches `{playlist:own-ID@VERSION}` or `{playlist:artist-ID@VERSION}`. Select a changed playlist again to approve its new revision. `{playlists-clear}` clears inherited playlists, and `{music-clear}` clears directly selected songs. Each can be cleared independently. Selecting sources uses no AI tokens and starts no playback.
 
 A private canvas can use the owner's saved playlists. To submit it to the Public Gallery, revise it to remove any own-playlist sources. Artist playlist inputs stay usable while the approved revision remains published. See [the audio contract](canvas-music-data.md) for ordered membership and playback.
 
-Enter `/stories` in the canvas composer and press Enter or Send to choose published stories. Select individual stories or **All Stories**. Add comma-separated tags in the Story Editor, then enter a shortcut such as `/stories-behind-the-song` to choose stories with that tag. The tagged picker can attach the entire matching catalog as one scope. All and tag scopes follow current publication and tag membership on reopen.
+Type `/stories` in the canvas composer to choose published stories. Select individual stories or **All Stories**. Add comma-separated tags in the Story Editor, then type a shortcut such as `/stories-behind-the-song` followed by a space or Send to choose stories with that tag. The tagged picker can attach the entire matching catalog as one scope. All and tag scopes follow current publication and tag membership on reopen.
 
 The composer stores `{story:ID}`, `{stories-all}`, `{stories-tag:TAG}`, or `{stories-clear}` and preserves the selection across edits. Canvas code can declare the `published_stories` binding for live narrative and related public catalog data. A bounded planning preview identifies when more rows exist. Archiving removes a story from live data and revokes delivery of media published only through that story.
 
@@ -40,7 +42,7 @@ History events include start, resume, pause, complete and skip. Measured listeni
 
 ## Notifications
 
-Send `/notifications` on its own to open the Notifications drawer. Include it in a build or `/edit` prompt to open the account-data picker with **Notification inbox** selected. Choose **Add selections** to attach `{me:my_notifications}`. You can also select that source directly from `/me`.
+Type `/notifications` on its own to open the Notifications drawer. Include it in a build or `/edit` prompt to open the account-data picker with **Notification inbox** selected. Choose **Add selections** to attach `{me:my_notifications}`. You can also select that source directly from `/me`.
 
 Canvas code can use the read-only `my_notifications` binding after the current viewer grants access in **What this canvas uses**. The binding contains notification kind, title, creation time and read status. The **Notification inbox** admin permission controls availability. Use the native drawer to manage notifications.
 
