@@ -47,7 +47,7 @@
       body: JSON.stringify(body)
     };
     if (action === 'listener' && body?.active === false) options.keepalive = true;
-    const controller = ['state', 'player'].includes(action) || (!host && action === 'directory') ? new AbortController() : null;
+    const controller = ['state', 'player', 'venue_accounts'].includes(action) || (!host && action === 'directory') ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
     if (controller) options.signal = controller.signal;
     try {
@@ -177,6 +177,67 @@
         dismiss.forEach(control => { control.disabled = false; });
       }
     }, report);
+  }
+  function bindVenueAccountPicker() {
+    const dialog = $('venue-dialog');
+    if (!dialog) return;
+    const owner = $('venue-owner');
+    const lookup = $('venue-lookup');
+    const input = $('venue-search');
+    const searchButton = $('venue-search-button');
+    const status = $('venue-search-status');
+    const myAccount = owner.value;
+    let generation = 0;
+
+    function clearMatches() {
+      owner.querySelectorAll('[data-venue-match]').forEach(option => option.remove());
+      owner.value = '';
+    }
+
+    async function searchAccounts() {
+      const query = input.value.trim();
+      const request = ++generation;
+      clearMatches();
+      if (query.length < 2) {
+        status.textContent = 'Enter at least two characters to search.';
+        input.focus();
+        return;
+      }
+      status.textContent = 'Searching for accounts…';
+      try {
+        const result = await api('venue_accounts', undefined, {q: query});
+        if (!dialog.open || request !== generation) return;
+        const accounts = result.accounts.filter(account => String(account.id) !== myAccount);
+        for (const account of accounts) {
+          const option = new Option([account.display_name, account.email].filter(Boolean).join(' · '), String(account.id));
+          option.dataset.venueMatch = '';
+          owner.add(option);
+        }
+        status.textContent = accounts.length ? 'Choose a matching account from the Account list.' : 'No other active accounts match that search.';
+        if (accounts.length && [input, searchButton].includes(document.activeElement)) owner.focus();
+      } catch (error) {
+        if (dialog.open && request === generation) status.textContent = error.message || 'Account search failed. Try again.';
+      }
+    }
+
+    input.addEventListener('input', () => {
+      generation++;
+      clearMatches();
+      status.textContent = '';
+    });
+    input.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.isComposing) return;
+      event.preventDefault();
+      void searchAccounts();
+    });
+    searchButton.onclick = () => void searchAccounts();
+    dialog.addEventListener('close', () => {
+      generation++;
+      clearMatches();
+      owner.value = myAccount;
+      lookup.open = false;
+      status.textContent = '';
+    });
   }
   function button(label, work) {
     const control = document.createElement('button');
@@ -773,7 +834,8 @@
         $('mode-link').href = 'jukebox.php';
         $('mode-link').textContent = 'Live Sessions';
         $('open-create').hidden = !data.admin && !data.venue;
-        $('open-venue').hidden = !data.admin;
+        const venueButton = $('open-venue');
+        if (venueButton) venueButton.hidden = !data.admin;
         $('listing').hidden = !data.admin;
         renderSessionList('sessions', data.sessions);
         if (!data.admin && !data.venue) notice('Ask a Stonefellow admin to enable your venue account.');
@@ -812,6 +874,7 @@
     notice('Venue account enabled.');
     void directory().catch(notice);
   });
+  bindVenueAccountPicker();
   const profile = $('jukebox-profile');
   document.addEventListener('click', event => {
     if (profile.open && !profile.contains(event.target)) profile.open = false;
