@@ -2397,9 +2397,10 @@
     if(chatImageDraftLimit<=0)return;
     input.maxLength=chatImageDraftLimit+chatDraftBindingLength(input.value);
   }
-  function chatMusicCommandRange(draft){
+  function chatMusicCommandRange(draft,commandEnd){
     for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music|songs|albums)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
+      if(commandEnd!==undefined&&end!==commandEnd)continue;
       const command=match[2].toLowerCase(),standalone=draft.trim().toLowerCase()==='/'+command;
       if(standalone||['create','revise','build_on'].includes(directListeningRoomCommand(draft)?.kind))
         return {start,end,standalone,all:command==='music-all',tab:command==='albums'?'albums':'songs'};
@@ -5807,16 +5808,22 @@
     }
     if(command==='notifications'&&!canvasBriefInChat(draft)){openNotificationDrawer();return;}
     const token='/'+command;
-    let next=draft.trim()?draft.trimEnd()+' '+token:token;
-    if(!chatResourceCommandRange(next,next.length)&&!chatImageCommandRange(next,next.length)&&
-      !chatMusicCommandRange(next))next="Let's build "+next;
+    const priorMusic=/^(?:music(?:-all)?|songs|albums)$/.test(command)?chatMusicCommandRange(draft):null;
+    const before=priorMusic?draft.slice(0,priorMusic.start):draft.trim()?draft.trimEnd()+' ':'';
+    const after=priorMusic?draft.slice(priorMusic.end):'';
+    let next=before+token+after,commandEnd=before.length+token.length;
+    if(!chatResourceCommandRange(next,commandEnd)&&!chatImageCommandRange(next,commandEnd)&&
+      !chatMusicCommandRange(next,commandEnd)){
+      const prefix="Let's build ";
+      next=prefix+next;commandEnd+=prefix.length;
+    }
     input.value=next;
-    input.setSelectionRange(next.length,next.length);
-    const resource=chatResourceCommandRange(next,next.length);
+    input.setSelectionRange(commandEnd,commandEnd);
+    const resource=chatResourceCommandRange(next,commandEnd);
     if(resource){void openChatResourcePicker(resource);return;}
-    const image=chatImageCommandRange(next,next.length);
+    const image=chatImageCommandRange(next,commandEnd);
     if(image){openChatImagePicker(image);return;}
-    const music=chatMusicCommandRange(next);
+    const music=chatMusicCommandRange(next,commandEnd);
     if(music?.all)applyChatMusicSelection(music,{mode:'all'});
     else if(music)void openChatMusicPicker(music);
   }
