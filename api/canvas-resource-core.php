@@ -5,6 +5,7 @@ require_once __DIR__.'/agent-canvas-public-commerce.php';
 require_once __DIR__.'/canvas-playlists-core.php';
 require_once __DIR__.'/canvas-stories-core.php';
 require_once __DIR__.'/canvas-lyrics-core.php';
+require_once __DIR__.'/agent-public-artist-context.php';
 
 function sf_canvas_resource_story_scope(mixed $raw): array {
     if($raw===['mode'=>'all'])return $raw;
@@ -24,15 +25,17 @@ function sf_canvas_resource_story_scope(mixed $raw): array {
 /** Syntax only. An omitted type and an explicitly empty selection have different meanings. */
 function sf_canvas_resource_artist_inputs(mixed $raw): ?array {
     if($raw===null)return null;
-    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids','stories','lyrics_ids','me_tools','data_sources']))
+    if(!is_array($raw)||($raw&&array_is_list($raw))||array_diff(array_keys($raw),['merch_ids','ticket_ids','stories','lyrics_ids','knowledge_ids','production_ids','me_tools','data_sources']))
         throw new InvalidArgumentException('Choose canvas resources from the picker.');
     $inputs=[];
-    foreach(['merch_ids','ticket_ids'] as $field){
+    foreach(['merch_ids','ticket_ids','knowledge_ids','production_ids'] as $field){
         if(!array_key_exists($field,$raw))continue;
         $ids=$raw[$field];
-        if(!is_array($ids)||!array_is_list($ids))throw new InvalidArgumentException('Choose merchandise or ticket resources from the picker.');
+        if(!is_array($ids)||!array_is_list($ids))throw new InvalidArgumentException('Choose valid resource IDs from the picker.');
         foreach($ids as $id)if(!is_string($id)||preg_match('/\A[A-Za-z0-9_-]{1,180}\z/',$id)!==1)
-            throw new InvalidArgumentException('Choose merchandise or ticket resources from the picker.');
+            throw new InvalidArgumentException('Choose valid resource IDs from the picker.');
+        if(in_array($field,['knowledge_ids','production_ids'],true)&&count($ids)>8)
+            throw new InvalidArgumentException('Choose up to eight sources of this type.');
         $inputs[$field]=array_values(array_unique($ids,SORT_STRING));
     }
     if(array_key_exists('lyrics_ids',$raw))$inputs['lyrics_ids']=sf_canvas_lyrics_track_ids($raw['lyrics_ids']);
@@ -57,13 +60,13 @@ function sf_canvas_resource_source_ids(array $raw): array {
 /** Resource tokens carry identity without consuming the natural-language design budget. */
 function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $artistProvided=false,?array $rawSources=null): array {
     $artistTokens=[];$sourceTokens=[];$cleared=[];$storyIds=[];$storyScopes=[];
-    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket|story|stories-tag|lyrics|me|data):([^}]*)|(merch-clear|tickets-clear|stories-all|stories-clear|lyrics-clear|me-clear|data-clear))\}\1/i',
+    $clean=preg_replace_callback('/(`?)\{(?:(canvas|merch|ticket|story|stories-tag|lyrics|knowledge|production|me|data):([^}]*)|(merch-clear|tickets-clear|stories-all|stories-clear|lyrics-clear|knowledge-clear|production-clear|me-clear|data-clear))\}\1/i',
         static function(array $match)use(&$artistTokens,&$sourceTokens,&$cleared,&$storyIds,&$storyScopes):string {
             if(($match[4]??'')!==''){
                 $command=strtolower($match[4]);
                 if($command==='stories-all')$storyScopes['all']=['mode'=>'all'];
                 elseif($command==='stories-clear')$storyScopes['clear']=['mode'=>'selected','story_ids'=>[]];
-                elseif($command==='lyrics-clear')$cleared['lyrics_ids']=true;
+                elseif(in_array($command,['lyrics-clear','knowledge-clear','production-clear'],true))$cleared[substr($command,0,-6).'_ids']=true;
                 elseif($command==='me-clear')$cleared['me_tools']=true;
                 elseif($command==='data-clear')$cleared['data_sources']=true;
                 else $cleared[$command==='merch-clear'?'merch_ids':'ticket_ids']=true;
@@ -79,8 +82,8 @@ function sf_canvas_resource_selection(string $brief,mixed $rawArtist=null,bool $
                 $artistTokens['data_sources'][]=sf_canvas_data_source_token($id);
             }elseif($kind==='me'){
                 $artistTokens['me_tools'][] = strtolower($id);
-            }elseif($kind==='lyrics'){
-                $artistTokens['lyrics_ids'][]=$id;
+            }elseif(in_array($kind,['lyrics','knowledge','production'],true)){
+                $artistTokens[$kind.'_ids'][]=$id;
             }elseif($kind==='story'){
                 $storyIds[]=$id;
             }elseif($kind==='stories-tag'){
@@ -143,7 +146,7 @@ function sf_canvas_resource_lyrics_enabled(): bool {
 }
 
 /** Model context contains selected public facts. Account purchases are separate private tools. */
-function sf_canvas_resource_artist_context(?array $inputs,bool $includeLyricExcerpts=false): array {
+function sf_canvas_resource_artist_context(?array $inputs,bool $includeLyricExcerpts=false,int $uid=0): array {
     $inputs=sf_canvas_resource_artist_inputs($inputs);$context=[];
     foreach(['merch_ids'=>'published_merch','ticket_ids'=>'published_ticket_offers'] as $field=>$tool){
         if($inputs!==null&&array_key_exists($field,$inputs))$context[$tool]=sf_canvas_resource_artist_rows($tool,$inputs);
@@ -182,6 +185,17 @@ function sf_canvas_resource_artist_context(?array $inputs,bool $includeLyricExce
             if($excerpts)$context['published_lyrics']['creative_excerpts']=$excerpts;
         }
     }
+    foreach(['knowledge','production'] as $kind){
+        $field=$kind.'_ids';
+        if(!empty($inputs[$field])){
+            $selected=array_fill_keys($inputs[$field],true);
+            $context[$kind]=array_values(array_filter(sf_canvas_editor_sources($uid,$kind,$includeLyricExcerpts),
+                static fn(array $item):bool=>isset($selected[$item['id']])));
+            if($kind==='production')$context[$kind]=array_map(
+                static fn(array $item):array=>array_intersect_key($item,['revision'=>true,'item_count'=>true]),
+                $context[$kind]);
+        }
+    }
     return $context;
 }
 
@@ -200,7 +214,7 @@ function sf_canvas_resource_validate_stories(?array $inputs): void {
 }
 
 /** Recheck published sources and enabled account capabilities before saving a creative revision. */
-function sf_canvas_resource_validate_scopes(?array $inputs): void {
+function sf_canvas_resource_validate_scopes(?array $inputs,int $uid=0): void {
     $inputs=sf_canvas_resource_artist_inputs($inputs);
     sf_canvas_resource_validate_stories($inputs);
     if(!empty($inputs['data_sources']))sf_canvas_data_source_context($inputs['data_sources']);
@@ -215,12 +229,19 @@ function sf_canvas_resource_validate_scopes(?array $inputs): void {
         foreach($inputs['me_tools'] as $id)if(!sf_canvas_permission_enabled($id,$policy))
             throw new InvalidArgumentException('An account data source is turned off for canvases. Update the /me selection.');
     }
+    foreach(['knowledge','production'] as $kind){
+        $field=$kind.'_ids';
+        if(empty($inputs[$field]))continue;
+        $allowed=array_column(sf_canvas_editor_sources($uid,$kind),'id');
+        if(array_diff($inputs[$field],$allowed))
+            throw new InvalidArgumentException('A selected '.$kind.' source has changed or is unavailable. Choose it again.');
+    }
 }
 
 /** Validate current access before a metered operation, independently of picker contents. */
 function sf_canvas_resource_validate(int $uid,?array $inputs,?array $sources=null): void {
     $inputs=sf_canvas_resource_artist_inputs($inputs);
-    sf_canvas_resource_validate_scopes($inputs);
+    sf_canvas_resource_validate_scopes($inputs,$uid);
     if($sources!==null){
         require_once __DIR__.'/agent-scene-history.php';
         foreach(sf_canvas_resource_source_ids($sources) as $id)if(sf_agent_scene_history_get($uid,$id)===null)
@@ -237,6 +258,7 @@ function sf_canvas_resource_validate(int $uid,?array $inputs,?array $sources=nul
 
 /** Complete picker inventory. These rows describe resources without generating a layout. */
 function sf_canvas_resource_inventory(int $uid,string $kind): array {
+    if(in_array($kind,['knowledge','production'],true))return sf_canvas_editor_sources($uid,$kind);
     if($kind==='lyrics')return sf_canvas_resource_lyrics_enabled()?sf_canvas_lyrics_inventory():[];
     if($kind==='stories')return sf_canvas_story_inventory();
     if($kind==='playlists')return sf_canvas_playlists_inventory($uid);
@@ -285,4 +307,35 @@ function sf_canvas_resource_inventory(int $uid,string $kind): array {
         return $items;
     }
     throw new InvalidArgumentException('Choose canvas, story, lyric, playlist, account, merchandise, or ticket resources.');
+}
+
+/** Read only the deliberately exposed metadata. Production IDs pin an editorial revision. */
+function sf_canvas_editor_sources(int $uid,string $kind,bool $includeExcerpts=false): array {
+    if($kind==='production'){
+        if($uid<1)return [];
+        require_once __DIR__.'/migrations.php';
+        if(!sf_migration_table_exists('story_assemblies')||!sf_migration_table_exists('story_assembly_items'))return [];
+        $query=sf_db()->prepare('SELECT a.id,a.title,a.revision,
+            (SELECT COUNT(*) FROM story_assembly_items i WHERE i.assembly_id=a.id) AS item_count
+            FROM story_assemblies a JOIN users u ON u.id=a.created_by
+            WHERE a.created_by=? AND u.role=? AND u.status=? ORDER BY a.updated_at DESC,a.id DESC');
+        $query->execute([$uid,'admin','active']);
+        $items=[];
+        foreach($query as $row){
+            $items[]=['id'=>$row['id'].'-r'.$row['revision'],
+                'title'=>sf_agent_public_artist_text($row['title'],180),'revision'=>(int)$row['revision'],
+                'item_count'=>(int)$row['item_count']];
+        }
+        return $items;
+    }
+    $path=SF_ROOT.'/storage/knowledge/index.json';
+    $index=is_file($path)?json_decode((string)file_get_contents($path),true):null;
+    $items=[];
+    foreach((array)($index['files']??[]) as $row){
+        if(!is_array($row)||($row['public_agent']??false)!==true||
+            !is_string($row['id']??null)||!preg_match('/\AK-[A-F0-9]{10}\z/',$row['id']))continue;
+        $items[$row['id']]=['id'=>$row['id'],'title'=>sf_agent_public_artist_text($row['name']??'',180)];
+        if($includeExcerpts)$items[$row['id']]['reference_excerpt']=sf_agent_public_artist_text($row['text']??$row['notes']??'',420);
+    }
+    return array_values($items);
 }

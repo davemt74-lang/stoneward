@@ -295,7 +295,7 @@ function sf_canvas_project_ideas_generate(array $user,array $request,string $kin
         if($kind==='suggest'&&empty($preferences['ideas_enabled']))throw new DomainException('Canvas ideas are turned off for this account.');
         $context=sf_canvas_project_ideas_context($owner,$currentId,trim($brief),$sourceIds??[],$meTools);
         if($playlistProvided)$context['selected_playlists']=$playlistManifest;
-        if($artistProvided)$context['selected_artist_resources']=sf_canvas_resource_artist_context($artistInputs);
+        if($artistProvided)$context['selected_artist_resources']=sf_canvas_resource_artist_context($artistInputs,false,$owner);
         if(isset($artistInputs['data_sources']))$context['selected_live_data_sources']=$artistInputs['data_sources']===[]?[]:sf_canvas_data_source_context($artistInputs['data_sources']);
         if($meTools!==null){
             require_once __DIR__.'/canvas-account-data-core.php';

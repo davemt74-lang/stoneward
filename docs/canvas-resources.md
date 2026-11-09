@@ -93,3 +93,9 @@ The ordinary chat agent can route a design conversation to the canvas discussion
 Project cards include **Like**, **Dislike** and an optional reason. The footer’s **Feedback** action opens the same controls for the current saved canvas. Feedback can be edited or cleared. **Cancel** ends a project without recording a dislike. Private feedback informs subsequent ideas and discussion; account history clearing and closure remove it, and account exports include it.
 
 The canvas resource endpoint supports `kind=canvas|merch|tickets|playlists|stories|lyrics|me`. A guest can read published artist playlists, stories and lyric availability. Signed-in users also receive their own playlists. New project interfaces include POST `api/canvas-projects.php` actions `discuss` and `feedback`. Saved `artist_inputs` is an additive history field with independently optional artist resource scopes. Existing music, images, playback, project approval and legacy API contracts remain in place.
+
+## Knowledge and production references
+
+Use `/knowledge` to select artist knowledge marked public for the agent. The Coding Agent receives short text excerpts as reference material. Private Knowledge records and original file paths stay out of the picker and the prompt.
+
+Use `/production` while signed in as a production administrator to select one of your editorial assemblies. The attachment pins its revision and gives the Coding Agent the revision and item count as context. Reattach a project after its editorial revision changes. The picker does not expose footage, render outputs, or editor actions. Canvases with private production attachments cannot be submitted to the public gallery.
