@@ -35,6 +35,24 @@ $alertControl=$post&&$hostMode&&$action==='control'&&in_array($body['event']??nu
 $db=sf_db();
 
 try{
+    if($action==='venue_accounts'){
+        if(!$hostMode||!$admin)sf_json_response(['ok'=>false,'message'=>'An administrator must look up venue accounts.'],403);
+        if($post){
+            header('Allow: GET');
+            sf_json_response(['ok'=>false,'message'=>'Method unavailable.'],405);
+        }
+        $query=$_GET['q']??'';
+        $query=is_string($query)?trim($query):'';
+        if(!preg_match('/\A[^\x00-\x1F\x7F]{2,120}\z/u',$query))
+            throw new InvalidArgumentException('Enter 2 to 120 characters of a name or email.');
+        $like='%'.str_replace(['!','%','_'],['!!','!%','!_'],$query).'%';
+        $accounts=sf_jukebox_query("SELECT id,display_name,email FROM users WHERE status='active'
+            AND (LOWER(display_name) LIKE LOWER(?) ESCAPE '!' OR LOWER(email) LIKE LOWER(?) ESCAPE '!')
+            ORDER BY display_name,id LIMIT 20",[$like,$like])->fetchAll(PDO::FETCH_ASSOC);
+        foreach($accounts as &$account)$account['id']=(int)$account['id'];
+        unset($account);
+        sf_json_response(['ok'=>true,'accounts'=>$accounts]);
+    }
     sf_jukebox_schema();
     if($followRequest||(($guestState||$guestDirectory)&&$uid>0)||$alertControl)sf_jukebox_follow_schema();
     if(!$post&&$action==='directory'){
@@ -75,10 +93,13 @@ try{
     }
     if($post&&$hostMode&&$action==='venue'){
         if(!$admin)throw new DomainException('An administrator must enable venue accounts.');
-        $owner=(int)($body['owner']??0);
-        $name=sf_clean_text($body['name']??'',120);
-        if($name===''||!sf_jukebox_query("SELECT 1 FROM users WHERE id=? AND status='active'",[$owner])->fetchColumn())
-            throw new InvalidArgumentException('Enter an active Stonefellow account ID and venue name.');
+        $owner=$body['owner']??null;
+        $owner=is_int($owner)||is_string($owner)?filter_var($owner,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):false;
+        $name=$body['name']??'';
+        $name=is_string($name)?sf_clean_text($name,120):'';
+        if($name==='')throw new InvalidArgumentException('Enter a venue name.');
+        if($owner===false||!sf_jukebox_query("SELECT 1 FROM users WHERE id=? AND status='active'",[$owner])->fetchColumn())
+            throw new InvalidArgumentException('Choose an active Stonefellow account.');
         $sql=$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'
             ?'INSERT INTO jukebox_venues (owner_id,name) VALUES (?,?) ON DUPLICATE KEY UPDATE name=VALUES(name)'
             :'INSERT INTO jukebox_venues (owner_id,name) VALUES (?,?) ON CONFLICT(owner_id) DO UPDATE SET name=excluded.name';

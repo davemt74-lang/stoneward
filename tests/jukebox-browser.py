@@ -56,7 +56,9 @@ def fixture(site):
           CREATE TABLE app_meta(meta_key TEXT PRIMARY KEY,meta_value TEXT NOT NULL,updated_at TEXT NOT NULL);
           INSERT INTO users VALUES(1,'admin@example.test','Admin','admin','active','','','',''),
           (2,'venue@example.test','Bartender','customer','active','','','',''),
-          (3,'other@example.test','Other','customer','active','','','','');''')
+          (3,'other@example.test','Other','customer','active','','','',''),
+          (4,'inactive@example.test','Bartender','customer','disabled','','','',''),
+          (5,'staff@example.test','Bartender','customer','active','','','','');''')
     subprocess.run([PHP, '-r', '''
         define('SF_ROOT',getcwd());
         require 'api/bootstrap.php';
@@ -216,20 +218,54 @@ def scenario(browser, base, phone_options):
     enable_venue.click()
     expect(venue_dialog).to_be_visible()
     assert venue_dialog.evaluate("dialog => dialog.matches(':modal')")
-    expect(venue_dialog.get_by_label('Account ID')).to_be_focused()
-    venue_dialog.get_by_label('Account ID').fill('999')
-    venue_dialog.get_by_label('Venue name').fill('Test Bar')
-    venue_dialog.get_by_role('button', name='Save venue').click()
-    expect(admin.locator('#venue-status')).to_contain_text('active Stonefellow account ID')
-    expect(venue_dialog).to_be_visible()
-    venue_dialog.get_by_label('Account ID').fill('2')
-    venue_dialog.get_by_role('button', name='Save venue').click()
+    owner = venue_dialog.locator('#venue-owner')
+    venue_name = venue_dialog.get_by_label('Venue name')
+    save_venue = venue_dialog.get_by_role('button', name='Save venue')
+    expect(owner).to_have_value('1')
+    expect(venue_name).to_be_focused()
+    venue_name.press_sequentially('desertRIO')
+    save_venue.click()
     expect(venue_dialog).to_be_hidden()
     expect(enable_venue).to_be_focused()
+    assert request(admin, 'directory', host=True)['venue'] == 'desertRIO'
+
+    mobile_admin = signed_in(1, **phone_options)
+    mobile_admin.locator('#open-venue').click()
+    mobile_venue = mobile_admin.locator('#venue-dialog')
+    expect(mobile_venue.locator('#venue-owner')).to_have_value('1')
+    expect(mobile_venue.get_by_label('Venue name')).to_be_focused()
+    mobile_venue.get_by_label('Venue name').fill('Mobile venue')
+    mobile_venue.get_by_role('button', name='Cancel', exact=True).click()
+    expect(mobile_venue).to_be_hidden()
+    mobile_admin.context.close()
+
+    enable_venue.click()
+    expect(owner).to_have_value('1')
+    venue_dialog.get_by_text('Find another account', exact=True).click()
+    search = venue_dialog.get_by_label('Name or email')
+    search.fill('NoSuchStonefellow')
+    expect(owner).to_have_value('')
+    search.press('Enter')
+    expect(venue_dialog.locator('#venue-search-status')).to_contain_text(re.compile(r'no .*accounts?', re.I))
+    expect(venue_dialog).to_be_visible()
+    assert not owner.evaluate('select => select.validity.valid')
+    search.fill('Bartender')
+    venue_dialog.get_by_role('button', name='Search', exact=True).click()
+    expect(owner.locator('option[value="2"]')).to_contain_text('venue@example.test')
+    expect(owner.locator('option[value="5"]')).to_contain_text('staff@example.test')
+    expect(owner.locator('option[value="4"]')).to_have_count(0)
+    expect(owner).to_have_value('')
+    owner.select_option('2')
+    venue_name.fill('Test Bar')
+    save_venue.click()
+    expect(venue_dialog).to_be_hidden()
+    expect(enable_venue).to_be_focused()
+    assert request(admin, 'directory', host=True)['venue'] == 'desertRIO'
     universal = request(admin, 'create', {'title': 'Universal', 'listed': True}, True)['id']
     venue = signed_in(2)
     expect(venue.locator('#open-create')).to_be_visible()
     expect(venue.locator('#open-venue')).to_be_hidden()
+    assert request(venue, 'directory', host=True)['venue'] == 'Test Bar'
     new_session = venue.locator('#open-create')
     create_dialog = venue.locator('#create-dialog')
     expect(venue.locator('#create')).to_be_hidden()
@@ -806,6 +842,19 @@ def http_scenario(base, site):
                 return {'status': response.status, **json.loads(raw)}
 
     admin, venue, outsider = Client(1), Client(2), Client(3)
+    bartender = {'id': 2, 'display_name': 'Bartender', 'email': 'venue@example.test'}
+    matches = admin.call('venue_accounts', q='bartender')
+    assert matches['ok'] and sorted(matches['accounts'], key=lambda account: account['id']) == [
+        bartender,
+        {'id': 5, 'display_name': 'Bartender', 'email': 'staff@example.test'},
+    ]
+    assert admin.call('venue_accounts', q='venue@example.test')['accounts'] == [bartender]
+    assert admin.call('venue_accounts', q='%_')['accounts'] == []
+    assert admin.call('venue_accounts', q='a')['status'] == 400
+    assert venue.call('venue_accounts', q='Bartender')['status'] == 403
+    assert Client().call('venue_accounts', q='Bartender')['status'] == 403
+    assert admin.call('venue', data={'owner': '2junk', 'name': 'Invalid'})['status'] == 400
+    assert admin.call('venue', data={'owner': 4, 'name': 'Inactive'})['status'] == 400
     assert admin.call('venue', data={'owner': 2, 'name': 'Test Bar'})['ok']
     public = admin.call('create', data={'title': 'Universal', 'listed': True})['id']
     session = venue.call('create', data={'title': 'Tonight'})['id']

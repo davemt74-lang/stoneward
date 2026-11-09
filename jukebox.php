@@ -12,6 +12,7 @@ if($host&&!$viewer){
 $csrf=sf_user_csrf();
 session_write_close();
 $profileName=trim((string)($viewer['display_name']??''))?:($viewer?'My account':'Guest');
+$venueAdmin=$host&&($viewer['role']??'')==='admin';
 $sessionId=$_GET['id']??'';
 $signInHref='./?view=login';
 if(is_string($sessionId)&&preg_match('/^[a-f0-9]{32}$/D',$sessionId))$signInHref.='#return_jukebox='.$sessionId;
@@ -33,13 +34,13 @@ header('Content-Security-Policy: '.$framePolicy);
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=7">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=8">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=2"></script>
-<script defer src="assets/js/jukebox.js?v=8"></script>
+<script defer src="assets/js/jukebox.js?v=9"></script>
 </head>
 <body<?=$host?' class="jukebox-host"':''?>>
 <header class="jukebox-header">
@@ -86,7 +87,9 @@ header('Content-Security-Policy: '.$framePolicy);
     </div>
     <div class="jukebox-page-actions">
 <?php if($host): ?>
+<?php if($venueAdmin): ?>
       <button id="open-venue" type="button" aria-haspopup="dialog" hidden>Enable venue account</button>
+<?php endif; ?>
       <button id="open-create" class="jukebox-primary" type="button" aria-haspopup="dialog" hidden>New session</button>
 <?php else: ?>
       <button type="button" data-pwa-install hidden>Install Stonefellow</button>
@@ -127,11 +130,26 @@ header('Content-Security-Policy: '.$framePolicy);
       </div>
     </form>
   </dialog>
+<?php endif; ?>
+<?php if($venueAdmin): ?>
   <dialog id="venue-dialog" class="jukebox-dialog" aria-labelledby="venue-heading">
     <div class="jukebox-dialog-head"><h2 id="venue-heading">Enable a venue account</h2><button type="button" class="jukebox-dialog-close" data-jukebox-dialog-close aria-label="Close venue setup">×</button></div>
     <form id="venue">
-      <label>Account ID <input type="number" name="owner" min="1" required autofocus></label>
-      <label>Venue name <input name="name" maxlength="120" required></label>
+      <label>Account
+        <select id="venue-owner" name="owner" required>
+          <option value="" disabled hidden>Choose an account</option>
+          <option value="<?=(int)$viewer['id']?>" selected>My account (<?=sf_pwa_shell_attr($profileName)?>)</option>
+        </select>
+      </label>
+      <details id="venue-lookup" class="jukebox-venue-lookup">
+        <summary>Find another account</summary>
+        <div class="jukebox-venue-search">
+          <label>Name or email <input type="search" id="venue-search" maxlength="120" autocomplete="off"></label>
+          <button type="button" id="venue-search-button">Search</button>
+        </div>
+        <p id="venue-search-status" class="jukebox-form-status" role="status"></p>
+      </details>
+      <label>Venue name <input name="name" maxlength="120" required autofocus></label>
       <p id="venue-status" class="jukebox-form-status" role="status"></p>
       <div class="jukebox-dialog-actions">
         <button type="button" data-jukebox-dialog-close>Cancel</button>
