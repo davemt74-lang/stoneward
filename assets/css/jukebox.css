@@ -23,12 +23,12 @@ body {
   min-height: 100vh;
   background: radial-gradient(ellipse 47rem 22rem at 10% 0, #261e16 0%, transparent 100%);
 }
-.jukebox-host {
+.jukebox-host, .jukebox-guest {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
 }
-.jukebox-host > main { flex: 1 0 auto; }
+.jukebox-host > main, .jukebox-guest > main { flex: 1 0 auto; }
 a { color: var(--jukebox-gold); text-underline-offset: .18em; }
 button, input, select { font: inherit; }
 button, input, select, summary, a { -webkit-tap-highlight-color: transparent; }
@@ -200,7 +200,7 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
   color: #ffdfb9;
 }
 .jukebox-status { margin-top: 1rem; }
-.jukebox-status:empty, .jukebox-form-status:empty {
+.jukebox-status:empty, .jukebox-form-status:empty, .jukebox-sr-only, #approval:empty, #listener-status:empty {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -209,8 +209,84 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
   border: 0;
   clip-path: inset(50%);
 }
-#recap-status:empty, #approval:empty,
-#copy-session-status:empty, #listener-status:empty, #player-status:empty { display: none; }
+#recap-status:empty, #copy-session-status:empty, #player-status:empty { display: none; }
+
+.jukebox-session-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .35rem;
+  margin-top: 1rem;
+  padding: .35rem;
+  border: 1px solid var(--jukebox-line);
+  border-radius: .75rem;
+  background: var(--jukebox-panel);
+}
+.jukebox-host .jukebox-session-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.jukebox-session-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  padding: .4rem .3rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--jukebox-muted);
+  font-size: .92rem;
+  font-weight: 650;
+}
+.jukebox-session-tabs button[aria-selected=true] {
+  border-color: #997d58;
+  background: #382a1c;
+  color: var(--jukebox-gold);
+}
+.jukebox-tab-badge, .jukebox-chat-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.3rem;
+  min-height: 1.3rem;
+  padding: 0 .25rem;
+  border-radius: 1rem;
+  background: var(--jukebox-gold);
+  color: #24190e;
+  font-size: .75rem;
+  line-height: 1.2;
+  font-weight: 700;
+}
+.jukebox-session-panel { display: grid; gap: .85rem; min-width: 0; }
+.jukebox-guest .jukebox-session-panel, #ended-session-tools { margin-top: .85rem; }
+#pairing:not(:has(#join:not([hidden]), #approval:not(:empty), #forget:not([hidden]))) { display: none; }
+.jukebox-chat-layout { display: grid; align-items: start; gap: .85rem; }
+.jukebox-chat-host { grid-template-columns: minmax(12rem, 1fr) minmax(0, 2fr); }
+.jukebox-chat-content { min-width: 0; }
+#chat-empty { margin: 0; color: var(--jukebox-muted); }
+.jukebox-chat-threads { padding: 0; margin: 0; list-style: none; }
+.jukebox-chat-threads:empty, .jukebox-chat-threads:not(:empty) + .jukebox-chat-threads-empty { display: none; }
+.jukebox-chat-threads button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  width: 100%;
+  margin-inline-start: 0;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.jukebox-chat-count { flex: none; }
+#chat-status { margin-block: .65rem; }
+#messages {
+  max-height: 28rem;
+  max-height: min(48dvh, 28rem);
+  margin-block: .65rem;
+  padding: 0 .35rem 0 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+#messages:empty { display: none; }
+#messages li + li { border-top: 1px solid var(--jukebox-line); }
+#send { max-width: none; }
+#music:not([hidden]) + .jukebox-music-placeholder { display: none; }
+.jukebox-music-placeholder { margin: 0; color: var(--jukebox-muted); }
 
 .jukebox-directory, .host-grid { display: grid; gap: .85rem; }
 .jukebox-directory { margin-top: 1.25rem; }
@@ -224,7 +300,7 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
   border-radius: .8rem;
   background: var(--jukebox-panel);
 }
-main > .jukebox-panel, #host { margin-top: .85rem; }
+main > .jukebox-panel { margin-top: .85rem; }
 .jukebox-panel > h2:first-child, .jukebox-panel > h3:first-child { margin-top: 0; }
 .jukebox-panel > :last-child { margin-bottom: 0; }
 .jukebox-directory .jukebox-panel > h2 {
@@ -304,15 +380,15 @@ main > .jukebox-panel, #host { margin-top: .85rem; }
   padding: .45rem .65rem;
   border: 1px solid var(--jukebox-input-line);
   border-radius: .55rem;
-  text-decoration: none;
+  color: var(--jukebox-gold);
 }
 .jukebox-host-jump:hover { background: var(--jukebox-raised); }
-.jukebox-host-view :is(#queue, #phones, #history) { margin: 0; }
-.jukebox-host-view :is(#queue, #phones, #history):empty { display: none; }
-.jukebox-host-queue:has(#queue:not(:empty)) #queue-empty,
+.jukebox-session-panel :is(#queue, #phones, #history) { margin: 0; }
+.jukebox-session-panel :is(#queue, #phones, #history):empty { display: none; }
+#queue:not(:empty) + #queue-empty,
 #phones:not(:empty) + .jukebox-phones-empty,
 #history:not(:empty) + .jukebox-history-empty { display: none; }
-.jukebox-host-view :is(#queue, #phones, #history) li + li { border-top: 1px solid var(--jukebox-line); }
+.jukebox-session-panel :is(#queue, #phones, #history) li + li { border-top: 1px solid var(--jukebox-line); }
 .jukebox-host-row, .jukebox-host-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .65rem; }
 .jukebox-host-row-label { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; }
 .jukebox-host-row-actions button { margin-inline-start: 0; }
@@ -382,47 +458,35 @@ main > .jukebox-panel, #host { margin-top: .85rem; }
 #recap-tracks td span { display: block; }
 
 #footer {
-  position: fixed;
+  position: sticky;
   z-index: 1;
-  inset: auto 0 0;
+  bottom: 0;
   max-height: 50vh;
   max-height: 50dvh;
   padding: .55rem 0 calc(.55rem + env(safe-area-inset-bottom));
   overflow: auto;
   border-top: 1px solid var(--jukebox-input-line);
   background: var(--jukebox-raised);
-}
-#footer small { display: block; }
-#footer details { margin-top: .35rem; }
-#footer summary { width: fit-content; min-height: 36px; padding-block: .3rem; color: var(--jukebox-gold); }
-#listener { margin: .45rem 0; }
-#listener-status { margin-top: .3rem; }
-body:has(#footer:not(.jukebox-host-player, [hidden])) main { padding-bottom: 8rem; }
-body:has(#listener:not([hidden])) main { padding-bottom: 13rem; }
-body:has(#footer details[open]) main { padding-bottom: 52vh; padding-bottom: 52dvh; }
-
-html:has(.jukebox-host-player:not([hidden])) { scroll-padding-block-end: calc(10rem + env(safe-area-inset-bottom)); }
-#footer.jukebox-host-player {
-  position: sticky;
-  bottom: 0;
   box-shadow: 0 -.35rem 1.25rem #0005;
 }
+#footer small { display: block; }
+html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(safe-area-inset-bottom)); }
 .jukebox-host-player-inner {
   display: grid;
   grid-template-columns: minmax(8rem, 1fr) auto minmax(7rem, 12rem);
   align-items: center;
   gap: .35rem 1rem;
 }
-.jukebox-host-player-inner > audio { display: none; }
-.jukebox-host-player-track, .jukebox-host-player-actions, .jukebox-host-volume {
+.jukebox-host-player-inner > audio, #listener-audio { display: none; }
+.jukebox-host-player-track, .jukebox-player-track, .jukebox-host-player-actions, .jukebox-host-volume {
   display: flex;
   align-items: center;
   min-width: 0;
   gap: .55rem;
 }
-.jukebox-host-player-track > div { min-width: 0; }
-.jukebox-host-player-track strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jukebox-host-player-track small { font-size: .8rem; overflow-wrap: anywhere; }
+:is(.jukebox-host-player-track, .jukebox-player-track) > div { min-width: 0; }
+:is(.jukebox-host-player-track, .jukebox-player-track) strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(.jukebox-host-player-track, .jukebox-player-track) small { font-size: .8rem; overflow-wrap: anywhere; }
 .jukebox-host-player-actions { flex-wrap: wrap; }
 .jukebox-host-player-actions:not(:has(button:not([hidden]))) { display: none; }
 .jukebox-host-volume { font-size: .84rem; }
@@ -434,14 +498,26 @@ html:has(.jukebox-host-player:not([hidden])) { scroll-padding-block-end: calc(10
   color: #ffdfb9;
   font-size: .87rem;
 }
+.jukebox-guest-player-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .25rem .6rem;
+}
+.jukebox-player-track { grid-column: 1; }
+#listener { display: contents; }
+.jukebox-listener-actions { grid-column: 2; justify-self: end; justify-content: end; gap: .35rem; }
+.jukebox-listener-actions button { font-size: .84rem; padding-inline: .55rem; }
+#listener-status { grid-column: 1 / -1; text-align: end; font-size: .8rem; overflow-wrap: anywhere; }
 
 @media (max-width: 42rem) {
-  .jukebox-directory-guest, .host-grid { grid-template-columns: minmax(0, 1fr); }
+  .jukebox-directory-guest, .host-grid, .jukebox-chat-host { grid-template-columns: minmax(0, 1fr); }
+  .jukebox-host .jukebox-session-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .jukebox-header-inner { min-height: 3.6rem; }
   .jukebox-profile-name { max-width: 5.5rem; }
   .jukebox-session-list a { flex-basis: 100%; }
   #recap-tracks { font-size: .84rem; }
-  html:has(.jukebox-host-player:not([hidden])) { scroll-padding-block-end: calc(12rem + env(safe-area-inset-bottom)); }
+  html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(12rem + env(safe-area-inset-bottom)); }
   .jukebox-host-player-inner { grid-template-columns: minmax(0, 1fr) minmax(6rem, 7.75rem); gap: .2rem .65rem; }
   .jukebox-host-player-actions { grid-column: 1 / -1; grid-row: 2; }
   .jukebox-host-volume { grid-column: 2; grid-row: 1; }
@@ -459,4 +535,7 @@ html:has(.jukebox-host-player:not([hidden])) { scroll-padding-block-end: calc(10
   #mode-link { padding-inline: .3rem; font-size: .8rem; }
   .jukebox-profile > summary { width: 44px; justify-content: center; padding-inline: 0; }
   .jukebox-profile > summary > svg:last-child { display: none; }
+  .jukebox-player-track { gap: .35rem; }
+  .jukebox-player-track .jukebox-record { width: 1.45rem; }
+  .jukebox-listener-actions button { padding-inline: .4rem; }
 }

@@ -1,8 +1,12 @@
 'use strict';
 
 (() => {
-  const maxProjectionMs = 4000;
   const staleAfterMs = 6000;
+  const staleTransportMs = 5000;
+  const initialDriftSeconds = 0.15;
+  const hardDriftSeconds = 0.7;
+  const quietDriftSeconds = 0.12;
+  const seekCooldownMs = 1000;
   const maxActivityGapMs = 2000;
   const activityToleranceMs = 150;
 
@@ -12,6 +16,7 @@
     let listening = false;
     let itemId = '';
     let seekOnStart = false;
+    let lastSeekAt = -Infinity;
     let playAttempt = null;
     let blocked = '';
     let status = '';
@@ -46,7 +51,7 @@
       const positionMs = audio.currentTime * 1000;
       if (!listening || !itemId || itemId !== snapshot.itemId || !snapshot.allowed || !snapshot.online ||
           snapshot.transport !== 'playing' || !Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0 ||
-          now - observedAt >= staleAfterMs || audio.paused || audio.ended || audio.seeking ||
+          freshForMs() <= 0 || audio.paused || audio.ended || audio.seeking ||
           audio.muted || audio.volume === 0 || audio.readyState < 2 || !Number.isFinite(positionMs)) {
         endActivity();
         return;
@@ -72,10 +77,17 @@
       onActivity({itemId, generation: activity.generation, advancedMs: 0, active: false, baseline: true});
     }
 
+    function setRate(rate) {
+      if (Math.abs(audio.playbackRate - rate) >= 0.005) {
+        try { audio.playbackRate = rate; } catch {}
+      }
+    }
+
     function pause() {
       endActivity();
       playAttempt = null;
-      audio.pause();
+      if (!audio.paused) audio.pause();
+      setRate(1);
       seekOnStart = true;
     }
 
@@ -83,6 +95,7 @@
       if (!itemId) return;
       pause();
       itemId = '';
+      lastSeekAt = -Infinity;
       audio.removeAttribute('src');
       audio.load();
     }
@@ -95,17 +108,37 @@
       report('');
     }
 
-    function hostPosition() {
-      const sampleAge = Math.min(maxProjectionMs, snapshot.sampleAgeMs + performance.now() - observedAt);
-      return snapshot.seconds + sampleAge / 1000;
+    function sampleAgeMs() {
+      return snapshot.sampleAgeMs + performance.now() - observedAt;
     }
 
-    function seekToHost(position) {
-      if (audio.readyState < 1 || audio.seeking) return;
+    function freshForMs() {
+      const responseFreshFor = staleAfterMs - (performance.now() - observedAt);
+      return snapshot.transport === 'playing' ? Math.min(responseFreshFor, staleTransportMs - sampleAgeMs()) : responseFreshFor;
+    }
+
+    function alignToHost(position) {
+      if (audio.readyState < 1) {
+        // Seed the media element's default start position before the gesture-bound play call.
+        if (seekOnStart && !playAttempt && Math.abs(audio.currentTime - position) > initialDriftSeconds) {
+          try { audio.currentTime = position; } catch {}
+        }
+        return;
+      }
+      if (audio.seeking) return;
       const target = Number.isFinite(audio.duration) ? Math.min(position, audio.duration) : position;
-      if (Math.abs(audio.currentTime - target) > (seekOnStart ? 0.15 : 2)) {
+      const drift = target - audio.currentTime;
+      const magnitude = Math.abs(drift);
+      const now = performance.now();
+      const initialSeek = seekOnStart && magnitude > initialDriftSeconds;
+      if (initialSeek || (magnitude > hardDriftSeconds && now - lastSeekAt >= seekCooldownMs)) {
+        setRate(1);
         endActivity();
         audio.currentTime = target;
+        lastSeekAt = now;
+      } else {
+        // Correct small differences without an audible jump or repeated network seeks.
+        setRate(magnitude <= quietDriftSeconds ? 1 : 1 + Math.max(-0.04, Math.min(0.04, drift * 0.08)));
       }
       seekOnStart = false;
     }
@@ -123,8 +156,9 @@
         report('');
         return;
       }
-      if (snapshot.online && performance.now() - observedAt >= staleAfterMs) {
-        disconnect();
+      if (snapshot.online && freshForMs() <= 0) {
+        pause();
+        report('Waiting for a fresh host playback update.');
         return;
       }
       if (itemId !== snapshot.itemId) {
@@ -147,13 +181,13 @@
         audio.src = urlForItem(itemId);
         seekOnStart = true;
       }
-      const position = hostPosition();
+      const position = snapshot.seconds + sampleAgeMs() / 1000;
       if (Number.isFinite(audio.duration) && position >= audio.duration) {
         pause();
         report('Waiting for the next song.');
         return;
       }
-      seekToHost(position);
+      alignToHost(position);
       if (playAttempt || !audio.paused) return;
 
       const attempt = {};
@@ -174,11 +208,13 @@
 
     function update(next) {
       const reconnecting = snapshot && !snapshot.online && next.online;
+      const changedGeneration = snapshot && next.generation !== snapshot.generation;
       snapshot = {
         ...next, itemId: next.itemId == null ? '' : String(next.itemId),
         seconds: Math.max(0, Number(next.seconds) || 0), sampleAgeMs: Math.max(0, Number(next.sampleAgeMs) || 0)
       };
       if (activity && (snapshot.itemId !== activity.itemId || snapshot.generation !== activity.generation)) endActivity();
+      if (changedGeneration || reconnecting) seekOnStart = true;
       if (reconnecting && (blocked === 'error' || audio.error)) {
         clearSource();
         blocked = '';
@@ -205,21 +241,26 @@
     }
 
     function checkFreshness() {
-      if (listening && snapshot.online && performance.now() - observedAt >= staleAfterMs) disconnect();
+      if (listening && snapshot.online && freshForMs() <= 0) sync();
     }
 
     function keepFresh() {
       clearTimeout(freshnessTimer);
       if (listening && snapshot.online) {
-        const remaining = staleAfterMs - (performance.now() - observedAt);
-        freshnessTimer = setTimeout(checkFreshness, Math.ceil(Math.max(0, remaining)));
+        const remaining = freshForMs();
+        if (remaining > 0) freshnessTimer = setTimeout(checkFreshness, Math.ceil(remaining));
       }
     }
 
     audio.addEventListener('loadedmetadata', sync);
+    audio.addEventListener('canplay', sync);
+    audio.addEventListener('seeked', sync);
     audio.addEventListener('waiting', () => {
       endActivity();
-      if (listening && !audio.paused) report('Buffering on this phone…');
+      if (listening && !audio.paused) {
+        if (!audio.seeking) seekOnStart = true;
+        report('Buffering on this phone…');
+      }
     });
     audio.addEventListener('playing', () => {
       if (listening && !audio.paused) {
@@ -247,6 +288,11 @@
       measureActivity();
     });
     if (onActivity) window.addEventListener('pagehide', endActivity);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || !listening) return;
+      seekOnStart = true;
+      checkFreshness();
+    });
 
     function toggleMute() {
       audio.muted = !audio.muted;

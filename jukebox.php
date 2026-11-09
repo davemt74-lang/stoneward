@@ -13,6 +13,8 @@ $csrf=sf_user_csrf();
 session_write_close();
 $profileName=trim((string)($viewer['display_name']??''))?:($viewer?'My account':'Guest');
 $venueAdmin=$host&&($viewer['role']??'')==='admin';
+$sessionTabs=$host?['overview'=>'Overview','phones'=>'Phones','music'=>'Music','chat'=>'Chat','history'=>'History','settings'=>'Settings']
+    :['overview'=>'Overview','music'=>'Music','chat'=>'Chat'];
 $sessionId=$_GET['id']??'';
 $signInHref='./?view=login';
 if(is_string($sessionId)&&preg_match('/^[a-f0-9]{32}$/D',$sessionId))$signInHref.='#return_jukebox='.$sessionId;
@@ -34,15 +36,15 @@ header('Content-Security-Policy: '.$framePolicy);
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=8">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=9">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
-<script defer src="assets/js/jukebox-listener.js?v=2"></script>
-<script defer src="assets/js/jukebox.js?v=9"></script>
+<script defer src="assets/js/jukebox-listener.js?v=3"></script>
+<script defer src="assets/js/jukebox.js?v=10"></script>
 </head>
-<body<?=$host?' class="jukebox-host"':''?>>
+<body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
   <div class="jukebox-header-inner">
     <a class="jukebox-brand" href="./">
@@ -196,37 +198,52 @@ header('Content-Security-Policy: '.$framePolicy);
 <a href="./?view=login" data-pwa-alert-signin hidden>Sign in for phone alerts</a>
 </div>
 <?php endif; ?>
-<section id="pairing" class="jukebox-panel" hidden>
-<form id="join"><label>Display name (optional) <input name="name" maxlength="80" autocomplete="nickname"></label>
-<label id="remember" hidden><input type="checkbox" name="remember"> Remember me at this venue</label>
-<button>Request access</button></form>
-<p id="approval"></p>
-<button type="button" id="forget" hidden>Forget me at this venue</button>
-</section>
+<?php if($host): ?><div id="host" class="jukebox-host-view" hidden><?php endif; ?>
+<nav id="session-tabs" class="jukebox-session-tabs" role="tablist" aria-label="Session sections" hidden>
+<?php foreach($sessionTabs as $tab=>$label): ?>
+  <button type="button" id="session-tab-<?=$tab?>" role="tab" data-session-tab="<?=$tab?>"
+    aria-controls="session-panel-<?=$tab?>" aria-selected="<?=$tab==='overview'?'true':'false'?>" tabindex="<?=$tab==='overview'?'0':'-1'?>">
+    <?=$label?><?php if($tab==='chat'): ?><span id="chat-unread" class="jukebox-tab-badge" hidden></span><?php endif; ?>
+  </button>
+<?php endforeach; ?>
+</nav>
+<p id="chat-notice" class="jukebox-sr-only" role="status"></p>
+<div id="session-panel-overview" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-overview" tabindex="0" hidden>
+  <section id="pairing" class="jukebox-panel" aria-labelledby="pairing-heading" hidden>
+    <h2 id="pairing-heading">Phone access</h2>
+    <form id="join">
+      <label>Display name (optional) <input name="name" maxlength="80" autocomplete="nickname"></label>
+      <label id="remember" hidden><input type="checkbox" name="remember"> Remember me at this venue</label>
+      <button>Request access</button>
+    </form>
+    <p id="approval" role="status"></p>
+    <button type="button" id="forget" hidden>Forget me at this venue</button>
+  </section>
 <?php if($host): ?>
-<div id="host" class="jukebox-host-view" hidden>
   <section class="jukebox-panel jukebox-host-overview" aria-labelledby="host-now-heading">
     <div>
       <h2 id="host-now-heading" class="jukebox-kicker">Now Playing</h2>
       <p id="host-now" class="jukebox-host-track">Jukebox idle</p>
       <p id="host-progress" class="jukebox-muted"></p>
     </div>
-    <a class="jukebox-host-jump" href="#host-phones">Phone approvals <span aria-hidden="true">↓</span></a>
+    <button type="button" class="jukebox-host-jump" data-session-open="phones">Phone approvals <span aria-hidden="true">→</span></button>
   </section>
+<?php endif; ?>
+  <section class="jukebox-panel jukebox-session-queue" aria-labelledby="queue-label">
+    <h2 id="queue-label">Up Next</h2>
+    <ol id="queue"></ol>
+    <p id="queue-empty" class="jukebox-empty">No songs queued yet.</p>
+  </section>
+</div>
+<?php if($host): ?>
+<div id="session-panel-phones" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-phones" tabindex="0" hidden>
   <div class="host-grid">
-    <section class="jukebox-panel jukebox-host-queue" aria-labelledby="queue-label">
-      <h2 id="queue-label">Up Next</h2>
-      <p id="queue-empty" class="jukebox-empty">No songs queued yet.</p>
-      <ol id="queue"></ol>
-    </section>
     <section id="host-phones" class="jukebox-panel jukebox-host-phones" aria-labelledby="phones-heading">
       <h2 id="phones-heading">Phone connections</h2>
       <p id="remote-listener-count" role="status" hidden></p>
       <ul id="phones"></ul>
       <p class="jukebox-empty jukebox-phones-empty">No phones have requested access yet.</p>
     </section>
-  </div>
-  <div class="host-grid">
     <section class="jukebox-panel" aria-labelledby="share-heading">
       <h2 id="share-heading">Share this session</h2>
       <div id="active-share"><div id="session-share">
@@ -237,19 +254,60 @@ header('Content-Security-Policy: '.$framePolicy);
         <label id="manual-session-copy" hidden>Guest session link <input id="session-link-value" type="url" readonly></label>
       </div></div>
     </section>
-    <section class="jukebox-panel jukebox-host-settings" aria-labelledby="host-settings-heading">
-      <h2 id="host-settings-heading">Session settings</h2>
-      <label class="remote-setting"><input id="remote-listening" type="checkbox" aria-describedby="remote-help"> Allow remote listening</label>
-      <small id="remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
-      <button type="button" id="end-session">End session</button>
-    </section>
   </div>
+</div>
+<?php endif; ?>
+<div id="session-panel-music" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-music" tabindex="0" hidden>
+  <section id="music" class="jukebox-panel" hidden>
+    <nav aria-label="Catalog views" id="tabs"><button type="button" data-tab="feed">Feed</button><button type="button" data-tab="songs">Songs</button><button type="button" data-tab="albums">Albums</button></nav>
+    <ul id="catalog"></ul>
+  </section>
+  <p class="jukebox-panel jukebox-music-placeholder">Songs will appear here when they’re available for this session.</p>
+</div>
+<div id="session-panel-chat" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-chat" tabindex="0" hidden>
+  <div class="jukebox-chat-layout<?=$host?' jukebox-chat-host':''?>">
+<?php if($host): ?>
+    <section class="jukebox-panel" aria-labelledby="chat-threads-heading">
+      <h2 id="chat-threads-heading">Phone conversations</h2>
+      <ul id="chat-threads" class="jukebox-chat-threads"></ul>
+      <p class="jukebox-empty jukebox-chat-threads-empty">Approved phones will appear here.</p>
+    </section>
+<?php endif; ?>
+    <div class="jukebox-chat-content">
+      <p id="chat-empty" class="jukebox-panel"><?=$host?'Choose a phone conversation to start chatting.':'Request access in Overview to chat with the host.'?></p>
+      <section id="chat" class="jukebox-panel" hidden>
+        <h2 id="chat-title" tabindex="-1">Private messages</h2>
+        <p id="chat-status" class="jukebox-form-status" role="status" hidden></p>
+        <ul id="messages" tabindex="0" aria-label="Message history"></ul>
+        <form id="send">
+          <label>Message <input name="text" maxlength="1000"></label>
+          <label>Image (optional) <input name="image" type="file" accept="image/jpeg,image/png,image/webp"></label>
+          <button>Send</button>
+        </form>
+      </section>
+    </div>
+  </div>
+</div>
+<?php if($host): ?>
+<div id="session-panel-history" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-history" tabindex="0" hidden>
   <section class="jukebox-panel jukebox-host-history" aria-labelledby="history-heading">
     <h2 id="history-heading">Play history</h2>
     <ul id="history"></ul>
     <p class="jukebox-empty jukebox-history-empty">Played songs will appear here.</p>
   </section>
+  <details id="crm" class="jukebox-panel" hidden><summary>Venue guests and visit history</summary><ul id="guests"></ul></details>
 </div>
+<div id="session-panel-settings" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-settings" tabindex="0" hidden>
+  <section class="jukebox-panel jukebox-host-settings" aria-labelledby="host-settings-heading">
+    <h2 id="host-settings-heading">Session settings</h2>
+    <label class="remote-setting"><input id="remote-listening" type="checkbox" aria-describedby="remote-help"> Allow remote listening</label>
+    <small id="remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
+    <button type="button" id="end-session">End session</button>
+  </section>
+</div>
+</div>
+<?php else: ?>
+<details id="crm" hidden><summary>Venue guests and visit history</summary><ul id="guests"></ul></details>
 <?php endif; ?>
 <section id="recap" class="jukebox-panel" hidden aria-labelledby="recap-heading">
 <h2 id="recap-heading">Session recap</h2>
@@ -275,16 +333,7 @@ header('Content-Security-Policy: '.$framePolicy);
 </section>
 </div>
 </section>
-<details id="crm" class="jukebox-panel" hidden><summary>Venue guests and visit history</summary><ul id="guests"></ul></details>
-<section id="chat" class="jukebox-panel" hidden>
-<h2 id="chat-title" tabindex="-1">Private messages</h2><ul id="messages"></ul>
-<form id="send"><label>Message <input name="text" maxlength="1000"></label>
-<label>Image (optional) <input name="image" type="file" accept="image/jpeg,image/png,image/webp"></label><button>Send</button></form>
-</section>
-<section id="music" class="jukebox-panel" hidden>
-<nav aria-label="Catalog views" id="tabs"><button data-tab="feed">Feed</button><button data-tab="songs">Songs</button><button data-tab="albums">Albums</button></nav>
-<ul id="catalog"></ul>
-</section>
+<div id="ended-session-tools" class="jukebox-session-panel" hidden></div>
 </main>
 <?php if($host): ?>
 <footer id="footer" class="jukebox-host-player" aria-label="Session audio player" hidden>
@@ -310,17 +359,23 @@ header('Content-Security-Policy: '.$framePolicy);
   </div>
 </footer>
 <?php else: ?>
-<footer id="footer" hidden><div class="jukebox-footer-inner"><div><strong id="now">Idle</strong><small id="progress"></small></div>
-<div id="listener" hidden>
-<audio id="listener-audio" preload="none"></audio>
-<div class="actions">
-<button type="button" id="listen">Listen on this phone</button>
-<button type="button" id="listener-mute" aria-pressed="false" hidden>Mute phone</button>
-<button type="button" id="listener-stop" hidden>Stop listening</button>
-</div>
-<small id="listener-status" role="status"></small>
-</div>
-<details><summary id="queue-label">Up Next</summary><ol id="queue"></ol></details></div></footer>
+<footer id="footer" class="jukebox-guest-player" aria-label="Phone audio player" hidden>
+  <div class="jukebox-footer-inner jukebox-guest-player-inner">
+    <div class="jukebox-player-track">
+      <span class="jukebox-record" aria-hidden="true"></span>
+      <div><strong id="now">Jukebox idle</strong><small id="progress"></small></div>
+    </div>
+    <div id="listener" hidden>
+      <audio id="listener-audio" preload="none"></audio>
+      <div class="actions jukebox-listener-actions">
+        <button type="button" id="listen" class="jukebox-primary">Stream on this phone</button>
+        <button type="button" id="listener-mute" aria-pressed="false" hidden>Mute phone</button>
+        <button type="button" id="listener-stop" hidden>Stop listening</button>
+      </div>
+      <small id="listener-status" role="status"></small>
+    </div>
+  </div>
+</footer>
 <?php endif; ?>
 </body>
 </html>

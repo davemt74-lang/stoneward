@@ -11,6 +11,7 @@ function sf_jukebox_schema(): void {
     $engine=$mysql?' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4':'';
     $blob=$mysql?'MEDIUMTEXT':'TEXT';
     $serial=$mysql?'BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY':'INTEGER PRIMARY KEY AUTOINCREMENT';
+    $threadIndex=$mysql?', INDEX jukebox_messages_thread (session_id,phone_id,id,sender)':'';
     $tables=[
         "jukebox_venues (owner_id BIGINT PRIMARY KEY, name VARCHAR(120) NOT NULL)",
         "jukebox_sessions (id CHAR(32) PRIMARY KEY, owner_id BIGINT NOT NULL, venue_id BIGINT NOT NULL,
@@ -32,9 +33,17 @@ function sf_jukebox_schema(): void {
             status VARCHAR(12) NOT NULL, requested BIGINT NOT NULL, played BIGINT NULL,
             UNIQUE(session_id,nonce))",
         "jukebox_messages (id $serial, session_id CHAR(32) NOT NULL, phone_id CHAR(32) NOT NULL,
-            sender VARCHAR(8) NOT NULL, body VARCHAR(1000) NOT NULL, image $blob NULL, created BIGINT NOT NULL)"
+            sender VARCHAR(8) NOT NULL, body VARCHAR(1000) NOT NULL, image $blob NULL, created BIGINT NOT NULL$threadIndex)"
     ];
-    foreach($tables as $table) sf_db()->exec("CREATE TABLE IF NOT EXISTS ".$table.$engine);
+    $db=sf_db();
+    foreach($tables as $table) $db->exec("CREATE TABLE IF NOT EXISTS ".$table.$engine);
+    if(!$mysql){
+        $db->exec('CREATE INDEX IF NOT EXISTS jukebox_messages_thread ON jukebox_messages (session_id,phone_id,id,sender)');
+    }elseif(!$db->query("SHOW INDEX FROM jukebox_messages WHERE Key_name='jukebox_messages_thread'")->fetch()){
+        // Existing installations need the polling index. Another first request may install it first.
+        try{$db->exec('CREATE INDEX jukebox_messages_thread ON jukebox_messages (session_id,phone_id,id,sender)');}
+        catch(PDOException $error){if((int)($error->errorInfo[1]??0)!==1061)throw $error;}
+    }
     sf_jukebox_listener_schema($mysql,$engine);
     $ready=true;
 }
@@ -197,6 +206,8 @@ function sf_jukebox_state(array $session,?array $phone,bool $host): array {
         if($row['status']==='current')$state['current']=$row;
         else $state['queue'][]=$row;
     }
+    if($phase==='live'&&($host||($phone['status']??'')==='approved'))
+        $state['chat_threads']=sf_jukebox_chat_threads($id,$host?null:(string)$phone['id']);
     if($state['remote_listening'])$state['transport']=sf_jukebox_transport($session,$state['current'],$state['online']);
     if($host){
         $state['listener_metrics']=sf_jukebox_listener_metrics($session,$state['transport']??null);
@@ -359,9 +370,27 @@ function sf_jukebox_controls(array $session,array $body): void {
     }else throw new InvalidArgumentException('Unknown player control.');
 }
 
-function sf_jukebox_thread(string $sessionId,string $phoneId): array {
-    return array_reverse(sf_jukebox_query('SELECT id,sender,body,image IS NOT NULL AS attachment,created
-        FROM jukebox_messages WHERE session_id=? AND phone_id=? ORDER BY id DESC LIMIT 50',[$sessionId,$phoneId])->fetchAll());
+function sf_jukebox_chat_threads(string $sessionId,?string $phoneId): array {
+    $args=[$phoneId===null?'guest':'host',$sessionId];
+    $phoneFilter='';
+    if($phoneId!==null){
+        $phoneFilter=' AND m.phone_id=?';
+        $args[]=$phoneId;
+    }
+    $rows=sf_jukebox_query("SELECT m.phone_id,MAX(m.id) AS latest_id,
+        SUM(CASE WHEN m.sender=? THEN 1 ELSE 0 END) AS incoming_count
+        FROM jukebox_messages m JOIN jukebox_phones p ON p.id=m.phone_id AND p.session_id=m.session_id
+        WHERE m.session_id=? AND p.status='approved'$phoneFilter GROUP BY m.phone_id",$args)->fetchAll();
+    return array_map(static fn(array $row):array=>['phone_id'=>(string)$row['phone_id'],
+        'latest_id'=>(string)$row['latest_id'],'incoming_count'=>(int)$row['incoming_count']],$rows);
+}
+
+function sf_jukebox_thread(string $sessionId,string $phoneId,bool $full=false): array {
+    $limit=$full?200:50;
+    $rows=sf_jukebox_query('SELECT id,sender,body,image IS NOT NULL AS attachment,created
+        FROM jukebox_messages WHERE session_id=? AND phone_id=? ORDER BY id DESC LIMIT '.$limit,[$sessionId,$phoneId])->fetchAll();
+    if($full)foreach($rows as $i=>$row)$rows[$i]['id']=(string)$row['id'];
+    return array_reverse($rows);
 }
 
 function sf_jukebox_message(string $sessionId,string $phoneId,string $sender,array $body): void {
