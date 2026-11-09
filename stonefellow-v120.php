@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('SF_ROOT', __DIR__);
-define('SF_BUILD', '1.3.315');
+define('SF_BUILD', '1.3.316');
 require_once __DIR__.'/api/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -336,18 +336,6 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
       <button id="playerClose" class="player-close" type="button" aria-label="Close player">×</button>
       <audio id="persistentAudio" preload="metadata"></audio>
     </div>
-    <nav id="chatQuickMenu" class="chat-quick-menu" hidden aria-label="Stonefellow quick links">
-      <button type="button" data-quick-action="record">Create Record</button>
-      <button type="button" data-quick-action="playlist">Create Playlist</button>
-      <button type="button" data-quick-action="shows">Tour Dates</button>
-      <button type="button" data-quick-action="store">Merch Store</button>
-      <button type="button" data-quick-action="membership">Membership + VIP</button>
-      <button type="button" data-quick-action="tickets">Tickets + VIP</button>
-<?php if(!empty($siteSettings['fan_community_enabled'])): ?>
-      <button type="button" data-quick-action="community">Fan Community</button>
-<?php endif; ?>
-      <button type="button" data-quick-action="newsletter">Newsletter</button>
-    </nav>
     <div class="chat-composer-shell">
       <button id="chatFooterHide" class="sf-chat-footer-hide" type="button" aria-label="Hide chat footer" title="Hide chat">×</button>
       <div id="voiceTranscript" class="voice-transcript" role="status" aria-live="polite" hidden><span class="voice-transcript-dot" aria-hidden="true"></span><span id="voiceTranscriptText"></span></div>
@@ -364,14 +352,31 @@ function sf_h(string $value): string { return htmlspecialchars($value,ENT_QUOTES
         <span role="status" data-canvas-image-edit-label></span>
         <button type="button" data-canvas-image-edit-cancel aria-label="Cancel image edit">Cancel</button>
       </div>
+    <div class="chat-command-anchor">
+    <nav id="chatQuickMenu" class="chat-quick-menu" hidden aria-label="Slash commands">
+      <label class="sr-only" for="chatCommandSearch">Search slash commands</label>
+      <input id="chatCommandSearch" type="search" placeholder="Search commands…" autocomplete="off">
+      <p data-command-empty role="status" hidden>No matching commands.</p>
+      <button type="button" data-quick-action="record">Create Record</button>
+      <button type="button" data-quick-action="playlist">Create Playlist</button>
+      <button type="button" data-quick-action="shows">Tour Dates</button>
+      <button type="button" data-quick-action="store">Merch Store</button>
+      <button type="button" data-quick-action="membership">Membership + VIP</button>
+      <button type="button" data-quick-action="tickets">Tickets + VIP</button>
+<?php if(!empty($siteSettings['fan_community_enabled'])): ?>
+      <button type="button" data-quick-action="community">Fan Community</button>
+<?php endif; ?>
+      <button type="button" data-quick-action="newsletter">Newsletter</button>
+    </nav>
     <form id="chatForm" class="chatbar" autocomplete="off">
-      <button id="chatQuickButton" class="chat-action plus" type="button" aria-label="Open quick actions" aria-controls="chatQuickMenu" aria-expanded="false">+</button>
+      <button id="chatQuickButton" class="chat-action plus" type="button" aria-label="Open slash commands" aria-controls="chatQuickMenu" aria-expanded="false">+</button>
       <button id="agentChatToggle" class="chat-action chat-toggle" type="button" aria-label="Open Agent Chat" aria-expanded="false" aria-controls="agentChatPopup" title="Open Agent Chat">▤</button>
       <label class="sr-only" for="chatInput">Ask Stonefellow anything</label>
       <input id="chatInput" type="text" placeholder="Ask Stonefellow anything…" maxlength="320">
       <button id="voiceButton" class="chat-action mic" type="button" aria-label="Start Voice Chat" aria-pressed="false">◉</button>
       <button class="chat-action send" type="submit" aria-label="Send message">↑</button>
     </form>
+    </div>
     </div>
     <div class="social-links" aria-label="Stonefellow social links">
       <a href="#" data-social="instagram">Instagram</a>

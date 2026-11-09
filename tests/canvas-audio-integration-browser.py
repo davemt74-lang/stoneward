@@ -798,9 +798,12 @@ def run_meyda_browser(pw,site,base,scene):
             page.wait_for_function('window.meydaCleanup !== undefined')
             assert page.evaluate('window.meydaCleanup')=={'released':True,'subscribed':True,'frames':int(frames)}
             assert output.get_attribute('data-frames')==frames
-            assert page.evaluate('SFPublicAgentCanvas.closeScene(false)')
+            # Playwright can observe DOM removal before it delivers frame detachment.
+            with page.expect_event('framedetached',predicate=lambda frame:frame is child):
+                assert page.evaluate('SFPublicAgentCanvas.closeScene(false)')
             expect(layer).to_have_count(0)
-            check(child.is_detached() and not errors,
+            assert not errors,errors
+            check(child.is_detached(),
                 f'Chromium/{width}: pagehide releases analysis resources and host close detaches the frame')
             context.close()
     finally:browser.close()

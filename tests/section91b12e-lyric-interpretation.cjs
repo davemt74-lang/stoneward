@@ -42,16 +42,17 @@ check('No writer notes means an explicitly labeled reading, never invented inten
     transcript:'Sky',canAnalyze:true,reports:[{text:'Tentative reading',sources:[]}]},()=>{});
   assert.match(target.textContent,/No song-specific published songwriter notes matched/);
 });
-check('Quick links form a vertical mesh-overlay rail without modal, title, or redundant actions',()=>{
+check('Slash commands use a searchable, nonmodal popup above the composer',()=>{
   const html=read('stonefellow-v120.php'),css=read('assets/css/site.css');
   const menu=html.match(/<nav id="chatQuickMenu"[\s\S]+?<\/nav>/)?.[0]||'';
-  assert.ok(menu);
+  assert.match(menu,/aria-label="Slash commands"/);
+  assert.match(menu,/id="chatCommandSearch" type="search"/);
   assert.doesNotMatch(menu,/Explore & create|sf-quick-grid|modal|dialog|control deck|chatQuickClose/);
   for(const label of ['Create Record','Create Playlist','Tour Dates','Merch Store','Membership','Tickets','Newsletter'])assert.ok(menu.includes(label),label);
-  assert.match(css,/\.chat-quick-menu\{[\s\S]*?display:flex;flex-direction:column;[\s\S]*?overflow-y:auto/);
-  assert.match(css,/\.chat-quick-menu\{[\s\S]*?background:transparent;box-shadow:none/);
-  assert.match(css,/\.chat-quick-menu button::before/);
-  assert.match(css,/\.chat-quick-menu button::after/);
+  const style=css.match(/(?:^|\n)\.chat-quick-menu\{([^}]+)\}/)?.[1]||'';
+  assert.match(style,/position:absolute;inset:auto auto calc\(100% \+ 8px\) 0/);
+  assert.match(style,/display:flex;flex-direction:column/);
+  assert.match(style,/overflow:auto/);
 });
 check('Song Lyrics and Record Clip are independent orb actions',()=>{
   const canvas=read('assets/js/public-agent-canvas.js'),app=read('assets/js/app.js');

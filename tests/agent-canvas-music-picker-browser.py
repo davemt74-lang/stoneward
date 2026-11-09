@@ -78,6 +78,34 @@ focused = r'''
         expect(picker.get_by_role('tab', name='Albums', exact=True)).to_have_attribute('aria-selected', 'true')
         picker.get_by_role('button', name='Cancel', exact=True).click()
         expect(composer).to_have_value('/edit use /ALBUMS')
+
+        menu_markup = re.search(r'<nav id="chatQuickMenu"[\s\S]+?</nav>', SHELL).group(0)
+        menu_markup = re.sub(r'<\?php[^\n]*\?>', '', menu_markup)
+        menu_button = re.search(r'<button id="chatQuickButton"[^>]*>[^<]*</button>', SHELL).group(0)
+        page.evaluate(''' + "'''" + r'''([markup, button]) => {
+          form.insertAdjacentHTML('beforebegin', markup);
+          form.insertAdjacentHTML('afterbegin', button);
+          window.quickMenu=document.getElementById('chatQuickMenu');
+          window.quickButton=document.getElementById('chatQuickButton');
+        }''' + "'''" + r''', [menu_markup, menu_button])
+        page.add_script_tag(content=block('  function closeQuickMenu(', '  function handleQuickAction('))
+        page.evaluate('bindChatCommandMenu();quickButton.onclick=openQuickMenu')
+        composer.fill("Let's build a canvas with /songs in this design")
+        composer.press('Enter')
+        expect(picker.get_by_role('tab', name='Songs', exact=True)).to_have_attribute('aria-selected', 'true')
+        picker.get_by_role('button', name='Cancel', exact=True).click()
+        page.get_by_role('button', name='Open slash commands').click()
+        command_search = page.get_by_role('searchbox', name='Search slash commands')
+        command_search.fill('/albums')
+        command_search.press('Enter')
+        expect(picker.get_by_role('tab', name='Albums', exact=True)).to_have_attribute('aria-selected', 'true')
+        expect(composer).to_have_value("Let's build a canvas with /albums in this design")
+        picker.get_by_role('checkbox', name='Alpha <b>album</b>', exact=True).check()
+        picker.get_by_role('button', name='Add songs', exact=True).click()
+        expect(composer).to_have_value("Let's build a canvas with {music-track:song-b} {music-track:song-a} {music-track:chorus-one} in this design")
+        check(page.evaluate('musicFixture.posts.length===1&&played.length===0'),
+              prefix + 'choosing Albums replaces a canceled Songs shortcut and retains the rest of the draft')
+
         composer.fill('/music')
         composer.press('Enter')
         expect(picker).to_be_visible()

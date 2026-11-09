@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.315';
+  window.STONEFELLOW_APP_BUILD='1.3.316';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -2397,9 +2397,10 @@
     if(chatImageDraftLimit<=0)return;
     input.maxLength=chatImageDraftLimit+chatDraftBindingLength(input.value);
   }
-  function chatMusicCommandRange(draft){
+  function chatMusicCommandRange(draft,commandEnd){
     for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music|songs|albums)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
+      if(commandEnd!==undefined&&end!==commandEnd)continue;
       const command=match[2].toLowerCase(),standalone=draft.trim().toLowerCase()==='/'+command;
       if(standalone||['create','revise','build_on'].includes(directListeningRoomCommand(draft)?.kind))
         return {start,end,standalone,all:command==='music-all',tab:command==='albums'?'albums':'songs'};
@@ -2705,6 +2706,9 @@
     event.preventDefault();
     clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
     clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
+    const navigationCommand=typeof quickMenu!=='undefined'&&quickMenu?
+      $$('[data-quick-action]',quickMenu).find(button=>'/'+button.dataset.slashCommand===input.value.trim().toLowerCase()):null;
+    if(navigationCommand){input.value='';syncChatImageDraftLimit();handleQuickAction(navigationCommand.dataset.quickAction);return;}
     const resourceRange=chatResourceCommandRange(input.value);
     if(resourceRange){void openChatResourcePicker(resourceRange);return;}
     const imageRange=chatImageCommandRange(input.value);
@@ -5732,7 +5736,97 @@
     await liveAgent(text)}
 
   function closeQuickMenu(restoreFocus=false){if(!quickMenu)return;quickMenu.hidden=true;quickButton?.setAttribute('aria-expanded','false');if(restoreFocus)quickButton?.focus({preventScroll:true})}
-  function openQuickMenu(){if(!quickMenu)return;closeMenu();closeChatPopup();quickMenu.hidden=false;quickButton?.setAttribute('aria-expanded','true');quickMenu.querySelector('[data-quick-action]')?.focus({preventScroll:true})}
+  function openQuickMenu(){
+    const search=quickMenu&&$('#chatCommandSearch',quickMenu);
+    if(!search)return;
+    closeMenu();closeChatPopup();
+    quickMenu.hidden=false;quickButton?.setAttribute('aria-expanded','true');
+    search.value='';search.dispatchEvent(new Event('input'));
+    quickMenu.scrollTop=0;search.focus({preventScroll:true});
+  }
+  function bindChatCommandMenu(){
+    const search=quickMenu&&$('#chatCommandSearch',quickMenu);
+    if(!search)return;
+    const empty=$('[data-command-empty]',quickMenu);
+    const resources=[
+      ['images','Attach saved images'],['songs','Choose songs'],['albums','Choose albums'],
+      ['music','Choose songs or albums'],['music-all','Attach the whole music catalog'],
+      ['playlists','Choose playlists'],['stories','Choose stories or use /stories-tag'],
+      ['lyrics','Choose published lyrics'],['knowledge','Choose published artist knowledge'],
+      ['production','Choose your production projects'],['canvas','Choose saved canvases'],
+      ['me','Choose your account data'],['data','Choose live API sources'],
+      ['merch','Choose merchandise'],['tickets','Choose ticket offers'],
+      ['notifications','Open notifications or attach the inbox in a build'],
+      ['edit','Start editing the current canvas'],['review-images','Review generated images'],
+      ['hide-agent','Hide the agent'],['show-agent','Show the agent']
+    ];
+    const makeRow=(button,command,label)=>{
+      const code=document.createElement('code'),description=document.createElement('span');
+      code.textContent='/'+command;description.textContent=label;
+      button.dataset.slashCommand=command;button.replaceChildren(code,description);
+    };
+    const legacy=$$('[data-quick-action]',quickMenu);
+    const rows=resources.map(([command,label])=>{
+      const button=document.createElement('button');button.type='button';
+      makeRow(button,command,label);
+      button.onclick=()=>chooseChatCommand(command);
+      return button;
+    });
+    legacy.forEach(button=>{
+      const action=button.dataset.quickAction;
+      makeRow(button,action==='tickets'?'ticket-office':action,button.textContent);
+      button.onclick=()=>handleQuickAction(action);
+    });
+    legacy[0]?.before(...rows);
+    const buttons=[...rows,...legacy];
+    search.addEventListener('input',()=>{
+      const query=search.value.trim().toLowerCase();
+      for(const button of buttons)button.hidden=!button.textContent.toLowerCase().includes(query);
+      empty.hidden=buttons.some(button=>!button.hidden);
+    });
+    quickMenu.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();closeQuickMenu(true);return;}
+      const visible=buttons.filter(button=>!button.hidden);
+      if(event.target===search&&event.key==='Enter'){
+        event.preventDefault();visible[0]?.click();return;
+      }
+      if(!['ArrowDown','ArrowUp'].includes(event.key)||!visible.length)return;
+      event.preventDefault();
+      const index=visible.indexOf(document.activeElement)+(event.key==='ArrowDown'?1:-1);
+      (index<0?search:visible[Math.min(index,visible.length-1)])?.focus();
+    });
+  }
+  function chooseChatCommand(command){
+    closeQuickMenu();
+    input.focus({preventScroll:true});
+    if(handleAgentVisibilityCommand('/'+command))return;
+    if(command==='review-images'){void handleListeningRoomCommand({kind:'image_review'});return;}
+    const draft=input.value;
+    if(command==='edit'){
+      if(!/^\s*\/edit(?:\s|$)/i.test(draft))input.value='/edit '+draft;
+      input.setSelectionRange(input.value.length,input.value.length);return;
+    }
+    if(command==='notifications'&&!canvasBriefInChat(draft)){openNotificationDrawer();return;}
+    const token='/'+command;
+    const priorMusic=/^(?:music(?:-all)?|songs|albums)$/.test(command)?chatMusicCommandRange(draft):null;
+    const before=priorMusic?draft.slice(0,priorMusic.start):draft.trim()?draft.trimEnd()+' ':'';
+    const after=priorMusic?draft.slice(priorMusic.end):'';
+    let next=before+token+after,commandEnd=before.length+token.length;
+    if(!chatResourceCommandRange(next,commandEnd)&&!chatImageCommandRange(next,commandEnd)&&
+      !chatMusicCommandRange(next,commandEnd)){
+      const prefix="Let's build ";
+      next=prefix+next;commandEnd+=prefix.length;
+    }
+    input.value=next;
+    input.setSelectionRange(commandEnd,commandEnd);
+    const resource=chatResourceCommandRange(next,commandEnd);
+    if(resource){void openChatResourcePicker(resource);return;}
+    const image=chatImageCommandRange(next,commandEnd);
+    if(image){openChatImagePicker(image);return;}
+    const music=chatMusicCommandRange(next,commandEnd);
+    if(music?.all)applyChatMusicSelection(music,{mode:'all'});
+    else if(music)void openChatMusicPicker(music);
+  }
   function handleQuickAction(action){closeQuickMenu();if(action==='record'){navigate('builder');return}if(action==='playlist'){void startRandomTemporaryPlaylist().then(result=>popupEntry('notice',result));return}if(action==='shows'){navigate('shows');return}if(action==='store'){window.SFPublicAgentCanvas?.active?.()?openExperienceDrawer('commerce','merch'):navigate('store');return}if(action==='membership'){navigate('membership');return}if(action==='tickets'){window.SFPublicAgentCanvas?.active?.()?openExperienceDrawer('commerce','tickets'):navigate('tickets');return}if(action==='community'){fanCommunityEnabled?navigate('community'):navigate('newsletter');return}if(action==='newsletter'){navigate('newsletter');return}}
   // Both screen sizes launch with the composer hidden. Desktop zzz and the
   // small restore chip can reveal it; mobile users have an explicit hide X.
@@ -5758,7 +5852,7 @@
   bindChatImagePicker();
   bindChatMusicPicker();
   bindChatResourcePicker();
-  form.onsubmit=submitAgentChat;if(quickButton)quickButton.onclick=e=>{e.stopPropagation();quickMenu?.hidden?openQuickMenu():closeQuickMenu()};if(chatToggle)chatToggle.onclick=()=>chatPopup?.hidden?openChatPopup():closeChatPopup();if(chatPopupClose)chatPopupClose.onclick=closeChatPopup;if(chatPopupNew)chatPopupNew.onclick=()=>{popupHistoryEpoch++;st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');popupEntries=[];popupHistoryLoaded=true;renderPopupEntries();input.focus()};if(orb)orb.onclick=()=>{if(document.body.classList.contains('artist-home-chat-hidden')){document.body.classList.remove('artist-home-chat-hidden');syncAgentDockLayout()}chatPopup?.hidden?openChatPopup():closeChatPopup()};if(agentInterrupt)agentInterrupt.onclick=interruptVoicePlayback;$$('[data-quick-action]',quickMenu||document).forEach(b=>b.onclick=()=>handleQuickAction(b.dataset.quickAction));document.addEventListener('click',e=>{if(quickMenu&&!quickMenu.hidden&&!quickMenu.contains(e.target)&&e.target!==quickButton)closeQuickMenu()});bind();bindAgentVisibilityMenu();syncAuthMenu();syncAgentDockLayout();
+  form.onsubmit=submitAgentChat;if(quickButton)quickButton.onclick=e=>{e.stopPropagation();quickMenu?.hidden?openQuickMenu():closeQuickMenu()};if(chatToggle)chatToggle.onclick=()=>chatPopup?.hidden?openChatPopup():closeChatPopup();if(chatPopupClose)chatPopupClose.onclick=closeChatPopup;if(chatPopupNew)chatPopupNew.onclick=()=>{popupHistoryEpoch++;st.conversationId='';localStorage.removeItem('stonefellow.agent.conversation');popupEntries=[];popupHistoryLoaded=true;renderPopupEntries();input.focus()};if(orb)orb.onclick=()=>{if(document.body.classList.contains('artist-home-chat-hidden')){document.body.classList.remove('artist-home-chat-hidden');syncAgentDockLayout()}chatPopup?.hidden?openChatPopup():closeChatPopup()};if(agentInterrupt)agentInterrupt.onclick=interruptVoicePlayback;bindChatCommandMenu();document.addEventListener('click',e=>{if(quickMenu&&!quickMenu.hidden&&!quickMenu.contains(e.target)&&e.target!==quickButton)closeQuickMenu()});bind();bindAgentVisibilityMenu();syncAuthMenu();syncAgentDockLayout();
   function updateVoiceReplyToggle(){if(!voiceReplyToggle)return;voiceReplyToggle.textContent=voiceRepliesEnabled?'Voice on':'Voice off';voiceReplyToggle.setAttribute('aria-pressed',String(voiceRepliesEnabled));voiceReplyToggle.title=voiceRepliesEnabled?'Mute spoken Agent replies':'Enable spoken Agent replies'}
   updateVoiceReplyToggle();
   function setVoiceRepliesEnabled(enabled,persist=true){

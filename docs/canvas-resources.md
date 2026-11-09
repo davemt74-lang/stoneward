@@ -1,5 +1,7 @@
 # Selected sources, discussion and feedback
 
+Select **+** in the chat footer to search slash commands. Choose a resource command to open its picker and keep your draft. Commands can also be entered directly in the chat bar.
+
 Type `/canvas`, `/merch` or `/tickets` anywhere in the public chat composer to open the matching source catalog. Search and select multiple records, then add the selection to the draft. This does not start a project. `/canvas` lists only the signed-in account’s saved canvases. Merchandise and ticket offers come from the current published artist catalog.
 
 The composer inserts `{canvas:ID}`, `{merch:ID}` or `{ticket:ID}`. Each type can be selected independently alongside `/images` and `/music`. Clearing merchandise or tickets inserts `{merch-clear}` or `{tickets-clear}`, so an `/edit` can explicitly clear an inherited type. An omitted type keeps its previous selection. Selected IDs are validated by the server, preserved in the project approval snapshot and checked again before a new build. Reopening a saved canvas reads current public availability; withdrawn merchandise and offers disappear from its live datasets.
