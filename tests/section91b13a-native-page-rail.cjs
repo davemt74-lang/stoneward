@@ -44,9 +44,10 @@ check('Page close and browser back restore home canvas without replacing the pla
   assert.match(app,/showNativePageNotice\('Page unavailable'/);
   assert.match(agent,/originalPlayerParent\.insertBefore\(player,before\)/);
 });
-check('Vertical quick menu, narrow accessible rail, and new futuristic theme',()=>{
-  assert.match(site,/\.chat-quick-menu\{[\s\S]*?flex-direction:column;/);
-  assert.match(site,/\.chat-quick-menu\{[\s\S]*?overflow-y:auto;/);
+check('Scrollable command menu and accessible native page rail',()=>{
+  const menu=site.match(/(?:^|\n)\.chat-quick-menu\{([^}]+)\}/)?.[1]||'';
+  assert.match(menu,/flex-direction:column;/);
+  assert.match(menu,/overflow:auto;/);
   assert.match(css,/\.sf-agent-page-rail\{/);
   assert.match(css,/\.sf-agent-page-rail\.open\{[\s\S]*?width:100%;height:100%/);
   assert.match(css,/\.sf-agent-page-content \:is\(\.store-grid/);

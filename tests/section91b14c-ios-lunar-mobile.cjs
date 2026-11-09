@@ -29,9 +29,10 @@ check('Lunar is an allowlisted, persistent and voice-selectable atmosphere',()=>
   assert.match(css,/data-sf-atmosphere="lunar"\]/);
   assert.match(site,/data-sf-atmosphere="lunar"\]/);
 });
-check('The plus navigation rail uses a translucent photographic overlay, not a full modal',()=>{
-  assert.match(site,/body\.sf-agent-canvas-active \.chat-quick-menu\{[\s\S]*?rgba\(7,12,20,\.27\)/);
-  assert.match(site,/backdrop-filter:blur\(9px\)/);
+check('The command popup stays legible over photographic backgrounds',()=>{
+  const style=site.match(/body\.sf-agent-canvas-active \.chat-quick-menu\{([^}]+)\}/)?.[1]||'';
+  assert.match(style,/background:rgba\(7,12,20,\.96\)/);
+  assert.match(style,/backdrop-filter:blur\(9px\)/);
   assert.match(site,/body\.sf-agent-canvas-active \.chat-quick-menu button\{/);
   assert.match(site,/text-shadow:0 1px 5px/);
 });
