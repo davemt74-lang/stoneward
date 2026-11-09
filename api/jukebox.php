@@ -154,7 +154,9 @@ try{
     $phone=$host?null:sf_jukebox_phone($session);
     $approved=($phone['status']??'')==='approved'&&!(int)$session['ended'];
     $thread=$host?(string)($_GET['phone']??$body['phone']??''):(string)($phone['id']??'');
-    if($host&&$thread!==''&&!sf_jukebox_query('SELECT 1 FROM jukebox_phones WHERE id=? AND session_id=?',[$thread,$id])->fetchColumn())
+    $hostThreadStatus=$host&&$thread!==''?sf_jukebox_query('SELECT status FROM jukebox_phones
+        WHERE id=? AND session_id=?',[$thread,$id])->fetchColumn():false;
+    if($host&&$thread!==''&&$hostThreadStatus===false)
         throw new OutOfBoundsException('Phone connection not found.');
 
     if(!$post){
@@ -167,12 +169,15 @@ try{
             $status=sf_media_stream_mp3($source,$method);
             sf_json_response(['ok'=>false,'message'=>'Session audio is unavailable.'],$status);
         }
+        $fullThread=$action==='thread'&&($_GET['full']??'')==='1';
+        if($fullThread&&$host&&($phase!=='live'||$hostThreadStatus!=='approved'))
+            throw new DomainException('Chat requires an approved phone.');
         $payload=match($action){
             'state'=>['state'=>sf_jukebox_state($session,$phone,$host),
                 'remembered'=>!$host&&!in_array($phase,['upcoming','canceled'],true)&&sf_jukebox_guest($session)!==null]
                 +($guestState?['signed_in'=>$uid>0,'following'=>sf_jukebox_following($id,$uid)]:[]),
             'catalog'=>($host||$approved||(int)$session['listed'])?sf_canvas_audio_catalog():throw new DomainException('Host approval is required.'),
-            'thread'=>($host||$approved)&&$thread!==''?['messages'=>sf_jukebox_thread($id,$thread)]:throw new DomainException('Chat access is unavailable.'),
+            'thread'=>($host||$approved)&&$thread!==''?['messages'=>sf_jukebox_thread($id,$thread,$fullThread)]:throw new DomainException('Chat access is unavailable.'),
             'recap'=>$host?['recap'=>sf_jukebox_recap($session)]:throw new DomainException('Host access is required.'),
             'crm'=>$host?['guests'=>sf_jukebox_crm((int)$session['venue_id'])]:throw new DomainException('Venue access is required.'),
             'image'=>[],
@@ -232,7 +237,7 @@ try{
                 }
                 break;
             case 'message':
-                if($host)$approved=(bool)sf_jukebox_query("SELECT 1 FROM jukebox_phones WHERE id=? AND session_id=? AND status='approved'",[$thread,$id])->fetchColumn();
+                if($host)$approved=$hostThreadStatus==='approved';
                 if(!$approved)throw new DomainException('Chat requires an approved phone.');
                 sf_jukebox_message($id,$thread,$host?'host':'guest',$body);
                 break;

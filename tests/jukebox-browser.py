@@ -150,20 +150,67 @@ def rewind_listener_clock(site, session, ms):
                    (ms, session))
 
 
+def session_tab(page, name):
+    tab = page.locator(f'#session-tabs [data-session-tab="{name}"]')
+    expect(tab).to_be_visible()
+    if tab.get_attribute('aria-selected') != 'true':
+        tab.click()
+    expect(tab).to_have_attribute('aria-selected', 'true')
+    expect(page.locator(f'#session-panel-{name}')).to_be_visible()
+    expect(page.locator('[id^="session-panel-"]:visible')).to_have_count(1)
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+    return tab
+
+
+def assert_playheads_synced(host, phone, tolerance=.75, item=None):
+    read = '''audio => ({position: audio.currentTime, paused: audio.paused, seeking: audio.seeking,
+      item: audio.currentSrc && new URL(audio.currentSrc).searchParams.get('item')})'''
+    venue_audio = host.locator('#audio')
+    phone_audio = phone.locator('#listener-audio')
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        venue = venue_audio.evaluate(read)
+        guest = phone_audio.evaluate(read)
+        if (venue['item'] and venue['item'] == guest['item'] and (item is None or venue['item'] == str(item))
+                and not any(player['paused'] or player['seeking'] for player in (venue, guest))
+                and abs(venue['position'] - guest['position']) <= tolerance):
+            return
+        time.sleep(.1)
+    assert False, f'Host and phone playheads failed to converge within {tolerance}s: {venue}, {guest}'
+
+
 def assert_host_player_layout(page):
     footer = page.locator('#footer')
     expect(footer).to_be_visible()
     for control in ('#audio', '#enable', '#volume', '#audio-start', '#player-toggle', '#player-skip'):
         expect(footer.locator(control)).to_have_count(1)
     expect(footer.locator('#end-session, #queue, #phones')).to_have_count(0)
-    expect(page.locator('main #end-session')).to_be_visible()
-    assert page.locator('main').evaluate('''main => {
-      const live = ['#host-now', '#queue-label', '#phones-heading'].map(id => main.querySelector(id));
-      const secondary = ['#share-heading', '#history-heading'].map(id => main.querySelector(id));
-      return live.every(section => section && secondary.every(panel => panel &&
-        section.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING));
-    }''')
+    expect(page.locator('#session-tabs').get_by_role('tab')).to_have_count(6)
+    overview = session_tab(page, 'overview')
+    expect(page.locator('#session-panel-overview #host-now')).to_be_visible()
+    expect(page.locator('#session-panel-overview #queue-label')).to_be_visible()
+    overview.press('ArrowRight')
+    phones = page.locator('#session-tab-phones')
+    expect(phones).to_be_focused()
+    expect(phones).to_have_attribute('aria-selected', 'true')
+    phones.press('ArrowLeft')
+    expect(overview).to_be_focused()
+    expect(overview).to_have_attribute('aria-selected', 'true')
+    page.locator('[data-session-open=phones]').click()
+    expect(phones).to_be_focused()
+    expect(phones).to_have_attribute('aria-selected', 'true')
+    expect(page.locator('#session-panel-phones #phones-heading')).to_be_visible()
+    expect(page.locator('#session-panel-phones #share-heading')).to_be_visible()
+    session_tab(page, 'chat')
+    expect(page.locator('#session-panel-chat #chat-empty')).to_be_visible()
+    session_tab(page, 'history')
+    expect(page.locator('#session-panel-history #history-heading')).to_be_visible()
+    session_tab(page, 'settings')
+    expect(page.locator('#session-panel-settings #end-session')).to_be_visible()
+    session_tab(page, 'music')
     expect(page.locator('#catalog li button').last).to_be_visible()
+    viewport = page.viewport_size
+    page.set_viewport_size({'width': viewport['width'], 'height': 340})
     assert page.evaluate('''() => {
       const footer = document.querySelector('#footer');
       const docked = () => Math.abs(footer.getBoundingClientRect().bottom - innerHeight) <= 2;
@@ -175,6 +222,8 @@ def assert_host_player_layout(page):
         lastAction.bottom <= footer.getBoundingClientRect().top &&
         document.documentElement.scrollWidth <= innerWidth + 1;
     }''')
+    page.set_viewport_size(viewport)
+    session_tab(page, 'overview')
     page.evaluate('scrollTo(0, 0)')
 
 
@@ -296,24 +345,29 @@ def scenario(browser, base, phone_options):
     mobile_host.goto(venue.url)
     assert_host_player_layout(mobile_host)
     mobile_host.context.close()
+    session_tab(venue, 'phones')
     expect(venue.locator('#qr svg')).to_be_visible()
     join = venue.locator('#join-link').get_attribute('href')
-    first = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True).new_page()
-    second = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True).new_page()
+    first = browser.new_context(**phone_options).new_page()
+    second = browser.new_context(**phone_options).new_page()
     for phone in (first, second):
         phone.goto(join)
-    expect(first.get_by_role('button', name='Listen on this phone')).to_be_hidden()
+    expect(first.locator('#listen')).to_be_hidden()
     assert request(first, 'request', {'track': 'a', 'nonce': '1'*32})['status'] == 409
+    session_tab(first, 'overview')
     first.locator('#join input[name=name]').fill('Dave')
     first.locator('#join input[name=remember]').check()
     first.get_by_role('button', name='Request access').click()
     venue.locator('#phones li').filter(has_text='Dave').get_by_role('button', name='Approve').click()
+    session_tab(first, 'music')
+    expect(first.locator('#session-tabs').get_by_role('tab')).to_have_count(3)
     first.get_by_role('button', name='Albums').click()
     first.get_by_role('button', name='The Record').click()
     expect(first.locator('#catalog')).to_contain_text('First Song')
     first.locator('#catalog li').filter(has_text='First Song').get_by_role('button', name='Play').click()
     footer = venue.locator('#footer')
     footer.get_by_role('button', name='Enable player on this device').click()
+    session_tab(venue, 'history')
     venue.locator('#history li, #audio-start:visible').first.wait_for()
     if venue.locator('#audio-start').is_visible():
         venue.locator('#audio-start').click()
@@ -325,14 +379,20 @@ def scenario(browser, base, phone_options):
     expect(first.locator('#player-toggle, #player-skip').filter(visible=True)).to_have_count(0)
     footer.locator('#volume').fill('0.45')
     assert footer.locator('#audio').evaluate('(audio) => Math.abs(audio.volume - .45) < .01')
-    listen = first.get_by_role('button', name='Listen on this phone')
+    listen = first.get_by_role('button', name='Stream on this phone', exact=True)
     expect(listen).to_be_visible()
+    assert listen.evaluate('''button => {
+      const player = button.closest('footer').getBoundingClientRect();
+      const gap = player.right - button.getBoundingClientRect().right;
+      return gap >= 0 && gap <= 36;
+    }''')
     assert first.locator('#listener-audio').evaluate('(audio) => audio.paused && !audio.currentSrc')
     first.wait_for_function("""async () => {
       const id = new URLSearchParams(location.search).get('id');
       const {state} = await (await fetch('api/jukebox.php?action=state&id=' + id)).json();
       return state.transport?.status === 'playing' && state.transport.position_ms > 0;
     }""", polling=250)
+    session_tab(venue, 'phones')
     listeners = venue.locator('#remote-listener-count')
     expect(listeners).to_have_text('0 phones listening now')
     assert request(venue, 'state', host=True)['state']['listener_metrics'] == audience()
@@ -340,6 +400,13 @@ def scenario(browser, base, phone_options):
     expect(first.locator('#remote-listener-count')).to_be_hidden()
     listen.click()
     first.wait_for_function("!document.querySelector('#listener-audio').paused")
+    assert_playheads_synced(venue, first)
+    # Deliberately give the phone the kind of small playhead lead the former
+    # two-second correction threshold could allow to persist indefinitely.
+    venue_position = footer.locator('#audio').evaluate('(audio) => audio.currentTime')
+    first.locator('#listener-audio').evaluate('(audio, position) => { audio.currentTime = position; }',
+                                              venue_position + 1.2)
+    assert_playheads_synced(venue, first, tolerance=.55)
     expect(listeners).to_have_text('1 phone listening now', timeout=15_000)
     metrics = request(venue, 'state', host=True)['state']['listener_metrics']
     assert metrics['unique_players'] == metrics['peak_players'] == 1 and metrics['listening_ms'] > 0
@@ -348,16 +415,20 @@ def scenario(browser, base, phone_options):
     expect(listeners).to_have_text('0 phones listening now')
     assert request(venue, 'state', host=True)['state']['transport']['status'] == 'playing'
     listen.click()
+    session_tab(second, 'overview')
+    second.locator('#join input[name=name]').fill('Jamie')
     second.get_by_role('button', name='Request access').click()
     next_approval = venue.locator('#phones li').first
     expect(next_approval).to_contain_text('pending')
     next_approval.get_by_role('button', name='Approve').click()
     expect(second.locator('#now')).to_have_text('First Song')
+    session_tab(second, 'music')
     second.locator('#catalog li').filter(has_text='Second Song').get_by_role('button', name='Add to Queue').click()
     expect(first.locator('#queue-label')).to_have_text('Up Next (1)')
     queued = {'track': 'b', 'nonce': '2'*32}
     assert request(first, 'request', queued)['ok'] and request(first, 'request', queued)['ok']
     expect(second.locator('#queue-label')).to_have_text('Up Next (2)')
+    session_tab(venue, 'overview')
     expect(venue.locator('main #queue-label')).to_have_text('Up Next (2)')
     expect(venue.locator('#queue-empty')).to_be_hidden()
     order = [row['id'] for row in request(venue, 'state', host=True)['state']['queue']]
@@ -369,22 +440,51 @@ def scenario(browser, base, phone_options):
         move_up.nth(1).click()
     assert moved.value.json()['ok']
     assert [row['id'] for row in request(venue, 'state', host=True)['state']['queue']] == order[::-1]
+
+    # Unread updates arrive while the host remains in Overview and only clear
+    # for the conversation they open. Opening another tab never opens a thread.
+    for phone, question in ((first, 'Can you hear this?'), (second, 'Song request question')):
+        session_tab(phone, 'chat')
+        phone.locator('#send input[name=text]').fill(question)
+        phone.get_by_role('button', name='Send', exact=True).click()
+        expect(phone.locator('#messages')).to_contain_text(question)
+        expect(phone.locator('#chat-unread')).to_be_hidden()
+        session_tab(phone, 'music')
+    expect(venue.locator('#chat-unread')).to_have_text('2')
+    expect(venue.locator('#chat-unread')).to_be_visible()
+    expect(venue.locator('#session-tab-overview')).to_have_attribute('aria-selected', 'true')
+    session_tab(venue, 'phones')
     venue.locator('#phones li').filter(has_text='Dave').get_by_role('button', name='Chat').click()
     expect(venue.locator('#chat-title')).to_be_focused()
+    expect(venue.locator('#messages')).to_contain_text('Can you hear this?')
+    expect(venue.locator('#chat-unread')).to_have_text('1')
+    expect(venue.locator('#chat-unread')).to_be_visible()
     venue.locator('#send input[name=text]').fill('Private hello')
     venue.locator('#send input[name=image]').set_input_files(
         {'name': 'guest.png', 'mimeType': 'image/png', 'buffer': base64.b64decode(PNG)})
     venue.get_by_role('button', name='Send').click()
+    expect(first.locator('#chat-unread')).to_have_text('1')
+    expect(first.locator('#chat-unread')).to_be_visible()
+    expect(first.locator('#session-tab-music')).to_have_attribute('aria-selected', 'true')
+    expect(second.locator('#chat-unread')).to_be_hidden()
+    session_tab(first, 'chat')
     expect(first.locator('#messages')).to_contain_text('Private hello')
     expect(first.locator('#messages img')).to_be_visible()
     first.wait_for_function("document.querySelector('#messages img').naturalWidth === 1")
+    expect(first.locator('#chat-unread')).to_be_hidden()
     assert 'Private hello' not in str(request(second, 'thread'))
+    venue.locator('#chat-threads').get_by_role('button', name=re.compile('Jamie')).click()
+    expect(venue.locator('#messages')).to_contain_text('Song request question')
+    expect(venue.locator('#chat-unread')).to_be_hidden()
+    expect(venue.locator('#messages')).not_to_contain_text('Private hello')
+    session_tab(venue, 'phones')
     expect(listeners).to_have_text('1 phone listening now', timeout=15_000)
     transport = footer.locator('#player-toggle')
     expect(transport).to_have_accessible_name('Pause')
     transport.focus()
     transport.press('Space')
     expect(first.locator('#progress')).to_contain_text('Paused')
+    first.wait_for_function("document.querySelector('#listener-audio').paused")
     expect(transport).to_have_accessible_name('Resume')
     expect(transport).to_be_focused()
     assert request(first, 'state')['state']['transport']['status'] == 'paused'
@@ -393,21 +493,29 @@ def scenario(browser, base, phone_options):
     transport.press('Space')
     expect(transport).to_have_accessible_name('Pause')
     expect(transport).to_be_focused()
-    venue.wait_for_function("!document.querySelector('#audio').paused")
-    venue.reload()
+    assert_playheads_synced(venue, first)
     expect(venue.locator('#queue-label')).to_have_text('Up Next (2)')
+    next_item = request(venue, 'state', host=True)['state']['queue'][0]['id']
     footer.get_by_role('button', name='Skip', exact=True).click()
     expect(second.locator('#now')).to_have_text('Second Song')
+    assert_playheads_synced(venue, first, item=next_item)
+    venue.reload()
+    expect(venue.locator('#queue-label')).to_have_text('Up Next (1)')
+    session_tab(venue, 'phones')
     venue.locator('#phones li').filter(has_text='Dave').get_by_role('button', name='Revoke').click()
+    session_tab(first, 'overview')
     expect(first.locator('#approval')).to_contain_text('closed')
     assert request(first, 'thread')['status'] == 409
+    expect(first.locator('#chat-unread')).to_be_hidden()
     another = request(venue, 'create', {'title': 'Next night'}, True)['id']
     first.goto(base + '/jukebox.php?id=' + another)
     first.get_by_role('button', name='Request access').click()
     venue.goto(base + '/jukebox.php?host=1&id=' + another)
+    session_tab(venue, 'phones')
     returning = venue.locator('#phones li').filter(has_text='Returning guest')
     expect(returning).to_contain_text('Dave')
     returning.get_by_role('button', name='Approve').click()
+    session_tab(venue, 'history')
     venue.get_by_text('Venue guests and visit history').click()
     expect(venue.locator('#guests')).to_contain_text('2 visits')
     assert request(venue, 'state', host=True)['state']['queue'] == []
@@ -422,10 +530,12 @@ def scenario(browser, base, phone_options):
     assert request(other, 'state', host=True, session=another)['status'] == 404
     venue.goto(base + '/jukebox.php?host=1&id=' + session)
     expect(venue.locator('#recap')).to_be_hidden()
+    session_tab(venue, 'settings')
     venue.once('dialog', lambda dialog: dialog.accept())
     venue.locator('main #end-session').click()
     expect(venue.get_by_role('heading', name='Session recap')).to_be_visible()
     expect(footer).to_be_hidden()
+    expect(venue.locator('#session-tabs')).to_be_hidden()
     expect(venue.locator('#recap-totals')).not_to_be_empty()
     expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
     expect(venue.locator('#recap-tracks')).to_contain_text('Second Song')
@@ -445,7 +555,7 @@ def scenario(browser, base, phone_options):
     expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
     second.reload()
     expect(second.locator('#recap')).to_be_hidden()
-    print('PASS responsive host dashboard and sticky player, queue controls, directory, venue forms, pairing, chat, and recap')
+    print('PASS host and phone tabs, private unread chat, synchronized native players, queue controls, pairing, and recap')
 
 
 def remote_scenario(browser, base, phone_options):
@@ -486,7 +596,7 @@ def remote_scenario(browser, base, phone_options):
     expect(profile.get_by_role('link', name='Sign in', exact=True)).to_have_attribute(
         'href', re.compile(r'\?view=login#return_jukebox=' + re.escape(session_id) + '$'))
     profile.locator('summary').click()
-    listen = phone.get_by_role('button', name='Listen on this phone')
+    listen = phone.get_by_role('button', name='Stream on this phone', exact=True)
     expect(listen).to_be_visible()
     remote_audio = phone.locator('#listener-audio')
     assert remote_audio.evaluate('(audio) => audio.paused && !audio.currentSrc')
@@ -499,10 +609,15 @@ def remote_scenario(browser, base, phone_options):
       const audio = document.querySelector('#listener-audio');
       return !audio.paused && audio.currentTime >= 6;
     }""")
-    phone.locator('#listener-mute').click()
-    assert remote_audio.evaluate('(audio) => audio.muted')
-    phone.locator('#listener-mute').click()
-    assert remote_audio.evaluate('(audio) => !audio.muted')
+    mute = phone.locator('#listener-mute')
+    press_mute = mute.tap if phone_options.get('has_touch') else mute.click
+    expect(mute).to_have_attribute('aria-pressed', 'false')
+    press_mute()
+    expect(mute).to_have_attribute('aria-pressed', 'true')
+    phone.wait_for_function("document.querySelector('#listener-audio').muted")
+    press_mute()
+    expect(mute).to_have_attribute('aria-pressed', 'false')
+    phone.wait_for_function("!document.querySelector('#listener-audio').muted")
     assert request(host, 'control', {'event': 'pause'}, True)['ok']
     phone.wait_for_function("document.querySelector('#listener-audio').paused")
     assert request(host, 'control', {'event': 'resume'}, True)['ok']
@@ -541,6 +656,7 @@ def remote_scenario(browser, base, phone_options):
     expect(phone.locator('#progress')).to_have_text('0:19')
     listen.click()
     phone.wait_for_function("!document.querySelector('#listener-audio').paused")
+    session_tab(host, 'settings')
     host.locator('#remote-listening').uncheck()
     expect(listen).to_be_hidden()
     phone.wait_for_function("document.querySelector('#listener-audio').paused")
@@ -693,6 +809,7 @@ def schedule_scenario(browser, base, phone_options):
     assert state['phase'] == 'upcoming' and state['scheduled_at'] == int(start_at.timestamp())
     expect(host.locator('#enable')).to_be_hidden()
     expect(host.locator('#footer')).to_be_hidden()
+    expect(host.locator('#session-tabs')).to_be_hidden()
     host.evaluate("Object.defineProperty(navigator, 'clipboard', {value: undefined})")
     host.locator('#copy-session-link').click()
     manual_link = host.locator('#session-link-value')
@@ -736,7 +853,7 @@ def schedule_scenario(browser, base, phone_options):
     expect(scheduled).to_be_visible()
     expect(scheduled).to_have_attribute('datetime', utc_iso(start_at))
     before = scheduled.inner_text()
-    for element in ('#pairing', '#music', '#footer', '#chat'):
+    for element in ('#session-tabs', '#pairing', '#music', '#footer', '#chat'):
         expect(phone.locator(element)).to_be_hidden()
     assert phone.locator('#listener-audio').evaluate('(audio) => audio.paused && !audio.currentSrc')
 
@@ -764,18 +881,23 @@ def schedule_scenario(browser, base, phone_options):
 
     phone.locator('#join input[name=name]').fill('Scheduled guest')
     phone.get_by_role('button', name='Request access').click()
+    session_tab(host, 'phones')
     host.locator('#phones li').filter(has_text='Scheduled guest').get_by_role('button', name='Approve').click()
+    session_tab(phone, 'music')
     phone.locator('#catalog li').filter(has_text='First Song').get_by_role('button', name='Play', exact=True).click()
     host.get_by_role('button', name='Enable player on this device').click()
+    session_tab(host, 'history')
     host.locator('#history li, #audio-start:visible').first.wait_for()
     if host.locator('#audio-start').is_visible():
         host.locator('#audio-start').click()
     expect(host.locator('#history')).to_contain_text('First Song')
     expect(phone.locator('#progress')).to_have_text(re.compile(r'^0:\d{2}$'))
-    phone.get_by_role('button', name='Listen on this phone').click()
+    phone.get_by_role('button', name='Stream on this phone', exact=True).click()
     phone.wait_for_function("!document.querySelector('#listener-audio').paused")
+    assert_playheads_synced(host, phone)
     phone.locator('#catalog li').filter(has_text='Second Song').get_by_role('button', name='Add to Queue').click()
     expect(host.locator('#queue-label')).to_have_text('Up Next (1)')
+    session_tab(host, 'settings')
     host.once('dialog', lambda dialog: dialog.accept())
     host.get_by_role('button', name='End session').click()
     expect(host.get_by_role('heading', name='Session recap')).to_be_visible()
@@ -864,6 +986,7 @@ def http_scenario(base, site):
     assert first.call('request', session, {'track': 'a', 'nonce': '1'*32})['status'] == 409
     assert first.call('join', session, {'name': 'Dave', 'remember': True})['status'] == 'pending'
     assert second.call('join', session, {})['ok']
+    assert 'chat_threads' not in first.call('state', session)['state']
     first_id = first.call('state', session)['state']['phone']['id']
     second_id = second.call('state', session)['state']['phone']['id']
     assert venue.call('approve', session, {'phone': first_id})['ok']
@@ -885,6 +1008,17 @@ def http_scenario(base, site):
     assert venue.call('message', session, {'phone': first_id, 'text': 'Private hello', 'image': PNG})['ok']
     message = first.call('thread', session)['messages'][0]
     assert message['body'] == 'Private hello' and message['attachment']
+    assert first.call('state', session)['state']['chat_threads'] == [{
+        'phone_id': first_id, 'latest_id': str(message['id']), 'incoming_count': 1,
+    }]
+    assert second.call('state', session, phone=first_id)['state']['chat_threads'] == []
+    assert 'chat_threads' not in Client().call('state', session, phone=first_id)['state']
+    assert first.call('message', session, {'text': 'Guest reply'})['ok']
+    reply = venue.call('thread', session, phone=first_id, full=1)['messages'][-1]
+    assert reply['body'] == 'Guest reply'
+    assert venue.call('state', session)['state']['chat_threads'] == [{
+        'phone_id': first_id, 'latest_id': str(reply['id']), 'incoming_count': 1,
+    }]
     image_url = base + f'/api/jukebox.php?action=image&id={session}&message={message["id"]}'
     with first.opener.open(image_url) as image:
         assert image.headers.get_content_type() == 'image/png'
@@ -893,6 +1027,10 @@ def http_scenario(base, site):
     assert second.call('thread', session, phone=first_id)['messages'] == []
     assert venue.call('revoke', session, {'phone': first_id})['ok']
     assert first.call('thread', session)['status'] == 409
+    assert first.call('thread', session, full=1)['status'] == 409
+    assert venue.call('thread', session, phone=first_id, full=1)['status'] == 409
+    assert 'chat_threads' not in first.call('state', session)['state']
+    assert venue.call('state', session)['state']['chat_threads'] == []
     next_session = venue.call('create', data={'title': 'Next night'})['id']
     assert first.call('join', next_session, {})['ok']
     returning = venue.call('state', next_session)['state']['phones'][0]

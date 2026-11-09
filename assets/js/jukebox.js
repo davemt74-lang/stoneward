@@ -7,6 +7,11 @@
   const host = params.get('host') === '1';
   const csrf = document.querySelector('meta[name=sf-csrf]').content;
   const audio = $('audio');
+  const sessionTabList = $('session-tabs');
+  const sessionTabButtons = [...sessionTabList.querySelectorAll('[data-session-tab]')];
+  const endedTools = $('ended-session-tools');
+  const sessionFollowUp = $(host ? 'crm' : 'pairing');
+  const sessionFollowUpParent = sessionFollowUp.parentElement;
   const nonce = (length = 16) => [...crypto.getRandomValues(new Uint8Array(length))]
     .map(value => value.toString(16).padStart(2, '0')).join('');
   const player = host ? nonce(32) : '';
@@ -19,11 +24,22 @@
   let playerActionPending = false;
   let remoteChangePending = false;
   let listener = null;
+  let phoneStreaming = false;
   let stateFetchError = '';
   let state = null;
   let catalog = null;
   let catalogPending = false;
+  let activeSessionTab = 'overview';
   let thread = '';
+  let threadRequest = null;
+  let renderedThreadVersion = null;
+  let chatUnread = 0;
+  const chatReadKey = 'stonefellow:jukebox-chat:' + id + ':' + (host ? 'host' : 'guest');
+  let chatReads = {};
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(chatReadKey));
+    if (stored && typeof stored === 'object' && !Array.isArray(stored)) chatReads = stored;
+  } catch {}
   let tab = 'feed';
   let album = '';
   let lastPlaying = false;
@@ -31,6 +47,7 @@
   let tickTask = null;
   let queuedTick = null;
   let directoryPending = false;
+  let crmRequest = null;
   let requestButtons = [];
   const renderKeys = new Map();
 
@@ -47,7 +64,7 @@
       body: JSON.stringify(body)
     };
     if (action === 'listener' && body?.active === false) options.keepalive = true;
-    const controller = ['state', 'player', 'venue_accounts'].includes(action) || (!host && action === 'directory') ? new AbortController() : null;
+    const controller = ['state', 'player', 'thread', 'crm', 'venue_accounts'].includes(action) || (!host && action === 'directory') ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
     if (controller) options.signal = controller.signal;
     try {
@@ -386,19 +403,7 @@
         button('Approve', () => mutate('approve', {phone: phone.id})),
         button('Deny', () => mutate('revoke', {phone: phone.id})));
       if (phone.status === 'approved') return hostRow(label,
-        button('Chat', async () => {
-          if (thread !== phone.id) {
-            $('messages').replaceChildren();
-            $('send').reset();
-          }
-          thread = phone.id;
-          $('chat-title').textContent = 'Private messages with ' + phone.name;
-          await tick();
-          if (thread === phone.id && !$('chat').hidden) {
-            $('chat').scrollIntoView({block: 'start'});
-            $('chat-title').focus({preventScroll: true});
-          }
-        }),
+        button('Chat', () => openChatThread(phone.id)),
         button('Revoke', () => mutate('revoke', {phone: phone.id})));
       return hostRow(label);
     });
@@ -525,6 +530,51 @@
     }
   }
 
+  function renderSessionTabs(phase) {
+    const live = phase === 'live';
+    const ended = phase === 'ended';
+    if (!live) activeSessionTab = 'overview';
+    if (!changed('session-tabs', [phase, activeSessionTab])) return;
+    sessionTabList.hidden = !live;
+    for (const tabButton of sessionTabButtons) {
+      const selected = tabButton.dataset.sessionTab === activeSessionTab;
+      tabButton.setAttribute('aria-selected', String(selected));
+      tabButton.tabIndex = selected ? 0 : -1;
+      $(tabButton.getAttribute('aria-controls')).hidden = !live || !selected;
+    }
+    const parent = ended ? endedTools : sessionFollowUpParent;
+    if (sessionFollowUp.parentElement !== parent) parent.append(sessionFollowUp);
+    endedTools.hidden = !ended;
+  }
+
+  function showSessionTab(name, focus = false) {
+    const target = sessionTabButtons.find(tabButton => tabButton.dataset.sessionTab === name);
+    if (!target || sessionTabList.hidden || !state) return;
+    activeSessionTab = name;
+    renderSessionTabs(phaseOf(state));
+    if (focus) target.focus();
+    renderChat();
+    if (name === 'chat') void refreshThread().catch(notice);
+  }
+
+  sessionTabList.addEventListener('click', event => {
+    const target = event.target.closest('[data-session-tab]');
+    if (target) showSessionTab(target.dataset.sessionTab);
+  });
+  sessionTabList.addEventListener('keydown', event => {
+    const index = sessionTabButtons.indexOf(event.target);
+    if (index < 0) return;
+    const end = sessionTabButtons.length - 1;
+    const target = {ArrowLeft: index === 0 ? end : index - 1,
+      ArrowRight: index === end ? 0 : index + 1, Home: 0, End: end}[event.key];
+    if (target === undefined) return;
+    event.preventDefault();
+    showSessionTab(sessionTabButtons[target].dataset.sessionTab, true);
+  });
+  for (const shortcut of document.querySelectorAll('[data-session-open]')) {
+    shortcut.addEventListener('click', () => showSessionTab(shortcut.dataset.sessionOpen, true));
+  }
+
   function render() {
     const phase = phaseOf(state);
     const live = phase === 'live';
@@ -532,6 +582,7 @@
     const approved = live && state.phone?.status === 'approved';
     $('title').textContent = state.title;
     renderSchedule(phase);
+    renderSessionTabs(phase);
     $('pairing').hidden = host || (!live && !ended);
     $('join').hidden = host || !live || Boolean(state.phone);
     $('remember').hidden = !Number(state.venue_id) || $('forget').dataset.remembered === 'true';
@@ -539,8 +590,10 @@
       pending: 'Waiting for the host to approve this phone.',
       revoked: 'The host closed this connection.'
     }[state.phone?.status] || '');
-    $('music').hidden = !catalog || !live || !Object.hasOwn(state, 'queue');
-    $('footer').hidden = !live || !Object.hasOwn(state, 'queue');
+    const canViewQueue = live && Object.hasOwn(state, 'queue');
+    $('music').hidden = !catalog || !canViewQueue;
+    $('footer').hidden = !canViewQueue;
+    $('queue').closest('.jukebox-session-queue').hidden = !canViewQueue;
     const playing = state.current;
     const now = playing ? title(playing.track_id) : 'Jukebox idle';
     const transport = state.transport?.status;
@@ -551,6 +604,7 @@
     $('progress').textContent = progress;
     const queued = state.queue?.length || 0;
     $('queue-label').textContent = 'Up Next (' + queued + ')';
+    $('queue-empty').hidden = queued > 0;
     if (changed('queue', [state.queue, Boolean(catalog), live])) list('queue', state.queue || [], (row, index) => {
       const label = title(row.track_id);
       if (!host || !live) return [label];
@@ -560,27 +614,22 @@
     });
     if (changed('catalog-rights', [canRequest(), Boolean(catalog)])) renderCatalog();
     requestButtons.forEach(control => { control.textContent = playing ? 'Add to Queue' : 'Play'; });
-    if (!host) thread = approved ? state.phone.id : '';
     if (host) {
       $('host-now').textContent = now;
       $('host-progress').textContent = progress;
-      $('queue-empty').hidden = queued > 0;
       $('host').hidden = !live;
       $('recap').hidden = !ended;
       $('crm').hidden = !Number(state.venue_id);
       if (live) renderHost();
-      if (state.phones?.find(phone => phone.id === thread)?.status !== 'approved' || !live) thread = '';
     }
-    $('chat').hidden = !thread;
-    if (!thread) {
-      $('messages').replaceChildren();
-      renderKeys.delete('thread');
-    }
+    renderChat();
   }
 
-  function updateListener() {
+  function updateListener(responseMs) {
     if (!listener) return;
     const transport = state.transport;
+    // Project the playhead from the server's sample through the trip back to this phone.
+    const responseTransitMs = Math.min(500, responseMs / 2);
     listener.update({
       allowed: state.remote_listening === true && phaseOf(state) === 'live',
       online: Boolean(state.online),
@@ -588,31 +637,146 @@
       generation: Number(transport?.generation ?? -1),
       transport: transport?.status ?? 'offline',
       seconds: Number(transport?.position_ms || 0) / 1000,
-      sampleAgeMs: Math.max(0, Number(transport?.server_time_ms || 0) - Number(transport?.sampled_at_ms || 0))
+      sampleAgeMs: Math.max(0, Number(transport?.server_time_ms || 0) - Number(transport?.sampled_at_ms || 0)) + responseTransitMs
     });
   }
 
-  async function refreshThread() {
-    if (!thread) return;
-    const key = thread;
-    const result = await api('thread', undefined, {phone: key});
-    if (thread !== key || !changed('thread', [key, result.messages])) return;
-    list('messages', result.messages, row => {
-      const parts = [(row.sender === 'host' ? 'Host' : 'Guest') + ' · ' + row.body];
-      if (Number(row.attachment)) {
-        const image = document.createElement('img');
-        image.src = endpoint('image', {phone: key, message: row.id});
-        image.alt = 'Chat attachment';
-        image.loading = 'lazy';
-        parts.push(image);
+  function chatStatus(message) {
+    const status = $('chat-status');
+    if (!status) return;
+    status.hidden = !message;
+    status.textContent = message;
+  }
+
+  function setChatThread(next) {
+    if (thread === next) return;
+    thread = next;
+    threadRequest = null;
+    renderedThreadVersion = null;
+    $('messages').replaceChildren();
+    $('send').reset();
+    chatStatus('');
+  }
+
+  function openChatThread(phoneId) {
+    if (stopped || !state || phaseOf(state) !== 'live' || !state.phones?.some(phone => phone.id === phoneId && phone.status === 'approved')) return;
+    setChatThread(phoneId);
+    showSessionTab('chat');
+    if (!$('chat').hidden) {
+      $('chat-title').scrollIntoView({block: 'nearest'});
+      $('chat-title').focus({preventScroll: true});
+    }
+  }
+
+  function renderChat(authorized = true) {
+    const live = authorized && !stopped && state && phaseOf(state) === 'live';
+    const phones = live && host ? (state.phones || []).filter(phone => phone.status === 'approved') : [];
+    const selected = host ? phones.find(phone => phone.id === thread)
+      : (live && state.phone?.status === 'approved' ? state.phone : null);
+    const chat = $('chat');
+    const wasFocused = chat.contains(document.activeElement);
+    setChatThread(selected?.id || '');
+    chat.hidden = !thread;
+    $('chat-empty').hidden = Boolean(thread);
+    if (thread) {
+      $('chat-title').textContent = host ? 'Private messages with ' + (selected.name || 'Guest') : 'Private messages with the host';
+    } else {
+      $('chat-empty').textContent = host ? (phones.length ? 'Choose a phone to open its conversation.' : 'Approved phones will appear here.')
+        : 'Request access on the Session tab. Once the host approves your phone, you can chat here.';
+      if (live && activeSessionTab === 'chat' && wasFocused) $('session-tab-chat').focus({preventScroll: true});
+    }
+
+    const unread = new Map((live ? state.chat_threads || [] : []).map(row => [row.phone_id,
+      Math.max(0, row.incoming_count - (Number(chatReads[row.phone_id]) || 0))]));
+    const count = [...unread.values()].reduce((total, value) => total + value, 0);
+    const label = count + (count === 1 ? ' unread message' : ' unread messages');
+    const badge = $('chat-unread');
+    if (count !== chatUnread || badge.hidden !== (count === 0)) {
+      badge.hidden = count === 0;
+      badge.textContent = count ? String(count) : '';
+      $('session-tab-chat').setAttribute('aria-label', count ? 'Chat, ' + label : 'Chat');
+      $('chat-notice').textContent = count > chatUnread ? label : '';
+      chatUnread = count;
+    }
+    if (host && changed('chat-threads', [phones.map(phone => [phone.id, phone.name, unread.get(phone.id) || 0]), thread])) {
+      const focusedPhone = document.activeElement?.dataset.chatPhone;
+      list('chat-threads', phones, phone => {
+        const control = button(phone.name || 'Guest', () => openChatThread(phone.id));
+        control.dataset.chatPhone = phone.id;
+        control.setAttribute('aria-pressed', String(phone.id === thread));
+        const messages = unread.get(phone.id) || 0;
+        if (messages) {
+          const badge = document.createElement('span');
+          badge.className = 'jukebox-chat-count';
+          badge.textContent = String(messages);
+          badge.setAttribute('aria-label', messages + (messages === 1 ? ' unread message' : ' unread messages'));
+          control.append(badge);
+        }
+        return [control];
+      });
+      if (focusedPhone && activeSessionTab === 'chat') {
+        [...$('chat-threads').querySelectorAll('[data-chat-phone]')].find(control => control.dataset.chatPhone === focusedPhone)?.focus({preventScroll: true});
       }
-      return parts;
-    });
+    }
+  }
+
+  async function refreshThread(force = false) {
+    if (!thread || activeSessionTab !== 'chat' || document.hidden) return;
+    const key = thread;
+    const version = state.chat_threads?.find(row => row.phone_id === key)?.latest_id || '0';
+    if (!force && renderedThreadVersion === version) return;
+    if (threadRequest?.key === key) {
+      if (force) threadRequest.reload = true;
+      return;
+    }
+    const request = {key, reload: false};
+    threadRequest = request;
+    const visible = () => threadRequest === request && thread === key && activeSessionTab === 'chat' && !document.hidden;
+    try {
+      const {messages} = await api('thread', undefined, {phone: key, full: '1'});
+      if (!visible()) return;
+      const history = $('messages');
+      const atBottom = renderedThreadVersion === null || history.scrollHeight - history.scrollTop - history.clientHeight < 32;
+      const previous = messages.findIndex(row => String(row.id) === renderedThreadVersion);
+      if (previous < 0) history.replaceChildren();
+      for (const row of messages.slice(previous + 1)) {
+        const item = document.createElement('li');
+        item.textContent = (row.sender === 'host' ? 'Host' : 'Guest') + ' · ' + row.body;
+        if (Number(row.attachment)) {
+          const image = document.createElement('img');
+          image.src = endpoint('image', {phone: key, message: row.id});
+          image.alt = 'Chat attachment';
+          image.loading = 'lazy';
+          item.append(image);
+        }
+        history.append(item);
+      }
+      if (atBottom) history.scrollTop = history.scrollHeight;
+      renderedThreadVersion = String(messages.at(-1)?.id || '0');
+      chatReads[key] = messages.filter(row => row.sender === (host ? 'guest' : 'host')).length;
+      try { sessionStorage.setItem(chatReadKey, JSON.stringify(chatReads)); } catch {}
+      chatStatus('');
+      renderChat();
+    } catch (error) {
+      if (!visible()) return;
+      if ([401, 403, 404, 409].includes(error.status)) {
+        setChatThread('');
+        $('chat').hidden = true;
+        $('chat-empty').hidden = false;
+        $('chat-empty').textContent = 'This conversation is unavailable.';
+      } else chatStatus(error.message);
+    } finally {
+      if (threadRequest === request) {
+        threadRequest = null;
+        if (request.reload) void refreshThread(true);
+      }
+    }
   }
 
   async function refreshCrm() {
-    if (!$('crm').open) return;
-    const {guests} = await api('crm');
+    if (crmRequest || !$('crm').open || (state && phaseOf(state) === 'live' && activeSessionTab !== 'history')) return;
+    crmRequest = api('crm').finally(() => { crmRequest = null; });
+    const {guests} = await crmRequest;
     if (!changed('guests', [guests, Boolean(catalog)])) return;
     list('guests', guests, guest => {
       const history = document.createElement('details');
@@ -641,7 +805,14 @@
       player, event, item, seconds: Math.floor(positionMs / 1000), position_ms: positionMs,
       transport: hostTransport, sample_seq: ++playerSequence, observed_revision: state?.revision, ...extras
     };
-    const request = playerReports.then(() => api('player', sample));
+    const request = playerReports.then(() => {
+      // Capture again at dispatch when the queued event still describes the native player.
+      if (item && item === currentItem && sample.transport === hostTransport && (event === 'playing' || event === 'progress')) {
+        sample.position_ms = Math.floor((audio.currentTime || 0) * 1000);
+        sample.seconds = Math.floor(sample.position_ms / 1000);
+      }
+      return api('player', sample);
+    });
     playerReports = request.catch(() => {});
     return request;
   }
@@ -746,7 +917,9 @@
   async function refreshSession() {
     let stateReceived = false;
     try {
+      const requestStarted = performance.now();
       const result = await api('state');
+      const responseMs = performance.now() - requestStarted;
       state = result.state;
       if (!host) {
         window.StonefellowPwaAlerts?.updateSession(result);
@@ -756,7 +929,7 @@
       stateReceived = true;
       if (stateFetchError && $('status').textContent === stateFetchError) notice('');
       stateFetchError = '';
-      updateListener();
+      updateListener(responseMs);
       $('forget').hidden = !result.remembered;
       $('forget').dataset.remembered = String(result.remembered);
       if (!catalog && !catalogPending && phase === 'live' && Object.hasOwn(state, 'queue')) {
@@ -774,12 +947,16 @@
         return;
       }
       if (phase === 'upcoming') return;
-      if (host) await syncPlayer();
-      await Promise.all([refreshThread(), host ? refreshCrm() : Promise.resolve()]);
+      void refreshThread();
+      if (host) {
+        void refreshCrm().catch(notice);
+        await syncPlayer();
+      }
     } catch (error) {
       if (!stateReceived) {
         stateFetchError = error.message;
         if (error.status === 404 || error.status === 401) {
+          renderChat(false);
           listener?.update({allowed: false});
           if (active) releasePlayer();
         } else listener?.disconnect();
@@ -921,7 +1098,10 @@
     }
     if (!body.phone || body.phone !== thread) throw new Error('This conversation changed. Open it and try again.');
     await api('message', body);
-    form.reset();
+    if (body.phone === thread) {
+      form.reset();
+      void refreshThread(true);
+    }
     await tick();
   });
 
@@ -1018,6 +1198,7 @@
       audio: $('listener-audio'), urlForItem: item => endpoint('audio', {item}),
       onActivity: createListenerReporter(),
       onChange({allowed, listening, muted, needsGesture, status}) {
+        phoneStreaming = allowed && listening;
         $('listener').hidden = !allowed;
         $('listen').hidden = listening && !needsGesture;
         $('listener-mute').hidden = !listening;
@@ -1026,7 +1207,10 @@
         $('listener-status').textContent = status;
       }
     });
-    $('listen').onclick = listener.listen;
+    $('listen').onclick = () => {
+      listener.listen();
+      void tick();
+    };
     $('listener-stop').onclick = listener.stop;
     $('listener-mute').onclick = listener.toggleMute;
     window.addEventListener('offline', listener.disconnect);
@@ -1035,7 +1219,7 @@
   function poll() {
     if (stopped) return;
     void tick();
-    setTimeout(poll, state?.phase === 'upcoming' ? 3000 : 1500);
+    setTimeout(poll, state?.phase === 'upcoming' ? 3000 : (phoneStreaming ? 1000 : 1500));
   }
   poll();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void tick(); });
