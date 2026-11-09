@@ -21,6 +21,7 @@ AUTOPLAY_ONLY='--autoplay-only' in sys.argv
 MUSIC_ID_ONLY='--music-id-only' in sys.argv
 MATTER_ONLY='--matter-only' in sys.argv
 MEYDA_ONLY='--meyda-only' in sys.argv
+LOOP_ONLY='--loop-only' in sys.argv
 if not HTTP_ONLY:
     from playwright.sync_api import expect, sync_playwright
 
@@ -809,6 +810,72 @@ def run_meyda_browser(pw,site,base,scene):
     finally:browser.close()
 
 
+def run_loop_browser(pw,site,base,scene):
+    source=r'''(async()=>{
+ const player=await StonefellowAudio.createPlayer('song-2');
+ const result=document.querySelector('.loop-result');
+ let previous=0,wraps=0;
+ player.subscribe(state=>{
+  if(state.playing&&state.loop&&previous-state.currentTime>.4)wraps++;
+  previous=state.currentTime;
+  window.loopState=state;
+  result.dataset.wraps=String(wraps);
+  result.textContent=state.seekable?'ready':'loading';
+ });
+ for(const [label,action] of [['Start loop',async()=>{
+  await player.setLoop(.5,1.4);await player.setPlaybackRate(1.5);await player.play();
+ }],['Pause loop',()=>player.pause()],['Clear loop',()=>player.clearLoop()]]){
+  const button=document.createElement('button');
+  button.textContent=label;button.onclick=action;
+  document.querySelector('.loop-controls').append(button);
+ }
+})()'''
+    saved=save_fixture_scene(site,{**scene,'title':'Independent audio practice loop',
+        'html':'<section class="loop-controls"><p class="loop-result">loading</p></section>',
+        'css':'.loop-controls{padding:85px 15px 0;max-width:300px}button{display:block;min-height:44px;touch-action:manipulation}',
+        'music_inputs':{'mode':'selected','track_ids':['song-2']},'js':source})
+    options={'args':['--no-sandbox']}
+    if CHROME:options['executable_path']=CHROME
+    browser=pw.chromium.launch(**options)
+    try:
+        for width,touch in ((1280,False),(390,True)):
+            context=browser.new_context(viewport={'width':width,'height':850},is_mobile=touch,has_touch=touch)
+            page=context.new_page()
+            errors=[]
+            page.on('pageerror',lambda error:errors.append(str(error)))
+            login(page,base,'owner@example.invalid')
+            page.goto(base+'/fixture.html?music=1')
+            assert page.evaluate('async id=>showFixture((await api("agent-scene.php?id="+id)).scene)',saved['id'])
+            layer=page.locator('.sf-agent-scene-backdrop iframe')
+            child=layer.element_handle().content_frame()
+            assert child is not None
+            expect(child.locator('.loop-result')).to_have_text('ready',timeout=12000)
+
+            def click(label):
+                button=child.get_by_role('button',name=label)
+                if touch:button.tap()
+                else:button.click()
+
+            click('Start loop')
+            child.wait_for_function('''() => Number(document.querySelector('.loop-result').dataset.wraps)>=2 &&
+                loopState.playing && loopState.playbackRate===1.5 && loopState.preservesPitch &&
+                loopState.loop.startSeconds===.5 && loopState.loop.endSeconds===1.4''',timeout=12000)
+            check(page.evaluate('audio.paused && playCalls.length===0'),
+                f'Chromium/{width}: native MP3 repeats at 1.5× with pitch preservation and leaves the main player alone')
+            click('Pause loop')
+            child.wait_for_function('() => !loopState.playing',timeout=8000)
+            paused=child.evaluate('loopState.currentTime')
+            page.wait_for_timeout(350)
+            check(child.evaluate('loopState.currentTime')==paused,f'Chromium/{width}: paused loop stays at its playhead')
+            click('Clear loop')
+            child.wait_for_function('() => loopState.loop===null',timeout=8000)
+            assert page.evaluate('SFPublicAgentCanvas.closeScene(false)')
+            expect(layer).to_have_count(0)
+            check(not errors,f'Chromium/{width}: clearing the range and closing the canvas completes without page errors')
+            context.close()
+    finally:browser.close()
+
+
 def run_music_http(client,site,scene):
     saved=save_music_scenes(site,scene)
     route='/api/agent-scene.php';selected=saved['selected'];other=saved['other']
@@ -953,6 +1020,8 @@ def main():
                             run_matter_browser(pw,site,base,scene)
                         elif MEYDA_ONLY:
                             run_meyda_browser(pw,site,base,scene)
+                        elif LOOP_ONLY:
+                            run_loop_browser(pw,site,base,scene)
                         else:
                             run_http(pw.request.new_context(base_url=base),site,mp3)
                             run_browser(pw,site,base,mp3,scene)
@@ -960,6 +1029,7 @@ def main():
                             run_gesture_browser(pw,site,base,scene)
                             run_matter_browser(pw,site,base,scene)
                             run_meyda_browser(pw,site,base,scene)
+                            run_loop_browser(pw,site,base,scene)
                             run_music_http(HTTPClient(base),site,scene)
             except BaseException:
                 log.seek(0);print(log.read()[-7000:]);raise

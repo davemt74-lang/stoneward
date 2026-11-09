@@ -142,6 +142,7 @@ jobs:
           python tests/canvas-audio-integration-browser.py --matter-only
           python tests/canvas-pixi-browser.py
           python tests/canvas-audio-integration-browser.py --meyda-only
+          python tests/canvas-audio-integration-browser.py --loop-only
           python tests/canvas-artwork-palette-browser.py
       - name: Existing public and administrator gallery controls
         run: |
