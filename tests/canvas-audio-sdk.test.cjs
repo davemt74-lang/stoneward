@@ -13,7 +13,7 @@ class Hub {
   constructor() { this.listeners = new Map(); }
   addEventListener(type, callback) { if (!this.listeners.has(type)) this.listeners.set(type, new Set()); this.listeners.get(type).add(callback); }
   removeEventListener(type, callback) { this.listeners.get(type)?.delete(callback); }
-  emit(type, event = {}) { for (const listener of [...(this.listeners.get(type) || [])]) listener(event); }
+  emit(type, event = { type }) { for (const listener of [...(this.listeners.get(type) || [])]) listener(event); }
   count() { return [...this.listeners.values()].reduce((total, listeners) => total + listeners.size, 0); }
 }
 function harness(overrides = {}) {
@@ -23,6 +23,7 @@ function harness(overrides = {}) {
   host.navigator = { userActivation: { isActive: false } };
   host.document = { activeElement: frame };
   const messages = [], created = [], revoked = [], calls = [], diagnostics = [], hostMedia = [], hostURLs = [], hostRevoked = [];
+  const timers = new Map(); let nextTimer = 0;
   class LocalMedia extends Hub {
     constructor() { super(); this.src = ''; this.currentSrc = ''; this.error = null; this.result = Promise.resolve(); }
     play() { return this.result; }
@@ -31,13 +32,16 @@ function harness(overrides = {}) {
   const parent = { postMessage(data) { messages.push({ direction: 'child', data }); queueMicrotask(() => host.emit('message', { source: frame.contentWindow, origin: 'null', isTrusted: true, data: structuredClone(data) })); } };
   frame.contentWindow = { postMessage(data) { messages.push({ direction: 'host', data }); queueMicrotask(() => child.emit('message', { source: parent, origin: 'https://artist.example', data: structuredClone(data) })); } };
   class HostMedia extends Hub {
-    constructor() { super(); Object.assign(this, { currentTime: 0, duration: 120, paused: true, ended: false, volume: 1, muted: false, src: '' }); hostMedia.push(this); }
-    play() { if (this.pendingPlay) return this.pendingPlay; if (this.failure) return Promise.reject(this.failure); this.paused = false; this.emit('play'); this.emit('playing'); return Promise.resolve(); }
+    constructor() { super(); Object.assign(this, { currentTime: 0, duration: 120, paused: true, ended: false, volume: 1, muted: false,
+      playbackRate: 1, preservesPitch: false, readyState: 4, src: '' }); hostMedia.push(this); }
+    play() { if (this.pendingPlay) return this.pendingPlay; if (this.failure) return Promise.reject(this.failure); this.paused = false; this.ended = false; this.emit('play'); this.emit('playing'); return Promise.resolve(); }
     pause() { this.paused = true; this.emit('pause'); }
     removeAttribute(name) { if (name === 'src') this.src = ''; }
     load() { this.emit('loadedmetadata'); }
   }
   const hostContext = vm.createContext({ window: host, crypto: webcrypto, Blob, AbortController, Audio: HostMedia,
+    setTimeout: (callback, delay) => { timers.set(++nextTimer, {callback, delay}); return nextTimer; },
+    clearTimeout: id => { timers.delete(id); },
     URL: {createObjectURL(blob) { const url = 'blob:host-' + (hostURLs.length + 1); hostURLs.push({url, blob}); return url; }, revokeObjectURL(url) {hostRevoked.push(url);}}, console });
   vm.runInContext(code, hostContext);
   const sdk = host.SFCanvasAudioSDK;
@@ -60,7 +64,7 @@ function harness(overrides = {}) {
   };
   let controller;
   return { host, child, frame, audio, api: child.StonefellowAudio, data: child.StonefellowData, sdk, options, messages, created, revoked, calls,
-    diagnostics, LocalMedia, nativeMediaPlay, hostMedia, hostURLs, hostRevoked,
+    diagnostics, LocalMedia, nativeMediaPlay, hostMedia, hostURLs, hostRevoked, timers,
     start() { controller = sdk.createHost(options); return controller; },
     setOwner(value) { owner = value; }, setPermission(value) { permitted = value; },
     destroy() { controller?.destroy(); },
@@ -470,7 +474,8 @@ test('independent host players expose arbitrary-code controls without invoking t
   const states = []; const unsubscribe = player.subscribe(state=>states.push(state));
   await player.play(); await player.seek(40); await player.setVolume(.3); await player.pause();
   const state = await player.getState();
-  assert.deepEqual({...state},{trackId:'song-two',title:'Track song-two',currentTime:40,duration:120,playing:false,volume:.3,muted:false,ended:false});
+  assert.deepEqual({...state},{trackId:'song-two',title:'Track song-two',currentTime:40,duration:120,playing:false,volume:.3,muted:false,ended:false,
+    seekable:true,playbackRate:1,preservesPitch:true,loop:null});
   assert.ok(states.every(Object.isFrozen)); assert.equal(h.calls.filter(row=>['play','pause','seek','volume'].includes(row[0])).length,0);
   assert.equal(h.calls.filter(row=>row[0]==='catalog').length,2,'create and each play check current selected/public catalog');
   h.hostMedia[0].currentTime=41;h.hostMedia[0].emit('timeupdate');await flush();assert.equal(states.at(-1).currentTime,41);
@@ -479,6 +484,65 @@ test('independent host players expose arbitrary-code controls without invoking t
   assert.ok(observations[0].disposed);assert.equal(h.hostMedia[0].paused,true);assert.equal(h.hostMedia[0].count(),0);assert.equal(h.hostMedia[0].src,'');
   assert.deepEqual(h.hostRevoked,['blob:host-1']);
   await assert.rejects(player.play(),error=>error.code==='audio_player_disposed');h.destroy();
+});
+
+test('independent A/B loops use native media time, validated seeks and pitch-preserving speed', async () => {
+  const h = harness(); h.start(); await flush();
+  const player = await h.api.createPlayer('song-one'), media = h.hostMedia[0];
+  const states = []; player.subscribe(state => states.push(state));
+  const selected = await player.setLoop(10, 12);
+  assert.deepEqual({...selected.loop}, {startSeconds:10,endSeconds:12});
+  assert.ok(Object.isFrozen(selected.loop));
+  assert.equal(selected.currentTime,10); assert.equal(selected.playing,false); assert.equal(h.timers.size,0);
+  await player.setPlaybackRate(.5);
+  assert.equal((await player.play()).playbackRate,.5);
+  assert.equal(media.preservesPitch,true);
+  assert.equal([...h.timers.values()][0].delay,4000);
+  // The clock can reach the expected boundary before buffering media actually advances.
+  const first = [...h.timers.values()][0];
+  media.currentTime=11; first.callback();
+  assert.equal(media.currentTime,11); assert.equal(h.timers.size,1);
+  assert.equal([...h.timers.values()][0].delay,2000);
+  await player.setPlaybackRate(2);
+  assert.equal([...h.timers.values()][0].delay,500);
+  media.readyState=2; media.emit('waiting'); assert.equal(h.timers.size,0);
+  media.readyState=4; media.emit('playing'); assert.equal([...h.timers.values()][0].delay,500);
+  media.currentTime=12.03; media.emit('timeupdate'); await flush();
+  assert.equal(media.currentTime,10); assert.equal(states.at(-1).currentTime,10);
+  for(const time of [9.9,12,13])await assert.rejects(player.seek(time),{code:'audio_seek_unavailable'});
+  await player.seek(11); await player.pause();
+  assert.equal(h.timers.size,0);
+  media.currentTime=12; media.emit('timeupdate'); assert.equal(media.currentTime,12);
+  await player.play(); assert.equal(media.currentTime,10);
+  await player.clearLoop(); assert.equal(h.timers.size,0); assert.equal((await player.getState()).loop,null);
+  await player.seek(20);
+  assert.ok(h.audio.paused); assert.equal(h.audio.currentTime,0);
+  h.destroy();
+});
+
+test('loop controls fail closed on invalid bounds, stale players and revoked access', async () => {
+  let canComplete;
+  const h = harness({observeIndependent: (_media, _track, settings) => {canComplete=settings.canComplete;}});
+  h.start(); await flush();
+  const player=await h.api.createPlayer('song-one'), media=h.hostMedia[0];
+  for(const [start,end] of [[NaN,1],[-1,1],[1,1.25],[4,3],[0,Infinity]])await assert.rejects(player.setLoop(start,end),{code:'invalid_audio_request'});
+  for(const rate of [0,.49,2.01,NaN,'1.5'])await assert.rejects(player.setPlaybackRate(rate),{code:'invalid_audio_request'});
+  await assert.rejects(player.setLoop(115,121),{code:'audio_seek_unavailable'});
+  media.duration=NaN;
+  assert.equal((await player.getState()).seekable,false);
+  await assert.rejects(player.setLoop(1,2),{code:'audio_seek_unavailable'});
+  media.duration=120;
+  await player.setLoop(.9,1.4);
+  await player.setLoop(118,120); await player.play();
+  Object.assign(media,{currentTime:120,paused:true,ended:true});
+  assert.equal(canComplete(),false);
+  media.emit('ended'); await flush();
+  assert.equal(media.currentTime,118); assert.equal(media.paused,false);
+  const pending=[...h.timers.values()][0];
+  h.setPermission(false); pending.callback(); await flush();
+  assert.equal(h.timers.size,0); assert.equal(media.paused,true); assert.equal(media.count(),0);
+  for(const operation of [()=>player.clearLoop(),()=>player.setLoop(1,2),()=>player.setPlaybackRate(1.5)])await assert.rejects(operation());
+  assert.deepEqual(h.hostRevoked,['blob:host-1']); h.destroy();
 });
 
 test('independent controls recheck public music scope and preserve native autoplay failures', async () => {
@@ -555,6 +619,53 @@ test('disposing during the fresh scope check aborts its read and settles play wi
  const pending=player.play(),rejected=assert.rejects(pending,error=>error.code==='audio_player_disposed');await flush();
  await player.dispose();await rejected;assert.equal(signal.aborted,true);
  finish({tracks:[track('song-one')],releases:[]});await flush();assert.equal(h.hostMedia[0].paused,true);assert.equal(h.hostRevoked.length,1);h.destroy();
+});
+
+test('pausing interrupts pending independent plays and leaves a later loop start intact', async () => {
+  let holdCatalog = false;
+  const pendingCatalog = [];
+  const h = harness({ loadCatalog: (filters, signal) => {
+    const result = { tracks: [track(filters.track_id)], releases: [] };
+    if (!holdCatalog) return Promise.resolve(result);
+    return new Promise(resolve => pendingCatalog.push({ signal, finish: () => resolve(result) }));
+  } });
+  h.start(); await flush();
+  const player = await h.api.createPlayer('song-one'), media = h.hostMedia[0];
+  const nativePlay = media.play.bind(media);
+  let nativeStarts = 0;
+  media.play = () => { nativeStarts++; return nativePlay(); };
+  await player.setLoop(2, 3);
+
+  holdCatalog = true;
+  const interrupted = [player.play(), player.play()].map(pending => assert.rejects(pending, { code: 'audio_playback_interrupted' }));
+  await flush();
+  assert.equal(pendingCatalog.length, 2);
+  assert.equal((await player.pause()).playing, false);
+  await Promise.all(interrupted);
+  assert.ok(pendingCatalog.every(read => read.signal.aborted));
+  assert.equal(nativeStarts, 0);
+  assert.equal(h.timers.size, 0);
+
+  holdCatalog = false;
+  assert.equal((await player.play()).playing, true);
+  pendingCatalog.forEach(read => read.finish());
+  await flush();
+  assert.equal(nativeStarts, 1);
+  assert.equal(h.timers.size, 1);
+  await player.pause();
+
+  let resolveNative;
+  media.pendingPlay = new Promise(resolve => { resolveNative = resolve; });
+  const nativeInterrupted = assert.rejects(player.play(), { code: 'audio_playback_interrupted' });
+  await flush();
+  assert.equal(nativeStarts, 2);
+  await player.pause();
+  await nativeInterrupted;
+  resolveNative();
+  await flush();
+  assert.equal((await player.getState()).playing, false);
+  assert.equal(h.timers.size, 0);
+  h.destroy();
 });
 
 const orderedPlaylist = () => ({ref:'artist-17',source:'artist',title:'Side sequence',description:'An ordered resource collection',revision_hash:'a'.repeat(64),

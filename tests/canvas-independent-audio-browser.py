@@ -32,9 +32,17 @@ PROGRAM = r'''(async()=>{
  }finally{await context.close();}});
  add('Play raw',async()=>{await rawAudio.play();});
  add('Pause raw',async()=>{rawAudio.pause();});
- add('Create independent',async()=>{player=await api.createPlayer({track_id:'song-one',id:'song-one'});window.player=player;player.subscribe(state=>window.independentState=state);});
+ add('Create independent',async()=>{
+  player=await api.createPlayer({track_id:'song-one',id:'song-one'});window.player=player;window.loopWraps=0;
+  player.subscribe(state=>{
+   if(state.playing&&state.loop&&window.independentState?.currentTime-state.currentTime>.2)window.loopWraps++;
+   window.independentState=state;
+  });
+ });
  add('Play independent',async()=>{await player.play();});
  add('Pause independent',async()=>{await player.pause();});
+ add('Set practice loop',async()=>{await player.setLoop(.5,1.3);await player.setPlaybackRate(1.5);});
+ add('Clear practice loop',async()=>{await player.clearLoop();});
  add('Finish independent',async()=>{await player.seek(5.4);await player.play();});
  add('Dispose independent',async()=>{await player.dispose();});
  add('Play synchronized',async()=>{await api.play('song-one');});
@@ -147,6 +155,20 @@ def run(page,mp3_bytes):
     expect(frame.locator('.status')).to_have_text('ready')
     page.wait_for_function('sceneLoaded')
     click('Create independent')
+    frame.wait_for_function('()=>independentState.seekable')
+    click('Set practice loop')
+    report_offset = page.evaluate('reports.length')
+    click('Play independent')
+    frame.wait_for_function('()=>loopWraps>=2&&independentState.playing&&independentState.playbackRate===1.5')
+    check(page.evaluate('canonical.paused&&observed.at(-1).media.playbackRate===1.5'),
+          'the independent practice range repeats at native 1.5× speed without starting the main player')
+    check(frame.evaluate('()=>independentState.preservesPitch'), 'practice playback enables native pitch preservation')
+    click('Pause independent')
+    page.wait_for_function('(offset)=>reports.slice(offset).some(row=>row.event_type==="pause")', arg=report_offset)
+    check(page.evaluate('(offset)=>reports.slice(offset).some(row=>row.event_type==="seek")&&reports.slice(offset).every(row=>row.event_type!=="complete")', report_offset),
+          'range wraps are observed as seeks without reporting a track completion')
+    click('Clear practice loop')
+    check(frame.evaluate('()=>independentState.loop===null'), 'clearing a paused practice loop restores unrestricted playback')
     click('Play independent')
     page.evaluate('owner="2";SFPublicAgentCanvas.syncPlayer()')
     check(page.evaluate('observed.at(-1).media.paused&&!observed.at(-1).media.getAttribute("src")'), 'account change revokes old-session host audio and its source')

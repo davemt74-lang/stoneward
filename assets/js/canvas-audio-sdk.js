@@ -6,7 +6,7 @@
   const maxBlobBytes = 128 * 1024 * 1024;
   const diagnosticLimit = 40;
   const diagnosticEvents = new Set(['session_ready', 'play_requested', 'rpc_error', 'local_playback_error', 'local_media_error', 'media_csp_violation', 'unhandled_rejection']);
-  const diagnosticMethods = new Set(['catalog', 'getTrack', 'getAudio', 'play', 'pause', 'seek', 'setVolume', 'getState', 'createPlayer', 'playerPlay', 'playerPause', 'playerSeek', 'playerVolume', 'playerState', 'playerDispose']);
+  const diagnosticMethods = new Set(['catalog', 'getTrack', 'getAudio', 'play', 'pause', 'seek', 'setVolume', 'getState', 'createPlayer', 'playerPlay', 'playerPause', 'playerSeek', 'playerVolume', 'playerState', 'playerDispose', 'playerSetLoop', 'playerClearLoop', 'playerRate']);
   const diagnosticCodes = new Set(['audio_unavailable', 'audio_session_closed', 'audio_busy', 'audio_asset_released', 'invalid_audio_source',
     'invalid_catalog', 'invalid_audio_request', 'invalid_audio_state', 'invalid_track', 'track_unavailable', 'audio_gesture_required',
     'audio_source_unavailable', 'audio_network_error', 'audio_decode_error', 'audio_playback_interrupted', 'audio_seek_unavailable', 'audio_catalog_unavailable', 'audio_player_disposed']);
@@ -156,7 +156,7 @@
     players.clear();
   }
   function playerState(player, state) {
-    player.state = Object.freeze({ ...state });
+    player.state = Object.freeze({ ...state, loop: state.loop ? Object.freeze({ ...state.loop }) : null });
     for (const listener of [...player.listeners]) { try { listener(player.state); } catch (_) {} }
   }
   function playerHandle(result) {
@@ -171,6 +171,9 @@
     return Object.freeze({
       play: () => run('playerPlay'), pause: () => run('playerPause'),
       seek: seconds => run('playerSeek', [seconds]), setVolume: value => run('playerVolume', [value]),
+      setLoop: (startSeconds, endSeconds) => run('playerSetLoop', [startSeconds, endSeconds]),
+      clearLoop: () => run('playerClearLoop'),
+      setPlaybackRate: rate => run('playerRate', [rate]),
       getState: () => run('playerState'),
       subscribe(listener) {
         if (typeof listener !== 'function') throw new TypeError('Audio state subscribers must be functions.');
@@ -409,7 +412,7 @@
   post({ type: 'connect' });
 })();`;
 
-  const hash = "'sha256-n6MV5SgUq3a4dA9WD1o1Cm1Pe5VE/4DQiQxq4L6JubQ='";
+  const hash = "'sha256-flyd8H1yhNYizs4fDsZYXCw/vBqLgyZyp0KjvHbOxKk='";
 
   function token() {
     return Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
@@ -565,7 +568,17 @@
       case 'playerPause':
       case 'playerState':
       case 'playerDispose':
+      case 'playerClearLoop':
         if (args.length !== 1 || !/^p-[a-f0-9]{32}$/.test(args[0])) throw error('Choose an active independent player.', 'invalid_audio_request');
+        return args;
+      case 'playerSetLoop':
+        if (args.length !== 3 || !/^p-[a-f0-9]{32}$/.test(args[0]) ||
+          !Number.isFinite(args[1]) || !Number.isFinite(args[2]) || args[1] < 0 || args[2] - args[1] + 1e-9 < .5)
+          throw error('Choose a loop at least half a second long.', 'invalid_audio_request');
+        return args;
+      case 'playerRate':
+        if (args.length !== 2 || !/^p-[a-f0-9]{32}$/.test(args[0]) || !Number.isFinite(args[1]) || args[1] < .5 || args[1] > 2)
+          throw error('Playback rate must be between 0.5 and 2.', 'invalid_audio_request');
         return args;
       case 'playerSeek':
       case 'playerVolume':
@@ -594,6 +607,7 @@
     let revoked = false;
     let diagnosticCount = 0;
     const events = ['play', 'pause', 'timeupdate', 'seeking', 'seeked', 'durationchange', 'loadedmetadata', 'volumechange', 'emptied', 'ended'];
+    const playerEvents = [...events, 'ratechange', 'playing', 'waiting'];
 
     function post(message) {
       try { frame.contentWindow?.postMessage({ channel, version, nonce, ...message }, '*'); } catch (_) {}
@@ -642,14 +656,39 @@
       const media = player.media;
       return { trackId: player.track.track_id, title: player.track.title, currentTime: number(media.currentTime),
         duration: number(media.duration, player.track.duration_seconds), playing: !media.paused && !media.ended,
-        volume: Math.min(1, number(media.volume, 1)), muted: !!media.muted, ended: !!media.ended };
+        volume: Math.min(1, number(media.volume, 1)), muted: !!media.muted, ended: !!media.ended,
+        seekable: Number.isFinite(media.duration), playbackRate: media.playbackRate,
+        preservesPitch: player.pitchProperty !== null && media[player.pitchProperty] === true,
+        loop: player.loop };
+    }
+    function stopLoopTimer(player) {
+      if (player.loopTimer !== null) clearTimeout(player.loopTimer);
+      player.loopTimer = null;
+    }
+    function scheduleLoop(session, player, endedEvent = false) {
+      stopLoopTimer(player);
+      const { media, loop } = player;
+      if (!loop || player.disposed || !player.playRequested || !active(session) || media.seeking) return;
+      const reachedTrackEnd = endedEvent && media.ended;
+      if (!reachedTrackEnd && (media.paused || media.ended || media.readyState < 3)) return;
+      if (reachedTrackEnd || media.currentTime >= loop.endSeconds) {
+        try {
+          media.currentTime = loop.startSeconds;
+          if (reachedTrackEnd) void media.play().catch(() => { player.publish(); });
+        } catch (_) { media.pause(); }
+        return;
+      }
+      // Schedule against media time, then recheck it after stalls, seeks or rate changes.
+      const delay = Math.min(2147483647, Math.max(25, (loop.endSeconds - media.currentTime) * 1000 / media.playbackRate));
+      player.loopTimer = setTimeout(() => scheduleLoop(session, player), delay);
     }
     function releasePlayer(session, player) {
       if (player.disposed) return;
       player.disposed = true;
-      player.controller.abort();
+      for (const controller of player.pendingPlays) controller.abort();
       session.players.delete(player.id);
-      for (const event of events) player.media.removeEventListener(event, player.publish);
+      stopLoopTimer(player);
+      for (const event of playerEvents) player.media.removeEventListener(event, player.mediaChanged);
       // Stop the host observer before clearing the element so it can finalize actual playback.
       try { player.observer?.dispose(); } catch (_) {}
       try { player.media.pause(); player.media.removeAttribute('src'); player.media.load(); } catch (_) {}
@@ -673,19 +712,26 @@
           (result?.track && (result.track.track_id !== id || result.track.source_available !== true)))
           throw error('The audio source is unavailable.', 'invalid_audio_source');
         const media = new Audio();
-        const player = { id: 'p-' + token(), track, media, url: URL.createObjectURL(blob), disposed: false, observer: null, controller: new AbortController() };
+        const pitchProperty = ['preservesPitch', 'webkitPreservesPitch'].find(name => name in media) ?? null;
+        const player = { id: 'p-' + token(), track, media, url: URL.createObjectURL(blob), disposed: false, observer: null,
+          pendingPlays: new Set(), loop: null, loopTimer: null, playRequested: false, pitchProperty };
+        if (pitchProperty !== null) { try { media[pitchProperty] = true; } catch (_) {} }
         player.publish = () => {
           if (!active(session) || player.disposed) return;
           post({ type: 'player-state', documentId: session.documentId, session: session.id, playerId: player.id, state: independentState(player) });
         };
+        player.mediaChanged = event => {
+          scheduleLoop(session, player, event.type === 'ended');
+          player.publish();
+        };
         session.players.set(player.id, player);
         try {
-          for (const event of events) media.addEventListener(event, player.publish);
+          for (const event of playerEvents) media.addEventListener(event, player.mediaChanged);
           player.observer = typeof observeIndependent === 'function' ? observeIndependent(media, Object.freeze({ ...track }), {
             isActive: () => active(session) && !player.disposed,
             canComplete: () => {
               const actual = number(media.duration), position = number(media.currentTime), published = track.duration_seconds;
-              if (!media.ended || (actual >= 10 && position < actual - Math.max(5, actual * .02))) return false;
+              if (player.loop || !media.ended || (actual >= 10 && position < actual - Math.max(5, actual * .02))) return false;
               return !(published >= 40 && position >= 2 && Math.max(position, actual) < published - Math.max(15, published * .08));
             }
           }) : null;
@@ -694,36 +740,71 @@
         return { playerId: player.id, state: independentState(player) };
       } finally { session.creating--; }
     }
-    function whilePlayerActive(player, promise, controller) {
+    function interruptedPlay(player) {
+      return player.disposed ? error('This independent player was released.', 'audio_player_disposed') :
+        error('Independent playback was interrupted.', 'audio_playback_interrupted');
+    }
+    function untilPlaybackInterrupted(player, promise, signal) {
       return new Promise((resolve, reject) => {
-        const aborted = () => { controller?.abort(); reject(error('This independent player was released.', 'audio_player_disposed')); };
-        player.controller.signal.addEventListener('abort', aborted, { once: true });
-        Promise.resolve(promise).then(resolve, reject).finally(() => player.controller.signal.removeEventListener('abort', aborted));
-        if (player.controller.signal.aborted) aborted();
+        const aborted = () => reject(interruptedPlay(player));
+        if (signal.aborted) aborted();
+        else signal.addEventListener('abort', aborted, { once: true });
+        Promise.resolve(promise).then(resolve, reject).finally(() => signal.removeEventListener('abort', aborted));
       });
     }
     async function independentOperation(session, job) {
       const player = session.players.get(job.args[0]);
       if (!player || player.disposed) throw error('This independent player was released.', 'audio_player_disposed');
+      const { media } = player;
       switch (job.method) {
-        case 'playerPlay':
-          await whilePlayerActive(player, freshTrack(session, player.track.track_id, job.controller.signal), job.controller);
-          if (!active(session) || player.disposed) throw error('This independent player was released.', 'audio_player_disposed');
-          try { await whilePlayerActive(player, player.media.play(), job.controller); }
-          catch (failure) {
-            if (player.disposed) throw error('This independent player was released.', 'audio_player_disposed');
-            throw error('Independent playback could not start.', failure?.name === 'NotAllowedError' ? 'audio_gesture_required' :
-              failure?.name === 'NotSupportedError' ? 'audio_decode_error' : failure?.name === 'AbortError' ? 'audio_playback_interrupted' : 'audio_unavailable');
-          }
+        case 'playerPlay': {
+          const { controller } = job;
+          const { signal } = controller;
+          player.pendingPlays.add(controller);
+          try {
+            await untilPlaybackInterrupted(player, freshTrack(session, player.track.track_id, signal), signal);
+            if (!active(session) || player.disposed || signal.aborted) throw interruptedPlay(player);
+            if (player.loop && (media.currentTime < player.loop.startSeconds || media.currentTime >= player.loop.endSeconds))
+              media.currentTime = player.loop.startSeconds;
+            player.playRequested = true;
+            try { await untilPlaybackInterrupted(player, media.play(), signal); }
+            catch (failure) {
+              if (player.disposed || signal.aborted) throw interruptedPlay(player);
+              if (media.paused) player.playRequested = false;
+              throw error('Independent playback could not start.', failure?.name === 'NotAllowedError' ? 'audio_gesture_required' :
+                failure?.name === 'NotSupportedError' ? 'audio_decode_error' : failure?.name === 'AbortError' ? 'audio_playback_interrupted' : 'audio_unavailable');
+            }
+            if (signal.aborted) throw interruptedPlay(player);
+          } finally { player.pendingPlays.delete(controller); }
           break;
-        case 'playerPause': player.media.pause(); break;
-        case 'playerSeek':
-          if (!Number.isFinite(player.media.duration) || job.args[1] > player.media.duration) throw error('This seek is unavailable.', 'audio_seek_unavailable');
-          player.media.currentTime = job.args[1]; break;
-        case 'playerVolume': player.media.volume = job.args[1]; break;
+        }
+        case 'playerPause':
+          player.playRequested = false;
+          for (const controller of player.pendingPlays) controller.abort();
+          media.pause();
+          break;
+        case 'playerSeek': {
+          const position = job.args[1], loop = player.loop;
+          if (!Number.isFinite(media.duration) || position > media.duration ||
+            (loop && (position < loop.startSeconds || position >= loop.endSeconds)))
+            throw error('This seek is unavailable.', 'audio_seek_unavailable');
+          media.currentTime = position; break;
+        }
+        case 'playerVolume': media.volume = job.args[1]; break;
+        case 'playerSetLoop': {
+          const [, startSeconds, endSeconds] = job.args;
+          if (!Number.isFinite(media.duration) || endSeconds > media.duration)
+            throw error('This loop is outside the loaded track duration.', 'audio_seek_unavailable');
+          if (media.currentTime < startSeconds || media.currentTime >= endSeconds) media.currentTime = startSeconds;
+          player.loop = { startSeconds, endSeconds };
+          break;
+        }
+        case 'playerClearLoop': player.loop = null; break;
+        case 'playerRate': media.playbackRate = job.args[1]; break;
         case 'playerDispose': releasePlayer(session, player); return true;
       }
       if (!active(session) || player.disposed) throw error('Canvas audio access ended.', 'audio_session_closed');
+      scheduleLoop(session, player);
       player.publish();
       return independentState(player);
     }

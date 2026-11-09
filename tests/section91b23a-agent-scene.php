@@ -216,7 +216,7 @@ $mode='clear_history';$balance=sf_token_balance(1);
 rejects(fn()=>sf_agent_scene_create($account,$request),InvalidArgumentException::class,'A reset during generation discards the result');
 verify(sf_token_balance(1)===$balance&&sf_agent_scene_history_list(1)===[],'A reset during generation prevents a charge and does not resurrect scene history');
 $mode='success';
-sf_token_adjust(1,10000,'admin_grant','fixture custom tool context budget');
+sf_token_adjust(1,20000,'admin_grant','fixture custom tool context budget');
 $standalone=['canvas_kind'=>'custom','brief'=>'An amber observatory','context_track_id'=>'song-one','request_id'=>str_repeat('a',32)];
 $created=sf_agent_scene_create($account,$standalone);
 $scene=$created['scene'];
@@ -228,6 +228,10 @@ verify(!str_contains($providerSystem,'1,800 characters')&&str_contains($provider
     !isset($prompt['player_controls_requested'])&&empty($scene['player_controls'])&&str_contains($providerSystem,'window.StonefellowAudio')&&
     !str_contains($providerSystem,SF_AGENT_SCENE_PLAYER_SLOT),
     'Custom output budget supports a detailed, responsive design with no unrequested controls or copy');
+verify(str_contains($providerSystem,'player.setLoop(startSeconds, endSeconds)')&&str_contains($providerSystem,'player.clearLoop()')&&
+    str_contains($providerSystem,'player.setPlaybackRate(rate)')&&str_contains($providerSystem,'state.seekable')&&
+    str_contains($providerSystem,'preservesPitch'),
+    'The coding prompt explains how to author an independent practice loop with native playback speed and pitch');
 verify($scene['track_id']===''&&$scene['song_title']===null&&$scene['artwork']===null&&$scene['story']===null&&$scene['lyric_cue']===null&&
     !array_key_exists('context_track_id',sf_agent_scene_history_get(1,$scene['id'])),'Optional song inspiration never binds playback, assets, lyrics or history');
 $before=$providerCalls;
