@@ -82,7 +82,7 @@
       let releaseMap = new Map();
       let ready = false;
       let loading = false;
-      let tab = 0;
+      let tab = options.tab === 'albums' ? 1 : 0;
       let settled = false;
       let selectionChanged = false;
       const rows = [];

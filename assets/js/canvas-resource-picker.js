@@ -3,6 +3,8 @@
 
   const kinds = Object.freeze({
     canvas: {title: 'Choose canvases', search: 'Search canvases', loading: 'Loading your canvases…', empty: 'No saved canvases are available yet.', fallback: 'Untitled canvas'},
+    knowledge: {title: 'Choose artist knowledge', search: 'Search artist knowledge', loading: 'Loading published knowledge…', empty: 'No artist knowledge is available yet.', fallback: 'Artist knowledge'},
+    production: {title: 'Choose production projects', search: 'Search production projects', loading: 'Loading production projects…', empty: 'No authorized projects are available.', fallback: 'Production project'},
     lyrics: {title: 'Choose lyrics', search: 'Search songs with lyrics', loading: 'Loading published lyrics…', empty: 'No song lyrics are published yet.', fallback: 'Untitled song'},
     me: {title: 'Choose your account data', search: 'Search account data or fields', loading: 'Loading account data categories…', empty: 'No account data categories are available.', fallback: 'Account data'},
     merch: {title: 'Choose merch', search: 'Search merch', loading: 'Loading public merch…', empty: 'No public merch is available yet.', fallback: 'Untitled merch'},
@@ -62,6 +64,7 @@
       const title = node('h2', '', config.title);
       title.id = prefix + '-title';
       const accountPicker = options.kind === 'me';
+      const selectionLimit = ['knowledge', 'production'].includes(options.kind) ? 8 : Infinity;
       const description = node('p', '', accountPicker
         ? 'Choose which data categories your canvas can request. You control access to each category separately when the canvas opens.'
         : options.kind==='playlists'?'Choose your own or published artist playlists. Track order is preserved; the agent designs the experience you request. Selection does not play music or start a build.':'Choose items to add to your prompt. Adding selections does not start a build.');
@@ -146,7 +149,10 @@
         count.textContent = allStories ? 'All published stories selected' : selected.size + ' selected';
         const unavailable=items.some(item=>item.unavailable&&selected.has(item.id));
         add.disabled = !ready || loading || unavailable;
-        for (const {input, id} of rows) input.checked = selected.has(id);
+        for (const {input, id} of rows) {
+          input.checked = selected.has(id);
+          if (selectionLimit !== Infinity) input.disabled = !input.checked && selected.size >= selectionLimit;
+        }
         if (allStoriesRow) {
           tagFilter.hidden = !ready || !storyTag;
           tagLabel.textContent = storyTag ? 'Showing stories tagged “' + storyTag + '”' : '';

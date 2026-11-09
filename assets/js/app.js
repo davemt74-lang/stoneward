@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.314';
+  window.STONEFELLOW_APP_BUILD='1.3.315';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -2118,7 +2118,7 @@
   }
   function canvasDesignBrief(brief){
     const clean=brief.replace(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi,' ')
-      .replace(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}/gi,' ')
+      .replace(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|(?:knowledge|production):[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|knowledge-clear|production-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}/gi,' ')
       .replace(/(`?)\{[^\S\r\n]*(?:hide-agent|design-ag(?:ent|net))[^\S\r\n]*\}\1/gi,' ').trim();
     return clean!==brief&&/^[.!?…]+$/.test(clean)?'':clean;
   }
@@ -2210,12 +2210,14 @@
     return typeof value==='string'&&value.length<=64&&/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
   }
   function chatDraftResourceInputs(draft){
-    const sources=[],lyrics=[],meTools=[],merch=[],tickets=[],playlists=[];
-    for(const match of draft.matchAll(/\{(canvas|lyrics|me|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
+    const sources=[],lyrics=[],knowledge=[],production=[],meTools=[],merch=[],tickets=[],playlists=[];
+    for(const match of draft.matchAll(/\{(canvas|lyrics|me|knowledge|production|merch|ticket):([A-Za-z0-9_-]{1,180})\}/gi)){
       const kind=match[1].toLowerCase(),id=match[2];
       if(kind==='canvas'){
         const value=Number(id);if(/^[1-9]\d*$/.test(id)&&Number.isSafeInteger(value))sources.push(value);
       }else if(kind==='lyrics')lyrics.push(id);
+      else if(kind==='knowledge')knowledge.push(id);
+      else if(kind==='production')production.push(id);
       else if(kind==='me'){if(/^[a-z][a-z0-9_]{0,63}$/i.test(id))meTools.push(id.toLowerCase());}
       else (kind==='merch'?merch:tickets).push(id);
     }
@@ -2227,6 +2229,8 @@
     const artist={};
     if(lyrics.length||/\{lyrics-clear\}/i.test(draft))artist.lyrics_ids=Array.from(new Set(lyrics));
     if(meTools.length||/\{me-clear\}/i.test(draft))artist.me_tools=Array.from(new Set(meTools));
+    if(knowledge.length||/\{knowledge-clear\}/i.test(draft))artist.knowledge_ids=Array.from(new Set(knowledge));
+    if(production.length||/\{production-clear\}/i.test(draft))artist.production_ids=Array.from(new Set(production));
     const dataSources=[],seenDataSources=new Set();
     for(const match of draft.matchAll(/\{data:([a-z][a-z0-9-]{0,31}):((?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*):([A-Za-z0-9_-]{1,100})\}/gi)){
       const source={alias:match[1].toLowerCase(),product:match[2].toLowerCase(),location_id:match[3]};
@@ -2246,15 +2250,16 @@
       ...(playlists.length||/\{playlists-clear\}/i.test(draft)?{playlist_inputs:{items:playlists}}:{})};
   }
   function chatResourceCommandRange(draft,caret){
-    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|me|merch|tickets|playlists|data|notifications|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(canvas|lyrics|me|knowledge|production|merch|tickets|playlists|data|notifications|stories(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
       if(caret!==undefined&&caret!==end)continue;
       const command=match[2].toLowerCase();
       const standalone=draft.trim().toLowerCase()==='/'+command;
       if(command==='notifications'){
+        if(standalone)return {kind:command,start,end,standalone};
         const requestedAccountTool='my_notifications';
         const candidate=draft.slice(0,start)+'{me:'+requestedAccountTool+'}'+draft.slice(end);
-        if(!standalone&&['create','revise','build_on'].includes(directListeningRoomCommand(candidate)?.kind))
+        if(['create','revise','build_on'].includes(directListeningRoomCommand(candidate)?.kind))
           return {kind:'me',start,end,standalone,requestedAccountTool};
         continue;
       }
@@ -2304,10 +2309,16 @@
   }
   async function openChatResourcePicker(range){
     if(chatResourcePicker||chatMusicPicker||chatImagePicker)return;
+    if(range.kind==='notifications'){
+      input.value='';
+      syncChatImageDraftLimit();
+      openNotificationDrawer();
+      return;
+    }
     const requestedDraft=input.value;
     await loadAuth();
     if(input.value!==requestedDraft||chatResourcePicker||chatMusicPicker||chatImagePicker)return;
-    if(!canvasOwner()&&!['data','lyrics','playlists','stories'].includes(range.kind)){
+    if(!canvasOwner()&&!['data','lyrics','knowledge','playlists','stories'].includes(range.kind)){
       popupEntry('notice',range.kind==='me'?'Sign in to choose your account data.':'Sign in to choose canvas project sources.');return;
     }
     const dataPicker=range.kind==='data';
@@ -2348,7 +2359,7 @@
           selectedAll:storyAllSelected}:{}),
         selectedVersions:range.kind==='playlists'?Object.fromEntries((playlistSelection?.items||[]).map(item=>[item.ref,item.version])):undefined,signedIn:!!owner,signal:picker.request.signal});
       if(!result||picker.request.signal.aborted||chatResourcePicker!==picker||owner!==canvasOwner()||input.value!==draft||
-        (revising&&sourceScene!==listeningRoom&&['data','lyrics','me','playlists','stories'].includes(range.kind)))return;
+        (revising&&sourceScene!==listeningRoom&&['data','lyrics','me','knowledge','production','playlists','stories'].includes(range.kind)))return;
       if(dataPicker)applyChatDataSelection(range,result);
       else applyChatResourceSelection(range,result.ids,result.items,result);
     }catch(error){if(error.name!=='AbortError'&&owner===canvasOwner())popupEntry('notice',error.message||'Sources could not load.');}
@@ -2358,11 +2369,14 @@
     const read=event=>{
       clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
       if(event?.isComposing||input.selectionStart!==input.selectionEnd)return;
-      const draft=input.value,range=chatResourceCommandRange(draft,input.selectionEnd),owner=canvasOwner();
-      // Wait for submission when a command could grow into another resource command.
-      if(!range||['stories','me','data'].includes(range.kind))return;
+      const draft=input.value,caret=input.selectionEnd,owner=canvasOwner();
+      const range=chatResourceCommandRange(draft,draft.slice(0,caret).trimEnd().length);
+      // An unfinished tag can itself look like a valid tag. A space or Send finishes it.
+      if(!range||(range.tag&&range.end===caret))return;
       chatResourceCommandTimer=setTimeout(()=>{
-        if(input.value===draft&&owner===canvasOwner())void openChatResourcePicker(range);
+        chatResourceCommandTimer=null;
+        if(input.value===draft&&owner===canvasOwner()&&document.activeElement===input&&
+          input.selectionStart===caret&&input.selectionEnd===caret)void openChatResourcePicker(range);
       },350);
     };
     input.addEventListener('input',read);input.addEventListener('compositionend',read);
@@ -2376,7 +2390,7 @@
     const placed=Array.from(draft.matchAll(/\{image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
     const references=Array.from(draft.matchAll(/\{reference-image-(?:ref-)?[a-f0-9]{32}\}/gi)).slice(0,chatImageReferenceLimit);
     const music=Array.from(draft.matchAll(/\{music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)\}/gi));
-    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}/gi));
+    const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|(?:knowledge|production):[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|knowledge-clear|production-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}/gi));
     return [...placed,...references,...music,...resources].reduce((length,match)=>length+match[0].length+1,0);
   }
   function syncChatImageDraftLimit(){
@@ -2384,11 +2398,11 @@
     input.maxLength=chatImageDraftLimit+chatDraftBindingLength(input.value);
   }
   function chatMusicCommandRange(draft){
-    for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music)(?=$|[\s),.!?;:])/gi)){
+    for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music|songs|albums)(?=$|[\s),.!?;:])/gi)){
       const start=match.index+match[1].length,end=start+match[2].length+1;
-      const standalone=draft.trim().toLowerCase()==='/'+match[2].toLowerCase();
+      const command=match[2].toLowerCase(),standalone=draft.trim().toLowerCase()==='/'+command;
       if(standalone||['create','revise','build_on'].includes(directListeningRoomCommand(draft)?.kind))
-        return {start,end,standalone,all:match[2].toLowerCase()==='music-all'};
+        return {start,end,standalone,all:command==='music-all',tab:command==='albums'?'albums':'songs'};
     }
     return null;
   }
@@ -2411,7 +2425,7 @@
     const picker={owner,request:new AbortController()};
     chatMusicPicker=picker;
     try{
-      const selection=await open({api,signal:picker.request.signal,selection:existing,selectedIds:existing?.mode==='selected'?existing.track_ids:[]});
+      const selection=await open({api,signal:picker.request.signal,selection:existing,tab:range.tab,selectedIds:existing?.mode==='selected'?existing.track_ids:[]});
       if(!selection||picker.request.signal.aborted||chatMusicPicker!==picker||canvasOwner()!==owner||input.value!==draft)return;
       applyChatMusicSelection(range,selection);
     }finally{
@@ -2423,11 +2437,13 @@
     const readDraft=event=>{
       clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
       if(event?.isComposing||input.selectionStart!==input.selectionEnd)return;
-      const draft=input.value,range=chatMusicCommandRange(draft),owner=canvasOwner();
+      const draft=input.value,caret=input.selectionEnd,owner=canvasOwner();
+      const range=chatMusicCommandRange(draft);
       if(!range)return;
       const apply=()=>{
         chatMusicCommandTimer=null;
-        if(input.value!==draft||canvasOwner()!==owner||chatImagePicker||chatMusicPicker||chatResourcePicker)return;
+        if(input.value!==draft||canvasOwner()!==owner||document.activeElement!==input||
+          input.selectionStart!==caret||input.selectionEnd!==caret||chatImagePicker||chatMusicPicker||chatResourcePicker)return;
         if(range.all)applyChatMusicSelection(range,{mode:'all'});
         else void openChatMusicPicker(range);
       };
@@ -2672,7 +2688,7 @@
     input.addEventListener('paste',event=>{
       if(chatImageDraftLimit<=0||!event.clipboardData)return;
       const draft=input.value.slice(0,input.selectionStart)+event.clipboardData.getData('text')+input.value.slice(input.selectionEnd);
-      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
+      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|(?:knowledge|production):[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|knowledge-clear|production-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
       input.maxLength=chatImageDraftLimit+chatDraftBindingLength(draft);
       setTimeout(syncChatImageDraftLimit,0);
     });
@@ -2689,12 +2705,6 @@
     event.preventDefault();
     clearTimeout(chatMusicCommandTimer);chatMusicCommandTimer=null;
     clearTimeout(chatResourceCommandTimer);chatResourceCommandTimer=null;
-    if(input.value.trim().toLowerCase()==='/notifications'){
-      input.value='';
-      syncChatImageDraftLimit();
-      openNotificationDrawer();
-      return;
-    }
     const resourceRange=chatResourceCommandRange(input.value);
     if(resourceRange){void openChatResourcePicker(resourceRange);return;}
     const imageRange=chatImageCommandRange(input.value);
@@ -2720,7 +2730,7 @@
     if(edit)return {kind:'revise',brief:(edit[1]||'').trim()};
     const command=text.replace(/[.!?…]+$/,'').trim()
       .replace(/^(?:(?:can|could|would|will)\s+you|i(?:['’]d|\s+would)\s+like\s+you\s+to)\s+(?:please\s+)?/i,'');
-    const assetReference=/\{\s*(?:canvas:|lyrics:|me:|data:|merch:|ticket:|playlist:|story:|stories-(?:all|clear|tag:)|lyrics-clear|me-clear|data-clear|playlists-clear|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
+    const assetReference=/\{\s*(?:canvas:|lyrics:|knowledge:|production:|me:|data:|merch:|ticket:|playlist:|story:|stories-(?:all|clear|tag:)|lyrics-clear|knowledge-clear|production-clear|me-clear|data-clear|playlists-clear|merch-|tickets-clear|show-|price-|media-|image-|reference-image-|music-)|\[\[\s*(?:merch|show|ticket|price|media)[:-]/i;
     if(/^\/review-images$/i.test(text))return {kind:'image_review'};
     const build=command.match(/^let['’]?s\s+build(?:\s*[:,]\s*|\s+|$)([\s\S]*)$/i);
     if(build){

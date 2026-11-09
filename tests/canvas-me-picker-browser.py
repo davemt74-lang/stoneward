@@ -97,6 +97,8 @@ with sync_playwright() as playwright:
                 items = [{**item, 'enabled': False} if item['id'] == 'my_notifications'
                          and not flags['notifications_enabled'] else item for item in INVENTORY]
                 handler.fulfill(json={'ok': True, 'items': items})
+            elif request.url == 'https://account.test/api/canvas-resources.php?kind=merch':
+                handler.fulfill(json={'ok': True, 'items': [{'id': 'hoodie', 'title': 'Published hoodie'}]})
             elif request.url == 'https://account.test/api/notifications.php':
                 if flags['hold_inbox']:
                     pending['inbox'] = handler
@@ -132,15 +134,21 @@ with sync_playwright() as playwright:
         def activate(control):
             control.tap() if width == 390 else control.click()
 
-        def open_picker(draft):
-            composer.fill(draft)
-            composer.press('Enter')
+        def type_draft(draft):
+            composer.fill('')
+            composer.press_sequentially(draft, delay=12)
+
+        def open_picker(draft, submit=True):
+            if submit:
+                composer.fill(draft)
+                composer.press('Enter')
+            else:
+                type_draft(draft)
             expect(picker).to_be_visible()
             expect(search).to_be_focused()
             expect(purchases).to_be_visible()
 
-        composer.fill('/me')
-        composer.press('Enter')
+        type_draft('/me')
         expect(page.locator('#notice')).to_have_text('Sign in to choose your account data.')
         expect(picker).not_to_be_visible()
         assert len(requests) == 1
@@ -165,10 +173,19 @@ with sync_playwright() as playwright:
         assert len(requests) == 1
 
         page.evaluate("owner='1'")
-        composer.fill('/me')
-        page.wait_for_timeout(425)
+        type_draft('/me')
+        composer.press_sequentially('rch', delay=30)
+        merch_picker = page.get_by_role('dialog', name='Choose merch', exact=True)
+        expect(merch_picker.get_by_role('checkbox', name='Published hoodie')).to_be_visible()
         expect(picker).not_to_be_visible()
-        open_picker('/Me')
+        assert requests == [
+            ('GET', 'https://account.test/'),
+            ('GET', 'https://account.test/api/canvas-resources.php?kind=merch'),
+        ]
+        merch_picker.get_by_role('searchbox').press('Escape')
+        expect(composer).to_have_value('/merch')
+        open_picker('/Me', submit=False)
+        expect(composer).to_have_value('/Me')
         expect(picker.get_by_role('checkbox')).to_have_count(7)
         expect(listening).to_have_accessible_description('Plays and completions by song. · Past 30 days · Up to 30 rows')
         assert 'PRIVATE_' not in picker.inner_text()
@@ -214,22 +231,21 @@ with sync_playwright() as playwright:
         page.evaluate("owner='2'")
         activate(add)
         expect(composer).to_have_value('/edit /me')
-        assert requests == [
+        early_requests = [
             ('GET', 'https://account.test/'),
+            ('GET', 'https://account.test/api/canvas-resources.php?kind=merch'),
             *[('GET', 'https://account.test/api/canvas-resources.php?kind=me')] * 4,
         ]
+        assert requests == early_requests
 
-        assert page.evaluate("chatResourceCommandRange('/notifications')===null&&"
+        assert page.evaluate("chatResourceCommandRange('/notifications').kind==='notifications'&&"
                              "chatResourceCommandRange('/notifications?')===null&&"
                              "chatResourceCommandRange('Discuss /notifications in chat')===null&&"
                              "chatResourceCommandRange('Let’s build a view with /notifications-all')===null&&"
                              "chatResourceCommandRange('Build a list with /notifications').requestedAccountTool==='my_notifications'")
         page.evaluate("setOwner('1');listeningRoom.artist_inputs.me_tools=['my_purchases']")
         draft = '/edit Restyle {lyrics:song} /notifications'
-        composer.fill(draft)
-        page.wait_for_timeout(425)
-        expect(picker).not_to_be_visible()
-        open_picker(draft)
+        open_picker(draft, submit=False)
         expect(notifications).to_be_checked()
         expect(purchases).to_be_checked()
         expect(composer).to_have_value(draft)
@@ -265,9 +281,9 @@ with sync_playwright() as playwright:
         expect(composer).to_have_value(draft)
         page.evaluate("setOwner('1')")
 
-        composer.fill('/notifications')
-        composer.press('Enter')
+        type_draft('/notifications')
         expect(activity.get_by_text('Signed-in notification')).to_be_visible()
+        expect(composer).to_have_value('')
         expect(close_activity).to_be_focused()
         expect(page.locator('#badge')).to_have_text('1')
         expect(picker).not_to_be_visible()
@@ -288,11 +304,11 @@ with sync_playwright() as playwright:
         expect(activity.get_by_text('Previous account only')).not_to_be_visible()
         expect(page.locator('#badge')).to_be_hidden()
         assert page.evaluate("st.drawer.data===null&&st.auth.csrf===undefined")
-        assert not errors and requests[5:] == [
+        assert not errors and requests[len(early_requests):] == [
             *[('GET', 'https://account.test/api/canvas-resources.php?kind=me')] * 5,
             *[('GET', 'https://account.test/api/notifications.php'),
               ('GET', 'https://account.test/api/playlists.php')] * 2,
         ]
-        print(f'PASS chromium/{width}: /me and /notifications attachment, local inbox, and account boundaries', flush=True)
+        print(f'PASS chromium/{width}: /me and /notifications auto-open, /merch debounce, and account boundaries', flush=True)
         context.close()
     browser.close()

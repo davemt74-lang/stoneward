@@ -124,4 +124,41 @@ verify($data['published_merch']['rows']===[],
     'Runtime selection is rechecked against current public visibility');
 rejects(fn()=>sf_canvas_resource_inventory(0,'canvas'),'Resource inventory requires an authenticated account');
 rejects(fn()=>sf_canvas_resource_inventory(1,'purchases'),'Picker kinds cannot request unrelated account datasets');
+mkdir($fixture.'/storage/knowledge',0700,true);
+file_put_contents($fixture.'/storage/knowledge/index.json',json_encode(['files'=>[
+    ['id'=>'K-0000000001','name'=>'Public notes','public_agent'=>true,'text'=>'Artist reference','stored_path'=>'private/file'],
+    ['id'=>'K-0000000002','name'=>'Internal notes','public_agent'=>false,'text'=>'Private reference'],
+]]));
+verify(sf_canvas_resource_inventory(0,'knowledge')===[['id'=>'K-0000000001','title'=>'Public notes']],
+    'Public knowledge inventory excludes private entries, excerpts and storage paths');
+$references=['knowledge_ids'=>['K-0000000001'],'production_ids'=>['7-r2']];
+verify(sf_canvas_resource_selection('Design {knowledge:K-0000000001} {production:7-r2}')===
+    ['Design',$references,true,null],'Both picker tokens become independent structured selections');
+rejects(fn()=>sf_canvas_resource_validate_scopes(['knowledge_ids'=>['K-0000000002']]),
+    'Private knowledge cannot be attached directly');
+$db->exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'");
+$db->exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+$db->exec("UPDATE users SET role='admin' WHERE id=1");
+$db->exec("CREATE TABLE story_assemblies(id INTEGER PRIMARY KEY,title TEXT,revision INTEGER,created_by INTEGER,updated_at TEXT)");
+$db->exec("CREATE TABLE story_assembly_items(assembly_id INTEGER)");
+$db->exec("INSERT INTO story_assemblies VALUES (7,'My edit',2,1,'now'),(9,'Another edit',2,2,'now')");
+$db->exec("INSERT INTO story_assembly_items VALUES(7),(7),(9)");
+verify(sf_canvas_resource_inventory(1,'production')===[['id'=>'7-r2','title'=>'My edit','revision'=>2,'item_count'=>2]],
+    'Production returns only the active admin’s own pinned project');
+verify(sf_canvas_resource_inventory(0,'production')===[]&&sf_canvas_resource_inventory(2,'production')===[],
+    'Guests and members receive no private production metadata');
+sf_canvas_resource_validate_scopes($references,1);
+verify(sf_canvas_resource_artist_context($references,true,1)===['knowledge'=>[
+    ['id'=>'K-0000000001','title'=>'Public notes','reference_excerpt'=>'Artist reference']],
+    'production'=>[['revision'=>2,'item_count'=>2]]],'Model receives bounded public knowledge and minimized production metadata');
+rejects(fn()=>sf_canvas_resource_validate_scopes(['production_ids'=>['9-r2']],1),
+    'Forged cross-account project references are rejected');
+require_once $root.'/api/canvas-gallery-core.php';
+rejects(fn()=>sf_canvas_gallery_snapshot(['html'=>'<p>Test</p>','css'=>'','artist_inputs'=>$references],'Test'),
+    'Private production attachments block gallery submission');
+$db->exec('UPDATE story_assemblies SET revision=3 WHERE id=7');
+rejects(fn()=>sf_canvas_resource_validate_scopes($references,1),'Inherited stale production revisions require reselection');
+file_put_contents($fixture.'/storage/knowledge/index.json','{"files":[]}');
+rejects(fn()=>sf_canvas_resource_validate_scopes(['knowledge_ids'=>['K-0000000001']],1),
+    'Withdrawn knowledge requires reselection before a revision');
 echo 'Canvas resources: '.$checks.' checks passed'.PHP_EOL;

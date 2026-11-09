@@ -57,6 +57,27 @@ focused = r'''
         check(page.evaluate('musicFixture.posts[0].music_inputs.mode==="all"&&musicFixture.posts[0].brief.includes("{music-all}")&&'
                             'musicFixture.posts[0].track_id===""'),
               prefix + 'an inline full-catalog command sends an all-mode selection through the normal build request')
+        composer.fill('')
+        composer.press_sequentially('/songs')
+        expect(picker.get_by_role('tab', name='Songs', exact=True)).to_have_attribute('aria-selected', 'true')
+        picker.get_by_role('checkbox', name='song-a', exact=True).check()
+        picker.get_by_role('button', name='Add songs', exact=True).click()
+        expect(composer).to_have_value("Let's build {music-track:song-a}")
+
+        composer.fill('')
+        composer.press_sequentially('/albums')
+        expect(picker.get_by_role('tab', name='Albums', exact=True)).to_have_attribute('aria-selected', 'true')
+        picker.get_by_role('checkbox', name='Alpha <b>album</b>', exact=True).check()
+        picker.get_by_role('button', name='Add songs', exact=True).click()
+        expect(composer).to_have_value("Let's build {music-track:song-b} {music-track:song-a} {music-track:chorus-one}")
+        check(page.evaluate('musicFixture.posts.length===1&&played.length===0'),
+              prefix + 'typing the direct aliases opens the requested tab and attaches ordered tracks without submitting or playing')
+
+        composer.fill('/edit use /ALBUMS')
+        composer.press('Enter')
+        expect(picker.get_by_role('tab', name='Albums', exact=True)).to_have_attribute('aria-selected', 'true')
+        picker.get_by_role('button', name='Cancel', exact=True).click()
+        expect(composer).to_have_value('/edit use /ALBUMS')
         composer.fill('/music')
         composer.press('Enter')
         expect(picker).to_be_visible()
@@ -196,7 +217,8 @@ focused = r'''
         expect(picker.get_by_text('No public songs are available yet.', exact=True)).to_be_visible()
         expect(picker.get_by_role('button', name='Add songs', exact=True)).to_be_disabled()
         expect(picker.get_by_role('button', name='Use entire catalog', exact=True)).to_be_disabled()
-        check(page.evaluate('chatMusicCommandRange("Let’s build /musical")===null&&chatMusicCommandRange("Let’s build /music-allocation")===null') and
+        check(page.evaluate('chatMusicCommandRange("Let’s build /musical")===null&&chatMusicCommandRange("Let’s build /music-allocation")===null&&'
+                            'chatMusicCommandRange("Let’s build /albums-extra")===null&&chatMusicCommandRange("https://example.test/songs")===null') and
               picker.evaluate('dialog=>dialog.scrollWidth<=dialog.clientWidth') and not errors and
               not any('untrusted-audio' in request for request in requests),
               prefix + 'empty inventory, command boundaries and mobile layout stay safe without audio requests')

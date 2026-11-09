@@ -146,7 +146,7 @@ function sf_canvas_project_list(int $uid): array {
 function sf_canvas_project_reuse(int $uid,int $id,array $project): ?array {
     $proposal=sf_canvas_project_get($uid,$id);if(!$proposal)throw new InvalidArgumentException('Canvas project not found.');
     if(in_array($proposal['status'],['awaiting_approval','approved'],true)&&hash_equals(sf_canvas_project_fingerprint($proposal['project']),sf_canvas_project_fingerprint($project))){
-        sf_canvas_resource_validate_scopes($project['artist_inputs']??null);
+        sf_canvas_resource_validate_scopes($project['artist_inputs']??null,$uid);
         return $proposal;
     }
     return null;
@@ -172,7 +172,7 @@ function sf_canvas_project_propose(array $user,array $request,string $source='us
     try{
         $q=$db->prepare('SELECT id FROM users WHERE id=? AND status=?'.($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' FOR UPDATE':''));$q->execute([$uid,'active']);$available=$q->fetchColumn()!==false;$q->closeCursor();
         if(!$available)throw new InvalidArgumentException('Your account is no longer available.');
-        sf_canvas_resource_validate_scopes($project['artist_inputs']??null);
+        sf_canvas_resource_validate_scopes($project['artist_inputs']??null,$uid);
         if($replaceId!==null)$db->prepare("UPDATE canvas_projects SET status='canceled',updated_at=? WHERE user_id=? AND id=? AND status IN ('awaiting_approval','approved')")->execute([$now,$uid,$replaceId]);
         $q=$db->prepare('INSERT INTO canvas_projects(user_id,title,concept,project_json,fingerprint,source,status,approval_mode,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
         $q->execute([$uid,$title,$concept,json_encode($project,JSON_THROW_ON_ERROR),sf_canvas_project_fingerprint($project),$source,$status,$prefs['auto_approve']?'automatic':null,$now,$now]);
@@ -183,7 +183,7 @@ function sf_canvas_project_approve(int $uid,int $id): array {
     $proposal=sf_canvas_project_get($uid,$id);if(!$proposal)throw new InvalidArgumentException('Canvas project not found.');
     if(!in_array($proposal['status'],['awaiting_approval','approved'],true))throw new SfCanvasProjectConflict('This canvas project cannot be approved now.');
     $bound=sf_canvas_project_bind_playlists($uid,$proposal['project']);
-    sf_canvas_resource_validate_scopes($bound['artist_inputs']??null);
+    sf_canvas_resource_validate_scopes($bound['artist_inputs']??null,$uid);
     sf_db()->prepare("UPDATE canvas_projects SET status='approved',approval_mode='manual',updated_at=? WHERE user_id=? AND id=? AND status IN ('awaiting_approval','approved')")->execute([gmdate('c'),$uid,$id]);
     return sf_canvas_project_get($uid,$id);
 }

@@ -51,6 +51,8 @@ function sf_canvas_gallery_snapshot(array $scene,string $title): array {
     if(isset($scene['agent_palette']))$snapshot['agent_palette']=sf_agent_scene_palette($scene['agent_palette']);
     if(array_key_exists('music_inputs',$scene))$snapshot['music_inputs']=sf_agent_canvas_music_inputs($scene['music_inputs']);
     if(array_key_exists('artist_inputs',$scene))$snapshot['artist_inputs']=sf_canvas_resource_artist_inputs($scene['artist_inputs']);
+    if(!empty($snapshot['artist_inputs']['production_ids']))
+        throw new InvalidArgumentException('Canvases using private production projects cannot be submitted.');
     if(isset($scene['playlist_inputs'])){
         $inputs=sf_canvas_playlists_inputs($scene['playlist_inputs']);$manifest=sf_canvas_playlists_manifest_validate($scene['playlist_manifest']??null);
         if($manifest===null)throw new InvalidArgumentException('This canvas needs its reviewed playlist snapshot.');
