@@ -634,7 +634,9 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
 .jukebox-host-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .jukebox-page-identity { display: flex; min-width: 0; align-items: center; gap: 1rem; }
 .jukebox-page-identity > div:last-child { min-width: 0; overflow-wrap: anywhere; }
-.jukebox-host-username { margin: .35rem 0 0; font-size: .95rem; }
+.jukebox-host-username { display: flex; flex-wrap: wrap; align-items: center; column-gap: .6rem; font-size: .95rem; }
+#open-venue-name { padding: .2rem .35rem; border: 0; background: transparent; color: var(--jukebox-gold); font-size: .86rem; }
+#open-venue-name:hover { text-decoration: underline; }
 .jukebox-host-logo, .jukebox-branding-image, .jukebox-branding-preview, .jukebox-session-logo {
   display: flex; flex: none; align-items: center; justify-content: center;
   overflow: hidden; border: 1px solid var(--jukebox-line); border-radius: .75rem; background: var(--jukebox-raised);

@@ -148,6 +148,20 @@ try{
         sf_jukebox_query($sql,[$owner,$name]);
         sf_json_response(['ok'=>true]);
     }
+    if($action==='venue_name'){
+        if(!$hostMode)sf_json_response(['ok'=>false,'message'=>'Host access is required.'],403);
+        if(!$post){
+            header('Allow: POST');
+            sf_json_response(['ok'=>false,'message'=>'Method unavailable.'],405);
+        }
+        $name=is_string($body['name']??null)?preg_replace('/\A\s+|\s+\z/u','',$body['name']):null;
+        if(array_diff_key($body,['name'=>true])||$name===null||!preg_match('/\A[^\x00-\x1F\x7F]{1,120}\z/u',$name))
+            throw new InvalidArgumentException('Enter a venue name of 1 to 120 characters.');
+        $changed=sf_jukebox_query('UPDATE jukebox_venues SET name=? WHERE owner_id=?',[$name,$uid])->rowCount();
+        if(!$changed&&!sf_jukebox_query('SELECT 1 FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn())
+            throw new DomainException('A venue account is required.');
+        sf_json_response(['ok'=>true,'venue'=>$name]);
+    }
     if($post&&$hostMode&&$action==='create'){
         $listed=$admin&&!empty($body['listed']);
         $venue=!$listed&&(bool)sf_jukebox_query('SELECT 1 FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn();
