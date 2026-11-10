@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+const SF_CUSTOM_CANVAS_BRIEF_MAX_BYTES=16000;
+
 require_once __DIR__.'/agent-canvas-public-commerce.php';
 require_once __DIR__.'/canvas-playlists-core.php';
 require_once __DIR__.'/canvas-stories-core.php';

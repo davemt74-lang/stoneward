@@ -160,6 +160,24 @@ $removedPlayer=sf_agent_scene_render(json_encode(['html'=>'<section>'.SF_AGENT_S
 verify($removedPlayer['html']==='<section></section>',
     'Repeated legacy host slots are removed without model repair');
 
+$formatted=sf_agent_scene_render(json_encode([
+    'html'=>"<!-- layout --><section\n class = 'stage\troom'><p class=\"card  highlight\"></p></section>",
+    'css'=>'/* layout */.stage{color:red}.stage::after{content:"✦"}',
+    'js'=>null,
+]),$optionalContext);
+verify($formatted['html']==='<section class="stage room"><p class="card  highlight"></p></section>'&&
+    $formatted['css']==='.stage{color:red}.stage::after{content:"✦"}'&&!isset($formatted['js'])&&sf_agent_scene_code($formatted)!==null,
+    'Generated custom canvases normalize harmless formatting into the saved code format');
+foreach([
+    ['html'=>"<!-- layout --><div class='stage' onclick=\"alert(1)\"></div>",'css'=>''],
+    ['html'=>"<!-- layout --><script class='stage'>alert(1)</script>",'css'=>''],
+    ['html'=>'<div></div>','css'=>'div{background:u/**/rl(https://example.com)}'],
+    ['html'=>'<div></div>','css'=>'@im/**/port "https://example.com";'],
+    ['html'=>'<div></div>','css'=>'div::after{content:"/* literal */"}'],
+    ['html'=>'<!--'.str_repeat('x',SF_AGENT_SCENE_CODE_LIMIT).'--><div></div>','css'=>''],
+] as $source)rejects(fn()=>sf_agent_scene_render(json_encode($source),$optionalContext),SfAgentSceneInvalidOutput::class,
+    'Generated custom formatting preserves the source validation boundaries');
+
 rejects(fn()=>sf_agent_scene_create($account,['track_id'=>'hidden','brief'=>'Design it']),InvalidArgumentException::class,'Unpublished songs fail before provider usage');
 rejects(fn()=>sf_agent_scene_create(['id'=>3,'role'=>'customer'],$request),RuntimeException::class,'Insufficient tokens fail before provider usage');
 verify($providerCalls===0,'Rejected requests make no provider calls');
@@ -223,11 +241,14 @@ $scene=$created['scene'];
 verify($prompt['published_song']===null&&$prompt['optional_playing_song']['track_id']==='song-one'&&
     $prompt['optional_playing_song']['title']==='Song & <Title>',
     'Standalone canvas supplies the current song ID and facts as optional context');
-verify(!str_contains($providerSystem,'1,800 characters')&&str_contains($providerSystem,'recognizable silhouettes')&&
+verify(!str_contains($providerSystem,'1,800 characters')&&!str_contains($providerSystem,'Avoid generic cards')&&
+    str_contains($providerSystem,'The listener chooses the visual style, layout and controls.')&&
+    str_contains($providerSystem,'including cards, grids, typography or unconventional layouts')&&
     str_contains($providerSystem,'phone and desktop')&&str_contains($providerSystem,'CSS-generated content')&&
+    str_contains($providerSystem,'selected_account_sources is present it is the entire allowed personal-data scope')&&
     !isset($prompt['player_controls_requested'])&&empty($scene['player_controls'])&&str_contains($providerSystem,'window.StonefellowAudio')&&
     !str_contains($providerSystem,SF_AGENT_SCENE_PLAYER_SLOT),
-    'Custom output budget supports a detailed, responsive design with no unrequested controls or copy');
+    'The creative brief directs the design while copy, responsiveness and account source rules remain available');
 verify(str_contains($providerSystem,'player.setLoop(startSeconds, endSeconds)')&&str_contains($providerSystem,'player.clearLoop()')&&
     str_contains($providerSystem,'player.setPlaybackRate(rate)')&&str_contains($providerSystem,'state.seekable')&&
     str_contains($providerSystem,'preservesPitch'),

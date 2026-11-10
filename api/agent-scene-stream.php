@@ -78,7 +78,7 @@ final class SfAgentSceneSourceEvents {
 final class SfAgentSceneStreamParser {
     private const MAX_STREAM_BYTES=2_000_000;
     private const MAX_EVENT_BYTES=260_000;
-    private const MAX_TEXT_BYTES=36_000;
+    private const MAX_TEXT_BYTES=96_000;
 
     private string $buffer='';
     private string $event='';

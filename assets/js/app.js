@@ -1,5 +1,5 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.325';
+  window.STONEFELLOW_APP_BUILD='1.3.326';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
@@ -1284,7 +1284,7 @@
             }
           }else if(event?.type==='delta'&&typeof event.text==='string'){
             outputLength+=event.text.length;
-            if(outputLength>36000)throw new Error('Scene output exceeded its limit');
+            if(outputLength>96000)throw new Error('Scene output exceeded its limit');
             onDelta(event.text);
           }else if(event?.type==='image'&&['generating','working','saved'].includes(event.state)){
             if(event.state!=='working')onTrace?.('image_'+event.state,{index:event.index,total:event.total,image:event.image});
@@ -2393,9 +2393,19 @@
     const resources=Array.from(draft.matchAll(/\{(?:canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|(?:knowledge|production):[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|knowledge-clear|production-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}/gi));
     return [...placed,...references,...music,...resources].reduce((length,match)=>length+match[0].length+1,0);
   }
+  function chatDraftLimit(draft){
+    const action=directListeningRoomCommand(draft);
+    const bindings=chatDraftBindingLength(draft);
+    const revising=action?.kind==='revise';
+    const coding=action?.canvasKind==='custom'||action?.kind==='build_on'||
+      (revising&&(listeningRoom?.canvas_kind==='custom'||listeningRoom?.canvas_kind==='space_eq'||bindings>0));
+    const textLimit=coding?16000:(action?.kind==='create'||revising)?1800:chatImageDraftLimit;
+    const commandLength=typeof action?.brief==='string'?Math.max(0,draft.length-action.brief.length):0;
+    return textLimit+bindings+commandLength;
+  }
   function syncChatImageDraftLimit(){
     if(chatImageDraftLimit<=0)return;
-    input.maxLength=chatImageDraftLimit+chatDraftBindingLength(input.value);
+    input.maxLength=Math.max(input.value.length,chatDraftLimit(input.value));
   }
   function chatMusicCommandRange(draft,commandEnd){
     for(const match of draft.matchAll(/(^|[\s(])\/(music-all|music|songs|albums)(?=$|[\s),.!?;:])/gi)){
@@ -2689,8 +2699,7 @@
     input.addEventListener('paste',event=>{
       if(chatImageDraftLimit<=0||!event.clipboardData)return;
       const draft=input.value.slice(0,input.selectionStart)+event.clipboardData.getData('text')+input.value.slice(input.selectionEnd);
-      if(!/\{(?:music-(?:track:[A-Za-z0-9_-]{1,180}|all|clear)|canvas:[1-9]\d*|lyrics:[A-Za-z0-9_-]{1,180}|(?:knowledge|production):[A-Za-z0-9_-]{1,180}|me:[a-z][a-z0-9_]{0,63}|data:[a-z][a-z0-9-]{0,31}:(?=[a-z0-9_.]{3,64}:)[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[A-Za-z0-9_-]{1,100}|merch:[A-Za-z0-9_-]{1,180}|ticket:[A-Za-z0-9_-]{1,180}|playlist:(?:own|artist)-[1-9]\d{0,18}@[a-f0-9]{64}|story:[1-9]\d{0,18}|stories-(?:all|clear|tag:[a-z0-9-]{1,64})|lyrics-clear|knowledge-clear|production-clear|me-clear|data-clear|playlists-clear|merch-clear|tickets-clear)\}|\/music-all(?=$|[\s),.!?;:])/i.test(draft))return;
-      input.maxLength=chatImageDraftLimit+chatDraftBindingLength(draft);
+      input.maxLength=chatDraftLimit(draft);
       setTimeout(syncChatImageDraftLimit,0);
     });
     const readDraft=()=>{
@@ -2722,6 +2731,9 @@
     if(input.value.trim().toLowerCase()==='ddd'&&toggleCanvasDebug()){input.value='';return;}
     if(handleAgentVisibilityCommand(input.value)){input.value='';return;}
     if(voiceTurnBusy){showTranscript('Finishing the previous voice reply. Your typed message is still in the bar.','waiting');return;}
+    if(chatImageDraftLimit>0&&input.value.length>chatDraftLimit(input.value)){
+      popupEntry('notice','Shorten this draft before sending. Start with “Let’s build” for a longer canvas brief.');return;
+    }
     if(chatImageDraftLimit>0)input.maxLength=chatImageDraftLimit;
     voiceInteractionStarted=true;
     command(input.value).catch(err=>say('I could not process that message. '+err.message));
@@ -2996,7 +3008,7 @@
   function canvasDebugReason(reason){
     if(typeof reason==='string'&&/^http_[45]\d{2}$/.test(reason))return reason;
     return ['timeout','stream_incomplete','output_limit','provider_busy','provider_refused','provider_unavailable',
-      'invalid_json','invalid_markup','output_too_large','missing_player_slot','invalid_code','invalid_library','invalid_image_request','invalid_image_binding',
+      'invalid_json','invalid_markup','output_too_large','missing_player_slot','invalid_code','invalid_library','account_scope','invalid_image_request','invalid_image_binding',
       'image_provider_unavailable','image_daily_limit','image_account_disabled','image_generation_failed','image_storage_failed','image_generation_disabled',
       'image_already_started'].includes(reason)?reason:undefined;
   }
@@ -3277,11 +3289,32 @@
     window.SFPublicAgentCanvas?.setSceneCoding?.('idle');
     return hadRoom;
   }
+  function canvasBuildReasonMessage(reason){
+    switch(reason){
+      case 'invalid_json':return 'The model did not return a complete canvas design.';
+      case 'invalid_markup':
+      case 'invalid_code':return 'The generated HTML, CSS, or JavaScript failed validation.';
+      case 'invalid_library':return 'The design uses an unavailable library.';
+      case 'account_scope':return 'The design requested account data outside its permissions.';
+      case 'output_too_large':return 'The generated code exceeded the canvas size limit.';
+      case 'invalid_image_binding':return 'The design references an unavailable image.';
+      case 'invalid_image_request':return 'The generated image request could not be used.';
+      case 'missing_player_slot':return 'The design did not include the required player slot.';
+      case 'output_limit':return 'The text model reached its output limit.';
+      case 'stream_incomplete':return 'The connection to the text model ended early.';
+      case 'timeout':return 'The text model timed out.';
+      case 'provider_busy':return 'The text model service was busy.';
+      case 'provider_unavailable':return 'The text model service was unavailable.';
+      default:return typeof reason==='string'&&/^http_[45]\d{2}$/.test(reason)?'The text model service returned an error.':'';
+    }
+  }
   function listeningRoomError(error,reading){
     if(error.payload?.error==='authentication_required')return 'Sign in again to access your canvases.';
+    const detail=error.payload?.error==='invalid_scene_output'?canvasBuildReasonMessage(error.payload.reason):'';
+    const message=String(error.message||'Please try again.')+(detail?' '+detail:'');
     if(['scene_model_unavailable','scene_image_unavailable','invalid_scene_output'].includes(error.payload?.error)&&/^[a-f0-9]{32}$/.test(error.payload.request_id||''))
-      return error.message+' Build reference '+error.payload.request_id+'.';
-    if(error.payload||!Number.isInteger(error.status)||error.status<100)return String(error.message||'Please try again.');
+      return message+' Build reference '+error.payload.request_id+'.';
+    if(error.payload||!Number.isInteger(error.status)||error.status<100)return message;
     const status=' (HTTP '+error.status+').';
     if(error.status===404)return 'The canvas service was not found'+status+' Check that the current deploy ZIP was extracted into the site folder.';
     if(error.status===401||error.status===403)return 'The server refused access to the canvas service'+status;
@@ -3430,7 +3463,11 @@
         if(!active())return;
         stage.setSceneCoding?.('streaming','Repair Agent is revising this candidate.');stage.appendSceneCode?.('raw',text);
       },
-      onRetry:()=>{if(active())stage.setSceneCoding?.('generating','Repair Agent is retrying the same approved correction.');},
+      onRetry:reason=>{
+        if(!active())return;
+        const detail=canvasBuildReasonMessage(reason);
+        stage.setSceneCoding?.('generating',(detail?detail+' ':'')+'Repair Agent is retrying the approved correction…');
+      },
       test:(scene,{signal,onEvent})=>{
         const context=canvasAudioContext(scene),valid=()=>active()&&!signal.aborted;
         const loadCatalog=async(filters={},readSignal)=>{
@@ -3528,7 +3565,7 @@
   async function sendListeningRoomRequest(build,signal,stage,requestActive,announce){
     const {payload,trace}=build;
     const started=Date.now();
-    let result,failure,streaming=false,receivedSource=false,announcement='',announced=false;
+    let result,failure,streaming=false,receivedSource=false,announcement='',announced=false,retryMessage='';
     try{
       result=await secureJsonPost('agent-scene.php',payload,false,signal,text=>{
         if(!text||!requestActive())return;
@@ -3536,7 +3573,7 @@
           streaming=true;
           trace('source_started');
           if(receivedSource)stage.setSceneCoding?.('generating');
-          stage.setSceneCoding?.('streaming',announcement||'Receiving live code from the text model…');
+          stage.setSceneCoding?.('streaming',retryMessage||announcement||'Receiving live code from the text model…');
         }
         receivedSource=true;
         stage.appendSceneCode?.('raw',text);
@@ -3551,16 +3588,21 @@
           (planKey.split(' ').length>=5&&(' '+designKey+' ').includes(' '+planKey+' ')));
         announcement=echoesBrief?(payload.previous_id?'I’m revising your canvas.':'I’m building your canvas.'):
           (payload.previous_id?'I’m updating the canvas with ':'I’m building ')+plan+'.';
+        const phase=receivedSource?'streaming':'generating';
         if(!announced){
           announced=true;
-          announce(announcement,receivedSource?'streaming':'generating');
-        }else stage.setSceneCoding?.(receivedSource?'streaming':'generating',announcement);
+          announce(announcement,phase);
+          if(!retryMessage)return;
+        }
+        stage.setSceneCoding?.(phase,retryMessage||announcement);
       },reason=>{
         if(!requestActive())return;
         trace('provider_retry',{reason:canvasDebugReason(reason)});
         streaming=false;
         announcement='';
-        stage.setSceneCoding?.(receivedSource?'streaming':'generating','Retrying the same canvas brief…');
+        const detail=canvasBuildReasonMessage(reason);
+        retryMessage=(detail?detail+' ':'')+'Retrying the same canvas brief…';
+        stage.setSceneCoding?.(receivedSource?'streaming':'generating',retryMessage);
       },(event,data)=>{
         if(!requestActive())return;
         if(event!=='image_generating'&&event!=='image_saved'){trace(event,data);return;}
@@ -3627,6 +3669,7 @@
     if(choice.use_saved&&editing)return {use_saved:true};
     if(choice.use_saved){
       input.value="Let's build "+brief+' ';
+      syncChatImageDraftLimit();
       input.setSelectionRange(input.value.length,input.value.length);
       reuseCanvasImagesOnly={owner,brief};
       setChatFooterHidden(false);
@@ -3804,9 +3847,17 @@
           action={kind:'revise'};
         }
       }
-      const design=reading?'':canvasDesignBrief(brief);
+      let design=reading?'':canvasDesignBrief(brief);
       const resourceInputs=reading?{}:chatDraftResourceInputs(brief);
-      if(Object.keys(resourceInputs).length)canvasKind='custom';
+      const musicInputs=reading?null:chatDraftMusicInputs(brief);
+      const imageReferenceIds=reading?[]:chatDraftVisualReferenceIds(brief);
+      const hasResources=Object.keys(resourceInputs).length>0||musicInputs!==null;
+      const hasImages=!reading&&(imageReferenceIds.length>0||chatDraftImageIds(brief).size>0);
+      if(action.kind==='revise'&&(hasResources||hasImages)&&!design.replace(/\{(?:reference-)?image-(?:ref-)?[a-f0-9]{32}\}/gi,'').trim()){
+        design='Incorporate the selected resources into this canvas and remove any cleared bindings. Preserve its layout, style, and interactions where possible.';
+        brief=design+' '+brief;
+      }
+      if(hasResources||hasImages)canvasKind='custom';
       const roomImageEdit=(!canvasKind||canvasKind==='listening_room')&&
         (/\{(?:reference-)?image-(?:ref-)?[a-f0-9]{32}\}/i.test(design)||/\b(?:create|generate|make|draw|render|design)\b[^.!?\n]{0,100}\b(?:images?|photos?|pictures?|illustrations?)\b/i.test(design));
       if(previousId&&design&&(canvasKind==='space_eq'||roomImageEdit))canvasKind='custom';
@@ -3845,8 +3896,6 @@
         else agent('thinking','Planning your canvas…');
       }
       const codingModel=!reading&&!editingImage&&canvasKind!=='space_eq'&&!(previousId&&!design)?selectedCanvasCodingModel(owner):null;
-      const imageReferenceIds=reading?[]:chatDraftVisualReferenceIds(brief);
-      const musicInputs=reading?null:chatDraftMusicInputs(brief);
       let response=reading
         ?await api('agent-scene.php'+(action.kind==='restore'?'?id='+action.id:action.kind==='image_review'?'?request_id='+action.requestId:''),undefined,request.signal)
         :await requestListeningRoom({track_id:String(trackId??''),brief,...(canvasKind?{canvas_kind:canvasKind}:{}),
@@ -5804,6 +5853,7 @@
     const draft=input.value;
     if(command==='edit'){
       if(!/^\s*\/edit(?:\s|$)/i.test(draft))input.value='/edit '+draft;
+      syncChatImageDraftLimit();
       input.setSelectionRange(input.value.length,input.value.length);return;
     }
     if(command==='notifications'&&!canvasBriefInChat(draft)){openNotificationDrawer();return;}
@@ -5818,6 +5868,7 @@
       next=prefix+next;commandEnd+=prefix.length;
     }
     input.value=next;
+    syncChatImageDraftLimit();
     input.setSelectionRange(commandEnd,commandEnd);
     const resource=chatResourceCommandRange(next,commandEnd);
     if(resource){void openChatResourcePicker(resource);return;}

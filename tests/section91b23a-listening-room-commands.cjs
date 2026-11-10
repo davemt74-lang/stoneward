@@ -142,6 +142,56 @@ test('a regular signed-in fan creates a scene, revises by saved ID, and sees a t
   assert.equal(h.scope.directListeningRoomCommand('Change the listening roomy'), null);
 });
 
+test('sending an edit with only a selected account source submits an actionable scoped revision', async () => {
+  const h=harness();
+  h.scope.api=async()=>({scene:{...h.scene(31),canvas_kind:'custom'}});
+  await h.scope.handleListeningRoomCommand({kind:'restore',id:31});
+  const token='{me:personal_listening_stats}';
+  h.scope.input={value:'/edit '+token};
+  h.scope.voiceTurnBusy=false;
+  h.scope.hide=()=>{};
+  h.scope.closeMenu=()=>{};
+  const commandStart=source.indexOf('  async function command(raw)');
+  vm.runInNewContext(source.slice(commandStart,source.indexOf('  function closeQuickMenu(',commandStart)),h.scope);
+  const handle=h.scope.handleListeningRoomCommand;
+  let submitted;
+  h.scope.handleListeningRoomCommand=action=>submitted=handle(action);
+  h.scope.submitAgentChat({preventDefault(){}});
+  assert.ok(submitted);
+  await submitted;
+  const project=h.approvedProjects[0].project;
+  assert.equal(project.previous_id,31);
+  assert.deepEqual(project.artist_inputs,{me_tools:['personal_listening_stats']});
+  assert.ok(project.brief.includes(token));
+  assert.match(h.scope.canvasDesignBrief(project.brief),/preserve.*layout, style, and interactions/i);
+  assert.equal(h.posts[0].proposal_id,h.approvedProjects[0].id);
+  assert.equal(h.posts[0].previous_id,31);
+  assert.deepEqual(h.posts[0].artist_inputs,project.artist_inputs);
+});
+
+test('a music selection alone can revise a built-in room as a custom canvas', async () => {
+  const h=harness();
+  await h.scope.handleListeningRoomCommand({kind:'restore',id:31});
+  await h.scope.handleListeningRoomCommand(h.scope.directListeningRoomCommand('/edit {music-track:static}'));
+  assert.equal(h.posts[0].previous_id,31);
+  assert.equal(h.posts[0].track_id,'desert');
+  assert.equal(h.posts[0].canvas_kind,'custom');
+  assert.deepEqual(h.posts[0].music_inputs,{mode:'selected',track_ids:['static']});
+  assert.ok(h.scope.canvasDesignBrief(h.posts[0].brief));
+});
+
+test('the draft limit follows the ordinary chat, built-in room and custom build routes', async () => {
+  const h=harness();
+  h.scope.input={maxLength:320,addEventListener(){}};
+  h.scope.bindChatImagePicker();
+  await h.scope.handleListeningRoomCommand({kind:'restore',id:31});
+  assert.equal(h.scope.chatDraftLimit('An ordinary chat message'),320);
+  assert.equal(h.scope.chatDraftLimit('/edit brighten the room'),1800+'/edit '.length);
+  assert.equal(h.scope.chatDraftLimit('Let’s build a visualizer'),16000+'Let’s build '.length);
+  const token='{music-track:static}';
+  assert.equal(h.scope.chatDraftLimit('/edit '+token),16000+'/edit '.length+token.length+1);
+});
+
 test('the actual app coordinator tests, repairs and retests a custom candidate before replacing the old canvas', async () => {
   const h=harness();
   await h.scope.handleListeningRoomCommand({kind:'restore',id:31});
@@ -1333,7 +1383,7 @@ test('batch image progress and partial receipts preserve every saved image', asy
   assert.equal(h.displayed.length, 0);
 });
 
-test('a provider retry clears partial source and can announce the recovered design', async () => {
+test('a provider retry explains the reason and replaces partial source without another announcement', async () => {
   const h = harness();
   const source = [];
   h.scope.window.SFPublicAgentCanvas.setSceneCoding = (state, message) => {
@@ -1345,7 +1395,7 @@ test('a provider retry clears partial source and can announce the recovered desi
     const events = [
       { type: 'concept', text: 'a star cluster EQ background' },
       { type: 'delta', text: 'incomplete code' },
-      { type: 'retry' },
+      { type: 'retry', reason: 'invalid_markup' },
       { type: 'concept', text: 'a star cluster EQ background' },
       { type: 'delta', text: 'recovered code' },
       { type: 'result', status: 201, data: { scene: { ...h.scene(11), canvas_kind: 'custom' } } },
@@ -1353,8 +1403,8 @@ test('a provider retry clears partial source and can announce the recovered desi
     const post = scenePost(async () => new Response(events.map(event => JSON.stringify(event) + '\n').join(''), {
       headers: { 'Content-Type': 'application/x-ndjson' },
     }));
-    return post('agent-scene.php', payload, retry, signal, onDelta, onConcept, () => {
-      onRetry();
+    return post('agent-scene.php', payload, retry, signal, onDelta, onConcept, reason => {
+      onRetry(reason);
       assert.deepEqual(source, ['incomplete code']);
     });
   };
@@ -1362,7 +1412,8 @@ test('a provider retry clears partial source and can announce the recovered desi
   await h.scope.handleListeningRoomCommand(command);
   assert.deepEqual(source, ['recovered code']);
   assert.equal(h.spoken.length, 1);
-  assert.ok(h.coding.some(entry => entry.message === 'Retrying the same canvas brief…'));
+  assert.equal(h.coding.filter(entry => entry.state === 'streaming').at(-1).message,
+    'The generated HTML, CSS, or JavaScript failed validation. Retrying the same canvas brief…');
   assert.equal(h.displayed[0].scene.id, 11);
 });
 
@@ -1486,6 +1537,24 @@ test('custom canvas recovery stops when the server cannot confirm the original r
   assert.equal(h.posts.length, 1);
   assert.equal(h.displayed.length, 0);
   assert.match(h.messages.at(-1), /unreadable response/);
+});
+
+test('a canvas validation failure keeps the saved canvas and reports its reason and reference', async () => {
+  const h = harness();
+  await h.scope.handleListeningRoomCommand({kind:'restore',id:31});
+  const message = 'The Coding Agent returned a design Stonefellow could not display.';
+  const requestId = 'ab'.repeat(16);
+  const payload = { error: 'invalid_scene_output', reason: 'account_scope', request_id: requestId };
+  const debug = [];
+  h.scope.recordCanvasDebug = (_id, event, data) => debug.push({ event, data });
+  h.scope.secureJsonPost = async () => { throw Object.assign(new Error(message), { status: 422, payload }); };
+  await h.scope.handleListeningRoomCommand({kind:'create',canvasKind:'custom',brief:'Build an animated backdrop'});
+  assert.deepEqual(h.displayed.map(entry => entry.scene.id), [31]);
+  assert.deepEqual(h.reads, ['agent-scene.php?id=31']);
+  assert.equal(h.messages.at(-1), `Canvas could not be created. ${message} The design requested account data outside its permissions. Build reference ${requestId}.`);
+  assert.equal(debug.find(entry => entry.event === 'build_failed').data.reason, 'account_scope');
+  const unknown = Object.assign(new Error(message), { payload: { ...payload, reason: '<private provider detail>' } });
+  assert.equal(h.scope.listeningRoomError(unknown, false), `${message} Build reference ${requestId}.`);
 });
 
 test('structured provider errors are shown immediately and closing aborts an in-progress recovery', async () => {
