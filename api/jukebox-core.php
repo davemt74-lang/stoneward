@@ -25,6 +25,7 @@ function sf_jukebox_schema(): void {
         "jukebox_remote (session_id CHAR(32) PRIMARY KEY, enabled INTEGER NOT NULL,
             status VARCHAR(12) NOT NULL, position_ms BIGINT NOT NULL, sampled_at_ms BIGINT NOT NULL,
             sample_seq BIGINT NOT NULL, control_revision BIGINT NOT NULL)",
+        "jukebox_auto_approval (session_id CHAR(32) PRIMARY KEY)",
         "jukebox_guests (id CHAR(32) PRIMARY KEY, venue_id BIGINT NOT NULL, token CHAR(64) NOT NULL,
             name VARCHAR(80) NOT NULL, UNIQUE(venue_id,token))",
         "jukebox_phones (id CHAR(32) PRIMARY KEY, session_id CHAR(32) NOT NULL, token CHAR(64) NOT NULL,
@@ -62,8 +63,9 @@ function sf_jukebox_query(string $sql,array $args=[]): PDOStatement {
 function sf_jukebox_session(string $id): array {
     $row=sf_jukebox_query('SELECT s.*, COALESCE(r.enabled,0) AS remote_enabled,
         r.status AS remote_status,r.position_ms,r.sampled_at_ms,r.sample_seq,r.control_revision,
-        j.scheduled_at,j.started_at FROM jukebox_sessions s
+        j.scheduled_at,j.started_at,a.session_id IS NOT NULL AS auto_approve_phones FROM jukebox_sessions s
         LEFT JOIN jukebox_remote r ON r.session_id=s.id
+        LEFT JOIN jukebox_auto_approval a ON a.session_id=s.id
         LEFT JOIN jukebox_schedule j ON j.session_id=s.id WHERE s.id=?',[$id])->fetch();
     if(!$row)throw new OutOfBoundsException('Jukebox session not found.');
     return $row;
@@ -97,17 +99,28 @@ function sf_jukebox_schedule_details(array $session): array {
 function sf_jukebox_settings(array $session): array {
     return ['title'=>(string)$session['title'],'listed'=>(bool)$session['listed'],
         'remote_listening'=>(bool)$session['remote_enabled'],
+        'auto_approve_phones'=>(bool)$session['auto_approve_phones'],
         'scheduled_at'=>isset($session['scheduled_at'])?(int)$session['scheduled_at']:null,
         'phase'=>sf_jukebox_phase($session)];
+}
+
+/** The caller holds the session write lock and changes the option only when needed. */
+function sf_jukebox_set_auto_approval(string $id,bool $enabled): void {
+    $sql=$enabled?'INSERT INTO jukebox_auto_approval (session_id) VALUES (?)':'DELETE FROM jukebox_auto_approval WHERE session_id=?';
+    sf_jukebox_query($sql,[$id]);
 }
 
 /** Called after taking the session write lock. Never copies or resets playback. */
 function sf_jukebox_settings_update(array $session,array $body,bool $admin): array {
     $current=sf_jukebox_settings($session);
     $expected=$body['expected']??null;
+    // Older editors can save the fields they know about without changing phone approval.
+    if(is_array($expected)&&!array_key_exists('auto_approve_phones',$body))
+        $expected+=['auto_approve_phones'=>$current['auto_approve_phones']];
     if(!is_array($expected)||count($expected)!==count($current)
         ||array_diff_key($current,$expected)||array_diff_key($expected,$current)
         ||!is_string($expected['title'])||!is_bool($expected['listed'])||!is_bool($expected['remote_listening'])
+        ||!is_bool($expected['auto_approve_phones'])
         ||($expected['scheduled_at']!==null&&!is_int($expected['scheduled_at']))
         ||!in_array($expected['phase'],['live','upcoming','ended','canceled'],true))
         throw new InvalidArgumentException('Reload the session settings before saving.');
@@ -124,9 +137,11 @@ function sf_jukebox_settings_update(array $session,array $body,bool $admin): arr
             throw new InvalidArgumentException('Enter a session name of 1 to 120 characters.');
         $next['title']=trim($body['title']);
     }
-    foreach(['listed','remote_listening'] as $key){
+    $booleanSettings=['listed'=>'the session is public.','remote_listening'=>'remote listening is enabled.',
+        'auto_approve_phones'=>'phone connections are approved automatically.'];
+    foreach($booleanSettings as $key=>$description){
         if(!array_key_exists($key,$body))continue;
-        if(!is_bool($body[$key]))throw new InvalidArgumentException('Choose whether '.($key==='listed'?'the session is public.':'remote listening is enabled.'));
+        if(!is_bool($body[$key]))throw new InvalidArgumentException('Choose whether '.$description);
         $next[$key]=$body[$key];
     }
     if(array_key_exists('scheduled_at',$body)){
@@ -137,7 +152,7 @@ function sf_jukebox_settings_update(array $session,array $body,bool $admin): arr
     if($next['listed']&&!$current['listed']&&!$admin)
         throw new DomainException('An administrator must make a session public.');
     if(in_array($current['phase'],['ended','canceled'],true)){
-        foreach(['listed','remote_listening','scheduled_at'] as $key){
+        foreach(['listed','remote_listening','auto_approve_phones','scheduled_at'] as $key){
             if($next[$key]!==$current[$key])throw new DomainException('Only the name of an archived session can be changed.');
         }
     }
@@ -149,6 +164,8 @@ function sf_jukebox_settings_update(array $session,array $body,bool $admin): arr
         sf_jukebox_query('UPDATE jukebox_sessions SET title=?,listed=? WHERE id=?',[$next['title'],(int)$next['listed'],$session['id']]);
     if($next['remote_listening']!==$current['remote_listening'])
         sf_jukebox_controls($session,['event'=>'remote_listening','enabled'=>$next['remote_listening']]);
+    if($next['auto_approve_phones']!==$current['auto_approve_phones'])
+        sf_jukebox_set_auto_approval($session['id'],$next['auto_approve_phones']);
     if($next['scheduled_at']!==$current['scheduled_at'])
         sf_jukebox_controls($session,['event'=>'reschedule','scheduled_at'=>$next['scheduled_at']]);
     return sf_jukebox_session($session['id']);
@@ -174,9 +191,10 @@ function sf_jukebox_directory_page(int $owner,string $scope,mixed $cursor,mixed 
         array_push($args,$position['created'],$position['created'],$position['id']);
     }
     $rows=sf_jukebox_query('SELECT s.id,s.owner_id,s.title,s.listed,s.ended,s.created,s.heartbeat,
-        COALESCE(r.enabled,0) AS remote_enabled,t.scheduled_at,t.started_at
+        COALESCE(r.enabled,0) AS remote_enabled,t.scheduled_at,t.started_at,a.session_id IS NOT NULL AS auto_approve_phones
         FROM jukebox_sessions s LEFT JOIN jukebox_schedule t ON t.session_id=s.id
-        LEFT JOIN jukebox_remote r ON r.session_id=s.id WHERE s.owner_id=? AND s.ended=?'.$older.
+        LEFT JOIN jukebox_remote r ON r.session_id=s.id
+        LEFT JOIN jukebox_auto_approval a ON a.session_id=s.id WHERE s.owner_id=? AND s.ended=?'.$older.
         ' ORDER BY s.created DESC,s.id DESC LIMIT '.($size+1),$args)->fetchAll();
     $next=null;
     if(count($rows)>$size){
@@ -289,6 +307,7 @@ function sf_jukebox_state(array $session,?array $phone,bool $host): array {
         if($host&&$phase==='upcoming'){
             $state['remote_listening']=(bool)$session['remote_enabled'];
             $state['listed']=(bool)$session['listed'];
+            $state['auto_approve_phones']=(bool)$session['auto_approve_phones'];
         }
         return $state;
     }
@@ -310,6 +329,7 @@ function sf_jukebox_state(array $session,?array $phone,bool $host): array {
         $state['chat_threads']=sf_jukebox_chat_threads($id,$host?null:(string)$phone['id']);
     if($state['remote_listening'])$state['transport']=sf_jukebox_transport($session,$state['current'],$state['online']);
     if($host){
+        $state['auto_approve_phones']=(bool)$session['auto_approve_phones'];
         $state['listener_metrics']=sf_jukebox_listener_metrics($session,$state['transport']??null);
         $state['phones']=sf_jukebox_query("SELECT p.id,p.name,p.status,
             (SELECT MAX(prior.approved) FROM jukebox_phones prior JOIN jukebox_guests g ON g.id=prior.guest_id
@@ -325,8 +345,11 @@ function sf_jukebox_join(array $session,array $body): array {
     $id=$session['id'];
     $existing=sf_jukebox_phone($session);
     if($existing)return ['status'=>$existing['status']];
-    $pending=sf_jukebox_query("SELECT COUNT(*) FROM jukebox_phones WHERE session_id=? AND status='pending'",[$id])->fetchColumn();
-    if((int)$pending>=50)throw new DomainException('The host needs to review pending requests before more phones can join.');
+    $autoApprove=(bool)$session['auto_approve_phones'];
+    if(!$autoApprove){
+        $pending=sf_jukebox_query("SELECT COUNT(*) FROM jukebox_phones WHERE session_id=? AND status='pending'",[$id])->fetchColumn();
+        if((int)$pending>=50)throw new DomainException('The host needs to review pending requests before more phones can join.');
+    }
     $name=sf_clean_text($body['name']??'',80);
     $guest=sf_jukebox_guest($session);
     if(!$guest&&!empty($body['remember'])&&(int)$session['venue_id']){
@@ -340,10 +363,12 @@ function sf_jukebox_join(array $session,array $body): array {
     if($guest&&$name!==$guest['name'])sf_jukebox_query('UPDATE jukebox_guests SET name=? WHERE id=?',[$name,$guest['id']]);
     $phone=bin2hex(random_bytes(16));
     $secret=bin2hex(random_bytes(32));
-    sf_jukebox_query("INSERT INTO jukebox_phones (id,session_id,token,guest_id,name,status,created) VALUES (?,?,?,?,?,'pending',?)",
-        [$phone,$id,hash('sha256',$secret),$guest['id']??null,$name?:'Guest '.strtoupper(substr($phone,0,4)),time()]);
+    $status=$autoApprove?'approved':'pending';
+    $now=time();
+    sf_jukebox_query('INSERT INTO jukebox_phones (id,session_id,token,guest_id,name,status,approved,created) VALUES (?,?,?,?,?,?,?,?)',
+        [$phone,$id,hash('sha256',$secret),$guest['id']??null,$name?:'Guest '.strtoupper(substr($phone,0,4)),$status,$autoApprove?$now:null,$now]);
     sf_jukebox_cookie('sf_jb_'.$id,$secret,time()+86400);
-    return ['status'=>'pending'];
+    return ['status'=>$status];
 }
 
 function sf_jukebox_request(array $session,?array $phone,array $body): void {

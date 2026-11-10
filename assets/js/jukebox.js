@@ -39,6 +39,7 @@
   let hostConfirmation = null;
   let playerActionPending = false;
   let remoteChangePending = false;
+  let disconnectAllPending = false;
   let listener = null;
   let phoneStreaming = false;
   let stateFetchError = '';
@@ -79,6 +80,7 @@
   let requestButtons = [];
   const renderKeys = new Map();
   let pageBranding = {logo_url: null, revision: -1};
+  let coverRevision = -1;
   let brandingOwnerAvailable = true;
 
   function endpoint(action, extra = {}) {
@@ -96,7 +98,7 @@
     };
     if (action === 'listener' && body?.active === false) options.keepalive = true;
     const controller = ['state', 'player', 'thread', 'crm', 'venue_accounts', 'directory'].includes(action)
-      || (['settings', 'branding'].includes(action) && body === undefined) ? new AbortController() : null;
+      || (['settings', 'branding', 'cover'].includes(action) && body === undefined) ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
     if (controller) options.signal = controller.signal;
     try {
@@ -131,22 +133,34 @@
     } catch { return null; }
   }
 
-  function paintLogo(image, fallback, source) {
+  function coverUrl(value) {
+    if (!value || typeof value !== 'string') return null;
+    try {
+      const url = new URL(value, location.href);
+      if (url.origin !== location.origin || url.pathname !== new URL('api/jukebox.php', location.href).pathname
+          || url.hash || url.username || url.password || [...url.searchParams].length !== 3
+          || url.searchParams.get('action') !== 'host_cover' || url.searchParams.get('host') !== '1'
+          || !/^[a-f0-9]{64}$/.test(url.searchParams.get('v') || '')) return null;
+      return url.href;
+    } catch { return null; }
+  }
+
+  function paintArtwork(image, fallback, source) {
     const next = source || '';
-    if (image.dataset.logoSource === next) return;
-    image.dataset.logoSource = next;
+    if (image.dataset.artworkSource === next) return;
+    image.dataset.artworkSource = next;
     image.hidden = true;
-    fallback.hidden = false;
+    if (fallback) fallback.hidden = false;
     if (!next) { image.removeAttribute('src'); return; }
     image.onload = () => {
-      if (image.dataset.logoSource !== next) return;
+      if (image.dataset.artworkSource !== next) return;
       image.hidden = false;
-      fallback.hidden = true;
+      if (fallback) fallback.hidden = true;
     };
     image.onerror = () => {
-      if (image.dataset.logoSource !== next) return;
+      if (image.dataset.artworkSource !== next) return;
       image.hidden = true;
-      fallback.hidden = false;
+      if (fallback) fallback.hidden = false;
     };
     image.src = next;
   }
@@ -159,15 +173,27 @@
       if (value.revision < pageBranding.revision) return;
       pageBranding = {logo_url: logoUrl(value.logo_url), revision: value.revision};
     }
-    paintLogo($('host-logo'), $('host-logo-fallback'), pageBranding.logo_url);
+    paintArtwork($('host-logo'), $('host-logo-fallback'), pageBranding.logo_url);
     if (host) {
-      paintLogo($('branding-current'), $('branding-current-fallback'), pageBranding.logo_url);
+      paintArtwork($('branding-current'), $('branding-current-fallback'), pageBranding.logo_url);
       connectionText('open-branding', pageBranding.logo_url ? 'Change logo' : 'Upload logo');
     }
   }
 
+  function applyHostCover(value) {
+    const image = $('host-cover');
+    if (!image || !value || !Number.isSafeInteger(value.revision) || value.revision < coverRevision) return;
+    const source = coverUrl(value.cover_url);
+    coverRevision = value.revision;
+    paintArtwork(image, null, source);
+    connectionText('open-cover', source ? 'Change cover image' : 'Add cover image');
+  }
+
   function brandingEditable(editable) {
-    if (host) $('host-branding').hidden = !editable || !brandingOwnerAvailable;
+    if (!host) return;
+    $('host-branding').hidden = !editable || !brandingOwnerAvailable;
+    const cover = $('open-cover');
+    if (cover) cover.hidden = !editable;
   }
 
   function bindBrandingDialog() {
@@ -177,13 +203,29 @@
     const form = $('branding');
     const file = $('branding-file');
     const close = [...dialog.querySelectorAll('[data-branding-close]')];
+    const logo = {
+      opener: $('open-branding'), action: 'branding', label: 'logo', name: 'host logo',
+      heading: 'Host logo / icon', choice: 'Choose a logo or icon',
+      description: 'This is a public logo, visible on your host page and every session you host.',
+      help: 'Square artwork works well and fits without cropping.',
+      url: value => logoUrl(value?.logo_url)
+    };
+    const cover = {
+      opener: $('open-cover'), action: 'cover', label: 'cover image', name: 'cover image',
+      heading: 'Cover image', choice: 'Choose a cover image',
+      description: 'This image appears on your private hosted events page.',
+      help: 'Wide landscape artwork works best. The edges may be cropped to fit.',
+      url: value => coverUrl(value?.cover_url)
+    };
+    let asset = logo;
     let generation = 0, reading = 0, saving = false, snapshot = null, selected;
     let editable = false;
     const report = text => connectionText('branding-status', text);
+    const preview = source => paintArtwork($('branding-preview'), $('branding-preview-fallback'), source);
     const controls = () => {
       file.disabled = saving || !snapshot || !editable;
       $('branding-save').disabled = saving || !editable || typeof selected !== 'string';
-      $('branding-remove').disabled = saving || !editable || !snapshot?.logo_url;
+      $('branding-remove').disabled = saving || !editable || !asset.url(snapshot);
       $('branding-reload').disabled = saving;
       close.forEach(control => { control.disabled = saving; });
     };
@@ -191,23 +233,24 @@
       reading++;
       selected = undefined;
       form.reset();
-      paintLogo($('branding-preview'), $('branding-preview-fallback'), logoUrl(snapshot?.logo_url));
+      preview(asset.url(snapshot));
     };
     async function load() {
       const request = ++generation;
       snapshot = null;
       editable = false;
       resetSelection();
-      report('Loading host logo…');
+      report('Loading ' + asset.name + '…');
       $('branding-reload').hidden = true;
       controls();
       try {
-        const data = await api('branding');
+        const data = await api(asset.action);
         if (!dialog.open || generation !== request) return;
-        snapshot = data.branding;
+        snapshot = data[asset.action];
         editable = data.branding_editable === true;
+        if (asset === cover) applyHostCover(snapshot);
         resetSelection();
-        report(editable ? '' : 'This account cannot change the host logo.');
+        report(editable ? '' : 'This account cannot change the ' + asset.name + '.');
         controls();
         if (editable && [dialog, document.body, $('branding-status'), $('branding-reload'), file].includes(document.activeElement)) file.focus({preventScroll: true});
       } catch (error) {
@@ -217,11 +260,24 @@
         controls();
       }
     }
-    $('open-branding').onclick = () => {
+    function open(choice) {
+      asset = choice;
+      dialog.dataset.asset = asset.action;
+      connectionText('branding-heading', asset.heading);
+      connectionText('branding-description', asset.description);
+      connectionText('branding-file-label', asset.choice);
+      connectionText('branding-file-help', 'PNG, JPEG, or WebP. Maximum 1 MB. ' + asset.help);
+      connectionText('branding-save', 'Save ' + asset.label);
+      connectionText('branding-remove', 'Remove ' + asset.label);
+      connectionText('branding-reload', 'Load latest ' + asset.label);
+      close[0].setAttribute('aria-label', 'Close ' + asset.name);
+      $('branding-preview').alt = asset === cover ? 'Cover image preview' : 'Host logo preview';
       dialog.showModal();
       $('branding-status').focus({preventScroll: true});
       void load();
-    };
+    }
+    logo.opener.onclick = () => open(logo);
+    if (cover.opener) cover.opener.onclick = () => open(cover);
     close.forEach(control => { control.onclick = () => dialog.close(); });
     dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
     dialog.addEventListener('close', () => {
@@ -229,14 +285,14 @@
       resetSelection();
       snapshot = null;
       report('');
-      if ($('open-branding').isConnected && !$('host-branding').hidden) $('open-branding').focus({preventScroll: true});
+      if (asset.opener.isConnected && !asset.opener.closest('[hidden]')) asset.opener.focus({preventScroll: true});
     });
     file.onchange = async () => {
       const request = ++reading;
       const context = generation;
       selected = undefined;
       const choice = file.files[0];
-      paintLogo($('branding-preview'), $('branding-preview-fallback'), logoUrl(snapshot?.logo_url));
+      preview(asset.url(snapshot));
       controls();
       if (!choice) { report(''); return; }
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(choice.type) || choice.size < 1 || choice.size > 1048576) {
@@ -261,8 +317,9 @@
         });
         if (!dialog.open || request !== reading || context !== generation) return;
         selected = data;
-        paintLogo($('branding-preview'), $('branding-preview-fallback'), data);
-        report('Ready to upload ' + choice.name + '. Save to publish it on your sessions.');
+        preview(data);
+        report('Ready to upload ' + choice.name + (asset === cover
+          ? '. Save to add it to your hosted events page.' : '. Save to publish it on your sessions.'));
         controls();
       } catch (error) {
         if (!dialog.open || request !== reading || context !== generation) return;
@@ -274,23 +331,32 @@
       if (saving || !snapshot || !editable) return;
       saving = true;
       controls();
-      report(image === null ? 'Removing logo…' : 'Uploading logo…');
+      report((image === null ? 'Removing ' : 'Uploading ') + asset.label + '…');
       try {
-        const data = await api('branding', {expected_revision: snapshot.revision, image});
-        applyPageBranding(data.branding);
-        if (state?.branding_editable) state.branding = data.branding;
-        if (!id) {
-          directoryRows = directoryRows.map(row => ({...row, branding: data.branding}));
-          renderSessionList('sessions', directoryRows);
+        const data = await api(asset.action, {expected_revision: snapshot.revision, image});
+        if (asset === cover) {
+          applyHostCover(data.cover);
+        } else {
+          applyPageBranding(data.branding);
+          if (state?.branding_editable) state.branding = data.branding;
+          if (!id) {
+            directoryRows = directoryRows.map(row => ({...row, branding: data.branding}));
+            renderSessionList('sessions', directoryRows);
+          }
         }
         dialog.close();
-        notice(image === null ? 'Host logo removed.' : 'Host logo updated.');
+        const name = asset === cover ? 'Cover image' : 'Host logo';
+        notice(name + (image === null ? ' removed.' : ' updated.'));
       } catch (error) {
         report(error.message);
-        if (error.status === 409) $('branding-reload').hidden = false;
+        if (error.status === 409) {
+          editable = false;
+          $('branding-reload').hidden = false;
+        }
       } finally {
         saving = false;
         controls();
+        if (dialog.open && !$('branding-reload').hidden) $('branding-reload').focus();
       }
     }
     form.onsubmit = event => {
@@ -810,6 +876,10 @@
       audience.textContent = count + (Number(count) === 1 ? ' phone listening now' : ' phones listening now');
     }
     const phones = state.phones || [];
+    connectionText('phone-approval-mode', state.auto_approve_phones === true
+      ? 'New phones are approved automatically.' : 'New phones need host approval.');
+    $('disconnect-all-phones').disabled = stopped || disconnectAllPending
+      || !phones.some(phone => phone.status === 'approved' || phone.status === 'pending');
     if (changed('phones', phones)) list('phones', [...phones].sort((a, b) =>
       Number(b.status === 'pending') - Number(a.status === 'pending')), phone => {
       const label = phone.name + ' · ' + phone.status + (phone.last_visit ? ' · Returning guest, last visit ' + date(phone.last_visit) : '');
@@ -1496,6 +1566,8 @@
     form.elements.listed.disabled = archived || $('edit-listing').hidden;
     form.elements.remote_listening.checked = settings.remote_listening;
     form.elements.remote_listening.disabled = archived;
+    form.elements.auto_approve_phones.checked = settings.auto_approve_phones === true;
+    form.elements.auto_approve_phones.disabled = archived;
     form.elements.scheduled_at.value = settings.scheduled_at ? localScheduleValue(settings.scheduled_at) : '';
     form.elements.scheduled_at.disabled = !upcoming;
     form.elements.scheduled_at.required = upcoming;
@@ -1517,6 +1589,7 @@
     form.elements.title.value = settings.title;
     form.elements.listed.checked = settings.listed && !$('listing').hidden;
     form.elements.remote_listening.checked = settings.remote_listening;
+    form.elements.auto_approve_phones.checked = settings.auto_approve_phones === true;
     form.elements.scheduled_at.value = '';
     $('create-source').textContent = `Using settings from “${settings.title}”. Choose when your new session starts.`;
     $('create-source').hidden = false;
@@ -1585,7 +1658,7 @@
       const titleText = title.querySelector('.session-title-copy');
       if (titleText.textContent !== label) titleText.textContent = label;
       const logo = title.querySelector('.jukebox-session-logo');
-      paintLogo(logo.querySelector('img'), logo.querySelector('.jukebox-record'), logoUrl((host ? pageBranding : row.branding)?.logo_url));
+      paintArtwork(logo.querySelector('img'), logo.querySelector('.jukebox-record'), logoUrl((host ? pageBranding : row.branding)?.logo_url));
       if (host) title.setAttribute('aria-label', phase === 'ended' || phase === 'canceled' ? `${label} (${phase})` : label);
       if (badge.textContent !== status) badge.textContent = status;
       badge.hidden = !status;
@@ -1628,6 +1701,7 @@
       directoryRows = append ? directoryRows.concat(data.sessions.filter(row => !previous.has(row.id))) : data.sessions;
       directoryCursor = data.next_cursor;
       applyPageBranding(data.branding);
+      applyHostCover(data.cover);
       brandingEditable(data.branding_editable === true);
       $('session-empty').hidden = Boolean(directoryRows.length);
       $('mode-link').href = 'jukebox.php';
@@ -1708,6 +1782,7 @@
 
   const createDialog = bindFormDialog('create', values => api('create', {
     title: values.get('title'), listed: values.has('listed'), remote_listening: values.has('remote_listening'),
+    auto_approve_phones: values.has('auto_approve_phones'),
     scheduled_at: scheduleTimestamp(values.get('scheduled_at'))
   }), result => { location.href = page(result.id, true); }, () => { $('create-source').hidden = true; });
   const editDialog = bindFormDialog('edit', async values => {
@@ -1716,6 +1791,7 @@
     if (!archived) {
       body.listed = $('edit-listing').hidden ? editSnapshot.listed : values.has('listed');
       body.remote_listening = values.has('remote_listening');
+      body.auto_approve_phones = values.has('auto_approve_phones');
       if (editSnapshot.phase === 'upcoming' && values.get('scheduled_at') !== localScheduleValue(editSnapshot.scheduled_at)) {
         body.scheduled_at = scheduleTimestamp(values.get('scheduled_at'));
       }
@@ -1850,6 +1926,24 @@
     $('end-session').onclick = handle(async () => {
       if (confirm('End this jukebox session for all connected guests?')) await mutate('control', {event: 'end'});
     });
+    $('disconnect-all-phones').onclick = async event => {
+      const control = event.currentTarget;
+      if (control.disabled || stopped || !confirm('Disconnect all connected phones and revoke pending requests? New phones will follow this session’s approval setting.')) return;
+      disconnectAllPending = true;
+      control.disabled = true;
+      connectionText('phone-disconnect-status', 'Disconnecting phones…');
+      try {
+        const {disconnected} = await api('disconnect_all', {});
+        await tick();
+        connectionText('phone-disconnect-status', disconnected === 0 ? 'No phones remained to disconnect.'
+          : `Disconnected ${disconnected} ${disconnected === 1 ? 'phone' : 'phones'}.`);
+      } catch (error) {
+        connectionText('phone-disconnect-status', error.message);
+      } finally {
+        disconnectAllPending = false;
+        if (!stopped && phaseOf(state) === 'live') renderHost();
+      }
+    };
     $('volume').oninput = () => { audio.volume = Number($('volume').value); };
     $('remote-listening').onchange = handle(async event => {
       const setting = event.currentTarget;

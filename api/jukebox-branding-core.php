@@ -9,6 +9,20 @@ function sf_jukebox_branding_schema(bool $mysql,string $engine): void {
         revision BIGINT NOT NULL DEFAULT 0)$engine");
 }
 
+/** The hosted-events cover is private and has its own revision. */
+function sf_jukebox_cover_schema(): void {
+    static $ready=false;
+    if($ready)return;
+    $db=sf_db();
+    $mysql=$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
+    $blob=$mysql?'MEDIUMTEXT':'TEXT';
+    $engine=$mysql?' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4':'';
+    $db->exec("CREATE TABLE IF NOT EXISTS jukebox_host_cover (
+        owner_id BIGINT PRIMARY KEY, image $blob NULL, cover_hash CHAR(64) NULL,
+        revision BIGINT NOT NULL DEFAULT 0)$engine");
+    $ready=true;
+}
+
 function sf_jukebox_branding_metadata(?array $row,bool $available=false): array {
     $hash=$row['logo_hash']??null;
     $valid=$available&&is_string($hash)&&preg_match('/\A[a-f0-9]{64}\z/',$hash);
@@ -31,6 +45,20 @@ function sf_jukebox_branding_map(array $owners): array {
 
 function sf_jukebox_branding_get(int $owner): array {
     return sf_jukebox_branding_map([$owner])[$owner]??sf_jukebox_branding_metadata(null);
+}
+
+function sf_jukebox_cover_metadata(?array $row): array {
+    $hash=$row['cover_hash']??null;
+    $valid=is_string($hash)&&preg_match('/\A[a-f0-9]{64}\z/',$hash);
+    return ['cover_url'=>$valid?'api/jukebox.php?action=host_cover&host=1&v='.$hash:null,
+        'revision'=>max(0,(int)($row['revision']??0))];
+}
+
+function sf_jukebox_cover_get(int $owner): array {
+    sf_jukebox_cover_schema();
+    $row=sf_jukebox_query("SELECT c.cover_hash,c.revision FROM jukebox_host_cover c
+        JOIN users u ON u.id=c.owner_id WHERE c.owner_id=? AND u.status='active'",[$owner])->fetch();
+    return sf_jukebox_cover_metadata($row?:null);
 }
 
 function sf_jukebox_branding_can_edit(int $owner,bool $admin): bool {
@@ -59,13 +87,17 @@ function sf_jukebox_branding_image(mixed $input): ?array {
     return ['image'=>$info['mime'].';base64,'.base64_encode($bytes),'hash'=>hash('sha256',$bytes)];
 }
 
-/** Lock only this host's artwork; a logo edit never touches player/session revisions. */
-function sf_jukebox_branding_update(int $owner,array $body,bool $admin): array {
+/** Lock this host's artwork independently of player and session revisions. */
+function sf_jukebox_branding_update(int $owner,array $body,bool $admin,bool $cover=false): array {
+    $label=$cover?'hosted events cover':'host logo';
     if(array_diff_key($body,['expected_revision'=>true,'image'=>true])
         ||!array_key_exists('image',$body)||!is_int($body['expected_revision']??null)
         ||$body['expected_revision']<0)
-        throw new InvalidArgumentException('Reload the host logo before saving.');
+        throw new InvalidArgumentException('Reload the '.$label.' before saving.');
     $image=sf_jukebox_branding_image($body['image']);
+    if($cover)sf_jukebox_cover_schema();
+    $table=$cover?'jukebox_host_cover':'jukebox_host_branding';
+    $hashColumn=$cover?'cover_hash':'logo_hash';
     $db=sf_db();$mysql=$db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
     $db->beginTransaction();
     // Account closure takes the same account lock before clearing optional artwork.
@@ -75,42 +107,50 @@ function sf_jukebox_branding_update(int $owner,array $body,bool $admin): array {
     if(!$account||$account['status']!=='active')
         throw new DomainException('This host account is unavailable.');
     if(!sf_jukebox_branding_can_edit($owner,$admin&&$account['role']==='admin'))throw new DomainException('A host account is required.');
-    $insert=$mysql?'INSERT IGNORE INTO jukebox_host_branding (owner_id) VALUES (?)'
-        :'INSERT INTO jukebox_host_branding (owner_id) VALUES (?) ON CONFLICT(owner_id) DO NOTHING';
+    $insert=$mysql?"INSERT IGNORE INTO $table (owner_id) VALUES (?)"
+        :"INSERT INTO $table (owner_id) VALUES (?) ON CONFLICT(owner_id) DO NOTHING";
     sf_jukebox_query($insert,[$owner]);
-    sf_jukebox_query('UPDATE jukebox_host_branding SET revision=revision WHERE owner_id=?',[$owner]);
-    $current=sf_jukebox_query('SELECT owner_id,logo_hash,revision FROM jukebox_host_branding WHERE owner_id=?',[$owner])->fetch();
+    sf_jukebox_query("UPDATE $table SET revision=revision WHERE owner_id=?",[$owner]);
+    $current=sf_jukebox_query("SELECT owner_id,$hashColumn,revision FROM $table WHERE owner_id=?",[$owner])->fetch();
     if((int)$current['revision']!==$body['expected_revision'])
-        throw new DomainException('The host logo changed. Reopen Host logo to review the latest image.');
+        throw new DomainException('The '.$label.' changed. Reopen '.ucfirst($label).' to review the latest image.');
     $hash=$image['hash']??null;
-    if($hash!==$current['logo_hash']){
-        sf_jukebox_query('UPDATE jukebox_host_branding SET image=?,logo_hash=?,revision=revision+1 WHERE owner_id=?',
+    if($hash!==$current[$hashColumn]){
+        sf_jukebox_query("UPDATE $table SET image=?,$hashColumn=?,revision=revision+1 WHERE owner_id=?",
             [$image['image']??null,$hash,$owner]);
-        $current['logo_hash']=$hash;$current['revision']=(int)$current['revision']+1;
+        $current[$hashColumn]=$hash;$current['revision']=(int)$current['revision']+1;
     }
-    $metadata=sf_jukebox_branding_metadata($current,true);
+    $metadata=$cover?sf_jukebox_cover_metadata($current):sf_jukebox_branding_metadata($current,true);
     $db->commit();
     return $metadata;
 }
 
-function sf_jukebox_branding_source(mixed $owner,mixed $version): array {
+function sf_jukebox_branding_source(mixed $owner,mixed $version,bool $cover=false): array {
+    $missing=$cover?'Hosted events cover not found.':'Host logo not found.';
     $owner=is_string($owner)?filter_var($owner,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):false;
     if($owner===false||!is_string($version)||!preg_match('/\A[a-f0-9]{64}\z/',$version))
-        throw new OutOfBoundsException('Host logo not found.');
-    $image=sf_jukebox_query("SELECT b.image FROM jukebox_host_branding b JOIN users u ON u.id=b.owner_id
-        WHERE b.owner_id=? AND b.logo_hash=? AND u.status='active'",[$owner,$version])->fetchColumn();
+        throw new OutOfBoundsException($missing);
+    if($cover)sf_jukebox_cover_schema();
+    $table=$cover?'jukebox_host_cover':'jukebox_host_branding';
+    $hashColumn=$cover?'cover_hash':'logo_hash';
+    $image=sf_jukebox_query("SELECT b.image FROM $table b JOIN users u ON u.id=b.owner_id
+        WHERE b.owner_id=? AND b.$hashColumn=? AND u.status='active'",[$owner,$version])->fetchColumn();
     if(!is_string($image)||!preg_match('/\A(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+\/=]+)\z/D',$image,$parts))
-        throw new OutOfBoundsException('Host logo not found.');
+        throw new OutOfBoundsException($missing);
     $bytes=base64_decode($parts[2],true);
-    if($bytes===false||!hash_equals($version,hash('sha256',$bytes)))throw new OutOfBoundsException('Host logo not found.');
+    if($bytes===false||!hash_equals($version,hash('sha256',$bytes)))throw new OutOfBoundsException($missing);
     return ['mime'=>$parts[1],'bytes'=>$bytes];
 }
 
 /** Closure must not create optional Jukebox storage for an account that never used it. */
 function sf_jukebox_branding_clear_user(int $owner): array {
     $catalog=sf_db()->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'
-        ?"SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='jukebox_host_branding'"
-        :"SELECT name FROM sqlite_master WHERE type='table' AND name='jukebox_host_branding'";
-    if(!sf_jukebox_query($catalog)->fetchColumn())return [];
-    return ['jukebox_host_branding'=>sf_jukebox_query('DELETE FROM jukebox_host_branding WHERE owner_id=?',[$owner])->rowCount()];
+        ?'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?'
+        :"SELECT name FROM sqlite_master WHERE type='table' AND name=?";
+    $purged=[];
+    foreach(['jukebox_host_branding','jukebox_host_cover'] as $table){
+        if(sf_jukebox_query($catalog,[$table])->fetchColumn())
+            $purged[$table]=sf_jukebox_query("DELETE FROM $table WHERE owner_id=?",[$owner])->rowCount();
+    }
+    return $purged;
 }
