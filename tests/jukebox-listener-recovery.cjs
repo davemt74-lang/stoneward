@@ -25,18 +25,37 @@ function emitter() {
 // The fake exposes native events, media position and deferred play promises;
 // assertions below exercise consent, freshness and audible-activity contracts.
 function setup() {
-  let now = 100, timerId = 0, src = '', muted = false;
-  const timers = new Map(), views = [], activity = [], attempts = [];
+  let now = 100, timerId = 0, src = '', muted = false, position = 0;
+  let bufferRanges = [[0, 120]];
+  const timers = new Map(), views = [], activity = [], attempts = [], seeks = [];
   const document = {...emitter(), hidden: false};
   const window = emitter();
   const audio = {
-    ...emitter(), currentTime: 0, duration: 120, readyState: 4, seeking: false,
+    ...emitter(), duration: 120, readyState: 4, seeking: false,
     paused: true, ended: false, volume: 1, playbackRate: 1, error: null,
     defaultMuted: false, deferred: false, playRejection: '', resetMutedOnPlay: false,
     loads: 0,
+    get currentTime() { return position; },
+    set currentTime(value) {
+      assert.ok(Number.isFinite(value), 'native seek position must be finite');
+      if (value !== position) seeks.push(value);
+      position = value;
+    },
+    get buffered() {
+      return {
+        length: bufferRanges.length,
+        start(index) { assert.ok(index < bufferRanges.length); return bufferRanges[index][0]; },
+        end(index) { assert.ok(index < bufferRanges.length); return bufferRanges[index][1]; }
+      };
+    },
+    setBuffers(ranges, readyState = this.readyState) {
+      bufferRanges = ranges.map(range => [...range]); this.readyState = readyState;
+    },
+    advancePosition(seconds) { position += seconds; },
     get src() { return src; },
     set src(value) {
-      src = value; this.currentTime = 0; this.paused = true;
+      src = value; position = 0; this.paused = true;
+      bufferRanges = [[0, this.duration]];
       this.readyState = 4; this.error = null;
     },
     get currentSrc() { return src; },
@@ -51,7 +70,7 @@ function setup() {
     },
     removeAttribute(name) { if (name === 'src') src = ''; },
     load() {
-      this.loads++; this.currentTime = 0; this.paused = true;
+      this.loads++; position = 0; this.paused = true;
       this.error = null; this.readyState = src ? 4 : 0;
     },
     pause() {
@@ -87,7 +106,7 @@ function setup() {
       const id = ++timerId; timers.set(id, {callback, due: now + delay}); return id;
     },
     clearTimeout(id) { timers.delete(id); },
-    HTMLMediaElement: {HAVE_METADATA: 1, HAVE_CURRENT_DATA: 2},
+    HTMLMediaElement: {HAVE_METADATA: 1, HAVE_CURRENT_DATA: 2, HAVE_FUTURE_DATA: 3, HAVE_ENOUGH_DATA: 4},
     Promise, Number, Math, Error
   });
   const listener = window.StonefellowJukeboxListener.create({
@@ -100,7 +119,7 @@ function setup() {
     transport: 'playing', seconds: 8, sampleAgeMs: 0
   };
   return {
-    listener, audio, window, document, activity, attempts, base,
+    listener, audio, window, document, activity, attempts, seeks, base,
     get now() { return now; },
     get view() { return views.at(-1); },
     update(extra = {}, started = now) {
@@ -272,12 +291,15 @@ test('network loss, host pause and host absence have distinct connection states'
 for (const readyState of [2, 4]) {
   test(`phone buffering clears on real native progress at readyState ${readyState}`, async () => {
     const h = setup(); await h.start(); h.audio.readyState = readyState;
+    h.audio.setBuffers([[0, h.audio.currentTime + .1]], readyState);
     h.audio.fire('waiting');
     assert.equal(h.view.connection, 'buffering');
     h.audio.fire('timeupdate');
     assert.equal(h.view.connection, 'buffering', 'queued unchanged-position event is not progress');
     h.update();
     assert.equal(h.view.connection, 'buffering', 'polling cannot clear native buffering');
+    h.audio.setBuffers([[0, h.audio.duration]], readyState);
+    h.audio.fire('progress'); await flush();
     h.advance(250); h.audio.currentTime += .25; h.audio.fire('timeupdate');
     assert.equal(h.view.connection, 'listening');
     h.update({seconds: h.audio.currentTime});
@@ -305,6 +327,210 @@ test('stale host playback cannot continue until fresh transport arrives', async 
   h.update({sampleAgeMs: 5100}); await flush();
   assert.equal(h.audio.paused, true);
   h.update({seconds: 20, sampleAgeMs: 0}); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.audio.currentTime, 20);
+});
+
+test('a healthy cached download stall does not interrupt or reseek native playback', async () => {
+  const h = setup(); await h.start();
+  const seeks = h.seeks.length, attempts = h.attempts.length, loads = h.audio.loads;
+  h.advance(1000); h.audio.advancePosition(1); h.audio.fire('timeupdate');
+  h.audio.setBuffers([[0, 20]]);
+  h.audio.fire('stalled'); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.view.connection, 'listening');
+  assert.equal(h.seeks.length, seeks);
+  assert.equal(h.attempts.length, attempts);
+  assert.equal(h.audio.loads, loads);
+});
+
+test('an underrun retains its source without chasing polls, then rejoins the latest buffered host target', async () => {
+  const h = setup(); await h.start();
+  const seeks = h.seeks.length, attempts = h.attempts.length, loads = h.audio.loads, src = h.audio.src;
+  h.audio.setBuffers([[0, 8.1]], 2); h.audio.fire('waiting');
+  assert.equal(h.audio.paused, true);
+  assert.equal(h.view.connection, 'buffering');
+  for (const seconds of [9, 10]) {
+    h.advance(1000); h.update({seconds}); h.audio.fire('progress'); await flush();
+    assert.equal(h.audio.paused, true);
+    assert.equal(h.view.connection, 'buffering');
+  }
+  assert.equal(h.seeks.length, seeks, 'polling must not move an unbuffered target repeatedly');
+  assert.equal(h.attempts.length, attempts);
+  assert.equal(h.audio.loads, loads);
+  assert.equal(h.audio.src, src);
+  h.audio.setBuffers([[0, 8.1], [11, 25]], 4); h.audio.fire('canplay'); await flush();
+  assert.equal(h.audio.paused, true, 'a later cached range cannot fill a hole around the host');
+  h.audio.setBuffers([[0, 18]], 2); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.audio.currentTime, 10);
+  assert.equal(h.view.connection, 'listening');
+  assert.equal(h.seeks.length, seeks + 1);
+  assert.equal(h.attempts.length, attempts + 1);
+  assert.equal(h.audio.loads, loads);
+});
+
+test('repeated underruns build more headroom without escalating on duplicate native events', async () => {
+  const h = setup(); await h.start();
+  h.audio.setBuffers([[0, 8.1]], 2); h.audio.fire('waiting');
+  h.audio.fire('waiting'); h.audio.fire('stalled');
+  h.audio.setBuffers([[0, 12]], 4); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, false, 'duplicate events from one stall are a single underrun');
+  h.audio.setBuffers([[0, 8.1]], 2); h.audio.fire('waiting');
+  h.audio.setBuffers([[0, 12]], 4); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, true, 'a second real underrun requires more cached headroom');
+  h.audio.setBuffers([[0, 16]], 4); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, false);
+});
+
+test('long warmup can reanchor once and resume only when the latest host target has a real reserve', async () => {
+  const h = setup(); await h.start();
+  const seeks = h.seeks.length, loads = h.audio.loads;
+  h.audio.setBuffers([[0, 8.1]], 2); h.audio.fire('waiting');
+  for (let second = 1; second <= 7; second++) {
+    h.advance(1000);
+    h.audio.setBuffers([[0, 8 + second + 1.2]], 2);
+    h.update({seconds: 8 + second}); h.audio.fire('progress'); await flush();
+    assert.equal(h.audio.paused, true, 'a short reserve must not release early');
+  }
+  h.advance(1000);
+  h.audio.setBuffers([[0, 8.1], [19, 30]], 2);
+  h.update({seconds: 16}); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, true, 'a long wait cannot make a missing target playable');
+  assert.equal(h.audio.currentTime, 16, 'one reposition lets a capped preloader request the live range');
+  assert.equal(h.seeks.length, seeks + 1);
+  h.advance(1000); h.update({seconds: 17}); h.audio.fire('progress'); h.audio.fire('canplay'); await flush();
+  assert.equal(h.audio.paused, true);
+  assert.equal(h.seeks.length, seeks + 1, 'continued thin-cache polls must not repeatedly restart the range');
+  h.audio.setBuffers([[16, 18.2]], 2); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.audio.currentTime, 17);
+  assert.equal(h.seeks.length, seeks + 2, 'one reposition and one buffered catchup are enough');
+  assert.equal(h.audio.loads, loads);
+});
+
+test('manual Resync during a buffer hold aligns once after fresh authorization and keeps mute', async () => {
+  const h = setup(); await h.start(); h.listener.toggleMute();
+  const seeks = h.seeks.length, attempts = h.attempts.length, loads = h.audio.loads, src = h.audio.src;
+  h.audio.setBuffers([[0, 8.1]], 2); h.audio.fire('waiting');
+  const oldRequest = h.now;
+  h.advance(100);
+  assert.equal(h.listener.resync(), true);
+  h.update({seconds: 15}, oldRequest); h.audio.fire('progress'); await flush();
+  assert.equal(h.view.resyncing, true);
+  assert.equal(h.audio.paused, true);
+  assert.equal(h.seeks.length, seeks);
+  assert.equal(h.attempts.length, attempts);
+  h.audio.deferred = true;
+  h.update({seconds: 16});
+  assert.equal(h.audio.currentTime, 16);
+  assert.equal(h.attempts.length, attempts + 1);
+  h.audio.setBuffers([[16, 22]], 4);
+  h.attempts.at(-1).resolve(); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.audio.muted, true);
+  assert.equal(h.audio.src, src);
+  assert.equal(h.audio.loads, loads);
+  assert.equal(h.seeks.length, seeks + 1);
+});
+
+test('ordinary drift correction does not seek outside cache or speed up a nearly empty phone', async () => {
+  const h = setup(); await h.start();
+  h.audio.setBuffers([[0, 8.3]], 2);
+  const seeks = h.seeks.length;
+  h.advance(1100); h.update({seconds: 12}); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.seeks.length, seeks);
+  assert.equal(h.audio.playbackRate, 1);
+  h.audio.setBuffers([[0, 25]], 4); h.update({seconds: 12}); await flush();
+  assert.equal(h.audio.currentTime, 12);
+  assert.equal(h.seeks.length, seeks + 1);
+  h.advance(1000); h.audio.advancePosition(1); h.update({seconds: 13}); await flush();
+  assert.equal(h.seeks.length, seeks + 1, 'aligned playback needs no further hard correction');
+});
+
+test('buffer refill cannot restart a phone after local Stop or a new access denial', async () => {
+  for (const revoke of [false, true]) {
+    const h = setup(); await h.start(); h.listener.toggleMute();
+    h.audio.setBuffers([[0, 8.1]], 2); h.audio.fire('waiting');
+    const attempts = h.attempts.length;
+    if (revoke) h.listener.update({allowed: false}); else h.listener.stop();
+    h.audio.setBuffers([[0, 120]], 4);
+    h.audio.fire('progress'); h.audio.fire('canplay'); h.audio.fire('timeupdate');
+    h.advance(100); h.update({seconds: 20}); await flush();
+    assert.equal(h.audio.paused, true);
+    assert.equal(h.audio.src, '');
+    assert.equal(h.view.listening, false);
+    assert.equal(h.audio.muted, true);
+    assert.equal(h.attempts.length, attempts);
+  }
+});
+
+test('host pause and skip remain authoritative while the phone is building a buffer', async () => {
+  const h = setup(); await h.start(); h.listener.toggleMute();
+  h.audio.setBuffers([[0, 8.1]], 2); h.audio.fire('waiting');
+  const attempts = h.attempts.length;
+  h.update({transport: 'paused'});
+  h.audio.setBuffers([[0, 120]], 4); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, true);
+  assert.equal(h.view.connection, 'paused');
+  assert.equal(h.attempts.length, attempts);
+  h.update({itemId: '2', generation: 2, seconds: 1}); await flush();
+  assert.equal(h.audio.src, '/audio?item=2');
+  assert.equal(h.audio.currentTime, 1);
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.audio.muted, true);
+  assert.equal(h.attempts.length, attempts + 1);
+});
+
+test('buffer warmup and its catchup seek never count as audible listening', async () => {
+  const h = setup(); await h.start();
+  const credited = () => h.activity.reduce((total, sample) => total + (sample.active ? sample.advancedMs : 0), 0);
+  h.advance(1000); h.audio.advancePosition(1); h.audio.fire('timeupdate');
+  h.update({seconds: 9});
+  assert.equal(credited(), 1000);
+  h.audio.setBuffers([[0, 9.1]], 2); h.audio.fire('waiting');
+  h.advance(2000); h.update({seconds: 11}); h.audio.fire('timeupdate');
+  assert.equal(credited(), 1000);
+  h.audio.setBuffers([[0, 20]], 4); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.currentTime, 11);
+  assert.equal(credited(), 1000, 'the catchup gap must not become listening credit');
+  h.advance(1000); h.audio.advancePosition(1); h.audio.fire('timeupdate');
+  assert.equal(credited(), 2000);
+});
+
+test('a short tail can resume with the remaining audio instead of waiting for impossible headroom', async () => {
+  const h = setup(); h.audio.duration = 20; h.base.seconds = 19; await h.start();
+  h.audio.setBuffers([[0, 19.1]], 2); h.audio.fire('waiting');
+  assert.equal(h.audio.paused, true);
+  h.audio.setBuffers([[0, 20]], 2); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.audio.currentTime, 19);
+  assert.equal(h.view.connection, 'listening');
+});
+
+test('rebuffer resumes inside the cached range even when the host is only slightly ahead', async () => {
+  const h = setup(); h.base.seconds = 20; await h.start();
+  const seeks = h.seeks.length;
+  h.audio.setBuffers([[0, 20]], 2); h.audio.fire('waiting');
+  h.update({seconds: 20.1});
+  h.audio.setBuffers([[20.1, 24]], 2); h.audio.fire('progress'); await flush();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.audio.currentTime, 20.1, 'restart must not remain just outside cached audio');
+  assert.equal(h.seeks.length, seeks + 1);
+});
+
+test('an isolated failed poll uses the original fresh lease without resetting its deadline', async () => {
+  const h = setup(); await h.start();
+  h.advance(2000); h.audio.advancePosition(2); h.listener.transientFailure();
+  assert.equal(h.audio.paused, false);
+  assert.equal(h.view.connection, 'reconnecting');
+  h.advance(2999); h.listener.transientFailure();
+  assert.equal(h.audio.paused, false);
+  h.advance(2); await flush();
+  assert.equal(h.audio.paused, true);
+  assert.equal(h.view.connection, 'reconnecting');
+  h.update({seconds: 20}); await flush();
   assert.equal(h.audio.paused, false);
   assert.equal(h.audio.currentTime, 20);
 });
