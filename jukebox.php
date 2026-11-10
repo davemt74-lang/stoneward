@@ -56,14 +56,14 @@ $renderSessionShare=static function(bool $host):void {
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=13">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=14">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-clock.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=5"></script>
-<script defer src="assets/js/jukebox.js?v=15"></script>
+<script defer src="assets/js/jukebox.js?v=16"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -102,6 +102,11 @@ $renderSessionShare=static function(bool $host):void {
   </div>
 </header>
 <main>
+<?php if($host&&$sessionId===''): ?>
+  <div id="host-cover-banner" class="jukebox-host-cover">
+    <img id="host-cover" alt="Hosted events cover image" decoding="async" hidden>
+  </div>
+<?php endif; ?>
   <div class="jukebox-page-head">
     <div class="jukebox-page-identity">
       <div id="host-logo-frame" class="jukebox-host-logo"<?=$host||$sessionId!==''?'':' hidden'?>>
@@ -116,6 +121,9 @@ $renderSessionShare=static function(bool $host):void {
     </div>
     <div class="jukebox-page-actions">
 <?php if($host): ?>
+<?php if($sessionId===''): ?>
+      <button id="open-cover" type="button" aria-haspopup="dialog" hidden>Add cover image</button>
+<?php endif; ?>
 <?php if($venueAdmin): ?>
       <button id="open-venue" type="button" aria-haspopup="dialog" hidden>Enable venue account</button>
 <?php endif; ?>
@@ -185,8 +193,8 @@ $renderSessionShare=static function(bool $host):void {
         <img id="branding-preview" alt="Host logo preview" width="160" height="160" hidden>
         <span id="branding-preview-fallback" class="jukebox-record" aria-hidden="true"></span>
       </div>
-      <label>Choose a logo or icon <input type="file" id="branding-file" name="image" accept="image/png,image/jpeg,image/webp" aria-describedby="branding-file-help" autofocus></label>
-      <small id="branding-file-help" class="jukebox-muted">PNG, JPEG, or WebP. Maximum 1 MB. Square artwork works well; your image will fit without cropping.</small>
+      <label><span id="branding-file-label">Choose a logo or icon</span> <input type="file" id="branding-file" name="image" accept="image/png,image/jpeg,image/webp" aria-describedby="branding-file-help" autofocus></label>
+      <small id="branding-file-help" class="jukebox-muted">PNG, JPEG, or WebP. Maximum 1 MB. Square artwork works well and fits without cropping.</small>
       <p id="branding-status" class="jukebox-form-status" role="status" tabindex="-1"></p>
       <button type="button" id="branding-reload" hidden>Load latest logo</button>
       <div class="jukebox-dialog-actions">
@@ -204,6 +212,8 @@ $renderSessionShare=static function(bool $host):void {
       <label id="listing" class="jukebox-checkbox"<?=$venueAdmin?'':' hidden'?>><input type="checkbox" name="listed"> Public universal session</label>
       <label class="jukebox-checkbox"><input type="checkbox" name="remote_listening" aria-describedby="create-remote-help"> Allow remote listening</label>
       <small id="create-remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
+      <label class="jukebox-checkbox"><input type="checkbox" name="auto_approve_phones" aria-describedby="create-auto-approve-help"> Auto-approve phone connections</label>
+      <small id="create-auto-approve-help" class="remote-help">New phones can join without waiting for host approval.</small>
       <label>Scheduled date and time (optional) <input type="datetime-local" name="scheduled_at" aria-describedby="create-schedule-help"></label>
       <small id="create-schedule-help" class="remote-help">Use your local time<span data-schedule-zone></span>. Leave blank to open the session now.</small>
       <p id="create-status" class="jukebox-form-status" role="status"></p>
@@ -221,6 +231,8 @@ $renderSessionShare=static function(bool $host):void {
         <label id="edit-listing" class="jukebox-checkbox"<?=$venueAdmin?'':' hidden'?>><input type="checkbox" name="listed"> Public universal session</label>
         <label class="jukebox-checkbox"><input type="checkbox" name="remote_listening" aria-describedby="edit-remote-help"> Allow remote listening</label>
         <small id="edit-remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
+        <label class="jukebox-checkbox"><input type="checkbox" name="auto_approve_phones" aria-describedby="edit-auto-approve-help"> Auto-approve phone connections</label>
+        <small id="edit-auto-approve-help" class="remote-help">New phones can join without waiting for host approval.</small>
         <label id="edit-schedule">Scheduled date and time <input type="datetime-local" name="scheduled_at" aria-describedby="edit-schedule-help"></label>
         <small id="edit-schedule-help" class="remote-help">Use your local time<span data-schedule-zone></span>.</small>
       </div>
@@ -357,6 +369,11 @@ $renderSessionShare=static function(bool $host):void {
     <section id="host-phones" class="jukebox-panel jukebox-host-phones" aria-labelledby="phones-heading">
       <h2 id="phones-heading">Phone connections</h2>
       <p id="remote-listener-count" role="status" hidden></p>
+      <p id="phone-approval-mode" class="jukebox-muted"></p>
+      <div class="actions jukebox-session-management-actions">
+        <button type="button" id="disconnect-all-phones" disabled>Disconnect all</button>
+        <p id="phone-disconnect-status" class="jukebox-form-status" role="status"></p>
+      </div>
       <ul id="phones"></ul>
       <p class="jukebox-empty jukebox-phones-empty">No phones have requested access yet.</p>
     </section>

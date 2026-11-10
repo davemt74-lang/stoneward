@@ -8,9 +8,10 @@ require_once __DIR__.'/jukebox-follow-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $action=$_GET['action']??'state';
 $audioRequest=$action==='audio';
-$logoRequest=$action==='host_logo';
-if(!in_array($method,$audioRequest||$logoRequest?['GET','HEAD']:['GET','POST'],true)){
-    header('Allow: '.($audioRequest||$logoRequest?'GET, HEAD':'GET, POST'));
+$coverRequest=$action==='host_cover';
+$artworkRequest=$action==='host_logo'||$coverRequest;
+if(!in_array($method,$audioRequest||$artworkRequest?['GET','HEAD']:['GET','POST'],true)){
+    header('Allow: '.($audioRequest||$artworkRequest?'GET, HEAD':'GET, POST'));
     sf_json_response(['ok'=>false,'message'=>'Method unavailable.'],405);
 }
 if($audioRequest){
@@ -25,7 +26,7 @@ $guestState=!$post&&!$hostMode&&$action==='state';
 $guestDirectory=!$post&&!$hostMode&&$action==='directory';
 if($post&&(int)($_SERVER['CONTENT_LENGTH']??0)>(in_array($action,['listener','follow'],true)?2048:1_450_000))
     sf_json_response(['ok'=>false,'message'=>'Request is too large.'],413);
-if($post&&$action==='branding'){
+if($post&&in_array($action,['branding','cover'],true)){
     // Bound the raw upload even when a chunked request omits Content-Length.
     $raw=file_get_contents('php://input',false,null,0,1_450_001);
     if($raw===false||strlen($raw)>1_450_000)sf_json_response(['ok'=>false,'message'=>'Request is too large.'],413);
@@ -62,8 +63,10 @@ try{
         sf_json_response(['ok'=>true,'accounts'=>$accounts]);
     }
     sf_jukebox_schema();
-    if($logoRequest){
-        $source=sf_jukebox_branding_source($_GET['owner']??null,$_GET['v']??null);
+    if($artworkRequest){
+        if($coverRequest&&!$hostMode)throw new OutOfBoundsException('Hosted events cover not found.');
+        $owner=$coverRequest?(string)$uid:($_GET['owner']??null);
+        $source=sf_jukebox_branding_source($owner,$_GET['v']??null,$coverRequest);
         header('Content-Type: '.$source['mime']);
         header('Content-Length: '.strlen($source['bytes']));
         header('Cache-Control: no-store');
@@ -73,12 +76,13 @@ try{
         if($method==='GET')echo $source['bytes'];
         exit;
     }
-    if($action==='branding'){
+    if(in_array($action,['branding','cover'],true)){
         if(!$hostMode)throw new DomainException('Host access is required.');
         $editable=sf_jukebox_branding_can_edit($uid,$admin);
         if($post&&!$editable)throw new DomainException('A host account is required.');
-        $branding=$post?sf_jukebox_branding_update($uid,$body,$admin):sf_jukebox_branding_get($uid);
-        sf_json_response(['ok'=>true,'branding'=>$branding,'branding_editable'=>$editable]);
+        $artwork=$post?sf_jukebox_branding_update($uid,$body,$admin,$action==='cover')
+            :($action==='cover'?sf_jukebox_cover_get($uid):sf_jukebox_branding_get($uid));
+        sf_json_response(['ok'=>true,$action=>$artwork,'branding_editable'=>$editable]);
     }
     if($followRequest||(($guestState||$guestDirectory)&&$uid>0)||$alertControl||$settingsWrite)sf_jukebox_follow_schema();
     if(!$post&&$action==='directory'){
@@ -90,8 +94,10 @@ try{
             throw new InvalidArgumentException('Session management requires the host directory.');
         $page=$scope!==null?sf_jukebox_directory_page($uid,$scope,$_GET['cursor']??null,$_GET['limit']??'25'):null;
         $sessions=$hostMode
-            ?($page['sessions']??sf_jukebox_query("SELECT $directoryFields,s.listed,COALESCE(r.enabled,0) AS remote_enabled
+            ?($page['sessions']??sf_jukebox_query("SELECT $directoryFields,s.listed,COALESCE(r.enabled,0) AS remote_enabled,
+                a.session_id IS NOT NULL AS auto_approve_phones
                 FROM jukebox_sessions s $scheduleJoin LEFT JOIN jukebox_remote r ON r.session_id=s.id
+                LEFT JOIN jukebox_auto_approval a ON a.session_id=s.id
                 WHERE s.owner_id=? ORDER BY s.created DESC,s.id DESC LIMIT 50",[$uid])->fetchAll())
             :[];
         if(!$hostMode){
@@ -123,7 +129,7 @@ try{
         $venue=$hostMode?sf_jukebox_query('SELECT name FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn():false;
         sf_json_response(['ok'=>true,'sessions'=>array_map($directoryRow,$sessions),'venue'=>$venue?:null,'admin'=>$admin]
             +($hostMode?['branding'=>$branding[$uid]??sf_jukebox_branding_metadata(null),
-                'branding_editable'=>sf_jukebox_branding_can_edit($uid,$admin)]:[])
+                'cover'=>sf_jukebox_cover_get($uid),'branding_editable'=>sf_jukebox_branding_can_edit($uid,$admin)]:[])
             +($page!==null?['scope'=>$scope,'next_cursor'=>$page['next_cursor']]:[])
             +($guestDirectory?['following_sessions'=>array_map($directoryRow,$followingSessions)]:[]));
     }
@@ -150,6 +156,8 @@ try{
         if($title==='')throw new InvalidArgumentException('Enter a session name.');
         $remote=array_key_exists('remote_listening',$body)?$body['remote_listening']:false;
         if(!is_bool($remote))throw new InvalidArgumentException('Choose whether remote listening is enabled.');
+        $autoApprove=array_key_exists('auto_approve_phones',$body)?$body['auto_approve_phones']:false;
+        if(!is_bool($autoApprove))throw new InvalidArgumentException('Choose whether phone connections are approved automatically.');
         $scheduledAt=($body['scheduled_at']??null)===null?null:sf_jukebox_schedule_time($body['scheduled_at']);
         $id=bin2hex(random_bytes(16));
         $db->beginTransaction();
@@ -157,6 +165,7 @@ try{
             [$id,$uid,$venue?$uid:0,$title,(int)$listed,time()]);
         if($scheduledAt!==null)sf_jukebox_schedule_create($id,$scheduledAt);
         if($remote)sf_jukebox_controls(sf_jukebox_session($id),['event'=>'remote_listening','enabled'=>true]);
+        if($autoApprove)sf_jukebox_set_auto_approval($id,true);
         $db->commit();
         sf_json_response(['ok'=>true,'id'=>$id],201);
     }
@@ -267,6 +276,11 @@ try{
                 if(!$host)throw new DomainException('Host access is required.');
                 if($action==='approve')sf_jukebox_query("UPDATE jukebox_phones SET status='approved',approved=? WHERE id=? AND session_id=? AND status='pending'",[time(),$thread,$id]);
                 else sf_jukebox_query("UPDATE jukebox_phones SET status='revoked' WHERE id=? AND session_id=?",[$thread,$id]);
+                break;
+            case 'disconnect_all':
+                if(!$host)throw new DomainException('Host access is required.');
+                $payload['disconnected']=sf_jukebox_query("UPDATE jukebox_phones SET status='revoked'
+                    WHERE session_id=? AND status IN ('approved','pending')",[$id])->rowCount();
                 break;
             case 'request':
                 if(!$host&&!$approved)throw new DomainException('Host approval is required.');

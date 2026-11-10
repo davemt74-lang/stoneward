@@ -1154,8 +1154,8 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
             target.mkdir(parents=True, exist_ok=True)
             page.screenshot(path=str(target / (label + '.png')))
 
-    def upload(page, encoded, width):
-        opener = page.locator('#open-branding')
+    def upload(page, encoded, width, kind='branding'):
+        opener = page.locator('#open-' + kind)
         expect(opener).to_be_visible()
         press(page, opener)
         dialog = page.locator('#branding-dialog')
@@ -1163,7 +1163,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
         assert dialog.evaluate('dialog => dialog.matches(":modal")')
         expect(dialog.locator('#branding-file')).to_be_enabled()
         dialog.locator('#branding-file').set_input_files({
-            'name': 'host-logo.png', 'mimeType': 'image/png', 'buffer': base64.b64decode(encoded)})
+            'name': kind + '.png', 'mimeType': 'image/png', 'buffer': base64.b64decode(encoded)})
         expect(dialog.locator('#branding-preview')).to_be_visible()
         page.wait_for_function("""width => {
           const img = document.querySelector('#branding-preview');
@@ -1199,6 +1199,34 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     assert_logo(host, 1)
     assert host.locator('#host-logo').get_attribute('src') == directory_logo
     expect(other.locator('#host-logo')).to_be_hidden()
+
+    banner = host.locator('#host-cover-banner')
+    cover = banner.locator('#host-cover')
+    expect(banner).to_be_hidden()
+    cover_opener, dialog = upload(host, SPLASH_ART, 8, kind='cover')
+    expect(dialog.get_by_role('heading', name='Cover image', exact=True)).to_be_visible()
+    dialog.get_by_role('button', name='Save cover image', exact=True).click()
+    expect(dialog).to_be_hidden()
+    expect(cover_opener).to_be_focused()
+    expect(cover).to_be_visible()
+    cover_src = cover.get_attribute('src')
+    assert cover_src != directory_logo
+    host.reload()
+    host.wait_for_function("document.querySelector('#host-cover')?.naturalWidth === 8")
+    expect(cover).to_have_attribute('src', cover_src)
+    expect(host.locator('#host-logo')).to_have_attribute('src', directory_logo)
+    expect(other.locator('#host-cover-banner')).to_be_hidden()
+    capture(host, 'cover-saved-host-1440')
+    host.set_viewport_size({'width': 320, 'height': 740})
+    expect(cover).to_be_visible()
+    assert host.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+    capture(host, 'cover-saved-host-320')
+    cover_opener.click()
+    dialog.get_by_role('button', name='Remove cover image', exact=True).click()
+    expect(dialog).to_be_hidden()
+    expect(banner).to_be_hidden()
+    expect(host.locator('#host-logo')).to_have_attribute('src', directory_logo)
+    host.set_viewport_size({'width': 1440, 'height': 960})
 
     other_session = request(other, 'create', {'title': 'Another host session'}, True)['id']
     observer = host_context.new_page()
@@ -1342,7 +1370,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     host_context.close()
     phone_context.close()
     other_context.close()
-    print('PASS host logo upload/preview/save/reload/replace/remove, stale edits, uninterrupted players and responsive right-aligned catalog actions')
+    print('PASS owner cover and host logo upload/preview/save/reload/remove, stale logo edits, uninterrupted players and responsive right-aligned catalog actions')
 
 def inline_splash_editor(browser, base):
     context = browser.new_context()
@@ -1467,11 +1495,14 @@ def schedule_scenario(browser, base, phone_options):
     def utc_iso(date):
         return date.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
-    def create_session(title, listed=False, date=start_at):
+    def create_session(title, listed=False, date=start_at, auto_approve=False):
         host.locator('#open-create').click()
         create.locator('input[name=title]').fill(title)
         create.locator('input[name=listed]').set_checked(listed)
         create.get_by_label('Allow remote listening').check()
+        approval = create.locator('input[name=auto_approve_phones]')
+        expect(approval).not_to_be_checked()
+        approval.set_checked(auto_approve)
         local_input(create, date)
         create.get_by_role('button', name='Create session').click()
         expect(host.get_by_role('heading', name=title, exact=True)).to_be_visible()
@@ -1482,7 +1513,8 @@ def schedule_scenario(browser, base, phone_options):
     title = 'Scheduled browser session'
     private_title = 'Scheduled private cancellation'
     private_at = start_at + timedelta(hours=2)
-    private_join = create_session(private_title, date=private_at)
+    private_join = create_session(private_title, date=private_at, auto_approve=True)
+    assert request(host, 'settings', host=True)['settings']['auto_approve_phones'] is True
     host.goto(base + '/jukebox.php?host=1')
     join = create_session(title, listed=True)
     waiting_qr = qr_modules(host)
@@ -1578,6 +1610,24 @@ def schedule_scenario(browser, base, phone_options):
     phone.locator('#join input[name=name]').fill('Scheduled guest')
     phone.get_by_role('button', name='Request access').click()
     session_tab(host, 'phones')
+    expect(host.locator('#phone-approval-mode')).to_have_text('New phones need host approval.')
+    pending = host.locator('#phones li').filter(has_text='Scheduled guest')
+    expect(pending.get_by_role('button', name='Approve')).to_be_visible()
+    session_tab(host, 'settings')
+    host.locator('#edit-session').click()
+    edit = host.locator('#edit-dialog')
+    edit.locator('[name=auto_approve_phones]').check()
+    edit.get_by_role('button', name='Save changes', exact=True).click()
+    expect(edit).to_be_hidden()
+    session_tab(host, 'phones')
+    expect(host.locator('#phone-approval-mode')).to_have_text('New phones are approved automatically.')
+    expect(pending.get_by_role('button', name='Approve')).to_be_visible()
+    new_phone = browser.new_context(**phone_options).new_page()
+    new_phone.goto(join)
+    new_phone.locator('#join input[name=name]').fill('Automatically approved guest')
+    new_phone.locator('#join').get_by_role('button').click()
+    auto_row = host.locator('#phones li').filter(has_text='Automatically approved guest')
+    expect(auto_row.get_by_role('button', name='Revoke')).to_be_visible()
     host.locator('#phones li').filter(has_text='Scheduled guest').get_by_role('button', name='Approve').click()
     session_tab(phone, 'music')
     phone.locator('#catalog li').filter(has_text='First Song').get_by_role('button', name='Play', exact=True).click()
@@ -1593,6 +1643,20 @@ def schedule_scenario(browser, base, phone_options):
     assert_playheads_synced(host, phone)
     phone.locator('#catalog li').filter(has_text='Second Song').get_by_role('button', name='Add to Queue').click()
     expect(host.locator('#queue-label')).to_have_text('Up Next (1)')
+    session_tab(host, 'phones')
+    disconnect = host.locator('#disconnect-all-phones')
+    expect(disconnect).to_be_enabled()
+    host.once('dialog', lambda dialog: dialog.dismiss())
+    disconnect.click()
+    expect(auto_row.get_by_role('button', name='Revoke')).to_be_visible()
+    host.once('dialog', lambda dialog: dialog.accept())
+    disconnect.click()
+    expect(host.locator('#phone-disconnect-status')).to_have_text('Disconnected 2 phones.')
+    expect(disconnect).to_be_disabled()
+    phone.wait_for_function("document.querySelector('#listener-audio').paused")
+    expect(phone.locator('#listen')).to_be_hidden()
+    assert len(request(host, 'state', host=True)['state']['queue']) == 1
+    new_phone.context.close()
     session_tab(host, 'settings')
     host.once('dialog', lambda dialog: dialog.accept())
     host.get_by_role('button', name='End session').click()
@@ -1632,7 +1696,7 @@ def schedule_scenario(browser, base, phone_options):
     expect(phone).to_have_url(private_join)
     expect(phone.locator('#pairing')).to_be_hidden()
     expect(phone.locator('#guest-share')).to_be_hidden()
-    print('PASS waiting-to-live guest QR, responsive Overview, shared splash, private following, playback, and recap')
+    print('PASS waiting-to-live guest QR, responsive Overview, shared splash, private following, phone approval/disconnect controls, playback and recap')
 
 
 def management_scenario(browser, base, phone_options, site):
@@ -1978,8 +2042,62 @@ def http_scenario(base, site):
     http_listener_scenario(Client, venue, outsider, site)
     http_schedule_scenario(Client, admin, venue, outsider, site)
     http_management_scenario(Client, admin, venue, outsider, site)
+    http_phone_controls_scenario(Client, venue, outsider)
     http_branding_scenario(Client, admin, venue, outsider, site, base)
 
+
+
+def http_phone_controls_scenario(Client, host, outsider):
+    assert host.call('create', data={'title': 'Invalid approval setting', 'auto_approve_phones': 1})['status'] == 400
+    session = host.call('create', data={'title': 'Phone controls', 'remote_listening': True})['id']
+    sibling = host.call('create', data={'title': 'Other event', 'auto_approve_phones': True})['id']
+    settings = host.call('settings', session)['settings']
+    assert settings['auto_approve_phones'] is False
+    pending, previously_revoked, approved = Client(), Client(), Client()
+    assert pending.call('join', session, {'name': 'Already pending'})['status'] == 'pending'
+    assert previously_revoked.call('join', session, {})['status'] == 'pending'
+    revoked_id = previously_revoked.call('state', session)['state']['phone']['id']
+    assert host.call('revoke', session, {'phone': revoked_id})['ok']
+    assert host.call('settings', session, {'expected': settings, 'auto_approve_phones': 'true'})['status'] == 400
+    saved = host.call('settings', session, {'expected': settings, 'auto_approve_phones': True})
+    assert saved['settings']['auto_approve_phones'] is True
+    assert pending.call('join', session, {})['status'] == 'pending'
+    assert previously_revoked.call('join', session, {})['status'] == 'revoked'
+    assert approved.call('join', session, {'name': 'Auto-approved'})['status'] == 'approved'
+    assert approved.call('join', sibling, {})['status'] == 'approved'
+    for track, nonce in (('a', '6'*32), ('b', '7'*32)):
+        assert approved.call('request', session, {'track': track, 'nonce': nonce})['ok']
+    player = '6'*64
+    assert host.call('player', session, {'player': player, 'event': 'claim'})['ok']
+    before = host.call('state', session)['state']
+    item = before['current']['id']
+    assert host.call('player', session, player_sample(player, 'playing', item, 1, 1000,
+                                                      observed_revision=before['revision']))['ok']
+    with approved.response('audio', session, item=item, method='HEAD') as audio:
+        assert audio.status == 200
+
+    assert pending.call('disconnect_all', session, {})['status'] in (403, 409)
+    assert outsider.call('disconnect_all', session, {})['status'] == 404
+    removed = host.call('disconnect_all', session, {})
+    assert removed['ok'] and removed['disconnected'] == 2, removed
+    assert host.call('disconnect_all', session, {})['disconnected'] == 0
+    for phone in (approved, pending, previously_revoked):
+        assert phone.call('join', session, {})['status'] == 'revoked'
+        assert phone.call('state', session)['state']['phone']['status'] == 'revoked'
+    with approved.response('audio', session, item=item, method='HEAD') as audio:
+        assert audio.status == 404
+    assert approved.call('request', session, {'track': 'b', 'nonce': '8'*32})['status'] == 409
+    assert approved.call('state', sibling)['state']['phone']['status'] == 'approved'
+    after = host.call('state', session)['state']
+    assert after['current']['id'] == item and after['queue'] == before['queue']
+    assert after['transport']['status'] == 'playing'
+    assert after['auto_approve_phones'] is True
+    assert Client().call('join', session, {})['status'] == 'approved'
+    assert host.call('settings', session, {'expected': saved['settings'], 'auto_approve_phones': False})['ok']
+    assert Client().call('join', session, {})['status'] == 'pending'
+    assert host.call('control', session, {'event': 'end'})['ok']
+    assert host.call('disconnect_all', session, {})['status'] == 409
+    print('PASS HTTP per-event phone approval, owner-only bulk disconnection, revoked cookies and uninterrupted queues/transport')
 
 
 def http_branding_scenario(Client, admin, venue, outsider, site, base):
@@ -2075,6 +2193,8 @@ def http_branding_scenario(Client, admin, venue, outsider, site, base):
     assert venue.call('state', other)['state']['branding'] == venue_before
     assert venue.call('branding')['branding'] == venue_before
 
+    http_cover_scenario(admin, venue, guest, live, branding, data_url)
+
     # The logo is intentionally public; fetching it needs no signed-in cookies.
     logo = urllib.parse.urljoin(base + '/', branding['logo_url'])
     with urllib.request.urlopen(logo) as image:
@@ -2123,6 +2243,8 @@ def http_branding_scenario(Client, admin, venue, outsider, site, base):
     closing = Client(5)
     closing_session = closing.call('create', data={'title': 'Closing logo session'})['id']
     closing_logo = closing.call('branding', data={'expected_revision': 0, 'image': data_url(original)})['branding']
+    closing_cover = closing.call('cover', data={'expected_revision': 0, 'image': data_url(original)})['cover']
+    cover_hash = urllib.parse.parse_qs(urllib.parse.urlsplit(closing_cover['cover_url']).query)['v'][0]
     closing_url = urllib.parse.urljoin(base + '/', closing_logo['logo_url'])
     with sqlite3.connect(site / 'config/fixture.sqlite') as db:
         db.execute("UPDATE users SET status='closed' WHERE id=5")
@@ -2133,12 +2255,71 @@ def http_branding_scenario(Client, admin, venue, outsider, site, base):
         assert False, 'Closed host logo remained publicly available'
     except urllib.error.HTTPError as error:
         assert error.code == 404
+    with closing.response('host_cover', v=cover_hash) as image:
+        assert image.status in (401, 404)
     subprocess.run([PHP, '-r', "define('SF_ROOT',getcwd());require 'api/bootstrap.php';require_once 'api/jukebox-core.php';echo json_encode(sf_jukebox_branding_clear_user(5));"],
                    cwd=site, check=True, stdout=subprocess.PIPE)
     with sqlite3.connect(site / 'config/fixture.sqlite') as db:
         assert db.execute('SELECT COUNT(*) FROM jukebox_host_branding WHERE owner_id=5').fetchone()[0] == 0
         assert db.execute('SELECT COUNT(*) FROM jukebox_host_branding WHERE owner_id=2').fetchone()[0] == 1
+        assert db.execute('SELECT COUNT(*) FROM jukebox_host_cover WHERE owner_id=5').fetchone()[0] == 0
+        assert db.execute('SELECT COUNT(*) FROM jukebox_host_cover WHERE owner_id=1').fetchone()[0] == 1
     print('PASS HTTP host logo authorization, CSRF, image validation, revisions, public byte serving, owner isolation and preserved session playback/chat')
+
+
+def http_cover_scenario(owner, other, guest, session, logo, data_url):
+    empty = {'cover_url': None, 'revision': 0}
+    assert owner.call('cover')['cover'] == other.call('cover')['cover'] == empty
+    original = base64.b64decode(SPLASH_ART)
+    upload = {'expected_revision': 0, 'image': data_url(original)}
+    assert guest.call('cover')['status'] in (403, 409)
+    assert guest.call('cover', data=upload)['status'] in (403, 409)
+    with owner.response('cover', data=upload, headers={'X-CSRF-Token': 'incorrect'}) as denied:
+        assert denied.status == 403
+    assert owner.call('cover', data=upload | {'owner': 2})['status'] == 400
+    assert owner.call('cover', data=upload | {'image': data_url(original, 'image/jpeg')})['status'] == 400
+    assert owner.call('cover')['cover'] == empty
+
+    saved = owner.call('cover', data=upload)['cover']
+    version = hashlib.sha256(original).hexdigest()
+    assert saved == {'cover_url': 'api/jukebox.php?action=host_cover&host=1&v=' + version, 'revision': 1}
+    assert owner.call('cover')['cover'] == saved
+    for params in ({}, {'scope': 'active'}, {'scope': 'archive'}):
+        directory = owner.call('directory', **params)
+        assert directory['cover'] == saved and directory['branding'] == logo
+        assert all('cover' not in row for row in directory['sessions'])
+    assert other.call('directory')['cover'] == empty
+    assert 'cover' not in guest.call('directory')
+    assert 'cover' not in owner.call('state', session)['state']
+    assert 'cover' not in guest.call('state', session)['state']
+
+    with owner.response('host_cover', v=version) as image:
+        assert image.status == 200 and image.headers.get_content_type() == 'image/png'
+        assert image.headers.get('X-Content-Type-Options') == 'nosniff'
+        assert 'no-store' in image.headers.get('Cache-Control', '')
+        assert image.read() == original
+    with owner.response('host_cover', v=version, method='HEAD') as image:
+        assert image.status == 200 and image.read() == b''
+        assert int(image.headers.get('Content-Length', '0')) == len(original)
+    with guest.response('host_cover', v=version) as image:
+        assert image.status == 404
+    guest.host = True
+    with guest.response('host_cover', v=version) as image:
+        assert image.status == 401
+    guest.host = False
+    with other.response('host_cover', v=version, owner=1) as image:
+        assert image.status == 404
+
+    replacement = {'expected_revision': 1, 'image': 'data:image/png;base64,' + PNG}
+    assert owner.call('cover', data=replacement | {'expected_revision': 0})['status'] == 409
+    replaced = owner.call('cover', data=replacement)['cover']
+    assert replaced['revision'] == 2 and replaced['cover_url'] != saved['cover_url']
+    with owner.response('host_cover', v=version) as image:
+        assert image.status == 404
+    removed = owner.call('cover', data={'expected_revision': 2, 'image': None})['cover']
+    assert removed == {'cover_url': None, 'revision': 3}
+    assert owner.call('branding')['branding'] == logo
+    print('PASS HTTP owner-only hosted events cover, validated private image bytes, independent logo and optimistic replacement/removal')
 
 def http_remote_scenario(Client, admin, venue, site):
     public = admin.call('create', data={'title': 'Remote public', 'listed': True, 'remote_listening': True})['id']
@@ -2444,7 +2625,7 @@ def http_management_scenario(Client, admin, venue, outsider, site):
     before = venue.call('state', session)['state']
     expected = venue.call('settings', session)['settings']
     assert expected == dict(title='Management source', listed=False, remote_listening=True,
-                            scheduled_at=None, phase='live')
+                            auto_approve_phones=False, scheduled_at=None, phase='live')
     for unauthorized in (guest, outsider):
         assert unauthorized.call('settings', session)['status'] in (403, 404, 409)
         assert unauthorized.call('settings', session, {'expected': expected, 'title': 'Intrusion'})['status'] in (403, 404, 409)
