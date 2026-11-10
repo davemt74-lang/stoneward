@@ -664,6 +664,239 @@ def remote_scenario(browser, base, phone_options):
     print('PASS anonymous phone listening, mid-song join, venue pause and skip, outage recovery, and local stop')
 
 
+def recovery_scenario(browser, base, phone_options, site):
+    # Fault injection must reach fetch: a controlling worker can otherwise
+    # bypass page.route(). PWA/worker acceptance stays enabled in its own cases.
+    host_context = browser.new_context(service_workers='block')
+    phone_context = browser.new_context(service_workers='block', **phone_options)
+    host = host_context.new_page()
+    phone = phone_context.new_page()
+    host.goto(base + '/login-fixture.php?user=1')
+    host.goto(base + '/jukebox.php?host=1')
+    session = request(host, 'create', {'title': 'Connection recovery test', 'listed': True,
+                                     'remote_listening': True}, True)['id']
+    host.goto(base + '/jukebox.php?host=1&id=' + session)
+    for index in range(6):
+        assert request(host, 'request', {'track': 'a' if index % 2 == 0 else 'b',
+                                      'nonce': f'{index + 100:032x}'}, True)['ok']
+    host.locator('#enable').click()
+    session_tab(host, 'history')
+    host.locator('#history li, #audio-start:visible').first.wait_for()
+    if host.locator('#audio-start').is_visible():
+        host.locator('#audio-start').click()
+    host.wait_for_function("!document.querySelector('#audio').paused")
+    phone.goto(base + '/jukebox.php?id=' + session)
+    assert request(phone, 'join', {'name': 'Recovery phone'})['ok']
+    phone_id = request(phone, 'state')['state']['phone']['id']
+    assert request(host, 'approve', {'phone': phone_id}, True)['ok']
+    assert request(phone, 'message', {'text': 'Keep the recovery conversation'})['ok']
+
+    audio = phone.locator('#listener-audio')
+    connection = phone.locator('#listener-connection')
+    resync = phone.locator('#listener-resync')
+    listen = phone.locator('#listen')
+
+    def press(control):
+        (control.tap if phone_options.get('has_touch') else control.click)()
+
+    def media_empty(page, selector):
+        page.wait_for_function("""selector => {
+          const audio = document.querySelector(selector);
+          return audio.paused && !audio.hasAttribute('src') && audio.networkState === 0;
+        }""", arg=selector)
+
+    def wait_native():
+        # The real host supplies production progress reports throughout waits.
+        # Require advancing native phone audio, not just a resolved play promise.
+        deadline, previous = time.monotonic() + 15, None
+        read = """audio => ({position:audio.currentTime, paused:audio.paused,
+          seeking:audio.seeking, item:audio.currentSrc && new URL(audio.currentSrc).searchParams.get('item')})"""
+        while time.monotonic() < deadline:
+            main = host.locator('#audio').evaluate(read)
+            remote = audio.evaluate(read)
+            advancing = previous is not None and remote['position'] > previous + .02
+            if (main['item'] and main['item'] == remote['item'] and advancing
+                    and not any(value['paused'] or value['seeking'] for value in (main, remote))
+                    and abs(main['position'] - remote['position']) <= .9):
+                expect(connection).to_have_attribute('data-connection', 'listening')
+                return
+            previous = remote['position']
+            phone.wait_for_timeout(200)
+        assert False, f'Recovery did not restore advancing synchronized audio: {main}, {remote}'
+
+    def restore_lifecycle():
+        phone.evaluate("""() => {
+          document.dispatchEvent(new Event('visibilitychange'));
+          const restored = new Event('pageshow');
+          Object.defineProperty(restored, 'persisted', {value:true});
+          dispatchEvent(restored);
+        }""")
+
+    def action_route(action, exclude_probe=False):
+        def matches(url):
+            parsed = urllib.parse.urlsplit(url)
+            query = urllib.parse.parse_qs(parsed.query)
+            return (parsed.path.endswith('/api/jukebox.php') and query.get('action') == [action]
+                    and (not exclude_probe or query.get('recovery_probe') != ['1']))
+        return matches
+
+    expect(listen).to_be_visible()
+    assert audio.evaluate('audio => audio.paused && !audio.hasAttribute("src")')
+    press(listen)
+    wait_native()
+    # Keep this short so normal track completion cannot be confused with a
+    # Resync mutation. Long waits still have six real queued tracks available.
+    if host.locator('#audio').evaluate('audio => audio.currentTime') > TRACK_SECONDS - 25:
+        assert request(host, 'control', {'event': 'skip'}, True)['ok']
+        wait_native()
+    before = request(host, 'state', host=True)['state']
+    press(phone.locator('#listener-mute'))
+    expect(phone.locator('#listener-mute')).to_have_attribute('aria-pressed', 'true')
+    assert audio.evaluate('audio => audio.muted')
+    audio.evaluate('audio => { audio.currentTime = Math.max(0, audio.currentTime - 3); }')
+    press(resync)
+    wait_native()
+    assert audio.evaluate('audio => audio.muted')
+    expect(phone.locator('#listener-mute')).to_have_attribute('aria-pressed', 'true')
+    after = request(host, 'state', host=True)['state']
+    for field in ('current', 'queue', 'phones', 'history'):
+        assert after[field] == before[field], field
+    assert request(host, 'thread', host=True, phone=phone_id, full=1)['messages'][0]['body'] == 'Keep the recovery conversation'
+    press(phone.locator('#listener-mute'))
+    expect(phone.locator('#listener-mute')).to_have_attribute('aria-pressed', 'false')
+    assert audio.evaluate('audio => !audio.muted')
+
+    assert request(host, 'control', {'event': 'pause'}, True)['ok']
+    expect(connection).to_have_attribute('data-connection', 'paused', timeout=10_000)
+    assert audio.evaluate('audio => audio.paused')
+    assert request(host, 'control', {'event': 'resume'}, True)['ok']
+    wait_native()
+
+    # Disconnect the host from its state/report endpoints, then make its last
+    # heartbeat absent. The phone remains site-connected but waits for the host.
+    host_lost = []
+    host_state, host_player = action_route('state'), action_route('player')
+    def abort_host(route):
+        host_lost.append(route.request.url)
+        route.abort()
+    host.route(host_state, abort_host)
+    host.route(host_player, abort_host)
+    deadline = time.monotonic() + 8
+    while not host_lost and time.monotonic() < deadline:
+        host.wait_for_timeout(50)
+    assert host_lost, 'Host outage did not intercept a state or player request'
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('UPDATE jukebox_sessions SET heartbeat=0 WHERE id=?', (session,))
+    expect(connection).to_have_attribute('data-connection', 'waiting', timeout=10_000)
+    expect(phone.locator('#listener-status')).to_contain_text('session player')
+    assert audio.evaluate('audio => audio.paused')
+    host.unroute(host_state)
+    host.unroute(host_player)
+    host.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+    wait_native()
+
+    phone_context.set_offline(True)
+    expect(connection).to_have_attribute('data-connection', 'reconnecting', timeout=10_000)
+    expect(phone.locator('#connection-badge')).to_have_attribute('data-connection', 'offline')
+    assert audio.evaluate('audio => audio.paused')
+    phone_context.set_offline(False)
+    wait_native()
+
+    state_route = action_route('state', exclude_probe=True)
+    outage_hits = []
+    def abort_state(route):
+        outage_hits.append(route.request.url)
+        route.abort()
+    phone.route(state_route, abort_state)
+    expect(connection).to_have_attribute('data-connection', 'reconnecting', timeout=10_000)
+    assert outage_hits, 'API outage did not intercept a state request'
+    assert audio.evaluate('audio => audio.paused')
+    phone.unroute(state_route)
+    wait_native()
+
+    # Simulate a background/native pause, then exercise both visibility return
+    # and persisted pageshow. This remains a browser test, not a hardware lock.
+    phone.evaluate("""() => {
+      Object.defineProperty(document, 'hidden', {configurable:true, get:() => true});
+      document.dispatchEvent(new Event('visibilitychange'));
+      document.querySelector('#listener-audio').pause();
+      Object.defineProperty(document, 'hidden', {configurable:true, get:() => false});
+    }""")
+    restore_lifecycle()
+    wait_native()
+    press(phone.locator('#listener-stop'))
+    media_empty(phone, '#listener-audio')
+    phone_context.set_offline(True)
+    phone_context.set_offline(False)
+    restore_lifecycle()
+    expect(connection).to_have_attribute('data-connection', 'idle', timeout=10_000)
+    phone.wait_for_timeout(1600)
+    media_empty(phone, '#listener-audio')
+    expect(resync).to_be_hidden()
+    expect(listen).to_be_visible()
+    press(listen)
+    wait_native()
+
+    # A response begun before Resync must not authorize playback after it.
+    # Hold the newer request too, proving no interim playing event occurs.
+    old_state = request(phone, 'state', recovery_probe='1')
+    pending = []
+    phone.route(state_route, lambda route: pending.append(route))
+    deadline = time.monotonic() + 5
+    while not pending and time.monotonic() < deadline:
+        phone.wait_for_timeout(50)
+    assert pending, 'No pre-Resync state request was captured'
+    phone.evaluate("""() => {
+      window.recoveryPlayingEvents = 0;
+      document.querySelector('#listener-audio').addEventListener('playing', () => window.recoveryPlayingEvents++);
+    }""")
+    press(resync)
+    assert audio.evaluate('audio => audio.paused')
+    assert request(host, 'control', {'event': 'remote_listening', 'enabled': False}, True)['ok']
+    old = pending.pop(0)
+    old.fulfill(status=200, content_type='application/json', body=json.dumps(old_state))
+    deadline = time.monotonic() + 4
+    while not pending and time.monotonic() < deadline:
+        phone.wait_for_timeout(50)
+    assert pending, 'Recovery did not request a newer authorized state'
+    phone.wait_for_timeout(200)
+    assert audio.evaluate('audio => audio.paused')
+    assert phone.evaluate('window.recoveryPlayingEvents') == 0
+    denied = request(phone, 'state', recovery_probe='1')
+    assert denied['state']['remote_listening'] is False
+    for route in pending:
+        route.fulfill(status=200, content_type='application/json', body=json.dumps(denied))
+    pending.clear()
+    phone.unroute(state_route)
+    expect(phone.locator('#listener')).to_be_hidden()
+    media_empty(phone, '#listener-audio')
+    assert phone.evaluate('window.recoveryPlayingEvents') == 0
+
+    # A denied host report after a successful state200 must also terminate the
+    # actual native host player, not only state-fetch authentication failures.
+    denied_reports = []
+    def deny_report(route):
+        denied_reports.append(route.request.url)
+        route.fulfill(status=403, content_type='application/json',
+                      body=json.dumps({'ok': False, 'message': 'Recovery fixture access closed'}))
+    host.route(host_player, deny_report)
+    expect(host.locator('#connection-badge')).to_have_attribute('data-connection', 'unavailable', timeout=10_000)
+    assert denied_reports, 'Host report denial was not intercepted'
+    media_empty(host, '#audio')
+    host.evaluate("""() => {
+      dispatchEvent(new Event('online'));
+      document.dispatchEvent(new Event('visibilitychange'));
+      const event = new Event('pageshow'); Object.defineProperty(event, 'persisted', {value:true}); dispatchEvent(event);
+    }""")
+    host.wait_for_timeout(1600)
+    media_empty(host, '#audio')
+    expect(host.locator('#connection-badge')).to_have_attribute('data-connection', 'unavailable')
+    host.unroute(host_player)
+    phone_context.close()
+    host_context.close()
+    print('PASS real host/phone recovery, fresh Resync, mute and Stop preservation, lifecycle, stale authorization, and host report denial')
+
+
 def inline_splash_editor(browser, base):
     context = browser.new_context()
     editor = context.new_page()
@@ -1081,7 +1314,7 @@ def management_scenario(browser, base, phone_options, site):
     delayed = pending_settings[0]
     with host.expect_response(lambda response: 'action=settings&' in response.url) as delivered:
         delayed.fulfill(response=delayed.fetch())
-    delivered.value.finished()
+    delivered.value.body()
     host.unroute(settings_pattern)
     host.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
     expect(host.locator('#edit-dialog, #create-dialog').filter(visible=True)).to_have_count(0)
@@ -1812,20 +2045,24 @@ with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
                         phone_options.pop('default_browser_type', None)
                     else:
                         browser = playwright.chromium.launch(executable_path=CHROME, args=['--no-sandbox'])
-                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only')):
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only')):
                         scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--remote-only' not in sys.argv and '--management-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv:
                         schedule_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--schedule-only' not in sys.argv and '--management-only' not in sys.argv:
+                    if '--schedule-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv:
                         remote_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv and '--recovery-only' not in sys.argv:
                         management_scenario(browser, base, phone_options, site)
+                        for context in browser.contexts:
+                            context.close()
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only')):
+                        recovery_scenario(browser, base, phone_options, site)
         except Exception:
             log.seek(0)
             print(log.read()[-16000:])

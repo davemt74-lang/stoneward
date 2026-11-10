@@ -200,6 +200,39 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
   color: #ffdfb9;
 }
 .jukebox-status { margin-top: 1rem; }
+.jukebox-connection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .6rem 1rem;
+  margin-top: .85rem;
+  padding: .8rem 1rem;
+  border: 1px solid var(--jukebox-line);
+  border-radius: .65rem;
+  background: var(--jukebox-panel);
+}
+.jukebox-connection-copy { min-width: 0; flex: 1 1 14rem; }
+.jukebox-connection-copy p { margin: .35rem 0 0; color: var(--jukebox-muted); font-size: .9rem; overflow-wrap: anywhere; }
+.jukebox-connection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  max-width: 100%;
+  padding: .2rem .5rem;
+  border: 1px solid var(--jukebox-line);
+  border-radius: 2rem;
+  color: var(--jukebox-muted);
+  font-size: .78rem;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.jukebox-connection-badge::before { content: ''; flex: none; width: .4rem; height: .4rem; border-radius: 50%; background: currentColor; }
+.jukebox-connection-badge:is([data-connection=connected], [data-connection=listening]) { color: var(--jukebox-green); border-color: #415844; background: #233628; }
+.jukebox-connection-badge:is([data-connection=connecting], [data-connection=reconnecting], [data-connection=buffering], [data-connection=action-required]) { color: var(--jukebox-gold); border-color: #806c4e; background: #382a1c; }
+.jukebox-connection-badge:is([data-connection=offline], [data-connection=error], [data-connection=unavailable]) { color: #ffcfb6; border-color: #8a5d48; background: #3a2720; }
+.jukebox-connection-badge[data-muted=true] { color: var(--jukebox-muted); border-color: var(--jukebox-line); background: var(--jukebox-raised); }
 .jukebox-status:empty, .jukebox-form-status:empty, .jukebox-sr-only, #approval:empty, #listener-status:empty {
   position: absolute;
   width: 1px;
@@ -538,6 +571,7 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
 #listener { display: contents; }
 .jukebox-listener-actions { grid-column: 2; justify-self: end; justify-content: end; gap: .35rem; }
 .jukebox-listener-actions button { font-size: .84rem; padding-inline: .55rem; }
+#listener-connection { grid-column: 1; grid-row: 2; justify-self: start; }
 #listener-status { grid-column: 1 / -1; text-align: end; font-size: .8rem; overflow-wrap: anywhere; }
 
 @media (max-width: 42rem) {
@@ -548,6 +582,10 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
   .jukebox-session-list a { flex-basis: 100%; }
   #recap-tracks { font-size: .84rem; }
   html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(12rem + env(safe-area-inset-bottom)); }
+  .jukebox-guest-player-inner { grid-template-columns: minmax(0, 1fr); }
+  .jukebox-listener-actions { grid-column: 1; justify-self: stretch; justify-content: end; }
+  #listener-connection { grid-column: 1; grid-row: auto; }
+  #listener-status { text-align: start; }
   .jukebox-host-player-inner { grid-template-columns: minmax(0, 1fr) minmax(6rem, 7.75rem); gap: .2rem .65rem; }
   .jukebox-host-player-actions { grid-column: 1 / -1; grid-row: 2; }
   .jukebox-host-volume { grid-column: 2; grid-row: 1; }

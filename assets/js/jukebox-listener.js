@@ -20,15 +20,26 @@
     let playAttempt = null;
     let blocked = '';
     let status = '';
+    let connection = 'idle';
+    let networkAvailable = true;
+    let awaitingUpdate = false;
+    let freshAfter = -Infinity;
+    let retryOnUpdate = false;
+    let localBuffering = false;
+    let lastMediaPosition = 0;
+    let muteIntent = Boolean(audio.muted);
     let previousView = '';
     let freshnessTimer;
     let activity = null;
 
-    function report(message = status) {
+    function report(message = status, nextConnection = connection) {
       status = message;
+      connection = nextConnection;
       const view = {
-        allowed: Boolean(snapshot?.allowed), listening, muted: audio.muted,
-        needsGesture: Boolean(blocked), status
+        allowed: Boolean(snapshot?.allowed), listening, muted: muteIntent || audio.muted,
+        needsGesture: Boolean(blocked), status, connection,
+        resyncing: listening && awaitingUpdate,
+        canResync: Boolean(snapshot?.allowed) && listening
       };
       const key = JSON.stringify(view);
       if (key !== previousView) {
@@ -49,10 +60,10 @@
       if (!onActivity) return;
       const now = performance.now();
       const positionMs = audio.currentTime * 1000;
-      if (!listening || !itemId || itemId !== snapshot.itemId || !snapshot.allowed || !snapshot.online ||
+      if (!listening || !snapshot || !networkAvailable || awaitingUpdate || blocked || !itemId || itemId !== snapshot.itemId || !snapshot.allowed || !snapshot.online ||
           snapshot.transport !== 'playing' || !Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0 ||
           freshForMs() <= 0 || audio.paused || audio.ended || audio.seeking ||
-          audio.muted || audio.volume === 0 || audio.readyState < 2 || !Number.isFinite(positionMs)) {
+          muteIntent || audio.muted || audio.volume === 0 || audio.readyState < 2 || !Number.isFinite(positionMs)) {
         endActivity();
         return;
       }
@@ -83,6 +94,14 @@
       }
     }
 
+    function applyMuteIntent() {
+      // WebKit can reset the native mute property while restoring a media source.
+      // Never clear a native/system mute without an explicit Unmute action.
+      if (!muteIntent) return;
+      if (!audio.defaultMuted) audio.defaultMuted = true;
+      if (!audio.muted) audio.muted = true;
+    }
+
     function pause() {
       endActivity();
       playAttempt = null;
@@ -92,12 +111,14 @@
     }
 
     function clearSource() {
-      if (!itemId) return;
       pause();
+      localBuffering = false;
+      if (!itemId) return;
       itemId = '';
       lastSeekAt = -Infinity;
       audio.removeAttribute('src');
       audio.load();
+      applyMuteIntent();
     }
 
     function stop() {
@@ -105,7 +126,7 @@
       listening = false;
       blocked = '';
       clearSource();
-      report('');
+      report(snapshot?.allowed ? 'Ready to listen on this phone.' : 'Remote listening is unavailable.', snapshot?.allowed ? 'idle' : 'unavailable');
     }
 
     function sampleAgeMs() {
@@ -114,7 +135,12 @@
 
     function freshForMs() {
       const responseFreshFor = staleAfterMs - (performance.now() - observedAt);
-      return snapshot.transport === 'playing' ? Math.min(responseFreshFor, staleTransportMs - sampleAgeMs()) : responseFreshFor;
+      return snapshot.online && snapshot.transport === 'playing' ? Math.min(responseFreshFor, staleTransportMs - sampleAgeMs()) : responseFreshFor;
+    }
+
+    function playbackPermitted() {
+      return listening && snapshot?.allowed && networkAvailable && !awaitingUpdate && !blocked &&
+        snapshot.online && snapshot.transport === 'playing' && itemId && itemId === snapshot.itemId && freshForMs() > 0;
     }
 
     function alignToHost(position) {
@@ -144,21 +170,28 @@
     }
 
     function showBlocked() {
-      report(blocked === 'gesture' ? 'Tap to continue listening.' : 'Audio could not load. Tap to retry.');
+      report(blocked === 'gesture' ? 'Tap to continue listening.' : 'Audio could not load. Tap to retry.',
+        blocked === 'gesture' ? 'action-required' : 'error');
     }
 
     function sync() {
+      applyMuteIntent();
       if (!snapshot?.allowed) {
         stop();
         return;
       }
-      if (!listening) {
-        report('');
+      if (!networkAvailable || awaitingUpdate) {
+        pause();
+        report(networkAvailable ? 'Reconnecting to the session…' : 'Connection lost. Reconnecting when this phone is online.', 'reconnecting');
         return;
       }
-      if (snapshot.online && freshForMs() <= 0) {
+      if (!listening) {
+        report('Ready to listen on this phone.', 'idle');
+        return;
+      }
+      if (freshForMs() <= 0) {
         pause();
-        report('Waiting for a fresh host playback update.');
+        report('Waiting for a fresh host playback update.', 'reconnecting');
         return;
       }
       if (itemId !== snapshot.itemId) {
@@ -169,34 +202,53 @@
         pause();
         report(!snapshot.online ? 'Waiting for the session player.' : ({
           paused: 'The host paused playback.', buffering: 'The host player is buffering.'
-        }[snapshot.transport] || 'Waiting for the next song.'));
+        }[snapshot.transport] || 'Waiting for the next song.'),
+        !snapshot.online ? 'waiting' : ({paused: 'paused', buffering: 'buffering'}[snapshot.transport] || 'waiting'));
         return;
       }
       if (blocked) {
+        pause();
         showBlocked();
         return;
       }
       if (!itemId) {
         itemId = snapshot.itemId;
         audio.src = urlForItem(itemId);
+        localBuffering = false;
+        lastMediaPosition = 0;
         seekOnStart = true;
       }
       const position = snapshot.seconds + sampleAgeMs() / 1000;
       if (Number.isFinite(audio.duration) && position >= audio.duration) {
         pause();
-        report('Waiting for the next song.');
+        report('Waiting for the next song.', 'waiting');
         return;
       }
       alignToHost(position);
-      if (playAttempt || !audio.paused) return;
+      if (playAttempt) {
+        report('Connecting audio…', 'connecting');
+        return;
+      }
+      if (!audio.paused) {
+        // WebKit may keep advancing at HAVE_CURRENT_DATA after returning from the background.
+        // Native waiting/progress events remain authoritative about an actual buffer stall.
+        report(localBuffering || audio.readyState < 2 ? 'Buffering on this phone…' : 'Listening on this phone.',
+          localBuffering || audio.readyState < 2 ? 'buffering' : 'listening');
+        return;
+      }
 
       const attempt = {};
       playAttempt = attempt;
-      report('Connecting audio…');
+      report('Connecting audio…', 'connecting');
+      applyMuteIntent();
       audio.play().then(() => {
-        if (playAttempt !== attempt) return;
+        if (playAttempt !== attempt) {
+          if (!playbackPermitted()) pause();
+          return;
+        }
         playAttempt = null;
-        report('Listening on this phone.');
+        if (!playbackPermitted()) { pause(); sync(); return; }
+        if (!audio.paused) report('Listening on this phone.', 'listening');
       }).catch(error => {
         if (playAttempt !== attempt) return;
         playAttempt = null;
@@ -207,6 +259,9 @@
     }
 
     function update(next) {
+      // A response started before Resync/reconnect cannot authorize playback after it.
+      if (next.allowed && ((awaitingUpdate && !Number.isFinite(next.requestStartedAt)) ||
+          (Number.isFinite(next.requestStartedAt) && next.requestStartedAt < freshAfter))) return;
       const reconnecting = snapshot && !snapshot.online && next.online;
       const changedGeneration = snapshot && next.generation !== snapshot.generation;
       snapshot = {
@@ -215,20 +270,44 @@
       };
       if (activity && (snapshot.itemId !== activity.itemId || snapshot.generation !== activity.generation)) endActivity();
       if (changedGeneration || reconnecting) seekOnStart = true;
-      if (reconnecting && (blocked === 'error' || audio.error)) {
+      if ((reconnecting || retryOnUpdate) && (blocked === 'error' || audio.error || localBuffering)) {
         clearSource();
-        blocked = '';
+        if (blocked !== 'gesture') blocked = '';
       }
+      networkAvailable = true;
+      awaitingUpdate = false;
+      retryOnUpdate = false;
       observedAt = performance.now();
       keepFresh();
       sync();
     }
 
     function disconnect() {
-      if (!snapshot) return;
       clearTimeout(freshnessTimer);
-      snapshot.online = false;
+      networkAvailable = false;
+      awaitingUpdate = true;
+      freshAfter = performance.now();
+      retryOnUpdate = true;
       sync();
+    }
+
+    function reconnect() {
+      clearTimeout(freshnessTimer);
+      networkAvailable = true;
+      awaitingUpdate = true;
+      freshAfter = performance.now();
+      retryOnUpdate = true;
+      seekOnStart = true;
+      sync();
+    }
+
+    function resync() {
+      if (!listening || !snapshot?.allowed) return false;
+      // A user retry may clear a failed play, but never changes listening consent or mute.
+      if (blocked === 'error' || audio.error || localBuffering) clearSource();
+      blocked = '';
+      reconnect();
+      return true;
     }
 
     function listen() {
@@ -241,50 +320,68 @@
     }
 
     function checkFreshness() {
-      if (listening && snapshot.online && freshForMs() <= 0) sync();
+      if (listening && snapshot && freshForMs() <= 0) sync();
     }
 
     function keepFresh() {
       clearTimeout(freshnessTimer);
-      if (listening && snapshot.online) {
+      if (listening && snapshot && networkAvailable && !awaitingUpdate) {
         const remaining = freshForMs();
         if (remaining > 0) freshnessTimer = setTimeout(checkFreshness, Math.ceil(remaining));
       }
     }
 
-    audio.addEventListener('loadedmetadata', sync);
-    audio.addEventListener('canplay', sync);
-    audio.addEventListener('seeked', sync);
-    audio.addEventListener('waiting', () => {
+    audio.addEventListener('loadedmetadata', () => { applyMuteIntent(); sync(); });
+    audio.addEventListener('canplay', () => { applyMuteIntent(); localBuffering = false; sync(); });
+    audio.addEventListener('seeked', () => { lastMediaPosition = audio.currentTime; sync(); });
+    const buffering = () => {
       endActivity();
-      if (listening && !audio.paused) {
+      if (playbackPermitted() && !audio.paused) {
+        localBuffering = true;
+        lastMediaPosition = audio.currentTime;
         if (!audio.seeking) seekOnStart = true;
-        report('Buffering on this phone…');
+        report('Buffering on this phone…', 'buffering');
       }
-    });
+    };
+    audio.addEventListener('waiting', buffering);
+    audio.addEventListener('stalled', buffering);
     audio.addEventListener('playing', () => {
-      if (listening && !audio.paused) {
-        report('Listening on this phone.');
+      applyMuteIntent();
+      if (!playbackPermitted()) { pause(); sync(); return; }
+      if (!audio.paused) {
+        localBuffering = false;
+        report('Listening on this phone.', 'listening');
         if (!activity) measureActivity();
       }
     });
     audio.addEventListener('ended', () => {
       endActivity();
-      if (listening && itemId) report('Waiting for the next song.');
+      if (listening && itemId) report('Waiting for the next song.', 'waiting');
     });
     audio.addEventListener('error', () => {
       endActivity();
       if (!listening || !itemId || !audio.error) return;
       blocked = 'error';
+      pause();
       sync();
     });
-    audio.addEventListener('pause', endActivity);
+    audio.addEventListener('pause', () => {
+      endActivity();
+      if (playbackPermitted() && !playAttempt) report('Playback paused on this phone. Reconnecting…', 'reconnecting');
+    });
     audio.addEventListener('seeking', endActivity);
     audio.addEventListener('volumechange', () => {
-      if (audio.muted || audio.volume === 0) endActivity();
+      applyMuteIntent();
+      if (muteIntent || audio.muted || audio.volume === 0) endActivity();
+      report();
     });
     audio.addEventListener('timeupdate', () => {
       checkFreshness();
+      if (playbackPermitted() && !audio.paused && !audio.seeking && audio.readyState >= 2 && audio.currentTime > lastMediaPosition) {
+        localBuffering = false;
+        report('Listening on this phone.', 'listening');
+      }
+      lastMediaPosition = audio.currentTime;
       measureActivity();
     });
     if (onActivity) window.addEventListener('pagehide', endActivity);
@@ -295,12 +392,14 @@
     });
 
     function toggleMute() {
-      audio.muted = !audio.muted;
-      if (audio.muted) endActivity();
+      muteIntent = !(muteIntent || audio.muted);
+      audio.defaultMuted = muteIntent;
+      if (audio.muted !== muteIntent) audio.muted = muteIntent;
+      if (muteIntent) endActivity();
       report();
     }
 
-    return {update, disconnect, listen, stop, toggleMute};
+    return {update, disconnect, reconnect, resync, listen, stop, toggleMute};
   }
 
   window.StonefellowJukeboxListener = {create};

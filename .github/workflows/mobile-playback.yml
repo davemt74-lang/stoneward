@@ -29,6 +29,8 @@ jobs:
         run: |
           node --check assets/js/app.js
           node --check assets/js/player-playback-lifecycle.js
+          node --check assets/js/jukebox-listener.js
+          node --test tests/jukebox-listener-recovery.cjs
           node --test tests/section91b21b2-playback.cjs
           node tests/section91b14d-playback-completion.cjs
           php tests/section91b14d-media-stream-range.php

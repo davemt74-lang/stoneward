@@ -96,6 +96,11 @@ jobs:
         env:
           SF_JUKEBOX_BROWSER: webkit
         run: python tests/jukebox-browser.py --schedule-only
+      - name: Jukebox connection recovery on iPhone-sized WebKit
+        if: matrix.browser == 'webkit'
+        env:
+          SF_JUKEBOX_BROWSER: webkit
+        run: python tests/jukebox-browser.py --recovery-only
       - name: Full canvas controls in the bundled current headless shell
         if: matrix.browser == 'chromium'
         env:

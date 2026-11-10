@@ -36,13 +36,13 @@ header('Content-Security-Policy: '.$framePolicy);
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=10">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=11">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
-<script defer src="assets/js/jukebox-listener.js?v=3"></script>
-<script defer src="assets/js/jukebox.js?v=11"></script>
+<script defer src="assets/js/jukebox-listener.js?v=4"></script>
+<script defer src="assets/js/jukebox.js?v=12"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -99,6 +99,13 @@ header('Content-Security-Policy: '.$framePolicy);
     </div>
   </div>
   <p id="status" class="jukebox-status" role="status"></p>
+  <section id="session-connection" class="jukebox-connection" aria-label="Session connection" hidden>
+    <div class="jukebox-connection-copy">
+      <span id="connection-badge" class="jukebox-connection-badge" data-connection="connecting">Connecting</span>
+      <p id="connection-detail" role="status" tabindex="-1">Checking the session connection…</p>
+    </div>
+    <button type="button" id="connection-retry" hidden>Reconnect</button>
+  </section>
   <div id="directory" class="jukebox-directory<?=$host?'':' jukebox-directory-guest'?>" hidden>
 <?php if($host): ?>
     <nav id="directory-tabs" class="jukebox-directory-tabs" role="tablist" aria-label="Your sessions">
@@ -420,9 +427,11 @@ header('Content-Security-Policy: '.$framePolicy);
       <audio id="listener-audio" preload="none"></audio>
       <div class="actions jukebox-listener-actions">
         <button type="button" id="listen" class="jukebox-primary">Stream on this phone</button>
+        <button type="button" id="listener-resync" hidden>Resync</button>
         <button type="button" id="listener-mute" aria-pressed="false" hidden>Mute phone</button>
         <button type="button" id="listener-stop" hidden>Stop listening</button>
       </div>
+      <span id="listener-connection" class="jukebox-connection-badge" data-connection="idle">Ready</span>
       <small id="listener-status" role="status"></small>
     </div>
   </div>
