@@ -26,6 +26,26 @@ $framePolicy=sf_pwa_shell_frame_policy(sf_public_base_url(),$waitingFrame);
 header('Cache-Control: no-store');
 header('Referrer-Policy: same-origin');
 header('Content-Security-Policy: '.$framePolicy);
+$renderSessionShare=static function(bool $host):void {
+?>
+<div id="session-share">
+<?php if($host): ?>
+  <p id="session-share-description" hidden></p>
+<?php else: ?>
+  <p id="session-share-description" class="jukebox-muted">Scan with your camera to open this session on another device.</p>
+<?php endif; ?>
+  <div id="qr"></div>
+  <div class="actions">
+<?php if($host): ?>
+    <a id="join-link">Open guest join page</a>
+<?php endif; ?>
+    <button type="button" id="copy-session-link">Copy session link</button>
+  </div>
+  <p id="copy-session-status" role="status"></p>
+  <label id="manual-session-copy" hidden>Guest session link <input id="session-link-value" type="url" readonly></label>
+</div>
+<?php
+};
 ?>
 <!doctype html>
 <html lang="en">
@@ -36,14 +56,14 @@ header('Content-Security-Policy: '.$framePolicy);
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=12">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=13">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-clock.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=5"></script>
-<script defer src="assets/js/jukebox.js?v=14"></script>
+<script defer src="assets/js/jukebox.js?v=15"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -294,6 +314,10 @@ header('Content-Security-Policy: '.$framePolicy);
 </nav>
 <p id="chat-notice" class="jukebox-sr-only" role="status"></p>
 <div id="session-panel-overview" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-overview" tabindex="0" hidden>
+  <div id="session-overview-details" class="jukebox-overview-details" hidden></div>
+<?php if(!$host): ?>
+  <div class="jukebox-guest-join">
+<?php endif; ?>
   <section id="pairing" class="jukebox-panel" aria-labelledby="pairing-heading" hidden>
     <h2 id="pairing-heading">Phone access</h2>
     <form id="join">
@@ -304,6 +328,13 @@ header('Content-Security-Policy: '.$framePolicy);
     <p id="approval" role="status"></p>
     <button type="button" id="forget" hidden>Forget me at this venue</button>
   </section>
+<?php if(!$host): ?>
+    <section id="guest-share" class="jukebox-panel" aria-labelledby="share-heading" hidden>
+      <h2 id="share-heading">Join on another device</h2>
+      <?php $renderSessionShare(false); ?>
+    </section>
+  </div>
+<?php endif; ?>
 <?php if($host): ?>
   <section class="jukebox-panel jukebox-host-overview" aria-labelledby="host-now-heading">
     <div>
@@ -331,13 +362,7 @@ header('Content-Security-Policy: '.$framePolicy);
     </section>
     <section class="jukebox-panel" aria-labelledby="share-heading">
       <h2 id="share-heading">Share this session</h2>
-      <div id="active-share"><div id="session-share">
-        <p id="session-share-description" hidden></p>
-        <div id="qr"></div>
-        <div class="actions"><a id="join-link">Open guest join page</a><button type="button" id="copy-session-link">Copy session link</button></div>
-        <p id="copy-session-status" role="status"></p>
-        <label id="manual-session-copy" hidden>Guest session link <input id="session-link-value" type="url" readonly></label>
-      </div></div>
+      <div id="active-share"><?php $renderSessionShare(true); ?></div>
     </section>
   </div>
 </div>
