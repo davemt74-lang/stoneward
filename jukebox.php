@@ -41,8 +41,9 @@ header('Content-Security-Policy: '.$framePolicy);
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
-<script defer src="assets/js/jukebox-listener.js?v=4"></script>
-<script defer src="assets/js/jukebox.js?v=13"></script>
+<script defer src="assets/js/jukebox-clock.js?v=1"></script>
+<script defer src="assets/js/jukebox-listener.js?v=5"></script>
+<script defer src="assets/js/jukebox.js?v=14"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">

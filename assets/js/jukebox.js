@@ -7,6 +7,7 @@
   const host = params.get('host') === '1';
   const csrf = document.querySelector('meta[name=sf-csrf]').content;
   const audio = $('audio');
+  const playbackClock = window.StonefellowJukeboxClock.create();
   const sessionTabList = $('session-tabs');
   const sessionTabButtons = [...sessionTabList.querySelectorAll('[data-session-tab]')];
   const endedTools = $('ended-session-tools');
@@ -21,6 +22,9 @@
   let hostPlayAttempt = null;
   let playerSequence = 0;
   let playerReports = Promise.resolve();
+  let hostProgressTask = null;
+  let hostProgressWanted = false;
+  let hostConfirmation = null;
   let playerActionPending = false;
   let remoteChangePending = false;
   let listener = null;
@@ -72,6 +76,7 @@
     return 'jukebox.php?' + new URLSearchParams({id: session, ...(isHost ? {host: '1'} : {})});
   }
   async function api(action, body, extra) {
+    const startedAt = performance.now();
     const options = body === undefined ? {} : {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
@@ -89,6 +94,9 @@
         const error = new Error(data.message || 'Jukebox request failed.');
         error.status = response.status;
         throw error;
+      }
+      if (action === 'state' || action === 'player') {
+        playbackClock.observe(Number(data.server_time_ms ?? data.state?.transport?.server_time_ms), startedAt, performance.now());
       }
       return data;
     } catch (error) {
@@ -1024,7 +1032,7 @@
     if (!listener) return;
     const transport = state.transport;
     // Project the playhead from the server's sample through the trip back to this phone.
-    const responseTransitMs = Math.min(500, responseMs / 2);
+    const responseTransitMs = playbackClock.transitMs(Number(transport?.server_time_ms), requestStartedAt, requestStartedAt + responseMs);
     listener.update({
       requestStartedAt,
       allowed: state.remote_listening === true && phaseOf(state) === 'live',
@@ -1201,11 +1209,18 @@
       player, event, item, seconds: Math.floor(positionMs / 1000), position_ms: positionMs,
       transport: hostTransport, sample_seq: ++playerSequence, observed_revision: state?.revision, ...extras
     };
+    const stampCapture = () => {
+      const capturedAt = playbackClock.serverAt();
+      if (Number.isFinite(capturedAt)) sample.captured_at_ms = Math.floor(capturedAt);
+      else delete sample.captured_at_ms;
+    };
+    stampCapture();
     const request = playerReports.then(() => {
       // Capture again at dispatch when the queued event still describes the native player.
       if (item && item === currentItem && sample.transport === hostTransport && (event === 'playing' || event === 'progress')) {
         sample.position_ms = Math.floor((audio.currentTime || 0) * 1000);
         sample.seconds = Math.floor(sample.position_ms / 1000);
+        stampCapture();
       }
       return api('player', sample);
     });
@@ -1234,14 +1249,41 @@
     else playerNotice(error);
   }
   function confirmHostPlayback(item) {
-    return playerEvent('playing', item).then(() => {
+    if (hostConfirmation?.item === item) return hostConfirmation.task;
+    const confirmation = {item};
+    confirmation.task = playerEvent('playing', item).then(() => {
       if (item === currentItem) lastPlaying = true;
+    }).finally(() => {
+      if (hostConfirmation === confirmation) hostConfirmation = null;
     });
+    hostConfirmation = confirmation;
+    return confirmation.task;
+  }
+  function reportHostProgress() {
+    if (!active || stopped || networkOffline) return Promise.resolve();
+    // Coalesce timer/poll reports. Capture the latest native position at dispatch,
+    // rather than queueing one request for every missed timer tick.
+    if (hostProgressTask) {
+      hostProgressWanted = true;
+      return hostProgressTask;
+    }
+    const task = playerEvent(currentItem ? 'progress' : 'heartbeat').then(() => {
+      if (active && !audio.paused && hostTransport === 'playing') playerNotice('');
+    }).finally(() => {
+      if (hostProgressTask !== task) return;
+      hostProgressTask = null;
+      if (hostProgressWanted) {
+        hostProgressWanted = false;
+        setTimeout(() => { void reportHostProgress().catch(reportHostError); }, 0);
+      }
+    });
+    hostProgressTask = task;
+    return task;
   }
   function reportNativeTransport(transport) {
     if (!active || !currentItem || audio.currentSrc !== audio.src || transport === hostTransport) return;
     hostTransport = transport;
-    const report = transport === 'playing' && !lastPlaying ? confirmHostPlayback(currentItem) : playerEvent('progress');
+    const report = transport === 'playing' && !lastPlaying ? confirmHostPlayback(currentItem) : reportHostProgress();
     void report.catch(reportHostError);
   }
   function startHostAudio() {
@@ -1288,9 +1330,8 @@
     }
     try {
       if (hostTransport === 'playing' && !lastPlaying) await confirmHostPlayback(currentItem);
-      else await playerEvent(item ? 'progress' : 'heartbeat');
+      else void reportHostProgress().catch(reportHostError);
     } catch (error) {
-      audio.pause();
       reportHostError(error);
       return;
     }
@@ -1363,7 +1404,7 @@
         invalidateConnection();
       } else if (!stateReceived) {
         connectionIssue = 'reconnecting';
-        listener?.disconnect();
+        listener?.transientFailure();
       }
       notice(error);
       renderConnection();
@@ -1865,4 +1906,7 @@
   window.addEventListener('pageshow', event => { if (event.persisted) void refreshConnection(); });
   renderConnection();
   poll();
+  if (host && id) setInterval(() => {
+    void reportHostProgress().catch(reportHostError);
+  }, 1000);
 })();

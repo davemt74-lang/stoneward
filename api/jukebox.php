@@ -295,7 +295,7 @@ try{
         }
     }
     $db->commit();
-    sf_json_response(['ok'=>true]+$payload);
+    sf_json_response(['ok'=>true]+$payload+($action==='player'?['server_time_ms'=>(int)floor(microtime(true)*1000)]:[]));
 }catch(OutOfBoundsException|InvalidArgumentException|DomainException $error){
     if($db->inTransaction())$db->rollBack();
     sf_json_response(['ok'=>false,'message'=>$error->getMessage()],$error instanceof OutOfBoundsException?404:($error instanceof DomainException?409:400));

@@ -408,12 +408,20 @@ function sf_jukebox_player(array $session,array $body): void {
         if($position===false)return;
         $position=max(0,min(86400000,$position??$seconds*1000));
         $now=(int)floor(microtime(true)*1000);
+        $captured=$now;
+        if(array_key_exists('captured_at_ms',$body)){
+            $capture=filter_var($body['captured_at_ms'],FILTER_VALIDATE_INT);
+            // The host estimates server time from measured round trips. A late
+            // upload must not make an old playhead appear freshly captured.
+            if($capture===false||$capture<$now-5000||$capture>$now+5000)return;
+            $captured=min($now,$capture);
+        }
         // Do not revive pre-buffer activity when transport starts moving again.
         if($session['remote_status']==='playing'&&($status!=='playing'||$now-(int)$session['sampled_at_ms']>5000))
             sf_jukebox_listener_invalidate($id);
         else sf_jukebox_listener_clear_expired($id,$now);
         sf_jukebox_query('UPDATE jukebox_remote SET status=?,position_ms=?,sampled_at_ms=?,sample_seq=? WHERE session_id=?',
-            [$status,$position,$now,$sequence??-1,$id]);
+            [$status,$position,$captured,$sequence??-1,$id]);
         $seconds=intdiv($position,1000);
         $progress=$progress||$status==='paused';
     }

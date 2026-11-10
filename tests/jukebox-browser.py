@@ -38,6 +38,7 @@ def fixture(site):
         (site / directory).symlink_to(ROOT / directory, target_is_directory=True)
     for file in ('jukebox.php', 'pwa-splash-preview.php', 'manifest.php', 'service-worker.js', 'offline.html',
                  'assets/js/jukebox.js', 'assets/js/jukebox-qr.js', 'assets/js/jukebox-listener.js',
+                 'assets/js/jukebox-clock.js',
                  'assets/js/pwa-shell.js', 'assets/js/pwa-phone-alerts.js'):
         (site / file).symlink_to(ROOT / file)
     (site / 'config/database.php').write_text("<?php return ['driver'=>'sqlite','path'=>__DIR__.'/fixture.sqlite'];")
@@ -813,6 +814,9 @@ def recovery_scenario(browser, base, phone_options, site):
     phone.route(state_route, abort_state)
     expect(connection).to_have_attribute('data-connection', 'reconnecting', timeout=10_000)
     assert outage_hits, 'API outage did not intercept a state request'
+    # A failed poll may bridge the unexpired transport lease. A sustained
+    # outage must still pause within that existing lease, with no refresh.
+    phone.wait_for_function("document.querySelector('#listener-audio').paused", timeout=6500)
     assert audio.evaluate('audio => audio.paused')
     phone.unroute(state_route)
     wait_native()
@@ -899,6 +903,148 @@ def recovery_scenario(browser, base, phone_options, site):
     host_context.close()
     print('PASS real host/phone recovery, fresh Resync, mute and Stop preservation, lifecycle, stale authorization, and host report denial')
 
+
+
+def buffer_scenario(browser, base, phone_options):
+    # Delay only phone media. The native host and both state polling loops keep
+    # running, so playback must join the moving host instead of its old anchor.
+    host_context = browser.new_context(service_workers='block')
+    phone_context = browser.new_context(service_workers='block', **phone_options)
+    host = host_context.new_page()
+    phone = phone_context.new_page()
+    host.goto(base + '/login-fixture.php?user=1')
+    host.goto(base + '/jukebox.php?host=1')
+    session = request(host, 'create', {'title': 'Slow phone media test', 'listed': True,
+                                     'remote_listening': True}, True)['id']
+    host.goto(base + '/jukebox.php?host=1&id=' + session)
+    for index in range(4):
+        assert request(host, 'request', {'track': 'a' if index % 2 == 0 else 'b',
+                                      'nonce': f'{index + 300:032x}'}, True)['ok']
+    host.locator('#enable').click()
+    host.wait_for_function("""() => {
+      const audio = document.querySelector('#audio');
+      return !audio.paused || !document.querySelector('#audio-start').hidden;
+    }""")
+    if host.locator('#audio-start').is_visible():
+        host.locator('#audio-start').click()
+    host.wait_for_function("!document.querySelector('#audio').paused")
+    phone.goto(base + '/jukebox.php?id=' + session)
+    listen = phone.locator('#listen')
+    audio = phone.locator('#listener-audio')
+    expect(listen).to_be_visible()
+
+    def press(control):
+        (control.tap if phone_options.get('has_touch') else control.click)()
+
+    def media_route(url):
+        parsed = urllib.parse.urlsplit(url)
+        return (parsed.path.endswith('/api/jukebox.php')
+                and urllib.parse.parse_qs(parsed.query).get('action') == ['audio'])
+
+    pending = []
+    def hold_audio(route):
+        # Fetching the small real fixture now frees the PHP worker for host
+        # reports. Holding fulfillment delays the browser's native media load.
+        response = route.fetch(timeout=10_000)
+        assert response.ok, f'Delayed media route failed: {response.status}'
+        pending.append((route, response))
+
+    def await_media():
+        deadline = time.monotonic() + 8
+        while not pending and time.monotonic() < deadline:
+            phone.wait_for_timeout(50)
+        assert pending, 'Phone media delay did not intercept a native audio request'
+
+    def release_media():
+        phone.unroute(media_route)
+        for route, response in pending:
+            route.fulfill(response=response)
+        pending.clear()
+
+    phone.evaluate("""() => {
+      window.bufferProbe = {seeks:0, playing:0};
+      const audio = document.querySelector('#listener-audio');
+      audio.addEventListener('seeking', () => window.bufferProbe.seeks++);
+      audio.addEventListener('playing', () => window.bufferProbe.playing++);
+    }""")
+    if host.locator('#audio').evaluate('audio => audio.currentTime') > TRACK_SECONDS - 20:
+        assert request(host, 'control', {'event': 'skip'}, True)['ok']
+        host.wait_for_function("!document.querySelector('#audio').paused")
+    phone.route(media_route, hold_audio)
+    before = host.locator('#audio').evaluate('audio => audio.currentTime')
+    press(listen)
+    await_media()
+    press(phone.locator('#listener-mute'))
+    phone.wait_for_timeout(4000)
+    assert host.locator('#audio').evaluate('audio => audio.currentTime') > before + 2.5
+    assert phone.evaluate('window.bufferProbe.playing') == 0
+    expect(phone.locator('#listener-connection')).not_to_have_attribute('data-connection', 'listening')
+    release_media()
+
+    read = """audio => ({position:audio.currentTime, paused:audio.paused, seeking:audio.seeking,
+      item:audio.currentSrc && new URL(audio.currentSrc).searchParams.get('item')})"""
+    deadline = time.monotonic() + 15
+    previous, stable_since, stable_seeks = None, None, None
+    while time.monotonic() < deadline:
+        main = host.locator('#audio').evaluate(read)
+        remote = audio.evaluate(read)
+        advancing = previous is not None and remote['position'] > previous + .02
+        aligned = (main['item'] and main['item'] == remote['item'] and advancing
+                   and not any(value['paused'] or value['seeking'] for value in (main, remote))
+                   and abs(main['position'] - remote['position']) <= .9)
+        if aligned:
+            if stable_since is None:
+                stable_since = time.monotonic()
+                stable_seeks = phone.evaluate('window.bufferProbe.seeks')
+            elif time.monotonic() - stable_since >= 3:
+                assert phone.evaluate('window.bufferProbe.seeks') - stable_seeks <= 1
+                break
+        else:
+            stable_since = None
+        previous = remote['position']
+        phone.wait_for_timeout(200)
+    else:
+        assert False, f'Delayed phone media failed sustained advancing alignment: {main}, {remote}'
+    assert audio.evaluate('audio => audio.muted'), 'Delayed media must retain the phone mute choice'
+    expect(phone.locator('#listener-mute')).to_have_attribute('aria-pressed', 'true')
+    expect(phone.locator('#listener-connection')).to_have_attribute('data-connection', 'listening')
+
+    # Slow host UI polling must not hold up its independent native playhead
+    # reports. Otherwise a loading chat/state response can stale every phone.
+    def host_state_route(url):
+        parsed = urllib.parse.urlsplit(url)
+        return (parsed.path.endswith('/api/jukebox.php')
+                and urllib.parse.parse_qs(parsed.query).get('action') == ['state'])
+    pending_states = []
+    host.route(host_state_route, lambda route: pending_states.append((route, route.fetch(timeout=10_000))))
+    deadline = time.monotonic() + 5
+    while not pending_states and time.monotonic() < deadline:
+        host.wait_for_timeout(50)
+    assert pending_states, 'Host state delay did not intercept a polling request'
+    before_report = request(phone, 'state')['state']['transport']['sampled_at_ms']
+    phone.wait_for_timeout(3300)
+    after_report = request(phone, 'state')['state']['transport']['sampled_at_ms']
+    assert after_report > before_report + 1500, 'Slow UI polling held up native host playback reports'
+    assert audio.evaluate('audio => !audio.paused')
+    host.unroute(host_state_route)
+    for route, response in pending_states:
+        route.fulfill(response=response)
+
+    press(phone.locator('#listener-stop'))
+    phone.route(media_route, hold_audio)
+    press(listen)
+    await_media()
+    press(phone.locator('#listener-stop'))
+    played = phone.evaluate('window.bufferProbe.playing')
+    release_media()
+    phone.wait_for_timeout(1800)
+    assert audio.evaluate('audio => audio.paused && !audio.hasAttribute("src")')
+    assert phone.evaluate('window.bufferProbe.playing') == played
+    expect(listen).to_be_visible()
+    expect(phone.locator('#listener-connection')).to_have_attribute('data-connection', 'idle')
+    phone_context.close()
+    host_context.close()
+    print('PASS delayed native phone media, sustained alignment, independent host reports, mute, and Stop during loading')
 
 
 def branding_scenario(browser, base, phone_options, site):
@@ -1941,6 +2087,40 @@ def http_remote_scenario(Client, admin, venue, site):
     transport = state['transport']
     assert transport['status'] == 'playing' and transport['position_ms'] == 6500
     assert 0 < transport['sampled_at_ms'] <= transport['server_time_ms']
+    # A delayed upload keeps the host's capture time, rather than falsely
+    # dating an old playhead to server receipt. Older callers remain valid.
+    timed = admin.call('create', data={'title': 'Capture clock test', 'listed': True,
+                                     'remote_listening': True})['id']
+    assert admin.call('request', timed, {'track': 'a', 'nonce': '9'*32})['ok']
+    assert admin.call('player', timed, player | {'event': 'claim'})['ok']
+    clock_state = anonymous.call('state', timed)['state']
+    timed_item = clock_state['current']['id']
+    capture = clock_state['transport']['server_time_ms'] - 1200
+    sample = player_sample(player['player'], 'playing', timed_item, 1, 4000,
+                           observed_revision=clock_state['revision'], captured_at_ms=capture)
+    received = admin.call('player', timed, sample)
+    assert received['ok'] and isinstance(received['server_time_ms'], int)
+    timed_transport = anonymous.call('state', timed)['state']['transport']
+    assert timed_transport['sampled_at_ms'] == capture and timed_transport['position_ms'] == 4000
+    assert timed_transport['server_time_ms'] - capture >= 1200
+    before_receipt = timed_transport['server_time_ms']
+    received = admin.call('player', timed, sample | {'sample_seq': 2, 'position_ms': 5000,
+                                                   'captured_at_ms': before_receipt + 2000})
+    timed_transport = anonymous.call('state', timed)['state']['transport']
+    assert before_receipt <= timed_transport['sampled_at_ms'] <= received['server_time_ms']
+    assert timed_transport['position_ms'] == 5000
+    for invalid_capture in (received['server_time_ms'] - 6000,
+                            received['server_time_ms'] + 6000, 'not-a-timestamp'):
+        assert admin.call('player', timed, sample | {'sample_seq': 3, 'position_ms': 9999,
+                                                    'captured_at_ms': invalid_capture})['ok']
+        unchanged = anonymous.call('state', timed)['state']['transport']
+        assert unchanged['sampled_at_ms'] == timed_transport['sampled_at_ms']
+        assert unchanged['position_ms'] == 5000
+    legacy = {key: value for key, value in sample.items() if key != 'captured_at_ms'}
+    received = admin.call('player', timed, legacy | {'sample_seq': 3, 'position_ms': 6500})
+    legacy_transport = anonymous.call('state', timed)['state']['transport']
+    assert legacy_transport['position_ms'] == 6500
+    assert timed_transport['sampled_at_ms'] <= legacy_transport['sampled_at_ms'] <= received['server_time_ms']
     directory = {row['id']: row for row in anonymous.call('directory')['sessions']}
     assert directory[public]['remote_listening'] is True and directory[public]['online'] is True
     assert directory[disabled]['remote_listening'] is False and private not in directory
@@ -2439,28 +2619,32 @@ with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
                         phone_options.pop('default_browser_type', None)
                     else:
                         browser = playwright.chromium.launch(executable_path=CHROME, args=['--no-sandbox'])
-                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only', '--branding-only')):
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only', '--branding-only', '--buffer-only')):
                         scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--remote-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv and '--buffer-only' not in sys.argv:
                         schedule_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--schedule-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv:
+                    if '--schedule-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv and '--buffer-only' not in sys.argv:
                         remote_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv and '--buffer-only' not in sys.argv:
                         management_scenario(browser, base, phone_options, site)
                         for context in browser.contexts:
                             context.close()
-                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--branding-only')):
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--branding-only', '--buffer-only')):
                         recovery_scenario(browser, base, phone_options, site)
                         for context in browser.contexts:
                             context.close()
-                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only')):
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only', '--buffer-only')):
                         branding_scenario(browser, base, phone_options, site)
+                        for context in browser.contexts:
+                            context.close()
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only', '--branding-only')):
+                        buffer_scenario(browser, base, phone_options)
         except Exception:
             log.seek(0)
             print(log.read()[-16000:])
