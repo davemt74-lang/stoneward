@@ -174,9 +174,14 @@
       pageBranding = {logo_url: logoUrl(value.logo_url), revision: value.revision};
     }
     paintArtwork($('host-logo'), $('host-logo-fallback'), pageBranding.logo_url);
-    if (host) {
+    if (host && id) {
       paintArtwork($('branding-current'), $('branding-current-fallback'), pageBranding.logo_url);
       connectionText('open-branding', pageBranding.logo_url ? 'Change logo' : 'Upload logo');
+    } else if (host) {
+      const opener = $('open-branding');
+      const label = pageBranding.logo_url ? 'Edit profile picture' : 'Upload profile picture';
+      opener.setAttribute('aria-label', label);
+      opener.title = label;
     }
   }
 
@@ -186,12 +191,12 @@
     const source = coverUrl(value.cover_url);
     coverRevision = value.revision;
     paintArtwork(image, null, source);
-    connectionText('open-cover', source ? 'Change cover image' : 'Add cover image');
+    connectionText('cover-edit-label', source ? 'Edit cover image' : 'Add cover image');
   }
 
   function brandingEditable(editable) {
     if (!host) return;
-    $('host-branding').hidden = !editable || !brandingOwnerAvailable;
+    $(id ? 'host-branding' : 'open-branding').hidden = !editable || !brandingOwnerAvailable;
     const cover = $('open-cover');
     if (cover) cover.hidden = !editable;
   }
