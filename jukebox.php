@@ -36,13 +36,13 @@ header('Content-Security-Policy: '.$framePolicy);
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=11">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=12">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=4"></script>
-<script defer src="assets/js/jukebox.js?v=12"></script>
+<script defer src="assets/js/jukebox.js?v=13"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -82,10 +82,16 @@ header('Content-Security-Policy: '.$framePolicy);
 </header>
 <main>
   <div class="jukebox-page-head">
-    <div>
+    <div class="jukebox-page-identity">
+      <div id="host-logo-frame" class="jukebox-host-logo"<?=$host||$sessionId!==''?'':' hidden'?>>
+        <img id="host-logo" alt="Host logo" width="80" height="80" hidden>
+        <span id="host-logo-fallback" class="jukebox-record" aria-hidden="true"></span>
+      </div>
+      <div>
       <p class="jukebox-kicker"><?=$host?'Session management':'Stonefellow Jukebox'?></p>
       <h1 id="title"><?=$host?'Jukebox':'Live Sessions'?></h1>
       <p id="session-intro" class="jukebox-muted" hidden>Open a session to see what’s playing or listen from your phone when enabled.</p>
+      </div>
     </div>
     <div class="jukebox-page-actions">
 <?php if($host): ?>
@@ -127,6 +133,18 @@ header('Content-Security-Policy: '.$framePolicy);
       </div>
 <?php endif; ?>
     </section>
+<?php if($host): ?>
+    <section id="host-branding" class="jukebox-panel jukebox-branding-settings" aria-labelledby="host-branding-heading" hidden>
+      <div class="jukebox-branding-summary">
+        <div class="jukebox-branding-image">
+          <img id="branding-current" alt="Current host logo" width="64" height="64" hidden>
+          <span id="branding-current-fallback" class="jukebox-record" aria-hidden="true"></span>
+        </div>
+        <div><h2 id="host-branding-heading">Host logo / icon</h2><p class="jukebox-muted">Give your sessions a recognizable identity. Your public logo appears on all sessions you host.</p></div>
+        <button type="button" id="open-branding" aria-haspopup="dialog">Upload logo</button>
+      </div>
+    </section>
+<?php endif; ?>
     <section id="upcoming-directory" class="jukebox-panel" aria-labelledby="upcoming-directory-heading" hidden>
       <h2 id="upcoming-directory-heading">Upcoming</h2>
       <ul id="upcoming-sessions" class="jukebox-session-list"></ul>
@@ -138,6 +156,25 @@ header('Content-Security-Policy: '.$framePolicy);
     </section>
   </div>
 <?php if($host): ?>
+  <dialog id="branding-dialog" class="jukebox-dialog" aria-labelledby="branding-heading" aria-describedby="branding-description">
+    <div class="jukebox-dialog-head"><h2 id="branding-heading">Host logo / icon</h2><button type="button" class="jukebox-dialog-close" data-branding-close aria-label="Close host logo">×</button></div>
+    <form id="branding">
+      <p id="branding-description" class="jukebox-muted">This is a public logo, visible on your host page and every session you host.</p>
+      <div class="jukebox-branding-preview">
+        <img id="branding-preview" alt="Host logo preview" width="160" height="160" hidden>
+        <span id="branding-preview-fallback" class="jukebox-record" aria-hidden="true"></span>
+      </div>
+      <label>Choose a logo or icon <input type="file" id="branding-file" name="image" accept="image/png,image/jpeg,image/webp" aria-describedby="branding-file-help" autofocus></label>
+      <small id="branding-file-help" class="jukebox-muted">PNG, JPEG, or WebP. Maximum 1 MB. Square artwork works well; your image will fit without cropping.</small>
+      <p id="branding-status" class="jukebox-form-status" role="status" tabindex="-1"></p>
+      <button type="button" id="branding-reload" hidden>Load latest logo</button>
+      <div class="jukebox-dialog-actions">
+        <button type="button" data-branding-close>Cancel</button>
+        <button type="button" id="branding-remove" disabled>Remove logo</button>
+        <button type="submit" id="branding-save" class="jukebox-primary" disabled>Save logo</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="create-dialog" class="jukebox-dialog" aria-labelledby="create-heading">
     <div class="jukebox-dialog-head"><h2 id="create-heading">Create session</h2><button type="button" class="jukebox-dialog-close" data-jukebox-dialog-close aria-label="Close create session">×</button></div>
     <form id="create">
@@ -307,7 +344,9 @@ header('Content-Security-Policy: '.$framePolicy);
 <div id="session-panel-music" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-music" tabindex="0" hidden>
   <section id="music" class="jukebox-panel" hidden>
     <nav aria-label="Catalog views" id="tabs"><button type="button" data-tab="feed">Feed</button><button type="button" data-tab="songs">Songs</button><button type="button" data-tab="albums">Albums</button></nav>
-    <ul id="catalog"></ul>
+    <div id="catalog-context" class="jukebox-catalog-context" hidden></div>
+    <ul id="catalog" class="jukebox-catalog-list" aria-label="Music catalog"></ul>
+    <p id="catalog-empty" class="jukebox-empty" hidden>No music is available in this view.</p>
   </section>
   <p class="jukebox-panel jukebox-music-placeholder">Songs will appear here when they’re available for this session.</p>
 </div>
@@ -345,6 +384,7 @@ header('Content-Security-Policy: '.$framePolicy);
   <details id="crm" class="jukebox-panel" hidden><summary>Venue guests and visit history</summary><ul id="guests"></ul></details>
 </div>
 <div id="session-panel-settings" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-settings" tabindex="0" hidden>
+  <div id="branding-settings-slot"></div>
   <section class="jukebox-panel jukebox-host-settings" aria-labelledby="host-settings-heading">
     <h2 id="host-settings-heading">Session settings</h2>
     <p class="jukebox-muted">Update the name and settings, or use them to create a new session.</p>
@@ -392,6 +432,7 @@ header('Content-Security-Policy: '.$framePolicy);
 </div>
 </section>
 <div id="ended-session-tools" class="jukebox-session-panel" hidden></div>
+<?php if($host): ?><div id="branding-session-tools" class="jukebox-session-panel jukebox-branding-session-tools" hidden></div><?php endif; ?>
 </main>
 <?php if($host): ?>
 <footer id="footer" class="jukebox-host-player" aria-label="Session audio player" hidden>

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/canvas-audio-core.php';
 require_once __DIR__.'/jukebox-listener-metrics.php';
+require_once __DIR__.'/jukebox-branding-core.php';
 
 function sf_jukebox_schema(): void {
     static $ready=false;
@@ -48,6 +49,7 @@ function sf_jukebox_schema(): void {
         }
     }
     sf_jukebox_listener_schema($mysql,$engine);
+    sf_jukebox_branding_schema($mysql,$engine);
     $ready=true;
 }
 
@@ -171,7 +173,7 @@ function sf_jukebox_directory_page(int $owner,string $scope,mixed $cursor,mixed 
         $older=' AND (s.created<? OR (s.created=? AND s.id<?))';
         array_push($args,$position['created'],$position['created'],$position['id']);
     }
-    $rows=sf_jukebox_query('SELECT s.id,s.title,s.listed,s.ended,s.created,s.heartbeat,
+    $rows=sf_jukebox_query('SELECT s.id,s.owner_id,s.title,s.listed,s.ended,s.created,s.heartbeat,
         COALESCE(r.enabled,0) AS remote_enabled,t.scheduled_at,t.started_at
         FROM jukebox_sessions s LEFT JOIN jukebox_schedule t ON t.session_id=s.id
         LEFT JOIN jukebox_remote r ON r.session_id=s.id WHERE s.owner_id=? AND s.ended=?'.$older.
@@ -280,16 +282,17 @@ function sf_jukebox_advance(array $session): void {
 function sf_jukebox_state(array $session,?array $phone,bool $host): array {
     $id=$session['id'];
     $schedule=sf_jukebox_schedule_details($session);
+    $branding=sf_jukebox_branding_get((int)$session['owner_id']);
     $phase=$schedule['phase'];
     if($phase==='upcoming'||$phase==='canceled'){
-        $state=array_intersect_key($session,array_flip(['id','title','ended']))+$schedule;
+        $state=array_intersect_key($session,array_flip(['id','title','ended']))+$schedule+['branding'=>$branding];
         if($host&&$phase==='upcoming'){
             $state['remote_listening']=(bool)$session['remote_enabled'];
             $state['listed']=(bool)$session['listed'];
         }
         return $state;
     }
-    $state=array_intersect_key($session,array_flip(['id','title','ended','venue_id','paused','seconds','revision']))+$schedule;
+    $state=array_intersect_key($session,array_flip(['id','title','ended','venue_id','paused','seconds','revision']))+$schedule+['branding'=>$branding];
     $state['phone']=$phone?array_intersect_key($phone,array_flip(['id','name','status'])):null;
     $state['remote_listening']=$host
         ?(bool)$session['remote_enabled']&&!(int)$session['ended']

@@ -607,3 +607,58 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
   .jukebox-player-track .jukebox-record { width: 1.45rem; }
   .jukebox-listener-actions button { padding-inline: .4rem; }
 }
+
+
+/* Host identity and owner-managed public artwork. */
+.jukebox-page-identity { display: flex; min-width: 0; align-items: center; gap: 1rem; }
+.jukebox-page-identity > div:last-child { min-width: 0; }
+.jukebox-host-logo, .jukebox-branding-image, .jukebox-branding-preview, .jukebox-session-logo {
+  display: flex; flex: none; align-items: center; justify-content: center;
+  overflow: hidden; border: 1px solid var(--jukebox-line); border-radius: .75rem; background: var(--jukebox-raised);
+}
+.jukebox-host-logo { width: 5rem; height: 5rem; }
+.jukebox-host-logo .jukebox-record { width: 2.8rem; height: 2.8rem; }
+:is(.jukebox-host-logo, .jukebox-branding-image, .jukebox-branding-preview, .jukebox-session-logo) img {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.jukebox-branding-summary { display: grid; grid-template-columns: 4rem minmax(0, 1fr) auto; gap: .8rem 1rem; align-items: center; }
+.jukebox-branding-summary h2 { margin: 0 0 .35rem; }
+.jukebox-branding-summary p { margin: 0; font-size: .9rem; }
+.jukebox-branding-summary > button { justify-self: end; }
+.jukebox-branding-image { width: 4rem; height: 4rem; }
+.jukebox-branding-preview { width: 10rem; height: 10rem; justify-self: center; margin: .3rem 0; }
+.jukebox-branding-preview .jukebox-record { width: 4rem; height: 4rem; }
+.jukebox-branding-session-tools { margin-top: .85rem; }
+#branding-settings-slot:not(:empty) { margin-bottom: .85rem; }
+.jukebox-session-logo { width: 2.5rem; height: 2.5rem; margin-inline-end: .65rem; border-radius: .45rem; }
+.jukebox-session-logo .jukebox-record { width: 1.55rem; height: 1.55rem; }
+.session-title-copy { min-width: 0; overflow-wrap: anywhere; }
+
+/* Full-width music rows keep every action on a consistent right edge. */
+#music #tabs { gap: .25rem; padding-bottom: .7rem; border-bottom: 1px solid var(--jukebox-line); }
+#music #tabs button { border-color: transparent; background: transparent; color: var(--jukebox-muted); font-weight: 650; }
+#music #tabs button[aria-pressed=true] { border-color: #997d58; background: #382a1c; color: var(--jukebox-gold); }
+.jukebox-catalog-list { list-style: none; padding: 0; margin: .15rem 0 0; }
+.jukebox-catalog-row { padding: .85rem 0; }
+.jukebox-catalog-row + .jukebox-catalog-row { border-top: 1px solid var(--jukebox-line); }
+.jukebox-catalog-row-content { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .6rem 1rem; }
+.jukebox-catalog-copy { min-width: 0; }
+.jukebox-catalog-title { display: block; font-size: 1rem; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+.jukebox-catalog-meta { display: block; margin-top: .2rem; color: var(--jukebox-muted); font-size: .85rem; overflow-wrap: anywhere; }
+.jukebox-catalog-actions { justify-self: end; display: flex; flex-wrap: wrap; justify-content: end; gap: .4rem; }
+.jukebox-catalog-actions button { margin: 0; white-space: nowrap; color: var(--jukebox-gold); }
+.jukebox-catalog-context { display: flex; align-items: center; gap: .75rem; justify-content: space-between; padding: .8rem 0 .3rem; }
+.jukebox-catalog-context h3 { margin: 0; order: 1; min-width: 0; }
+.jukebox-catalog-context button { order: 2; flex: none; margin: 0 0 0 auto; }
+#catalog-empty { margin-top: .8rem; }
+@media (max-width: 42rem) {
+  .jukebox-host-logo { width: 3.5rem; height: 3.5rem; border-radius: .6rem; }
+  .jukebox-host-logo .jukebox-record { width: 2rem; height: 2rem; }
+  .jukebox-page-identity { gap: .7rem; }
+  .jukebox-branding-summary { grid-template-columns: 3rem minmax(0, 1fr); gap: .65rem; }
+  .jukebox-branding-image { width: 3rem; height: 3rem; }
+  .jukebox-branding-summary > button { grid-column: 1 / -1; }
+  .jukebox-catalog-row-content { gap: .55rem; }
+  .jukebox-catalog-actions button { font-size: .86rem; padding-inline: .6rem; }
+  .jukebox-catalog-meta { font-size: .8rem; }
+}

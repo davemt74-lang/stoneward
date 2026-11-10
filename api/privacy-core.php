@@ -174,6 +174,7 @@ function sf_privacy_close_account(int $userId,array $user,string $password,strin
       $purged['canvas_images']=sf_agent_canvas_image_clear_metadata($userId);
       $purged+=sf_image_gen_clear_user_quota($pdo,$userId);
       $purged+=sf_jukebox_follow_clear_user($userId);
+      $purged+=sf_jukebox_branding_clear_user($userId);
       $purged['canvas_apps']=$agent['canvas_apps']??0;
       $purged+=sf_canvas_app_clear_installed($userId);
       foreach(['user_sessions','user_favorites','user_listening_progress','user_guest_recent_signals','user_guest_imports','user_track_feedback','user_play_queue','user_saved_builds','user_library','user_notification_preferences','notification_delivery_keys','notification_events','notification_generation_state','user_notifications','user_activity','user_collections','user_playlists','agent_listening_sessions','community_posts','account_action_tokens','user_token_balances','token_ledger','user_subscriptions','user_trial_history','ai_token_reservations'] as $table)$purged[$table]=sf_privacy_delete_rows($table,$userId);
