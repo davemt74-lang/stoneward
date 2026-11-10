@@ -11,11 +11,13 @@ if($host&&!$viewer){
 }
 $csrf=sf_user_csrf();
 session_write_close();
-$profileName=trim((string)($viewer['display_name']??''))?:($viewer?'My account':'Guest');
+$profileName=trim((string)($viewer['display_name']??''));
+if($profileName==='')$profileName=$viewer?'My account':'Guest';
 $venueAdmin=$host&&($viewer['role']??'')==='admin';
 $sessionTabs=$host?['overview'=>'Overview','phones'=>'Phones','music'=>'Music','chat'=>'Chat','history'=>'History','settings'=>'Settings']
     :['overview'=>'Overview','music'=>'Music','chat'=>'Chat'];
 $sessionId=$_GET['id']??'';
+$hostDirectory=$host&&$sessionId==='';
 $signInHref='./?view=login';
 if(is_string($sessionId)&&preg_match('/^[a-f0-9]{32}$/D',$sessionId))$signInHref.='#return_jukebox='.$sessionId;
 $pwaSplash=sf_pwa_splash_published();
@@ -55,15 +57,15 @@ $renderSessionShare=static function(bool $host):void {
 <meta name="robots" content="noindex">
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
-<title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=14">
+<title><?=$hostDirectory?sf_pwa_shell_attr($profileName).' · Stonefellow':'Stonefellow Jukebox'?></title>
+<link rel="stylesheet" href="assets/css/jukebox.css?v=15">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-clock.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=5"></script>
-<script defer src="assets/js/jukebox.js?v=16"></script>
+<script defer src="assets/js/jukebox.js?v=17"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -102,7 +104,7 @@ $renderSessionShare=static function(bool $host):void {
   </div>
 </header>
 <main>
-<?php if($host&&$sessionId===''): ?>
+<?php if($hostDirectory): ?>
   <div id="host-cover-banner" class="jukebox-host-cover">
     <img id="host-cover" alt="Hosted events cover image" decoding="async" hidden>
   </div>
@@ -115,13 +117,16 @@ $renderSessionShare=static function(bool $host):void {
       </div>
       <div>
       <p class="jukebox-kicker"><?=$host?'Session management':'Stonefellow Jukebox'?></p>
-      <h1 id="title"><?=$host?'Jukebox':'Live Sessions'?></h1>
+      <h1 id="title"><?=$hostDirectory?sf_pwa_shell_attr($profileName):($host?'Jukebox':'Live Sessions')?></h1>
+<?php if($hostDirectory): ?>
+      <p id="host-username" class="jukebox-host-username jukebox-muted" hidden><?=sf_pwa_shell_attr($profileName)?></p>
+<?php endif; ?>
       <p id="session-intro" class="jukebox-muted" hidden>Open a session to see what’s playing or listen from your phone when enabled.</p>
       </div>
     </div>
     <div class="jukebox-page-actions">
 <?php if($host): ?>
-<?php if($sessionId===''): ?>
+<?php if($hostDirectory): ?>
       <button id="open-cover" type="button" aria-haspopup="dialog" hidden>Add cover image</button>
 <?php endif; ?>
 <?php if($venueAdmin): ?>

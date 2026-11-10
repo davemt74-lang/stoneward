@@ -127,7 +127,7 @@ try{
             return $row+['remote_listening'=>(bool)$session['remote_listening'],'online'=>sf_jukebox_player_online($session)];
         };
         $venue=$hostMode?sf_jukebox_query('SELECT name FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn():false;
-        sf_json_response(['ok'=>true,'sessions'=>array_map($directoryRow,$sessions),'venue'=>$venue?:null,'admin'=>$admin]
+        sf_json_response(['ok'=>true,'sessions'=>array_map($directoryRow,$sessions),'venue'=>$venue===false||$venue===''?null:$venue,'admin'=>$admin]
             +($hostMode?['branding'=>$branding[$uid]??sf_jukebox_branding_metadata(null),
                 'cover'=>sf_jukebox_cover_get($uid),'branding_editable'=>sf_jukebox_branding_can_edit($uid,$admin)]:[])
             +($page!==null?['scope'=>$scope,'next_cursor'=>$page['next_cursor']]:[])
