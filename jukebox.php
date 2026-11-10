@@ -36,13 +36,13 @@ header('Content-Security-Policy: '.$framePolicy);
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title>Stonefellow Jukebox</title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=9">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=10">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=3"></script>
-<script defer src="assets/js/jukebox.js?v=10"></script>
+<script defer src="assets/js/jukebox.js?v=11"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -100,10 +100,25 @@ header('Content-Security-Policy: '.$framePolicy);
   </div>
   <p id="status" class="jukebox-status" role="status"></p>
   <div id="directory" class="jukebox-directory<?=$host?'':' jukebox-directory-guest'?>" hidden>
-    <section class="jukebox-panel" aria-labelledby="session-heading">
+<?php if($host): ?>
+    <nav id="directory-tabs" class="jukebox-directory-tabs" role="tablist" aria-label="Your sessions">
+      <button type="button" id="directory-tab-active" role="tab" data-directory-scope="active" aria-controls="directory-results" aria-selected="true">Active</button>
+      <button type="button" id="directory-tab-archive" role="tab" data-directory-scope="archive" aria-controls="directory-results" aria-selected="false" tabindex="-1">Archive</button>
+    </nav>
+<?php endif; ?>
+    <section id="directory-results" class="jukebox-panel" <?=$host?'role="tabpanel" aria-labelledby="directory-tab-active" tabindex="0"':'aria-labelledby="session-heading"'?>>
       <h2 id="session-heading"><?=$host?'Your sessions':'Live'?></h2>
+<?php if($host): ?>
+      <p id="directory-description" class="jukebox-muted jukebox-directory-description">Open and scheduled sessions. Completed sessions move to Archive.</p>
+<?php endif; ?>
       <ul id="sessions" class="jukebox-session-list"></ul>
       <p id="session-empty" class="jukebox-empty" hidden>No sessions yet.</p>
+<?php if($host): ?>
+      <div class="jukebox-directory-pagination">
+        <p id="directory-status" class="jukebox-muted" role="status"></p>
+        <button type="button" id="directory-more" hidden>Load more</button>
+      </div>
+<?php endif; ?>
     </section>
     <section id="upcoming-directory" class="jukebox-panel" aria-labelledby="upcoming-directory-heading" hidden>
       <h2 id="upcoming-directory-heading">Upcoming</h2>
@@ -119,8 +134,9 @@ header('Content-Security-Policy: '.$framePolicy);
   <dialog id="create-dialog" class="jukebox-dialog" aria-labelledby="create-heading">
     <div class="jukebox-dialog-head"><h2 id="create-heading">Create session</h2><button type="button" class="jukebox-dialog-close" data-jukebox-dialog-close aria-label="Close create session">×</button></div>
     <form id="create">
+      <p id="create-source" class="jukebox-muted" hidden></p>
       <label>Session name <input name="title" maxlength="120" required autofocus></label>
-      <label id="listing" class="jukebox-checkbox" hidden><input type="checkbox" name="listed"> Public universal session</label>
+      <label id="listing" class="jukebox-checkbox"<?=$venueAdmin?'':' hidden'?>><input type="checkbox" name="listed"> Public universal session</label>
       <label class="jukebox-checkbox"><input type="checkbox" name="remote_listening" aria-describedby="create-remote-help"> Allow remote listening</label>
       <small id="create-remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
       <label>Scheduled date and time (optional) <input type="datetime-local" name="scheduled_at" aria-describedby="create-schedule-help"></label>
@@ -129,6 +145,26 @@ header('Content-Security-Policy: '.$framePolicy);
       <div class="jukebox-dialog-actions">
         <button type="button" data-jukebox-dialog-close>Cancel</button>
         <button type="submit" class="jukebox-primary">Create session</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="edit-dialog" class="jukebox-dialog" aria-labelledby="edit-heading" aria-describedby="edit-description">
+    <div class="jukebox-dialog-head"><h2 id="edit-heading">Edit session</h2><button type="button" class="jukebox-dialog-close" data-jukebox-dialog-close aria-label="Close edit session">×</button></div>
+    <form id="edit">
+      <label>Session name <input name="title" maxlength="120" required autofocus></label>
+      <div id="edit-options" class="jukebox-edit-options">
+        <label id="edit-listing" class="jukebox-checkbox"<?=$venueAdmin?'':' hidden'?>><input type="checkbox" name="listed"> Public universal session</label>
+        <label class="jukebox-checkbox"><input type="checkbox" name="remote_listening" aria-describedby="edit-remote-help"> Allow remote listening</label>
+        <small id="edit-remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
+        <label id="edit-schedule">Scheduled date and time <input type="datetime-local" name="scheduled_at" aria-describedby="edit-schedule-help"></label>
+        <small id="edit-schedule-help" class="remote-help">Use your local time<span data-schedule-zone></span>.</small>
+      </div>
+      <p id="edit-description" class="jukebox-muted"></p>
+      <p id="edit-status" class="jukebox-form-status" role="status"></p>
+      <button type="button" id="edit-reload" hidden>Load latest settings</button>
+      <div class="jukebox-dialog-actions">
+        <button type="button" data-jukebox-dialog-close>Cancel</button>
+        <button type="submit" class="jukebox-primary">Save changes</button>
       </div>
     </form>
   </dialog>
@@ -172,6 +208,10 @@ header('Content-Security-Policy: '.$framePolicy);
 </div>
 <?php endif; ?>
 <?php if($host): ?>
+<div class="actions jukebox-session-management-actions">
+<button type="button" id="upcoming-edit-session" aria-haspopup="dialog">Edit session</button>
+<button type="button" id="upcoming-reuse-session" aria-haspopup="dialog">Use settings</button>
+</div>
 <div id="schedule-controls">
 <div id="upcoming-share"></div>
 <form id="reschedule">
@@ -300,6 +340,11 @@ header('Content-Security-Policy: '.$framePolicy);
 <div id="session-panel-settings" class="jukebox-session-panel" role="tabpanel" aria-labelledby="session-tab-settings" tabindex="0" hidden>
   <section class="jukebox-panel jukebox-host-settings" aria-labelledby="host-settings-heading">
     <h2 id="host-settings-heading">Session settings</h2>
+    <p class="jukebox-muted">Update the name and settings, or use them to create a new session.</p>
+    <div class="actions jukebox-session-management-actions">
+      <button type="button" id="edit-session" aria-haspopup="dialog">Edit session</button>
+      <button type="button" id="reuse-session" aria-haspopup="dialog">Use settings</button>
+    </div>
     <label class="remote-setting"><input id="remote-listening" type="checkbox" aria-describedby="remote-help"> Allow remote listening</label>
     <small id="remote-help" class="remote-help">Anyone can listen to a public session. Private sessions are available to approved phones.</small>
     <button type="button" id="end-session">End session</button>
@@ -311,6 +356,12 @@ header('Content-Security-Policy: '.$framePolicy);
 <?php endif; ?>
 <section id="recap" class="jukebox-panel" hidden aria-labelledby="recap-heading">
 <h2 id="recap-heading">Session recap</h2>
+<?php if($host): ?>
+<div class="actions jukebox-session-management-actions">
+<button type="button" id="recap-edit-session" aria-haspopup="dialog">Rename session</button>
+<button type="button" id="recap-reuse-session" aria-haspopup="dialog">Use settings</button>
+</div>
+<?php endif; ?>
 <p id="recap-status" role="status"></p>
 <button type="button" id="recap-retry" hidden>Retry recap</button>
 <div id="recap-content" hidden>

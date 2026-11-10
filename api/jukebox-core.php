@@ -12,13 +12,14 @@ function sf_jukebox_schema(): void {
     $blob=$mysql?'MEDIUMTEXT':'TEXT';
     $serial=$mysql?'BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY':'INTEGER PRIMARY KEY AUTOINCREMENT';
     $threadIndex=$mysql?', INDEX jukebox_messages_thread (session_id,phone_id,id,sender)':'';
+    $directoryIndex=$mysql?', INDEX jukebox_sessions_owner_directory (owner_id,ended,created,id)':'';
     $tables=[
         "jukebox_venues (owner_id BIGINT PRIMARY KEY, name VARCHAR(120) NOT NULL)",
         "jukebox_sessions (id CHAR(32) PRIMARY KEY, owner_id BIGINT NOT NULL, venue_id BIGINT NOT NULL,
             title VARCHAR(120) NOT NULL, listed INTEGER NOT NULL, ended INTEGER NOT NULL DEFAULT 0,
             revision BIGINT NOT NULL DEFAULT 0, player CHAR(64) NOT NULL DEFAULT '',
             heartbeat BIGINT NOT NULL DEFAULT 0, current_id BIGINT NULL, paused INTEGER NOT NULL DEFAULT 0,
-            seconds INTEGER NOT NULL DEFAULT 0, created BIGINT NOT NULL)",
+            seconds INTEGER NOT NULL DEFAULT 0, created BIGINT NOT NULL$directoryIndex)",
         "jukebox_schedule (session_id CHAR(32) PRIMARY KEY, scheduled_at BIGINT NOT NULL, started_at BIGINT NULL)",
         "jukebox_remote (session_id CHAR(32) PRIMARY KEY, enabled INTEGER NOT NULL,
             status VARCHAR(12) NOT NULL, position_ms BIGINT NOT NULL, sampled_at_ms BIGINT NOT NULL,
@@ -37,12 +38,14 @@ function sf_jukebox_schema(): void {
     ];
     $db=sf_db();
     foreach($tables as $table) $db->exec("CREATE TABLE IF NOT EXISTS ".$table.$engine);
-    if(!$mysql){
-        $db->exec('CREATE INDEX IF NOT EXISTS jukebox_messages_thread ON jukebox_messages (session_id,phone_id,id,sender)');
-    }elseif(!$db->query("SHOW INDEX FROM jukebox_messages WHERE Key_name='jukebox_messages_thread'")->fetch()){
-        // Existing installations need the polling index. Another first request may install it first.
-        try{$db->exec('CREATE INDEX jukebox_messages_thread ON jukebox_messages (session_id,phone_id,id,sender)');}
-        catch(PDOException $error){if((int)($error->errorInfo[1]??0)!==1061)throw $error;}
+    foreach(['jukebox_messages_thread'=>['jukebox_messages','session_id,phone_id,id,sender'],
+        'jukebox_sessions_owner_directory'=>['jukebox_sessions','owner_id,ended,created,id']] as $index=>[$table,$columns]){
+        if(!$mysql)$db->exec("CREATE INDEX IF NOT EXISTS $index ON $table ($columns)");
+        elseif(!$db->query("SHOW INDEX FROM $table WHERE Key_name='$index'")->fetch()){
+            // Existing installations need these indexes. Another first request may install one first.
+            try{$db->exec("CREATE INDEX $index ON $table ($columns)");}
+            catch(PDOException $error){if((int)($error->errorInfo[1]??0)!==1061)throw $error;}
+        }
     }
     sf_jukebox_listener_schema($mysql,$engine);
     $ready=true;
@@ -86,6 +89,100 @@ function sf_jukebox_schedule_details(array $session): array {
     $started=$session['started_at']??($scheduled===null?($session['created']??null):null);
     return ['phase'=>sf_jukebox_phase($session),'scheduled_at'=>$scheduled,
         'started_at'=>$started===null?null:(int)$started];
+}
+
+/** Persisted configuration, independent of player heartbeats and transport state. */
+function sf_jukebox_settings(array $session): array {
+    return ['title'=>(string)$session['title'],'listed'=>(bool)$session['listed'],
+        'remote_listening'=>(bool)$session['remote_enabled'],
+        'scheduled_at'=>isset($session['scheduled_at'])?(int)$session['scheduled_at']:null,
+        'phase'=>sf_jukebox_phase($session)];
+}
+
+/** Called after taking the session write lock. Never copies or resets playback. */
+function sf_jukebox_settings_update(array $session,array $body,bool $admin): array {
+    $current=sf_jukebox_settings($session);
+    $expected=$body['expected']??null;
+    if(!is_array($expected)||count($expected)!==count($current)
+        ||array_diff_key($current,$expected)||array_diff_key($expected,$current)
+        ||!is_string($expected['title'])||!is_bool($expected['listed'])||!is_bool($expected['remote_listening'])
+        ||($expected['scheduled_at']!==null&&!is_int($expected['scheduled_at']))
+        ||!in_array($expected['phase'],['live','upcoming','ended','canceled'],true))
+        throw new InvalidArgumentException('Reload the session settings before saving.');
+    foreach($current as $key=>$value){
+        if($expected[$key]!==$value)
+            throw new DomainException('These session settings changed. Reopen Edit session to review the latest settings.');
+    }
+    $changes=array_diff_key($body,['expected'=>true]);
+    if(!$changes||array_diff_key($changes,$current)||array_key_exists('phase',$changes))
+        throw new InvalidArgumentException('Choose valid session settings to update.');
+    $next=$current;
+    if(array_key_exists('title',$body)){
+        if(!is_string($body['title'])||!preg_match('/\A[^\x00-\x1F\x7F]{1,120}\z/u',trim($body['title'])))
+            throw new InvalidArgumentException('Enter a session name of 1 to 120 characters.');
+        $next['title']=trim($body['title']);
+    }
+    foreach(['listed','remote_listening'] as $key){
+        if(!array_key_exists($key,$body))continue;
+        if(!is_bool($body[$key]))throw new InvalidArgumentException('Choose whether '.($key==='listed'?'the session is public.':'remote listening is enabled.'));
+        $next[$key]=$body[$key];
+    }
+    if(array_key_exists('scheduled_at',$body)){
+        if($body['scheduled_at']!==null&&!is_int($body['scheduled_at']))
+            throw new InvalidArgumentException('Choose a valid scheduled time.');
+        $next['scheduled_at']=$body['scheduled_at'];
+    }
+    if($next['listed']&&!$current['listed']&&!$admin)
+        throw new DomainException('An administrator must make a session public.');
+    if(in_array($current['phase'],['ended','canceled'],true)){
+        foreach(['listed','remote_listening','scheduled_at'] as $key){
+            if($next[$key]!==$current[$key])throw new DomainException('Only the name of an archived session can be changed.');
+        }
+    }
+    if($next['scheduled_at']!==$current['scheduled_at']){
+        if($current['phase']!=='upcoming')throw new DomainException('Only an upcoming session can be rescheduled.');
+        $next['scheduled_at']=sf_jukebox_schedule_time($next['scheduled_at']);
+    }
+    if($next['title']!==$current['title']||$next['listed']!==$current['listed'])
+        sf_jukebox_query('UPDATE jukebox_sessions SET title=?,listed=? WHERE id=?',[$next['title'],(int)$next['listed'],$session['id']]);
+    if($next['remote_listening']!==$current['remote_listening'])
+        sf_jukebox_controls($session,['event'=>'remote_listening','enabled'=>$next['remote_listening']]);
+    if($next['scheduled_at']!==$current['scheduled_at'])
+        sf_jukebox_controls($session,['event'=>'reschedule','scheduled_at'=>$next['scheduled_at']]);
+    return sf_jukebox_session($session['id']);
+}
+
+/** Keyset pagination keeps older sessions reachable as new sessions are created. */
+function sf_jukebox_directory_page(int $owner,string $scope,mixed $cursor,mixed $limit): array {
+    if(!in_array($scope,['active','archive'],true))throw new InvalidArgumentException('Choose Active or Archive sessions.');
+    if(!is_string($limit)||!preg_match('/\A(?:[1-9]|1[0-9]|2[0-5])\z/',$limit))
+        throw new InvalidArgumentException('Choose a session page size from 1 to 25.');
+    $size=(int)$limit;
+    $args=[$owner,$scope==='archive'?1:0];
+    $older='';
+    if($cursor!==null){
+        if(!is_string($cursor)||!preg_match('/\A[A-Za-z0-9_-]{1,256}\z/',$cursor))
+            throw new InvalidArgumentException('This session page link is invalid.');
+        $decoded=base64_decode(strtr($cursor,'-_','+/'),true);
+        $position=$decoded===false?null:json_decode($decoded,true);
+        if(!is_array($position)||($position['scope']??null)!==$scope||!is_int($position['created']??null)
+            ||$position['created']<0||!is_string($position['id']??null)||!preg_match('/\A[a-f0-9]{32}\z/',$position['id']))
+            throw new InvalidArgumentException('This session page link is invalid.');
+        $older=' AND (s.created<? OR (s.created=? AND s.id<?))';
+        array_push($args,$position['created'],$position['created'],$position['id']);
+    }
+    $rows=sf_jukebox_query('SELECT s.id,s.title,s.listed,s.ended,s.created,s.heartbeat,
+        COALESCE(r.enabled,0) AS remote_enabled,t.scheduled_at,t.started_at
+        FROM jukebox_sessions s LEFT JOIN jukebox_schedule t ON t.session_id=s.id
+        LEFT JOIN jukebox_remote r ON r.session_id=s.id WHERE s.owner_id=? AND s.ended=?'.$older.
+        ' ORDER BY s.created DESC,s.id DESC LIMIT '.($size+1),$args)->fetchAll();
+    $next=null;
+    if(count($rows)>$size){
+        array_pop($rows);
+        $last=$rows[count($rows)-1];
+        $next=rtrim(strtr(base64_encode(json_encode(['scope'=>$scope,'created'=>(int)$last['created'],'id'=>$last['id']])),'+/','-_'),'=');
+    }
+    return ['sessions'=>$rows,'next_cursor'=>$next];
 }
 
 function sf_jukebox_token(mixed $token): string {

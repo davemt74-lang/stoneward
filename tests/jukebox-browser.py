@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PHP = os.environ.get('SF_TEST_PHP', 'php')
 CHROME = os.environ.get('CHROMIUM_BIN')
 BROWSER = os.environ.get('SF_JUKEBOX_BROWSER', 'chromium')
-PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aH1sAAAAASUVORK5CYII='
+PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII='
 SPLASH_ART = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAGCAIAAABxZ0isAAAAEUlEQVR4nGNIFS3BihgGUgIAEWksoW5LtJgAAAAASUVORK5CYII='
 TRACK_SECONDS = 45
 MANAGED_AUDIO = 'M' + 'A'*20
@@ -116,16 +116,16 @@ def fixture(site):
     """)
 
 
-def request(page, action, data=None, host=False, session=None):
-    return page.evaluate("""async ({action,data,host,session}) => {
+def request(page, action, data=None, host=False, session=None, **params):
+    return page.evaluate("""async ({action,data,host,session,params}) => {
       const url = new URL('api/jukebox.php', location.href);
       const current = new URLSearchParams(location.search);
-      url.search = new URLSearchParams({action,id:session ?? current.get('id') ?? '',host:host?'1':'0'});
+      url.search = new URLSearchParams({action,id:session ?? current.get('id') ?? '',host:host?'1':'0',...params});
       const options = data === null ? {} : {method:'POST',body:JSON.stringify(data),
         headers:{'Content-Type':'application/json','X-CSRF-Token':document.querySelector('meta[name=sf-csrf]').content}};
       const response = await fetch(url,options);
       return {status:response.status,...await response.json()};
-    }""", dict(action=action, data=data, host=host, session=session))
+    }""", dict(action=action, data=data, host=host, session=session, params=params))
 
 
 def player_sample(player, event, item, sequence, position_ms, transport='playing', **extra):
@@ -550,6 +550,7 @@ def scenario(browser, base, phone_options):
     assert recap['unique_players'] == recap['peak_players'] == 1
     assert recap['active_players'] == 0 and recap['listening_ms'] >= metrics['listening_ms']
     venue.goto(base + '/jukebox.php?host=1')
+    venue.locator('[data-directory-scope=archive]').click()
     venue.get_by_role('link', name='Tonight at Test Bar (ended)', exact=True).click()
     expect(venue.get_by_role('heading', name='Session recap')).to_be_visible()
     expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
@@ -934,6 +935,186 @@ def schedule_scenario(browser, base, phone_options):
     print('PASS shared QR splash design with distinct session details, private following, same-link start, playback, and recap')
 
 
+def management_scenario(browser, base, phone_options, site):
+    host = browser.new_context().new_page()
+    host.goto(base + '/login-fixture.php?user=1')
+    host.goto(base + '/jukebox.php?host=1')
+    future = ((int(time.time()) + 172800) // 60) * 60 + 37
+    source = request(host, 'create', dict(title='Management browser source', listed=True,
+                                         remote_listening=True, scheduled_at=future), True)['id']
+    host.goto(base + f'/jukebox.php?host=1&id={source}')
+    join = host.locator('#join-link').get_attribute('href')
+    qr = host.locator('#qr svg rect').evaluate_all('rects => rects.map(rect => rect.outerHTML)')
+    host.locator('#upcoming-edit-session').click()
+    edit = host.locator('#edit-dialog')
+    expect(edit).to_be_visible()
+    assert edit.evaluate("dialog => dialog.matches(':modal')")
+    expect(edit.locator('[name=title]')).to_be_focused()
+    expect(edit.locator('[name=listed]')).to_be_checked()
+    expect(edit.locator('[name=remote_listening]')).to_be_checked()
+    expect(edit.locator('[name=scheduled_at]')).not_to_have_value('')
+    edit.locator('[name=title]').fill('Scheduled rename')
+    edit.get_by_role('button', name='Save changes', exact=True).click()
+    expect(edit).to_be_hidden()
+    expect(host.locator('#title')).to_have_text('Scheduled rename')
+    assert host.locator('#join-link').get_attribute('href') == join
+    assert host.locator('#qr svg rect').evaluate_all('rects => rects.map(rect => rect.outerHTML)') == qr
+    assert request(host, 'settings', host=True)['settings']['scheduled_at'] == future
+    host.locator('#upcoming-edit-session').click()
+    changed_time = future + 3600 - 37
+    edit.locator('[name=scheduled_at]').fill(datetime.fromtimestamp(changed_time, timezone.utc).strftime('%Y-%m-%dT%H:%M'))
+    edit.get_by_role('button', name='Save changes', exact=True).click()
+    expect(edit).to_be_hidden()
+    assert request(host, 'settings', host=True)['settings']['scheduled_at'] == changed_time
+    host.locator('#start-session').click()
+    expect(host.locator('#footer')).to_be_visible()
+
+    phone = browser.new_context(**phone_options).new_page()
+    phone.goto(join)
+    assert request(phone, 'join', {'name': 'Management guest'})['ok']
+    phone_id = request(phone, 'state')['state']['phone']['id']
+    assert request(host, 'approve', {'phone': phone_id}, True)['ok']
+    for track, nonce in (('a', 'c'*32), ('b', 'd'*32)):
+        assert request(phone, 'request', {'track': track, 'nonce': nonce})['ok']
+    assert request(phone, 'message', {'text': 'Conversation survives editing'})['ok']
+    expect(host.locator('#host-now')).to_have_text('First Song')
+    host.get_by_role('button', name='Enable player on this device').click()
+    host.wait_for_function("!document.querySelector('#audio').paused || document.querySelector('#audio-start').getClientRects().length > 0")
+    if host.locator('#audio-start').is_visible():
+        host.locator('#audio-start').click()
+    host.wait_for_function("!document.querySelector('#audio').paused && document.querySelector('#audio').currentTime > 0")
+    phone.get_by_role('button', name='Stream on this phone', exact=True).click()
+    phone.wait_for_function("!document.querySelector('#listener-audio').paused")
+    assert_playheads_synced(host, phone)
+    before = request(host, 'state', host=True)['state']
+    position = host.locator('#audio').evaluate("audio => { audio.managementFixture = 'same-node'; return audio.currentTime; }")
+    current_src = host.locator('#audio').evaluate('audio => audio.currentSrc')
+    session_tab(host, 'settings')
+    host.locator('#edit-session').click()
+    edit.locator('[name=title]').fill('Live rename')
+    snapshot = request(host, 'settings', host=True)['settings']
+    assert request(host, 'settings', {'expected': snapshot, 'title': 'Edited by another host'}, True)['ok']
+    edit.get_by_role('button', name='Save changes', exact=True).click()
+    expect(edit.locator('#edit-reload')).to_be_visible()
+    expect(edit.locator('[name=title]')).to_have_value('Live rename')
+    edit.locator('#edit-reload').click()
+    expect(edit.locator('[name=title]')).to_have_value('Edited by another host')
+    edit.locator('[name=title]').fill('Live rename')
+    edit.get_by_role('button', name='Save changes', exact=True).click()
+    expect(edit).to_be_hidden()
+    expect(host.locator('#title')).to_have_text('Live rename')
+    expect(phone.locator('#title')).to_have_text('Live rename', timeout=10_000)
+    after = request(host, 'state', host=True)['state']
+    assert after['current'] == before['current'] and after['queue'] == before['queue']
+    assert after['phones'] == before['phones'] and after['history'] == before['history']
+    assert host.locator('#audio').evaluate("(audio, position) => audio.managementFixture === 'same-node' && !audio.paused && audio.currentTime >= position", position)
+    assert host.locator('#audio').evaluate('audio => audio.currentSrc') == current_src
+    assert_playheads_synced(host, phone)
+    assert request(host, 'thread', host=True, phone=phone_id, full=1)['messages'][0]['body'] == 'Conversation survives editing'
+
+    mobile = browser.new_context(**phone_options).new_page()
+    mobile.goto(base + '/login-fixture.php?user=1')
+    mobile.goto(host.url)
+    session_tab(mobile, 'settings')
+    mobile.locator('#edit-session').click()
+    mobile_edit = mobile.locator('#edit-dialog')
+    expect(mobile_edit.locator('[name=title]')).to_be_focused()
+    assert mobile.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+    mobile_edit.get_by_role('button', name='Cancel', exact=True).click()
+    expect(mobile.locator('#edit-session')).to_be_focused()
+    mobile.context.close()
+
+    host.once('dialog', lambda dialog: dialog.accept())
+    host.locator('#end-session').click()
+    expect(host.get_by_role('heading', name='Session recap', exact=True)).to_be_visible()
+    host.locator('#recap-edit-session').click()
+    expect(edit.get_by_role('heading', name='Rename session', exact=True)).to_be_visible()
+    expect(edit.locator('#edit-options')).to_be_hidden()
+    edit.locator('[name=title]').fill('Finished session rename')
+    edit.get_by_role('button', name='Save changes', exact=True).click()
+    expect(edit).to_be_hidden()
+    expect(host.locator('#title')).to_have_text('Finished session rename')
+    expect(host.locator('#recap-tracks')).to_contain_text('First Song')
+    host.locator('#recap-reuse-session').click()
+    create = host.locator('#create-dialog')
+    expect(create).to_be_visible()
+    expect(create.locator('[name=title]')).to_have_value('Finished session rename')
+    expect(create.locator('[name=listed]')).to_be_checked()
+    expect(create.locator('[name=remote_listening]')).to_be_checked()
+    expect(create.locator('[name=scheduled_at]')).to_have_value('')
+    create.locator('[name=title]').fill('Independent new session')
+    create.get_by_role('button', name='Create session', exact=True).click()
+    expect(host.locator('#title')).to_have_text('Independent new session')
+    copied = request(host, 'state', host=True)['state']
+    assert copied['id'] != source and copied['phase'] == 'live' and copied['scheduled_at'] is None
+    assert copied['current'] is None and copied['phones'] == copied['queue'] == copied['history'] == []
+    assert copied['chat_threads'] == [] and not copied['online']
+    phone.goto(base + '/jukebox.php?id=' + copied['id'])
+    assert not request(phone, 'state')['state'].get('phone')
+    expect(phone.locator('#edit-session, #reuse-session, #directory-tabs').filter(visible=True)).to_have_count(0)
+
+    archive_ids = []
+    for index in range(27):
+        old = request(host, 'create', {'title': f'Archive browser {index}', 'listed': True}, True)['id']
+        assert request(host, 'control', {'event': 'end'}, True, session=old)['ok']
+        archive_ids.append(old)
+    canceled = request(host, 'create', {'title': 'Canceled browser', 'listed': True,
+                                        'scheduled_at': future}, True)['id']
+    assert request(host, 'control', {'event': 'cancel'}, True, session=canceled)['ok']
+    host.goto(base + '/jukebox.php?host=1')
+    active_tab = host.locator('[data-directory-scope=active]')
+    archive_tab = host.locator('[data-directory-scope=archive]')
+    expect(active_tab).to_have_attribute('aria-selected', 'true')
+    expect(host.locator(f'#sessions [data-session-id="{copied["id"]}"]')).to_be_visible()
+    for old in (source, canceled):
+        expect(host.locator(f'#sessions [data-session-id="{old}"]')).to_have_count(0)
+    # An Edit response that arrives after changing directory scope belongs to
+    # the old view and must not open a detached session's modal.
+    pending_settings = []
+    settings_pattern = '**/api/jukebox.php?action=settings&*'
+    host.route(settings_pattern, lambda route: pending_settings.append(route))
+    with host.expect_request(lambda req: 'action=settings&' in req.url):
+        host.locator(f'[data-session-edit="{copied["id"]}"]').click()
+    assert len(pending_settings) == 1
+    archive_tab.click()
+    expect(archive_tab).to_have_attribute('aria-selected', 'true')
+    delayed = pending_settings[0]
+    with host.expect_response(lambda response: 'action=settings&' in response.url) as delivered:
+        delayed.fulfill(response=delayed.fetch())
+    delivered.value.finished()
+    host.unroute(settings_pattern)
+    host.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+    expect(host.locator('#edit-dialog, #create-dialog').filter(visible=True)).to_have_count(0)
+    expect(host.locator('#sessions [data-session-id]')).to_have_count(25)
+    while host.locator('#directory-more').is_visible():
+        count = host.locator('#sessions [data-session-id]').count()
+        host.locator('#directory-more').click()
+        host.wait_for_function('(count) => document.querySelectorAll("#sessions [data-session-id]").length > count', arg=count)
+    rendered = host.locator('#sessions [data-session-id]').evaluate_all('rows => rows.map(row => row.dataset.sessionId)')
+    assert set(archive_ids + [source, canceled]).issubset(rendered)
+    expect(host.locator('#directory-more')).to_be_hidden()
+    expect(host.locator(f'#sessions [data-session-id="{copied["id"]}"]')).to_have_count(0)
+    old_row = host.locator(f'#sessions [data-session-id="{archive_ids[0]}"]')
+    expect(host.locator(f'#sessions [data-session-id="{canceled}"] [data-session-recap]')).to_be_hidden()
+    old_row.locator(f'[data-session-recap="{archive_ids[0]}"]').click()
+    expect(host.get_by_role('heading', name='Session recap', exact=True)).to_be_visible()
+    expect(host.locator('#title')).to_have_text('Archive browser 0')
+    assert request(host, 'recap', host=True)['recap']['totals']['requests'] == 0
+    overdue = request(host, 'create', {'title': 'Overdue waiting source', 'listed': True,
+                                       'scheduled_at': future}, True)['id']
+    past = int(time.time()) - 60
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('UPDATE jukebox_schedule SET scheduled_at=? WHERE session_id=?', (past, overdue))
+    host.goto(base + f'/jukebox.php?host=1&id={overdue}')
+    host.locator('#upcoming-edit-session').click()
+    edit.locator('[name=title]').fill('Still waiting for the host')
+    edit.get_by_role('button', name='Save changes', exact=True).click()
+    expect(edit).to_be_hidden()
+    expect(host.locator('#title')).to_have_text('Still waiting for the host')
+    assert request(host, 'settings', host=True)['settings']['scheduled_at'] == past
+    print('PASS browser scheduled/live/archived edits preserve QR, playback and chat; mobile modals; fresh reuse; archive pagination and older recaps')
+
+
 def http_scenario(base, site):
     class Client:
         def __init__(self, user=None):
@@ -1096,6 +1277,7 @@ def http_scenario(base, site):
     http_remote_scenario(Client, admin, venue, site)
     http_listener_scenario(Client, venue, outsider, site)
     http_schedule_scenario(Client, admin, venue, outsider, site)
+    http_management_scenario(Client, admin, venue, outsider, site)
 
 
 def http_remote_scenario(Client, admin, venue, site):
@@ -1341,6 +1523,157 @@ def http_listener_scenario(Client, venue, outsider, site):
     print('PASS HTTP listener authorization, deduplication, distinct tabs, peak, expiry, and host-only listening recap')
 
 
+def http_management_scenario(Client, admin, venue, outsider, site):
+    guest = Client()
+    session = venue.call('create', data={'title': 'Management source', 'remote_listening': True})['id']
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute('DROP INDEX jukebox_sessions_owner_directory')
+    assert venue.call('settings', session)['ok']
+    assert venue.call('settings', session)['ok']
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        assert [row[2] for row in db.execute('PRAGMA index_info(jukebox_sessions_owner_directory)')] == [
+            'owner_id', 'ended', 'created', 'id']
+        assert sum(row[1] == 'jukebox_sessions_owner_directory'
+                   for row in db.execute('PRAGMA index_list(jukebox_sessions)')) == 1
+    assert guest.call('join', session, {'name': 'Keep this guest'})['ok']
+    phone = guest.call('state', session)['state']['phone']['id']
+    assert venue.call('approve', session, {'phone': phone})['ok']
+    for track, nonce in (('a', 'a'*32), ('b', 'b'*32)):
+        assert guest.call('request', session, {'track': track, 'nonce': nonce})['ok']
+    player = 'e'*64
+    assert venue.call('player', session, {'player': player, 'event': 'claim'})['ok']
+    before = venue.call('state', session)['state']
+    item = before['current']['id']
+    assert venue.call('player', session, player_sample(player, 'playing', item, 1, 1000,
+                                                       observed_revision=before['revision']))['ok']
+    assert guest.call('message', session, {'text': 'Keep the conversation'})['ok']
+    before = venue.call('state', session)['state']
+    expected = venue.call('settings', session)['settings']
+    assert expected == dict(title='Management source', listed=False, remote_listening=True,
+                            scheduled_at=None, phase='live')
+    for unauthorized in (guest, outsider):
+        assert unauthorized.call('settings', session)['status'] in (403, 404, 409)
+        assert unauthorized.call('settings', session, {'expected': expected, 'title': 'Intrusion'})['status'] in (403, 404, 409)
+    for invalid in ({'title': ''}, {'title': []}, {'listed': 'false'},
+                    {'remote_listening': 1}, {'scheduled_at': int(time.time()) + 86400}):
+        result = venue.call('settings', session, {'expected': expected, **invalid})
+        assert result['status'] in (400, 409), result
+    assert venue.call('settings', session, {'title': 'Missing snapshot'})['status'] in (400, 409)
+    assert venue.call('settings', session, {'expected': expected, 'listed': True})['status'] in (403, 409)
+    assert venue.call('settings', session)['settings'] == expected
+
+    # Player heartbeats increment revision while a host edits. They must not
+    # invalidate a settings snapshot or restart the active track.
+    assert venue.call('player', session, player_sample(player, 'playing', item, 2, 1500,
+                                                       observed_revision=before['revision']))['ok']
+    saved = venue.call('settings', session, {'expected': expected, 'title': 'Renamed while playing'})
+    assert saved['ok'], saved
+    after = venue.call('state', session)['state']
+    assert after['id'] == session and after['title'] == 'Renamed while playing'
+    assert after['current'] == before['current'] and after['queue'] == before['queue']
+    assert after['phones'] == before['phones'] and after['history'] == before['history']
+    assert after['transport']['status'] == 'playing'
+    assert venue.call('thread', session, phone=phone, full=1)['messages'][0]['body'] == 'Keep the conversation'
+    assert guest.call('state', session)['state']['phone']['id'] == phone
+    assert venue.call('settings', session, {'expected': expected, 'title': 'Stale overwrite'})['status'] == 409
+    current = venue.call('settings', session)['settings']
+    assert admin.call('settings', session)['settings'] == current
+    assert admin.call('settings', session, {'expected': current, 'title': 'Admin reviewed'})['ok']
+    current = venue.call('settings', session)['settings']
+    assert current['title'] == 'Admin reviewed'
+
+    # Reusing settings creates a distinct session, never copies its queue,
+    # phone approvals, conversation, player claim, or its original start time.
+    copy = venue.call('create', data={key: current[key] for key in ('title', 'listed', 'remote_listening')})['id']
+    copied = venue.call('state', copy)['state']
+    assert copy != session and copied['phase'] == 'live' and copied['scheduled_at'] is None
+    assert copied['phones'] == copied['queue'] == copied['history'] == [] and copied['current'] is None
+    assert copied['chat_threads'] == [] and not copied['online']
+    assert not guest.call('state', copy)['state'].get('phone')
+
+    assert venue.call('control', session, {'event': 'end'})['ok']
+    recap = venue.call('recap', session)['recap']
+    archived = venue.call('settings', session)['settings']
+    assert archived['phase'] == 'ended' and archived['remote_listening'] is True
+    assert venue.call('settings', session, {'expected': archived, 'remote_listening': False})['status'] == 409
+    assert venue.call('settings', session, {'expected': archived, 'title': 'Archive title'})['ok']
+    renamed_recap = venue.call('recap', session)['recap']
+    assert renamed_recap == {**recap, 'title': 'Archive title'}
+
+    future = int(time.time()) + 86400
+    upcoming = admin.call('create', data={'title': 'Future settings', 'listed': True,
+                                         'remote_listening': True, 'scheduled_at': future})['id']
+    follower = Client(3)
+    follower.host = False
+    assert follower.call('follow', upcoming, {'following': True})['ok']
+    original = admin.call('settings', upcoming)['settings']
+    for invalid_time in (None, future - 86460, str(future), True):
+        assert admin.call('settings', upcoming, {'expected': original, 'scheduled_at': invalid_time})['status'] == 400
+    updated = future + 3600
+    assert admin.call('settings', upcoming, {'expected': original, 'title': 'Rescheduled settings',
+                                           'scheduled_at': updated})['ok']
+    assert guest.call('state', upcoming)['state']['scheduled_at'] == updated
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        alerts = db.execute('SELECT event_type,event_at,state FROM jukebox_alerts WHERE session_id=? ORDER BY id',
+                            (upcoming,)).fetchall()
+    assert ('reminder', future, 'obsolete') in alerts
+    assert ('rescheduled', updated, 'pending') in alerts and ('reminder', updated, 'pending') in alerts
+    original = admin.call('settings', upcoming)['settings']
+    assert admin.call('settings', upcoming, {'expected': original, 'title': 'Rename only'})['ok']
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        assert db.execute('SELECT event_type,event_at,state FROM jukebox_alerts WHERE session_id=? ORDER BY id',
+                          (upcoming,)).fetchall() == alerts
+    assert admin.call('control', upcoming, {'event': 'cancel'})['ok']
+    canceled = admin.call('settings', upcoming)['settings']
+    assert canceled['phase'] == 'canceled'
+    assert admin.call('settings', upcoming, {'expected': canceled, 'title': 'Canceled title'})['ok']
+    assert admin.call('settings', upcoming, {'expected': {**canceled, 'title': 'Canceled title'},
+                                           'scheduled_at': updated + 3600})['status'] == 409
+    assert admin.call('recap', upcoming)['status'] == 409
+
+    # Seed enough older records to exceed the former 50-session directory.
+    # Stable cursors must expose every active and archived row once, including
+    # canceled sessions, while another session arrives between pages.
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        rows = [(f'{9000 + index:032x}', 2, 2, f'Older {index}', 0,
+                 int(index < 28), 1000 + index) for index in range(60)]
+        db.executemany('INSERT INTO jukebox_sessions(id,owner_id,venue_id,title,listed,ended,created) VALUES(?,?,?,?,?,?,?)', rows)
+        canceled_id = rows[0][0]
+        db.execute('INSERT INTO jukebox_schedule(session_id,scheduled_at) VALUES(?,?)', (canceled_id, future))
+        expected_ids = {}
+        for scope, ended in (('active', 0), ('archive', 1)):
+            expected_ids[scope] = [row[0] for row in db.execute(
+                'SELECT id FROM jukebox_sessions WHERE owner_id=2 AND ended=? ORDER BY created DESC,id DESC', (ended,))]
+    assert rows[1][0] not in [row['id'] for row in venue.call('directory')['sessions']]
+    for scope in ('active', 'archive'):
+        ids, cursor = [], None
+        while True:
+            page = venue.call('directory', scope=scope, limit=7, **({'cursor': cursor} if cursor else {}))
+            assert page['ok'] and page['scope'] == scope and len(page['sessions']) <= 7
+            for row in page['sessions']:
+                assert row['phase'] in (('live', 'upcoming') if scope == 'active' else ('ended', 'canceled'))
+            ids.extend(row['id'] for row in page['sessions'])
+            if len(ids) == len(page['sessions']):
+                arrived = venue.call('create', data={'title': 'Arrived during pagination'})['id']
+                with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+                    db.execute('UPDATE jukebox_sessions SET created=? WHERE id=?', (int(time.time()) + 5, arrived))
+                if scope == 'archive':
+                    assert venue.call('control', arrived, {'event': 'end'})['ok']
+            cursor = page['next_cursor']
+            if not cursor:
+                break
+        assert arrived not in ids
+        assert ids == expected_ids[scope] and len(ids) == len(set(ids)), (scope, ids, expected_ids[scope])
+    assert venue.call('recap', rows[1][0])['recap']['totals']['requests'] == 0
+    assert venue.call('recap', canceled_id)['status'] == 409
+    assert guest.call('directory', scope='archive')['status'] in (400, 403, 409)
+    assert outsider.call('directory', scope='archive')['sessions'] == []
+    assert venue.call('directory', scope='invalid')['status'] == 400
+    assert venue.call('directory', scope='archive', cursor='broken')['status'] == 400
+    assert upcoming not in [row['id'] for row in venue.call('directory', scope='archive')['sessions']]
+    print('PASS HTTP session settings validation, roles, safe concurrent edits, preserved playback/chat, reuse isolation, alerts, and archive pagination')
+
+
 def http_schedule_scenario(Client, admin, venue, outsider, site):
     guest = Client()
     now = int(time.time())
@@ -1479,16 +1812,20 @@ with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
                         phone_options.pop('default_browser_type', None)
                     else:
                         browser = playwright.chromium.launch(executable_path=CHROME, args=['--no-sandbox'])
-                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv:
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only')):
                         scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--remote-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--management-only' not in sys.argv:
                         schedule_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--schedule-only' not in sys.argv:
+                    if '--schedule-only' not in sys.argv and '--management-only' not in sys.argv:
                         remote_scenario(browser, base, phone_options)
+                        for context in browser.contexts:
+                            context.close()
+                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv:
+                        management_scenario(browser, base, phone_options, site)
         except Exception:
             log.seek(0)
             print(log.read()[-16000:])

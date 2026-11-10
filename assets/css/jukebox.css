@@ -290,6 +290,21 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
 
 .jukebox-directory, .host-grid { display: grid; gap: .85rem; }
 .jukebox-directory { margin-top: 1.25rem; }
+.jukebox-directory-tabs {
+  display: flex;
+  gap: .35rem;
+  justify-self: start;
+  padding: .3rem;
+  border: 1px solid var(--jukebox-line);
+  border-radius: .7rem;
+  background: var(--jukebox-panel);
+}
+.jukebox-directory-tabs button { min-width: 6.5rem; border-color: transparent; background: transparent; color: var(--jukebox-muted); font-weight: 650; }
+.jukebox-directory-tabs button[aria-selected=true] { border-color: #997d58; background: #382a1c; color: var(--jukebox-gold); }
+.jukebox-directory-description { margin: -.15rem 0 1rem; font-size: .92rem; }
+.jukebox-directory-pagination { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: .6rem; margin-top: .8rem; }
+.jukebox-directory-pagination p { margin: 0; font-size: .87rem; }
+.jukebox-directory-pagination:has(p:empty):has(button[hidden]) { display: none; }
 .jukebox-directory-guest, .host-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .jukebox-host-view { display: grid; gap: .85rem; }
 #following-directory { grid-column: 1 / -1; }
@@ -356,6 +371,19 @@ main > .jukebox-panel { margin-top: .85rem; }
 .session-badge-live { background: #233628; color: var(--jukebox-green); }
 .session-badge-upcoming { background: #382a1c; color: var(--jukebox-gold); }
 .session-date { display: block; flex-basis: 100%; color: var(--jukebox-muted); font-size: .92rem; }
+.jukebox-host #sessions > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .15rem .75rem;
+  padding-block: .8rem;
+}
+.jukebox-host #sessions > li > a { grid-column: 1; }
+.jukebox-host #sessions .session-badge { grid-column: 2; grid-row: 1; }
+.jukebox-host #sessions .session-date { grid-column: 1 / -1; }
+.jukebox-session-card-actions { display: flex; flex-wrap: wrap; gap: .45rem; grid-column: 1 / -1; margin-top: .25rem; }
+.jukebox-session-card-actions button { margin: 0; color: var(--jukebox-gold); font-size: .9rem; }
+.jukebox-session-card-actions a { flex: none; min-height: 44px; padding: .5rem .35rem; color: var(--jukebox-gold); font-size: .9rem; }
+.jukebox-session-management-actions { margin-block: .85rem; }
 
 .jukebox-host-overview {
   display: flex;
@@ -420,6 +448,8 @@ main > .jukebox-panel { margin-top: .85rem; }
 .jukebox-dialog-head h2 { margin: 0; }
 .jukebox-dialog-close { width: 44px; flex: none; padding: 0; line-height: 1; font-size: 1.4rem; }
 .jukebox-dialog form { margin: .85rem 0 0; }
+.jukebox-dialog form > p.jukebox-muted { margin: 0; font-size: .9rem; }
+.jukebox-edit-options { display: grid; gap: .7rem; }
 .jukebox-dialog-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: .55rem; margin-top: .25rem; }
 .jukebox-venue-lookup { border: 1px solid var(--jukebox-line); border-radius: .45rem; }
 .jukebox-venue-lookup summary { min-height: 44px; padding: .55rem .65rem; }

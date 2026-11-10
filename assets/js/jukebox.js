@@ -47,6 +47,13 @@
   let tickTask = null;
   let queuedTick = null;
   let directoryPending = false;
+  let directoryScope = 'active';
+  let directoryRows = [];
+  let directoryCursor = null;
+  let directoryGeneration = 0;
+  let editingSession = '';
+  let editSnapshot = null;
+  let managementLoad = 0;
   let crmRequest = null;
   let requestButtons = [];
   const renderKeys = new Map();
@@ -64,7 +71,8 @@
       body: JSON.stringify(body)
     };
     if (action === 'listener' && body?.active === false) options.keepalive = true;
-    const controller = ['state', 'player', 'thread', 'crm', 'venue_accounts'].includes(action) || (!host && action === 'directory') ? new AbortController() : null;
+    const controller = ['state', 'player', 'thread', 'crm', 'venue_accounts', 'directory'].includes(action)
+      || (action === 'settings' && body === undefined) ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
     if (controller) options.signal = controller.signal;
     try {
@@ -161,39 +169,51 @@
       }
     };
   }
-  function bindFormDialog(name, save, afterSave) {
+  function bindFormDialog(name, save, afterSave, onClose = () => {}) {
     const dialog = $(name + '-dialog');
     if (!dialog) return;
     const opener = $('open-' + name);
     const form = $(name);
     const dismiss = dialog.querySelectorAll('[data-jukebox-dialog-close]');
     let saving = false;
+    let returnFocus = opener;
     const report = error => {
       $(name + '-status').textContent = typeof error === 'string' ? error : error.message;
     };
-    opener.onclick = () => dialog.showModal();
+    const open = (control = opener) => {
+      managementLoad++;
+      returnFocus = control;
+      form.reset();
+      report('');
+      if (!dialog.open) dialog.showModal();
+    };
+    if (opener) opener.onclick = () => open(opener);
     dismiss.forEach(control => { control.onclick = () => dialog.close(); });
     dialog.addEventListener('cancel', event => {
       if (saving) event.preventDefault();
     });
     dialog.addEventListener('close', () => {
+      managementLoad++;
       form.reset();
       report('');
-      opener.focus({preventScroll: true});
+      onClose();
+      if (returnFocus?.isConnected) returnFocus.focus({preventScroll: true});
     });
     form.onsubmit = handle(async () => {
+      if (saving) return;
       saving = true;
       report('Saving…');
       dismiss.forEach(control => { control.disabled = true; });
       try {
         const result = await save(new FormData(form));
         dialog.close();
-        afterSave(result);
+        await afterSave(result);
       } finally {
         saving = false;
         dismiss.forEach(control => { control.disabled = false; });
       }
     }, report);
+    return {open, form, dialog, report};
   }
   function bindVenueAccountPicker() {
     const dialog = $('venue-dialog');
@@ -620,6 +640,7 @@
       $('host').hidden = !live;
       $('recap').hidden = !ended;
       $('crm').hidden = !Number(state.venue_id);
+      $('upcoming-edit-session').textContent = phase === 'canceled' ? 'Rename session' : 'Edit session';
       if (live) renderHost();
     }
     renderChat();
@@ -966,6 +987,61 @@
     }
   }
 
+  async function openSessionEdit(sessionId, control) {
+    const generation = ++managementLoad;
+    const {settings} = await api('settings', undefined, {id: sessionId});
+    if (generation !== managementLoad || !control.isConnected) return;
+    editingSession = sessionId;
+    editSnapshot = settings;
+    editDialog.open(control);
+    fillEditSettings(settings);
+  }
+
+  function fillEditSettings(settings) {
+    const form = editDialog.form;
+    const archived = settings.phase === 'ended' || settings.phase === 'canceled';
+    const upcoming = settings.phase === 'upcoming';
+    $('edit-heading').textContent = archived ? 'Rename session' : 'Edit session';
+    form.elements.title.value = settings.title;
+    form.elements.listed.checked = settings.listed;
+    form.elements.listed.disabled = archived || $('edit-listing').hidden;
+    form.elements.remote_listening.checked = settings.remote_listening;
+    form.elements.remote_listening.disabled = archived;
+    form.elements.scheduled_at.value = settings.scheduled_at ? localScheduleValue(settings.scheduled_at) : '';
+    form.elements.scheduled_at.disabled = !upcoming;
+    form.elements.scheduled_at.required = upcoming;
+    $('edit-options').hidden = archived;
+    $('edit-schedule').hidden = !upcoming;
+    $('edit-schedule-help').hidden = !upcoming;
+    $('edit-description').textContent = settings.phase === 'canceled' ? 'Canceled sessions can be renamed. The session link stays available.'
+      : archived ? 'Completed sessions can be renamed. The recap and session link stay available.'
+      : 'The session link stays the same, so guests can keep using it.';
+    $('edit-reload').hidden = true;
+  }
+
+  async function reuseSessionSettings(sessionId, control) {
+    const generation = ++managementLoad;
+    const {settings} = await api('settings', undefined, {id: sessionId});
+    if (generation !== managementLoad || !control.isConnected) return;
+    createDialog.open(control);
+    const form = createDialog.form;
+    form.elements.title.value = settings.title;
+    form.elements.listed.checked = settings.listed && !$('listing').hidden;
+    form.elements.remote_listening.checked = settings.remote_listening;
+    form.elements.scheduled_at.value = '';
+    $('create-source').textContent = `Using settings from “${settings.title}”. Choose when your new session starts.`;
+    $('create-source').hidden = false;
+  }
+
+  function applySessionSettings(sessionId, settings) {
+    directoryRows = directoryRows.map(row => row.id === sessionId ? {...row, ...settings, settings} : row);
+    if (!id) renderSessionList('sessions', directoryRows);
+    if (sessionId === id && state) {
+      Object.assign(state, settings);
+      render();
+    }
+  }
+
   function renderSessionList(containerId, sessions) {
     const container = $(containerId);
     const existing = new Map([...container.children].map(item => [item.dataset.sessionId, item]));
@@ -983,40 +1059,122 @@
         const scheduled = document.createElement('time');
         scheduled.className = 'session-date';
         item.append(link(row.title, page(row.id, host)), badge, scheduled);
+        if (host) {
+          const actions = document.createElement('div');
+          actions.className = 'jukebox-session-card-actions';
+          const edit = button('Edit', event => openSessionEdit(row.id, event.currentTarget));
+          edit.dataset.sessionEdit = row.id;
+          edit.setAttribute('aria-haspopup', 'dialog');
+          const reuse = button('Use settings', event => reuseSessionSettings(row.id, event.currentTarget));
+          reuse.dataset.sessionReuse = row.id;
+          reuse.setAttribute('aria-haspopup', 'dialog');
+          const recap = link('View recap', page(row.id, true));
+          recap.dataset.sessionRecap = row.id;
+          actions.append(edit, reuse, recap);
+          item.append(actions);
+        }
       }
       const [title, badge, scheduled] = item.children;
-      const label = host && (phase === 'ended' || phase === 'canceled') ? `${row.title} (${phase})` : row.title;
-      const status = host ? ({upcoming: 'Upcoming', live: 'Open'}[phase] || '')
+      const label = row.title;
+      const status = host ? ({upcoming: 'Upcoming', live: 'Open', ended: 'Completed', canceled: 'Canceled'}[phase] || '')
         : upcoming ? (row.remote_listening ? 'Phone listening planned' : '')
         : (row.online ? 'Live' : 'Host player offline') + (row.remote_listening ? ' · Phone listening enabled' : '');
       if (title.textContent !== label) title.textContent = label;
+      if (host) title.setAttribute('aria-label', phase === 'ended' || phase === 'canceled' ? `${label} (${phase})` : label);
       if (badge.textContent !== status) badge.textContent = status;
       badge.hidden = !status;
       badge.classList.toggle('session-badge-live', phase === 'live' && Boolean(row.online));
       badge.classList.toggle('session-badge-upcoming', upcoming);
+      if (host) {
+        const edit = item.querySelector('[data-session-edit]');
+        edit.textContent = phase === 'ended' || phase === 'canceled' ? 'Rename' : 'Edit';
+        edit.setAttribute('aria-label', `${edit.textContent} ${row.title}`);
+        item.querySelector('[data-session-reuse]').setAttribute('aria-label', `Use settings from ${row.title}`);
+        const recap = item.querySelector('[data-session-recap]');
+        recap.hidden = phase !== 'ended';
+        recap.setAttribute('aria-label', `View recap for ${row.title}`);
+      }
       scheduled.hidden = !upcoming;
       if (upcoming) setScheduleDate(scheduled, row.scheduled_at);
       if (container.children[index] !== item) container.insertBefore(item, container.children[index] ?? null);
     });
   }
+  async function hostDirectory(append = false) {
+    if (append && (directoryPending || !directoryCursor)) return;
+    const scope = directoryScope;
+    const generation = append ? directoryGeneration : ++directoryGeneration;
+    directoryPending = true;
+    $('directory').hidden = false;
+    $('directory-results').setAttribute('aria-busy', 'true');
+    $('directory-more').disabled = true;
+    $('directory-status').textContent = append ? 'Loading more sessions…' : `Loading ${scope === 'archive' ? 'archived' : 'active'} sessions…`;
+    if (!append) {
+      directoryRows = [];
+      directoryCursor = null;
+      renderSessionList('sessions', []);
+      $('session-empty').hidden = true;
+      $('directory-more').hidden = true;
+    }
+    try {
+      const data = await api('directory', undefined, {scope, limit: '25', ...(append ? {cursor: directoryCursor} : {})});
+      if (generation !== directoryGeneration) return;
+      const previous = new Set(directoryRows.map(row => row.id));
+      directoryRows = append ? directoryRows.concat(data.sessions.filter(row => !previous.has(row.id))) : data.sessions;
+      directoryCursor = data.next_cursor;
+      $('session-empty').hidden = Boolean(directoryRows.length);
+      $('mode-link').href = 'jukebox.php';
+      $('mode-link').textContent = 'Live Sessions';
+      $('open-create').hidden = !data.admin && !data.venue;
+      const venueButton = $('open-venue');
+      if (venueButton) venueButton.hidden = !data.admin;
+      $('listing').hidden = !data.admin;
+      renderSessionList('sessions', directoryRows);
+      $('directory-more').hidden = !directoryCursor;
+      $('directory-more').textContent = 'Load more';
+      $('directory-status').textContent = directoryRows.length
+        ? `${directoryRows.length} ${scope === 'archive' ? 'archived' : 'active'} ${directoryRows.length === 1 ? 'session' : 'sessions'} shown.` : '';
+      if (!data.admin && !data.venue) notice('Ask a Stonefellow admin to enable your venue account.');
+    } catch (error) {
+      if (generation !== directoryGeneration) return;
+      $('directory-status').textContent = error.message;
+      $('directory-more').textContent = 'Retry loading sessions';
+      $('directory-more').hidden = false;
+    } finally {
+      if (generation === directoryGeneration) {
+        directoryPending = false;
+        $('directory-results').removeAttribute('aria-busy');
+        $('directory-more').disabled = false;
+      }
+    }
+  }
+
+  function selectDirectoryScope(scope, focus = false) {
+    if (scope === directoryScope) return;
+    managementLoad++;
+    directoryScope = scope;
+    for (const control of $('directory-tabs').querySelectorAll('[data-directory-scope]')) {
+      const selected = control.dataset.directoryScope === scope;
+      control.setAttribute('aria-selected', String(selected));
+      control.tabIndex = selected ? 0 : -1;
+      if (selected && focus) control.focus();
+    }
+    $('directory-results').setAttribute('aria-labelledby', 'directory-tab-' + scope);
+    $('session-heading').textContent = scope === 'archive' ? 'Archive' : 'Active sessions';
+    $('directory-description').textContent = scope === 'archive'
+      ? 'Ended and canceled sessions. Open an ended session to view its recap.'
+      : 'Open and scheduled sessions. Completed sessions move to Archive.';
+    $('session-empty').textContent = scope === 'archive' ? 'No archived sessions yet.' : 'No active sessions. Create a new session to get started.';
+    void directory();
+  }
+
   async function directory() {
+    if (host) return hostDirectory();
     if (directoryPending) return;
     directoryPending = true;
     try {
       const data = await api('directory');
       $('directory').hidden = false;
-      if (host) {
-        $('session-empty').hidden = Boolean(data.sessions.length);
-        $('session-heading').textContent = 'Your sessions';
-        $('mode-link').href = 'jukebox.php';
-        $('mode-link').textContent = 'Live Sessions';
-        $('open-create').hidden = !data.admin && !data.venue;
-        const venueButton = $('open-venue');
-        if (venueButton) venueButton.hidden = !data.admin;
-        $('listing').hidden = !data.admin;
-        renderSessionList('sessions', data.sessions);
-        if (!data.admin && !data.venue) notice('Ask a Stonefellow admin to enable your venue account.');
-      } else {
+      {
         $('title').textContent = 'Live Sessions';
         $('session-heading').textContent = 'Live';
         $('session-intro').hidden = false;
@@ -1040,10 +1198,59 @@
     }
   }
 
-  bindFormDialog('create', values => api('create', {
+  const createDialog = bindFormDialog('create', values => api('create', {
     title: values.get('title'), listed: values.has('listed'), remote_listening: values.has('remote_listening'),
     scheduled_at: scheduleTimestamp(values.get('scheduled_at'))
-  }), result => { location.href = page(result.id, true); });
+  }), result => { location.href = page(result.id, true); }, () => { $('create-source').hidden = true; });
+  const editDialog = bindFormDialog('edit', async values => {
+    const archived = editSnapshot.phase === 'ended' || editSnapshot.phase === 'canceled';
+    const body = {expected: editSnapshot, title: values.get('title')};
+    if (!archived) {
+      body.listed = $('edit-listing').hidden ? editSnapshot.listed : values.has('listed');
+      body.remote_listening = values.has('remote_listening');
+      if (editSnapshot.phase === 'upcoming' && values.get('scheduled_at') !== localScheduleValue(editSnapshot.scheduled_at)) {
+        body.scheduled_at = scheduleTimestamp(values.get('scheduled_at'));
+      }
+    }
+    try {
+      return await api('settings', body, {id: editingSession});
+    } catch (error) {
+      if (error.status === 409) $('edit-reload').hidden = false;
+      throw error;
+    }
+  }, ({settings}) => {
+    applySessionSettings(editingSession, settings);
+    notice('Session updated.');
+  });
+  if (host) {
+    $('edit-reload').onclick = handle(async () => {
+      const generation = managementLoad;
+      const sessionId = editingSession;
+      const {settings} = await api('settings', undefined, {id: sessionId});
+      if (generation !== managementLoad || editingSession !== sessionId || !editDialog.dialog.open) return;
+      editSnapshot = settings;
+      fillEditSettings(settings);
+    }, error => editDialog.report(error));
+    $('directory-tabs').addEventListener('click', event => {
+      const control = event.target.closest('[data-directory-scope]');
+      if (control) selectDirectoryScope(control.dataset.directoryScope);
+    });
+    $('directory-tabs').addEventListener('keydown', event => {
+      if (!event.target.matches('[data-directory-scope]') || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const scope = event.key === 'Home' ? 'active' : event.key === 'End' ? 'archive' : directoryScope === 'active' ? 'archive' : 'active';
+      selectDirectoryScope(scope, true);
+    });
+    $('directory-more').onclick = () => { void hostDirectory(Boolean(directoryCursor)); };
+    for (const target of ['edit-session', 'upcoming-edit-session', 'recap-edit-session']) {
+      $(target).onclick = handle(event => openSessionEdit(id, event.currentTarget));
+    }
+    for (const target of ['reuse-session', 'upcoming-reuse-session', 'recap-reuse-session']) {
+      $(target).onclick = handle(event => reuseSessionSettings(id, event.currentTarget));
+    }
+    $('session-heading').textContent = 'Active sessions';
+    $('session-empty').textContent = 'No active sessions. Create a new session to get started.';
+  }
   for (const label of document.querySelectorAll('[data-schedule-zone]')) {
     label.textContent = ` (${scheduleDate.resolvedOptions().timeZone})`;
   }

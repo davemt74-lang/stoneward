@@ -32,6 +32,7 @@ if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
 $uid=(int)($user['id']??0);
 $admin=($user['role']??'')==='admin';
 $alertControl=$post&&$hostMode&&$action==='control'&&in_array($body['event']??null,['start','reschedule','cancel','end'],true);
+$settingsWrite=$post&&$hostMode&&$action==='settings';
 $db=sf_db();
 
 try{
@@ -54,14 +55,19 @@ try{
         sf_json_response(['ok'=>true,'accounts'=>$accounts]);
     }
     sf_jukebox_schema();
-    if($followRequest||(($guestState||$guestDirectory)&&$uid>0)||$alertControl)sf_jukebox_follow_schema();
+    if($followRequest||(($guestState||$guestDirectory)&&$uid>0)||$alertControl||$settingsWrite)sf_jukebox_follow_schema();
     if(!$post&&$action==='directory'){
         $directoryFields='s.id,s.title,s.ended,s.created,s.heartbeat,t.scheduled_at,t.started_at';
         $scheduleJoin=' LEFT JOIN jukebox_schedule t ON t.session_id=s.id';
         $followingSessions=[];
+        $scope=$_GET['scope']??null;
+        if($scope!==null&&(!$hostMode||!is_string($scope)))
+            throw new InvalidArgumentException('Session management requires the host directory.');
+        $page=$scope!==null?sf_jukebox_directory_page($uid,$scope,$_GET['cursor']??null,$_GET['limit']??'25'):null;
         $sessions=$hostMode
-            ?sf_jukebox_query("SELECT $directoryFields FROM jukebox_sessions s $scheduleJoin
-                WHERE s.owner_id=? ORDER BY s.created DESC,s.id DESC LIMIT 50",[$uid])->fetchAll()
+            ?($page['sessions']??sf_jukebox_query("SELECT $directoryFields,s.listed,COALESCE(r.enabled,0) AS remote_enabled
+                FROM jukebox_sessions s $scheduleJoin LEFT JOIN jukebox_remote r ON r.session_id=s.id
+                WHERE s.owner_id=? ORDER BY s.created DESC,s.id DESC LIMIT 50",[$uid])->fetchAll())
             :[];
         if(!$hostMode){
             $publicSessions="SELECT $directoryFields,COALESCE(r.enabled,0) AS remote_listening
@@ -84,11 +90,12 @@ try{
         }
         $directoryRow=static function(array $session)use($hostMode): array {
             $row=['id'=>$session['id'],'title'=>$session['title']]+sf_jukebox_schedule_details($session);
-            if($hostMode)return $row+['ended'=>$session['ended']];
+            if($hostMode)return $row+['ended'=>$session['ended'],'settings'=>sf_jukebox_settings($session)];
             return $row+['remote_listening'=>(bool)$session['remote_listening'],'online'=>sf_jukebox_player_online($session)];
         };
         $venue=$hostMode?sf_jukebox_query('SELECT name FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn():false;
         sf_json_response(['ok'=>true,'sessions'=>array_map($directoryRow,$sessions),'venue'=>$venue?:null,'admin'=>$admin]
+            +($page!==null?['scope'=>$scope,'next_cursor'=>$page['next_cursor']]:[])
             +($guestDirectory?['following_sessions'=>array_map($directoryRow,$followingSessions)]:[]));
     }
     if($post&&$hostMode&&$action==='venue'){
@@ -140,6 +147,18 @@ try{
     $session=sf_jukebox_session($id);
     $host=$hostMode&&sf_jukebox_owner($session,$user);
     if($hostMode&&!$host)throw new OutOfBoundsException('Jukebox session not found.');
+    if($action==='settings'){
+        if(!$host)throw new DomainException('Host access is required.');
+        if($post){
+            $updated=sf_jukebox_settings_update($session,$body,$admin);
+            if($updated['scheduled_at']!==$session['scheduled_at'])
+                sf_jukebox_alert_session_change($session,$updated,'reschedule');
+            $session=$updated;
+        }
+        $settings=sf_jukebox_settings($session);
+        $db->commit();
+        sf_json_response(['ok'=>true,'settings'=>$settings]);
+    }
     if($followRequest){
         if($hostMode)throw new DomainException('Open the guest session to follow it.');
         $following=sf_jukebox_follow_set($session,$uid,$body['following']??null);
