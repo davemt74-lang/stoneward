@@ -19,7 +19,7 @@ import zlib
 from zoneinfo import ZoneInfo
 
 if '--http-only' not in sys.argv:
-    from playwright.sync_api import expect, sync_playwright
+    from playwright.sync_api import Error as PlaywrightError, expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 PHP = os.environ.get('SF_TEST_PHP', 'php')
@@ -942,12 +942,13 @@ def buffer_scenario(browser, base, phone_options):
                 and urllib.parse.parse_qs(parsed.query).get('action') == ['audio'])
 
     pending = []
+    holding_media = True
+
     def hold_audio(route):
-        # Fetching the small real fixture now frees the PHP worker for host
-        # reports. Holding fulfillment delays the browser's native media load.
-        response = route.fetch(timeout=10_000)
-        assert response.ok, f'Delayed media route failed: {response.status}'
-        pending.append((route, response))
+        if holding_media:
+            pending.append(route)
+        else:
+            route.continue_()
 
     def await_media():
         deadline = time.monotonic() + 8
@@ -955,11 +956,19 @@ def buffer_scenario(browser, base, phone_options):
             phone.wait_for_timeout(50)
         assert pending, 'Phone media delay did not intercept a native audio request'
 
-    def release_media():
-        phone.unroute(media_route)
-        for route, response in pending:
-            route.fulfill(response=response)
+    def release_media(after_stop=False):
+        nonlocal holding_media
+        holding_media = False
+        # Removing the interceptor first resolves its held requests in
+        # Playwright. Release them while it is still installed.
+        for route in pending:
+            try:
+                route.continue_()
+            except PlaywrightError as error:
+                if not after_stop or str(error).split(': ', 1)[-1] != 'Route is already handled!':
+                    raise
         pending.clear()
+        phone.unroute(media_route)
 
     phone.evaluate("""() => {
       window.bufferProbe = {seeks:0, playing:0};
@@ -979,7 +988,10 @@ def buffer_scenario(browser, base, phone_options):
     assert host.locator('#audio').evaluate('audio => audio.currentTime') > before + 2.5
     assert phone.evaluate('window.bufferProbe.playing') == 0
     expect(phone.locator('#listener-connection')).not_to_have_attribute('data-connection', 'listening')
-    release_media()
+    with phone.expect_response(lambda response: media_route(response.url)) as delivered:
+        release_media()
+    response = delivered.value
+    assert response.ok, f'Delayed media route failed: {response.status}'
 
     read = """audio => ({position:audio.currentTime, paused:audio.paused, seeking:audio.seeking,
       item:audio.currentSrc && new URL(audio.currentSrc).searchParams.get('item')})"""
@@ -1016,7 +1028,15 @@ def buffer_scenario(browser, base, phone_options):
         return (parsed.path.endswith('/api/jukebox.php')
                 and urllib.parse.parse_qs(parsed.query).get('action') == ['state'])
     pending_states = []
-    host.route(host_state_route, lambda route: pending_states.append((route, route.fetch(timeout=10_000))))
+    holding_state = True
+
+    def hold_state(route):
+        if holding_state:
+            pending_states.append(route)
+        else:
+            route.continue_()
+
+    host.route(host_state_route, hold_state)
     deadline = time.monotonic() + 5
     while not pending_states and time.monotonic() < deadline:
         host.wait_for_timeout(50)
@@ -1026,17 +1046,20 @@ def buffer_scenario(browser, base, phone_options):
     after_report = request(phone, 'state')['state']['transport']['sampled_at_ms']
     assert after_report > before_report + 1500, 'Slow UI polling held up native host playback reports'
     assert audio.evaluate('audio => !audio.paused')
+    holding_state = False
+    for route in pending_states:
+        route.continue_()
     host.unroute(host_state_route)
-    for route, response in pending_states:
-        route.fulfill(response=response)
 
     press(phone.locator('#listener-stop'))
+    holding_media = True
     phone.route(media_route, hold_audio)
     press(listen)
     await_media()
     press(phone.locator('#listener-stop'))
     played = phone.evaluate('window.bufferProbe.playing')
-    release_media()
+    assert audio.evaluate('audio => audio.paused && !audio.hasAttribute("src")')
+    release_media(after_stop=True)
     phone.wait_for_timeout(1800)
     assert audio.evaluate('audio => audio.paused && !audio.hasAttribute("src")')
     assert phone.evaluate('window.bufferProbe.playing') == played
