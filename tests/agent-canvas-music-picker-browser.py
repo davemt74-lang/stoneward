@@ -204,6 +204,15 @@ focused = r'''
               prefix + 'a pasted inline full-catalog command expands in place without inventing a design or submitting it')
         pasted = "Let's build a music wall " + ' '.join('{music-track:' + track_id + '}' for track_id in chosen['track_ids']) + ' ' + image_token
         composer.fill('')
+        long_brief = 'Let’s build a detailed canvas. ' + 'Use a brushed metal surface with warm highlights. ' * 35
+        page.evaluate('text=>navigator.clipboard.writeText(text)', long_brief)
+        composer.press('Control+V')
+        expect(composer).to_have_value(long_brief)
+        composer.press('End')
+        composer.press_sequentially(' Add rounded corners.')
+        expect(composer).to_have_value(long_brief + ' Add rounded corners.')
+        check(page.evaluate('musicFixture.posts.length===5'), prefix + 'long canvas briefs can be pasted and extended without submitting')
+        composer.fill('')
         page.evaluate('text=>navigator.clipboard.writeText(text)', 'x' * 400)
         composer.press('Control+V')
         expect(composer).to_have_value('x' * 320)

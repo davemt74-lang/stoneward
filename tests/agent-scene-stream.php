@@ -229,7 +229,7 @@ rejected(static function():void {
 },'A provider overload after code begins is distinguished from an invalid result','provider_busy');
 rejected(static function():void {
     $parser=new SfAgentSceneStreamParser('openai');
-    $parser->push(event('response.output_text.delta',['delta'=>str_repeat('x',36_001)]));
+    $parser->push(event('response.output_text.delta',['delta'=>str_repeat('x',96_001)]));
 },'Text output cap applies before any oversized delta is sent');
 rejected(static function():void {
     $parser=new SfAgentSceneStreamParser('openai');

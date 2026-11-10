@@ -240,6 +240,15 @@ class FixtureModelTransport {
             $request = json_decode($requestJson, true);
             if (($request['stream'] ?? false) !== true) return false;
             $delta = 'response.output_text.delta';
+            if ($fixtureMode === 'stream-full-first') {
+                file_put_contents(__DIR__ . '/model-full-first.json', $requestJson);
+                if (($request['max_output_tokens'] ?? 0) < 8192) {
+                    $this->response = $this->event('response.incomplete', ['response' => [
+                        'status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens'],
+                    ]]);
+                    return true;
+                }
+            }
             if ($fixtureMode === 'stream-cancel') {
                 $this->response = $this->event($delta, ['delta'=>'{"concept":"a new revision","html":"<article>']);
                 $this->response .= ':'.str_repeat(' ', 8189-strlen($this->response))."\n\n";
@@ -1094,7 +1103,7 @@ def exercise_incomplete_custom_canvas(site, base, first, second, csrf):
     brief = 'a star cluster EQ background for earth girl.  the star clusters should pulse different colors'
     payload = {'canvas_kind': 'custom', 'track_id': track_id, 'brief': brief}
     calls = (site / 'model-calls').read_text().splitlines()
-    for index, (mode, retry_limit) in enumerate([('stream-incomplete', 8192), ('stream-eof', 4096)], start=1):
+    for index, mode in enumerate(['stream-incomplete', 'stream-eof'], start=1):
         request_id = f'{index + 0xf0:02x}' * 16
         create = {**payload, 'request_id': request_id}
         (site / 'model-mode').write_text(mode)
@@ -1110,7 +1119,7 @@ def exercise_incomplete_custom_canvas(site, base, first, second, csrf):
         retry = json.loads((site / 'model-retry-request-2.json').read_text())
         initial_brief = json.loads(initial['input'][0]['content'][0]['text'])
         retry_brief = json.loads(retry['input'][0]['content'][0]['text'])
-        check(initial['max_output_tokens'] == 4096 and retry['max_output_tokens'] == retry_limit
+        check(initial['max_output_tokens'] == retry['max_output_tokens'] == 8192
               and 'reasoning' not in initial and 'reasoning' not in retry
               and initial_brief == retry_brief and retry_brief['design_brief'] == brief
               and retry_brief['published_song']['title'] == 'Earth Girl',
@@ -1319,7 +1328,7 @@ def exercise_constrained_output_retry(site, base, first, csrf):
         events = [json.loads(line) for line in response]
     initial = json.loads((site / 'model-retry-request-1.json').read_text())
     retry = json.loads((site / 'model-retry-request-2.json').read_text())
-    check(initial['max_output_tokens'] == 1600 and 1600 <= retry['max_output_tokens'] <= 2100
+    check(1600 <= initial['max_output_tokens'] == retry['max_output_tokens'] <= 2100
           and initial['input'] == retry['input'] and 'smallest complete design' in retry['instructions']
           and events[-1]['type'] == 'result' and events[-1]['data']['active_tokens_used'] == MODEL_USAGE,
           'a constrained fan can still build with a compact retry inside their available token budget')
@@ -1495,7 +1504,7 @@ def exercise_canvas_timeout(site, base, first, csrf):
     prompt = json.loads(retry['input'][0]['content'][0]['text'])
     check([event['type'] for event in events] == ['concept', 'delta', 'retry', 'concept', 'delta', 'delta', 'result']
           and initial['input'] == retry['input'] and prompt['design_brief'] == payload['brief']
-          and 'player_controls_requested' not in prompt and initial['max_output_tokens'] == 4096
+          and 'player_controls_requested' not in prompt and initial['max_output_tokens'] == 8192
           and retry['max_output_tokens'] == 2000 and 'The first attempt timed out' in retry['instructions'],
           'a timed-out stream starts one compact retry of the same authored revision without forced UI requirements')
     result = events[-1]['data']
@@ -1803,6 +1812,38 @@ def exercise_admin_model_catalog(site, base, fan):
           'A provider catalog failure keeps the raw upstream response private')
 
 
+def exercise_full_first_pass(site, base, first, csrf):
+    subprocess.run([PHP, '-r', """
+        require 'api/bootstrap.php';
+        sf_token_adjust(1, 30000, 'admin_grant', 'long-brief-fixture');
+    """], cwd=site, check=True)
+    brief = '\n'.join(
+        f'In region {region}, use a different shade of blue and space the controls evenly.'
+        for region in range(40)
+    )
+    assert 1800 < len(brief.encode()) < 16000
+    calls = (site / 'model-calls').read_text().splitlines()
+    (site / 'model-mode').write_text('stream-full-first')
+    payload = {'canvas_kind': 'custom', 'brief': brief, 'request_id': '74' * 16}
+    with open_response(first, base, SCENE, method='POST', csrf=csrf, accept=NDJSON, data=payload) as response:
+        events = [json.loads(line) for line in response]
+    model_request = json.loads((site / 'model-full-first.json').read_text())
+    model_prompt = json.loads(model_request['input'][0]['content'][0]['text'])
+    terminal = events[-1]
+    check(terminal['type'] == 'result' and terminal['status'] == 201
+          and all(event['type'] != 'retry' for event in events)
+          and model_request['max_output_tokens'] == 8192
+          and model_prompt['design_brief'] == brief
+          and terminal['data']['scene']['design_brief'] == brief
+          and (site / 'model-calls').read_text().splitlines() == calls + ['stream-full-first'],
+          'A long custom brief reaches the model intact and saves on the first call with its full reserved allowance')
+    status, _, rejected = request(first, base, SCENE, method='POST', csrf=csrf,
+                                  data={'canvas_kind': 'custom', 'brief': 'é' * 8001})
+    check(status == 422 and rejected.get('error') == 'invalid_scene_request'
+          and (site / 'model-calls').read_text().splitlines() == calls + ['stream-full-first'],
+          'The custom brief byte limit applies before any provider call')
+
+
 def run(site):
     shutil.copytree(ROOT / 'api', site / 'api')
     shutil.copytree(ROOT / 'assets/vendor/canvas', site / 'assets/vendor/canvas')
@@ -1902,6 +1943,7 @@ def run(site):
         exercise_canvas_data_tools(site, base, first, second, csrf)
         exercise_coding_model_selection(site, base, first, csrf)
         exercise_admin_model_catalog(site, base, first)
+        exercise_full_first_pass(site, base, first, csrf)
 
         image_id = '72' * 16
         with sqlite3.connect(dbpath) as db:

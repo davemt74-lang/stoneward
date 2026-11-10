@@ -32,7 +32,7 @@ function sf_agent_scene_design_brief(mixed $value): ?string {
         preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u',$value)!==0)
         throw new InvalidArgumentException('Invalid canvas design brief.');
     $value=trim(str_replace(["\r\n","\r"],"\n",$value));
-    if(strlen($value)>1800)throw new InvalidArgumentException('Canvas design brief is too long.');
+    if(strlen($value)>SF_CUSTOM_CANVAS_BRIEF_MAX_BYTES)throw new InvalidArgumentException('Canvas design brief is too long.');
     return $value===''?null:$value;
 }
 

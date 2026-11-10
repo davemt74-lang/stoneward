@@ -67,14 +67,15 @@ function sf_canvas_project_normalize(array $raw,bool $parseResourceTokens=true):
     if(array_is_list($raw)||array_diff(array_keys($raw),$allowed))throw new InvalidArgumentException('Choose supported canvas project inputs.');
     if(!in_array($raw['action']??'create',['create','revise'],true))throw new InvalidArgumentException('Canvas projects build or revise canvas code.');
     $kind=$raw['canvas_kind']??'custom';if(!in_array($kind,['custom','listening_room','space_eq'],true))throw new InvalidArgumentException('Choose a supported canvas type.');
-    $brief=sf_canvas_project_text($raw['brief']??'',2*1024*1024,'Describe the canvas in 1 to 1800 characters.');
+    $brief=sf_canvas_project_text($raw['brief']??'',2*1024*1024,'Provide a valid canvas brief.');
     $rawSources=array_key_exists('source_scene_ids',$raw)?sf_canvas_project_source_ids($raw['source_scene_ids']):null;
     if($parseResourceTokens)[$brief,$artist,$artistProvided,$sources]=sf_canvas_resource_selection($brief,$raw['artist_inputs']??null,array_key_exists('artist_inputs',$raw),$rawSources);
     else{$artistProvided=array_key_exists('artist_inputs',$raw);$artist=$artistProvided?sf_canvas_resource_artist_inputs($raw['artist_inputs']):null;$sources=$rawSources;}
     [$brief,$playlists,$playlistsProvided]=sf_canvas_playlists_selection($brief,$raw['playlist_inputs']??null,array_key_exists('playlist_inputs',$raw));
     $playlistsProvided=$playlistsProvided&&$playlists!==null;
     [$clean,$music,$musicProvided]=sf_agent_canvas_music_selection($brief,$raw['music_inputs']??null,array_key_exists('music_inputs',$raw));
-    if(strlen($clean)>1800)throw new InvalidArgumentException('Describe the canvas in 1 to 1800 characters.');
+    $briefLimit=$kind==='custom'?SF_CUSTOM_CANVAS_BRIEF_MAX_BYTES:1800;
+    if(strlen($clean)>$briefLimit)throw new InvalidArgumentException('The canvas brief exceeds '.$briefLimit.' UTF-8 bytes.');
     $project=['action'=>'create','canvas_kind'=>$kind,'brief'=>$brief];
     foreach(['track_id','context_track_id'] as $field){
         $value=$raw[$field]??'';if(!is_string($value)||strlen($value)>180||($value!==''&&preg_match('/\A[A-Za-z0-9_-]+\z/',$value)!==1))throw new InvalidArgumentException('Choose an available song context.');
