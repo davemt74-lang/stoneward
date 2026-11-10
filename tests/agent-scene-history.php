@@ -65,8 +65,9 @@ check($first['design_brief']===$brief&&sf_agent_scene_history_get(2,$first['id']
 check(sf_agent_scene_design_brief(" \r\nA real request.\r\nA second line.\r\n ")==="A real request.\nA second line."&&
     sf_agent_scene_design_brief('   ')===null&&sf_agent_scene_design_brief(null)===null,
     'saved brief normalization keeps actual words and treats missing or blank prompts as unavailable');
-check(sf_agent_scene_design_brief(str_repeat('音',600))===str_repeat('音',600),'the brief byte limit supports complete UTF-8 text');
-rejects(fn()=>sf_agent_scene_history_save(2,array_replace($scene,['design_brief'=>str_repeat('音',601)])),'oversized design briefs cannot be stored');
+$longBrief=str_repeat('音',5333).'a';
+check(strlen($longBrief)===16000&&sf_agent_scene_design_brief($longBrief)===$longBrief,'the brief byte limit supports complete UTF-8 text');
+rejects(fn()=>sf_agent_scene_history_save(2,array_replace($scene,['design_brief'=>$longBrief.'a'])),'oversized design briefs cannot be stored');
 rejects(fn()=>sf_agent_scene_history_save(2,array_replace($scene,['design_brief'=>['invented'=>'prompt']])),'non-text briefs cannot be stored');
 rejects(fn()=>sf_agent_scene_history_save(2,array_replace($scene,['design_brief'=>"hidden\0instruction"])),'control bytes cannot enter saved brief metadata');
 check(sf_agent_scene_history_get(3,$first['id'])===null&&sf_agent_scene_history_get(1,$first['id'])===null,'another fan and site administrator cannot read private scenes');

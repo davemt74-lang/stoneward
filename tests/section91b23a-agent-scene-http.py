@@ -1824,7 +1824,24 @@ def exercise_full_first_pass(site, base, first, csrf):
     assert 1800 < len(brief.encode()) < 16000
     calls = (site / 'model-calls').read_text().splitlines()
     (site / 'model-mode').write_text('stream-full-first')
-    payload = {'canvas_kind': 'custom', 'brief': brief, 'request_id': '74' * 16}
+    status, _, preflight = request(first, base, SCENE, method='POST', csrf=csrf,
+                                   data={'action': 'image_preflight', 'brief': brief, 'editing': False})
+    check(status == 200 and preflight['preflight']['requested_count'] is None,
+          'The normal canvas image preflight accepts the longer coding brief')
+    status, _, _ = request(first, base, SCENE, method='POST', csrf=csrf,
+                            data={'action': 'image_preflight', 'brief': brief, 'editing': True})
+    check(status == 422, 'A dedicated image edit retains its brief limit')
+    projects = '/api/canvas-projects.php'
+    status, _, _ = request(first, base, projects, method='POST', csrf=csrf,
+                            data={'action': 'preferences', 'ideas_enabled': False, 'auto_approve': True})
+    assert status == 200
+    status, _, prepared = request(first, base, projects, method='POST', csrf=csrf, data={
+        'action': 'propose', 'request_id': '75' * 16, 'project': {'canvas_kind': 'custom', 'brief': brief},
+    })
+    proposal = prepared.get('proposal', {})
+    check(status == 200 and proposal.get('status') == 'approved' and proposal['project']['brief'] == brief,
+          'Project preparation retains the full longer coding brief through account approval')
+    payload = {**proposal['project'], 'project_managed': True, 'proposal_id': proposal['id'], 'request_id': '74' * 16}
     with open_response(first, base, SCENE, method='POST', csrf=csrf, accept=NDJSON, data=payload) as response:
         events = [json.loads(line) for line in response]
     model_request = json.loads((site / 'model-full-first.json').read_text())
