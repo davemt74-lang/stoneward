@@ -333,10 +333,17 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
 
 .jukebox-directory, .host-grid { display: grid; gap: .85rem; }
 .jukebox-directory { margin-top: 1.25rem; }
+.jukebox-directory-toolbar, .jukebox-directory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .55rem;
+}
+.jukebox-directory-actions { justify-content: end; margin-inline-start: auto; }
 .jukebox-directory-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: .35rem;
-  justify-self: start;
   padding: .3rem;
   border: 1px solid var(--jukebox-line);
   border-radius: .7rem;
@@ -621,14 +628,28 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
 
 /* Host identity and owner-managed artwork. */
 .jukebox-host-cover {
+  position: relative;
   width: 100%;
   aspect-ratio: 3 / 1;
   max-height: 19rem;
   overflow: hidden;
   background: var(--jukebox-raised);
 }
-.jukebox-host-cover:has(> img[hidden]) { display: none; }
+.jukebox-host-cover:has(> img[hidden]) { aspect-ratio: auto; min-height: 4.75rem; }
+.jukebox-host-cover:has(> img[hidden]):has(> button[hidden]) { display: none; }
 .jukebox-host-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.jukebox-cover-edit {
+  position: absolute;
+  inset-block-end: .65rem;
+  inset-inline-end: max(var(--jukebox-gutter), env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  box-shadow: 0 1px 5px #0008;
+  font-size: .86rem;
+  font-weight: 650;
+}
+.jukebox-cover-edit svg { flex: none; }
 .jukebox-page-identity { display: flex; min-width: 0; align-items: center; gap: 1rem; }
 .jukebox-page-identity > div:last-child { min-width: 0; overflow-wrap: anywhere; }
 .jukebox-host-username { display: flex; flex-wrap: wrap; align-items: center; column-gap: .6rem; font-size: .95rem; }
@@ -638,8 +659,31 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
   display: flex; flex: none; align-items: center; justify-content: center;
   overflow: hidden; border: 1px solid var(--jukebox-line); border-radius: .75rem; background: var(--jukebox-raised);
 }
-.jukebox-host-logo { width: 5rem; height: 5rem; }
+.jukebox-host-logo { position: relative; width: 5rem; height: 5rem; }
 .jukebox-host-logo .jukebox-record { width: 2.8rem; height: 2.8rem; }
+.jukebox-avatar-edit {
+  position: absolute;
+  inset-block-end: 2px;
+  inset-inline-end: 2px;
+  display: grid;
+  place-items: end;
+  width: 44px;
+  padding: 0;
+  border: 0;
+}
+.jukebox-avatar-edit, button.jukebox-avatar-edit:hover:not(:disabled, [aria-disabled=true]) { background: transparent; }
+.jukebox-avatar-edit:focus-visible { outline-offset: -2px; }
+.jukebox-avatar-edit svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 5px;
+  border: 1px solid var(--jukebox-input-line);
+  border-radius: 50%;
+  background: var(--jukebox-raised);
+  box-shadow: 0 1px 4px #0008;
+  color: var(--jukebox-text);
+}
+.jukebox-avatar-edit:is(:hover, :focus-visible) svg { border-color: var(--jukebox-gold); }
 :is(.jukebox-host-logo, .jukebox-branding-image, .jukebox-branding-preview, .jukebox-session-logo) img {
   width: 100%; height: 100%; object-fit: contain;
 }
@@ -676,6 +720,9 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
 .jukebox-catalog-context button { order: 2; flex: none; margin: 0 0 0 auto; }
 #catalog-empty { margin-top: .8rem; }
 @media (max-width: 42rem) {
+  .jukebox-directory-toolbar, .jukebox-directory-actions, .jukebox-directory-tabs { gap: .25rem; }
+  .jukebox-directory-tabs { padding: .2rem; }
+  .jukebox-directory-toolbar button { min-width: 44px; padding-inline: .30rem; font-size: .8rem; }
   .jukebox-host-cover { aspect-ratio: 2 / 1; }
   .jukebox-host-logo { width: 3.5rem; height: 3.5rem; border-radius: .6rem; }
   .jukebox-host-logo .jukebox-record { width: 2rem; height: 2rem; }
@@ -686,4 +733,10 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
   .jukebox-catalog-row-content { gap: .55rem; }
   .jukebox-catalog-actions button { font-size: .86rem; padding-inline: .6rem; }
   .jukebox-catalog-meta { font-size: .8rem; }
+}
+
+@media (max-width: 22rem) {
+  .jukebox-directory-toolbar, .jukebox-directory-actions, .jukebox-directory-tabs { gap: .15rem; }
+  .jukebox-directory-tabs { padding: .15rem; }
+  .jukebox-directory-toolbar button { padding-inline: .125rem; }
 }

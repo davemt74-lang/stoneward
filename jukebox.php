@@ -58,14 +58,14 @@ $renderSessionShare=static function(bool $host):void {
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title><?=$hostDirectory?sf_pwa_shell_attr($profileName).' · Stonefellow':'Stonefellow Jukebox'?></title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=16">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=17">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-clock.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=5"></script>
-<script defer src="assets/js/jukebox.js?v=18"></script>
+<script defer src="assets/js/jukebox.js?v=19"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -106,6 +106,10 @@ $renderSessionShare=static function(bool $host):void {
 <?php if($hostDirectory): ?>
 <div id="host-cover-banner" class="jukebox-host-cover">
   <img id="host-cover" alt="Hosted events cover image" decoding="async" hidden>
+  <button type="button" id="open-cover" class="jukebox-cover-edit" aria-haspopup="dialog" hidden>
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h4l2-3h4l2 3h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="3"/></svg>
+    <span id="cover-edit-label">Add cover image</span>
+  </button>
 </div>
 <?php endif; ?>
 <main>
@@ -114,6 +118,11 @@ $renderSessionShare=static function(bool $host):void {
       <div id="host-logo-frame" class="jukebox-host-logo"<?=$host||$sessionId!==''?'':' hidden'?>>
         <img id="host-logo" alt="Host logo" width="80" height="80" hidden>
         <span id="host-logo-fallback" class="jukebox-record" aria-hidden="true"></span>
+<?php if($hostDirectory): ?>
+        <button type="button" id="open-branding" class="jukebox-avatar-edit" aria-haspopup="dialog" aria-label="Upload profile picture" title="Upload profile picture" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h4l2-3h4l2 3h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="3"/></svg>
+        </button>
+<?php endif; ?>
       </div>
       <div>
       <p class="jukebox-kicker"><?=$host?'Session management':'Stonefellow Jukebox'?></p>
@@ -127,19 +136,11 @@ $renderSessionShare=static function(bool $host):void {
       <p id="session-intro" class="jukebox-muted" hidden>Open a session to see what’s playing or listen from your phone when enabled.</p>
       </div>
     </div>
+<?php if(!$host): ?>
     <div class="jukebox-page-actions">
-<?php if($host): ?>
-<?php if($hostDirectory): ?>
-      <button id="open-cover" type="button" aria-haspopup="dialog" hidden>Add cover image</button>
-<?php endif; ?>
-<?php if($venueAdmin): ?>
-      <button id="open-venue" type="button" aria-haspopup="dialog" hidden>Enable venue account</button>
-<?php endif; ?>
-      <button id="open-create" class="jukebox-primary" type="button" aria-haspopup="dialog" hidden>New session</button>
-<?php else: ?>
       <button type="button" data-pwa-install hidden>Install Stonefellow</button>
-<?php endif; ?>
     </div>
+<?php endif; ?>
   </div>
   <p id="status" class="jukebox-status" role="status"></p>
   <section id="session-connection" class="jukebox-connection" aria-label="Session connection" hidden>
@@ -151,10 +152,18 @@ $renderSessionShare=static function(bool $host):void {
   </section>
   <div id="directory" class="jukebox-directory<?=$host?'':' jukebox-directory-guest'?>" hidden>
 <?php if($host): ?>
-    <nav id="directory-tabs" class="jukebox-directory-tabs" role="tablist" aria-label="Your sessions">
-      <button type="button" id="directory-tab-active" role="tab" data-directory-scope="active" aria-controls="directory-results" aria-selected="true">Active</button>
-      <button type="button" id="directory-tab-archive" role="tab" data-directory-scope="archive" aria-controls="directory-results" aria-selected="false" tabindex="-1">Archive</button>
-    </nav>
+    <div class="jukebox-directory-toolbar">
+      <nav id="directory-tabs" class="jukebox-directory-tabs" role="tablist" aria-label="Your sessions">
+        <button type="button" id="directory-tab-active" role="tab" data-directory-scope="active" aria-controls="directory-results" aria-selected="true">Active</button>
+        <button type="button" id="directory-tab-archive" role="tab" data-directory-scope="archive" aria-controls="directory-results" aria-selected="false" tabindex="-1">Archive</button>
+      </nav>
+      <div class="jukebox-directory-actions">
+<?php if($venueAdmin): ?>
+        <button id="open-venue" type="button" aria-haspopup="dialog" hidden>+ Account</button>
+<?php endif; ?>
+        <button id="open-create" class="jukebox-primary" type="button" aria-haspopup="dialog" hidden>+ Session</button>
+      </div>
+    </div>
 <?php endif; ?>
     <section id="directory-results" class="jukebox-panel" <?=$host?'role="tabpanel" aria-labelledby="directory-tab-active" tabindex="0"':'aria-labelledby="session-heading"'?>>
       <h2 id="session-heading"><?=$host?'Your sessions':'Live'?></h2>
@@ -170,7 +179,7 @@ $renderSessionShare=static function(bool $host):void {
       </div>
 <?php endif; ?>
     </section>
-<?php if($host): ?>
+<?php if($host&&!$hostDirectory): ?>
     <section id="host-branding" class="jukebox-panel jukebox-branding-settings" aria-labelledby="host-branding-heading" hidden>
       <div class="jukebox-branding-summary">
         <div class="jukebox-branding-image">
