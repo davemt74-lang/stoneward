@@ -1678,6 +1678,14 @@
       if (container.children[index] !== item) container.insertBefore(item, container.children[index] ?? null);
     });
   }
+  function applyHostVenueName(venue) {
+    const name = venue?.trim() || '';
+    const heading = name || $('host-username').textContent;
+    connectionText('title', heading);
+    $('host-venue-details').hidden = !name;
+    $('venue-name').elements.name.defaultValue = name;
+    document.title = heading + ' · Stonefellow';
+  }
   async function hostDirectory(append = false) {
     if (append && (directoryPending || !directoryCursor)) return;
     const scope = directoryScope;
@@ -1700,12 +1708,7 @@
       const previous = new Set(directoryRows.map(row => row.id));
       directoryRows = append ? directoryRows.concat(data.sessions.filter(row => !previous.has(row.id))) : data.sessions;
       directoryCursor = data.next_cursor;
-      const username = $('host-username');
-      const venue = data.venue?.trim();
-      const heading = venue || username.textContent;
-      connectionText('title', heading);
-      username.hidden = !venue;
-      document.title = heading + ' · Stonefellow';
+      applyHostVenueName(data.venue);
       applyPageBranding(data.branding);
       applyHostCover(data.cover);
       brandingEditable(data.branding_editable === true);
@@ -1847,6 +1850,11 @@
   bindFormDialog('venue', values => api('venue', Object.fromEntries(values)), () => {
     notice('Venue account enabled.');
     void directory().catch(notice);
+  });
+  bindFormDialog('venue-name', values => api('venue_name', {name: values.get('name')}), result => {
+    applyHostVenueName(result.venue);
+    notice('Venue name saved.');
+    if (directoryPending) void directory().catch(notice);
   });
   bindVenueAccountPicker();
   bindBrandingDialog();

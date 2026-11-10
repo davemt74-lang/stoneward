@@ -58,14 +58,14 @@ $renderSessionShare=static function(bool $host):void {
 <meta name="sf-csrf" content="<?=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8')?>">
 <?php sf_pwa_shell_head($pwaSplash,(string)(sf_site_settings()['media_app_icon']??'')); ?>
 <title><?=$hostDirectory?sf_pwa_shell_attr($profileName).' · Stonefellow':'Stonefellow Jukebox'?></title>
-<link rel="stylesheet" href="assets/css/jukebox.css?v=15">
+<link rel="stylesheet" href="assets/css/jukebox.css?v=16">
 <link rel="stylesheet" href="assets/css/pwa-shell.css?v=1">
 <script defer src="assets/js/pwa-shell.js?v=1"></script>
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-clock.js?v=1"></script>
 <script defer src="assets/js/jukebox-listener.js?v=5"></script>
-<script defer src="assets/js/jukebox.js?v=17"></script>
+<script defer src="assets/js/jukebox.js?v=18"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">
@@ -103,12 +103,12 @@ $renderSessionShare=static function(bool $host):void {
     </nav>
   </div>
 </header>
-<main>
 <?php if($hostDirectory): ?>
-  <div id="host-cover-banner" class="jukebox-host-cover">
-    <img id="host-cover" alt="Hosted events cover image" decoding="async" hidden>
-  </div>
+<div id="host-cover-banner" class="jukebox-host-cover">
+  <img id="host-cover" alt="Hosted events cover image" decoding="async" hidden>
+</div>
 <?php endif; ?>
+<main>
   <div class="jukebox-page-head">
     <div class="jukebox-page-identity">
       <div id="host-logo-frame" class="jukebox-host-logo"<?=$host||$sessionId!==''?'':' hidden'?>>
@@ -119,7 +119,10 @@ $renderSessionShare=static function(bool $host):void {
       <p class="jukebox-kicker"><?=$host?'Session management':'Stonefellow Jukebox'?></p>
       <h1 id="title"><?=$hostDirectory?sf_pwa_shell_attr($profileName):($host?'Jukebox':'Live Sessions')?></h1>
 <?php if($hostDirectory): ?>
-      <p id="host-username" class="jukebox-host-username jukebox-muted" hidden><?=sf_pwa_shell_attr($profileName)?></p>
+      <div id="host-venue-details" class="jukebox-host-username jukebox-muted" hidden>
+        <span id="host-username"><?=sf_pwa_shell_attr($profileName)?></span>
+        <button id="open-venue-name" type="button" aria-haspopup="dialog">Edit venue name</button>
+      </div>
 <?php endif; ?>
       <p id="session-intro" class="jukebox-muted" hidden>Open a session to see what’s playing or listen from your phone when enabled.</p>
       </div>
@@ -274,6 +277,19 @@ $renderSessionShare=static function(bool $host):void {
       <div class="jukebox-dialog-actions">
         <button type="button" data-jukebox-dialog-close>Cancel</button>
         <button type="submit" class="jukebox-primary">Save venue</button>
+      </div>
+    </form>
+  </dialog>
+<?php endif; ?>
+<?php if($hostDirectory): ?>
+  <dialog id="venue-name-dialog" class="jukebox-dialog" aria-labelledby="venue-name-heading">
+    <div class="jukebox-dialog-head"><h2 id="venue-name-heading">Edit venue name</h2><button type="button" class="jukebox-dialog-close" data-jukebox-dialog-close aria-label="Close venue name editor">×</button></div>
+    <form id="venue-name">
+      <label>Venue name <input name="name" maxlength="120" required autofocus></label>
+      <p id="venue-name-status" class="jukebox-form-status" role="status"></p>
+      <div class="jukebox-dialog-actions">
+        <button type="button" data-jukebox-dialog-close>Cancel</button>
+        <button type="submit" class="jukebox-primary">Save name</button>
       </div>
     </form>
   </dialog>

@@ -1145,6 +1145,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     expect(other.locator('#session-empty')).to_be_visible()
     expect(other.get_by_role('heading', name='Other', exact=True)).to_be_visible()
     expect(other.locator('#host-username')).to_be_hidden()
+    expect(other.locator('#open-venue-name')).to_be_hidden()
 
     other.goto(base + '/login-fixture.php?user=2')
     other.goto(base + '/jukebox.php?host=1')
@@ -1161,6 +1162,29 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     expect(username).to_have_text('Admin')
     assert username.evaluate("""label => parseFloat(getComputedStyle(label).fontSize) <
       parseFloat(getComputedStyle(document.querySelector('h1')).fontSize)""")
+
+    other.set_viewport_size({'width': 390, 'height': 844})
+    other.reload()
+    edit_venue = other.get_by_role('button', name='Edit venue name', exact=True)
+    edit_venue.click()
+    edit_venue_dialog = other.locator('#venue-name-dialog')
+    expect(edit_venue_dialog.get_by_role('heading', name='Edit venue name')).to_be_visible()
+    name = edit_venue_dialog.get_by_role('textbox', name='Venue name', exact=True)
+    expect(name).to_have_value('Other logo host')
+    name.fill('Discard this change')
+    edit_venue_dialog.get_by_role('button', name='Cancel', exact=True).click()
+    expect(edit_venue_dialog).to_be_hidden()
+    expect(other.locator('#title')).to_have_text('Other logo host')
+    edit_venue.click()
+    expect(name).to_have_value('Other logo host')
+    name.fill('Listening Room & Friends')
+    edit_venue_dialog.get_by_role('button', name='Save name', exact=True).click()
+    expect(edit_venue_dialog).to_be_hidden()
+    expect(other.locator('#title')).to_have_text('Listening Room & Friends')
+    expect(other.locator('#host-username')).to_have_text('Bartender')
+    other.reload()
+    expect(other.locator('#title')).to_have_text('Listening Room & Friends')
+    assert request(host, 'directory', host=True)['venue'] == 'Hosted events venue'
 
     def press(page, control):
         (control.tap if page is phone and phone_options.get('has_touch') else control.click)()
@@ -1223,11 +1247,19 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
 
     def assert_full_width_cover():
         expect(cover).to_be_visible()
-        banner_bounds = banner.bounding_box()
-        directory_bounds = host.locator('#directory-results').bounding_box()
-        assert banner_bounds and directory_bounds
-        for edge in ('x', 'width'):
-            assert abs(banner_bounds[edge] - directory_bounds[edge]) <= 1, (banner_bounds, directory_bounds)
+        bounds = host.evaluate("""() => {
+          const rect = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+          return {
+            width: document.documentElement.clientWidth,
+            header: rect('.jukebox-header'),
+            banner: rect('#host-cover-banner'),
+            image: rect('#host-cover'),
+          };
+        }""")
+        for part in ('banner', 'image'):
+            assert abs(bounds[part]['left']) <= 1, bounds
+            assert abs(bounds[part]['right'] - bounds['width']) <= 1, bounds
+            assert abs(bounds[part]['top'] - bounds['header']['bottom']) <= 1, bounds
 
     expect(banner).to_be_hidden()
     cover_opener, dialog = upload(host, SPLASH_ART, 8, kind='cover')
@@ -1248,7 +1280,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     capture(host, 'cover-saved-host-1440')
     host.set_viewport_size({'width': 320, 'height': 740})
     assert_full_width_cover()
-    assert host.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+    assert host.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1')
     capture(host, 'cover-saved-host-320')
     cover_opener.click()
     dialog.get_by_role('button', name='Remove cover image', exact=True).click()
@@ -1401,7 +1433,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     host_context.close()
     phone_context.close()
     other_context.close()
-    print('PASS hosted venue identity, responsive full-width cover, host logo edits, uninterrupted players and right-aligned catalog actions')
+    print('PASS hosted venue identity and name edits, edge-to-edge cover, host logo edits, uninterrupted players and right-aligned catalog actions')
 
 def inline_splash_editor(browser, base):
     context = browser.new_context()
@@ -1958,6 +1990,23 @@ def http_scenario(base, site):
     session = venue.call('create', data={'title': 'Tonight'})['id']
     assert public != session
     first, second = Client(), Client()
+    with venue.response('venue_name') as response:
+        assert response.status == 405 and response.headers.get('Allow') == 'POST'
+    with venue.response('venue_name', data={'name': 'Wrong token'},
+                        headers={'X-CSRF-Token': 'incorrect'}) as response:
+        assert response.status == 403
+    assert first.call('venue_name', data={'name': 'Guest attempt'})['status'] == 403
+    assert outsider.call('venue_name', data={'name': 'Unprovisioned venue'})['status'] == 409
+    for invalid in ({}, {'name': '  '}, {'name': 7}, {'name': 'Wrong owner', 'owner': 3}):
+        assert venue.call('venue_name', data=invalid)['status'] == 400
+    assert venue.call('directory')['venue'] == 'Test Bar'
+    settings = venue.call('settings', session)['settings']
+    renamed = {'status': 200, 'ok': True, 'venue': 'Listening Room & Friends'}
+    assert venue.call('venue_name', data={'name': ' Listening Room & Friends '}) == renamed
+    assert venue.call('venue_name', data={'name': renamed['venue']}) == renamed
+    assert Client(2).call('directory')['venue'] == renamed['venue']
+    assert outsider.call('directory')['venue'] is None
+    assert venue.call('settings', session)['settings'] == settings
     assert [row['id'] for row in first.call('directory')['sessions']] == [public]
     assert first.call('request', session, {'track': 'a', 'nonce': '1'*32})['status'] == 409
     assert first.call('join', session, {'name': 'Dave', 'remember': True})['status'] == 'pending'
@@ -2068,7 +2117,7 @@ def http_scenario(base, site):
     assert empty['phones'] == {'connections': 0, 'approved': 0}
     assert empty['totals'] == dict.fromkeys(totals, 0) and empty['tracks'] == []
     assert Client().call('recap', public)['status'] == 409
-    print('PASS HTTP pairing, shared queue, player ownership, play history, private chat, CRM, and host-only session recap')
+    print('PASS HTTP venue name ownership and validation, pairing, shared queue, playback, chat, CRM, and host-only recap')
     http_remote_scenario(Client, admin, venue, site)
     http_listener_scenario(Client, venue, outsider, site)
     http_schedule_scenario(Client, admin, venue, outsider, site)
