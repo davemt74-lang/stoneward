@@ -10,6 +10,18 @@
   const playbackClock = window.StonefellowJukeboxClock.create();
   const sessionTabList = $('session-tabs');
   const sessionTabButtons = [...sessionTabList.querySelectorAll('[data-session-tab]')];
+  const overviewDetails = $('session-overview-details');
+  const mobileSession = window.matchMedia('(max-width: 42rem)');
+  const detailHomes = id ? [
+    $('session-connection'),
+    document.querySelector('[data-pwa-session-follow]'),
+    document.querySelector('[data-pwa-phone-alerts]'),
+    document.querySelector('[data-pwa-install]')
+  ].filter(Boolean).map(node => {
+    const home = document.createComment('session detail');
+    node.before(home);
+    return {node, home};
+  }) : [];
   const endedTools = $('ended-session-tools');
   const sessionFollowUp = $(host ? 'crm' : 'pairing');
   const sessionFollowUpParent = sessionFollowUp.parentElement;
@@ -389,6 +401,8 @@
     connectionIssue = 'unavailable';
     connectionRefreshing = false;
     stopped = true;
+    placeOverviewDetails();
+    if (!host) $('guest-share').hidden = true;
     renderChat(false);
     listener?.update({allowed: false});
     if (active) releasePlayer();
@@ -447,6 +461,12 @@
   function notice(error) {
     connectionText('status', typeof error === 'string' ? error : error.message);
   }
+  function focusSessionControl(control) {
+    const target = control.closest('[hidden]')
+      ? sessionTabButtons.find(tab => tab.dataset.sessionTab === activeSessionTab)
+      : control;
+    target?.focus({preventScroll: true});
+  }
   function connectionAction(work) {
     const run = handle(work);
     return async event => {
@@ -454,7 +474,7 @@
       const focused = control === document.activeElement;
       await run(event);
       renderConnection();
-      if (focused && control?.hidden) $('connection-detail').focus({preventScroll: true});
+      if (focused && control?.hidden) focusSessionControl($('connection-detail'));
     };
   }
   function playerNotice(error) {
@@ -924,6 +944,44 @@
     }
   }
 
+  function initializeSessionShare() {
+    const join = new URL(page(id, false), location.href);
+    const link = $('join-link');
+    if (link) link.href = join.href;
+    const qr = $('qr');
+    qr.innerHTML = window.StonefellowJukeboxQR.svg(join.href);
+    if (!host) qr.firstElementChild.setAttribute('aria-label', 'Scan to open this session on another device');
+    $('session-link-value').value = join.href;
+    $('copy-session-link').onclick = handle(async () => {
+      const status = $('copy-session-status');
+      try {
+        await navigator.clipboard.writeText(join.href);
+        $('manual-session-copy').hidden = true;
+        status.textContent = 'Session link copied.';
+      } catch {
+        $('manual-session-copy').hidden = false;
+        const field = $('session-link-value');
+        field.focus();
+        field.select();
+        status.textContent = 'Copy the selected session link.';
+      }
+    });
+  }
+
+  function placeOverviewDetails() {
+    const inOverview = mobileSession.matches && state !== null &&
+      phaseOf(state) === 'live' && connectionIssue !== 'unavailable';
+    if (overviewDetails.hidden === !inOverview) return;
+    const focused = document.activeElement;
+    const restoreFocus = detailHomes.some(({node}) => node.contains(focused));
+    for (const {node, home} of detailHomes) {
+      if (inOverview) overviewDetails.append(node);
+      else home.after(node);
+    }
+    overviewDetails.hidden = !inOverview;
+    if (restoreFocus) focusSessionControl(focused);
+  }
+
   function renderSessionTabs(phase) {
     const live = phase === 'live';
     const ended = phase === 'ended';
@@ -984,6 +1042,13 @@
     }
     renderSchedule(phase);
     renderSessionTabs(phase);
+    placeOverviewDetails();
+    if (!host) {
+      const share = $('guest-share');
+      const canShare = live && connectionIssue !== 'unavailable';
+      if (canShare && share.hidden) initializeSessionShare();
+      share.hidden = !canShare;
+    }
     $('pairing').hidden = host || (!live && !ended);
     $('join').hidden = host || !live || Boolean(state.phone);
     $('remember').hidden = !Number(state.venue_id) || $('forget').dataset.remembered === 'true';
@@ -1768,24 +1833,7 @@
   if (host) {
     $('mode-link').textContent = 'Your sessions';
     $('recap-retry').onclick = handle(refreshRecap);
-    const join = new URL(page(id, false), location.href);
-    $('join-link').href = join.href;
-    $('qr').innerHTML = window.StonefellowJukeboxQR.svg(join.href);
-    $('session-link-value').value = join.href;
-    $('copy-session-link').onclick = handle(async () => {
-      const status = $('copy-session-status');
-      try {
-        await navigator.clipboard.writeText(join.href);
-        $('manual-session-copy').hidden = true;
-        status.textContent = 'Session link copied.';
-      } catch {
-        $('manual-session-copy').hidden = false;
-        const field = $('session-link-value');
-        field.focus();
-        field.select();
-        status.textContent = 'Copy the selected session link.';
-      }
-    });
+    initializeSessionShare();
     $('reschedule').onsubmit = handle(async event => {
       const values = new FormData(event.currentTarget);
       await mutate('control', {event: 'reschedule', scheduled_at: scheduleTimestamp(values.get('scheduled_at'))});
@@ -1870,7 +1918,7 @@
           ? 'Phone audio is muted. Unmute when you’re ready.' : status);
         renderConnection();
         if (controlsFocused && (!allowed || focused.hidden)) {
-          (allowed && !$('listen').hidden ? $('listen') : $('connection-detail')).focus({preventScroll: true});
+          focusSessionControl(allowed && !$('listen').hidden ? $('listen') : $('connection-detail'));
         }
       }
     });
@@ -1892,6 +1940,7 @@
     setTimeout(poll, state?.phase === 'upcoming' ? 3000 : (phoneStreaming ? 1000 : 1500));
   }
   $('connection-retry').onclick = connectionAction(() => refreshConnection());
+  mobileSession.addEventListener('change', placeOverviewDetails);
   window.addEventListener('offline', () => {
     if (stopped) return;
     sessionRefreshEpoch++;

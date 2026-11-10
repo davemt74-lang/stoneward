@@ -166,6 +166,34 @@ def session_tab(page, name):
     return tab
 
 
+def assert_mobile_session_details(page, guest=False):
+    assert page.evaluate("matchMedia('(max-width: 42rem)').matches")
+    session_tab(page, 'overview')
+    details = page.locator('#session-panel-overview #session-overview-details')
+    expect(details.locator('#session-connection')).to_be_visible()
+    if guest:
+        for control in ('[data-pwa-session-follow]', '[data-pwa-phone-alerts]'):
+            expect(details.locator(control)).to_be_visible()
+        expect(details.locator('[data-pwa-install]')).to_have_count(1)
+    assert page.evaluate('''() => {
+      const head = document.querySelector('.jukebox-page-head').getBoundingClientRect();
+      const tabs = document.querySelector('#session-tabs').getBoundingClientRect();
+      const details = document.querySelector('#session-overview-details').getBoundingClientRect();
+      return tabs.top >= head.bottom && tabs.top - head.bottom <= 32 && details.top >= tabs.bottom;
+    }'''), 'Mobile tabs should appear immediately below the session header and above Overview details'
+    session_tab(page, 'music')
+    expect(details).to_be_hidden()
+    expect(page.locator('#session-connection')).to_be_hidden()
+    session_tab(page, 'overview')
+    expect(details.locator('#session-connection')).to_be_visible()
+
+
+def qr_modules(page, selector='#qr'):
+    qr = page.locator(selector + ' svg')
+    expect(qr).to_be_visible()
+    return qr.locator('rect').evaluate_all('rects => rects.map(rect => rect.outerHTML)')
+
+
 def assert_playheads_synced(host, phone, tolerance=.75, item=None):
     read = '''audio => ({position: audio.currentTime, paused: audio.paused, seeking: audio.seeking,
       item: audio.currentSrc && new URL(audio.currentSrc).searchParams.get('item')})'''
@@ -343,25 +371,39 @@ def scenario(browser, base, phone_options):
     session = venue.url.split('id=')[1].split('&')[0]
     assert session != universal
     assert_host_player_layout(venue)
+    expect(venue.locator('#session-connection')).to_be_visible()
+    expect(venue.locator('#session-overview-details #session-connection')).to_have_count(0)
     expect(venue.locator('#queue-empty')).to_be_visible()
     expect(venue.locator('#player-toggle, #player-skip').filter(visible=True)).to_have_count(0)
     mobile_host = signed_in(2, **phone_options)
     mobile_host.goto(venue.url)
     assert_host_player_layout(mobile_host)
+    assert_mobile_session_details(mobile_host)
     mobile_host.context.close()
     session_tab(venue, 'phones')
     expect(venue.locator('#qr svg')).to_be_visible()
     join = venue.locator('#join-link').get_attribute('href')
     first = browser.new_context(**phone_options).new_page()
     second = browser.new_context(**phone_options).new_page()
-    for phone in (first, second):
-        phone.goto(join)
+    first.goto(join + '&campaign=fixture#invite')
+    second.goto(join)
+    assert_mobile_session_details(first, guest=True)
+    assert qr_modules(first, '#guest-share #qr') == qr_modules(venue), 'Guest and host QR must encode the same link'
+    first.evaluate("Object.defineProperty(navigator, 'clipboard', {value: undefined})")
+    first.locator('#guest-share #copy-session-link').click()
+    manual_share = first.locator('#guest-share #session-link-value')
+    expect(manual_share).to_be_visible()
+    expect(manual_share).to_have_value(join)
+    expect(manual_share).to_be_focused()
+    expect(first.locator('#guest-share #copy-session-status')).to_contain_text('Copy')
     expect(first.locator('#listen')).to_be_hidden()
     assert request(first, 'request', {'track': 'a', 'nonce': '1'*32})['status'] == 409
     session_tab(first, 'overview')
     first.locator('#join input[name=name]').fill('Dave')
     first.locator('#join input[name=remember]').check()
     first.get_by_role('button', name='Request access').click()
+    expect(first.locator('#approval')).to_contain_text('Waiting for the host to approve')
+    assert request(first, 'request', {'track': 'a', 'nonce': '1'*32})['status'] == 409
     venue.locator('#phones li').filter(has_text='Dave').get_by_role('button', name='Approve').click()
     session_tab(first, 'music')
     expect(first.locator('#session-tabs').get_by_role('tab')).to_have_count(3)
@@ -526,6 +568,7 @@ def scenario(browser, base, phone_options):
     public = browser.new_context().new_page()
     public.goto(base + '/jukebox.php')
     expect(public.get_by_role('link', name='Universal')).to_be_visible()
+    expect(public.get_by_role('link', name='Tonight at Test Bar')).to_have_count(0)
     expect(public.get_by_role('link', name='Next night')).to_have_count(0)
     other = signed_in(3)
     expect(other.locator('#session-empty')).to_be_visible()
@@ -560,7 +603,8 @@ def scenario(browser, base, phone_options):
     expect(venue.locator('#recap-tracks')).to_contain_text('First Song')
     second.reload()
     expect(second.locator('#recap')).to_be_hidden()
-    print('PASS host and phone tabs, private unread chat, synchronized native players, queue controls, pairing, and recap')
+    expect(second.locator('#guest-share')).to_be_hidden()
+    print('PASS guest QR and canonical link copying, mobile Overview, private approval and chat, synchronized playback, queue, and recap')
 
 
 def remote_scenario(browser, base, phone_options):
@@ -1441,6 +1485,7 @@ def schedule_scenario(browser, base, phone_options):
     private_join = create_session(private_title, date=private_at)
     host.goto(base + '/jukebox.php?host=1')
     join = create_session(title, listed=True)
+    waiting_qr = qr_modules(host)
     private_artwork_url = inline_splash_editor(browser, base)
     state = request(host, 'state', host=True)['state']
     assert state['phase'] == 'upcoming' and state['scheduled_at'] == int(start_at.timestamp())
@@ -1490,8 +1535,10 @@ def schedule_scenario(browser, base, phone_options):
     expect(scheduled).to_be_visible()
     expect(scheduled).to_have_attribute('datetime', utc_iso(start_at))
     before = scheduled.inner_text()
-    for element in ('#session-tabs', '#pairing', '#music', '#footer', '#chat'):
+    for element in ('#session-tabs', '#pairing', '#music', '#footer', '#chat', '#guest-share'):
         expect(phone.locator(element)).to_be_hidden()
+    expect(phone.locator('#session-connection')).to_be_visible()
+    expect(phone.locator('#session-overview-details #session-connection')).to_have_count(0)
     assert phone.locator('#listener-audio').evaluate('(audio) => audio.paused && !audio.currentSrc')
 
     edited_at = start_at + timedelta(hours=1)
@@ -1511,6 +1558,18 @@ def schedule_scenario(browser, base, phone_options):
     assert_splash_image(other_splash.frame_locator('iframe'))
     expect(phone).to_have_url(join)
     assert host.locator('#join-link').get_attribute('href') == join
+    assert_mobile_session_details(phone, guest=True)
+    assert qr_modules(phone, '#guest-share #qr') == waiting_qr
+    session_tab(phone, 'music')
+    viewport = phone.viewport_size
+    phone.set_viewport_size({'width': 1000, 'height': viewport['height']})
+    expect(phone.locator('#session-connection')).to_be_visible()
+    expect(phone.locator('#session-overview-details [data-pwa-session-follow], '
+                         '#session-overview-details [data-pwa-phone-alerts]')).to_have_count(0)
+    expect(phone.locator('.jukebox-page-head [data-pwa-install]')).to_have_count(1)
+    phone.set_viewport_size(viewport)
+    expect(phone.locator('#session-connection')).to_be_hidden()
+    session_tab(phone, 'overview')
     directory.bring_to_front()
     expect(upcoming).to_have_count(0, timeout=12_000)
     expect(live).to_be_visible(timeout=12_000)
@@ -1540,6 +1599,10 @@ def schedule_scenario(browser, base, phone_options):
     expect(host.get_by_role('heading', name='Session recap')).to_be_visible()
     expect(host.locator('#footer')).to_be_hidden()
     expect(host.locator('#recap-tracks')).to_contain_text('First Song')
+    expect(phone.locator('#connection-badge')).to_have_text('Completed')
+    expect(phone.locator('#session-connection')).to_be_visible()
+    expect(phone.locator('#session-overview-details #session-connection')).to_have_count(0)
+    expect(phone.locator('#guest-share')).to_be_hidden()
 
     host.goto(private_join + '&host=1')
     phone.goto(private_join)
@@ -1568,7 +1631,8 @@ def schedule_scenario(browser, base, phone_options):
     expect(splash.get_by_role('heading', name='Session canceled')).to_be_visible(timeout=10_000)
     expect(phone).to_have_url(private_join)
     expect(phone.locator('#pairing')).to_be_hidden()
-    print('PASS shared QR splash design with distinct session details, private following, same-link start, playback, and recap')
+    expect(phone.locator('#guest-share')).to_be_hidden()
+    print('PASS waiting-to-live guest QR, responsive Overview, shared splash, private following, playback, and recap')
 
 
 def management_scenario(browser, base, phone_options, site):

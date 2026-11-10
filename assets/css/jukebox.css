@@ -287,6 +287,16 @@ main { padding-block: clamp(1.2rem, 4vw, 2.6rem) max(2.25rem, env(safe-area-inse
 }
 .jukebox-session-panel { display: grid; gap: .85rem; min-width: 0; }
 .jukebox-guest .jukebox-session-panel, #ended-session-tools { margin-top: .85rem; }
+.jukebox-overview-details { display: grid; gap: .85rem; min-width: 0; }
+.jukebox-overview-details > .jukebox-connection { margin-top: 0; }
+.jukebox-overview-details > [data-pwa-install] { justify-self: start; }
+.jukebox-guest-join {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  align-items: start;
+  gap: .85rem;
+  min-width: 0;
+}
 #pairing:not(:has(#join:not([hidden]), #approval:not(:empty), #forget:not([hidden]))) { display: none; }
 .jukebox-chat-layout { display: grid; align-items: start; gap: .85rem; }
 .jukebox-chat-host { grid-template-columns: minmax(12rem, 1fr) minmax(0, 2fr); }
@@ -575,7 +585,7 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
 #listener-status { grid-column: 1 / -1; text-align: end; font-size: .8rem; overflow-wrap: anywhere; }
 
 @media (max-width: 42rem) {
-  .jukebox-directory-guest, .host-grid, .jukebox-chat-host { grid-template-columns: minmax(0, 1fr); }
+  .jukebox-directory-guest, .host-grid, .jukebox-chat-host, .jukebox-guest-join { grid-template-columns: minmax(0, 1fr); }
   .jukebox-host .jukebox-session-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .jukebox-header-inner { min-height: 3.6rem; }
   .jukebox-profile-name { max-width: 5.5rem; }
