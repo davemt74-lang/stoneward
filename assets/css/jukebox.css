@@ -625,9 +625,6 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
   aspect-ratio: 3 / 1;
   max-height: 19rem;
   overflow: hidden;
-  margin-bottom: clamp(1rem, 3vw, 1.65rem);
-  border: 1px solid var(--jukebox-line);
-  border-radius: .85rem;
   background: var(--jukebox-raised);
 }
 .jukebox-host-cover:has(> img[hidden]) { display: none; }

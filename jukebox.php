@@ -103,12 +103,12 @@ $renderSessionShare=static function(bool $host):void {
     </nav>
   </div>
 </header>
-<main>
 <?php if($hostDirectory): ?>
-  <div id="host-cover-banner" class="jukebox-host-cover">
-    <img id="host-cover" alt="Hosted events cover image" decoding="async" hidden>
-  </div>
+<div id="host-cover-banner" class="jukebox-host-cover">
+  <img id="host-cover" alt="Hosted events cover image" decoding="async" hidden>
+</div>
 <?php endif; ?>
+<main>
   <div class="jukebox-page-head">
     <div class="jukebox-page-identity">
       <div id="host-logo-frame" class="jukebox-host-logo"<?=$host||$sessionId!==''?'':' hidden'?>>

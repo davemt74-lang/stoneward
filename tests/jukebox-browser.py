@@ -1247,11 +1247,19 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
 
     def assert_full_width_cover():
         expect(cover).to_be_visible()
-        banner_bounds = banner.bounding_box()
-        directory_bounds = host.locator('#directory-results').bounding_box()
-        assert banner_bounds and directory_bounds
-        for edge in ('x', 'width'):
-            assert abs(banner_bounds[edge] - directory_bounds[edge]) <= 1, (banner_bounds, directory_bounds)
+        bounds = host.evaluate("""() => {
+          const rect = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+          return {
+            width: document.documentElement.clientWidth,
+            header: rect('.jukebox-header'),
+            banner: rect('#host-cover-banner'),
+            image: rect('#host-cover'),
+          };
+        }""")
+        for part in ('banner', 'image'):
+            assert abs(bounds[part]['left']) <= 1, bounds
+            assert abs(bounds[part]['right'] - bounds['width']) <= 1, bounds
+            assert abs(bounds[part]['top'] - bounds['header']['bottom']) <= 1, bounds
 
     expect(banner).to_be_hidden()
     cover_opener, dialog = upload(host, SPLASH_ART, 8, kind='cover')
@@ -1272,7 +1280,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     capture(host, 'cover-saved-host-1440')
     host.set_viewport_size({'width': 320, 'height': 740})
     assert_full_width_cover()
-    assert host.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+    assert host.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1')
     capture(host, 'cover-saved-host-320')
     cover_opener.click()
     dialog.get_by_role('button', name='Remove cover image', exact=True).click()
@@ -1425,7 +1433,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     host_context.close()
     phone_context.close()
     other_context.close()
-    print('PASS hosted venue identity and name edits, responsive full-width cover, host logo edits, uninterrupted players and right-aligned catalog actions')
+    print('PASS hosted venue identity and name edits, edge-to-edge cover, host logo edits, uninterrupted players and right-aligned catalog actions')
 
 def inline_splash_editor(browser, base):
     context = browser.new_context()
