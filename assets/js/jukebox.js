@@ -26,6 +26,11 @@
   let listener = null;
   let phoneStreaming = false;
   let stateFetchError = '';
+  let sessionRefreshEpoch = 0;
+  let connectionIssue = '';
+  let connectionRefreshing = false;
+  let networkOffline = navigator.onLine === false;
+  let listenerView = null;
   let state = null;
   let catalog = null;
   let catalogPending = false;
@@ -92,6 +97,120 @@
     }
   }
 
+  const connectionLabels = {
+    idle: 'Ready', connecting: 'Connecting', listening: 'Listening', paused: 'Paused',
+    buffering: 'Buffering', reconnecting: 'Reconnecting', waiting: 'Waiting',
+    'action-required': 'Tap to resume', error: 'Retry audio', unavailable: 'Unavailable'
+  };
+
+  function connectionText(id, text) {
+    const target = $(id);
+    if (target.textContent !== text) target.textContent = text;
+  }
+
+  function renderConnection() {
+    if (!id) return;
+    $('session-connection').hidden = false;
+    let code = 'connecting';
+    let label = 'Connecting';
+    let detail = 'Checking the session connection…';
+    let muted = false;
+    const phase = state ? phaseOf(state) : '';
+    if (connectionIssue === 'unavailable') {
+      code = 'unavailable';
+      label = 'Unavailable';
+      detail = 'This session is unavailable or your access changed. Open the session link again to continue.';
+    } else if (networkOffline) {
+      code = 'offline';
+      label = 'Offline';
+      detail = 'Your device is offline. Reconnect to the internet; the session will refresh automatically.';
+    } else if (connectionIssue || connectionRefreshing) {
+      code = 'reconnecting';
+      label = 'Reconnecting';
+      detail = 'Refreshing the session connection. Phone audio waits for a fresh host update.';
+      if (host) detail = 'Refreshing your connection to Stonefellow. The last player update may be out of date.';
+    } else if (state) {
+      code = 'connected';
+      label = 'Connected';
+      if (phase === 'ended' || phase === 'canceled') {
+        label = phase === 'ended' ? 'Completed' : 'Canceled';
+        detail = phase === 'ended' ? 'The session has ended.' : 'This session was canceled.';
+      } else if (phase === 'upcoming') {
+        code = 'waiting';
+        label = 'Waiting';
+        detail = host ? 'Session connected. Start when you’re ready; the QR link stays the same.'
+          : 'Session connected. This page will update when the host starts.';
+      } else if (host) {
+        const transport = state.transport?.status;
+        if (!state.online) {
+          code = 'waiting';
+          label = 'Player offline';
+          detail = active ? 'Session connected. Waiting for this device to update playback.'
+            : 'You’re connected to Stonefellow. Enable a session player to play music.';
+        } else {
+          label = transport === 'paused' || Number(state.paused) ? 'Player paused'
+            : transport === 'buffering' ? 'Player buffering' : 'Player online';
+          if (transport === 'buffering') code = 'buffering';
+          detail = active ? 'Playback is hosted on this device.' : 'The session player is running on another device.';
+          const count = state.listener_metrics?.active_players;
+          if (state.remote_listening === true && count != null) {
+            detail += ' ' + count + (Number(count) === 1 ? ' phone listening now.' : ' phones listening now.');
+          }
+        }
+      } else if (state.remote_listening === true && listenerView?.allowed) {
+        code = listenerView.connection;
+        label = connectionLabels[code] || 'Connected';
+        muted = listenerView.muted && code === 'listening';
+        if (muted) label = 'Muted';
+        detail = muted ? 'Phone audio is muted. Unmute when you’re ready.'
+          : listenerView.status || 'Tap Stream on this phone to listen with the host.';
+      } else if (state.phone?.status === 'pending') {
+        code = 'waiting';
+        label = 'Awaiting approval';
+        detail = 'Session connected. Waiting for the host to approve this phone.';
+      } else if (state.phone?.status === 'revoked') {
+        code = 'unavailable';
+        label = 'Access closed';
+        detail = 'The host closed this phone connection. Phone audio has stopped.';
+      } else {
+        detail = 'Session connected. Phone streaming is not enabled for this connection.';
+      }
+    }
+    const badge = $('connection-badge');
+    badge.dataset.connection = code;
+    badge.dataset.muted = String(muted);
+    connectionText('connection-badge', label);
+    connectionText('connection-detail', detail);
+    const retry = $('connection-retry');
+    retry.hidden = !connectionIssue || connectionIssue === 'unavailable';
+    retry.disabled = connectionRefreshing || networkOffline;
+    if (!host && listenerView) {
+      $('listener-resync').disabled = !listenerView.canResync || connectionRefreshing || networkOffline;
+      connectionText('listener-resync', connectionRefreshing && listenerView.listening ? 'Resyncing…' : 'Resync');
+    }
+  }
+
+  function invalidateConnection() {
+    sessionRefreshEpoch++;
+    connectionIssue = 'unavailable';
+    connectionRefreshing = false;
+    stopped = true;
+    renderChat(false);
+    listener?.update({allowed: false});
+    if (active) releasePlayer();
+    renderConnection();
+  }
+
+  function refreshConnection({resync = false} = {}) {
+    if (stopped) return Promise.resolve();
+    sessionRefreshEpoch++;
+    networkOffline = navigator.onLine === false;
+    connectionRefreshing = true;
+    if (!resync) listener?.reconnect();
+    renderConnection();
+    return tick();
+  }
+
   function createListenerReporter() {
     const storageKey = 'stonefellow:jukebox-listener:' + id;
     let playerId, sequence, pending;
@@ -132,7 +251,17 @@
     };
   }
   function notice(error) {
-    $('status').textContent = typeof error === 'string' ? error : error.message;
+    connectionText('status', typeof error === 'string' ? error : error.message);
+  }
+  function connectionAction(work) {
+    const run = handle(work);
+    return async event => {
+      const control = event?.currentTarget;
+      const focused = control === document.activeElement;
+      await run(event);
+      renderConnection();
+      if (focused && control?.hidden) $('connection-detail').focus({preventScroll: true});
+    };
   }
   function playerNotice(error) {
     $('player-status').textContent = typeof error === 'string' ? error : error.message;
@@ -644,14 +773,16 @@
       if (live) renderHost();
     }
     renderChat();
+    renderConnection();
   }
 
-  function updateListener(responseMs) {
+  function updateListener(responseMs, requestStartedAt) {
     if (!listener) return;
     const transport = state.transport;
     // Project the playhead from the server's sample through the trip back to this phone.
     const responseTransitMs = Math.min(500, responseMs / 2);
     listener.update({
+      requestStartedAt,
       allowed: state.remote_listening === true && phaseOf(state) === 'live',
       online: Boolean(state.online),
       itemId: state.current?.id ?? '',
@@ -853,7 +984,8 @@
     clearHostSource();
   }
   function reportHostError(error) {
-    if (error.status === 409) releasePlayer();
+    if ([401, 403, 404].includes(error.status)) invalidateConnection();
+    else if (error.status === 409) releasePlayer();
     if ($('footer').hidden) notice(error);
     else playerNotice(error);
   }
@@ -936,12 +1068,17 @@
   }
 
   async function refreshSession() {
+    const requestEpoch = sessionRefreshEpoch;
     let stateReceived = false;
     try {
       const requestStarted = performance.now();
       const result = await api('state');
+      if (requestEpoch !== sessionRefreshEpoch) return;
       const responseMs = performance.now() - requestStarted;
       state = result.state;
+      connectionIssue = '';
+      connectionRefreshing = false;
+      networkOffline = false;
       if (!host) {
         window.StonefellowPwaAlerts?.updateSession(result);
         document.dispatchEvent(new CustomEvent('stonefellow:jukebox-state', {detail: state}));
@@ -950,7 +1087,7 @@
       stateReceived = true;
       if (stateFetchError && $('status').textContent === stateFetchError) notice('');
       stateFetchError = '';
-      updateListener(responseMs);
+      updateListener(responseMs, requestStarted);
       $('forget').hidden = !result.remembered;
       $('forget').dataset.remembered = String(result.remembered);
       if (!catalog && !catalogPending && phase === 'live' && Object.hasOwn(state, 'queue')) {
@@ -974,16 +1111,18 @@
         await syncPlayer();
       }
     } catch (error) {
-      if (!stateReceived) {
-        stateFetchError = error.message;
-        if (error.status === 404 || error.status === 401) {
-          renderChat(false);
-          listener?.update({allowed: false});
-          if (active) releasePlayer();
-        } else listener?.disconnect();
+      if (requestEpoch !== sessionRefreshEpoch) return;
+      connectionRefreshing = false;
+      const terminal = [401, 403, 404].includes(error.status);
+      if (!stateReceived) stateFetchError = error.message;
+      if (terminal) {
+        invalidateConnection();
+      } else if (!stateReceived) {
+        connectionIssue = 'reconnecting';
+        listener?.disconnect();
       }
       notice(error);
-      if (error.status === 404 || error.status === 401) stopped = true;
+      renderConnection();
     }
   }
 
@@ -1404,30 +1543,62 @@
     listener = window.StonefellowJukeboxListener.create({
       audio: $('listener-audio'), urlForItem: item => endpoint('audio', {item}),
       onActivity: createListenerReporter(),
-      onChange({allowed, listening, muted, needsGesture, status}) {
+      onChange(view) {
+        const {allowed, listening, muted, needsGesture, status, connection} = view;
+        listenerView = view;
         phoneStreaming = allowed && listening;
+        const focused = document.activeElement;
+        const controlsFocused = $('listener').contains(focused);
         $('listener').hidden = !allowed;
         $('listen').hidden = listening && !needsGesture;
+        connectionText('listen', connection === 'error' ? 'Retry phone audio' : needsGesture ? 'Resume phone audio' : 'Stream on this phone');
+        $('listener-resync').hidden = !listening;
         $('listener-mute').hidden = !listening;
         $('listener-mute').setAttribute('aria-pressed', String(muted));
+        connectionText('listener-mute', muted ? 'Unmute phone' : 'Mute phone');
         $('listener-stop').hidden = !listening;
-        $('listener-status').textContent = status;
+        const badge = $('listener-connection');
+        badge.dataset.connection = connection;
+        badge.dataset.muted = String(muted);
+        connectionText('listener-connection', muted && connection === 'listening' ? 'Muted' : connectionLabels[connection] || 'Ready');
+        connectionText('listener-status', muted && connection === 'listening'
+          ? 'Phone audio is muted. Unmute when you’re ready.' : status);
+        renderConnection();
+        if (controlsFocused && (!allowed || focused.hidden)) {
+          (allowed && !$('listen').hidden ? $('listen') : $('connection-detail')).focus({preventScroll: true});
+        }
       }
     });
     $('listen').onclick = () => {
       listener.listen();
       void tick();
     };
+    $('listener-resync').onclick = connectionAction(async () => {
+      if (!listener.resync()) return;
+      await refreshConnection({resync: true});
+    });
     $('listener-stop').onclick = listener.stop;
     $('listener-mute').onclick = listener.toggleMute;
-    window.addEventListener('offline', listener.disconnect);
-    window.addEventListener('online', () => { void tick(); });
+
   }
   function poll() {
     if (stopped) return;
     void tick();
     setTimeout(poll, state?.phase === 'upcoming' ? 3000 : (phoneStreaming ? 1000 : 1500));
   }
+  $('connection-retry').onclick = connectionAction(() => refreshConnection());
+  window.addEventListener('offline', () => {
+    if (stopped) return;
+    sessionRefreshEpoch++;
+    networkOffline = true;
+    connectionRefreshing = false;
+    connectionIssue = 'reconnecting';
+    listener?.disconnect();
+    renderConnection();
+  });
+  window.addEventListener('online', () => { void refreshConnection(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) void refreshConnection(); });
+  window.addEventListener('pageshow', event => { if (event.persisted) void refreshConnection(); });
+  renderConnection();
   poll();
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) void tick(); });
 })();
