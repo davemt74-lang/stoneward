@@ -734,3 +734,9 @@ html:has(#footer:not([hidden])) { scroll-padding-block-end: calc(10rem + env(saf
   .jukebox-catalog-actions button { font-size: .86rem; padding-inline: .6rem; }
   .jukebox-catalog-meta { font-size: .8rem; }
 }
+
+@media (max-width: 22rem) {
+  .jukebox-directory-toolbar, .jukebox-directory-actions, .jukebox-directory-tabs { gap: .15rem; }
+  .jukebox-directory-tabs { padding: .15rem; }
+  .jukebox-directory-toolbar button { padding-inline: .125rem; }
+}
