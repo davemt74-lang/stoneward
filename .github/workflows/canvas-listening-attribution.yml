@@ -101,6 +101,11 @@ jobs:
         env:
           SF_JUKEBOX_BROWSER: webkit
         run: python tests/jukebox-browser.py --recovery-only
+      - name: Jukebox host logo and catalog layout on iPhone-sized WebKit
+        if: matrix.browser == 'webkit'
+        env:
+          SF_JUKEBOX_BROWSER: webkit
+        run: python tests/jukebox-browser.py --branding-only
       - name: Full canvas controls in the bundled current headless shell
         if: matrix.browser == 'chromium'
         env:

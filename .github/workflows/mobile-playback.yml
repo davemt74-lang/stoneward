@@ -46,9 +46,18 @@ jobs:
           CHROMIUM_EXECUTABLE: /nonexistent/use-playwright-chromium
         run: python3 tests/section91b21b2-browser.py
       - name: Jukebox pairing, playback, chat and venue CRM
+        env:
+          SF_JUKEBOX_SCREENSHOT_DIR: ${{ runner.temp }}/jukebox-ui
         run: |
           python3 tests/jukebox-browser.py --http-only
           python3 tests/jukebox-browser.py
+      - name: Jukebox layout review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jukebox-ui-${{ github.sha }}
+          path: ${{ runner.temp }}/jukebox-ui
+          if-no-files-found: ignore
       - name: PWA splash publishing, session follows, and Web Push protocol
         env:
           SF_PWA_ICON_TEST_REQUIRE_GD: '1'

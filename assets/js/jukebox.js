@@ -62,6 +62,8 @@
   let crmRequest = null;
   let requestButtons = [];
   const renderKeys = new Map();
+  let pageBranding = {logo_url: null, revision: -1};
+  let brandingOwnerAvailable = true;
 
   function endpoint(action, extra = {}) {
     return 'api/jukebox.php?' + new URLSearchParams({action, id, ...(host ? {host: '1'} : {}), ...extra});
@@ -77,7 +79,7 @@
     };
     if (action === 'listener' && body?.active === false) options.keepalive = true;
     const controller = ['state', 'player', 'thread', 'crm', 'venue_accounts', 'directory'].includes(action)
-      || (action === 'settings' && body === undefined) ? new AbortController() : null;
+      || (['settings', 'branding'].includes(action) && body === undefined) ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
     if (controller) options.signal = controller.signal;
     try {
@@ -95,6 +97,188 @@
     } finally {
       if (timer !== null) clearTimeout(timer);
     }
+  }
+
+  function logoUrl(value) {
+    if (!value || typeof value !== 'string') return null;
+    try {
+      const url = new URL(value, location.href);
+      if (url.origin !== location.origin || url.pathname !== new URL('api/jukebox.php', location.href).pathname
+          || url.searchParams.get('action') !== 'host_logo'
+          || !/^[1-9][0-9]*$/.test(url.searchParams.get('owner') || '')
+          || !/^[a-f0-9]{64}$/.test(url.searchParams.get('v') || '')) return null;
+      return url.href;
+    } catch { return null; }
+  }
+
+  function paintLogo(image, fallback, source) {
+    const next = source || '';
+    if (image.dataset.logoSource === next) return;
+    image.dataset.logoSource = next;
+    image.hidden = true;
+    fallback.hidden = false;
+    if (!next) { image.removeAttribute('src'); return; }
+    image.onload = () => {
+      if (image.dataset.logoSource !== next) return;
+      image.hidden = false;
+      fallback.hidden = true;
+    };
+    image.onerror = () => {
+      if (image.dataset.logoSource !== next) return;
+      image.hidden = true;
+      fallback.hidden = false;
+    };
+    image.src = next;
+  }
+
+  function applyPageBranding(value) {
+    if (!value || !Number.isSafeInteger(value.revision)) return;
+    if (value.owner_available === false) brandingOwnerAvailable = false;
+    if (!brandingOwnerAvailable) pageBranding = {logo_url: null, revision: 0};
+    else {
+      if (value.revision < pageBranding.revision) return;
+      pageBranding = {logo_url: logoUrl(value.logo_url), revision: value.revision};
+    }
+    paintLogo($('host-logo'), $('host-logo-fallback'), pageBranding.logo_url);
+    if (host) {
+      paintLogo($('branding-current'), $('branding-current-fallback'), pageBranding.logo_url);
+      connectionText('open-branding', pageBranding.logo_url ? 'Change logo' : 'Upload logo');
+    }
+  }
+
+  function brandingEditable(editable) {
+    if (host) $('host-branding').hidden = !editable || !brandingOwnerAvailable;
+  }
+
+  function bindBrandingDialog() {
+    if (!host) return;
+    if (id) $('branding-settings-slot').append($('host-branding'));
+    const dialog = $('branding-dialog');
+    const form = $('branding');
+    const file = $('branding-file');
+    const close = [...dialog.querySelectorAll('[data-branding-close]')];
+    let generation = 0, reading = 0, saving = false, snapshot = null, selected;
+    let editable = false;
+    const report = text => connectionText('branding-status', text);
+    const controls = () => {
+      file.disabled = saving || !snapshot || !editable;
+      $('branding-save').disabled = saving || !editable || typeof selected !== 'string';
+      $('branding-remove').disabled = saving || !editable || !snapshot?.logo_url;
+      $('branding-reload').disabled = saving;
+      close.forEach(control => { control.disabled = saving; });
+    };
+    const resetSelection = () => {
+      reading++;
+      selected = undefined;
+      form.reset();
+      paintLogo($('branding-preview'), $('branding-preview-fallback'), logoUrl(snapshot?.logo_url));
+    };
+    async function load() {
+      const request = ++generation;
+      snapshot = null;
+      editable = false;
+      resetSelection();
+      report('Loading host logo…');
+      $('branding-reload').hidden = true;
+      controls();
+      try {
+        const data = await api('branding');
+        if (!dialog.open || generation !== request) return;
+        snapshot = data.branding;
+        editable = data.branding_editable === true;
+        resetSelection();
+        report(editable ? '' : 'This account cannot change the host logo.');
+        controls();
+        if (editable && [dialog, document.body, $('branding-status'), $('branding-reload'), file].includes(document.activeElement)) file.focus({preventScroll: true});
+      } catch (error) {
+        if (!dialog.open || generation !== request) return;
+        report(error.message);
+        $('branding-reload').hidden = false;
+        controls();
+      }
+    }
+    $('open-branding').onclick = () => {
+      dialog.showModal();
+      $('branding-status').focus({preventScroll: true});
+      void load();
+    };
+    close.forEach(control => { control.onclick = () => dialog.close(); });
+    dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+    dialog.addEventListener('close', () => {
+      generation++;
+      resetSelection();
+      snapshot = null;
+      report('');
+      if ($('open-branding').isConnected && !$('host-branding').hidden) $('open-branding').focus({preventScroll: true});
+    });
+    file.onchange = async () => {
+      const request = ++reading;
+      const context = generation;
+      selected = undefined;
+      const choice = file.files[0];
+      paintLogo($('branding-preview'), $('branding-preview-fallback'), logoUrl(snapshot?.logo_url));
+      controls();
+      if (!choice) { report(''); return; }
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(choice.type) || choice.size < 1 || choice.size > 1048576) {
+        report('Choose a PNG, JPEG, or WebP image up to 1 MB.');
+        return;
+      }
+      report('Reading image…');
+      try {
+        const data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('The image could not be read. Choose it again.'));
+          reader.readAsDataURL(choice);
+        });
+        if (!dialog.open || request !== reading || context !== generation) return;
+        await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => image.naturalWidth * image.naturalHeight <= 20000000 ? resolve()
+            : reject(new Error('Choose an image smaller than 20 megapixels.'));
+          image.onerror = () => reject(new Error('This image could not be opened. Choose a PNG, JPEG, or WebP image.'));
+          image.src = data;
+        });
+        if (!dialog.open || request !== reading || context !== generation) return;
+        selected = data;
+        paintLogo($('branding-preview'), $('branding-preview-fallback'), data);
+        report('Ready to upload ' + choice.name + '. Save to publish it on your sessions.');
+        controls();
+      } catch (error) {
+        if (!dialog.open || request !== reading || context !== generation) return;
+        report(error.message);
+        controls();
+      }
+    };
+    async function save(image) {
+      if (saving || !snapshot || !editable) return;
+      saving = true;
+      controls();
+      report(image === null ? 'Removing logo…' : 'Uploading logo…');
+      try {
+        const data = await api('branding', {expected_revision: snapshot.revision, image});
+        applyPageBranding(data.branding);
+        if (state?.branding_editable) state.branding = data.branding;
+        if (!id) {
+          directoryRows = directoryRows.map(row => ({...row, branding: data.branding}));
+          renderSessionList('sessions', directoryRows);
+        }
+        dialog.close();
+        notice(image === null ? 'Host logo removed.' : 'Host logo updated.');
+      } catch (error) {
+        report(error.message);
+        if (error.status === 409) $('branding-reload').hidden = false;
+      } finally {
+        saving = false;
+        controls();
+      }
+    }
+    form.onsubmit = event => {
+      event.preventDefault();
+      if (typeof selected === 'string') void save(selected);
+    };
+    $('branding-remove').onclick = () => void save(null);
+    $('branding-reload').onclick = () => void load();
   }
 
   const connectionLabels = {
@@ -191,6 +375,8 @@
   }
 
   function invalidateConnection() {
+    applyPageBranding({owner_available: false, logo_url: null, revision: 0});
+    brandingEditable(false);
     sessionRefreshEpoch++;
     connectionIssue = 'unavailable';
     connectionRefreshing = false;
@@ -489,44 +675,95 @@
     }
   }
 
+  function catalogRow(label, metadata, action) {
+    const row = document.createElement('div');
+    row.className = 'jukebox-catalog-row-content';
+    const copy = document.createElement('div');
+    copy.className = 'jukebox-catalog-copy';
+    const name = document.createElement('strong');
+    name.className = 'jukebox-catalog-title';
+    name.textContent = label;
+    copy.append(name);
+    if (metadata) {
+      const detail = document.createElement('small');
+      detail.className = 'jukebox-catalog-meta';
+      detail.textContent = metadata;
+      copy.append(detail);
+    }
+    row.append(copy);
+    if (action) {
+      const actions = document.createElement('div');
+      actions.className = 'jukebox-catalog-actions';
+      actions.append(action);
+      row.append(actions);
+    }
+    return row;
+  }
+
   function renderCatalog() {
     if (!catalog) return;
     requestButtons = [];
     $('tabs').querySelectorAll('button').forEach(control => control.setAttribute('aria-pressed', control.dataset.tab === tab));
+    const context = $('catalog-context');
+    context.replaceChildren();
+    context.hidden = true;
+    const releases = new Map(catalog.releases.map(release => [release.release_id, release]));
     if (tab === 'albums' && !album) {
-      list('catalog', catalog.releases, release => [button(release.title, () => {
-        album = release.release_id;
-        renderCatalog();
-      })]);
-      return;
-    }
-    const release = catalog.releases.find(row => row.release_id === album);
-    const tracks = tab === 'albums' ? (release?.track_ids || []).map(key =>
-      catalog.tracks.find(track => track.track_id === key)).filter(Boolean) : [...catalog.tracks];
-    if (tab === 'songs') tracks.sort((a, b) => a.title.localeCompare(b.title));
-    list('catalog', tracks, track => {
-      const parts = [track.title];
-      if (canRequest() && track.source_available) {
-        const control = button(state.current ? 'Add to Queue' : 'Play', async () => {
-          const request = {track: track.track_id, nonce: nonce()};
-          try {
-            await api('request', request);
-          } catch (error) {
-            if (error.status) throw error;
-            await api('request', request);
-          }
-          await tick();
+      list('catalog', catalog.releases, release => {
+        const count = release.track_ids.length;
+        const open = button('View songs', () => {
+          album = release.release_id;
+          renderCatalog();
+          $('catalog-back').focus({preventScroll: true});
         });
-        requestButtons.push(control);
-        parts.push(control);
+        open.setAttribute('aria-label', 'View songs in ' + release.title);
+        const row = catalogRow(release.title, count + (count === 1 ? ' song' : ' songs'), open);
+        row.dataset.releaseId = release.release_id;
+        return [row];
+      });
+    } else {
+      const release = releases.get(album);
+      const tracks = tab === 'albums' ? (release?.track_ids || []).map(key =>
+        catalog.tracks.find(track => track.track_id === key)).filter(Boolean) : [...catalog.tracks];
+      if (tab === 'songs') tracks.sort((a, b) => a.title.localeCompare(b.title));
+      list('catalog', tracks, track => {
+        const details = (track.release_ids || []).map(key => releases.get(key)?.title).filter(Boolean);
+        if (Number(track.duration_seconds) > 0) details.push(time(Number(track.duration_seconds)));
+        let control;
+        if (canRequest() && track.source_available) {
+          control = button(state.current ? 'Add to Queue' : 'Play', async () => {
+            const request = {track: track.track_id, nonce: nonce()};
+            try { await api('request', request); }
+            catch (error) { if (error.status) throw error; await api('request', request); }
+            await tick();
+          });
+          requestButtons.push(control);
+        } else if (!track.source_available) details.push('Audio unavailable');
+        const row = catalogRow(track.title, details.join(' · '), control);
+        row.dataset.trackId = track.track_id;
+        return [row];
+      });
+      if (tab === 'albums') {
+        context.hidden = false;
+        const back = button('All albums', () => {
+          const previousAlbum = album;
+          album = '';
+          renderCatalog();
+          [...$('catalog').children].find(row => row.dataset.releaseId === previousAlbum)?.querySelector('button')?.focus({preventScroll: true});
+        });
+        back.id = 'catalog-back';
+        context.append(back);
+        const heading = document.createElement('h3');
+        heading.textContent = release?.title || 'Album';
+        context.append(heading);
       }
-      return parts;
-    });
-    if (tab === 'albums') {
-      const back = document.createElement('li');
-      back.append(button('All albums', () => { album = ''; renderCatalog(); }));
-      $('catalog').prepend(back);
     }
+    [...$('catalog').children].forEach(item => {
+      item.className = 'jukebox-catalog-row';
+      if (item.firstElementChild.dataset.trackId) item.dataset.trackId = item.firstElementChild.dataset.trackId;
+      if (item.firstElementChild.dataset.releaseId) item.dataset.releaseId = item.firstElementChild.dataset.releaseId;
+    });
+    $('catalog-empty').hidden = $('catalog').children.length > 0;
   }
 
   async function mutate(action, body) {
@@ -730,6 +967,13 @@
     const ended = phase === 'ended';
     const approved = live && state.phone?.status === 'approved';
     $('title').textContent = state.title;
+    applyPageBranding(state.branding);
+    brandingEditable(state.branding_editable === true);
+    if (host) {
+      const destination = live ? $('branding-settings-slot') : $('branding-session-tools');
+      if ($('host-branding').parentElement !== destination) destination.append($('host-branding'));
+      $('branding-session-tools').hidden = live || state.branding_editable !== true;
+    }
     renderSchedule(phase);
     renderSessionTabs(phase);
     $('pairing').hidden = host || (!live && !ended);
@@ -1197,7 +1441,21 @@
         badge.className = 'session-badge';
         const scheduled = document.createElement('time');
         scheduled.className = 'session-date';
-        item.append(link(row.title, page(row.id, host)), badge, scheduled);
+        const sessionLink = link('', page(row.id, host));
+        const logo = document.createElement('span');
+        logo.className = 'jukebox-session-logo';
+        const image = document.createElement('img');
+        image.alt = '';
+        image.width = image.height = 40;
+        image.hidden = true;
+        const fallback = document.createElement('span');
+        fallback.className = 'jukebox-record';
+        fallback.setAttribute('aria-hidden', 'true');
+        logo.append(image, fallback);
+        const text = document.createElement('span');
+        text.className = 'session-title-copy';
+        sessionLink.append(logo, text);
+        item.append(sessionLink, badge, scheduled);
         if (host) {
           const actions = document.createElement('div');
           actions.className = 'jukebox-session-card-actions';
@@ -1218,7 +1476,10 @@
       const status = host ? ({upcoming: 'Upcoming', live: 'Open', ended: 'Completed', canceled: 'Canceled'}[phase] || '')
         : upcoming ? (row.remote_listening ? 'Phone listening planned' : '')
         : (row.online ? 'Live' : 'Host player offline') + (row.remote_listening ? ' · Phone listening enabled' : '');
-      if (title.textContent !== label) title.textContent = label;
+      const titleText = title.querySelector('.session-title-copy');
+      if (titleText.textContent !== label) titleText.textContent = label;
+      const logo = title.querySelector('.jukebox-session-logo');
+      paintLogo(logo.querySelector('img'), logo.querySelector('.jukebox-record'), logoUrl((host ? pageBranding : row.branding)?.logo_url));
       if (host) title.setAttribute('aria-label', phase === 'ended' || phase === 'canceled' ? `${label} (${phase})` : label);
       if (badge.textContent !== status) badge.textContent = status;
       badge.hidden = !status;
@@ -1260,6 +1521,8 @@
       const previous = new Set(directoryRows.map(row => row.id));
       directoryRows = append ? directoryRows.concat(data.sessions.filter(row => !previous.has(row.id))) : data.sessions;
       directoryCursor = data.next_cursor;
+      applyPageBranding(data.branding);
+      brandingEditable(data.branding_editable === true);
       $('session-empty').hidden = Boolean(directoryRows.length);
       $('mode-link').href = 'jukebox.php';
       $('mode-link').textContent = 'Live Sessions';
@@ -1398,6 +1661,7 @@
     void directory().catch(notice);
   });
   bindVenueAccountPicker();
+  bindBrandingDialog();
   const profile = $('jukebox-profile');
   document.addEventListener('click', event => {
     if (profile.open && !profile.contains(event.target)) profile.open = false;

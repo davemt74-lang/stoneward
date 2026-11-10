@@ -8,8 +8,9 @@ require_once __DIR__.'/jukebox-follow-core.php';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 $action=$_GET['action']??'state';
 $audioRequest=$action==='audio';
-if(!in_array($method,$audioRequest?['GET','HEAD']:['GET','POST'],true)){
-    header('Allow: '.($audioRequest?'GET, HEAD':'GET, POST'));
+$logoRequest=$action==='host_logo';
+if(!in_array($method,$audioRequest||$logoRequest?['GET','HEAD']:['GET','POST'],true)){
+    header('Allow: '.($audioRequest||$logoRequest?'GET, HEAD':'GET, POST'));
     sf_json_response(['ok'=>false,'message'=>'Method unavailable.'],405);
 }
 if($audioRequest){
@@ -24,7 +25,13 @@ $guestState=!$post&&!$hostMode&&$action==='state';
 $guestDirectory=!$post&&!$hostMode&&$action==='directory';
 if($post&&(int)($_SERVER['CONTENT_LENGTH']??0)>(in_array($action,['listener','follow'],true)?2048:1_450_000))
     sf_json_response(['ok'=>false,'message'=>'Request is too large.'],413);
-$body=$post?sf_request_json():[];
+if($post&&$action==='branding'){
+    // Bound the raw upload even when a chunked request omits Content-Length.
+    $raw=file_get_contents('php://input',false,null,0,1_450_001);
+    if($raw===false||strlen($raw)>1_450_000)sf_json_response(['ok'=>false,'message'=>'Request is too large.'],413);
+    $body=trim($raw)===''?[]:json_decode($raw,true);
+    if(!is_array($body))sf_json_response(['ok'=>false,'error'=>'invalid_json'],400);
+}else $body=$post?sf_request_json():[];
 $user=$hostMode||$followRequest?sf_require_user(false,$post)
     :(($guestState||$guestDirectory)&&sf_auth_cookie_value()!==''?sf_current_user():null);
 if($post&&!$hostMode&&!$followRequest)sf_require_csrf();
@@ -55,9 +62,27 @@ try{
         sf_json_response(['ok'=>true,'accounts'=>$accounts]);
     }
     sf_jukebox_schema();
+    if($logoRequest){
+        $source=sf_jukebox_branding_source($_GET['owner']??null,$_GET['v']??null);
+        header('Content-Type: '.$source['mime']);
+        header('Content-Length: '.strlen($source['bytes']));
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        header('Cross-Origin-Resource-Policy: same-origin');
+        header("Content-Security-Policy: default-src 'none'; sandbox");
+        if($method==='GET')echo $source['bytes'];
+        exit;
+    }
+    if($action==='branding'){
+        if(!$hostMode)throw new DomainException('Host access is required.');
+        $editable=sf_jukebox_branding_can_edit($uid,$admin);
+        if($post&&!$editable)throw new DomainException('A host account is required.');
+        $branding=$post?sf_jukebox_branding_update($uid,$body,$admin):sf_jukebox_branding_get($uid);
+        sf_json_response(['ok'=>true,'branding'=>$branding,'branding_editable'=>$editable]);
+    }
     if($followRequest||(($guestState||$guestDirectory)&&$uid>0)||$alertControl||$settingsWrite)sf_jukebox_follow_schema();
     if(!$post&&$action==='directory'){
-        $directoryFields='s.id,s.title,s.ended,s.created,s.heartbeat,t.scheduled_at,t.started_at';
+        $directoryFields='s.id,s.owner_id,s.title,s.ended,s.created,s.heartbeat,t.scheduled_at,t.started_at';
         $scheduleJoin=' LEFT JOIN jukebox_schedule t ON t.session_id=s.id';
         $followingSessions=[];
         $scope=$_GET['scope']??null;
@@ -88,13 +113,17 @@ try{
                 ORDER BY COALESCE(t.started_at,t.scheduled_at,s.created) DESC,s.id DESC LIMIT 100",[$uid])->fetchAll();
             $db->commit();
         }
-        $directoryRow=static function(array $session)use($hostMode): array {
-            $row=['id'=>$session['id'],'title'=>$session['title']]+sf_jukebox_schedule_details($session);
+        $branding=sf_jukebox_branding_map(array_merge([$uid],array_column($sessions,'owner_id'),array_column($followingSessions,'owner_id')));
+        $directoryRow=static function(array $session)use($hostMode,$branding): array {
+            $row=['id'=>$session['id'],'title'=>$session['title']]+sf_jukebox_schedule_details($session)
+                +['branding'=>$branding[(int)$session['owner_id']]??sf_jukebox_branding_metadata(null)];
             if($hostMode)return $row+['ended'=>$session['ended'],'settings'=>sf_jukebox_settings($session)];
             return $row+['remote_listening'=>(bool)$session['remote_listening'],'online'=>sf_jukebox_player_online($session)];
         };
         $venue=$hostMode?sf_jukebox_query('SELECT name FROM jukebox_venues WHERE owner_id=?',[$uid])->fetchColumn():false;
         sf_json_response(['ok'=>true,'sessions'=>array_map($directoryRow,$sessions),'venue'=>$venue?:null,'admin'=>$admin]
+            +($hostMode?['branding'=>$branding[$uid]??sf_jukebox_branding_metadata(null),
+                'branding_editable'=>sf_jukebox_branding_can_edit($uid,$admin)]:[])
             +($page!==null?['scope'=>$scope,'next_cursor'=>$page['next_cursor']]:[])
             +($guestDirectory?['following_sessions'=>array_map($directoryRow,$followingSessions)]:[]));
     }
@@ -192,7 +221,8 @@ try{
         if($fullThread&&$host&&($phase!=='live'||$hostThreadStatus!=='approved'))
             throw new DomainException('Chat requires an approved phone.');
         $payload=match($action){
-            'state'=>['state'=>sf_jukebox_state($session,$phone,$host),
+            'state'=>['state'=>sf_jukebox_state($session,$phone,$host)+($host?['branding_editable'=>
+                (int)$session['owner_id']===$uid&&sf_jukebox_branding_can_edit($uid,$admin)]:[]),
                 'remembered'=>!$host&&!in_array($phase,['upcoming','canceled'],true)&&sf_jukebox_guest($session)!==null]
                 +($guestState?['signed_in'=>$uid>0,'following'=>sf_jukebox_following($id,$uid)]:[]),
             'catalog'=>($host||$approved||(int)$session['listed'])?sf_canvas_audio_catalog():throw new DomainException('Host approval is required.'),

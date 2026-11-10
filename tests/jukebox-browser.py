@@ -1,5 +1,6 @@
 """Scheduled sessions, venue pairing, shared playback, remote listening, chat, and recaps."""
 import base64
+import hashlib
 from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
@@ -10,9 +11,11 @@ import json
 from http.cookiejar import CookieJar
 import sqlite3
 import subprocess
+import struct
 import tempfile
 import time
 import urllib.request
+import zlib
 from zoneinfo import ZoneInfo
 
 if '--http-only' not in sys.argv:
@@ -897,6 +900,237 @@ def recovery_scenario(browser, base, phone_options, site):
     print('PASS real host/phone recovery, fresh Resync, mute and Stop preservation, lifecycle, stale authorization, and host report denial')
 
 
+
+def branding_scenario(browser, base, phone_options, site):
+    paths = [site / 'data/catalog.json', site / 'data/releases.json']
+    originals = [path.read_text() for path in paths]
+    tracks = json.loads(originals[0])
+    tracks[0]['title'] = 'Zebra constellation — a long song title that should wrap without moving its action'
+    tracks[1]['title'] = 'Amber horizon — another long song title with a clear action at the far right'
+    releases = json.loads(originals[1])
+    releases[0]['title'] = 'The Record — an album title long enough to wrap cleanly on a small phone'
+    for path, value in zip(paths, (tracks, releases)):
+        path.write_text(json.dumps(value))
+    try:
+        _branding_browser(browser, base, phone_options, site, tracks, releases[0]['title'])
+    finally:
+        for path, original in zip(paths, originals):
+            path.write_text(original)
+
+
+def _branding_browser(browser, base, phone_options, site, tracks, release_title):
+    host_context = browser.new_context(service_workers='block')
+    host = host_context.new_page()
+    host.goto(base + '/login-fixture.php?user=1')
+    host.goto(base + '/jukebox.php?host=1')
+    phone_context = browser.new_context(service_workers='block', **phone_options)
+    phone = phone_context.new_page()
+    other_context = browser.new_context(service_workers='block')
+    other = other_context.new_page()
+    other.goto(base + '/login-fixture.php?user=2')
+    other.goto(base + '/jukebox.php?host=1')
+    assert request(host, 'venue', {'owner': 2, 'name': 'Other logo host'}, True)['ok']
+
+    def press(page, control):
+        (control.tap if page is phone and phone_options.get('has_touch') else control.click)()
+
+    def capture(page, label):
+        directory = os.environ.get('SF_JUKEBOX_SCREENSHOT_DIR')
+        if directory:
+            target = Path(directory).resolve()
+            target.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(target / (label + '.png')))
+
+    def upload(page, encoded, width):
+        opener = page.locator('#open-branding')
+        expect(opener).to_be_visible()
+        press(page, opener)
+        dialog = page.locator('#branding-dialog')
+        expect(dialog).to_be_visible()
+        assert dialog.evaluate('dialog => dialog.matches(":modal")')
+        expect(dialog.locator('#branding-file')).to_be_enabled()
+        dialog.locator('#branding-file').set_input_files({
+            'name': 'host-logo.png', 'mimeType': 'image/png', 'buffer': base64.b64decode(encoded)})
+        expect(dialog.locator('#branding-preview')).to_be_visible()
+        page.wait_for_function("""width => {
+          const img = document.querySelector('#branding-preview');
+          return img.complete && img.naturalWidth === width;
+        }""", arg=width)
+        return opener, dialog
+
+    def assert_logo(page, width):
+        expect(page.locator('#host-logo')).to_be_visible()
+        page.wait_for_function("""width => {
+          const image = document.querySelector('#host-logo');
+          return image.complete && image.naturalWidth === width;
+        }""", arg=width)
+        assert page.locator('#host-logo').evaluate(
+            'img => getComputedStyle(img).objectFit === "contain"')
+
+    expect(host.locator('#open-branding')).to_be_visible()
+    host.set_viewport_size({'width': 1440, 'height': 960})
+    opener, dialog = upload(host, PNG, 1)
+    capture(host, 'branding-upload-1440')
+    host.keyboard.press('Escape')
+    expect(dialog).to_be_hidden()
+    expect(opener).to_be_focused()
+    # An unsaved preview must not replace the saved public logo.
+    assert request(host, 'branding', host=True)['branding']['logo_url'] is None
+    opener, dialog = upload(host, PNG, 1)
+    dialog.locator('#branding-save').click()
+    expect(dialog).to_be_hidden()
+    expect(opener).to_be_focused()
+    assert_logo(host, 1)
+    directory_logo = host.locator('#host-logo').get_attribute('src')
+    host.reload()
+    assert_logo(host, 1)
+    assert host.locator('#host-logo').get_attribute('src') == directory_logo
+    expect(other.locator('#host-logo')).to_be_hidden()
+
+    other_session = request(other, 'create', {'title': 'Another host session'}, True)['id']
+    observer = host_context.new_page()
+    observer.goto(base + '/jukebox.php?host=1&id=' + other_session)
+    session_tab(observer, 'settings')
+    expect(observer.locator('#open-branding')).to_be_hidden()
+    expect(observer.locator('#host-logo')).to_be_hidden()
+    assert request(observer, 'state', host=True)['state']['branding_editable'] is False
+    observer.close()
+
+    session = request(host, 'create', {'title': 'Logo and catalog layout', 'listed': True,
+                                      'remote_listening': True}, True)['id']
+    upcoming = request(host, 'create', {'title': 'Upcoming host logo', 'listed': True,
+                                       'scheduled_at': int(time.time()) + 86400}, True)['id']
+    phone.goto(base + '/jukebox.php?id=' + upcoming)
+    assert_logo(phone, 1)
+    host.goto(base + '/jukebox.php?host=1&id=' + session)
+    assert_logo(host, 1)
+    phone.goto(base + '/jukebox.php?id=' + session)
+    assert_logo(phone, 1)
+    assert request(phone, 'join', {'name': 'Catalog phone'})['ok']
+    phone_id = request(phone, 'state')['state']['phone']['id']
+    assert request(host, 'approve', {'phone': phone_id}, True)['ok']
+
+    def catalog_layout(page, tab, width):
+        session_tab(page, 'music')
+        page.locator('#tabs [data-tab="' + tab + '"]').click()
+        rows = page.locator('#catalog > li.jukebox-catalog-row')
+        expect(rows).to_have_count(1 if tab == 'albums' else 2)
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+        for index in range(rows.count()):
+            row = rows.nth(index)
+            action = row.locator('.jukebox-catalog-actions').get_by_role('button')
+            expect(action).to_be_visible()
+            bounds = row.bounding_box()
+            button_bounds = action.bounding_box()
+            assert bounds and button_bounds
+            assert 0 <= bounds['x'] + bounds['width'] - button_bounds['x'] - button_bounds['width'] <= 25
+            assert button_bounds['width'] >= 44 and button_bounds['height'] >= 44
+            assert row.locator('.jukebox-catalog-title').inner_text()
+        if tab == 'songs':
+            assert rows.first.locator('.jukebox-catalog-title').inner_text() == tracks[1]['title']
+        elif tab == 'feed':
+            assert rows.first.locator('.jukebox-catalog-title').inner_text() == tracks[0]['title']
+        page.evaluate('scrollTo(0, 0)')
+        capture(page, f'branding-{"phone" if page is phone else "host"}-{tab}-{width}')
+
+    # Actual request controls remain available and correctly scoped.
+    session_tab(phone, 'music')
+    phone.locator('#tabs [data-tab=feed]').click()
+    first_row = phone.locator('#catalog > li').filter(has_text=tracks[0]['title'])
+    press(phone, first_row.get_by_role('button', name='Play', exact=True))
+    expect(host.locator('#host-now')).to_have_text(tracks[0]['title'])
+    session_tab(host, 'history')
+    host.locator('#enable').click()
+    host.wait_for_function("""() => !document.querySelector('#audio').paused ||
+      !document.querySelector('#audio-start').hidden""")
+    if host.locator('#audio-start').is_visible():
+        host.locator('#audio-start').click()
+    host.wait_for_function("!document.querySelector('#audio').paused")
+    for index in range(4):
+        assert request(host, 'request', {'track': 'b' if index % 2 == 0 else 'a',
+                                       'nonce': f'{index + 800:032x}'}, True)['ok']
+    press(phone, phone.locator('#listen'))
+    phone.wait_for_function("!document.querySelector('#listener-audio').paused")
+    assert_playheads_synced(host, phone)
+    for page in (host, phone):
+        for width, height in ((1440, 960), (390, 844), (320, 740)):
+            page.set_viewport_size({'width': width, 'height': height})
+            assert_logo(page, 1)
+            for tab in ('feed', 'songs', 'albums'):
+                catalog_layout(page, tab, width)
+            album_action = page.locator('#catalog .jukebox-catalog-actions').get_by_role('button')
+            expect(album_action).to_have_accessible_name('View songs in ' + release_title)
+            press(page, album_action)
+            expect(page.locator('#catalog')).to_contain_text(tracks[0]['title'])
+            expect(page.locator('#catalog')).to_contain_text(tracks[1]['title'])
+            page.locator('#catalog-context').get_by_role('button', name='All albums', exact=True).click()
+            expect(page.locator('#catalog .jukebox-catalog-actions').get_by_role('button')).to_be_visible()
+
+    # Uploading a replacement from session Settings must retain the same native
+    # player, its source and time rather than claiming/reloading the session.
+    if host.locator('#audio').evaluate('audio => audio.currentTime') > TRACK_SECONDS - 25:
+        assert request(host, 'control', {'event': 'skip'}, True)['ok']
+        item = str(request(host, 'state', host=True)['state']['current']['id'])
+        host.wait_for_function('''item => {
+          const audio = document.querySelector('#audio');
+          return !audio.paused && audio.currentSrc && new URL(audio.currentSrc).searchParams.get('item') === item;
+        }''', arg=item)
+        assert_playheads_synced(host, phone)
+    host.set_viewport_size({'width': 390, 'height': 844})
+    session_tab(host, 'settings')
+    before = host.locator('#audio').evaluate("""audio => {
+      audio.brandingFixture = 'same-player';
+      return {source:audio.currentSrc, position:audio.currentTime};
+    }""")
+    opener, dialog = upload(host, SPLASH_ART, 8)
+    capture(host, 'branding-upload-390')
+    dialog.locator('#branding-save').click()
+    expect(dialog).to_be_hidden()
+    assert_logo(host, 8)
+    assert_logo(phone, 8)
+    assert host.locator('#audio').evaluate(
+        '(audio, source) => !audio.paused && audio.currentSrc === source && audio.brandingFixture === "same-player"',
+        before['source'])
+    assert host.locator('#audio').evaluate('audio => audio.currentTime') >= before['position']
+    assert request(host, 'state', host=True)['state']['id'] == session
+    assert request(phone, 'state')['state']['phone']['id'] == phone_id
+    capture(host, 'branding-saved-host-390')
+
+    # A stale logo form offers a reload rather than overwriting another edit.
+    press(host, opener)
+    expect(dialog.locator('#branding-file')).to_be_enabled()
+    current = request(host, 'branding', host=True)['branding']
+    assert request(host, 'branding', {'expected_revision': current['revision'],
+                                      'image': 'data:image/png;base64,' + PNG}, True)['ok']
+    dialog.locator('#branding-file').set_input_files(
+        {'name': 'host-logo.png', 'mimeType': 'image/png', 'buffer': base64.b64decode(SPLASH_ART)})
+    dialog.locator('#branding-save').click()
+    expect(dialog.locator('#branding-reload')).to_be_visible()
+    expect(dialog).to_be_visible()
+    dialog.locator('#branding-reload').click()
+    host.keyboard.press('Escape')
+    expect(dialog).to_be_hidden()
+    expect(opener).to_be_focused()
+    host.set_viewport_size({'width': 320, 'height': 740})
+    opener, dialog = upload(host, PNG, 1)
+    capture(host, 'branding-upload-320')
+    host.keyboard.press('Escape')
+    expect(dialog).to_be_hidden()
+    press(host, opener)
+    dialog.locator('#branding-remove').click()
+    expect(dialog).to_be_hidden()
+    expect(host.locator('#host-logo')).to_be_hidden()
+    expect(phone.locator('#host-logo')).to_be_hidden()
+    expect(host.locator('#host-logo-fallback')).to_be_visible()
+    host.reload()
+    expect(host.locator('#host-logo')).to_be_hidden()
+    assert request(host, 'branding', host=True)['branding']['logo_url'] is None
+
+    host_context.close()
+    phone_context.close()
+    other_context.close()
+    print('PASS host logo upload/preview/save/reload/replace/remove, stale edits, uninterrupted players and responsive right-aligned catalog actions')
+
 def inline_splash_editor(browser, base):
     context = browser.new_context()
     editor = context.new_page()
@@ -1511,7 +1745,167 @@ def http_scenario(base, site):
     http_listener_scenario(Client, venue, outsider, site)
     http_schedule_scenario(Client, admin, venue, outsider, site)
     http_management_scenario(Client, admin, venue, outsider, site)
+    http_branding_scenario(Client, admin, venue, outsider, site, base)
 
+
+
+def http_branding_scenario(Client, admin, venue, outsider, site, base):
+    guest = Client()
+    first = admin.call('branding')['branding']
+    assert first == {'logo_url': None, 'revision': 0, 'owner_available': True}
+    venue_before = venue.call('branding')['branding']
+    for denied in (guest.call('branding'),
+                   guest.call('branding', data={'expected_revision': 0, 'image': 'data:image/png;base64,' + PNG})):
+        assert denied['status'] in (403, 409), denied
+    guest.host = True
+    assert guest.call('branding')['status'] == 401
+    guest.host = False
+    assert outsider.call('branding', data={'expected_revision': 0, 'image': 'data:image/png;base64,' + PNG})['status'] in (403, 409)
+    with admin.response('branding', data={'expected_revision': 0, 'image': 'data:image/png;base64,' + PNG},
+                        headers={'X-CSRF-Token': 'incorrect'}) as denied:
+        assert denied.status == 403
+    assert admin.call('branding')['branding'] == first
+
+    def data_url(raw, mime='image/png'):
+        return 'data:' + mime + ';base64,' + base64.b64encode(raw).decode()
+
+    original = base64.b64decode(PNG)
+    dimension = bytearray(original)
+    dimension[16:24] = struct.pack('>II', 5000, 5000)
+    dimension[29:33] = struct.pack('>I', zlib.crc32(dimension[12:29]))
+    invalid_images = [
+        'data:image/svg+xml;base64,' + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg"/>').decode(),
+        data_url(b'not really a PNG'), data_url(original, 'image/jpeg'),
+        'https://example.test/logo.png', 'data:image/png;base64,not-base64!',
+        'data:image/png;base64,' + PNG + '\n',
+        data_url(original + b'\0' * (1_048_577 - len(original))),
+        data_url(dimension),
+    ]
+    for image in invalid_images:
+        invalid = admin.call('branding', data={'expected_revision': 0, 'image': image})
+        assert invalid['status'] == 400, invalid
+        assert admin.call('branding')['branding'] == first
+    for revision in (-1, True, '0', None):
+        assert admin.call('branding', data={'expected_revision': revision, 'image': data_url(original)})['status'] == 400
+    assert admin.call('branding', data={'expected_revision': 0, 'image': data_url(original), 'owner': 2})['status'] == 400
+
+    live = admin.call('create', data={'title': 'Branding live', 'listed': True, 'remote_listening': True})['id']
+    upcoming = admin.call('create', data={'title': 'Branding upcoming', 'listed': True,
+                                          'scheduled_at': int(time.time()) + 86400})['id']
+    ended = admin.call('create', data={'title': 'Branding ended', 'listed': True})['id']
+    canceled = admin.call('create', data={'title': 'Branding canceled', 'listed': True,
+                                         'scheduled_at': int(time.time()) + 86400})['id']
+    assert admin.call('control', ended, {'event': 'end'})['ok']
+    assert admin.call('control', canceled, {'event': 'cancel'})['ok']
+    other = venue.call('create', data={'title': 'Other host logo'})['id']
+    assert guest.call('join', live, {'name': 'Branding listener'})['ok']
+    phone = guest.call('state', live)['state']['phone']['id']
+    assert admin.call('approve', live, {'phone': phone})['ok']
+    assert guest.call('request', live, {'track': 'a', 'nonce': '7'*32})['ok']
+    assert guest.call('request', live, {'track': 'b', 'nonce': '8'*32})['ok']
+    assert guest.call('message', live, {'text': 'Branding leaves this conversation intact'})['ok']
+    player = '7'*64
+    assert admin.call('player', live, {'player': player, 'event': 'claim'})['ok']
+    before = admin.call('state', live)['state']
+    item = before['current']['id']
+    assert admin.call('player', live, player_sample(player, 'playing', item, 1, 1000,
+                                                   observed_revision=before['revision']))['ok']
+    before = admin.call('state', live)['state']
+    # A player's revision/heartbeat can change after opening the logo form.
+    # It must not make the independent branding revision stale.
+    assert admin.call('player', live, player_sample(player, 'progress', item, 2, 1500,
+                                                   observed_revision=before['revision']))['ok']
+    before = admin.call('state', live)['state']
+    saved = admin.call('branding', data={'expected_revision': 0, 'image': data_url(original)})
+    assert saved['ok'], saved
+    branding = saved['branding']
+    assert branding['revision'] == 1 and branding['logo_url']
+    assert set(branding) == {'logo_url', 'revision', 'owner_available'}
+    assert branding['owner_available'] is True
+    assert len(json.dumps(branding)) < 400 and 'base64' not in json.dumps(branding)
+    assert admin.call('branding')['branding'] == branding
+    after = admin.call('state', live)['state']
+    for key in ('id', 'current', 'queue', 'phones', 'history', 'revision'):
+        assert after[key] == before[key], key
+    assert after['transport']['status'] == 'playing'
+    assert guest.call('state', live)['state']['phone']['id'] == phone
+    assert admin.call('thread', live, phone=phone, full=1)['messages'][0]['body'] == 'Branding leaves this conversation intact'
+    for session in (live, upcoming, ended, canceled):
+        assert admin.call('state', session)['state']['branding'] == branding
+        assert guest.call('state', session)['state']['branding'] == branding
+    for scope in ('active', 'archive'):
+        directory = admin.call('directory', scope=scope)
+        assert directory['branding'] == branding
+        assert all(row['branding'] == branding for row in directory['sessions'])
+    directory = guest.call('directory')
+    assert next(row for row in directory['sessions'] if row['id'] == live)['branding'] == branding
+    assert venue.call('state', other)['state']['branding'] == venue_before
+    assert venue.call('branding')['branding'] == venue_before
+
+    # The logo is intentionally public; fetching it needs no signed-in cookies.
+    logo = urllib.parse.urljoin(base + '/', branding['logo_url'])
+    with urllib.request.urlopen(logo) as image:
+        assert image.status == 200 and image.headers.get_content_type() == 'image/png'
+        assert image.headers.get('X-Content-Type-Options') == 'nosniff'
+        assert 'no-store' in image.headers.get('Cache-Control', '')
+        assert image.read() == original
+    with urllib.request.urlopen(urllib.request.Request(logo, method='HEAD')) as image:
+        assert image.status == 200 and image.read() == b''
+        assert int(image.headers.get('Content-Length', '0')) == len(original)
+    params = urllib.parse.parse_qs(urllib.parse.urlsplit(logo).query)
+    assert params['v'] == [hashlib.sha256(original).hexdigest()]
+    bad_logo = logo.replace(params['v'][0], '0'*64)
+    try:
+        urllib.request.urlopen(bad_logo)
+        assert False, 'Wrong content hash was served'
+    except urllib.error.HTTPError as error:
+        assert error.code == 404
+
+    assert admin.call('branding', data={'expected_revision': 0, 'image': data_url(base64.b64decode(SPLASH_ART))})['status'] == 409
+    assert admin.call('branding')['branding'] == branding
+    replaced = admin.call('branding', data={'expected_revision': 1, 'image': data_url(base64.b64decode(SPLASH_ART))})['branding']
+    assert replaced['revision'] == 2 and replaced['logo_url'] != branding['logo_url']
+    try:
+        urllib.request.urlopen(logo)
+        assert False, 'Replaced logo hash stayed valid'
+    except urllib.error.HTTPError as error:
+        assert error.code == 404
+    removed = admin.call('branding', data={'expected_revision': 2, 'image': None})['branding']
+    assert removed == {'logo_url': None, 'revision': 3, 'owner_available': True}
+    assert admin.call('branding')['branding'] == removed
+    assert guest.call('state', live)['state']['branding'] == removed
+    assert admin.call('branding', data={'expected_revision': 2, 'image': data_url(original)})['status'] == 409
+    own = venue.call('branding', data={'expected_revision': venue_before['revision'], 'image': data_url(original)})
+    assert own['ok'] and own['branding']['logo_url'] != branding['logo_url']
+    assert admin.call('branding')['branding'] == removed
+    assert guest.call('state', other)['state']['branding'] == own['branding']
+    assert admin.call('state', other)['state']['branding_editable'] is False
+    assert venue.call('state', other)['state']['branding_editable'] is True
+    assert admin.call('state', live)['state']['branding_editable'] is True
+    assert admin.call('branding', data={'expected_revision': 3, 'image': None})['branding'] == removed
+
+    # A closed host must disappear from public branding immediately, even if
+    # its optional storage cleanup has not run yet. Cleanup is owner-scoped.
+    assert admin.call('venue', data={'owner': 5, 'name': 'Closing host'})['ok']
+    closing = Client(5)
+    closing_session = closing.call('create', data={'title': 'Closing logo session'})['id']
+    closing_logo = closing.call('branding', data={'expected_revision': 0, 'image': data_url(original)})['branding']
+    closing_url = urllib.parse.urljoin(base + '/', closing_logo['logo_url'])
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        db.execute("UPDATE users SET status='closed' WHERE id=5")
+    assert guest.call('state', closing_session)['state']['branding'] == {
+        'logo_url': None, 'revision': 0, 'owner_available': False}
+    try:
+        urllib.request.urlopen(closing_url)
+        assert False, 'Closed host logo remained publicly available'
+    except urllib.error.HTTPError as error:
+        assert error.code == 404
+    subprocess.run([PHP, '-r', "define('SF_ROOT',getcwd());require 'api/bootstrap.php';require_once 'api/jukebox-core.php';echo json_encode(sf_jukebox_branding_clear_user(5));"],
+                   cwd=site, check=True, stdout=subprocess.PIPE)
+    with sqlite3.connect(site / 'config/fixture.sqlite') as db:
+        assert db.execute('SELECT COUNT(*) FROM jukebox_host_branding WHERE owner_id=5').fetchone()[0] == 0
+        assert db.execute('SELECT COUNT(*) FROM jukebox_host_branding WHERE owner_id=2').fetchone()[0] == 1
+    print('PASS HTTP host logo authorization, CSRF, image validation, revisions, public byte serving, owner isolation and preserved session playback/chat')
 
 def http_remote_scenario(Client, admin, venue, site):
     public = admin.call('create', data={'title': 'Remote public', 'listed': True, 'remote_listening': True})['id']
@@ -2045,24 +2439,28 @@ with tempfile.TemporaryDirectory(prefix='stoneward-jukebox-') as temp:
                         phone_options.pop('default_browser_type', None)
                     else:
                         browser = playwright.chromium.launch(executable_path=CHROME, args=['--no-sandbox'])
-                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only')):
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only', '--branding-only')):
                         scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--remote-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv:
                         schedule_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--schedule-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv:
+                    if '--schedule-only' not in sys.argv and '--management-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv:
                         remote_scenario(browser, base, phone_options)
                         for context in browser.contexts:
                             context.close()
-                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv and '--recovery-only' not in sys.argv:
+                    if '--remote-only' not in sys.argv and '--schedule-only' not in sys.argv and '--recovery-only' not in sys.argv and '--branding-only' not in sys.argv:
                         management_scenario(browser, base, phone_options, site)
                         for context in browser.contexts:
                             context.close()
-                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only')):
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--branding-only')):
                         recovery_scenario(browser, base, phone_options, site)
+                        for context in browser.contexts:
+                            context.close()
+                    if not any(option in sys.argv for option in ('--remote-only', '--schedule-only', '--management-only', '--recovery-only')):
+                        branding_scenario(browser, base, phone_options, site)
         except Exception:
             log.seek(0)
             print(log.read()[-16000:])
