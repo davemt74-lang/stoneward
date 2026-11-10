@@ -1700,6 +1700,12 @@
       const previous = new Set(directoryRows.map(row => row.id));
       directoryRows = append ? directoryRows.concat(data.sessions.filter(row => !previous.has(row.id))) : data.sessions;
       directoryCursor = data.next_cursor;
+      const username = $('host-username');
+      const venue = data.venue?.trim();
+      const heading = venue || username.textContent;
+      connectionText('title', heading);
+      username.hidden = !venue;
+      document.title = heading + ' · Stonefellow';
       applyPageBranding(data.branding);
       applyHostCover(data.cover);
       brandingEditable(data.branding_editable === true);

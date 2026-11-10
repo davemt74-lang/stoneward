@@ -1140,9 +1140,27 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     phone = phone_context.new_page()
     other_context = browser.new_context(service_workers='block')
     other = other_context.new_page()
+    other.goto(base + '/login-fixture.php?user=3')
+    other.goto(base + '/jukebox.php?host=1')
+    expect(other.locator('#session-empty')).to_be_visible()
+    expect(other.get_by_role('heading', name='Other', exact=True)).to_be_visible()
+    expect(other.locator('#host-username')).to_be_hidden()
+
     other.goto(base + '/login-fixture.php?user=2')
     other.goto(base + '/jukebox.php?host=1')
     assert request(host, 'venue', {'owner': 2, 'name': 'Other logo host'}, True)['ok']
+
+    host.locator('#open-venue').click()
+    venue_dialog = host.locator('#venue-dialog')
+    venue_dialog.get_by_label('Venue name').fill('Hosted events venue')
+    venue_dialog.get_by_role('button', name='Save venue', exact=True).click()
+    expect(venue_dialog).to_be_hidden()
+    expect(host.get_by_role('heading', name='Hosted events venue', exact=True)).to_be_visible()
+    username = host.locator('#host-username')
+    expect(username).to_be_visible()
+    expect(username).to_have_text('Admin')
+    assert username.evaluate("""label => parseFloat(getComputedStyle(label).fontSize) <
+      parseFloat(getComputedStyle(document.querySelector('h1')).fontSize)""")
 
     def press(page, control):
         (control.tap if page is phone and phone_options.get('has_touch') else control.click)()
@@ -1202,6 +1220,15 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
 
     banner = host.locator('#host-cover-banner')
     cover = banner.locator('#host-cover')
+
+    def assert_full_width_cover():
+        expect(cover).to_be_visible()
+        banner_bounds = banner.bounding_box()
+        directory_bounds = host.locator('#directory-results').bounding_box()
+        assert banner_bounds and directory_bounds
+        for edge in ('x', 'width'):
+            assert abs(banner_bounds[edge] - directory_bounds[edge]) <= 1, (banner_bounds, directory_bounds)
+
     expect(banner).to_be_hidden()
     cover_opener, dialog = upload(host, SPLASH_ART, 8, kind='cover')
     expect(dialog.get_by_role('heading', name='Cover image', exact=True)).to_be_visible()
@@ -1215,10 +1242,12 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     host.wait_for_function("document.querySelector('#host-cover')?.naturalWidth === 8")
     expect(cover).to_have_attribute('src', cover_src)
     expect(host.locator('#host-logo')).to_have_attribute('src', directory_logo)
+    expect(host.get_by_role('heading', name='Hosted events venue', exact=True)).to_be_visible()
     expect(other.locator('#host-cover-banner')).to_be_hidden()
+    assert_full_width_cover()
     capture(host, 'cover-saved-host-1440')
     host.set_viewport_size({'width': 320, 'height': 740})
-    expect(cover).to_be_visible()
+    assert_full_width_cover()
     assert host.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
     capture(host, 'cover-saved-host-320')
     cover_opener.click()
@@ -1245,6 +1274,8 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     assert_logo(phone, 1)
     host.goto(base + '/jukebox.php?host=1&id=' + session)
     assert_logo(host, 1)
+    expect(host.get_by_role('heading', name='Logo and catalog layout', exact=True)).to_be_visible()
+    expect(host.locator('#host-username')).to_be_hidden()
     phone.goto(base + '/jukebox.php?id=' + session)
     assert_logo(phone, 1)
     assert request(phone, 'join', {'name': 'Catalog phone'})['ok']
@@ -1370,7 +1401,7 @@ def _branding_browser(browser, base, phone_options, site, tracks, release_title)
     host_context.close()
     phone_context.close()
     other_context.close()
-    print('PASS owner cover and host logo upload/preview/save/reload/remove, stale logo edits, uninterrupted players and responsive right-aligned catalog actions')
+    print('PASS hosted venue identity, responsive full-width cover, host logo edits, uninterrupted players and right-aligned catalog actions')
 
 def inline_splash_editor(browser, base):
     context = browser.new_context()
