@@ -18,13 +18,14 @@ jobs:
     env:
       SF_TEST_PHP: php
       VP3_TEST_REPOSITORY: ${{ github.workspace }}/software-provider-reference
+      VP3_TEST_REVISION: aae15539187a8226463b41f9a02e0da67b99cc59
     steps:
       - uses: actions/checkout@v4
       - name: Checkout the accepted VP3 provider contract
         uses: actions/checkout@v4
         with:
           repository: davemt74-lang/software
-          ref: 1a6a565b7e87d19f658b711260ba52e5f990e01e
+          ref: aae15539187a8226463b41f9a02e0da67b99cc59
           path: software-provider-reference
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -56,6 +57,7 @@ jobs:
       - name: Original provider retains site attribution and streaming
         env:
           VP3_TEST_REPOSITORY: ${{ github.workspace }}/software-provider-original
+          VP3_TEST_REVISION: 41603520b24c3ac6146dca5cb7310d04a8a3de9e
         run: node tests/vp3-music-integration.mjs --http-only
 
   vp3-music-browser:
@@ -70,6 +72,7 @@ jobs:
       SF_TEST_PHP: php
       SF_AUDIO_BROWSER: ${{ matrix.browser }}
       VP3_TEST_REPOSITORY: ${{ github.workspace }}/software-provider-reference
+      VP3_TEST_REVISION: aae15539187a8226463b41f9a02e0da67b99cc59
       VP3_MUSIC_ARTIFACT_DIR: artifacts/vp3-music-${{ matrix.browser }}
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +80,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: davemt74-lang/software
-          ref: 1a6a565b7e87d19f658b711260ba52e5f990e01e
+          ref: aae15539187a8226463b41f9a02e0da67b99cc59
           path: software-provider-reference
           persist-credentials: false
       - uses: actions/setup-node@v4
