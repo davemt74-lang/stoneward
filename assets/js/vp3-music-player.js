@@ -48,7 +48,7 @@
       return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
     })();
     const key = () => 'mps1_' + Array.from(random.getRandomValues(new Uint8Array(32)), x => x.toString(16).padStart(2, '0')).join('');
-    let current = null, disposed = false, operation = 0, activeOperation = null, draining = false, retryTimer = null, renewTimer = null;
+    let current = null, disposed = false, operation = 0, activeOperation = null, draining = false, renewTimer = null;
     let wantsAudio = false, renewing = false, mediaChanges = 0;
     const queue = [];
     const rate = () => Math.max(.25, Math.min(4, number(audio.playbackRate) || 1));
@@ -61,9 +61,10 @@
     function safeState() {
       const p = current;
       return p ? { kind: 'vp3', track_id: p.trackId, play_id: p.playId, session_id: p.sessionId || null,
-        recording_id: p.reference.recording_id, asset_id: p.assetId || null, state: p.failed ? 'unavailable' : p.state,
+        recording_id: p.reference.recording_id, asset_id: p.assetId || null, state: p.failed ? 'unavailable' : p.confirmationRequired ? 'confirmation_required' : p.state,
         accepted_seq: p.acceptedSeq, accepted_played_ms: p.acceptedMs, reported_played_ms: milliseconds(p.played),
-        pending_events: queue.filter(entry => entry.play === p).length, renewing: renewing || mediaChanges > 0, terminal: !!p.failed } : null;
+        pending_events: queue.filter(entry => entry.play === p).length, renewing: renewing || mediaChanges > 0,
+        confirmation_required: !!p.confirmationRequired, terminal: !!p.failed } : null;
     }
     function publish() { try { options.onStatus?.(safeState()); } catch (_) {} }
     function terminal(p, error) {
@@ -76,6 +77,24 @@
         try { options.onError?.(p.failed); } catch (_) {}
         publish();
       }
+    }
+    function requireConfirmation(p, error) {
+      if (p.failed) return;
+      p.confirmationRequired = true; p.partial = true;
+      if (current !== p || p.closed) {
+        // A bounded final send for an abandoned play must not block the next
+        // track's independent sequence indefinitely.
+        for (let i = queue.length - 1; i >= 0; i--) if (queue[i].play === p) queue.splice(i, 1);
+        return;
+      }
+      // A denied request can be opaque when authorization precedes CORS.
+      // We cannot name the reason, but buffered bytes cannot keep playing
+      // after this grant can no longer be confirmed. Explicit Play retries
+      // the same session and frozen requests; it never allocates a new grant.
+      cancelPending();
+      try { audio.pause(); } catch (_) {}
+      try { options.onError?.(error); } catch (_) {}
+      publish();
     }
     async function post(p, body, signal) {
       const endpoint = new URL(p.source.provider_api); endpoint.searchParams.set('site_id', p.source.site_id);
@@ -159,26 +178,29 @@
         while (queue.length) {
           const task = queue[0], p = task.play;
           if (p.failed) { queue.shift(); continue; }
+          if (p.confirmationRequired) break;
           try { const result = await post(p, task.body); receipt(p, result, task.body.seq); if (queue[0] === task) queue.shift(); }
           catch (error) {
             if (!error.retryable) { terminal(p, error); continue; }
-            p.partial = true;
-            if (!disposed && retryTimer === null) retryTimer = schedule(() => { retryTimer = null; void drain(); }, options.queueRetryMs ?? 3000);
-            break; // The exact frozen event stays first; never skip a sequence.
+            requireConfirmation(p, error);
+            // The current play's exact frozen event stays first. A user retry
+            // must confirm its authority before this sequence can continue.
+            if (current === p && !p.closed) break;
           }
         }
       } finally { draining = false; publish(); }
     }
     function playing() {
       const p = current;
-      if (!active() || !p?.sessionId || p.failed || p.closed || audio.paused || audio.seeking) return;
-      if (!wantsAudio) { audio.pause(); return; }
+      if (!p?.sessionId) return;
+      if (!active() || p.failed || p.closed || !wantsAudio || p.confirmationRequired) { if (!audio.paused) audio.pause(); return; }
+      if (audio.paused || audio.seeking) return;
       if (!p.started) { p.started = true; p.played = 0; p.lastClock = clock(); p.lastPosition = position(); p.lastRate = rate(); enqueue(p, 'resume', 'playing'); }
       else if (p.state !== 'playing') { sample(p); p.lastClock = clock(); p.lastPosition = position(); enqueue(p, 'resume', 'playing'); }
       scheduleRenew();
     }
     function progress() {
-      const p = current; if (!active() || !p?.started || p.failed || p.closed) return;
+      const p = current; if (!active() || !p?.started || p.failed || p.closed || p.confirmationRequired) return;
       sample(p);
       if (p.state === 'playing' && clock() - p.lastReport >= 10000) enqueue(p, 'heartbeat', 'playing');
     }
@@ -201,6 +223,10 @@
     }
     function finish() {
       const p = current;
+      if (p?.confirmationRequired) {
+        p.closed = true;
+        for (let i = queue.length - 1; i >= 0; i--) if (queue[i].play === p) queue.splice(i, 1);
+      }
       if (p?.started && !p.failed && !p.closed) {
         sample(p, true);
         // Queue controls may replace the track from an earlier ended listener.
@@ -259,7 +285,7 @@
             const result = await post(p, body, signal);
             if (result.request_id !== body.request_id) throw failure();
             receipt(p, result); mediaTicket(p, result); p.renewBody = null;
-            if (p.media.ticket_expires_ms > wallClock() + 1000) return;
+            if (p.media.ticket_expires_ms > wallClock() + 1000) { p.confirmationRequired = false; return; }
             // An exact replay may return an expired ticket. A genuinely later
             // renewal gets a new ID while preserving this session and asset.
           }
@@ -270,7 +296,7 @@
       }
     }
     async function applyMedia(p, at, valid, signal, resume) {
-      if (!valid() || current !== p || p.failed) throw interrupted();
+      if (!valid() || current !== p || p.failed || p.confirmationRequired) throw interrupted();
       mediaChanges++;
       try {
         if (audio.getAttribute?.('src') !== p.media.url || audio.error) {
@@ -312,7 +338,11 @@
         const p = current; if (p.failed) throw p.failed;
         await ensureBegin(p, context.signal);
         if (!context.valid() || current !== p) throw interrupted();
-        if (p.media.ticket_expires_ms <= wallClock() + 15000) await fetchRenewal(p, context.signal);
+        if (p.confirmationRequired || p.media.ticket_expires_ms <= wallClock() + 15000) {
+          try { await fetchRenewal(p, context.signal); }
+          catch (error) { if (error?.retryable === true) requireConfirmation(p, error); throw error; }
+          await drain();
+        }
         await applyMedia(p, at, context.valid, context.signal, true);
         scheduleRenew(); publish(); return safeState();
       } catch (error) {
@@ -329,6 +359,7 @@
       p.renewTask = (async () => {
         try {
           await fetchRenewal(p);
+          await drain();
           if (!valid()) return safeState();
           const at = number(audio.currentTime), resume = wantsAudio && !audio.paused;
           sample(p); renewing = true; buffer();
@@ -336,7 +367,7 @@
           scheduleRenew(); return safeState();
         } catch (error) {
           if (error?.retryable === false) terminal(p, error);
-          else if (error?.name !== 'AbortError') { p.partial = true; try { options.onError?.(error); } catch (_) {} }
+          else if (error?.name !== 'AbortError') requireConfirmation(p, error);
           throw error;
         } finally { renewing = false; p.renewTask = null; publish(); }
       })();
@@ -344,7 +375,7 @@
     }
     function scheduleRenew() {
       clearRenew(); const p = current;
-      if (!active() || !p?.media || p.closed || p.failed || !wantsAudio || audio.paused) return;
+      if (!active() || !p?.media || p.closed || p.failed || p.confirmationRequired || !wantsAudio || audio.paused) return;
       renewTimer = schedule(() => { renewTimer = null; void renew().catch(() => {}); }, Math.max(1000, p.media.ticket_expires_ms - wallClock() - 15000));
     }
     function pause() { cancelPending(); audio.pause(); publish(); }
@@ -362,11 +393,11 @@
       ratechange: () => { const p = current; if (!p?.started || p.closed || p.failed) return; sample(p); enqueue(p, 'ratechange', audio.paused ? 'paused' : p.state === 'buffering' ? 'buffering' : 'playing'); },
       emptied: buffer };
     for (const [name, handler] of Object.entries(handlers)) audio.addEventListener(name, handler);
-    const flush = () => { const p = current; if (p?.started && !p.failed && !p.closed) { sample(p); enqueue(p, 'heartbeat', audio.paused ? 'paused' : p.state === 'playing' ? 'playing' : 'buffering'); } };
+    const flush = () => { const p = current; if (p?.started && !p.failed && !p.closed && !p.confirmationRequired) { sample(p); enqueue(p, 'heartbeat', audio.paused ? 'paused' : p.state === 'playing' ? 'playing' : 'buffering'); } };
     root.addEventListener?.('pagehide', flush);
     return Object.freeze({ play, pause, stop, renew, recover, cancelPending, state: safeState, matches: track => same(current, track),
       isRenewing: () => renewing || mediaChanges > 0, flush,
-      dispose() { if (disposed) return; stop(); disposed = true; clearRenew(); if (retryTimer !== null) unschedule(retryTimer); retryTimer = null;
+      dispose() { if (disposed) return; stop(); disposed = true; clearRenew();
         root.removeEventListener?.('pagehide', flush); for (const [name, handler] of Object.entries(handlers)) audio.removeEventListener(name, handler); }
     });
   }

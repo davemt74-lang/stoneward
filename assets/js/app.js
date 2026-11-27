@@ -5134,7 +5134,10 @@
     vp3Main=window.SFVP3Music.create({audio,
       resolveSource:async(track,signal)=>api('vp3-music-source.php?'+new URLSearchParams({track_id:String(track.id)}),undefined,signal),
       isActive:()=>!!st.track&&window.SFVP3Music.supports(st.track),
-      onError:error=>{if(error.retryable===false)playbackProblem('This VP3 song is unavailable. Check the site connection or choose another song.');}
+      onError:error=>{
+        if(error.retryable===false)playbackProblem('This VP3 song is unavailable. Check the site connection or choose another song.');
+        else if(vp3Main?.state()?.confirmation_required)playbackProblem('The VP3 connection could not be confirmed. Tap Play to retry.');
+      }
     });
     return vp3Main;
   }

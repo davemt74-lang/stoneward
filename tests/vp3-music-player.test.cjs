@@ -30,6 +30,7 @@ function fixture(options={}){
       const held=mode.hold;mode.hold=null;
       await (held.honorAbort?Promise.race([held.promise,new Promise((_,reject)=>init.signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'})),{once:true}))]):held.promise);
     }
+    if(mode.opaque===true||mode.opaque===b.action)throw new TypeError('opaque network or CORS denial');
     if(mode.revoked)return {ok:false,status:404,json:async()=>({ok:false,protocol:music.protocol,code:'unavailable',retryable:false})};
     let result;
     if(b.action==='playback.begin'){
@@ -48,6 +49,7 @@ function fixture(options={}){
     if(mode.badMedia&&result.media)result={...result,media:{...result.media,...mode.badMedia}};
     if(mode.badReceipt)result={...result,...mode.badReceipt};
     if(mode.lose===b.action){mode.lose=null;if(mode.loseAdvance){now+=mode.loseAdvance;wall+=mode.loseAdvance;mode.loseAdvance=0;}throw new TypeError('network response lost');}
+    if(mode.loseAlways===b.action)throw new TypeError('committed response repeatedly lost');
     return {ok:true,status:200,json:async()=>result};
   };
   const controller=music.create({audio,resolveSource:async()=>({ok:true,source:{kind:'vp3',...ids,provider_api:'https://vp3.example.test/api/music-provider-v1.php'}}),fetch,crypto:webcrypto,
@@ -121,7 +123,8 @@ test('pause during renewal wins over a late renewal response',async()=>{
 test('revocation is terminal and cannot silently allocate a replacement play',async()=>{
   const f=fixture();await f.controller.play(track);await tick();f.mode.revoked=true;await assert.rejects(f.controller.renew());await tick();
   assert.equal(f.audio.paused,true);assert.equal(f.controller.state().terminal,true);assert.equal(f.errors.length,1);
-  await assert.rejects(f.controller.play(track));assert.equal(f.begins().length,1);f.controller.dispose();
+  await assert.rejects(f.controller.play(track));assert.equal(f.begins().length,1);
+  await f.audio.play();assert.equal(f.audio.paused,true,'a late native play cannot restart buffered terminal media');f.controller.dispose();
 });
 test('a different asset or foreign media URL is rejected before assigning it to audio',async()=>{
   for(const badMedia of [{url:'https://foreign.example.test/api/music-provider-media-v1.php?ticket=mpd1.stolen'},{url:'https://vp3.example.test/private/master.wav?ticket=mpd1.stolen'},{etag:'not-pinned'}]){
@@ -189,4 +192,40 @@ test('a host-owned loop retains its play while a natural-end queue replacement f
 test('long observation gaps are marked partial and cannot claim the entire unattended interval',async()=>{
   const f=fixture();await f.controller.play(track);f.advance(120000);f.controller.flush();await tick();
   assert.equal(f.controller.state().accepted_played_ms,30000);assert.ok(f.events().some(x=>x.body.observation_partial));f.controller.dispose();
+});
+test('opaque renewal denial pauses buffered media, parks retries and requires confirmation of the same grant',async()=>{
+  const f=fixture();await f.controller.play(track);f.advance(2500);f.controller.flush();await tick();const before=f.controller.state(),position=f.audio.currentTime;
+  f.mode.opaque='playback.renew';await assert.rejects(f.controller.renew(),error=>error.retryable===true);await tick();
+  const denied=f.controller.state();assert.equal(denied.confirmation_required,true);assert.equal(denied.state,'confirmation_required');assert.equal(denied.terminal,false);
+  assert.equal(f.audio.paused,true);assert.equal(denied.session_id,before.session_id);assert.equal(denied.play_id,before.play_id);assert.equal(denied.accepted_played_ms,before.accepted_played_ms);
+  const calls=f.calls.length;f.advance(20000);f.controller.flush();await tick();assert.equal(f.calls.length,calls,'no automatic retry or heartbeat while authority is unconfirmed');assert.equal(f.timers.size,0);
+  await assert.rejects(f.controller.play(track,{position}),error=>error.retryable===true);await tick();
+  const failed=f.calls.filter(x=>x.body.action==='playback.renew');assert.equal(failed.length,6);assert.equal(new Set(failed.map(x=>x.init.body)).size,1);
+  assert.equal(f.audio.paused,true);assert.equal(f.audio.currentTime,position);assert.equal(f.begins().length,1);
+  f.mode.opaque=false;await f.controller.play(track,{position});await tick();
+  assert.equal(f.controller.state().confirmation_required,false);assert.equal(f.controller.state().session_id,before.session_id);assert.equal(f.audio.paused,false);assert.equal(f.begins().length,1);
+  assert.equal(new Set(f.calls.filter(x=>x.body.action==='playback.renew').map(x=>x.init.body)).size,1);f.controller.dispose();
+});
+test('opaque event denial stops playback and preserves its frozen first event for confirmed manual retry',async()=>{
+  const f=fixture();await f.controller.play(track);await tick();f.mode.opaque='playback.events';f.advance(2500);f.controller.flush();await tick();
+  const before=f.controller.state(),blocked=f.events().filter(x=>x.body.seq===2);assert.equal(blocked.length,3);assert.equal(new Set(blocked.map(x=>x.init.body)).size,1);
+  assert.equal(f.audio.paused,true);assert.equal(before.confirmation_required,true);const count=f.calls.length;f.advance(20000);await tick();assert.equal(f.calls.length,count);
+  f.mode.opaque=false;await f.controller.play(track,{position:f.audio.currentTime});await tick();
+  const retries=f.events().filter(x=>x.body.seq===2);assert.equal(retries.length,4);assert.equal(new Set(retries.map(x=>x.init.body)).size,1);
+  assert.equal(f.calls.filter(x=>x.body.action==='playback.renew').length,1);assert.equal(f.controller.state().session_id,before.session_id);
+  assert.equal(f.controller.state().accepted_played_ms,2500);assert.equal(f.begins().length,1);assert.equal(f.audio.paused,false);f.controller.dispose();
+});
+test('exhausted lost renewal acknowledgements retain the original committed receipt identity',async()=>{
+  const f=fixture();await f.controller.play(track);await tick();const before=f.controller.state();f.mode.loseAlways='playback.renew';
+  await assert.rejects(f.controller.renew(),error=>error.retryable===true);assert.equal(f.audio.paused,true);assert.equal(f.controller.state().confirmation_required,true);
+  f.mode.loseAlways=null;await f.controller.play(track);await tick();
+  const renews=f.calls.filter(x=>x.body.action==='playback.renew');assert.equal(renews.length,4);assert.equal(new Set(renews.map(x=>x.init.body)).size,1);
+  assert.equal(f.controller.state().session_id,before.session_id);assert.equal(f.controller.state().asset_id,before.asset_id);assert.equal(f.begins().length,1);f.controller.dispose();
+});
+test('an explicitly selected next track is not blocked by an abandoned unconfirmed event sequence',async()=>{
+  const f=fixture();await f.controller.play(track);await tick();f.mode.opaque='playback.events';f.advance(1000);f.controller.flush();await tick();
+  assert.equal(f.controller.state().confirmation_required,true);f.mode.opaque=false;
+  await f.controller.play({...track,id:'another-local-import'},{position:0});await tick();
+  assert.equal(f.sessions.size,2);assert.equal(f.controller.state().track_id,'another-local-import');assert.equal(f.controller.state().confirmation_required,false);
+  assert.equal(f.controller.state().accepted_seq,1);assert.equal(f.controller.state().accepted_played_ms,0);assert.equal(f.audio.paused,false);f.controller.dispose();
 });

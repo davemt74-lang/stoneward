@@ -12,6 +12,7 @@ require_once $repository.'/admin/api/bootstrap.php';
 require_once $repository.'/api/vp3-music-core.php';
 require_once $repository.'/api/homeserver-music-core.php';
 require_once $repository.'/api/kunaki-publishing-jobs.php';
+require_once $repository.'/api/canvas-audio-core.php';
 $checks=0;
 function vp3check(bool $condition,string $message):void {global $checks;if(!$condition)throw new RuntimeException('FAIL: '.$message);$checks++;echo 'PASS '.$message.PHP_EOL;}
 function vp3fails(callable $call,string $code):void {
@@ -126,9 +127,19 @@ try{
     vp3check(!str_contains($public,$credential)&&!str_contains($public,'credential_payload')&&!str_contains($public,'request_id')&&!str_contains($public,'SECRET'),'Public catalog asset contains no connection, journal, private metadata or receipt data');
     $source=sf_vp3_music_source_for_track($firstRow);
     vp3check($source['provider_api']===$api&&$source['recording_id']===vp3uuid(10),'Public resolver binds to current imported identity');
+    $snapshot=sf_vp3_music_read_state();
+    vp3check(sf_vp3_music_source_for_track($firstRow,$snapshot)===$source
+        &&sf_canvas_audio_track_source($firstRow,$snapshot)===sf_canvas_audio_track_source($firstRow),
+        'One caller-owned private snapshot preserves the exact public source descriptor');
+    $canvasBefore=sf_canvas_audio_catalog();
+    vp3check(count($canvasBefore['tracks'])===2&&count(array_filter($canvasBefore['tracks'],static fn($track)=>$track['source_available']))===2,
+        'Canvas catalog resolves all imported references from one current private snapshot');
     sf_vp3_music_mutate(function(array &$state):void{$state['connection']['provider_url']='https://vp3.music.example.com/api/music-provider-v1.php?credential=SECRET';});
     vp3check(sf_vp3_music_source_for_track($firstRow)===null,'Public resolver rejects a corrupt saved provider URL without exposing it');
+    vp3check(!array_filter(sf_canvas_audio_catalog()['tracks'],static fn($track)=>$track['source_available']),
+        'A later canvas catalog operation reads fresh private state after a write');
     sf_vp3_music_mutate(function(array &$state)use($api):void{$state['connection']['provider_url']=$api;});
+    vp3check(sf_canvas_audio_catalog()===$canvasBefore,'Fresh catalog resolution restores identical public output after state repair');
     vp3check(sf_vp3_music_source_for_track(array_replace($firstRow,['state'=>'hidden']))===null,'Hidden local track is unavailable through the resolver');
     $calls=count($remote['calls']);vp3check(sf_vp3_music_action($request,7,$context)===$first&&count($remote['calls'])===$calls,'Completed import retry performs no remote mutation and duplicates no row');
     vp3fails(fn()=>sf_vp3_music_action(array_replace($request,['recording_ids'=>[vp3uuid(10)]]),7,$context),'request_conflict');

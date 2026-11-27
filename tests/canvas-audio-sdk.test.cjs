@@ -977,14 +977,14 @@ test('typed streams decline raw getAudio even if a custom loader incorrectly ret
 });
 
 test('typed independent media recovery shares the existing observer and keeps its recovery state visible', async () => {
-  let transport,observerSettings,finish,renewing=false,created=0,recoveries=0;
+  let transport,observerSettings,finish,renewing=false,confirmation=false,created=0,recoveries=0;
   const h=harness({
     loadCatalog:async ({track_id})=>({tracks:[streamedTrack(track_id)],releases:[]}),
     loadAudio:async()=>{throw Error('must not fetch raw bytes');},
     observeIndependent:(_media,_track,settings)=>{observerSettings=settings;return {dispose(){}};},
     createStreamPlayer:media=>{
       created++;
-      transport={async play(){await media.play();},pause(){media.pause();},dispose(){media.pause();},state:()=>({terminal:false}),isRenewing:()=>renewing,
+      transport={async play(){await media.play();},pause(){media.pause();},dispose(){media.pause();},state:()=>({terminal:false,confirmation_required:confirmation}),isRenewing:()=>renewing,
         recover(){recoveries++;renewing=true;return new Promise(resolve=>{finish=()=>{renewing=false;resolve();};});}};
       return transport;
     }
@@ -992,7 +992,12 @@ test('typed independent media recovery shares the existing observer and keeps it
   h.host.SFVP3Music=vp3;h.start();await flush();const player=await h.api.createPlayer('vp3-song');await player.play();
   h.hostMedia[0].emit('error');h.hostMedia[0].emit('error');await flush();
   assert.equal(recoveries,1);assert.equal(observerSettings.isRecovering(),true);
-  finish();await flush();assert.equal(observerSettings.isRecovering(),false);assert.equal(created,1);h.destroy();
+  finish();await flush();assert.equal(observerSettings.isRecovering(),false);assert.equal(created,1);
+  await player.setLoop(118,120);
+  confirmation=true;h.hostMedia[0].emit('error');await flush();assert.equal(recoveries,1,'unconfirmed grants cannot trigger automatic recovery');
+  h.hostMedia[0].currentTime=120;h.hostMedia[0].ended=true;h.hostMedia[0].paused=true;h.hostMedia[0].emit('ended');await flush();
+  assert.equal(h.hostMedia[0].paused,true,'a queued loop completion cannot replay buffered media after authority loss');
+  assert.equal(h.hostMedia[0].currentTime,120);assert.equal(h.timers.size,0);h.destroy();
 });
 
 test('a malformed VP3 capability cannot fall back to an independent local Blob source', async () => {

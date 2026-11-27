@@ -5,7 +5,7 @@ $read=static fn(string $p):string=>(string)file_get_contents($root.'/'.$p);
 $html=$read('admin/index.php');$js=$read('admin/assets/sidebar-accordion.js');$css=$read('admin/assets/admin.css');$admin=$read('admin/assets/admin.js');
 $groups=[
  'overview'=>['dashboard','analytics','calendar'],
- 'music'=>['catalog','media','uploads','templates','releases','artist-playlists','song-moments','shows'],
+ 'music'=>['catalog','vp3-music','media','uploads','templates','releases','artist-playlists','song-moments','shows'],
  'publishing'=>['distribution','press','rights'],
  'audience'=>['crm','song-moderation','customer','campaigns','automations'],
  'commerce'=>['products','orders','fulfillment','pod','membership','ticketing','packages'],

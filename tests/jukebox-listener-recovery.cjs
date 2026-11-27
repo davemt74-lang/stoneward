@@ -145,15 +145,16 @@ function setup(overrides = {}) {
 function providerSetup() {
   const entries=[];
   const h=setup({createStreamPlayer({audio,itemId,isActive,onError}){
-    const entry={itemId,isActive,onError,plays:0,pauses:0,disposed:false,renewing:false,terminal:false};entries.push(entry);
+    const entry={itemId,isActive,onError,plays:0,pauses:0,disposed:false,renewing:false,terminal:false,confirmationRequired:false,confirmAttempts:0,recoveries:0};entries.push(entry);
     entry.controller={async play(_track,settings){
       if(entry.terminal)throw Object.assign(Error('unavailable'),{retryable:false});
+      if(entry.confirmationRequired){entry.confirmAttempts++;throw Object.assign(Error('unconfirmed'),{retryable:true});}
       entry.plays++;assert.equal(settings.isCurrent(),true);
       if(!audio.src)audio.src='https://provider.test/media?ticket=mpd1.PRIVATE';
       audio.currentTime=settings.position;
       await audio.play();
-    },pause(){entry.pauses++;audio.pause();},dispose(){entry.disposed=true;audio.pause();},state:()=>({terminal:entry.terminal}),
-      isRenewing:()=>entry.renewing,recover:async()=>{entry.renewing=true;await Promise.resolve();entry.renewing=false;}};
+    },pause(){entry.pauses++;audio.pause();},dispose(){entry.disposed=true;audio.pause();},state:()=>({terminal:entry.terminal,confirmation_required:entry.confirmationRequired}),
+      isRenewing:()=>entry.renewing,recover:async()=>{entry.recoveries++;entry.renewing=true;await Promise.resolve();entry.renewing=false;}};
     return entry.controller;
   }});
   h.window.SFVP3Music=vp3;
@@ -185,6 +186,27 @@ test('terminal provider revocation stays stopped through polls and retry until t
   h.listener.listen();await flush();assert.equal(h.entries.length,1);assert.equal(old.plays,1);assert.equal(h.audio.paused,true);
   h.update({itemId:'2',generation:2,seconds:0});await flush();
   assert.equal(old.disposed,true);assert.equal(h.entries.length,2);assert.equal(h.audio.paused,false);h.listener.stop();
+});
+
+test('an unconfirmed provider grant stays paused through phone polls until an explicit retry',async()=>{
+  const h=providerSetup();await h.start();const entry=h.entries[0];entry.confirmationRequired=true;entry.onError({retryable:true});
+  h.update();h.update({seconds:9});await flush();
+  h.audio.error={code:2};h.audio.fire('error');await flush();assert.equal(entry.recoveries,0);
+  assert.equal(h.audio.paused,true);assert.equal(h.view.connection,'error');assert.equal(entry.confirmAttempts,0);assert.equal(entry.plays,1);
+  h.listener.listen();await flush();assert.equal(entry.confirmAttempts,1);assert.equal(h.audio.paused,true);assert.equal(h.entries.length,1);
+  entry.confirmationRequired=false;h.listener.listen();await flush();assert.equal(h.audio.paused,false);assert.equal(entry.plays,2);h.listener.stop();
+});
+
+test('actual Jukebox host poll cannot resume an unconfirmed provider grant even if retry UI is hidden',async()=>{
+  const hostSource=fs.readFileSync(path.join(__dirname,'../assets/js/jukebox.js'),'utf8');
+  const actual=hostSource.slice(hostSource.indexOf('  async function syncPlayer() {'),hostSource.indexOf('  function tick() {'));
+  let starts=0,confirmation=true;
+  const context={active:true,currentItem:'1',state:{current:{id:'1',track_id:'vp3-song'},paused:0},audio:{paused:true,ended:false},
+    hostTransport:'playing',lastPlaying:true,hostStreamPlayer:{isRenewing:()=>false,state:()=>({confirmation_required:confirmation})},
+    $:()=>({hidden:true}),reportHostProgress:()=>Promise.resolve(),reportHostError:error=>{throw error;},startHostAudio:()=>{starts++;}};
+  vm.createContext(context);vm.runInContext(actual,context);
+  await context.syncPlayer();assert.equal(starts,0);
+  confirmation=false;await context.syncPlayer();assert.equal(starts,1);
 });
 
 test('provider freshness and access revocation cancel owned transport without local fallback',async()=>{

@@ -1515,7 +1515,7 @@
       reportHostError(error);
       return;
     }
-    if (active && item && !Number(state.paused) && audio.paused && !audio.ended && !hostStreamPlayer?.isRenewing() && $('audio-start').hidden) startHostAudio();
+    if (active && item && !Number(state.paused) && audio.paused && !audio.ended && !hostStreamPlayer?.isRenewing() && !hostStreamPlayer?.state()?.confirmation_required && $('audio-start').hidden) startHostAudio();
   }
 
   function tick() {
@@ -2039,7 +2039,7 @@
       if (audio.paused && !audio.ended && hostTransport !== 'starting') reportNativeTransport(hostStreamPlayer?.isRenewing() ? 'buffering' : 'paused');
     });
     audio.addEventListener('error', () => {
-      if (!active || !currentItem || !hostStreamPlayer || hostStreamPlayer.isRenewing() || hostStreamPlayer.state()?.terminal || !audio.error) return;
+      if (!active || !currentItem || !hostStreamPlayer || hostStreamPlayer.isRenewing() || hostStreamPlayer.state()?.terminal || hostStreamPlayer.state()?.confirmation_required || !audio.error) return;
       const selectedItem = currentItem;
       hostTransport = 'buffering';
       void hostStreamPlayer.recover().catch(error => {

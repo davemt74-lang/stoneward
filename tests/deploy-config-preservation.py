@@ -25,12 +25,14 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         'config/store.php': '<?php return ["mode"=>"production"];\n',
         'config/database.php': '<?php // host database secret\n',
         'config/secrets.php': '<?php // host provider secret\n',
+        'config/app-secret.php': '<?php // host credential encryption key\n',
         '.env': 'PROVIDER_SECRET=private-fixture\n',
         '.env.local': 'PROVIDER_SECRET=private-local-fixture\n',
         'storage/media/production.mp3': 'runtime media fixture\n',
         'uploads/photo.jpg': 'user image fixture\n',
         'data/catalog.json': '[{"id":"host-catalog"}]\n',
         'assets/js/fixture.js': 'window.fixture=true;\n',
+        'assets/js/catalog.js': 'window.STONEFELLOW_CATALOG=[{id:"repository-sample"}];\n',
         '.github/workflows/fixture.yml': 'name: excluded CI\n',
         'tests/fixture.php': '<?php // excluded test\n',
         'speech-gateway/fixture.js': '// separate gateway\n',
@@ -38,6 +40,9 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         'scripts/release-zip.sh': (ROOT / 'scripts/release-zip.sh').read_text(),
     }
     required_assets = (
+        'api/vp3-music-core.php', 'api/vp3-music-reference.php', 'api/vp3-music-source.php', 'api/vp3-music-site.php',
+        'admin/api/vp3-music.php', 'admin/assets/vp3-music.js', 'admin/assets/vp3-music.css',
+        'assets/js/vp3-music-player.js', 'docs/VP3-MUSIC-DEPLOY.txt',
         'api/canvas-data.php', 'api/canvas-geography-core.php', 'api/canvas-map-core.php', 'api/canvas-earthquakes-core.php',
         'assets/js/canvas-data-picker.js', 'assets/js/canvas-location.js',
         'api/canvas-libraries.php', 'api/canvas-library-core.php', 'api/media-artwork-palette.php',
@@ -69,7 +74,7 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         assert set(required_assets) <= set(names)
         assert not any(name.endswith('.zip') for name in names)
         assert not any(name.startswith(('storage/', 'uploads/', 'data/', '.github/', 'tests/', 'scripts/', 'speech-gateway/')) for name in names)
-        assert not any(name in names for name in ('config/store.php', 'config/database.php', 'config/secrets.php', '.env', '.env.local'))
+        assert not any(name in names for name in ('config/store.php', 'config/database.php', 'config/secrets.php', 'config/app-secret.php', 'assets/js/catalog.js', '.env', '.env.local'))
         assert f'Source commit: {commit}' in archive.read('DEPLOY-MANIFEST.txt').decode()
         for name in names:
             if name.endswith('/') or name == 'DEPLOY-MANIFEST.txt':
@@ -80,11 +85,16 @@ with TemporaryDirectory(prefix='sf-deploy-config-') as directory:
         (host / 'config').mkdir(parents=True)
         (host / 'storage/media').mkdir(parents=True)
         (host / 'data').mkdir(parents=True)
+        (host / 'assets/js').mkdir(parents=True)
         (host / 'config/store.php').write_text('host-custom-configuration')
         (host / 'storage/media/production.mp3').write_text('host-production-media')
         (host / 'data/catalog.json').write_text('host-catalog')
+        (host / 'config/app-secret.php').write_text('host-encryption-key')
+        (host / 'assets/js/catalog.js').write_text('host-generated-public-catalog')
         archive.extractall(host)
         assert (host / 'config/store.php').read_text() == 'host-custom-configuration'
         assert (host / 'storage/media/production.mp3').read_text() == 'host-production-media'
         assert (host / 'data/catalog.json').read_text() == 'host-catalog'
+        assert (host / 'config/app-secret.php').read_text() == 'host-encryption-key'
+        assert (host / 'assets/js/catalog.js').read_text() == 'host-generated-public-catalog'
     print('Deployment source equality, ZIP integrity, root extraction, and host config/media preservation passed')

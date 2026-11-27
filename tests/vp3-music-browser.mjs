@@ -81,6 +81,13 @@ async function geometry(page, selector) {
   });
 }
 
+async function capture(page, filename) {
+  // Measure the actionable scrolled position first, then place fixed Admin
+  // chrome at the document top for a coherent full-page review artifact.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({path: path.join(artifactDirectory, filename), fullPage: true});
+}
+
 export async function runBrowserAcceptance() {
   fs.mkdirSync(artifactDirectory, {recursive: true});
   const playwright = await import(process.env.SF_PLAYWRIGHT_MODULE
@@ -93,8 +100,9 @@ export async function runBrowserAcceptance() {
   try {
     for (const width of [1440, 390]) {
       const fixture = await musicIntegrationFixture();
-      let browser, context;
-      const errors = [];
+      let browser, context, reviewGeometry;
+      let revocationStarted = false;
+      const errors = [], expectedNetworkDiagnostics = [];
       try {
         evidence.provider_revision = fixture.providerRevision;
         const identity = fixture.provider.identities.find(row => Number(row.catalog_track_id) === 10);
@@ -112,7 +120,17 @@ export async function runBrowserAcceptance() {
         // A provider cookie must not accompany any provider playback/API/media request.
         await context.addCookies([{name: 'unrelated_provider_session', value: 'fixture-cookie-must-not-travel', url: providerOrigin, secure: true, sameSite: 'None'}]);
         const page = activePage = await context.newPage();
-        page.on('pageerror', error => errors.push(clean(error.message)));
+        page.on('pageerror', error => {
+          const message = clean(error.message);
+          // WebKit emits an engine pageerror for a deliberately rejected CORS
+          // request even when fetch rejects into the application's handler.
+          // Accept only this exact site endpoint after intentional revocation;
+          // every other JavaScript/network diagnostic remains a failure.
+          if (engine === 'webkit' && revocationStarted && message.includes(new URL(providerOrigin).hostname +
+              '/api/music-provider-v1.php?site_id=' + registration.site.site_id) && message.endsWith('due to access control checks.')) {
+            expectedNetworkDiagnostics.push({phase: 'revoked_provider', message});
+          } else errors.push(message);
+        });
         const unrelatedAdmin = new Set(['templates.php', 'state.php', 'releases.php', 'shows.php', 'crm.php',
           'knowledge.php', 'users.php', 'packages.php', 'ai-providers.php', 'customer-lifecycle.php']);
         await page.route(url => url.origin === artistOrigin && url.pathname.startsWith('/admin/api/') && unrelatedAdmin.has(url.pathname.split('/').at(-1)),
@@ -160,11 +178,11 @@ export async function runBrowserAcceptance() {
         check(!(await page.evaluate(() => !!window.injected)) && await page.locator('.vp3-track img[src="x"]').count() === 0,
           engine + '/' + width + ': provider title stays escaped text');
         await page.getByRole('button', {name: 'Review selection', exact: true}).click();
-        const reviewGeometry = await geometry(page, '#vp3Import');
+        reviewGeometry = await geometry(page, '#vp3Import');
         check(reviewGeometry.page_width <= width + 1 && reviewGeometry.unobstructed && reviewGeometry.height >= 40,
           engine + '/' + width + ': import review button fits viewport and is unobstructed');
         check(reviewGeometry.nested_scroll.length === 0, engine + '/' + width + ': importer uses page flow without a nested scroll trap');
-        await page.screenshot({path: path.join(artifactDirectory, 'admin-' + width + '-review.png'), fullPage: true});
+        await capture(page, 'admin-' + width + '-review.png');
         fixture.controls.dropAction = 'import';
         await page.getByRole('button', {name: 'Import selected songs', exact: true}).click();
         await page.getByRole('button', {name: 'Retry the same request', exact: true}).waitFor({state: 'visible'});
@@ -180,7 +198,7 @@ export async function runBrowserAcceptance() {
         check(true, engine + '/' + width + ': real imported catalog contains one stable provider song and unchanged native song');
         check(!await page.evaluate(() => /vmp1_|mps1_|mpd1\./.test(JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]))),
           engine + '/' + width + ': browser storage contains no provider secrets');
-        await page.screenshot({path: path.join(artifactDirectory, 'admin-' + width + '-complete.png'), fullPage: true});
+        await capture(page, 'admin-' + width + '-complete.png');
         playerHost(fixture, imported);
         await page.goto(artistOrigin + '/music.php?private=PRIVATE-QUERY#PRIVATE-FRAGMENT', {waitUntil: 'domcontentloaded'});
         await page.evaluate(() => window.fixtureReady);
@@ -239,7 +257,7 @@ export async function runBrowserAcceptance() {
         const heard = fixture.provider.readDb('SELECT accepted_played_ms,position_ms FROM music_provider_sessions_v1 WHERE session_id=?', [initial.provider.session_id])[0];
         check(Number(heard.accepted_played_ms) > 0 && Number(heard.accepted_played_ms) < 10000 && Number(heard.position_ms) > 17000,
           engine + '/' + width + ': seeking does not count skipped audio as heard time');
-        await page.screenshot({path: path.join(artifactDirectory, 'player-' + width + '-renewed.png'), fullPage: true});
+        await capture(page, 'player-' + width + '-renewed.png');
         for (const [route, expected] of [['/', artistOrigin + '/'], ['/music?private=hidden#secret', artistOrigin + '/music'],
           ['/account.php?session=hidden', ''], ['/track/' + imported.id, ''], ['/music-workspace.php', '']]) {
           await page.evaluate(route => {stopProvider(); history.replaceState({}, '', route);}, route);
@@ -261,21 +279,51 @@ export async function runBrowserAcceptance() {
         check(providerTraffic.filter(row => row.action.startsWith('playback.')).every(row => row.origin === artistOrigin && !row.referrer),
           engine + '/' + width + ': real CORS uses registered artist origin and no referrer');
         const revision = Number(fixture.provider.readDb('SELECT revision FROM music_provider_sites_v1 WHERE site_id=?', [registration.site.site_id])[0].revision);
+        const beforeRevocation = await page.evaluate(() => playerSnapshot());
         fixture.provider.ownerService({action: 'site.revoke', workspace_id: 1, site_id: registration.site.site_id,
           request_id: cryptoRandomUUID(), expected_revision: revision});
+        revocationStarted = true;
+        const revocationTrafficAt = fixture.traffic.length;
         const beforeRevocationBegins = fixture.traffic.filter(row => row.action === 'playback.begin').length;
         await page.locator('#renew').click();
-        await page.waitForFunction(() => playerSnapshot().provider?.terminal === true && audio.paused, undefined, {timeout: 20000});
+        await page.waitForFunction(() => {
+          const provider = playerSnapshot().provider;
+          return audio.paused && !playerSnapshot().renewing && (provider?.confirmation_required === true || provider?.terminal === true) &&
+            window.renewOutcome !== 'pending' && window.renewOutcome !== 'complete';
+        }, undefined, {timeout: 20000});
+        const rejected = await page.evaluate(() => playerSnapshot());
+        assert.equal(rejected.provider.session_id, beforeRevocation.provider.session_id);
+        assert.equal(rejected.provider.play_id, beforeRevocation.provider.play_id);
+        assert.ok(fixture.traffic.slice(revocationTrafficAt).some(row => row.hostname === new URL(providerOrigin).hostname &&
+          row.pathname === '/api/music-provider-v1.php' && row.status === 403 && (row.action === 'playback.renew' || row.method === 'OPTIONS')),
+          'Actual pinned provider rejects revoked renewal or its preflight');
         assert.equal(fixture.traffic.filter(row => row.action === 'playback.begin').length, beforeRevocationBegins);
-        check(true, engine + '/' + width + ': actual remote revocation stops renewal without fabricating another play');
+        check(true, engine + '/' + width + ': actual remote revocation pauses unconfirmed playback without inventing a revoke reason or another play');
+        await page.locator('#footer').click();
+        await page.waitForFunction(() => {
+          const provider = playerSnapshot().provider;
+          return audio.paused && footerPlayer.dataset.playbackPhase === 'error' &&
+            (provider?.confirmation_required === true || provider?.terminal === true);
+        }, undefined, {timeout: 20000});
+        const refusedResume = await page.evaluate(() => playerSnapshot());
+        assert.equal(refusedResume.provider.session_id, rejected.provider.session_id);
+        assert.equal(refusedResume.provider.play_id, rejected.provider.play_id);
+        assert.ok(Math.abs(refusedResume.position - rejected.position) < .1, 'Failed grant confirmation never resumes buffered audio');
+        assert.equal(fixture.traffic.filter(row => row.action === 'playback.begin').length, beforeRevocationBegins);
+        const rejectedRenewals = fixture.traffic.slice(revocationTrafficAt).filter(row => row.action === 'playback.renew');
+        assert.ok(new Set(rejectedRenewals.map(row => row.body_sha256)).size <= 1, 'Explicit retry preserves the unacknowledged renewal identity');
+        check(true, engine + '/' + width + ': footer retry cannot resume a rejected grant or create another provider session');
+        await capture(page, 'player-' + width + '-revoked.png');
         await page.locator('#local').click();
         await page.waitForFunction(() => playerSnapshot().track === 'local-song' && audio.currentTime > .3 && !audio.paused);
         check(!await page.evaluate(() => /vmp1_|mps1_|mpd1\./.test(JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]))),
           engine + '/' + width + ': local playback still works after provider revocation without persistent provider secrets');
         check(errors.length === 0, engine + '/' + width + ': no browser exceptions: ' + errors.join('; '));
-        evidence.widths.push({width, review_geometry: reviewGeometry, browser_errors: errors, traffic: fixture.traffic});
+        evidence.widths.push({width, review_geometry: reviewGeometry, browser_errors: errors,
+          expected_network_diagnostics: expectedNetworkDiagnostics, traffic: fixture.traffic});
       } catch (error) {
-        evidence.widths.push({width, failed: true, failure: clean(error.message), browser_errors: errors, traffic: fixture.traffic});
+        evidence.widths.push({width, failed: true, failure: clean(error.message), review_geometry: reviewGeometry,
+          browser_errors: errors, expected_network_diagnostics: expectedNetworkDiagnostics, traffic: fixture.traffic});
         try {await activePage?.screenshot({path: path.join(artifactDirectory, 'failure-' + width + '.png'), fullPage: true});} catch {}
         throw error;
       } finally {

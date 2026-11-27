@@ -106,6 +106,13 @@ Position, rate, playing/paused intent, sequence and counters continue without th
 main player's new-track branch. Late responses, cancellation, blocked autoplay
 and terminal revocation have explicit lifecycle handling.
 
+If bounded transport retries cannot confirm provider access, playback pauses and
+automatic retries stop. The player retains its frozen renewal/event identities;
+explicit Play must confirm the same session before audio can resume. A browser may
+hide a denial behind a CORS/network error, so the client reports confirmation is
+required without inventing a specific revocation reason. Readable terminal denials
+remain terminal.
+
 Stoneward personal history retains its own privacy settings. Provider reports
 receive no customer ID, email, account cookie or private history. Downloaded bytes
 are not listened time.

@@ -89,6 +89,11 @@ history. No customer identifier, email or personal-session cookie is forwarded.
 Preload, downloaded bytes, pauses and seeks do not automatically become listened
 time. URL renewal preserves the provider session and original audio asset.
 
+When provider access cannot be confirmed after bounded retries, audio pauses and
+automatic retries stop. Tap Play retries the same pending session and must confirm
+it before resuming. Browser-hidden CORS or network errors are described as a
+connection confirmation problem; the client does not guess why access failed.
+
 Host-owned measurable canvas playback uses the shared adapter. Raw provider
 getAudio/blob retrieval is unavailable: a byte transfer would not establish
 observable listening or grant production/download rights.

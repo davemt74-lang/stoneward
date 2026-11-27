@@ -590,11 +590,11 @@ function sf_vp3_music_site_proof(): ?array {
         'ok'=>true,'protocol'=>'vp3_music_site_v1','site_id'=>$c['site_id'],'origin'=>$c['origin'],
         'challenge'=>$c['verification']['challenge']]:null;
 }
-/** Called only after the caller's normal catalog/canvas scope authorization. No personal identity crosses to VP3. */
-function sf_vp3_music_source_for_track(array $track): ?array {
+/** Called after normal catalog/canvas scope authorization. A private snapshot belongs to one enclosing read only. */
+function sf_vp3_music_source_for_track(array $track,?array $stateSnapshot=null): ?array {
     if(!function_exists('sf_track_is_public')||!sf_track_is_public($track))return null;
     $s=$track['audio_source']??null;if(!is_array($s)||($s['kind']??null)!=='vp3')return null;
-    $state=sf_vp3_music_read_state();$c=$state['connection']??null;
+    $state=$stateSnapshot??sf_vp3_music_read_state();$c=$state['connection']??null;
     if(!is_array($c)||($c['state']??null)!=='ready'||($s['installation_id']??null)!==$c['installation_id']
         ||($s['site_id']??null)!==$c['site_id']||!in_array($s['recording_id']??null,(array)($c['recording_ids']??[]),true))return null;
     $import=$state['imports'][$c['installation_id'].':'.($s['recording_id']??'')]??null;

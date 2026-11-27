@@ -670,6 +670,7 @@
       stopLoopTimer(player);
       const { media, loop } = player;
       if (!loop || player.disposed || !player.playRequested || !active(session) || media.seeking) return;
+      if (player.stream?.state()?.confirmation_required || player.stream?.state()?.terminal) return;
       const reachedTrackEnd = endedEvent && media.ended;
       if (!reachedTrackEnd && (media.paused || media.ended || media.readyState < 3)) return;
       if (reachedTrackEnd || media.currentTime >= loop.endSeconds) {
@@ -731,7 +732,7 @@
         player.mediaChanged = event => {
           scheduleLoop(session, player, event.type === 'ended');
           player.publish();
-          if(event.type==='error'&&player.stream&&player.playRequested&&!player.recovery&&!player.stream.isRenewing()&&!player.stream.state()?.terminal){
+          if(event.type==='error'&&player.stream&&player.playRequested&&!player.recovery&&!player.stream.isRenewing()&&!player.stream.state()?.terminal&&!player.stream.state()?.confirmation_required){
             player.recovery=player.stream.recover().catch(()=>{player.playRequested=false;}).finally(()=>{player.recovery=null;player.publish();});
           }
         };

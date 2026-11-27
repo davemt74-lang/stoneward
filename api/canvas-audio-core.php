@@ -97,10 +97,10 @@ function sf_canvas_audio_local_file(string $relative,string $rootName,bool $allo
 }
 
 /** Resolve an existing public listening MP3 without granting access to an original. */
-function sf_canvas_audio_track_source(array $track): array {
+function sf_canvas_audio_track_source(array $track,?array $vp3StateSnapshot=null): array {
     if(sf_track_is_vp3_source($track)){
         require_once __DIR__.'/vp3-music-core.php';
-        $provider=sf_vp3_music_source_for_track($track);
+        $provider=sf_vp3_music_source_for_track($track,$vp3StateSnapshot);
         return $provider?['reason'=>'available','provider'=>$provider]:['reason'=>'unavailable_source'];
     }
     $reference=$track['audio']??null;
@@ -188,14 +188,19 @@ function sf_canvas_audio_catalog(?string $releaseId=null,?string $trackId=null):
         if($trackId!==null&&!in_array($trackId,$ids,true))continue;
         $releases[]=['release_id'=>$id,'title'=>sf_agent_public_artist_text($release['title']??'',180),'track_ids'=>$ids];
     }
-    $tracks=[];$public=[];
+    $tracks=[];$public=[];$vp3StateSnapshot=null;
     foreach(sf_public_catalog() as $row){
         $id=(string)($row['id']??'');
         if(sf_canvas_audio_id($id)===null||($trackId!==null&&$id!==$trackId))continue;
         if($releaseId!==null&&!in_array($releaseId,$members[$id]??[],true))continue;
         $track=sf_canvas_audio_public_track($id);
         if($track===null)continue;
-        $source=sf_canvas_audio_track_source($track);$provider=isset($source['provider']);$available=isset($source['file'])||$provider;
+        if(sf_track_is_vp3_source($track)&&$vp3StateSnapshot===null){
+            require_once __DIR__.'/vp3-music-core.php';
+            // Read once for this catalog operation, never cache across subsequent requests or writes.
+            $vp3StateSnapshot=sf_vp3_music_read_state();
+        }
+        $source=sf_canvas_audio_track_source($track,$vp3StateSnapshot);$provider=isset($source['provider']);$available=isset($source['file'])||$provider;
         $url=isset($source['file'])?'api/canvas-audio.php?action=source&track_id='.rawurlencode($id):null;
         $public[$id]=['track_id'=>$id,'title'=>sf_agent_public_artist_text($track['title']??'',180),
             'duration_seconds'=>is_numeric($track['duration']??null)?max(0,(int)$track['duration']):0,

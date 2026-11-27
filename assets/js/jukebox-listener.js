@@ -275,8 +275,8 @@
           streamPlayer = createStreamPlayer({audio, itemId: selectedItem, track: sourceTrack,
             isActive: () => listening && itemId === selectedItem && !!snapshot?.allowed,
             onError: error => {
-              if (itemId !== selectedItem || error.retryable) return;
-              blocked = 'terminal'; pause(); showBlocked();
+              if (itemId !== selectedItem || (error.retryable && !streamPlayer?.state()?.confirmation_required)) return;
+              blocked = error.retryable ? 'error' : 'terminal'; pause(); showBlocked();
             }
           });
         } else if (sourceTrack?.audio_source?.kind === 'vp3' || sourceTrack?.audio_publishing_mode === 'vp3_stream_only') {
@@ -477,7 +477,7 @@
       endActivity();
       if (!listening || !itemId || !audio.error) return;
       if (streamPlayer) {
-        if (streamPlayer.isRenewing() || streamPlayer.state()?.terminal || playAttempt) return;
+        if (streamPlayer.isRenewing() || streamPlayer.state()?.terminal || streamPlayer.state()?.confirmation_required || playAttempt) return;
         const attempt = {}; playAttempt = attempt;
         void streamPlayer.recover().then(() => {
           if (playAttempt === attempt) { playAttempt = null; sync(); }
