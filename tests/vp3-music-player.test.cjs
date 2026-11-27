@@ -65,9 +65,37 @@ test('only explicit stable VP3 references select the provider transport',()=>{
   assert.equal(music.safeSourcePage('https://artist.example.test/music.php?token=secret#private'),'https://artist.example.test/music.php');
   assert.equal(music.safeSourcePage('https://artist.example.test/account/private-id'),'');
   assert.equal(music.safeSourcePage('https://secret@artist.example.test/music.php'),'');
-  assert.equal(music.safeSourcePage('https://artist.example.test/track/public-song'),'');
-  assert.equal(music.safeSourcePage('https://artist.example.test/release/public-release'),'');
-  assert.equal(music.safeSourcePage('https://artist.example.test/stonefellow-v120.php'),'');
+  assert.equal(music.safeSourcePage('https://artist.example.test/track/public-song'),'https://artist.example.test/track/public-song');
+  assert.equal(music.safeSourcePage('https://artist.example.test/release/public-release'),'https://artist.example.test/release/public-release');
+  assert.equal(music.safeSourcePage('https://artist.example.test/stonefellow-v120.php'),'https://artist.example.test/stonefellow-v120.php');
+});
+test('source pages retain only bounded real public routes and the actual artist origin',()=>{
+  const origin='https://artist.example.test';
+  for(const path of ['/track/vp3-123_ABC','/track/song/','/release/album-2026','/release/album/', '/stonefellow-v120.php']) {
+    assert.equal(music.safeSourcePage(origin+path+'?token=PRIVATE#PRIVATE',origin),origin+path);
+  }
+  for(const path of ['/account/private','/track/','/release/', '/track/'+ 'a'.repeat(161),'/track/song/secret',
+    '/track/song?bad=space value','/track/a.b','/track/%73ong','/track/a%2fb','/track/a%5cb','/private/../music',
+    '/track/%2e%2e/music','/track/..','/track/../music','/track/./song','/track//song','//music',
+    '/track/\\song','/track/song\n','/track/song\t','/stonefellow-v120.php/private']) {
+    assert.equal(music.safeSourcePage(origin+path,origin),'',path);
+  }
+  for(const url of ['https://foreign.example.test/track/song','https://user:password@artist.example.test/track/song',
+    'http://artist.example.test/track/song','https://artist.example.test:8443/track/song','/track/song']) {
+    assert.equal(music.safeSourcePage(url,origin),'',url);
+  }
+  assert.equal(music.safeSourcePage(origin+'/track/'+ 'a'.repeat(160),origin),origin+'/track/'+ 'a'.repeat(160));
+});
+test('the exact sanitized public source is frozen through begin retry and renewal',async()=>{
+  let url='https://artist.example.test/track/public-song?private=secret#secret';
+  const f=fixture({sourceUrl:()=>url});f.mode.lose='playback.begin';
+  await f.controller.play(track);await tick();
+  assert.equal(f.begins().length,2);assert.deepEqual(f.begins()[0].body,f.begins()[1].body);
+  assert.equal(f.begins()[0].body.source_url,'https://artist.example.test/track/public-song');
+  url='https://artist.example.test/release/new-page';await f.controller.renew();await tick();
+  assert.equal(f.begins().length,2,'navigation and URL renewal do not begin another play');
+  assert.equal(f.begins()[0].body.source_url,'https://artist.example.test/track/public-song');
+  f.controller.dispose();
 });
 test('begin allocates no listening; actual first resume is zero and transport omits site identity credentials',async()=>{
   const f=fixture();await f.controller.play(track,{position:0});await tick();

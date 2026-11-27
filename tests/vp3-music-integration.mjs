@@ -7,7 +7,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {musicIntegrationFixture, artistOrigin, providerOrigin, createRegistration, verifyActualProof} from './vp3-music-fixture.mjs';
+import {musicIntegrationFixture, artistOrigin, providerOrigin, protocol, createRegistration, verifyActualProof} from './vp3-music-fixture.mjs';
+import providerPlayer from '../assets/js/vp3-music-player.js';
 export {createRegistration, verifyActualProof} from './vp3-music-fixture.mjs';
 
 const endpoint = '/admin/api/vp3-music.php';
@@ -130,6 +131,26 @@ export async function runHttpAcceptance() {
     const source = expect(await client.request('/api/vp3-music-source.php?track_id=' + track.id), 200, 'public resolver returns current stable provider identity');
     assert.equal(source.source.provider_api, providerOrigin + '/api/music-provider-v1.php');
     assert.doesNotMatch(JSON.stringify(source), privatePattern);
+    const discovery = await (await fetch(fixture.provider.base + '/api/music-provider-v1.php')).json();
+    const extendedPages = discovery.source_page_profile === 'public_music_pages_v2';
+    assert.ok(!discovery.source_page_profile || extendedPages, 'Explicit accepted source-page profile');
+    for (const route of ['/track/' + track.id, '/release/public-release/', '/stonefellow-v120.php']) {
+      const safePage = providerPlayer.safeSourcePage(artistOrigin + route + '?credential=PRIVATE#PRIVATE', artistOrigin);
+      assert.equal(safePage, artistOrigin + route, 'Actual Stoneward sanitizer retains the public route only');
+      const begin = {protocol, action: 'playback.begin', site_id: registration.site.site_id, recording_id: identity.recording_id,
+        play_id: uuid(), playback_key: 'mps1_' + crypto.randomBytes(32).toString('hex'), source_url: safePage, source_surface: 'player', position_ms: 0, playback_rate: 1};
+      const response = await fixture.provider.request(begin, {origin: artistOrigin});
+      const receipt = expect({status: response.status, data: await response.json()}, 200,
+        'real paired provider accepts public route ' + route);
+      assert.equal(receipt.source.url, extendedPages ? safePage : null,
+        extendedPages ? 'Current provider retains public page' : 'Original provider preserves site-only fallback');
+      assert.equal(receipt.source.verified_origin, artistOrigin); assert.equal(receipt.source.page_verified, false);
+      assert.doesNotMatch(JSON.stringify(receipt.source), /PRIVATE|credential/);
+      const retry = await fixture.provider.request(begin, {origin: artistOrigin});
+      const repeated = expect({status: retry.status, data: await retry.json()}, 200, 'source-page begin retry preserves one session');
+      delete repeated.correlation_id; delete receipt.correlation_id; assert.deepEqual(repeated, receipt);
+    }
+    checks.push(extendedPages ? 'paired public_music_pages_v2 retains new pages' : 'paired original provider safely retains site attribution for new pages');
     const canvasCatalog = expect(await client.request('/api/canvas-audio.php?action=catalog&track_id=' + track.id), 200,
       'actual canvas catalog exposes typed imported playback capability');
     const canvasSong = canvasCatalog.tracks?.find(row => String(row.id || row.track_id) === track.id);
