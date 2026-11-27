@@ -188,7 +188,7 @@ try{
     if(!preg_match('/\A[a-f0-9]{32}\z/',$id))throw new OutOfBoundsException('Jukebox session not found.');
     // Managed MP3 resolution uses lazy media schema setup. MySQL DDL must run
     // before the session transaction so it cannot commit queue changes early.
-    if(in_array($action,['audio','catalog','request'],true))sf_media_ensure_schema();
+    if(in_array($action,['audio','stream','catalog','request'],true))sf_media_ensure_schema();
     if($post){
         // The first statement is a write on both engines. It serializes changes
         // for this session before reading approvals, the player, or queue order.
@@ -231,6 +231,15 @@ try{
         throw new OutOfBoundsException('Phone connection not found.');
 
     if(!$post){
+        if($action==='stream'){
+            $item=$_GET['item']??null;
+            $playable=is_string($item)&&preg_match('/\A[1-9][0-9]{0,18}\z/',$item)
+                ?sf_jukebox_item_source($session,$phone,$item,$host):null;
+            if(($playable['kind']??null)!=='vp3')throw new OutOfBoundsException('Session audio is unavailable.');
+            $db->commit();
+            header('Cache-Control: no-store, private');
+            sf_json_response(['ok'=>true,'source'=>$playable['source']]);
+        }
         if($audioRequest){
             $item=$_GET['item']??null;
             $source=is_string($item)&&preg_match('/\A[1-9][0-9]{0,18}\z/',$item)

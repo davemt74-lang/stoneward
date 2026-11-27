@@ -2035,6 +2035,7 @@ ${probe?`<script>${probe.source}</script>`:''}${reactive?`<script>${sceneAudioBr
         dataProximitySources:listeningScene?.dataProximitySources,
         loadData:(alias,signal,locationId)=>options.onCanvasDataRead?.(alias,context,signal,locationId),
         observeIndependent:(media,track,settings)=>options.onCanvasIndependentAudioObserve?.(media,track,context,settings),
+        createStreamPlayer:(media,track,settings)=>options.onCanvasStreamPlayer?.(media,track,context,settings),
         play:trackId=>options.onCanvasAudioPlay?.(trackId),
         pause:()=>options.onCanvasAudioPause?.(),
         seek:position=>options.onCanvasAudioSeek?.(position),

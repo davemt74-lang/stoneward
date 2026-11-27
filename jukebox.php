@@ -64,8 +64,9 @@ $renderSessionShare=static function(bool $host):void {
 <?php if(!$host): ?><script defer src="assets/js/pwa-phone-alerts.js?v=1"></script><?php endif; ?>
 <script defer src="assets/js/jukebox-qr.js?v=1"></script>
 <script defer src="assets/js/jukebox-clock.js?v=1"></script>
-<script defer src="assets/js/jukebox-listener.js?v=5"></script>
-<script defer src="assets/js/jukebox.js?v=19"></script>
+<script defer src="assets/js/vp3-music-player.js?v=1.3.332"></script>
+<script defer src="assets/js/jukebox-listener.js?v=6"></script>
+<script defer src="assets/js/jukebox.js?v=20"></script>
 </head>
 <body class="<?=$host?'jukebox-host':'jukebox-guest'?>">
 <header class="jukebox-header">

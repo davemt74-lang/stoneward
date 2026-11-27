@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/vp3-music-reference.php';
 /**
  * 84B7: a read-only, account-scoped native playback contract.
  * Physical vinyl credits never create digital access.
@@ -15,6 +16,7 @@ function sf_hs_music_audio_reference(int $userId,string $trackId,array $owned,ar
     if(!$permitted)throw new RuntimeException('Music entitlement unavailable.');
     $track=$catalog[$trackId]??null;
     if(!is_array($track))throw new RuntimeException('Music master unavailable.');
+    if(sf_track_is_vp3_source($track))throw new RuntimeException('VP3 streaming does not grant a local download or HomeServer master.');
     $original=(string)($track['private_master_audio']??'');
     if($original!==''&&preg_match('/^api\\/media\\.php\\?id=M[A-F0-9]{20}$/D',$original))
         return $original;
@@ -46,6 +48,11 @@ function sf_hs_music_rights(array $tracks,array $balances,array $catalog):array 
         $id=(string)($track['id']??'');
         $balance=(array)($balances[$id]??[]);
         $t=(array)($catalog[$id]??[]);
+        if(sf_track_is_vp3_source($t)){
+            $track['can_stream']=false;$track['can_download']=false;
+            $track['vinyl_print_rights']=['granted'=>0,'reserved_or_used'=>0,'available'=>0,'packages'=>[]];
+            continue;
+        }
         $packages=[];
         if(!empty($t['podEligible']))
             foreach((array)($t['vinyl_license_packages']??[]) as $p){

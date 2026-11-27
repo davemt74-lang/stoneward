@@ -32,6 +32,10 @@
   let currentItem = '';
   let hostTransport = 'starting';
   let hostPlayAttempt = null;
+  let hostStreamPlayer = null;
+  let hostSourceTrack = null;
+  let hostStartPosition = 0;
+  let hostSourceUnavailable = false;
   let playerSequence = 0;
   let playerReports = Promise.resolve();
   let hostProgressTask = null;
@@ -88,6 +92,12 @@
   }
   function page(session, isHost) {
     return 'jukebox.php?' + new URLSearchParams({id: session, ...(isHost ? {host: '1'} : {})});
+  }
+  async function resolveStreamSource(item, signal) {
+    const response = await fetch(endpoint('stream', {item}), {signal, credentials: 'same-origin', cache: 'no-store'});
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw Object.assign(new Error('This VP3 recording is unavailable.'), {retryable: response.status >= 500});
+    return result;
   }
   async function api(action, body, extra) {
     const startedAt = performance.now();
@@ -1178,6 +1188,7 @@
       allowed: state.remote_listening === true && phaseOf(state) === 'live',
       online: Boolean(state.online),
       itemId: state.current?.id ?? '',
+      track: state.current ? {id: state.current.track_id, audio_source: state.current.audio_source, audio_publishing_mode: state.current.audio_publishing_mode} : null,
       generation: Number(transport?.generation ?? -1),
       transport: transport?.status ?? 'offline',
       seconds: Number(transport?.position_ms || 0) / 1000,
@@ -1372,9 +1383,15 @@
     lastPlaying = false;
     hostTransport = 'starting';
     hostPlayAttempt = null;
+    hostStreamPlayer?.dispose();
+    hostStreamPlayer = null;
+    hostSourceTrack = null;
+    hostStartPosition = 0;
+    hostSourceUnavailable = false;
     $('audio-start').hidden = true;
     if (!audio.hasAttribute('src')) return;
     audio.pause();
+    audio.removeAttribute('crossorigin');
     audio.removeAttribute('src');
     audio.load();
   }
@@ -1429,7 +1446,12 @@
   function startHostAudio() {
     if (hostPlayAttempt) return hostPlayAttempt;
     const item = currentItem;
-    const attempt = audio.play().then(() => {
+    if (hostSourceUnavailable || hostStreamPlayer?.state()?.terminal) { playerNotice('This VP3 recording is unavailable. Choose another song.'); return Promise.resolve(); }
+    const request = hostStreamPlayer ? hostStreamPlayer.play(hostSourceTrack, {
+      position: audio.getAttribute('src') ? audio.currentTime : hostStartPosition,
+      isCurrent: () => active && item === currentItem && !Number(state?.paused)
+    }) : audio.play();
+    const attempt = request.then(() => {
       if (item !== currentItem || !active) return;
       playerNotice('');
       $('audio-start').hidden = true;
@@ -1439,6 +1461,7 @@
         playerNotice('Press Start audio on this device to allow playback.');
         $('audio-start').hidden = false;
       } else if (error.name !== 'AbortError') {
+        if (hostStreamPlayer?.state()?.terminal) { playerNotice('This VP3 recording is unavailable. Choose another song.'); return; }
         playerNotice('A track was unavailable. Advancing the queue.');
         await playerEvent('failed', item);
         await tick();
@@ -1457,14 +1480,31 @@
     } else if (String(item.id) !== currentItem) {
       clearHostSource();
       currentItem = String(item.id);
-      audio.src = 'api/canvas-audio.php?' + new URLSearchParams({action: 'source', track_id: item.track_id, item: item.id});
       const seconds = Number(state.transport?.position_ms ?? Number(state.seconds) * 1000) / 1000;
-      if (seconds > 0) audio.currentTime = seconds;
+      hostSourceTrack = {id: item.track_id, audio_source: item.audio_source, audio_publishing_mode: item.audio_publishing_mode};
+      if (window.SFVP3Music?.supports(hostSourceTrack)) {
+        const selectedItem = currentItem;
+        hostStartPosition = Math.max(0, seconds || 0);
+        hostStreamPlayer = window.SFVP3Music.create({audio, sourceSurface: 'player',
+          isActive: () => active && currentItem === selectedItem,
+          resolveSource: (_, signal) => resolveStreamSource(selectedItem, signal),
+          onError: error => {
+            if (selectedItem !== currentItem) return;
+            playerNotice(error.retryable ? 'The music connection could not be confirmed. Try Start audio again.' : 'This VP3 recording is unavailable. Choose another song.');
+            if (error.retryable && audio.paused) $('audio-start').hidden = false;
+          }
+        });
+      } else if (item.audio_source?.kind === 'vp3' || item.audio_publishing_mode === 'vp3_stream_only') {
+        hostSourceUnavailable = true;
+      } else {
+        audio.src = 'api/canvas-audio.php?' + new URLSearchParams({action: 'source', track_id: item.track_id, item: item.id});
+        if (seconds > 0) audio.currentTime = seconds;
+      }
     }
     if (item && Number(state.paused)) {
       hostTransport = 'paused';
       $('audio-start').hidden = true;
-      audio.pause();
+      if (hostStreamPlayer) hostStreamPlayer.pause(); else audio.pause();
     } else if (hostTransport === 'paused' && audio.paused) {
       hostTransport = 'starting';
     }
@@ -1475,7 +1515,7 @@
       reportHostError(error);
       return;
     }
-    if (active && item && !Number(state.paused) && audio.paused && !audio.ended && $('audio-start').hidden) startHostAudio();
+    if (active && item && !Number(state.paused) && audio.paused && !audio.ended && !hostStreamPlayer?.isRenewing() && !hostStreamPlayer?.state()?.confirmation_required && $('audio-start').hidden) startHostAudio();
   }
 
   function tick() {
@@ -1996,7 +2036,17 @@
     audio.addEventListener('waiting', reportBuffering);
     audio.addEventListener('stalled', reportBuffering);
     audio.addEventListener('pause', () => {
-      if (audio.paused && !audio.ended && hostTransport !== 'starting') reportNativeTransport('paused');
+      if (audio.paused && !audio.ended && hostTransport !== 'starting') reportNativeTransport(hostStreamPlayer?.isRenewing() ? 'buffering' : 'paused');
+    });
+    audio.addEventListener('error', () => {
+      if (!active || !currentItem || !hostStreamPlayer || hostStreamPlayer.isRenewing() || hostStreamPlayer.state()?.terminal || hostStreamPlayer.state()?.confirmation_required || !audio.error) return;
+      const selectedItem = currentItem;
+      hostTransport = 'buffering';
+      void hostStreamPlayer.recover().catch(error => {
+        if (selectedItem !== currentItem || error.name === 'AbortError') return;
+        playerNotice('Audio could not reconnect. Press Start audio to retry.');
+        $('audio-start').hidden = false;
+      });
     });
     audio.addEventListener('ended', () => {
       if (active && currentItem && audio.ended && audio.currentSrc === audio.src) {
@@ -2008,6 +2058,8 @@
     $('mode-link').textContent = 'Live Sessions';
     listener = window.StonefellowJukeboxListener.create({
       audio: $('listener-audio'), urlForItem: item => endpoint('audio', {item}),
+      createStreamPlayer: ({audio, itemId, isActive, onError}) => window.SFVP3Music.create({audio, isActive, onError, sourceSurface: 'player',
+        resolveSource: (_, signal) => resolveStreamSource(itemId, signal)}),
       onActivity: createListenerReporter(),
       onChange(view) {
         const {allowed, listening, muted, needsGesture, status, connection} = view;

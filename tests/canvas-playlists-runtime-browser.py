@@ -74,11 +74,11 @@ with tempfile.TemporaryDirectory(prefix='stoneward-playlist-runtime-ui-') as tem
     tracks = [{'id': 'song-' + str(index), 'title': 'Song ' + str(index), 'duration': 6, 'audio': ''} for index in (1, 2)]
     html = '<!doctype html><meta charset="utf-8"><style>body{font:16px system-ui}button{min-height:44px;margin:8px}</style><button id="catalog">Read catalog</button><button id="source">Load MP3</button><button id="play">Play song</button><div id="player"><audio id="canonical"></audio></div>'
     html += '<script>window.fixtureScene=' + json.dumps(seeded['scene']).replace('<', '\\u003c') + ';window.fixtureTracks=' + json.dumps(tracks) + ';</script>'
-    for name in ('player-playback-lifecycle.js', 'listening-telemetry.js'):
+    for name in ('player-playback-lifecycle.js', 'listening-telemetry.js', 'vp3-music-player.js'):
         html += '<script src="assets/js/' + name + '"></script>'
     api_start = APP.index('  async function api(')
     api = APP[api_start:APP.index('\n', api_start)]
-    html += '<script>' + SETUP + api + block('  function ensureListenSession(){', '  function fmtWhen(') + block('  function canvasAudioState(){', '  async function renderAgentCanvas(){') + block('  function playbackEndedEarly(){', '  function rememberPlaybackPosition(){') + block('  function play(t,', '  function seekPlayback(') + '''
+    html += '<script>' + SETUP + api + block('  const hasPlayableAudio=', '  let playbackWantsAudio=') + block('  function ensureListenSession(){', '  function fmtWhen(') + block('  function canvasAudioState(){', '  async function renderAgentCanvas(){') + block('  function playbackEndedEarly(){', '  function rememberPlaybackPosition(){') + block('  function play(t,', '  function seekPlayback(') + '''
     listeningTelemetryMain();
     const run=async(kind,operation)=>{results[kind]='pending';try{results[kind]={ok:true,value:await operation()};}catch(error){results[kind]={ok:false,code:error.code||'rejected'};}};
     document.getElementById('catalog').onclick=()=>run('catalog',()=>loadCanvasAudioCatalog({scene_id:999,gallery_id:'f'.repeat(32)}));

@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const app=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
+const sourceHelpers=app.slice(app.indexOf('  const hasPlayableAudio='),app.indexOf('  let playbackWantsAudio='));
 
 function extract(name){
   const start=app.search(new RegExp('(?:async )?function '+name+'\\('));
@@ -32,7 +33,7 @@ async function run(){
   sandbox.playbackLifecycle=sandbox.window.StonefellowPlaybackLifecycle.create();
   sandbox.playbackLifecycle.remember(sandbox.playbackLifecycle.token(),75);
   const code=['savedPlaybackPosition','syncConversationMusic','elementPlayerVolume','playerVolume','applyPlayerVolume','setPlayerVolume','observedPlayer','playerState','describePlayer','executePlayerAgentAction'].map(extract).join('\n');
-  vm.runInContext(code+';globalThis.run=executePlayerAgentAction;',sandbox);
+  vm.runInContext(sourceHelpers+code+';globalThis.run=executePlayerAgentAction;',sandbox);
   assert.match(await sandbox.run({type:'player_status'}),/“Night Drive”.*playing.*1:15 of 3:20.*80 percent/);
   assert.equal((await sandbox.run({type:'set_player_volume',mode:'set',percent:30})), 'Stonefellow player volume is now 30 percent.');
   assert.equal(audio.volume,0.3);

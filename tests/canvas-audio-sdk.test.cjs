@@ -6,6 +6,9 @@ const vm = require('node:vm');
 const { createHash, webcrypto } = require('node:crypto');
 const path = require('node:path');
 const code = fs.readFileSync(path.join(__dirname, '../assets/js/canvas-audio-sdk.js'), 'utf8');
+const vp3 = require('../assets/js/vp3-music-player.js');
+const streamedTrack = id => ({...track(id), audio_url:null, source_url:null, source_kind:'vp3',raw_audio_available:false,
+  audio_source:{kind:'vp3',installation_id:'11111111-1111-4111-8111-111111111111',site_id:'22222222-2222-4222-8222-222222222222',recording_id:'33333333-3333-4333-8333-333333333333'}});
 const flush = async () => { for (let count = 0; count < 8; count++) await new Promise(resolve => setImmediate(resolve)); };
 const track = id => ({ track_id: id, title: 'Track ' + id, duration_seconds: 120, release_ids: ['album-one'],
   audio_url: '/preview/' + id, source_available: true, source_reason: '', source_url: '/source/' + id });
@@ -936,4 +939,72 @@ test('a pending location check is isolated to one live canvas session and aborts
     assert.equal(loads, 1);
     h.destroy();
   }
+});
+
+test('typed VP3 independent players stay parent owned and never materialize a raw audio Blob', async () => {
+  const transports = [], observations = []; let rawReads = 0, permitted = true;
+  const h = harness({
+    loadCatalog: async ({track_id}) => ({tracks:[{...streamedTrack(track_id),source_available:permitted}],releases:[]}),
+    loadAudio: async () => {rawReads++; throw Error('streaming is not a raw source');},
+    observeIndependent: (media, item, settings) => {const entry={media,item,settings,disposed:false};observations.push(entry);return {dispose(){entry.disposed=true;}};},
+    createStreamPlayer: (media, item, settings) => {
+      const entry={media,item,settings,plays:0,pauses:0,disposed:false};transports.push(entry);
+      return {async play(selected, request){entry.plays++;assert.equal(selected.track_id,'vp3-song');assert.equal(request.isCurrent(),true);media.src='https://provider.test/api/music-provider-media-v1.php?ticket=mpd1.PRIVATE';await media.play();},
+        pause(){entry.pauses++;media.pause();},dispose(){entry.disposed=true;media.pause();},isRenewing:()=>false,state:()=>({terminal:false})};
+    }
+  });
+  h.host.SFVP3Music=vp3;const host=h.start();await flush();
+  const player=await h.api.createPlayer('vp3-song');
+  assert.equal(transports.length,1);assert.equal(transports[0].plays,0,'creation alone never starts a provider play');
+  assert.equal(observations.length,1);assert.equal(rawReads,0);assert.equal(h.hostURLs.length,0);
+  assert.equal((await h.api.getTrack('vp3-song')).raw_audio_available,false);
+  await player.play();await player.pause();await player.seek(18);await player.play();await flush();
+  assert.equal(transports[0].plays,2);assert.equal(transports[0].pauses,1);assert.equal(h.hostMedia[0].currentTime,18);
+  assert.equal(rawReads,0);assert.equal(h.hostURLs.length,0);assert.equal(JSON.stringify(h.messages).includes('mpd1.PRIVATE'),false);
+  permitted=false;await assert.rejects(player.play(),error=>error.code==='track_unavailable');
+  assert.equal(transports[0].plays,2,'fresh scope denial prevents another stream command');
+  h.setOwner(2);host.refresh();await flush();
+  assert.equal(transports[0].settings.isActive(),false);assert.equal(transports[0].disposed,true);assert.equal(observations[0].disposed,true);
+  h.destroy();
+});
+
+test('typed streams decline raw getAudio even if a custom loader incorrectly returns bytes', async () => {
+  const h=harness({loadAudio:async id=>({track:streamedTrack(id),blob:new Blob(['not-an-export'],{type:'audio/mpeg'})})});
+  h.host.SFVP3Music=vp3;h.start();await flush();
+  await assert.rejects(h.api.getAudio('vp3-song'),error=>error.code==='audio_source_unavailable');
+  assert.equal(h.created.length,0);assert.equal(h.messages.some(message=>message.direction==='host'&&message.data.value?.blob instanceof Blob),false);
+  h.destroy();
+});
+
+test('typed independent media recovery shares the existing observer and keeps its recovery state visible', async () => {
+  let transport,observerSettings,finish,renewing=false,confirmation=false,created=0,recoveries=0;
+  const h=harness({
+    loadCatalog:async ({track_id})=>({tracks:[streamedTrack(track_id)],releases:[]}),
+    loadAudio:async()=>{throw Error('must not fetch raw bytes');},
+    observeIndependent:(_media,_track,settings)=>{observerSettings=settings;return {dispose(){}};},
+    createStreamPlayer:media=>{
+      created++;
+      transport={async play(){await media.play();},pause(){media.pause();},dispose(){media.pause();},state:()=>({terminal:false,confirmation_required:confirmation}),isRenewing:()=>renewing,
+        recover(){recoveries++;renewing=true;return new Promise(resolve=>{finish=()=>{renewing=false;resolve();};});}};
+      return transport;
+    }
+  });
+  h.host.SFVP3Music=vp3;h.start();await flush();const player=await h.api.createPlayer('vp3-song');await player.play();
+  h.hostMedia[0].emit('error');h.hostMedia[0].emit('error');await flush();
+  assert.equal(recoveries,1);assert.equal(observerSettings.isRecovering(),true);
+  finish();await flush();assert.equal(observerSettings.isRecovering(),false);assert.equal(created,1);
+  await player.setLoop(118,120);
+  confirmation=true;h.hostMedia[0].emit('error');await flush();assert.equal(recoveries,1,'unconfirmed grants cannot trigger automatic recovery');
+  h.hostMedia[0].currentTime=120;h.hostMedia[0].ended=true;h.hostMedia[0].paused=true;h.hostMedia[0].emit('ended');await flush();
+  assert.equal(h.hostMedia[0].paused,true,'a queued loop completion cannot replay buffered media after authority loss');
+  assert.equal(h.hostMedia[0].currentTime,120);assert.equal(h.timers.size,0);h.destroy();
+});
+
+test('a malformed VP3 capability cannot fall back to an independent local Blob source', async () => {
+  let reads=0;
+  const h=harness({loadCatalog:async({track_id})=>({tracks:[{...streamedTrack(track_id),audio_source:{kind:'vp3'}}],releases:[]}),
+    loadAudio:async()=>{reads++;return new Blob(['private']);},createStreamPlayer:()=>{throw Error('invalid capability');}});
+  h.host.SFVP3Music=vp3;h.start();await flush();
+  await assert.rejects(h.api.createPlayer('vp3-song'),error=>error.code==='audio_source_unavailable');
+  assert.equal(reads,0);assert.equal(h.hostMedia.length,0);h.destroy();
 });

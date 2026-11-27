@@ -42,6 +42,57 @@ const songs=[
   {id:'unsafe',title:'External Audio',audio:'https://external.example/bad.mp3'}
 ];
 const player=musicBrowser.StonefellowAdminMusic.create({audio,tracks:()=>songs,baseUrl:'https://stonefellow.test/admin/index.php',onState:s=>{visible=s}});
+async function verifyProviderAdmin(){
+  const music=require('../assets/js/vp3-music-player.js'),{webcrypto}=require('node:crypto');
+  const reference={kind:'vp3',installation_id:'11111111-1111-4111-8111-111111111111',site_id:'22222222-2222-4222-8222-222222222222',recording_id:'33333333-3333-4333-8333-333333333333'};
+  const imported={id:'vp3-song',title:'Imported Song',audio:'',audio_source:reference};
+  const owned=new EventTarget();Object.assign(owned,{src:'',currentTime:0,duration:120,paused:true,ended:false,readyState:4,playbackRate:1,volume:1,muted:false,seeking:false,error:null,blocked:true,
+    getAttribute(name){return name==='src'?this.src:null;},removeAttribute(name){if(name==='src')this.src='';},
+    load(){this.error=null;this.dispatchEvent(new Event('loadedmetadata'));},pause(){this.paused=true;this.dispatchEvent(new Event('pause'));},
+    async play(){if(this.blocked)throw Object.assign(Error('blocked'),{name:'NotAllowedError'});this.paused=false;this.dispatchEvent(new Event('playing'));}});
+  const providerCalls=[],resolverCalls=[];let allocation=null,created=0,hold=null,release;
+  const browser={SFVP3Music:{...music,create(settings){created++;return music.create({...settings,crypto:webcrypto,sourceUrl:'https://stonefellow.test/admin/index.php',fetch:async(url,init)=>{
+    const body=JSON.parse(init.body);providerCalls.push({url,init,body});
+    if(body.action==='playback.begin')allocation??={play_id:body.play_id,session_id:'44444444-4444-4444-8444-444444444444',seq:0,played:0};
+    if(body.action==='playback.events'){assert.equal(body.seq,allocation.seq+1);allocation.seq=body.seq;allocation.played=body.cumulative_played_ms;}
+    const result={ok:true,protocol:music.protocol,session_id:allocation.session_id,play_id:allocation.play_id,site_id:reference.site_id,recording_id:reference.recording_id,
+      asset_id:'55555555-5555-4555-8555-555555555555',identity:{provider_id:reference.installation_id},accepted_seq:allocation.seq,accepted_played_ms:allocation.played};
+    if(body.action==='playback.begin')result.media={url:'https://vp3.test/api/music-provider-media-v1.php?ticket=mpd1.fixture',ticket_expires_ms:Date.now()+300000,mime:'audio/mpeg',byte_size:1024,etag:'"sha256-'+('a'.repeat(64))+'"'};
+    return {ok:true,status:200,json:async()=>result};
+  }});}}};
+  vm.runInNewContext(read('admin/assets/agent-music-controller.js'),{window:browser,URL,fetch:async(url,init)=>{
+    resolverCalls.push({url,init});if(hold)await hold;
+    return {ok:true,status:200,json:async()=>({ok:true,source:{...reference,provider_api:'https://vp3.test/api/music-provider-v1.php'}})};
+  }});
+  const admin=browser.StonefellowAdminMusic.create({audio:owned,tracks:()=>[imported,{id:'local',title:'Local Song',audio:'assets/local.mp3'},
+    {id:'broken',title:'Broken Provider',audio:'assets/private.mp3',audio_publishing_mode:'vp3_stream_only'}],baseUrl:'https://stonefellow.test/admin/index.php'});
+  assert.match(await admin.handle('play Imported Song'),/browser blocked playback/);
+  check('Admin imported music allocates one pending provider play without claiming listening',()=>{
+    assert.equal(providerCalls.filter(call=>call.body.action==='playback.begin').length,1);assert.equal(providerCalls.filter(call=>call.body.action==='playback.events').length,0);
+  });
+  owned.blocked=false;assert.match(await admin.resume(),/Playing/);await new Promise(resolve=>setImmediate(resolve));
+  check('Admin Tap Play reuses the pending provider grant and emits an actual zero-time resume',()=>{
+    assert.equal(created,1);assert.equal(providerCalls.filter(call=>call.body.action==='playback.begin').length,1);
+    assert.equal(providerCalls.find(call=>call.body.action==='playback.events').body.cumulative_played_ms,0);
+  });
+  check('Admin resolves a public local track ID and keeps provider requests anonymous',()=>{
+    assert.equal(resolverCalls[0].url,'https://stonefellow.test/api/vp3-music-source.php?track_id=vp3-song');assert.equal(resolverCalls[0].init.credentials,'same-origin');
+    for(const call of providerCalls){assert.equal(call.init.credentials,'omit');assert.equal(Object.keys(call.body).some(key=>/user|customer|email|account|cookie/.test(key)),false);}
+    assert.equal(providerCalls[0].body.source_url,'');
+  });
+  admin.pause();assert.equal(owned.paused,true);await admin.resume();await new Promise(resolve=>setImmediate(resolve));
+  check('Admin pause and resume retain the same provider play',()=>assert.equal(providerCalls.filter(call=>call.body.action==='playback.begin').length,1));
+  await admin.handle('play Local Song');
+  check('Admin can switch from typed provider to its original same-origin preview transport',()=>assert.equal(owned.src,'https://stonefellow.test/assets/local.mp3'));
+  check('Malformed Admin provider rows cannot fall back to local audio',()=>assert.equal(music.hasPlayableSource({audio:'assets/private.mp3',audio_publishing_mode:'vp3_stream_only'}),false));
+  assert.match(await admin.handle('play Broken Provider'),/could not find/);
+  hold=new Promise(resolve=>{release=resolve;});const pending=admin.play(imported);await Promise.resolve();admin.pause();release();
+  assert.match(await pending,/canceled/);await new Promise(resolve=>setImmediate(resolve));
+  check('Admin pause cancels a late source resolution before another provider begin',()=>{
+    assert.equal(owned.paused,true);assert.equal(providerCalls.filter(call=>call.body.action==='playback.begin').length,1);
+  });
+  admin.stop();
+}
 async function run(){
   check('Admin player starts empty and hidden',()=>assert.equal(visible.has_track,false));
   assert.match(await player.handle('Stonefellow, play Earth Girl'),/Playing “Earth Girl/);
@@ -79,6 +130,7 @@ async function run(){
   audio.pause();audio.rejectPlay=true;
   assert.match(await player.handle('play Earth Girl'),/browser blocked playback/);
   check('Autoplay denial is reported instead of falsely claiming audio played',()=>assert.equal(player.state().playing,false));
+  await verifyProviderAdmin();
 
   const publicApp=read('assets/js/app.js'),adminApp=read('admin/assets/admin.js');
   check('Public recognition has speech-guarded start and result',()=>assert.match(publicApp,/voiceSpeechGuard\?\.blocked/g));

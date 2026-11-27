@@ -1,14 +1,16 @@
 /* Section 91B4 — Browser-owned Admin Agent music transport.
- * Only same-origin catalog previews play; private masters and remote URLs do
- * not enter this player. Player commands are local and need no AI approval.
+ * Same-origin catalog previews and explicit VP3 references use separate
+ * transports. Private masters and arbitrary remote URLs never enter this player.
  */
 (() => {
   'use strict';
   const norm=text=>String(text||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();
   function create({audio,tracks,baseUrl,onState=()=>{}}) {
     if(!audio||typeof tracks!=='function')throw new Error('Admin music transport unavailable.');
-    let current=null,level=0.7,lastAudible=0.7,speaking=false,conversation=false,probe=false;
+    let current=null,level=0.7,lastAudible=0.7,speaking=false,conversation=false,probe=false,generation=0,provider=null;
+    const isProvider=track=>window.SFVP3Music?.supports(track)===true;
     const resolveSource=track=>{
+      if(track?.audio_source?.kind==='vp3'||track?.audio_publishing_mode==='vp3_stream_only')return null;
       const raw=String(track?.audio||'').trim();if(!raw||raw.startsWith('//'))return null;
       try{
         const reference=raw.startsWith('/')?new URL(raw,new URL(baseUrl).origin):
@@ -16,23 +18,45 @@
         return reference.origin===new URL(baseUrl).origin&&/^https?:$/.test(reference.protocol)?reference.href:null;
       }catch(_){return null}
     };
-    const catalog=()=>tracks().filter(t=>t&&t.id&&t.title&&resolveSource(t));
+    const catalog=()=>tracks().filter(t=>t&&t.id&&t.title&&(isProvider(t)||resolveSource(t)));
     const state=()=>({track_id:current?.id||'',title:current?.title||'',playing:!!current&&!audio.paused,volume_percent:Math.round(level*100),has_track:!!current});
     const publish=()=>onState(state());
     const syncVolume=()=>{audio.volume=probe?0:Math.max(0,Math.min(level,speaking?0.16:conversation?0.40:level))};
     const duck=(voiceActive,conversationActive,probeActive=false)=>{speaking=!!voiceActive;conversation=!!conversationActive;probe=!!probeActive;syncVolume();publish()};
     const setVolume=percent=>{const requested=Number(percent);if(!Number.isFinite(requested))return null;level=Math.max(0,Math.min(1,requested/100));if(level>0)lastAudible=level;syncVolume();publish();return Math.round(level*100)};
+    const streamPlayer=()=>provider||(provider=window.SFVP3Music.create({audio,sourceSurface:'agent',isActive:()=>isProvider(current),onError:publish,
+      resolveSource:async(track,signal)=>{
+        const endpoint=new URL('../api/vp3-music-source.php',baseUrl);endpoint.searchParams.set('track_id',String(track.id));
+        const response=await fetch(endpoint.href,{signal,credentials:'same-origin',cache:'no-store'}),result=await response.json();
+        if(!response.ok||!result.ok)throw Object.assign(new Error('This VP3 song is unavailable.'),{retryable:response.status>=500});
+        return result;
+      }
+    }));
     const play=async track=>{
       if(!track)return 'No playable Stonefellow song was found.';
-      const source=resolveSource(track);
-      if(!source)return 'That song has no same-site audio preview available.';
-      if(current?.id!==track.id||audio.src!==source){audio.pause();audio.src=source;audio.load?.()}
+      const typed=isProvider(track),source=typed?null:resolveSource(track),token=++generation;
+      if(!typed&&!source)return 'That song has no same-site audio preview available.';
+      provider?.cancelPending();
+      const position=current?.id===track.id&&!audio.ended?audio.currentTime:0;
+      if(!typed){
+        provider?.stop();
+        if(current?.id!==track.id||audio.src!==source){audio.pause();audio.removeAttribute?.('crossorigin');audio.src=source;audio.load?.()}
+      }
       current=track;publish();
-      try{await audio.play();syncVolume();publish();return 'Playing “'+track.title+'.”'}
-      catch(_){publish();return 'The browser blocked playback. Click Play in the Admin music bar to enable audio.'}
+      try{
+        if(typed)await streamPlayer().play(track,{position,isCurrent:()=>generation===token&&current===track});
+        else await audio.play();
+        if(generation!==token)return 'Playback was canceled.';
+        syncVolume();publish();return 'Playing “'+track.title+'.”';
+      }catch(error){
+        publish();
+        if(error?.name==='AbortError')return 'Playback was canceled.';
+        if(typed&&error?.name!=='NotAllowedError')return 'That VP3 song is currently unavailable. Try Play again.';
+        return 'The browser blocked playback. Click Play in the Admin music bar to enable audio.';
+      }
     };
-    const pause=()=>{if(!current)return 'No song is loaded.';audio.pause();publish();return 'Paused “'+current.title+'.”'};
-    const stop=()=>{if(!current)return 'No song is loaded.';audio.pause();try{audio.currentTime=0}catch(_){}publish();return 'Stopped “'+current.title+'.”'};
+    const pause=()=>{if(!current)return 'No song is loaded.';generation++;if(isProvider(current))provider?.pause();else audio.pause();publish();return 'Paused “'+current.title+'.”'};
+    const stop=()=>{if(!current)return 'No song is loaded.';generation++;provider?.stop();audio.pause();try{audio.currentTime=0}catch(_){}publish();return 'Stopped “'+current.title+'.”'};
     const resume=async()=>current?audio.paused?play(current):'“'+current.title+'” is already playing.':'No song is loaded. Ask me to play a Stonefellow track.';
     const step=async direction=>{
       const available=catalog();if(!available.length)return 'No playable Stonefellow songs are available.';

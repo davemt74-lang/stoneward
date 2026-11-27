@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const app=fs.readFileSync('assets/js/app.js','utf8');
 const lifecycle=fs.readFileSync('assets/js/player-playback-lifecycle.js','utf8');
 const functions=app.slice(app.indexOf('  function playbackEndedEarly(){'),app.indexOf('  async function stepTrack('));
+const sourceHelpers=app.slice(app.indexOf('  const hasPlayableAudio='),app.indexOf('  let playbackWantsAudio='));
 function setup(){
  let at=60,sequence=0;const listeners=new Map(),timers=new Map(),plays=[];
  const audio={duration:240,readyState:4,seeking:false,paused:false,error:null,src:'api/media.php?id=test',mode:'normal',
@@ -10,7 +11,7 @@ function setup(){
   addEventListener(n,fn){if(!listeners.has(n))listeners.set(n,new Set());listeners.get(n).add(fn)},removeEventListener(n,fn){listeners.get(n)?.delete(fn)},
   fire(n){for(const fn of [...(listeners.get(n)||[])])fn()},
   pause(){this.paused=true},load(){at=0;this.duration=NaN;this.readyState=0;this.seeking=false;this.error=null},
-  getAttribute(n){return this[n]},play(){plays.push(at);this.paused=false;return Promise.resolve()},
+  getAttribute(n){return this[n]},removeAttribute(){},play(){plays.push(at);this.paused=false;return Promise.resolve()},
   metadata(d=240){this.duration=d;this.readyState=1;this.fire('loadedmetadata')},finishSeek(){this.seeking=false;this.readyState=4;this.fire('seeked')},
   resetAtError(){at=0;this.error={code:2}},setPosition(n){at=n}};
  const ctx={window:{},audio,st:{track:{id:'song',audio:audio.src,duration:240},playlistPlayback:{},playSource:'player'},
@@ -18,7 +19,7 @@ function setup(){
   setTimeout(fn){const id=++sequence;timers.set(id,fn);return id},clearTimeout(id){timers.delete(id)},time:n=>String(n),
   songCaptureSkill:null,songListeningSkill:null,updateFooterPlayer(){},updateQueueUi(){},clearPlaylistPlayback(){},recordListen(){},agent(){},
   Promise,Number,Math,Error};
- vm.createContext(ctx);vm.runInContext(lifecycle,ctx);ctx.playbackLifecycle=ctx.window.StonefellowPlaybackLifecycle.create();vm.runInContext(functions,ctx);
+ vm.createContext(ctx);vm.runInContext(lifecycle,ctx);ctx.playbackLifecycle=ctx.window.StonefellowPlaybackLifecycle.create();vm.runInContext(sourceHelpers+functions,ctx);
  ctx.rememberPlaybackPosition();
  return {ctx,audio,plays,listeners,timers,fail(){for(const fn of [...timers.values()])fn()},start(){audio.error={code:2};return ctx.recoverNetworkPlayback()}};
 }

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 if(!defined('SF_ROOT')) define('SF_ROOT', dirname(__DIR__));
+require_once __DIR__.'/vp3-music-reference.php';
 
 function sf_json_response(array $payload, int $status = 200): never {
     $json=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE);
@@ -53,7 +54,7 @@ function sf_track_is_public(array $track): bool {
         && !in_array((string)($track['state']??'published'),['draft','private','hidden','archived','deleted'],true);
 }
 function sf_public_catalog(): array {
-    return array_values(array_filter(sf_catalog(),'sf_track_is_public'));
+    return array_values(array_map('sf_public_track_projection',array_filter(sf_catalog(),'sf_track_is_public')));
 }
 
 function sf_track_map(): array {
@@ -80,6 +81,7 @@ function sf_validate_builder(array $b, string $format, int $userId=0): array {
             $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
             if(!sf_track_is_public($t)){$errors[]="Track {$t['title']} is not publicly available.";continue;}
+            if(sf_track_is_vp3_source($t)){$errors[]="Track {$t['title']} is licensed here for VP3 streaming only.";continue;}
             if(empty($t['podEligible'])){$errors[]="Track {$t['title']} is not eligible for custom media.";continue;}
             if(($t['audio_publishing_mode']??'')==='preview_only'){
                 $errors[]="Track {$t['title']} needs a separate private production original for vinyl.";continue;
@@ -117,6 +119,7 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
         if($type==='track'){
             $id=(string)($raw['track_id'] ?? ''); $t=$tracks[$id] ?? null;
             if(!$t){$errors[]="Unknown track: $id.";continue;}
+            if(sf_track_is_vp3_source($t)){$errors[]="Track {$t['title']} is available here for VP3 streaming only.";continue;}
             if(array_key_exists('digital_purchase_enabled',$t)&&!$t['digital_purchase_enabled']){
                 $errors[]="Track {$t['title']} is streaming-only; a private master is required for digital sales.";continue;
             }
@@ -138,8 +141,8 @@ function sf_quote(array $cart,string $campaignCode='',?int $userId=null): array 
                 ||count(array_filter($ids,fn($id)=>isset($tracks[$id])))!==count($ids)){
                 $errors[]='Album track list is invalid.';continue;
             }
-            if(count(array_filter($ids,fn($id)=>array_key_exists('digital_purchase_enabled',$tracks[$id])
-                &&!$tracks[$id]['digital_purchase_enabled']))>0){
+            if(count(array_filter($ids,fn($id)=>sf_track_is_vp3_source($tracks[$id])||(array_key_exists('digital_purchase_enabled',$tracks[$id])
+                &&!$tracks[$id]['digital_purchase_enabled'])))>0){
                 $errors[]='Album includes a streaming-only song that is unavailable for digital purchase.';continue;
             }
             $price=(int)round(max(0,(float)($r['digital_price']??0))*100);

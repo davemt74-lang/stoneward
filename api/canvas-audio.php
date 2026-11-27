@@ -13,7 +13,7 @@ if(!in_array($method,['GET','HEAD'],true)){
     sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 }
 $action=$_GET['action']??'catalog';
-if(!is_string($action)||!in_array($action,['catalog','source'],true))sf_json_response(['ok'=>false,'error'=>'invalid_canvas_audio_action'],400);
+if(!is_string($action)||!in_array($action,['catalog','source','stream'],true))sf_json_response(['ok'=>false,'error'=>'invalid_canvas_audio_action'],400);
 foreach(['release_id','track_id'] as $key){
     if(isset($_GET[$key])&&sf_canvas_audio_id($_GET[$key])===null)sf_json_response(['ok'=>false,'error'=>'invalid_canvas_audio_filter'],400);
 }
@@ -32,6 +32,11 @@ try{
     if($action==='catalog')sf_json_response(['ok'=>true]+sf_canvas_audio_runtime_catalog($context,$_GET['release_id']??null,$_GET['track_id']??null));
     if(!isset($_GET['track_id']))sf_json_response(['ok'=>false,'error'=>'canvas_audio_track_required'],400);
     if(!sf_canvas_audio_context_allows($context,$_GET['track_id']))sf_json_response(['ok'=>false,'error'=>'canvas_audio_unavailable'],404);
+    if($action==='stream'){
+        $playable=sf_canvas_audio_playable_source($_GET['track_id']);
+        if(($playable['kind']??null)!=='vp3')sf_json_response(['ok'=>false,'error'=>'canvas_audio_unavailable'],404);
+        sf_json_response(['ok'=>true,'source'=>$playable['source']]);
+    }
     $source=sf_canvas_audio_source($_GET['track_id']);
     if($source===null)sf_json_response(['ok'=>false,'error'=>'canvas_audio_unavailable'],404);
     $status=sf_media_stream_mp3($source,$method);

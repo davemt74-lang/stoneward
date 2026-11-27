@@ -1,0 +1,95 @@
+name: VP3 Music Import and Playback
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  vp3-music-runtime:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SF_TEST_PHP: php
+      VP3_TEST_REPOSITORY: ${{ github.workspace }}/software-provider-reference
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout the accepted VP3 provider contract
+        uses: actions/checkout@v4
+        with:
+          repository: davemt74-lang/software
+          ref: 41603520b24c3ac6146dca5cb7310d04a8a3de9e
+          path: software-provider-reference
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, fileinfo, curl, mbstring, ctype, openssl
+          coverage: none
+      - name: Install real audio fixture support
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Connection, recovery, commerce isolation and player state
+        run: |
+          php tests/vp3-music-core.php
+          php tests/vp3-music-playlists.php
+          node tests/vp3-music-player.test.cjs
+      - name: Real Stoneward and VP3 HTTP integration
+        run: node tests/vp3-music-integration.mjs --http-only
+
+  vp3-music-browser:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    env:
+      SF_TEST_PHP: php
+      SF_AUDIO_BROWSER: ${{ matrix.browser }}
+      VP3_TEST_REPOSITORY: ${{ github.workspace }}/software-provider-reference
+      VP3_MUSIC_ARTIFACT_DIR: artifacts/vp3-music-${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout the accepted VP3 provider contract
+        uses: actions/checkout@v4
+        with:
+          repository: davemt74-lang/software
+          ref: 41603520b24c3ac6146dca5cb7310d04a8a3de9e
+          path: software-provider-reference
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, pdo_mysql, fileinfo, curl, mbstring, ctype, openssl
+          coverage: none
+      - name: Install browser and native audio fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          npm install --no-save --ignore-scripts playwright@1.64.1
+          npx playwright install --with-deps "$SF_AUDIO_BROWSER"
+      - name: Desktop and phone import, media, privacy, renewal and revocation
+        run: node tests/vp3-music-integration.mjs
+      - name: Publish sanitized screenshots and assertion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vp3-music-${{ matrix.browser }}
+          path: artifacts/vp3-music-${{ matrix.browser }}/
+          if-no-files-found: warn
+          retention-days: 14

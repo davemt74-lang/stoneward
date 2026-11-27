@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/vp3-music-reference.php';
 
 function sf_songbook_json(array $v): string { return json_encode($v,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?: '[]'; }
 function sf_songbook_decode(mixed $v,array $fallback=[]): array { $d=is_array($v)?$v:json_decode((string)$v,true);return is_array($d)?$d:$fallback; }
@@ -21,6 +22,7 @@ function sf_songbook_public_catalog_rows(array $catalog): array {
             if(!sf_track_is_public($track))continue;
         }elseif(($track['public_visible']??true)===false||in_array((string)($track['state']??'published'),['draft','private','hidden','archived','deleted'],true))continue;
         unset($track['lyrics']);
+        $track=sf_public_track_projection($track);
         $out[]=$track;
     }
     return $out;

@@ -1,0 +1,64 @@
+.vp3-music{min-width:0;max-width:100%;padding-bottom:24px}
+.vp3-music h2,.vp3-music h3,.vp3-music p,.vp3-music dd{overflow-wrap:anywhere}
+.vp3-music .actions{display:flex;flex-wrap:wrap;gap:10px}
+.vp3-music button{min-height:44px;white-space:normal}
+.vp3-music button:disabled{opacity:.5;cursor:wait}
+.vp3-music input,.vp3-music textarea{min-width:0;max-width:100%}
+.vp3-music .field small{font-size:.75rem;line-height:1.5;text-transform:none;letter-spacing:normal}
+.vp3-setup-steps{padding-left:22px;line-height:1.7;color:var(--muted)}
+.vp3-setup-steps li+li{margin-top:8px}
+.vp3-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:20px 0}
+.vp3-full-row{grid-column:1/-1}
+.vp3-form-grid textarea{font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
+.vp3-connection-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:16px 0}
+.vp3-connection-details div{min-width:0}
+.vp3-connection-details dt{font-size:.7rem;color:var(--muted);margin-bottom:6px}
+.vp3-connection-details dd{margin:0;font-size:.86rem;line-height:1.5}
+.vp3-connection-details a{color:var(--accent)}
+.vp3-connection-details small{display:block;color:var(--muted);margin-top:4px}
+.vp3-connection-state{margin:8px 0 0}
+.vp3-recovery{border:1px solid var(--accent);padding:20px!important}
+.vp3-search{display:flex;align-items:end;gap:12px;margin:20px 0}
+.vp3-search .field{flex:1;min-width:0}
+.vp3-selection-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:20px 0}
+.vp3-selection-summary span{font-size:.75rem;color:var(--muted)}
+.vp3-selection-summary button{margin-left:auto}
+.vp3-album{margin:24px 0}
+.vp3-album-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
+.vp3-album-heading h3{margin:0;font:400 1.1rem/1.4 Georgia,serif}
+.vp3-track-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.vp3-track{display:grid;grid-template-columns:20px 56px minmax(0,1fr);gap:12px;align-items:center;padding:14px;border:1px solid var(--line);background:var(--panel);min-width:0;cursor:pointer}
+.vp3-track:has(input:checked){border-color:var(--accent);background:var(--panel2)}
+.vp3-track:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.vp3-track input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.vp3-track img,.vp3-art-placeholder{width:56px;height:56px;object-fit:cover;border-radius:4px}
+.vp3-art-placeholder{display:grid;place-items:center;background:var(--panel2);color:var(--accent);font-size:1.5rem}
+.vp3-track-text{display:grid;gap:5px;min-width:0;overflow-wrap:anywhere}
+.vp3-track-text strong{font-size:.87rem;line-height:1.4}
+.vp3-track-text span,.vp3-track-text small{font-size:.73rem;line-height:1.5;color:var(--muted)}
+.vp3-track-text .vp3-unavailable{color:var(--bad)}
+.vp3-other-selected{margin:20px 0;color:var(--muted)}
+.vp3-other-selected summary{cursor:pointer;padding:10px 0}
+.vp3-other-selected ul{padding:0;list-style:none}
+.vp3-other-selected li{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:10px 0}
+.vp3-other-selected li span{font-size:.7rem;overflow-wrap:anywhere;min-width:0}
+.vp3-import-footer{display:flex;align-items:center;justify-content:space-between;gap:20px;border-top:1px solid var(--line);padding-top:20px;margin-top:24px}
+.vp3-import-footer p{max-width:620px;color:var(--muted);font-size:.82rem;line-height:1.6}
+.vp3-review{border:1px solid var(--accent);padding:20px!important}
+.vp3-review p{line-height:1.7}
+.vp3-music-status:empty{display:none}
+@media(max-width:760px){
+ .vp3-form-grid,.vp3-connection-details,.vp3-track-list{grid-template-columns:1fr}
+ .vp3-import-footer{align-items:stretch;flex-direction:column;gap:8px}
+ .vp3-import-footer button{width:100%}
+ .vp3-connection .panel-title{align-items:flex-start}
+ .vp3-connection .actions{width:100%}
+ .vp3-connection .actions button{flex:1 1 140px}
+}
+@media(max-width:420px){
+ .vp3-track{grid-template-columns:18px 44px minmax(0,1fr);gap:9px;padding:12px}
+ .vp3-track img,.vp3-art-placeholder{width:44px;height:44px}
+ .vp3-search{flex-direction:column;align-items:stretch}
+ .vp3-album-heading{align-items:flex-start}
+ .vp3-selection-summary button{margin-left:0}
+}

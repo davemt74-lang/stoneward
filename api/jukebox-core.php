@@ -247,11 +247,17 @@ function sf_jukebox_remote_access(array $session,?array $phone): bool {
 }
 
 function sf_jukebox_remote_source(array $session,?array $phone,string $item): ?array {
-    if(!sf_jukebox_remote_access($session,$phone)||!sf_jukebox_player_online($session)
+    $playable=sf_jukebox_item_source($session,$phone,$item);
+    return ($playable['kind']??null)==='local'?$playable['file']+['track_id'=>$playable['track_id']]:null;
+}
+
+/** Recheck the current queue item and phone/host authority before resolving a typed stream. */
+function sf_jukebox_item_source(array $session,?array $phone,string $item,bool $host=false): ?array {
+    if(($host?sf_jukebox_phase($session)!=='live':!sf_jukebox_remote_access($session,$phone)||!sf_jukebox_player_online($session))
         ||$session['current_id']===null||(string)$session['current_id']!==$item)return null;
     $track=sf_jukebox_query("SELECT track_id FROM jukebox_requests WHERE session_id=? AND id=?
-        AND status='current' AND played IS NOT NULL",[$session['id'],$item])->fetchColumn();
-    return $track===false?null:sf_canvas_audio_source((string)$track);
+        AND status='current'".($host?'':' AND played IS NOT NULL'),[$session['id'],$item])->fetchColumn();
+    return $track===false?null:sf_canvas_audio_playable_source((string)$track);
 }
 
 function sf_jukebox_transport(array $session,?array $item,bool $online): array {
@@ -322,7 +328,15 @@ function sf_jukebox_state(array $session,?array $phone,bool $host): array {
     $state['queue']=[];
     $rows=sf_jukebox_query("SELECT id,track_id,status,played FROM jukebox_requests WHERE session_id=? AND status IN ('queued','current') ORDER BY position,id",[$id])->fetchAll();
     foreach($rows as $row){
-        if($row['status']==='current')$state['current']=$row;
+        if($row['status']==='current'){
+            // Stable public references only; a fresh stream request checks the
+            // private connection and selection before the provider grants media.
+            $track=sf_canvas_audio_public_track((string)$row['track_id']);
+            if($track!==null&&sf_track_is_vp3_source($track)){
+                $row['audio_source']=sf_public_track_projection($track)['audio_source'];$row['audio_publishing_mode']='vp3_stream_only';
+            }
+            $state['current']=$row;
+        }
         else $state['queue'][]=$row;
     }
     if($phase==='live'&&($host||($phone['status']??'')==='approved'))
@@ -381,7 +395,7 @@ function sf_jukebox_request(array $session,?array $phone,array $body): void {
         return;
     }
     $track=sf_clean_text($body['track']??'',180);
-    if(sf_canvas_audio_source($track)===null)throw new InvalidArgumentException('This track is unavailable.');
+    if(sf_canvas_audio_playable_source($track)===null)throw new InvalidArgumentException('This track is unavailable.');
     $count=sf_jukebox_query("SELECT COUNT(*) FROM jukebox_requests WHERE session_id=? AND status='queued'",[$id])->fetchColumn();
     if((int)$count>=100)throw new DomainException('The jukebox queue is full.');
     sf_jukebox_query("INSERT INTO jukebox_requests (session_id,phone_id,nonce,track_id,position,status,requested) VALUES (?,?,?,?,?,'queued',?)",

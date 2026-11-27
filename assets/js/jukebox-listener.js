@@ -14,7 +14,7 @@
   const maxActivityGapMs = 2000;
   const activityToleranceMs = 150;
 
-  function create({audio, urlForItem, onChange, onActivity}) {
+  function create({audio, urlForItem, onChange, onActivity, createStreamPlayer}) {
     let snapshot = null;
     let observedAt = 0;
     let listening = false;
@@ -39,6 +39,8 @@
     let previousView = '';
     let freshnessTimer;
     let activity = null;
+    let streamPlayer = null;
+    let sourceTrack = null;
 
     function report(message = status, nextConnection = connection) {
       status = message;
@@ -113,7 +115,8 @@
     function pause() {
       endActivity();
       playAttempt = null;
-      if (!audio.paused) audio.pause();
+      if (streamPlayer) streamPlayer.pause();
+      else if (!audio.paused) audio.pause();
       setRate(1);
       seekOnStart = true;
     }
@@ -128,10 +131,14 @@
       pause();
       clearBufferWait();
       hasPlayed = false;
+      streamPlayer?.dispose();
+      streamPlayer = null;
+      sourceTrack = null;
       if (!itemId) return;
       itemId = '';
       lastSeekAt = -Infinity;
       audio.removeAttribute('src');
+      audio.removeAttribute('crossorigin');
       audio.load();
       applyMuteIntent();
     }
@@ -217,7 +224,7 @@
     }
 
     function showBlocked() {
-      report(blocked === 'gesture' ? 'Tap to continue listening.' : 'Audio could not load. Tap to retry.',
+      report(blocked === 'terminal' ? 'This VP3 recording is unavailable. Waiting for another song.' : blocked === 'gesture' ? 'Tap to continue listening.' : 'Audio could not load. Tap to retry.',
         blocked === 'gesture' ? 'action-required' : 'error');
     }
 
@@ -243,7 +250,7 @@
       }
       if (itemId !== snapshot.itemId) {
         clearSource();
-        if (blocked === 'error') blocked = '';
+        if (blocked === 'error' || blocked === 'terminal') blocked = '';
       }
       if (!snapshot.online || snapshot.transport !== 'playing' || !snapshot.itemId) {
         pause();
@@ -261,9 +268,26 @@
       if (!itemId) {
         itemId = snapshot.itemId;
         audio.preload = 'auto';
-        audio.src = urlForItem(itemId);
+        sourceTrack = snapshot.track;
+        if (window.SFVP3Music?.supports(sourceTrack)) {
+          if (typeof createStreamPlayer !== 'function') { blocked = 'terminal'; showBlocked(); return; }
+          const selectedItem = itemId;
+          streamPlayer = createStreamPlayer({audio, itemId: selectedItem, track: sourceTrack,
+            isActive: () => listening && itemId === selectedItem && !!snapshot?.allowed,
+            onError: error => {
+              if (itemId !== selectedItem || (error.retryable && !streamPlayer?.state()?.confirmation_required)) return;
+              blocked = error.retryable ? 'error' : 'terminal'; pause(); showBlocked();
+            }
+          });
+        } else if (sourceTrack?.audio_source?.kind === 'vp3' || sourceTrack?.audio_publishing_mode === 'vp3_stream_only') {
+          blocked = 'terminal'; showBlocked(); return;
+        } else audio.src = urlForItem(itemId);
         lastMediaPosition = 0;
         seekOnStart = true;
+      }
+      if (streamPlayer && (streamPlayer.isRenewing() || playAttempt)) {
+        report('Connecting audio…', 'connecting');
+        return;
       }
       const position = snapshot.seconds + sampleAgeMs() / 1000;
       if (Number.isFinite(audio.duration) && position >= audio.duration) {
@@ -311,7 +335,8 @@
       playAttempt = attempt;
       report('Connecting audio…', 'connecting');
       applyMuteIntent();
-      audio.play().then(() => {
+      const request = streamPlayer ? streamPlayer.play(sourceTrack, {position, isCurrent: () => playAttempt === attempt && playbackPermitted()}) : audio.play();
+      request.then(() => {
         if (playAttempt !== attempt) {
           if (!playbackPermitted()) pause();
           return;
@@ -323,7 +348,7 @@
         if (playAttempt !== attempt) return;
         playAttempt = null;
         if (error.name === 'AbortError') return;
-        blocked = error.name === 'NotAllowedError' ? 'gesture' : 'error';
+        blocked = streamPlayer?.state()?.terminal ? 'terminal' : error.name === 'NotAllowedError' ? 'gesture' : 'error';
         showBlocked();
       });
     }
@@ -340,7 +365,7 @@
       };
       if (activity && (snapshot.itemId !== activity.itemId || snapshot.generation !== activity.generation)) endActivity();
       if (changedGeneration || reconnecting) seekOnStart = true;
-      if ((reconnecting || retryOnUpdate) && (blocked === 'error' || audio.error)) {
+      if ((reconnecting || retryOnUpdate) && !streamPlayer && (blocked === 'error' || audio.error)) {
         clearSource();
         if (blocked !== 'gesture') blocked = '';
       }
@@ -385,7 +410,7 @@
     function resync() {
       if (!listening || !snapshot?.allowed) return false;
       // A user retry may clear a failed play, but never changes listening consent or mute.
-      if (blocked === 'error' || audio.error) clearSource();
+      if (!streamPlayer && (blocked === 'error' || audio.error)) clearSource();
       else clearBufferWait();
       blocked = '';
       reconnect();
@@ -394,7 +419,7 @@
 
     function listen() {
       if (!snapshot?.allowed) return;
-      if (blocked === 'error') clearSource();
+      if (blocked === 'error' && !streamPlayer) clearSource();
       listening = true;
       blocked = '';
       keepFresh();
@@ -420,7 +445,7 @@
     const buffering = () => {
       // Keep the first native play tied to the user's gesture. A pending
       // initial load/seek is not a fresh underrun to restart over and over.
-      if (!playbackPermitted() || audio.paused || audio.seeking || playAttempt || !hasPlayed) return;
+      if (!playbackPermitted() || audio.paused || audio.seeking || playAttempt || streamPlayer?.isRenewing() || !hasPlayed) return;
       localBuffering = true;
       bufferUnderruns++;
       bufferStartedAt = performance.now();
@@ -451,6 +476,19 @@
     audio.addEventListener('error', () => {
       endActivity();
       if (!listening || !itemId || !audio.error) return;
+      if (streamPlayer) {
+        if (streamPlayer.isRenewing() || streamPlayer.state()?.terminal || streamPlayer.state()?.confirmation_required || playAttempt) return;
+        const attempt = {}; playAttempt = attempt;
+        void streamPlayer.recover().then(() => {
+          if (playAttempt === attempt) { playAttempt = null; sync(); }
+        }).catch(error => {
+          if (playAttempt !== attempt || error.name === 'AbortError') return;
+          playAttempt = null;
+          blocked = streamPlayer?.state()?.terminal ? 'terminal' : 'error';
+          pause(); showBlocked();
+        });
+        return;
+      }
       blocked = 'error';
       pause();
       sync();

@@ -12,8 +12,11 @@ git -C "$root" archive --format=tar HEAD | tar -xf - -C "$stage/site"
 rm -rf "$stage/site/.github" "$stage/site/tests" "$stage/site/scripts"
 # Source updates must never overwrite the host's configuration or user data.
 rm -rf "$stage/site/storage" "$stage/site/uploads" "$stage/site/data"
+# This is the host's generated catalog, paired with data/catalog.json.
+# Replacing it with the repository sample would hide existing imported songs.
+rm -f "$stage/site/assets/js/catalog.js"
 rm -f "$stage/site/config/store.php" "$stage/site/config/database.php" \
- "$stage/site/config/secrets.php" "$stage/site/.env" "$stage/site/.env.local"
+ "$stage/site/config/secrets.php" "$stage/site/config/app-secret.php" "$stage/site/.env" "$stage/site/.env.local"
 # The separate ElevenLabs Node gateway must not be published under the PHP web root.
 rm -rf "$stage/site/speech-gateway"
 rm -f "$stage/site/.gitignore" "$stage/site/.gitattributes"
@@ -32,6 +35,9 @@ rm -f "$stage/site/AUDIT-REPORT.md" "$stage/site/RELEASE-NOTES.md" \
   echo "Safety: no Stripe live payment activation"
 } > "$stage/site/DEPLOY-MANIFEST.txt"
 for file in index.php upgrade.php admin/index.php api/bootstrap.php config/store.default.php \
+  api/vp3-music-core.php api/vp3-music-reference.php api/vp3-music-source.php api/vp3-music-site.php \
+  admin/api/vp3-music.php admin/assets/vp3-music.js admin/assets/vp3-music.css assets/js/vp3-music-player.js \
+  docs/VP3-MUSIC-DEPLOY.txt \
   api/canvas-data.php api/canvas-geography-core.php api/canvas-map-core.php api/canvas-earthquakes-core.php \
   api/canvas-libraries.php api/canvas-library-core.php api/media-artwork-palette.php \
   assets/js/canvas-library-runtime.js assets/js/media-artwork-palette.js \
@@ -42,7 +48,7 @@ for file in index.php upgrade.php admin/index.php api/bootstrap.php config/store
 done
 (cd "$stage/site" && zip -X -q -r "$out/stonefellow-deploy.zip" .)
 unzip -tqq "$out/stonefellow-deploy.zip"
-if unzip -Z1 "$out/stonefellow-deploy.zip" | grep -E '^(storage/|uploads/|data/|config/(store|database|secrets)\.php$|\.env($|\.))' >/dev/null; then
+if unzip -Z1 "$out/stonefellow-deploy.zip" | grep -E '^(storage/|uploads/|data/|assets/js/catalog\.js$|config/(store|database|secrets|app-secret)\.php$|\.env($|\.))' >/dev/null; then
   echo 'Host configuration or runtime data found in deployment ZIP.' >&2; exit 1
 fi
 (unzip -p "$out/stonefellow-deploy.zip" DEPLOY-MANIFEST.txt | grep -Fx "Source commit: $(git -C "$root" rev-parse HEAD)")
