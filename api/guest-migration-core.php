@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/vp3-music-reference.php';
 
 /** Section 91B17O: consented, atomic import of browser-only guest music. */
 function sf_guest_migration_ensure_schema(): void {
@@ -37,7 +38,7 @@ function sf_guest_migration_import(int $userId,array $request): array {
     $catalog=sf_track_map();$validTrack=function($id)use($catalog):string{
         if(!is_string($id)||strlen($id)<1||strlen($id)>180)throw new InvalidArgumentException('Invalid song identifier in import.');
         $track=$catalog[$id]??null;
-        if(!$track||!sf_track_is_public($track)||empty($track['audio']))throw new InvalidArgumentException('One of the songs is no longer public and playable.');
+        if(!$track||!sf_track_is_public($track)||!sf_track_has_playable_source($track))throw new InvalidArgumentException('One of the songs is no longer public and playable.');
         return $id;
     };
     $playlists=[];

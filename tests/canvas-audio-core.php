@@ -25,6 +25,8 @@ $cases=[
     ['id'=>'root-relative','audio'=>'/assets/audio/public.mp3'],
     ['id'=>'remote','audio'=>'https://example.invalid/private-signed-source?token=SECRET_URL_TOKEN'],
     ['id'=>'remote-relative','audio'=>'//example.invalid/remote.mp3'],
+    ['id'=>'vp3-malformed','audio'=>'assets/audio/public.mp3','audio_source'=>['kind'=>'vp3']],
+    ['id'=>'vp3-mode-only','audio'=>'assets/audio/public.mp3','audio_publishing_mode'=>'vp3_stream_only'],
     ['id'=>'private-master','audio'=>'api/media.php?id=MMASTER'],
     ['id'=>'nonprimary','audio'=>'api/media.php?id=MALTERNATE'],
     ['id'=>'wrong-track','audio'=>'api/media.php?id=MWRONGTRACK'],
@@ -82,9 +84,11 @@ foreach(['managed','legacy-assets','legacy-uploads','encoded-title','root-relati
     check($source!==null&&file_get_contents($source['path'])===$bytes&&$source['mime']==='audio/mpeg'&&$source['size']===strlen($bytes),
         $id.' resolves the exact current public MP3');
 }
-foreach(['remote','remote-relative','private-master','nonprimary','wrong-track','wrong-file','download-query','private-storage','traversal','encoded-traversal','double-encoded-traversal','symlink-file','symlink-dir','legacy-query','missing-file','missing-source','wrong-format','private-track','draft-track','hidden-release-track','hidden-legacy-release-track','unknown'] as $id){
+foreach(['remote','remote-relative','vp3-malformed','vp3-mode-only','private-master','nonprimary','wrong-track','wrong-file','download-query','private-storage','traversal','encoded-traversal','double-encoded-traversal','symlink-file','symlink-dir','legacy-query','missing-file','missing-source','wrong-format','private-track','draft-track','hidden-release-track','hidden-legacy-release-track','unknown'] as $id){
     check(sf_canvas_audio_source($id)===null,$id.' cannot expose MP3 bytes through the canvas API');
 }
+check(sf_canvas_audio_playable_source('vp3-malformed')===null&&sf_canvas_audio_playable_source('vp3-mode-only')===null,
+    'a malformed typed provider track cannot fall back to a local file capability');
 $data=sf_canvas_audio_catalog('main');$ids=array_column($data['tracks'],'track_id');
 $expected=array_values(array_filter($ordered,static fn(string $id):bool=>!in_array($id,['private-track','draft-track','hidden-release-track','hidden-legacy-release-track'],true)));
 check($ids===$expected&&$data['releases'][0]['track_ids']===$expected,

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/vp3-music-reference.php';
 
 function sf_playlists_ensure_schema(): void {
     static $done=false;if($done)return;$pdo=sf_db();$driver=(string)(sf_db_config()['driver']??'');
@@ -33,7 +34,11 @@ function sf_playlist_track_payload(string $trackId): ?array {
         (($t['public_visible']??true)!==false
          && !in_array((string)($t['state']??'published'),['draft','private','hidden','archived','deleted'],true));
     if(!$public)return null;
-    return ['id'=>$trackId,'title'=>(string)($t['title']??$trackId),'release'=>(string)($t['release']??''),'artwork'=>(string)($t['artwork']??''),'duration'=>(int)($t['duration']??0),'audio'=>(string)($t['audio']??'')];
+    $t=sf_public_track_projection($t);
+    $payload=['id'=>$trackId,'title'=>(string)($t['title']??$trackId),'release'=>(string)($t['release']??''),'artwork'=>(string)($t['artwork']??''),'duration'=>(int)($t['duration']??0),'audio'=>(string)($t['audio']??'')];
+    if(sf_track_is_vp3_source($t))$payload+=['audio_source'=>$t['audio_source'],'audio_publishing_mode'=>'vp3_stream_only',
+        'vp3_availability'=>in_array($t['vp3_availability']??null,['ready','not_selected','pending_refresh','unavailable','temporarily_unavailable'],true)?$t['vp3_availability']:'unavailable'];
+    return $payload;
 }
 function sf_playlist_row(int $playlistId): ?array {sf_playlists_ensure_schema();$q=sf_db()->prepare('SELECT * FROM user_playlists WHERE id=? LIMIT 1');$q->execute([$playlistId]);$r=$q->fetch();return $r?:null;}
 function sf_playlist_tracks(int $playlistId,bool $current=false): array {
@@ -116,7 +121,7 @@ function sf_agent_random_playlist_track_ids(array $published,int $limit=7): arra
     $ids=[];
     foreach($published as $track){
         $id=(string)($track['id']??'');
-        if($id!==''&&!empty($track['audio']))$ids[$id]=$id;
+        if($id!==''&&sf_track_has_playable_source($track))$ids[$id]=$id;
     }
     $ids=array_values($ids);
     for($i=count($ids)-1;$i>0;$i--){

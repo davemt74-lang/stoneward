@@ -1,9 +1,11 @@
 (() => {
-  window.STONEFELLOW_APP_BUILD='1.3.331';
+  window.STONEFELLOW_APP_BUILD='1.3.332';
   const cfg=window.STONEFELLOW_CONFIG||{},site=window.STONEFELLOW_SITE||{},artistHomepageEnabled=!!site.artistHomepageEnabled,homepageTemplate='agent_canvas',fanCommunityEnabled=!!site.fanCommunityEnabled; let releases=window.STONEFELLOW_RELEASES||[], shows=[], catalog=(window.STONEFELLOW_CATALOG||[]).map(x=>({...x,mood:x.mood||[],themes:x.themes||[],credits:x.credits||[]}));
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const orb=$('#agentOrb'),msg=$('#agentMessage'),status=$('#agentState'),agentInterrupt=$('#agentInterrupt'),chatFooter=$('.chat-footer'),mainCanvas=$('#dynamicCanvas'),starters=$('#starterActions'),input=$('#chatInput'),form=$('#chatForm'),voice=$('#voiceButton'),menu=$('#menuPanel'),splash=$('#splashScreen'),footerPlayer=$('#footerPlayer'),audio=$('#persistentAudio'),playerArtwork=$('#playerArtwork'),playerTitle=$('#playerTitle'),playerRelease=$('#playerRelease'),playerPlaybackStatus=$('#playerPlaybackStatus'),playerToggle=$('#playerToggle'),playerPrev=$('#playerPrev'),playerNext=$('#playerNext'),playerSeek=$('#playerSeek'),playerCurrent=$('#playerCurrent'),playerDuration=$('#playerDuration'),playerClose=$('#playerClose'),notificationButton=$('#notificationButton'),notificationBadge=$('#notificationBadge'),notificationDrawer=$('#notificationDrawer'),notificationBackdrop=$('#notificationBackdrop'),notificationClose=$('#notificationClose'),drawerContent=$('#drawerContent'),drawerUnreadCount=$('#drawerUnreadCount'),playerQueueButton=$('#playerQueueButton'),playerQueueCount=$('#playerQueueCount'),queueDrawer=$('#queueDrawer'),queueBackdrop=$('#queueBackdrop'),queueClose=$('#queueClose'),queueContent=$('#queueContent'),queueDrawerCount=$('#queueDrawerCount'),queueClear=$('#queueClear'),quickButton=$('#chatQuickButton'),quickMenu=$('#chatQuickMenu'),chatPopup=$('#agentChatPopup'),chatToggle=$('#agentChatToggle'),chatPopupClose=$('#agentChatClose'),chatPopupNew=$('#agentChatNew'),chatPopupMessages=$('#agentChatPopupMessages'),chatPopupState=$('#agentChatPopupState');
   const playbackLifecycle=window.StonefellowPlaybackLifecycle.create();
+  const hasPlayableAudio=track=>window.SFVP3Music?.hasPlayableSource(track)??(!!track&&track.audio_source?.kind!=='vp3'&&track.audio_publishing_mode!=='vp3_stream_only'&&typeof track.audio==='string'&&track.audio!=='');
+  let vp3Main=null;
   let playbackWantsAudio=false,playbackBufferTimer=null,pendingNetworkRecovery=null,queueAdvancePending=false;
   let canvas=mainCanvas;
   let listeningRoom=null,listeningRoomRequest=null,listeningRoomOwner=null,canvasSelection=null;
@@ -185,7 +187,7 @@
       case 'play_track':{
         const track=trackById(action.track_id);
         if(!track)return 'I could not find that published song in the player.';
-        if(!track.audio)return 'I found “'+track.title+'”, but it has no playable audio. I have not started a different song.';
+        if(!hasPlayableAudio(track))return 'I found “'+track.title+'”, but it has no playable audio. I have not started a different song.';
         const started=await play(track,0,'agent');
         return started&&st.track?.id===track.id&&!audio.paused&&!!audio.src
           ?'Playing “'+track.title+'.”':'The browser could not confirm playback of “'+track.title+'.” Check its audio file or press Play.';
@@ -876,8 +878,8 @@
     const guestName=validGuestName(guestProfile?.display_name);
     const name=guestName&&guestName!==st.auth.user?.display_name?guestName:'';
     const playlists=guestSavedPlaylists.filter(item=>item?.id&&item?.name&&Array.isArray(item.track_ids)&&
-      item.track_ids.length>0&&item.track_ids.every(id=>trackById(id)?.audio));
-    const recent=[...new Set((Array.isArray(st.queue.history)?st.queue.history:[]).filter(id=>typeof id==='string'&&trackById(id)?.audio))].slice(0,30);
+      item.track_ids.length>0&&item.track_ids.every(id=>hasPlayableAudio(trackById(id))));
+    const recent=[...new Set((Array.isArray(st.queue.history)?st.queue.history:[]).filter(id=>typeof id==='string'&&hasPlayableAudio(trackById(id))))].slice(0,30);
     const recentSignature=JSON.stringify(recent);
     let importedSignature='';try{importedSignature=localStorage.getItem(keys.recent)||''}catch(_){}
     const needsRecent=recent.length>0&&importedSignature!==recentSignature;
@@ -1538,7 +1540,7 @@
   async function startTemporaryPlaylist(action){
     if(agentSessionActive())return 'End the active Agent listening session before starting a random playlist.';
     const ids=Array.isArray(action?.track_ids)?action.track_ids:[];
-    if(!ids.length||ids.length>20||ids.some(id=>!trackById(id)?.audio)||new Set(ids).size!==ids.length)
+    if(!ids.length||ids.length>20||ids.some(id=>!hasPlayableAudio(trackById(id)))||new Set(ids).size!==ids.length)
       return 'The temporary playlist contains an unavailable or repeated song. I have not changed playback.';
     const name=String(action.name||'Stonefellow Random Mix').slice(0,120);
     st.playlistPlayback={playlistId:'temporary:'+Date.now(),playlistName:name,trackIds:ids.slice(),index:0,temporary:true};
@@ -1555,7 +1557,7 @@
   }
   async function startRandomTemporaryPlaylist(){
     const seen=new Set(),available=catalog.filter(track=>{
-      if(!track?.audio||!track.id||seen.has(track.id)||track.agent_discoverable===false)return false;
+      if(!hasPlayableAudio(track)||!track.id||seen.has(track.id)||track.agent_discoverable===false)return false;
       seen.add(track.id);return true;
     });
     if(!available.length)return 'No playable Stonefellow songs are currently available to create a playlist.';
@@ -1586,7 +1588,7 @@
   async function loadGuestSavedPlaylist(id){
     const saved=guestSavedPlaylists.find(p=>p.id===id);
     if(!saved)return;
-    const ids=saved.track_ids.filter(trackId=>trackById(trackId)?.audio);
+    const ids=saved.track_ids.filter(trackId=>hasPlayableAudio(trackById(trackId)));
     if(!ids.length){popupEntry('notice','The songs in that saved mix are not currently available.');return;}
     st.playlistPlayback={playlistId:'temporary:guest:'+saved.id,playlistName:saved.name||'Saved Mix',trackIds:ids,index:0,temporary:true};
     updateQueueUi();
@@ -1595,10 +1597,11 @@
   }
   async function playWelcomeLatest(){
     const selected=trackById(welcomeLatestTrackId);
-    if(!selected?.audio)return playLatestRelease();
+    if(!hasPlayableAudio(selected))return playLatestRelease();
     if(st.track?.id===selected.id&&!audio.paused)return '“'+selected.title+'” is already playing.';
     if(st.track?.id===selected.id){
-      try{await audio.play();return 'Playing “'+selected.title+'”.'}catch(_){return 'I could not resume “'+selected.title+'”.'}
+      const resumed=await play(selected,savedPlaybackPosition(),st.playSource||'welcome_latest_release',true);
+      return resumed?'Playing “'+selected.title+'”.':'I could not resume “'+selected.title+'”.';
     }
     const started=await play(selected,0,'welcome_latest_release',true);
     return started?'Playing “'+selected.title+'”.':'I could not start “'+selected.title+'”.';
@@ -1607,9 +1610,9 @@
     await refreshSiteData();
     const published=releases.filter(release=>(release.state||'published')==='published'&&release.public_visible!==false&&release.agent_discoverable!==false)
       .sort((a,b)=>String(b.release_date||'').localeCompare(String(a.release_date||'')));
-    const latest=published.find(release=>(release.track_ids||[]).some(id=>trackById(id)?.audio));
+    const latest=published.find(release=>(release.track_ids||[]).some(id=>hasPlayableAudio(trackById(id))));
     if(!latest)return 'There isn’t a playable published release right now. I can make you a random playlist instead.';
-    const tracks=(latest.track_ids||[]).map(trackById).filter(track=>track?.audio&&track.agent_discoverable!==false);
+    const tracks=(latest.track_ids||[]).map(trackById).filter(track=>hasPlayableAudio(track)&&track.agent_discoverable!==false);
     if(!tracks.length)return 'That release has no playable songs yet.';
     st.playlistPlayback={playlistId:'release:'+latest.id,playlistName:latest.title,trackIds:tracks.map(track=>track.id),index:0};
     updateQueueUi();
@@ -1631,7 +1634,7 @@
   }
   function playTemporaryTrack(index){
     if(!isTemporaryPlaylist()||!Number.isInteger(index)||index<0||index>=st.playlistPlayback.trackIds.length)return;
-    const track=trackById(st.playlistPlayback.trackIds[index]);if(!track?.audio)return;
+    const track=trackById(st.playlistPlayback.trackIds[index]);if(!hasPlayableAudio(track))return;
     st.playlistPlayback.index=index;updateQueueUi();void play(track,0,'temporary_playlist',true);
   }
   function clearPlaylistPlayback(){st.playlistPlayback={playlistId:null,playlistName:'',trackIds:[],index:-1};updateQueueUi()}
@@ -1663,7 +1666,7 @@
       },
     });
     listeningTelemetryMain.current=window.SFListeningTelemetry.observeMain(audio,{getTrack:()=>st.track,getContext:()=>({app:true}),method:'main',
-      isRecovering:()=>!!pendingNetworkRecovery,canComplete:()=>!playbackEndedEarly()});
+      isRecovering:()=>!!pendingNetworkRecovery||!!vp3Main?.isRenewing(),canComplete:()=>!playbackEndedEarly()});
     return listeningTelemetryMain.current;
   }
   function fmtWhen(v){if(!v)return'';const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString()}
@@ -4368,7 +4371,8 @@
     const owner=canvasSceneOwner(),scene=listeningRoom;
     const catalog=await loadCanvasAudioCatalog({track_id:trackId},signal);
     const track=catalog.tracks.find(row=>row.track_id===trackId);
-    if(!track?.source_available)throw new Error('This song does not have an available hosted MP3 source.');
+    if(!track?.source_available)throw new Error('This song does not have an available audio source.');
+    if(track.source_kind==='vp3')throw Object.assign(new Error('This song supports streamed playback, not raw audio export.'),{code:'audio_source_unavailable'});
     requireCanvasAudioSession(owner,scene);
     const path=canvasAudioSourcePath(trackId,scene);
     const response=await fetch((cfg.apiBase||'api')+'/'+path,{credentials:'same-origin',mode:'same-origin',cache:'no-store',redirect:'error',signal});
@@ -4401,7 +4405,7 @@
       if(String(st.track?.id)===id&&!audio.paused&&!audio.ended)return canvasAudioState();
       // The fresh catalog authorized this source. Keep canonical player state,
       // but do not fall back to a listening URL cached before a media update.
-      track={...track,audio:(cfg.apiBase||'api')+'/'+canvasAudioSourcePath(id,scene)};
+      if(published.source_kind!=='vp3')track={...track,audio:(cfg.apiBase||'api')+'/'+canvasAudioSourcePath(id,scene)};
       const position=String(st.track?.id)===id?savedPlaybackPosition():0;
       stage='playback';
       let failure;
@@ -4553,6 +4557,14 @@
       },
       onSceneClose:()=>{selectCanvasId(canvasOwner(),null);clearListeningRoom();},
       onCanvasIndependentAudioObserve:(media,track,context,settings={})=>window.SFListeningTelemetry?.observe(media,{...settings,getTrack:()=>track,getContext:()=>context,method:'independent'}),
+      onCanvasStreamPlayer:(media,track,context,settings={})=>window.SFVP3Music?.create({audio:media,...settings,sourceSurface:'canvas',
+        resolveSource:async(selected,signal)=>{
+          const owner=canvasSceneOwner(),scene=listeningRoom;requireCanvasAudioSession(owner,scene);
+          if(JSON.stringify(canvasAudioContext(scene))!==JSON.stringify(context))throw new Error('Canvas audio access changed.');
+          const result=await api('canvas-audio.php?'+new URLSearchParams({action:'stream',track_id:String(selected.track_id),...context}),undefined,signal);
+          requireCanvasAudioSession(owner,scene);return result;
+        }
+      }),
       onCanvasDataRead:loadCanvasData,
       onCanvasAudioCatalog:loadCanvasAudioCatalog,
       onCanvasAudioSource:loadCanvasAudioSource,
@@ -5110,14 +5122,33 @@
     recovery.controller?.cancel();recovery.reject?.(new Error('Playback action replaced'));
   }
   function invalidatePlayback(){
-    playbackWantsAudio=false;playbackLifecycle.begin(savedPlaybackPosition());clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
+    playbackWantsAudio=false;vp3Main?.cancelPending();playbackLifecycle.begin(savedPlaybackPosition());clearPlaybackBufferWatch();cancelNetworkRecovery();setPlaybackStatus();
   }
   function playbackProblem(message){
     playbackWantsAudio=false;st.playing=false;clearPlaybackBufferWatch();cancelNetworkRecovery();
     setPlaybackStatus(message,'error');updateFooterPlayer();
   }
+  function vp3MainPlayer(){
+    if(vp3Main)return vp3Main;
+    if(!window.SFVP3Music)throw new Error('The VP3 music player is unavailable.');
+    vp3Main=window.SFVP3Music.create({audio,
+      resolveSource:async(track,signal)=>api('vp3-music-source.php?'+new URLSearchParams({track_id:String(track.id)}),undefined,signal),
+      isActive:()=>!!st.track&&window.SFVP3Music.supports(st.track),
+      onError:error=>{if(error.retryable===false)playbackProblem('This VP3 song is unavailable. Check the site connection or choose another song.');}
+    });
+    return vp3Main;
+  }
   function recoverNetworkPlayback(){
     const token=playbackLifecycle.token(),code=Number(audio.error?.code||0);
+    if(window.SFVP3Music?.supports(st.track)){
+      if(!playbackWantsAudio||![2,4].includes(code)||!playbackLifecycle.allowNetworkRetry(token,2))return false;
+      clearPlaybackBufferWatch();setPlaybackStatus('Reconnecting to VP3…','buffering');
+      void vp3MainPlayer().recover().then(()=>{
+        if(!playbackLifecycle.isCurrent(token))return;
+        st.playing=!audio.paused;setPlaybackStatus();updateFooterPlayer();
+      }).catch(error=>{if(playbackLifecycle.isCurrent(token))playbackProblem(error.retryable===false?'This VP3 song is no longer available.':'Connection unavailable · tap Play to retry.');});
+      return true;
+    }
     if(!playbackWantsAudio||!st.track?.audio||!playbackLifecycle.allowNetworkRetry(token,code))return false;
     const id=String(st.track.id),source=String(st.track.audio);
     // MediaError can reset currentTime before error dispatch. Keep the last verified progress.
@@ -5145,22 +5176,26 @@
     return true;
   }
   function play(t,resumeAt=0,source='player',keepPlaylist=false,onFailure=null,listeningContext=null){
-    if(!t?.audio)return Promise.resolve(false);
-    const changing=!st.track||String(st.track.id)!==String(t.id)||audio.getAttribute('src')!==String(t.audio);
+    if(!hasPlayableAudio(t))return Promise.resolve(false);
+    const provider=window.SFVP3Music?.supports(t)===true;
+    const changing=!st.track||String(st.track.id)!==String(t.id)||(provider?!vp3Main?.matches(t):audio.getAttribute('src')!==String(t.audio));
     const reloading=changing||!!audio.error||footerPlayer?.dataset.playbackPhase==='error';
     if(changing){songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');}
     if(changing&&st.track&&!audio.paused){const dur=Number(audio.duration||st.track.duration||0),pos=Number(audio.currentTime||0);if(!dur||pos<Math.max(0,dur-2))recordListen('skip')}
+    if(!provider&&vp3Main?.state())vp3Main.stop();
     const token=playbackLifecycle.begin(Math.max(0,Number(resumeAt)||0));cancelNetworkRecovery();clearPlaybackBufferWatch();setPlaybackStatus();
     if(!keepPlaylist)clearPlaylistPlayback();
     st.playSource=source||'player';st.track=t;playbackWantsAudio=true;st.playing=false;updateQueueUi();
-    globalThis.SFListeningTelemetry?.prepareMain?.(listeningContext||{app:true},{trackId:String(t.id),restart:reloading||audio.ended,startAt:Math.max(0,Number(resumeAt)||0)});
-    if(reloading){audio.pause();audio.src=t.audio;audio.load()}
+    globalThis.SFListeningTelemetry?.prepareMain?.(listeningContext||{app:true},{trackId:String(t.id),restart:(provider?changing:reloading)||audio.ended,startAt:Math.max(0,Number(resumeAt)||0)});
+    if(!provider&&reloading){audio.pause();audio.removeAttribute('crossorigin');audio.src=t.audio;audio.load()}
     const startAt=Math.max(0,Number(resumeAt)||0);
     if(!reloading&&keepPlaylist&&startAt===0)try{audio.currentTime=0}catch(_){}
     const resumeNeeded=startAt>0&&(reloading||!Number.isFinite(audio.currentTime)||Math.abs(audio.currentTime-startAt)>0.35||audio.seeking);
     updateFooterPlayer();
     let attempt;
-    if(resumeNeeded){
+    if(provider){
+      attempt=vp3MainPlayer().play(t,{position:startAt,isCurrent:()=>playbackWantsAudio&&playbackLifecycle.isCurrent(token),sourceSurface:listeningContext?.scene_id||listeningContext?.gallery_id?'canvas':String(source).startsWith('agent')?'agent':'player'});
+    }else if(resumeNeeded){
       // Manual resume uses the same verified-seek gate as automatic network recovery.
       attempt=new Promise((resolve,reject)=>{
         const recovery={token,position:startAt,controller:null,reject};pendingNetworkRecovery=recovery;
@@ -5174,7 +5209,7 @@
     return Promise.resolve(attempt).then(()=>{
       if(!playbackLifecycle.isCurrent(token)||String(st.track?.id)!==String(t.id)||audio.paused)return false;
       cancelNetworkRecovery();st.playing=true;rememberPlaybackPosition();recordListen(startAt>0?'resume':'start');
-      agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+' Ask me about it, buy it, or put it on a record.');
+      agent('playing',(startAt>0?'Resuming ':'Playing ')+'“'+t.title+'.”'+(st.playlistPlayback.playlistId?' · '+st.playlistPlayback.playlistName:'')+(provider?' Ask me about this song.':' Ask me about it, buy it, or put it on a record.'));
       updateFooterPlayer();return true;
     }).catch(error=>{
       if(!playbackLifecycle.isCurrent(token))return false;
@@ -5950,7 +5985,7 @@
     if(st.auth.authenticated){void loadNotificationDrawer();setInterval(loadNotificationDrawer,60000)}
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!notificationDrawer.hidden){event.preventDefault();event.stopPropagation();closeNotificationDrawer()}});
   }
-  playerToggle.onclick=toggle;playerPrev.onclick=()=>stepTrack(-1);playerNext.onclick=()=>stepTrack(1);if(playerQueueButton)playerQueueButton.onclick=openQueue;if(queueClose)queueClose.onclick=closeQueue;if(queueBackdrop)queueBackdrop.onclick=closeQueue;if(queueClear)queueClear.onclick=()=>clearQueue(true);playerClose.onclick=()=>{songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');invalidatePlayback();audio.pause();audio.removeAttribute('src');audio.load();st.track=null;st.playing=false;st.playSource='player';songMoments?.setTrack(null);clearPlaylistPlayback();footerPlayer.hidden=true;window.SFPublicAgentCanvas?.syncPlayer?.();document.body.classList.remove('has-player');agent('idle','Player closed. Your place in the site is unchanged.')};
+  playerToggle.onclick=toggle;playerPrev.onclick=()=>stepTrack(-1);playerNext.onclick=()=>stepTrack(1);if(playerQueueButton)playerQueueButton.onclick=openQueue;if(queueClose)queueClose.onclick=closeQueue;if(queueBackdrop)queueBackdrop.onclick=closeQueue;if(queueClear)queueClear.onclick=()=>clearQueue(true);playerClose.onclick=()=>{songCaptureSkill?.discard();if(songListeningSkill?.status().active)void songListeningSkill.stop('switch');invalidatePlayback();vp3Main?.stop();audio.pause();audio.removeAttribute('src');audio.load();st.track=null;st.playing=false;st.playSource='player';songMoments?.setTrack(null);clearPlaylistPlayback();footerPlayer.hidden=true;window.SFPublicAgentCanvas?.syncPlayer?.();document.body.classList.remove('has-player');agent('idle','Player closed. Your place in the site is unchanged.')};
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&queueDrawer&&!queueDrawer.hidden){event.preventDefault();closeQueue()}});
   playerTitle.onclick=playerArtwork.onclick=()=>{if(st.track){renderStory(st.track);setUrl('track',{id:st.track.id})}};
   playerSeek.oninput=()=>seekPlayback(Number(playerSeek.value)/1000);

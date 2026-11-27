@@ -4,6 +4,8 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'){sf_admin_require_auth(false);sf_
 if(($_SERVER['REQUEST_METHOD']??'')!=='POST') sf_json_response(['ok'=>false,'error'=>'method_not_allowed'],405);
 $me=sf_admin_require_auth(true);$body=sf_request_json();$id=(string)($body['id']??'');$catalog=sf_catalog();$idx=null;foreach($catalog as $i=>$t)if((string)($t['id']??'')===$id){$idx=$i;break;}if($idx===null)sf_json_response(['ok'=>false,'message'=>'Track not found.'],404);
 $track=$catalog[$idx];$patch=is_array($body['track']??null)?$body['track']:[];
+if(sf_track_is_vp3_source($track)&&(!empty($patch['digital_purchase_enabled'])||!empty($patch['podEligible'])||!empty($patch['vinyl_license_packages'])))
+  sf_json_response(['ok'=>false,'message'=>'VP3 imports provide streaming access only. Publish separately authorized local masters for sales or manufacturing.'],422);
 if(($body['action']??'')==='lifecycle'){
   $next=(string)($body['state']??'');
   if(!in_array($next,['published','hidden','archived','deleted'],true))sf_json_response(['ok'=>false,'message'=>'Invalid song lifecycle state.'],422);

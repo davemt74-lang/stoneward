@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/vp3-music-reference.php';
 /**
  * Vinyl printing is a finite, per-song right. Digital stream/download ownership
  * remains permanent when a print credit is reserved or spent.
@@ -49,7 +50,7 @@ function sf_vinyl_locked_album(array $release,array $tracks,int $sideLimit):arra
     $sides=['A'=>['duration'=>0,'tracks'=>[]],'B'=>['duration'=>0,'tracks'=>[]]];
     foreach($ids as $index=>$id){
         $t=$tracks[(string)$id]??null;
-        if(!is_array($t)||empty($t['podEligible']) || ($t['audio_publishing_mode']??'')==='preview_only'
+        if(!is_array($t)||sf_track_is_vp3_source($t)||empty($t['podEligible']) || ($t['audio_publishing_mode']??'')==='preview_only'
             || (empty($t['private_master_audio'])&&(($t['audio_publishing_mode']??'')==='preview_master_split'||empty($t['audio']))))
             throw new InvalidArgumentException('Album contains an unavailable vinyl master.');
         $dur=(int)($t['duration']??0);
@@ -89,7 +90,7 @@ function sf_vinyl_license_quote(array $request,array $tracks,array $releases):ar
     if($type==='vinyl_license_pack'){
         $id=(string)($request['track_id']??'');
         $track=$tracks[$id]??null;
-        if(!is_array($track)||empty($track['podEligible'])||($track['audio_publishing_mode']??'')==='preview_only')throw new InvalidArgumentException('Unknown vinyl-eligible song.');
+        if(!is_array($track)||sf_track_is_vp3_source($track)||empty($track['podEligible'])||($track['audio_publishing_mode']??'')==='preview_only')throw new InvalidArgumentException('Unknown vinyl-eligible song.');
         $p=sf_vinyl_package((array)($track['vinyl_license_packages']??[]),$licenses);
         if(!$p)throw new InvalidArgumentException('That song print-license package is not for sale.');
         return ['type'=>'vinyl_license_pack','track_id'=>$id,'licenses'=>$licenses,
@@ -108,7 +109,7 @@ function sf_vinyl_license_quote(array $request,array $tracks,array $releases):ar
         $ids=array_values(array_map('strval',(array)($release['track_ids']??[])));
         if(!$ids||count($ids)>40||count(array_unique($ids))!==count($ids))
             throw new InvalidArgumentException('Album has no valid tracklist.');
-        foreach($ids as $tid)if(empty($tracks[$tid]['podEligible'])||($tracks[$tid]['audio_publishing_mode']??'')==='preview_only')
+        foreach($ids as $tid)if(sf_track_is_vp3_source((array)($tracks[$tid]??[]))||empty($tracks[$tid]['podEligible'])||($tracks[$tid]['audio_publishing_mode']??'')==='preview_only')
             throw new InvalidArgumentException('Album contains a non-printable track.');
         return ['type'=>'album_vinyl_license_pack','release_id'=>$id,
             'track_ids'=>$ids,'licenses'=>$licenses,'label'=>(string)$release['title'].' · '.$licenses.' album vinyl print license(s)',

@@ -74,7 +74,7 @@ function sf_kunaki_publishing_entitlements(array $vinylOrder,int $itemIndex,
         if(!isset($available[$track])||(int)($grants[$track]??0)<1)
             throw new RuntimeException('Music ownership and vinyl print license required for song '.$track.'.');
         $row=$catalog[$track]??null;
-        if(!is_array($row)||empty($row['podEligible'])||empty($row['audio']))
+        if(!is_array($row)||sf_track_is_vp3_source($row)||empty($row['podEligible'])||empty($row['audio']))
             throw new RuntimeException('Catalog master is missing or not approved for vinyl.');
         $proof[]=['track_id'=>$track,'source_order_id'=>$available[$track],
             'title'=>substr((string)($row['title']??''),0,160),

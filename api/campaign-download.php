@@ -2,6 +2,7 @@
 declare(strict_types=1);require __DIR__.'/bootstrap.php';sf_campaign_ensure_schema();
 $token=sf_clean_text($_GET['token']??'',80);$e=sf_campaign_entitlement_by_token($token);if(!$e||($e['entitlement_type']??'')!=='offer_download'){http_response_code(404);exit('Download unavailable.');}
 $payload=sf_campaign_decode($e['payload_json']??'',[]);$trackId=sf_clean_text($payload['track_id']??'',120);$track=sf_track_map()[$trackId]??null;if(!$track){http_response_code(404);exit('Track unavailable.');}
+if(sf_track_is_vp3_source($track)){http_response_code(404);exit('VP3 streaming does not grant a download.');}
 $audio=(string)($track['audio']??'');if($audio===''||preg_match('#^https?://#i',$audio)){http_response_code(404);exit('Protected local download unavailable.');}
 $root=realpath(SF_ROOT);$file=realpath(SF_ROOT.'/'.ltrim($audio,'/'));if(!$root||!$file||!str_starts_with($file,$root.DIRECTORY_SEPARATOR)||!is_file($file)){http_response_code(404);exit('Download unavailable.');}
 $now=gmdate('c');if(($e['status']??'')==='claimed')sf_db()->prepare("UPDATE campaign_entitlements SET status='redeemed',redeemed_at=? WHERE id=?")->execute([$now,(int)$e['id']]);

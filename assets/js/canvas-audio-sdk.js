@@ -445,7 +445,8 @@
       audio_url: text(track.audio_url, 2048),
       source_available: track.source_available === true,
       source_reason: text(track.source_reason),
-      source_url: text(track.source_url, 2048)
+      source_url: text(track.source_url, 2048),
+      ...(track.source_kind==='vp3'?{source_kind:'vp3',raw_audio_available:false,audio_source:window.SFVP3Music?.reference(track)}:{})
     };
   }
   function normalizePlaylists(value) {
@@ -590,7 +591,7 @@
   }
 
   function createHost(options) {
-    const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic, observeIndependent, loadData } = options;
+    const { frame, audio, getOwner, canUse, loadCatalog, loadAudio, play, pause, seek, setVolume, getState, onDiagnostic, observeIndependent, createStreamPlayer, loadData } = options;
     const dataAliases = new Set(Array.isArray(options.dataAliases) ? options.dataAliases : []);
     const dataLocationAliases = new Set(Array.isArray(options.dataLocationAliases) ? options.dataLocationAliases : []);
     const proximityPoints = new Map();
@@ -607,7 +608,7 @@
     let revoked = false;
     let diagnosticCount = 0;
     const events = ['play', 'pause', 'timeupdate', 'seeking', 'seeked', 'durationchange', 'loadedmetadata', 'volumechange', 'emptied', 'ended'];
-    const playerEvents = [...events, 'ratechange', 'playing', 'waiting'];
+    const playerEvents = [...events, 'ratechange', 'playing', 'waiting', 'error'];
 
     function post(message) {
       try { frame.contentWindow?.postMessage({ channel, version, nonce, ...message }, '*'); } catch (_) {}
@@ -691,8 +692,9 @@
       for (const event of playerEvents) player.media.removeEventListener(event, player.mediaChanged);
       // Stop the host observer before clearing the element so it can finalize actual playback.
       try { player.observer?.dispose(); } catch (_) {}
+      try { player.stream?.dispose(); } catch (_) {}
       try { player.media.pause(); player.media.removeAttribute('src'); player.media.load(); } catch (_) {}
-      URL.revokeObjectURL(player.url);
+      if(player.url)URL.revokeObjectURL(player.url);
     }
     async function freshTrack(session, id, signal) {
       const result = await catalog(session, { track_id: id }, signal);
@@ -705,15 +707,21 @@
       session.creating++;
       try {
         const track = await freshTrack(session, id, signal);
-        const result = await loadAudio(id, signal);
-        if (!active(session)) throw error('Canvas audio access ended.', 'audio_session_closed');
-        const blob = result instanceof Blob ? result : result?.blob;
-        if (!(blob instanceof Blob) || blob.size < 1 || blob.size > maxBlobBytes ||
-          (result?.track && (result.track.track_id !== id || result.track.source_available !== true)))
-          throw error('The audio source is unavailable.', 'invalid_audio_source');
+        const provider = track.source_kind === 'vp3';
+        if(provider && (!track.audio_source || typeof createStreamPlayer !== 'function'))
+          throw error('This streamed player is unavailable.', 'audio_source_unavailable');
+        let blob = null;
+        if(!provider){
+          const result = await loadAudio(id, signal);
+          if (!active(session)) throw error('Canvas audio access ended.', 'audio_session_closed');
+          blob = result instanceof Blob ? result : result?.blob;
+          if (!(blob instanceof Blob) || blob.size < 1 || blob.size > maxBlobBytes ||
+            (result?.track && (result.track.track_id !== id || result.track.source_available !== true)))
+            throw error('The audio source is unavailable.', 'invalid_audio_source');
+        }
         const media = new Audio();
         const pitchProperty = ['preservesPitch', 'webkitPreservesPitch'].find(name => name in media) ?? null;
-        const player = { id: 'p-' + token(), track, media, url: URL.createObjectURL(blob), disposed: false, observer: null,
+        const player = { id: 'p-' + token(), track, media, url: provider ? null : URL.createObjectURL(blob), disposed: false, observer: null, stream: null,
           pendingPlays: new Set(), loop: null, loopTimer: null, playRequested: false, pitchProperty };
         if (pitchProperty !== null) { try { media[pitchProperty] = true; } catch (_) {} }
         player.publish = () => {
@@ -723,19 +731,26 @@
         player.mediaChanged = event => {
           scheduleLoop(session, player, event.type === 'ended');
           player.publish();
+          if(event.type==='error'&&player.stream&&player.playRequested&&!player.recovery&&!player.stream.isRenewing()&&!player.stream.state()?.terminal){
+            player.recovery=player.stream.recover().catch(()=>{player.playRequested=false;}).finally(()=>{player.recovery=null;player.publish();});
+          }
         };
         session.players.set(player.id, player);
         try {
           for (const event of playerEvents) media.addEventListener(event, player.mediaChanged);
           player.observer = typeof observeIndependent === 'function' ? observeIndependent(media, Object.freeze({ ...track }), {
             isActive: () => active(session) && !player.disposed,
+            isRecovering: () => player.stream?.isRenewing() === true,
             canComplete: () => {
               const actual = number(media.duration), position = number(media.currentTime), published = track.duration_seconds;
               if (player.loop || !media.ended || (actual >= 10 && position < actual - Math.max(5, actual * .02))) return false;
               return !(published >= 40 && position >= 2 && Math.max(position, actual) < published - Math.max(15, published * .08));
             }
           }) : null;
-          media.preload = 'metadata'; media.src = player.url; media.load();
+          if(provider){
+            player.stream=createStreamPlayer(media,Object.freeze({...track}),{isActive:()=>active(session)&&!player.disposed,isLooping:()=>!!player.loop});
+            if(!player.stream||typeof player.stream.play!=='function')throw error('This streamed player is unavailable.','audio_source_unavailable');
+          }else{media.preload = 'metadata'; media.src = player.url; media.load();}
         } catch (failure) { releasePlayer(session, player); throw failure; }
         return { playerId: player.id, state: independentState(player) };
       } finally { session.creating--; }
@@ -767,7 +782,7 @@
             if (player.loop && (media.currentTime < player.loop.startSeconds || media.currentTime >= player.loop.endSeconds))
               media.currentTime = player.loop.startSeconds;
             player.playRequested = true;
-            try { await untilPlaybackInterrupted(player, media.play(), signal); }
+            try { await untilPlaybackInterrupted(player, player.stream ? player.stream.play(player.track,{position:number(media.currentTime),signal,isCurrent:()=>active(session)&&!player.disposed&&!signal.aborted,sourceSurface:'canvas'}) : media.play(), signal); }
             catch (failure) {
               if (player.disposed || signal.aborted) throw interruptedPlay(player);
               if (media.paused) player.playRequested = false;
@@ -781,7 +796,7 @@
         case 'playerPause':
           player.playRequested = false;
           for (const controller of player.pendingPlays) controller.abort();
-          media.pause();
+          if(player.stream)player.stream.pause();else media.pause();
           break;
         case 'playerSeek': {
           const position = job.args[1], loop = player.loop;
@@ -898,6 +913,7 @@
           let track = result?.track ? normalizeTrack(result.track) : session.tracks.get(argument);
           if (!track) track = (await catalog(session, { track_id: argument }, job.controller.signal)).tracks.find(item => item.track_id === argument);
           if (!track || track.track_id !== argument || !track.source_available) throw error('This track source is unavailable.', 'track_unavailable');
+          if(track.source_kind==='vp3')throw error('This recording supports parent-owned playback, not raw audio export.','audio_source_unavailable');
           return { track, blob };
         }
         case 'play': await play(argument); break;

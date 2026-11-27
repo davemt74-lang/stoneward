@@ -7,6 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'assets/js/jukebox-listener.js'), 'utf8');
+const vp3 = require('../assets/js/vp3-music-player.js');
 const flush = async () => { for (let index = 0; index < 8; index++) await Promise.resolve(); };
 
 function emitter() {
@@ -24,7 +25,7 @@ function emitter() {
 
 // The fake exposes native events, media position and deferred play promises;
 // assertions below exercise consent, freshness and audible-activity contracts.
-function setup() {
+function setup(overrides = {}) {
   let now = 100, timerId = 0, src = '', muted = false, position = 0;
   let bufferRanges = [[0, 120]];
   const timers = new Map(), views = [], activity = [], attempts = [], seeks = [];
@@ -112,7 +113,8 @@ function setup() {
   const listener = window.StonefellowJukeboxListener.create({
     audio, urlForItem: id => '/audio?item=' + id,
     onChange: view => views.push({...view}),
-    onActivity: sample => activity.push({...sample})
+    onActivity: sample => activity.push({...sample}),
+    ...overrides
   });
   const base = {
     allowed: true, online: true, itemId: '1', generation: 1,
@@ -139,6 +141,60 @@ function setup() {
     }
   };
 }
+
+function providerSetup() {
+  const entries=[];
+  const h=setup({createStreamPlayer({audio,itemId,isActive,onError}){
+    const entry={itemId,isActive,onError,plays:0,pauses:0,disposed:false,renewing:false,terminal:false};entries.push(entry);
+    entry.controller={async play(_track,settings){
+      if(entry.terminal)throw Object.assign(Error('unavailable'),{retryable:false});
+      entry.plays++;assert.equal(settings.isCurrent(),true);
+      if(!audio.src)audio.src='https://provider.test/media?ticket=mpd1.PRIVATE';
+      audio.currentTime=settings.position;
+      await audio.play();
+    },pause(){entry.pauses++;audio.pause();},dispose(){entry.disposed=true;audio.pause();},state:()=>({terminal:entry.terminal}),
+      isRenewing:()=>entry.renewing,recover:async()=>{entry.renewing=true;await Promise.resolve();entry.renewing=false;}};
+    return entry.controller;
+  }});
+  h.window.SFVP3Music=vp3;
+  h.base.track={id:'vp3-song',audio_source:{kind:'vp3',installation_id:'11111111-1111-4111-8111-111111111111',site_id:'22222222-2222-4222-8222-222222222222',recording_id:'33333333-3333-4333-8333-333333333333'}};
+  return {...h,entries,get view(){return h.view;},get now(){return h.now;}};
+}
+
+test('typed phone playback uses one parent transport and a blocked gesture reuses it',async()=>{
+  const h=providerSetup();h.audio.playRejection='NotAllowedError';await h.start();
+  assert.equal(h.entries.length,1);assert.equal(h.entries[0].plays,1);assert.equal(h.view.needsGesture,true);
+  assert.equal(h.audio.src.startsWith('/audio?'),false);assert.equal(h.activity.some(sample=>sample.active),false);
+  h.audio.playRejection='';h.listener.listen();await flush();
+  assert.equal(h.entries.length,1);assert.equal(h.entries[0].plays,2);assert.equal(h.audio.paused,false);assert.equal(h.audio.currentTime,8);
+  h.listener.stop();assert.equal(h.entries[0].disposed,true);assert.equal(h.audio.src,'');
+});
+
+test('phone host-time updates cannot restart or reseek a provider ticket replacement',async()=>{
+  const h=providerSetup();await h.start();const entry=h.entries[0],plays=entry.plays;
+  entry.renewing=true;h.audio.pause();const seeks=h.seeks.length;h.update({seconds:22});await flush();
+  assert.equal(entry.plays,plays);assert.equal(h.seeks.length,seeks);assert.equal(h.entries.length,1);
+  entry.renewing=false;h.update({seconds:22});await flush();
+  assert.equal(h.entries.length,1);assert.equal(entry.plays,plays+1);assert.equal(h.audio.paused,false);assert.equal(h.audio.currentTime,22);
+  h.listener.stop();
+});
+
+test('terminal provider revocation stays stopped through polls and retry until the queue item changes',async()=>{
+  const h=providerSetup();await h.start();const old=h.entries[0];old.terminal=true;old.onError({retryable:false});
+  h.update();await flush();assert.equal(h.audio.paused,true);assert.equal(old.plays,1);
+  h.listener.listen();await flush();assert.equal(h.entries.length,1);assert.equal(old.plays,1);assert.equal(h.audio.paused,true);
+  h.update({itemId:'2',generation:2,seconds:0});await flush();
+  assert.equal(old.disposed,true);assert.equal(h.entries.length,2);assert.equal(h.audio.paused,false);h.listener.stop();
+});
+
+test('provider freshness and access revocation cancel owned transport without local fallback',async()=>{
+  const h=providerSetup();await h.start();h.advance(5001);await flush();
+  assert.equal(h.audio.paused,true);assert.ok(h.entries[0].pauses>0);assert.equal(h.entries.length,1);
+  h.update({allowed:false});await flush();assert.equal(h.entries[0].disposed,true);assert.equal(h.audio.src,'');
+  h.update();await flush();assert.equal(h.entries.length,1);assert.equal(h.audio.paused,true);
+  const broken=setup();broken.window.SFVP3Music=vp3;broken.base.track={id:'malformed',audio:'assets/private.mp3',audio_publishing_mode:'vp3_stream_only'};
+  await broken.start();assert.equal(broken.attempts.length,0);assert.equal(broken.audio.src,'');broken.listener.stop();
+});
 
 test('fresh updates and lifecycle recovery never opt in a stopped phone', async () => {
   const h = setup();

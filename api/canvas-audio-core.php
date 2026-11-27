@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/agent-canvas-data.php';
 require_once __DIR__.'/media-stream-range.php';
+require_once __DIR__.'/vp3-music-reference.php';
 
 final class SfCanvasAudioContextUnavailable extends RuntimeException {}
 
@@ -57,6 +58,7 @@ function sf_canvas_audio_runtime_catalog(?array $context,?string $releaseId=null
         $catalog['releases']=$releases;
     }
     foreach($catalog['tracks'] as &$track){
+        if(($track['source_kind']??'')==='vp3')continue;
         $url='api/canvas-audio.php?'.http_build_query(['action'=>'source','track_id'=>$track['track_id']]+$context['query']);
         $track['audio_url']=$url;$track['source_url']=$url;
     }unset($track);
@@ -96,6 +98,11 @@ function sf_canvas_audio_local_file(string $relative,string $rootName,bool $allo
 
 /** Resolve an existing public listening MP3 without granting access to an original. */
 function sf_canvas_audio_track_source(array $track): array {
+    if(sf_track_is_vp3_source($track)){
+        require_once __DIR__.'/vp3-music-core.php';
+        $provider=sf_vp3_music_source_for_track($track);
+        return $provider?['reason'=>'available','provider'=>$provider]:['reason'=>'unavailable_source'];
+    }
     $reference=$track['audio']??null;
     if(!is_string($reference)||$reference==='')return ['reason'=>'missing_source'];
     if(strlen($reference)>2000||str_contains($reference,'\\')||preg_match('/[\x00-\x1F\x7F]/',$reference))return ['reason'=>'unsupported_source'];
@@ -156,6 +163,16 @@ function sf_canvas_audio_source(string $trackId): ?array {
     return isset($source['file'])?$source['file']+['track_id'=>$trackId]:null;
 }
 
+/** A typed public playback capability; raw byte consumers must still use the local-file resolver. */
+function sf_canvas_audio_playable_source(string $trackId): ?array {
+    if(sf_canvas_audio_id($trackId)===null)return null;
+    $track=sf_canvas_audio_public_track($trackId);
+    if($track===null)return null;
+    $source=sf_canvas_audio_track_source($track);
+    if(isset($source['provider']))return ['kind'=>'vp3','track_id'=>$trackId,'source'=>$source['provider']];
+    return isset($source['file'])?['kind'=>'local','track_id'=>$trackId,'file'=>$source['file']]:null;
+}
+
 /** Public metadata contains stable IDs and authorized source URLs, never storage references. */
 function sf_canvas_audio_catalog(?string $releaseId=null,?string $trackId=null): array {
     $members=[];$releaseTracks=[];
@@ -178,12 +195,17 @@ function sf_canvas_audio_catalog(?string $releaseId=null,?string $trackId=null):
         if($releaseId!==null&&!in_array($releaseId,$members[$id]??[],true))continue;
         $track=sf_canvas_audio_public_track($id);
         if($track===null)continue;
-        $source=sf_canvas_audio_track_source($track);$available=isset($source['file']);
-        $url=$available?'api/canvas-audio.php?action=source&track_id='.rawurlencode($id):null;
+        $source=sf_canvas_audio_track_source($track);$provider=isset($source['provider']);$available=isset($source['file'])||$provider;
+        $url=isset($source['file'])?'api/canvas-audio.php?action=source&track_id='.rawurlencode($id):null;
         $public[$id]=['track_id'=>$id,'title'=>sf_agent_public_artist_text($track['title']??'',180),
             'duration_seconds'=>is_numeric($track['duration']??null)?max(0,(int)$track['duration']):0,
             'release_ids'=>$members[$id]??[],'audio_url'=>$url,'source_url'=>$url,'mime'=>$available?'audio/mpeg':null,
             'source_available'=>$available,'source_reason'=>$source['reason']];
+        if($provider){
+            $descriptor=$source['provider'];
+            $public[$id]['source_kind']='vp3';$public[$id]['raw_audio_available']=false;$public[$id]['mime']=null;
+            $public[$id]['audio_source']=['kind'=>'vp3','installation_id'=>$descriptor['installation_id'],'site_id'=>$descriptor['site_id'],'recording_id'=>$descriptor['recording_id']];
+        }
     }
     if($releaseId!==null){
         foreach($releaseTracks[$releaseId]??[] as $id)if(isset($public[$id]))$tracks[]=$public[$id];

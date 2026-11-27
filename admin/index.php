@@ -6,7 +6,7 @@ require_once __DIR__.'/api/bootstrap.php';
 if(!sf_installed()){http_response_code(503);exit('Stonefellow database configuration is unavailable.');}
 $adminUser=sf_current_user();
 if(!$adminUser||($adminUser['role']??'')!=='admin'){header('Location: login.php');exit;}
-define('SF_ADMIN_BUILD','1.3.331');
+define('SF_ADMIN_BUILD','1.3.332');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
 ?>
@@ -56,6 +56,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <link rel="stylesheet" href="assets/songbook.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/theme.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
   <link rel="stylesheet" href="assets/agent-mesh-theme.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
+  <link rel="stylesheet" href="assets/vp3-music.css?v=<?=rawurlencode(SF_ADMIN_BUILD)?>">
 </head>
 <body>
   <div id="adminApp" class="admin-app">
@@ -75,6 +76,7 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
           <summary class="admin-nav-summary"><span>Music &amp; Media</span><span class="admin-nav-chevron" aria-hidden="true"></span></summary>
           <div class="admin-nav-items">
             <button type="button" data-view="catalog"><span>02</span>Catalog</button>
+            <button type="button" data-view="vp3-music"><span>02A</span>Import Music from VP3</button>
             <button type="button" data-view="media"><span>03</span>Media Library</button>
             <button type="button" data-view="uploads"><span>04</span>Folder Scan & Upload</button>
             <button type="button" data-view="templates"><span>05</span>Metadata Templates</button>
@@ -237,9 +239,11 @@ header('X-Stonefellow-Build: '.SF_ADMIN_BUILD);
   <script src="../assets/js/conversation-barge-in.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="../assets/js/speech-segments.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="../assets/js/agent-audio-player-skill.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
+  <script src="../assets/js/vp3-music-player.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-music-controller.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin-confirm.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/admin.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>&amp;e5=1"></script>
+  <script src="assets/vp3-music.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/song-moment-preview.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/song-moments.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>
   <script src="assets/agent-particle-orb.js?v=<?=rawurlencode(SF_ADMIN_BUILD)?>"></script>

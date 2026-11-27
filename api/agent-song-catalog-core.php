@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/vp3-music-reference.php';
 /** 91B21B4 — temporary, authorized catalog sections -> OpenAI lyric drafts. */
 require_once __DIR__.'/agent-song-transcribe-core.php';
 require_once __DIR__.'/ai-token-reservations.php';
@@ -21,7 +22,7 @@ function sf_song_catalog_track(string $id,array $published): array {
     if($id===''||strlen($id)>180||preg_match('/[\x00-\x1F\x7F]/',$id))
         sf_song_catalog_error('invalid_song_section',422,'Choose a published playable song.');
     $matches=array_values(array_filter($published,static fn($track)=>is_array($track)
-        &&(string)($track['id']??'')===$id&&is_string($track['audio']??null)&&$track['audio']!==''));
+        &&(string)($track['id']??'')===$id&&sf_track_has_playable_source($track)));
     if(count($matches)!==1)sf_song_catalog_error('song_unavailable',404,'This published song is no longer available.');
     return $matches[0];
 }
@@ -29,6 +30,8 @@ function sf_song_catalog_track(string $id,array $published): array {
 /** The public catalog reference, never a client URL or manufacturing original. */
 function sf_song_catalog_source(string $trackId,array $published,array $user,bool $verifyHash=false,?string $expectedReference=null): array {
     $track=sf_song_catalog_track($trackId,$published);
+    if(sf_track_is_vp3_source($track))
+        sf_song_catalog_error('song_source_unavailable',422,'VP3 streaming does not authorize local audio extraction or lyric transcription.');
     $reference=$track['audio'];
     if($expectedReference!==null&&$reference!==$expectedReference)
         sf_song_catalog_error('song_source_changed',409,'The song was republished. Reload the player before selecting lyrics.');

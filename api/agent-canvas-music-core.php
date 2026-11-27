@@ -62,7 +62,7 @@ function sf_agent_canvas_music_validate(array $inputs): void {
     $inputs=sf_agent_canvas_music_inputs($inputs);
     if($inputs['mode']==='all')return;
     require_once __DIR__.'/canvas-audio-core.php';
-    foreach($inputs['track_ids'] as $id)if(sf_canvas_audio_source($id)===null)
+    foreach($inputs['track_ids'] as $id)if(sf_canvas_audio_playable_source($id)===null)
         throw new InvalidArgumentException('One or more selected songs are unavailable. Refresh the music picker.');
 }
 

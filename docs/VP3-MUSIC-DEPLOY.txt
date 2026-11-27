@@ -1,0 +1,119 @@
+STONEWARD 1.3.332 — IMPORT MUSIC FROM VP3 (ML2C)
+
+This is the Stoneward client integration for VP3 Music Provider v1. VP3 remains
+the catalog and audio host. This package does not deploy or upgrade the VP3 host.
+The compatible provider acceptance reference is software commit
+41603520b24c3ac6146dca5cb7310d04a8a3de9e (ML2B, PRs #939 and #945).
+
+INSTALL
+
+1. Back up matching application code, database, data/, storage/, uploads/, host
+   configuration and config/app-secret.php as one recoverable set. The app secret
+   decrypts this installation's credentials. Do not copy a production connection,
+   key or private state into another artist site.
+
+2. Update the existing artist installation with the verified full Stoneward
+   deployment ZIP. Preserve config/store.php,
+   config/database.php, config/secrets.php, config/app-secret.php, .env, data/,
+   storage/ and uploads/. The source archive excludes host data/configuration.
+   Read DEPLOY-MANIFEST.txt and verify its source commit and archive checksum.
+   Keep the current data/catalog.json and generated assets/js/catalog.js together.
+   The archive also excludes that generated catalog asset to preserve live songs.
+   New installations need the existing installer/catalog initialization process;
+   this source update does not supply another artist's runtime catalog or state.
+
+3. Complete any existing Stoneward upgrade required by the installed version.
+   This feature creates private connection state only after an authenticated
+   administrator explicitly saves a connection. It adds no automatic music import
+   or historical-listening backfill.
+
+4. The initial profile requires Stoneward at an HTTPS domain root with its correct
+   configured public address. VP3 fetches the fixed root verification endpoint:
+       https://artist.example/api/vp3-music-site.php
+   Subdirectory installs are not supported by this profile. VP3 itself may use a
+   supported canonical installation subpath. Stoneward needs PHP cURL, OpenSSL,
+   public DNS and outbound HTTPS. Keep storage/ and config/ inaccessible from the
+   web; they contain the private connection state and encryption key.
+
+CONNECT AND IMPORT
+
+5. In VP3 Music Workspace, open Sites & streaming. Register this artist site's
+   exact HTTPS origin. Copy the one-time management credential and the provided
+   site-verification JSON. Production and staging use separate registrations.
+
+6. In Stoneward Admin, open Catalog → Import Music from VP3. Enter the VP3 address,
+   credential and verification JSON, then Save connection. Return to VP3 and
+   choose Verify site. In Stoneward choose Check connection.
+
+7. Select eligible published public songs and review the complete selection.
+   Choose Import selected songs. Audio remains in VP3; local tracks store stable
+   provider references. A changed selection invalidates existing provider playback
+   sessions for this site. An unchanged set preserves its provider revision.
+   Imports are streaming-only: no paid-download, master-access or manufacturing
+   permission is supplied.
+
+8. Existing imported track IDs remain stable. Later imports update unchanged
+   provider-supplied values while preserving local editorial overrides and local
+   hidden/archive/deleted state. Unavailable remote references remain identifiable
+   and can be removed from the selected set.
+
+RECOVERY AND CONNECTION CHANGES
+
+9. If a response is lost, use Retry the same request. The original request identity
+   and values remain in page memory; no credential is saved in browser storage.
+   After reload, Finish the saved import uses the server's private journal.
+
+10. An interrupted publication can leave catalog JSON and generated public
+    JavaScript at different stages. Resume saved import checks exact staged/current
+    hashes before continuing. It never overwrites an unrelated catalog edit.
+    For a catalog conflict, explicitly discard the pending import and review a
+    fresh selection. The remote VP3 selection may already have changed; discarding
+    the pending local import does not undo that provider change.
+
+11. Reconnect using a fresh VP3 site credential and verification response when the
+    grant changes. Disconnect removes the saved connection and blocks new local
+    source resolution. It does not revoke grants already issued by VP3. Revoke the
+    site in VP3 to stop subsequent provider authorization and renewal. Delivered
+    bytes or an already admitted response cannot be recalled.
+
+12. Restore the matching catalog, private import state and app-secret together.
+    Reconcile current VP3 publication, site registration and revocations before
+    reopening traffic. Do not delete pending state to force past a conflict, and
+    do not treat a copied installation as a verified new site.
+
+PLAYBACK AND MEASUREMENT
+
+The shared player supports VP3 sources alongside local recordings. Provider begin,
+event and renewal receipts remain separate from Stoneward personal listening
+history. No customer identifier, email or personal-session cookie is forwarded.
+Preload, downloaded bytes, pauses and seeks do not automatically become listened
+time. URL renewal preserves the provider session and original audio asset.
+
+Host-owned measurable canvas playback uses the shared adapter. Raw provider
+getAudio/blob retrieval is unavailable: a byte transfer would not establish
+observable listening or grant production/download rights.
+
+Attribution retains the registered site and canonical recording. Accepted VP3 v1
+retains only recognized public page paths. Query strings/fragments are removed
+before transport; private and unsupported paths are omitted. Stoneward's
+/track/{id}, /release/{id} and /stonefellow-v120.php paths have unavailable page
+context in this profile. The player never invents a replacement /music page.
+Page context is client-reported, not independent proof of human attention.
+
+Keep provider responses out of shared caches. Redact short-lived media URL queries,
+Authorization values and playback keys from diagnostics. The service worker caches
+eligible static assets, not provider sessions or audio responses.
+
+INITIAL LIMITS AND LIVE ACCEPTANCE
+
+One active VP3 music connection per Stoneward installation. Up to 500 explicitly
+selected public recordings per provider site. VP3's current canonical /uploads
+audio and 64 MiB asset profile applies; legacy files may need repair upload in VP3.
+Private/paid streaming, downloads, royalties, payments and managed hosting are
+separate phases.
+
+Before rollout, perform the ML2D combined pilot on the actual hosts: real site
+proof, browser CORS/media headers after Apache/CDN processing, seeking and renewal,
+withdrawal/revocation, backup recovery, and physical iPhone/Android playback.
+Browser fixtures and narrow viewports do not certify those live results.
+The implementation PR records exact source, CI, screenshot, merge and ZIP evidence.

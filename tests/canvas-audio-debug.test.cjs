@@ -7,18 +7,19 @@ const {webcrypto}=require('node:crypto');
 const app=fs.readFileSync(require('node:path').join(__dirname,'../assets/js/app.js'),'utf8');
 const helpers=app.slice(app.indexOf('  function canvasAudioState(){'),app.indexOf('  async function renderAgentCanvas(){'));
 const player=app.slice(app.indexOf('  function play(t,'),app.indexOf('  function toggle(){'));
+const sourceHelpers=app.slice(app.indexOf('  const hasPlayableAudio='),app.indexOf('  let playbackWantsAudio='));
 
 function harness(name='NotAllowedError',mediaCode=0){
   const failure=Object.assign(new Error('Private native failure text'),{name});
   const scene={id:19,music_inputs:{mode:'selected',track_ids:['song-1']}};
   const track={id:'song-1',title:'Song',audio:'old.mp3',duration:120};
   const records=[],statuses=[];
-  const scope={crypto:webcrypto,WeakMap,URLSearchParams,Uint8Array,
+  const scope={window:{},crypto:webcrypto,WeakMap,URLSearchParams,Uint8Array,
     owner:'1',listeningRoom:scene,cfg:{apiBase:'api'},records,statuses,
     canvasSceneOwner:()=>scope.owner,isGalleryScene:()=>false,requirePublishedCanvas:async()=>{},
     st:{auth:{authenticated:true},track:null,playlistPlayback:{}},
     audio:{paused:true,ended:false,error:mediaCode?{code:mediaCode}:null,duration:120,currentTime:0,
-      getAttribute:()=>'',pause(){},load(){},play:()=>Promise.reject(failure)},
+      getAttribute:()=>'',removeAttribute(){},pause(){},load(){},play:()=>Promise.reject(failure)},
     trackById:()=>track,refreshSiteData:async()=>{},savedPlaybackPosition:()=>0,playerVolume:()=>1,
     api:async()=>({tracks:[{track_id:'song-1',source_available:true}],releases:[],playlists:[]}),
     playbackLifecycle:{begin:()=>1,isCurrent:()=>true},footerPlayer:{dataset:{}},
@@ -27,7 +28,7 @@ function harness(name='NotAllowedError',mediaCode=0){
     recordListen(){},rememberPlaybackPosition(){},playbackProblem:message=>statuses.push(message),
     recordCanvasDebug:(id,event,data)=>records.push({id,event,data})};
   vm.createContext(scope);
-  vm.runInContext('function canvasOwner(){return owner;}\n'+helpers+'\n'+player,scope);
+  vm.runInContext('function canvasOwner(){return owner;}\n'+sourceHelpers+helpers+'\n'+player,scope);
   return {scope,records,statuses,failure,scene};
 }
 
