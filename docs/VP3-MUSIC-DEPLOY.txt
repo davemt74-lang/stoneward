@@ -1,9 +1,14 @@
-STONEWARD 1.3.332 — IMPORT MUSIC FROM VP3 (ML2C)
+STONEWARD 1.3.333 — IMPORT MUSIC FROM VP3 / PUBLIC PAGE ATTRIBUTION
 
 This is the Stoneward client integration for VP3 Music Provider v1. VP3 remains
 the catalog and audio host. This package does not deploy or upgrade the VP3 host.
-The compatible provider acceptance reference is software commit
+The original compatible provider acceptance reference is software commit
 41603520b24c3ac6146dca5cb7310d04a8a3de9e (ML2B, PRs #939 and #945).
+The v1.3.333 release handoff identifies the exact extended provider paired with
+this client. Its discovery advertises source_page_profile=public_music_pages_v2.
+The original provider remains compatible with site/song attribution only for the
+new public-page forms; no reconnect or automatic song reimport is required solely
+to add those route forms.
 
 INSTALL
 
@@ -100,9 +105,12 @@ observable listening or grant production/download rights.
 
 Attribution retains the registered site and canonical recording. Accepted VP3 v1
 retains only recognized public page paths. Query strings/fragments are removed
-before transport; private and unsupported paths are omitted. Stoneward's
-/track/{id}, /release/{id} and /stonefellow-v120.php paths have unavailable page
-context in this profile. The player never invents a replacement /music page.
+before transport; private and unsupported paths are omitted. Version 1.3.333 sends
+Stoneward's actual /track/{id}, /release/{id} and /stonefellow-v120.php public paths.
+The extended provider retains them; an older provider omits their page context
+while retaining the registered site and recording. Either update order works.
+An already acknowledged session keeps its original page context through updates.
+The player never invents a replacement /music page.
 Page context is client-reported, not independent proof of human attention.
 
 Keep provider responses out of shared caches. Redact short-lived media URL queries,

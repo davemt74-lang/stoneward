@@ -105,6 +105,10 @@ export async function runBrowserAcceptance() {
       const errors = [], expectedNetworkDiagnostics = [];
       try {
         evidence.provider_revision = fixture.providerRevision;
+        const discovery = await (await fetch(fixture.provider.base + '/api/music-provider-v1.php')).json();
+        const extendedPages = discovery.source_page_profile === 'public_music_pages_v2';
+        assert.ok(!discovery.source_page_profile || extendedPages, 'Explicit accepted source-page profile');
+        evidence.source_page_profile = discovery.source_page_profile || 'public_music_pages_v1';
         const identity = fixture.provider.identities.find(row => Number(row.catalog_track_id) === 10);
         const hostileTitle = 'Long artist song title for mobile selection — ' + 'a lovely refrain '.repeat(6) + '<img src=x onerror=window.injected=true>';
         fixture.provider.execute('UPDATE artist_catalog_tracks_v181 SET title=? WHERE id=10', [hostileTitle]);
@@ -258,8 +262,11 @@ export async function runBrowserAcceptance() {
         check(Number(heard.accepted_played_ms) > 0 && Number(heard.accepted_played_ms) < 10000 && Number(heard.position_ms) > 17000,
           engine + '/' + width + ': seeking does not count skipped audio as heard time');
         await capture(page, 'player-' + width + '-renewed.png');
-        for (const [route, expected] of [['/', artistOrigin + '/'], ['/music?private=hidden#secret', artistOrigin + '/music'],
-          ['/account.php?session=hidden', ''], ['/track/' + imported.id, ''], ['/music-workspace.php', '']]) {
+        for (const [route, expected, stored = expected || null] of [['/', artistOrigin + '/'], ['/music?private=hidden#secret', artistOrigin + '/music'],
+          ['/account.php?session=hidden', ''], ['/music-workspace.php', ''],
+          ['/track/' + imported.id + '?private=hidden#secret', artistOrigin + '/track/' + imported.id, extendedPages ? artistOrigin + '/track/' + imported.id : null],
+          ['/release/public-release/', artistOrigin + '/release/public-release/', extendedPages ? artistOrigin + '/release/public-release/' : null],
+          ['/stonefellow-v120.php?view=music&private=hidden', artistOrigin + '/stonefellow-v120.php', extendedPages ? artistOrigin + '/stonefellow-v120.php' : null]]) {
           await page.evaluate(route => {stopProvider(); history.replaceState({}, '', route);}, route);
           const count = fixture.traffic.filter(row => row.action === 'playback.begin').length;
           await page.locator('#main').click();
@@ -268,9 +275,9 @@ export async function runBrowserAcceptance() {
           assert.equal(fresh.length, 1); assert.equal(fresh[0].source_url, expected);
           const receipt = await page.evaluate(() => playerSnapshot().provider);
           const source = JSON.parse(fixture.provider.readDb('SELECT source_json FROM music_provider_sessions_v1 WHERE session_id=?', [receipt.session_id])[0].source_json);
-          assert.equal(source.url, expected || null); assert.equal(source.page_verified, false); assert.equal(source.verified_origin, artistOrigin);
+          assert.equal(source.url, stored); assert.equal(source.page_verified, false); assert.equal(source.verified_origin, artistOrigin);
         }
-        check(true, engine + '/' + width + ': actual root/music page context retained; private/unknown pretty routes omitted without fabricated mapping');
+        check(true, engine + '/' + width + ': public song/release/shell pages follow ' + evidence.source_page_profile + '; private paths omitted and original site-only compatibility preserved');
         const providerTraffic = fixture.traffic.filter(row => row.hostname === new URL(providerOrigin).hostname);
         check(providerTraffic.some(row => row.pathname === '/api/music-provider-media-v1.php' && [200, 206].includes(row.status)),
           engine + '/' + width + ': native browser consumes real provider audio over cross-origin HTTPS');

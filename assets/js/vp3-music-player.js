@@ -28,10 +28,20 @@
         !/\/api\/music-provider-v1\.php$/.test(url.pathname)) throw failure();
     return Object.freeze({ ...supplied, provider_api: url.href });
   }
-  function page(value) {
+  function page(value, expectedOrigin = root.location?.origin) {
     try {
-      const url = new URL(value || root.location?.href || '');
-      return url.protocol === 'https:' && !url.username && !url.password && publicPaths.has(url.pathname) ? url.origin + url.pathname : '';
+      const raw = value || root.location?.href || '';
+      if (typeof raw !== 'string' || raw.length > 2048 || /[\x00-\x20\x7f\\]/.test(raw)) return '';
+      // Inspect the original path before URL normalizes dot segments or encoded
+      // separators. Only the real public music routes may leave this browser.
+      const parts = /^https:\/\/[^/?#]+([^?#]*)/i.exec(raw);
+      if (!parts) return '';
+      const path = parts[1] || '/';
+      const publicPath = publicPaths.has(path) || path === '/stonefellow-v120.php'
+        || /^\/(?:track|release)\/[A-Za-z0-9_-]{1,160}\/?$/.test(path);
+      const url = new URL(raw);
+      return publicPath && url.protocol === 'https:' && !url.username && !url.password && url.pathname === path
+        && (!expectedOrigin || url.origin === expectedOrigin) ? url.origin + path : '';
     } catch (_) { return ''; }
   }
   function create(options) {

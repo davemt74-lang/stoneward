@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: davemt74-lang/software
-          ref: 41603520b24c3ac6146dca5cb7310d04a8a3de9e
+          ref: 1a6a565b7e87d19f658b711260ba52e5f990e01e
           path: software-provider-reference
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -46,6 +46,17 @@ jobs:
           node tests/vp3-music-player.test.cjs
       - name: Real Stoneward and VP3 HTTP integration
         run: node tests/vp3-music-integration.mjs --http-only
+      - name: Checkout the original provider for compatibility
+        uses: actions/checkout@v4
+        with:
+          repository: davemt74-lang/software
+          ref: 41603520b24c3ac6146dca5cb7310d04a8a3de9e
+          path: software-provider-original
+          persist-credentials: false
+      - name: Original provider retains site attribution and streaming
+        env:
+          VP3_TEST_REPOSITORY: ${{ github.workspace }}/software-provider-original
+        run: node tests/vp3-music-integration.mjs --http-only
 
   vp3-music-browser:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -66,7 +77,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: davemt74-lang/software
-          ref: 41603520b24c3ac6146dca5cb7310d04a8a3de9e
+          ref: 1a6a565b7e87d19f658b711260ba52e5f990e01e
           path: software-provider-reference
           persist-credentials: false
       - uses: actions/setup-node@v4

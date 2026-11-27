@@ -8,10 +8,15 @@ retains its catalog IDs, presentation, local editorial changes, player, playlist
 and listener privacy.
 
 The provider protocol is **vp3_music_provider_v1**; this client's management
-responses use **stoneward_vp3_music_v1**. Acceptance pins
+responses use **stoneward_vp3_music_v1**. The original v1.3.332 acceptance pinned
 [software@41603520b24c](https://github.com/davemt74-lang/software/tree/41603520b24c3ac6146dca5cb7310d04a8a3de9e).
 [ML2B's implemented contract](https://github.com/davemt74-lang/software/blob/41603520b24c3ac6146dca5cb7310d04a8a3de9e/docs/music-listening/ML2B-IMPLEMENTATION.md)
 owns provider authority, timing, media and receipt semantics.
+
+Version 1.3.333 adds the bounded public-page profile used by VP3's ML3 reporting.
+Its paired workflow pins the published extended provider; a separate HTTP run
+retains compatibility with the original provider above. The release PR records
+the exact source pair and deployment ZIPs. No wire-protocol version changes.
 
 Normal Admin Catalog and Music & Media navigation expose **Import Music from
 VP3**. The artist registers this site in VP3, saves the verification JSON and scoped
@@ -125,10 +130,19 @@ and sandbox network policy are not broadened.
 ## Attribution and phase boundaries
 
 Only actual recognized public HTTPS page paths are sent, without query/fragment
-data. Private and unsupported paths are omitted before transport. Under the pinned
-provider profile, /track/{id}, /release/{id} and /stonefellow-v120.php are omitted.
-Those plays retain registered-site and recording attribution with unavailable
-page context. No invented /music source is substituted.
+data. Private and unsupported paths are omitted before transport. Version 1.3.333
+adds the actual public /track/{id}, /release/{id} and /stonefellow-v120.php routes.
+Track/release IDs use the Apache router's bounded alphabet, with at most 160
+letters, digits, underscores or hyphens. Raw paths are checked before browser URL
+normalization so traversal, encoded separators, controls and backslashes cannot
+become an accepted public route. Browser attribution stays on the actual page origin.
+
+The extended provider advertises public_music_pages_v2. An older provider still
+accepts the playback request but retains registered-site and recording attribution
+with unavailable page context for these new forms. Either deployment order is
+compatible. A provider update preserves exact pending begin receipts that used the
+old omitted-page projection, without changing their historical source. No invented
+/music source is substituted.
 
 Site origin is verified; retained page context is client-reported. This is not
 proof of a unique person, human attention, paid entitlement or royalty obligation.
