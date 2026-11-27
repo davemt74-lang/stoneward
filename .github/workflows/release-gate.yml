@@ -751,7 +751,9 @@ jobs:
           mkdir -p dist/deploy
           git archive HEAD | tar -x -C dist/deploy
           rm -rf dist/deploy/.github dist/deploy/tests dist/deploy/storage dist/deploy/uploads dist/deploy/data dist/deploy/speech-gateway
-          rm -f dist/deploy/config/store.php dist/deploy/config/database.php dist/deploy/config/secrets.php dist/deploy/.env dist/deploy/.env.local
+          rm -f dist/deploy/config/store.php dist/deploy/config/database.php dist/deploy/config/secrets.php dist/deploy/config/app-secret.php dist/deploy/.env dist/deploy/.env.local dist/deploy/assets/js/catalog.js
+          test ! -e dist/deploy/config/app-secret.php
+          test ! -e dist/deploy/assets/js/catalog.js
           test -s dist/deploy/config/store.default.php
           # These root documents are historical snapshots from older releases.
           # Replace the misleading v1.3.2 manifest with the actual source commit.

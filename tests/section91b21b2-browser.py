@@ -6,6 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('media_http',ROOT/'tests/section91b21b2-media-http.py');http=importlib.util.module_from_spec(spec);spec.loader.exec_module(http)
 app=(ROOT/'assets/js/app.js').read_text()
 functions=app[app.index('  function playbackEndedEarly(){'):app.index('  async function stepTrack(')]
+source_helpers=app[app.index('  const hasPlayableAudio='):app.index('  let playbackWantsAudio=')]
 handlers=app[app.index("  audio.addEventListener('loadedmetadata',"):app.index("  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&chatPopup")]
 setup="""
 const audio=document.querySelector('audio'),playerCurrent=document.createElement('span'),playerDuration=document.createElement('span'),playerSeek=document.createElement('input');
@@ -22,7 +23,7 @@ window.receipts=[];window.playPositions=[];audio.addEventListener('play',()=>win
 with tempfile.TemporaryDirectory(prefix='sf-mobile-browser-') as directory:
  base=Path(directory);http.make_fixture(base)
  subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','sine=frequency=220:sample_rate=44100','-t','240','-ac','1','-b:a','64k',str(base/'storage/media/song.mp3')],check=True)
- html='<meta name="viewport" content="width=device-width, initial-scale=1"><title>Playback regression fixture</title><section><p></p><audio preload="metadata"></audio><button id="start">Play test song</button></section><script>'+(ROOT/'assets/js/player-playback-lifecycle.js').read_text()+setup+functions+handlers+"document.querySelector('button').onclick=()=>play(track);</script>"
+ html='<meta name="viewport" content="width=device-width, initial-scale=1"><title>Playback regression fixture</title><section><p></p><audio preload="metadata"></audio><button id="start">Play test song</button></section><script>'+(ROOT/'assets/js/player-playback-lifecycle.js').read_text()+(ROOT/'assets/js/vp3-music-player.js').read_text()+setup+source_helpers+functions+handlers+"document.querySelector('button').onclick=()=>play(track);</script>"
  (base/'index.html').write_text(html)
  with sync_playwright() as pw:
   executable=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium')

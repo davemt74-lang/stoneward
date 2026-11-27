@@ -7,7 +7,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {musicIntegrationFixture, artistOrigin, providerOrigin, protocol} from './vp3-music-fixture.mjs';
+import {musicIntegrationFixture, artistOrigin, providerOrigin, createRegistration, verifyActualProof} from './vp3-music-fixture.mjs';
+export {createRegistration, verifyActualProof} from './vp3-music-fixture.mjs';
 
 const endpoint = '/admin/api/vp3-music.php';
 const uuid = () => crypto.randomUUID();
@@ -44,32 +45,6 @@ export function httpClient(fixture) {
     return result;
   }
   return {request, login};
-}
-
-export function createRegistration(fixture, origin = artistOrigin) {
-  const credential = 'vmp1_' + crypto.randomBytes(32).toString('hex');
-  const created = fixture.provider.ownerService({action: 'site.create', workspace_id: 1,
-    request_id: uuid(), origin, label: 'Stoneward integration acceptance', environment: 'production', credential});
-  assert.equal(created.ok, true);
-  return {credential, created, site: created.site};
-}
-
-export async function verifyActualProof(fixture, registration) {
-  const response = await fetch(fixture.base + '/api/vp3-music-site.php');
-  assert.equal(response.status, 200, 'Actual fixed Stoneward proof endpoint responds');
-  const proof = await response.json();
-  assert.deepEqual(proof, registration.site.verification.response,
-    'Actual public proof is exactly the registered VP3 challenge');
-  // The only substitution is the network fetch boundary: the actual fetched
-  // Stoneward bytes enter VP3's production owner action/challenge comparison.
-  const verified = JSON.parse(fixture.provider.run(
-    '$site=json_decode($argv[2],true,512,JSON_THROW_ON_ERROR);$proof=json_decode($argv[3],true,512,JSON_THROW_ON_ERROR);' +
-    '$input=["protocol"=>"vp3_music_provider_v1","action"=>"site.verify","workspace_id"=>$site["workspace_id"],"site_id"=>$site["site_id"],"expected_revision"=>$site["revision"],"request_id"=>$argv[4]];' +
-    'echo json_encode(music_provider_v1_owner_action(db(),current_user(),$input,["verify_request"=>static fn()=>$proof]),JSON_THROW_ON_ERROR);',
-    JSON.stringify(registration.site), JSON.stringify(proof), uuid()));
-  assert.equal(verified.ok, true); assert.equal(verified.site.status, 'active');
-  registration.site = verified.site;
-  return verified;
 }
 
 export function importInput(catalog, recordingIds) {

@@ -10,8 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
-import {musicIntegrationFixture, artistOrigin, providerOrigin, repository} from './vp3-music-fixture.mjs';
-import {createRegistration, verifyActualProof} from './vp3-music-integration.mjs';
+import {musicIntegrationFixture, artistOrigin, providerOrigin, repository, createRegistration, verifyActualProof} from './vp3-music-fixture.mjs';
 
 const engine = process.env.SF_AUDIO_BROWSER || 'chromium';
 assert.ok(['chromium', 'webkit'].includes(engine), 'SF_AUDIO_BROWSER must be chromium or webkit');
